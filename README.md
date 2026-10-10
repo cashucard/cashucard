@@ -11,7 +11,10 @@ What differs from upstream:
 - A spend takes no message from the reader: the card builds the slot's secret
   and signs its hash. `SIGN_ARBITRARY` is gone, and `AUTH` proves the card is
   the card.
-- Nothing is loaded onto a card with no PIN, or no owner.
+- Nothing is loaded onto a card with no owner, or onto one with no PIN but by
+  the owner's grant. The PIN is optional (1.16): a card set up with none pays
+  without one, and a card with one has a no-PIN allowance, what it will sign for
+  in a day without the PIN; over it, the PIN is asked for the whole payment.
 - The card has an owner, a P-256 public key worked out on the holder's phone
   from its seed. Only that phone can change the PIN, unblock the card, set the
   limit or add funds with no PIN.

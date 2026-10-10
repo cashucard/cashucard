@@ -19,8 +19,9 @@ tested.
 
 **Which version this describes.** The note was written when the applet was at
 version 1.1, and most of its tables still say so (29 bytes of `GET_INFO`, 64
-slots, a `SPEND` of one slot). The clock has been brought up to software 1.15:
-the rows and sentences that name it say what the card does now. For the rest,
+slots, a `SPEND` of one slot). The clock has been brought up to software 1.15,
+and the PIN made optional in 1.16: the rows and sentences that name them say what
+the card does now. For the rest,
 `docs/FOXY-CARD-SPEC.md` and `docs/FOXY-CARD-DAILY-LIMIT.md` are what is built.
 
 ## 1. What we would like you to look at
@@ -122,21 +123,21 @@ Class `B0` as yours. AID: package `F0 46 4F 58 59 43 41 52 44`, applet the same 
 
 | Command | Yours | Ours |
 |---|---|---|
-| `01` GET_INFO | 8 bytes | 29: adds format, tries left, locked, has-record, the daily limit, has-owner, then the day (`now`, window start, spent today) |
+| `01` GET_INFO | 8 bytes | 29: adds format, tries left, locked, has-record, the daily limit, has-owner, then the day (`now`, window start, spent today). With P1 = 1, 42: the limit on one payment (owner's grant only), the no-PIN allowance and what is counted against it (anyone; 1.16) |
 | `13` GET_PROOF | 78-byte slot | 82: adds a 4-byte date |
 | `15` AUTH | none | reader sends 16 random bytes; card answers 16 of its own and a BIP-340 signature. No PIN |
 | `16` GET_CARD | none | the card record, with the daily limit and, where a time key was up to 1.14, the hardest difficulty and the hash of the newest block header the card has taken |
-| `20` SPEND | slot + 32-byte message | slot only. With a limit set, refused (`6A8F`) for a piece that would take today past it; otherwise adds the piece's whole amount to what is spent today in the transaction that marks the slot spent |
+| `20` SPEND | slot + 32-byte message | slot only. With a limit set, refused (`6A8F`) for a piece that would take today past it; otherwise adds the piece's whole amount to what is spent today in the transaction that marks the slot spent. (Since format 4 a payment is `22`, `23`, `26` and `24`, one signature; from 1.16 the PIN is asked at `24`, and a card with a PIN signs up to its no-PIN allowance a day without it, a card with none always signs: `6A94` asks for the PIN) |
 | `21` SIGN_ARBITRARY | signs anything | removed (`6D00`) |
 | `30` LOAD_PROOF | 77 bytes | 81, with the date; needs an owner on the card, a card record, and a PIN set and verified or the owner's `ALLOW_LOAD` for the tap. It asks nothing of the clock. Never touches the limit |
 | `31` CLEAR_SPENT | the PIN if one is set | the PIN if one is set, or the owner's `ALLOW_LOAD` for the tap |
 | `32` SET_CARD | none | writes the record (unit, refund key, mint; sixty-five bytes where a time key was are sent and not read); a PIN on a card with no owner, the owner's proof on a card with one; refused while the card holds unspent pieces. Never touches the limit or the clock |
 | `33` SET_LIMIT, PIN form | none | the daily limit (4 bytes, big-endian; 0 is none), by the PIN, on a card with no owner and nothing unspent only. (`33` was once a limit on one PIN entry, removed; this is not that) |
-| `34` SET_LIMIT, owner's form | none | proof length, proof, then the limit. The owner's proof, no PIN, any funds |
+| `34` SET_LIMIT, owner's form | none | proof length, proof, then the limit (4 bytes; 8 add the limit on one payment; 12, from 1.16, add the no-PIN allowance, which a card with no PIN refuses, `6985`). The owner's proof, no PIN, any funds |
 | `35` SET_TIME | none | gone in 1.15 (`6D00`). It took a time under an ECDSA signature by a time key in the record |
 | `36` SET_HEADER | none | a Bitcoin block header, 80 bytes. No key, no PIN, no owner. The card hashes it twice with SHA-256 and the hash must be at or under the target its own `bits` name, at or under a floor built into the applet, and, once the card has taken a header, at or under four times the target of the hardest taken (`6A93` otherwise; `6A80` for `bits` no header could carry). A header with a later time moves the card's clock forward; answers its `now` |
 | `37` TELL_TIME | none | the terminal's own clock, 4 bytes. A note for the receipts and the log, trusted for nothing |
-| `41` SET_PIN | the PIN, once (`6985` if one exists) | sets or replaces the PIN, and unblocks, on a card with no owner and nothing unspent only. A card with an owner refuses it (`6A91`) |
+| `41` SET_PIN | the PIN, once (`6985` if one exists) | sets or replaces the PIN, and unblocks, on a card with no owner and nothing unspent only. A card with an owner refuses it (`6A91`), unless it has no PIN and the owner's grant is in the tap (ADD PIN, 1.16) |
 | `42` CHANGE_PIN | old PIN length, old PIN, new PIN | proof length, proof, new PIN. The owner's proof; no old PIN, no session, any PIN state, any funds. Resets the tries |
 | `43` SET_OWNER | none | the owner's public key, 65 bytes uncompressed. On a card with no owner while it is empty, with no proof; on a card with an owner, only with the old owner's proof and only while it is empty (`6A8D` otherwise, `6A91` without a good proof) |
 | `44` GET_NONCE | none | no data; answers a fresh 16 bytes held in RAM. No PIN; `6A90` on a card with no owner |
@@ -146,8 +147,9 @@ Class `B0` as yours. AID: package `F0 46 4F 58 59 43 41 52 44`, applet the same 
 New status words: `6A8F` over the day's limit (was "over the limit"), `6A90`
 no owner, `6A91` the owner's proof is missing or wrong, or the command is not
 open to a card with an owner, `6A93` a `SET_HEADER` whose work is not enough,
-`6A94` a `LOAD_PROOF` of a piece whose nonce is already in a slot, spent or not.
-(`6A92` was "never told the time", and is unused since 1.15.)
+`6A94` a `LOAD_PROOF` of a piece whose nonce is already in a slot, spent or not,
+and (1.16) a signature refused for want of the PIN. (`6A92` was "never told the
+time", and is unused since 1.15.)
 
 64 slots of 82 bytes (yours: 32 of 78). The card record is unit, the daily
 limit, a 33-byte refund key, 65 bytes that hold the hardest difficulty and the
@@ -155,7 +157,7 @@ newest hash of a block header taken (a time key up to 1.14), the clock and the
 day, and the mint's address (up to 80 bytes). Apart from it the card keeps a
 65-byte owner public key, which nothing reads out. The applet's version was 1.1
 (`SELECT` answers `01 01`) and the format byte 3 when this was written; they are
-1.15 (`01 0F`) and 4 now.
+1.16 (`01 10`) and 4 now.
 
 **The owner and its proof.** The holder's phone works the owner's private key out
 for each card as HMAC-SHA256 with the 64-byte BIP-39 seed as the key, over
@@ -170,7 +172,7 @@ end the PIN session.
 | Command | Label (ASCII) | Value |
 |---|---|---|
 | `CHANGE_PIN` | `FoxyCard/change-pin` | the new PIN's bytes |
-| `SET_LIMIT` (`34`) | `FoxyCard/set-limit` | the new limit, 4 bytes, big-endian |
+| `SET_LIMIT` (`34`) | `FoxyCard/set-limit` | the new limit, 4 bytes, big-endian (8 or 12 from 1.5 and 1.16: the limit on one payment, then the no-PIN allowance) |
 | `SET_OWNER` (on a card with an owner) | `FoxyCard/set-owner` | the new owner key, 65 bytes |
 | `SET_CARD` (on a card with an owner) | `FoxyCard/set-card` | the data sent |
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |

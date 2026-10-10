@@ -99,6 +99,17 @@ The gate does not cover a card with **no PIN**. Cards ship without one, and
 until one is set a reader in range can drain the card. Setting a PIN is the
 holder's first job.
 
+**Software 1.16 moved the gate, and made the PIN optional.** In the Foxy fork a
+spend is asked its PIN at the signature (`SPEND_ALL_SIGN`), not when it is begun,
+because what leaves the card is only known there. A card with a PIN signs without
+it only up to the no-PIN allowance the owner has set (a day's worth, counted in
+the daily limit's window), and answers `6A94` over it, for the whole payment; a
+blocked card has no allowance, and the answer is the same. A card with no PIN
+signs, under its daily limit and its limit on one payment, and is cash to whoever
+holds it. Neither writes anything but a signature: the PIN is asked before the
+limits, so a reader with no PIN cannot fill the card's log.
+`FOXY-CARD-DAILY-LIMIT.md` 6f has the whole.
+
 **The blocked state had its own bug (ENG-615).** Every build before applet 0.3
 gated on `pinState == 1`, and a blocked card has `pinState == 2`, so three
 wrong PINs *removed* the gate: the card reported itself blocked and spent

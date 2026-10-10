@@ -25,11 +25,21 @@ Rules the screens keep to:
 - **The word is daily limit.** The screens call what the card keeps the daily
   limit, and its row CHANGE LIMIT. The card's screen shows it, what is left of
   it today and when the day turns.
+- **The PIN is optional (software 1.16).** A card may be set up with no PIN, and
+  then it pays without one. A card that has a PIN has a third figure beside the
+  daily limit, the NO PIN LIMIT: how much it will pay in a day without the PIN
+  being typed. Over it the till asks for the PIN, for the whole payment. A card
+  with no PIN has no such figure, and no screen mentions one. A card of software
+  before 1.16 always asks for its PIN, and keeps today's flow (A2 first).
 
 ## A. Paying by card (the receiver's phone)
 
 ### A1. Receive invoice screen (the app's own)
 - A **CARD** button beside TAP.
+- On a card of software 1.16 the button goes straight to the sheet and the tap,
+  with no PIN pad first (A3): the card says whether it needs the PIN. A card of
+  an earlier software goes to A2 first, because it always asks for the PIN and a
+  tap before it would be wasted.
 
 ### A2. Card PIN
 The payer types their card's PIN on the receiver's phone.
@@ -37,9 +47,19 @@ The payer types their card's PIN on the receiver's phone.
 - Title `CARD PIN`; under it `To pay $0.43 (₿500). The card's owner types its PIN here.`
 - PIN dots, 4 to 8; the key pad
 - After a wrong PIN, a red line: `Wrong PIN. 2 tries left.`
+- (1.16) Also the pad that follows a tap which found the card needs the PIN, with
+  TAP AGAIN where the PAY button is
 - The button: `PAY $0.43`, grey until four digits are in
 
 ### A3. Tapping (behind Apple's sheet, and after it)
+On a card of software 1.16 the tap comes first. The card is read; if it has no
+PIN, or the amount is within its no-PIN allowance (what is left of it today), the
+payment goes in that tap, and the PIN is never asked. Otherwise the sheet ends
+saying `Enter the card's PIN`, the PIN pad of A2 comes up, and TAP AGAIN pays with
+the PIN, sealed as ever. The card's own answer is the truth (`6A94` at the
+signature, which closes the sheet the same way), and what the phone read first only
+saves a signature that would be refused. Nothing was taken either way.
+
 One screen, with the amount on it throughout:
 - `HOLD THE CARD TO THE TOP OF THE PHONE` (CANCEL only here)
 - `READING THE CARD`
@@ -68,7 +88,8 @@ Each is one of the app's cards: a title, a line or two, one or two buttons.
 | A DIFFERENT MINT | the card's mint and this phone's |
 | NO CHANGE WHILE OFFLINE | this phone has no connection and cannot give change, and the card does not hold pieces that make exactly the price. Said before the PIN is sent; nothing was taken |
 | TAKEN ON TRUST | this phone has no connection, so the mint was not asked: the card's pieces are kept and swapped in when it is online. Not paid until then. Asked first, with the HIGH RISK card (YOU ARE OFFLINE), CONTINUE or REJECT, before the PIN |
-| NO MONEY ON THIS CARD | a card with no PIN, or nothing loaded |
+| ENTER THE CARD'S PIN | (1.16) the card has a PIN and the amount is over its no-PIN allowance, by what the phone read or by the card's own `6A94`. The PIN pad of A2 follows; TAP AGAIN pays. Nothing was taken |
+| NO MONEY ON THIS CARD | nothing loaded (a card with no PIN, 1.16, may be loaded and pays without one) |
 | NOT A FOXY CARD | it could not be read, or is another kind |
 | NO CARD READER | this phone, or this build, cannot read cards |
 | THE CARD LEFT TOO SOON | nothing was paid; what the card signed for goes back on it |
@@ -101,15 +122,19 @@ Home's layout, so the two read as one design:
   Tapping the balance opens this card's history.
 - **The daily limit**, under the balance: `DAILY LIMIT` and its amount, or
   `NO LIMIT`; with a limit, `LEFT TODAY` and its amount, and `THE DAY TURNS
-  AT` a time. Dollars first, as the balance is.
+  AT` a time. Dollars first, as the balance is. (1.16) On a card that has a PIN
+  and a no-PIN limit, the limit line gains it: `NO PIN UP TO $10`, with what is
+  left of it today.
 - A line in the warning colour when money is waiting to go onto a card
   (`₿500 is waiting to go onto this card. Press here, then tap it.`).
 - **ADD FUNDS** and **WITHDRAW** where home has RECEIVE and SEND;
-  **CHANGE PIN** and **CHANGE LIMIT** where it has SCAN and PASTE.
+  **CHANGE PIN** and **CHANGE LIMIT** where it has SCAN and PASTE. On a card with
+  no PIN (1.16) CHANGE PIN reads **ADD PIN** (B6).
 - The connection's banner at the foot, as on home.
 
 A new card has, in place of the pill and the buttons, one line (`This card is
-new. Give it a PIN to put money on it.`) and **SET UP THIS CARD**. A blocked
+new. Give it a PIN to put money on it.`; since 1.16 the PIN may be left out, B3)
+and **SET UP THIS CARD**. A blocked
 card has the pill and a red line. On its owner's phone the line says that this
 phone can unblock the card by giving it a new PIN, and there is one button,
 **UNBLOCK**, which is CHANGE PIN (B6); on any other phone the line says that
@@ -120,7 +145,11 @@ on this screen.
 
 ### B3. Setting up a new card
 - `CHOOSE A PIN` (`Four to eight digits. The card asks for it every time it
-  pays.`), then `TYPE IT AGAIN`; NEXT under each
+  pays.`), then `TYPE IT AGAIN`; NEXT under each. (1.16) Under the pad on
+  CHOOSE A PIN, a second button, **NO PIN**: the card is set up with none, and the
+  next step is the tap, as it is with a PIN. The warning that a card with no PIN
+  is cash to whoever holds it is not here; it is said where a PIN is offered
+  later (B6, ADD PIN)
 - The notice, titled `SET UP THIS CARD`: `This phone can reset this card's PIN
   and limit. Whoever holds the card and this phone's seed phrase holds its
   money.` with the buttons CONTINUE and CANCEL. It is the one place that says
@@ -128,9 +157,9 @@ on this screen.
   own, the owner is the friend's phone that sets the card up
 - No limit is asked for and none is suggested: a new card has none. A limit is
   set later from CHANGE LIMIT (B7)
-- A tap, which writes the card's PIN, its record and, last, its owner key. The
-  owner goes in last so that no step needs a proof: a set-up cut off anywhere is
-  finished by the next set-up tap
+- A tap, which writes the card's PIN (none, with NO PIN), its record and, last, its
+  owner key. The owner goes in last so that no step needs a proof: a set-up cut
+  off anywhere is finished by the next set-up tap
 - `THE CARD IS READY`: that it is cash, that whoever has the card and its PIN
   has the money, and that if the card is lost the money on it is gone. ADD
   FUNDS, LATER
@@ -168,6 +197,11 @@ on this screen.
   words. Renewing and taking everything off a card work the same way.
 
 ### B6. Change PIN, and unblock
+- On a card with no PIN (1.16) the row reads **ADD PIN**. Its first screen says,
+  in one line, that a card with no PIN is cash to whoever holds it. Then
+  `CHOOSE A PIN` and `TYPE IT AGAIN`, and one tap: the owner's grant, then the PIN,
+  sealed. The toast: `PIN added. Every payment asks for it until you set a no-PIN
+  limit.` The card's no-PIN limit is nothing until then (B7a)
 - Two pads in turn: `NEW PIN`, then `NEW PIN AGAIN`; a tap. No old PIN is asked:
   the owner's phone does not know it, and the card takes the owner's proof in
   its place
@@ -213,6 +247,24 @@ the limit than that. If the seed phrase is lost, the PIN and the limit can never
 be changed, and a blocked card can never be unblocked. A phone that does not hold
 the card's seed phrase cannot change the limit, and says so.
 
+### B7a. No PIN limit (1.16)
+Shown in CHANGE LIMIT, as a third button, **NO PIN LIMIT**, in the pill style of
+DAILY LIMIT, and only on a card that has a PIN. Its three steps are the daily
+limit's:
+
+1. **A warning**: what it is. `Your card pays up to this much a day without the PIN
+   being typed. Over it, the PIN is asked for the whole payment. Only payments
+   made without the PIN count.`
+2. **The app's SET AMOUNT screen**, dollars first, with **NO LIMIT** under NEXT,
+   which is 0: every payment asks for the PIN.
+3. **A confirmation**, then a tap, which writes the three limits to the card with
+   the owner's proof (the daily limit and the limit on one payment as they were).
+   No PIN is asked.
+
+The card's screen shows it in its limit line (B2). A card that has no PIN has no
+such button. The dollars are re-pegged by the owner's phone, as the daily limit's
+are, when the price moves.
+
 ### B8. A card's history
 - The app's HISTORY screen, titled `CARD HISTORY`, with only the entries that
   name this card: money put on it, money taken off it, and payments taken
@@ -220,6 +272,8 @@ the card's seed phrase cannot change the limit, and says so.
   left off, and there is no button to clear it.
 - A card keeps no list of its own. What it paid at somebody else's phone is
   not here.
+- (1.16) The log screen, which reads the card's own account, says `no PIN` beside
+  a tap in which a payment was made without the PIN, under the no-PIN limit.
 
 ### B9. Moving a card to another mint (built, with no button for now)
 - The app's list of mints, titled `TO WHICH MINT?`, without the card's own

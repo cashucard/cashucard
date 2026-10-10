@@ -19,7 +19,7 @@ import javacardx.crypto.*;
  * AID: F0 46 4F 58 59 43 41 52 44   ("FOXYCARD" after a proprietary F0)
  *
  * Command set:
- *   0x01  GET_INFO         — version, format, slot stats, PIN state, tries, limit, owner, the day; with P1 = 1, the tap as well
+ *   0x01  GET_INFO         — version, format, slot stats, PIN state, tries, limit, owner, the day; with P1 = 1, the tap limit (owner only) and the no-PIN allowance as well
  *   0x10  GET_PUBKEY       — 33-byte compressed secp256k1 card pubkey
  *   0x11  GET_BALANCE      — sum of unspent proof amounts (uint32)
  *   0x12  GET_PROOF_COUNT  — count of non-empty slots
@@ -33,18 +33,18 @@ import javacardx.crypto.*;
  *   0x22  SPEND_ALL_BEGIN  — the places a payment is made of, in order (one signature for all: NUT-11 SIG_ALL)
  *   0x23  SPEND_ALL_OUTPUTS — the swap's outputs, 37 bytes each, hashed into the message as they come
  *   0x26  SPEND_ALL_CHANGE — one change output the card makes for itself, locked to its own key; answers the blinded message
- *   0x24  SPEND_ALL_SIGN   — the one signature; every piece named is burned as it is given
+ *   0x24  SPEND_ALL_SIGN   — the one signature; every piece named is burned as it is given; with a PIN set, the PIN or the no-PIN allowance (6A94)
  *   0x25  SPEND_ALL_AGAIN  — the last signature given, again, for an answer lost on the air
  *   0x30  LOAD_PROOF       — store new proof (an owner, a time, and a PIN or the owner's grant)
  *   0x31  CLEAR_SPENT      — free spent slots (PIN, or the owner's grant)
  *   0x32  SET_CARD         — write the card record (open card: PIN; owned card: the owner's proof; only with nothing unspent)
  *   0x33  SET_LIMIT        — the daily limit, by PIN: an open card only (no owner, nothing unspent)
- *   0x34  SET_LIMIT        — the daily limit, by the owner's proof; with eight bytes, the limit on one payment as well
+ *   0x34  SET_LIMIT        — the daily limit, by the owner's proof; with eight bytes, the limit on one payment as well; with twelve, the no-PIN allowance
  *   0x35  (was SET_TIME, a time under a key's signature: gone in 1.15, answers 6D00)
  *   0x36  SET_HEADER       — a Bitcoin block header: its proof of work moves the card's clock forward
  *   0x37  TELL_TIME        — the terminal's own clock, a note for receipts and the log, trusted for nothing
  *   0x40  VERIFY_PIN       — verify the PIN
- *   0x41  SET_PIN          — set or replace the PIN: an open card only (no owner, nothing unspent)
+ *   0x41  SET_PIN          — set or replace the PIN on an open card (no owner, nothing unspent); add one to a card with an owner that has none (the owner's grant)
  *   0x42  CHANGE_PIN       — the owner's proof and the new PIN: no old PIN, any state
  *   0x43  SET_OWNER        — give the card its owner key (an open card, or the old owner's proof; nothing unspent)
  *   0x44  GET_NONCE        — a fresh nonce for the owner's proof
@@ -59,8 +59,9 @@ import javacardx.crypto.*;
  *   - SIGN_ARBITRARY is gone. It signed anything and burned nothing. AUTH is
  *     what is left of "prove you are the card", over a tagged hash that no
  *     secret can hash to.
- *   - Nothing is loaded onto a card with no PIN, and nothing onto a card with
- *     no owner.
+ *   - Nothing is loaded onto a card with no PIN but by the owner's grant (or the
+ *     change of a payment it has just made), and nothing onto a card with no
+ *     owner. (Since 1.16 a card may have no PIN at all; it then pays without one.)
  *   - A piece is loaded once. A nonce that is in any slot, spent or not, is
  *     refused (6A94): the card signs the secret, which the nonce makes, and
  *     takes the amount on the terminal's word, so a copy with a smaller
@@ -132,7 +133,11 @@ public class CashuApplet extends Applet {
     // seconds over it, and two more for every further limit's worth (`waitsFor`). The work of making the
     // change counts toward it. And one payment a tap at full speed: a second one in the same time in the
     // field is slowed as one over the limit, unless the owner's grant is in the tap.
-    static final byte VERSION_MINOR = (byte) 0x0F;
+    // 1.16 makes the PIN optional. A card may have none, and then it pays without one (its limits still hold). A card
+    // with a PIN has a third limit, the NO-PIN ALLOWANCE: what it signs for in a day without the PIN, counted in the day's
+    // window beside the daily limit; over it the signature is refused with 6A94 and the PIN is asked for the whole payment.
+    // A PIN is added to a card that has an owner by the owner's grant (SET_PIN). The wire is otherwise 1.15's.
+    static final byte VERSION_MINOR = (byte) 0x10;
     static final byte FORMAT        = (byte) 0x04;
 
     // -------------------------------------------------------------------------
@@ -250,13 +255,15 @@ public class CashuApplet extends Applet {
     // wait, sats, big-endian; 0 is NO limit. It is not counted against a clock
     // and nothing is remembered of it from one payment to the next: a payment
     // is judged by its own size, and every limit's worth past the first costs
-    // signatures of the card's own work before it signs (6a, `waitsFor`). The
-    // two fields after it held a ten-second window and its count, when this
-    // was a limit a clock turned; they are kept as zeros, so the record and
-    // GET_INFO are the lengths they were.
+    // signatures of the card's own work before it signs (6a, `waitsFor`).
     static final short CARD_TAP_LIMIT_OFFSET  = (short) 197;
-    static final short CARD_TAP_WINDOW_OFFSET = (short) 201;
-    static final short CARD_TAP_SPENT_OFFSET  = (short) 205;
+    // The NO-PIN ALLOWANCE (1.16): what the card signs for in a day without the PIN, sats, big-endian, on a card that has
+    // a PIN; 0 is none, and then every payment needs the PIN. And what it has signed for with no PIN in the day's window
+    // (CARD_WINDOW_OFFSET, shared with the daily limit): it goes to 0 when the day turns. Only a payment signed with no
+    // PIN while a PIN was set counts. These eight bytes held a ten-second window and its count of the limit on one payment
+    // until 1.15 and were zeros since; GET_INFO P1 = 1 says them (34..37 and 38..41), to anyone.
+    static final short CARD_NOPIN_LIMIT_OFFSET = (short) 201;
+    static final short CARD_NOPIN_SPENT_OFFSET = (short) 205;
     /** The card's face: a code of three characters (capital letters and digits) naming its design, or zeros for none (1.10, docs/CARD-DESIGNS.md). */
     static final short CARD_DESIGN_OFFSET  = (short) 209;
     static final short CARD_DESIGN_LEN     = (short) 3;
@@ -342,10 +349,11 @@ public class CashuApplet extends Applet {
     static final short LOG_E_SATS           = (short) 4;   // sats signed for in it (4)
     static final short LOG_E_PIECES         = (short) 8;   // pieces signed (1, stops at 255)
     static final short LOG_E_REFUSED        = (short) 9;   // spends refused in it for being over a limit (1, stops at 255)
-    static final short LOG_E_FLAGS          = (short) 10;  // bit 0: the third refusal of a run, or one after it, was in this tap; bit 1: a payment in it waited (6a)
+    static final short LOG_E_FLAGS          = (short) 10;  // bit 0: the third refusal of a run, or one after it, was in this tap; bit 1: a payment in it waited (6a); bit 2: unused since 1.15; bit 3: a payment in it was signed with no PIN
     static final byte  LOG_FLAG_TAMPER      = (byte) 0x01;
     static final byte  LOG_FLAG_WAITED      = (byte) 0x02; // a payment in this tap was over the limit on one payment, and was waited for
     static final byte  LOG_FLAG_CLOCK       = (byte) 0x04; // set by software before 1.15, when a signed clock was moved on twice in one tap; never set since (the clock is block headers)
+    static final byte  LOG_FLAG_NOPIN       = (byte) 0x08; // 1.16: a payment in this tap was signed with no PIN, on a card that has one, under its no-PIN allowance
     static final short LOG_E_LOADS          = (short) 11;  // pieces put on in it (1, stops at 255)
     static final short LOG_E_LOADED         = (short) 12;  // sats put on in it (4)
     static final short LOG_E_TOLD           = (short) 16;  // the time the terminal told at the tap (TELL_TIME, 4; zeros if it told none): a note, trusted for nothing
@@ -407,6 +415,7 @@ public class CashuApplet extends Applet {
     // 0x6A92 was "never told the time": since 1.15 a card spends its first day on trust, and nothing answers it.
     static final short SW_LITTLE_WORK           = (short) 0x6A93; // SET_HEADER whose work is not enough: not its own difficulty's, under the floor, or under a quarter of the best seen
     static final short SW_PIECE_ON_CARD         = (short) 0x6A94; // LOAD_PROOF of a piece whose nonce is already in a slot, spent or not
+    static final short SW_PIN_NEEDED            = (short) 0x6A94; // SPEND_ALL_SIGN, a PIN set and not given, and the no-PIN allowance not enough: the PIN, for the whole payment (1.16; a different command from the load that answers the same word)
     // 6A95 was "over the limit on one tap", when that was refused; it is now waited for (6a) and the word is unused
     static final short SW_TOO_MANY              = (short) 0x6A96; // more pieces than one signature can burn at once
 
@@ -623,6 +632,7 @@ public class CashuApplet extends Applet {
     private static final byte[] DAY_SECONDS = { (byte) 0x00, (byte) 0x01, (byte) 0x51, (byte) 0x80 };
 
     private static final byte[] ONE = { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01 };
+    private static final byte[] ZERO = { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00 };
 
     /** What one limit's worth past the first costs a payment: this many signatures of work, about three seconds on the chip. */
     // The wait (6a), in signatures of the card's own work (about 0.6 s each on the chip, 0.7 over NFC):
@@ -756,6 +766,7 @@ public class CashuApplet extends Applet {
     //   108..111 a copy of a date, divided away; the end of a window, added up
     //   112..115 what the day would have signed for, with this piece
     //   116..119 what the tap would have signed for, with this piece
+    //   128..131 what the day's no-PIN allowance would have been signed for, with this payment (SPEND_ALL_SIGN)
     private static final short X_HEX   = (short) 0;
     private static final short X_MSG   = (short) 66;
     private static final short X_DEC   = (short) 98;
@@ -764,6 +775,8 @@ public class CashuApplet extends Applet {
     private static final short X_TAP   = (short) 116;
     // an output's text for the hash, in one piece: its amount in decimal, right-aligned in ten bytes, then its B_ in hex (66)
     private static final short X_OUT   = (short) 120;
+    // in the room SPEND_ALL_SIGN leaves free after the eight states of the openings (X_OUT .. X_OUT + 7)
+    private static final short X_NOPIN = (short) 128;
     private static final short X_LEN   = (short) 196;
     private byte[] scratch;
     /** The log (LOG_*). Permanent. */
@@ -1108,10 +1121,11 @@ public class CashuApplet extends Applet {
         Util.arrayCopyNonAtomic(cardRecord, CARD_SPENT_OFFSET, buf, (short) 25, (short) 4);
         // and whether this tap, being the one after a payment, may put pieces on with no PIN
         buf[29] = changeGrant[0];
-        /* P1 = 1 asks for the limit on one payment as well: the limit, and
-         * eight bytes that were a window and its count and are zeros. Asked for,
-         * and not simply appended, so that a reader that knows the thirty
-         * bytes and checks for them still gets thirty. */
+        /* P1 = 1 asks for the limit on one payment and the no-PIN allowance as
+         * well: the limit on one payment (30..33), the allowance (34..37) and
+         * what has been signed for with no PIN in the day's window (38..41).
+         * Asked for, and not simply appended, so that a reader that knows the
+         * thirty bytes and checks for them still gets thirty. */
         if (p1 == (byte) 1) {
             /* The limit on one payment is the holder's and is said to the
              * holder only: with the owner's grant given in this tap, and to
@@ -1126,8 +1140,12 @@ public class CashuApplet extends Applet {
             } else {
                 Util.arrayFillNonAtomic(buf, (short) 30, (short) 4, (byte) 0);
             }
-            Util.arrayCopyNonAtomic(cardRecord, CARD_TAP_WINDOW_OFFSET, buf, (short) 34, (short) 4);
-            Util.arrayCopyNonAtomic(cardRecord, CARD_TAP_SPENT_OFFSET, buf, (short) 38, (short) 4);
+            /* The allowance is said to anyone: a till needs it to know whether
+             * to ask for the PIN, and nothing is learned from it that trying
+             * would not tell. (Not the limit on one payment above: that one
+             * is waited for, and knowing it would be a way round the wait.) */
+            Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_LIMIT_OFFSET, buf, (short) 34, (short) 4);
+            Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_SPENT_OFFSET, buf, (short) 38, (short) 4);
             apdu.setOutgoingAndSend((short) 0, (short) 42);
             return;
         }
@@ -1401,7 +1419,7 @@ public class CashuApplet extends Applet {
     }
 
     // -------------------------------------------------------------------------
-    // Category 0x2x — Spend commands (PIN-gated when a PIN is set or blocked, D13)
+    // Category 0x2x — Spend commands (the PIN, or the no-PIN allowance, is asked at the signature when a PIN is set or blocked, D13 and 1.16)
     // -------------------------------------------------------------------------
 
     /*
@@ -1432,7 +1450,10 @@ public class CashuApplet extends Applet {
     /**
      * SPEND_ALL_BEGIN: one byte for each place to pay with, in order.
      *
-     * The PIN, as any spend. Every place named once, holding an unspent piece,
+     * No PIN is asked here (1.16): whether this payment may be signed for without
+     * one is for SPEND_ALL_SIGN to say, when what it takes from the card is
+     * known, and a payment begun is of no use to anyone until it is signed.
+     * Every place named once, holding an unspent piece,
      * and all of one date (pieces with different dates have different lock
      * conditions, and a mint takes no one signature for those: `6A80`). The
      * day's limit and the wait on one payment are held to what leaves the
@@ -1443,9 +1464,7 @@ public class CashuApplet extends Applet {
      * (4, big-endian).
      */
     private void processSpendAllBegin(APDU apdu) {
-        // D13: gate FIRST — a wrong or missing PIN throws before anything is looked at.
         // A LOCKED card still spends (lock disables writes, not the bearer's ability to pay).
-        requirePinIfSet();
         short n = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
         if (n < (short) 1) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
@@ -1478,6 +1497,10 @@ public class CashuApplet extends Applet {
         }
         // a sum that wraps is past any limit, and past what four bytes can say: not a payment
         if (carry != 0) Util.arrayFillNonAtomic(allSum, (short) 0, (short) 4, (byte) 0xFF);
+        /* And past any allowance: with a PIN set and not given it is the PIN's
+         * to ask for, and no refusal is written in the log for a reader that has
+         * not the PIN (the one refusal this command makes, below, is the log's). */
+        if (carry != 0 && needsAllowance()) ISOException.throwIt(SW_PIN_NEEDED);
         /* The day's limit and the wait (6a) are held to what leaves the card
          * for good: the pieces less the change the card makes for itself
          * (1.12), which is not known until SIGN, where both are worked out,
@@ -1855,10 +1878,18 @@ public class CashuApplet extends Applet {
      * the field first (`finishBurn`): the transaction is the same size for one
      * piece as for all 128. Should it fail all the same, nothing is burned and
      * the answer is `6A96`.
+     *
+     * The PIN (1.16), where one is set, is asked here and nowhere earlier: once
+     * what leaves the card is known, a payment is signed with the PIN given in
+     * this tap, or with no PIN within the day's allowance, or it is refused
+     * `6A94` and given up (`requireAllowanceOrPin`). A card with no PIN signs.
+     * The day's window is begun by the first payment when either the daily
+     * limit or the allowance is set, and when the day turns the day's count and
+     * the allowance's both go to nothing, in the transaction that commits the
+     * payment.
      */
     private void processSpendAllSign(APDU apdu) {
         if (allState[0] != (byte) 1) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-        requirePinIfSet();
         byte[] buf = apdu.getBuffer();
 
         /* The wait, where the payment is over the limit on one payment (6a).
@@ -1878,6 +1909,12 @@ public class CashuApplet extends Applet {
         subUint32(allNet, (short) 0, allChange, (short) 0);
         short waits = Util.getShort(allState, (short) 2);
         if (waits < 0) {
+            /* The PIN, where one is set (1.16): the PIN given in this tap, or
+             * the no-PIN allowance, which has to hold the whole of what leaves
+             * the card. Asked before the limits, so that a reader with no PIN
+             * writes nothing in the card's log: a refusal for being over a
+             * limit is the card's account of a terminal that was told better. */
+            requireAllowanceOrPin();
             // refused by the day (or for want of a time), the payment is gone, as it was when BEGIN asked
             try {
                 requireUnderLimits(allNet, (short) 0, (short) 0);
@@ -1910,10 +1947,22 @@ public class CashuApplet extends Applet {
         short n = (short)(allState[1] & 0xFF);
 
         /* The day's limit again, as it stands now: what the day would have
-         * signed for is left in scratch (X_SUM) for the commit. */
+         * signed for is left in scratch (X_SUM) for the commit. And the
+         * allowance: what the day's no-PIN spending would be is left in
+         * scratch (X_NOPIN). */
+        boolean noPin = requireAllowanceOrPin();
         requireUnderLimits(allNet, (short) 0, (short) 0);
         boolean limited = !isZero(cardRecord, CARD_LIMIT_OFFSET, (short) 4);
-        boolean newDay = limited && dayIsOver();
+        /* The day's window serves the daily limit and the allowance, and begins at
+         * the first payment when either is set. When the day turns, what it
+         * counted goes to nothing. */
+        boolean windowed = limited || !isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
+        boolean newDay = windowed && dayIsOver();
+        if (!noPin) {
+            // not counted against the allowance: its count is what it was, or nothing in a new day
+            if (newDay) Util.arrayFillNonAtomic(scratch, X_NOPIN, (short) 4, (byte) 0);
+            else Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_SPENT_OFFSET, scratch, X_NOPIN, (short) 4);
+        }
 
         shaAll.doFinal(buf, (short) 0, (short) 0, scratch, X_MSG);
         short sigLen = schnorrHW.sign(cardPrivKey, cardPubKey, scratch, X_MSG, buf, (short) 0);
@@ -1931,9 +1980,10 @@ public class CashuApplet extends Applet {
 
         try {
             JCSystem.beginTransaction();
-            if (limited) {
+            if (windowed) {
                 if (newDay) Util.arrayCopy(cardRecord, CARD_NOW_OFFSET, cardRecord, CARD_WINDOW_OFFSET, (short) 4);
-                Util.arrayCopy(scratch, X_SUM, cardRecord, CARD_SPENT_OFFSET, (short) 4);
+                if (limited) Util.arrayCopy(scratch, X_SUM, cardRecord, CARD_SPENT_OFFSET, (short) 4);
+                Util.arrayCopy(scratch, X_NOPIN, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
             }
             /* The payment itself: one byte, whatever the number of places.
              * From the moment this commits every place in the list is spent,
@@ -1951,9 +2001,12 @@ public class CashuApplet extends Applet {
             if (allState[6] != (byte) 0) Util.arrayCopy(scratch, X_OUT, openState, (short) 0, CHANGE_MOST);
             // a payment that was over the limit on one payment says so in the card's account of the tap
             if (allState[4] == (byte) 1) cardLog[(short)(entry + LOG_E_FLAGS)] |= LOG_FLAG_WAITED;
-            // and the signature itself, for the terminal whose answer is lost on the air (SPEND_ALL_AGAIN)
+            // and one that was signed with no PIN, on a card that has one
+            if (noPin) cardLog[(short)(entry + LOG_E_FLAGS)] |= LOG_FLAG_NOPIN;
+            /* and the signature itself, for the terminal whose answer is lost on the air (SPEND_ALL_AGAIN); a
+             * signature given with no PIN is marked 2, and is given again with no PIN */
             Util.arrayCopy(buf, (short) 0, lastSig, (short) 1, (short) 64);
-            lastSig[0] = (byte) 1;
+            lastSig[0] = noPin ? (byte) 2 : (byte) 1;
             JCSystem.commitTransaction();
         } catch (TransactionException e) {
             if (JCSystem.getTransactionDepth() != (byte) 0) JCSystem.abortTransaction();
@@ -2032,11 +2085,15 @@ public class CashuApplet extends Applet {
      * gives nothing away: the signature is good only for the pieces it burned
      * and the outputs it was made for, which are the asking terminal's own,
      * and a terminal that did not make that payment can do nothing with it.
-     * The PIN, as a spend. `6A88` on a card that has never signed.
+     * The PIN, as a spend was: where a PIN is set, it must have been given in
+     * this tap, unless the signature asked for is one that was given with no PIN
+     * (under the allowance, 1.16), which is given again with none, so that a till
+     * whose answer was lost need not ask for a PIN it did not need. `6A88` on a
+     * card that has never signed.
      */
     private void processSpendAllAgain(APDU apdu) {
-        requirePinIfSet();
-        if (lastSig[0] != (byte) 1) ISOException.throwIt(SW_SLOT_EMPTY);
+        if (lastSig[0] != (byte) 2) requirePinIfSet();
+        if (lastSig[0] == (byte) 0) ISOException.throwIt(SW_SLOT_EMPTY);
         byte[] buf = apdu.getBuffer();
         Util.arrayCopyNonAtomic(lastSig, (short) 1, buf, (short) 0, (short) 64);
         apdu.setOutgoingAndSend((short) 0, (short) 64);
@@ -2394,8 +2451,10 @@ public class CashuApplet extends Applet {
 
     private void processClearSpent(APDU apdu) {
         requireNotLocked();
-        // the PIN, or the owner's grant for this tap, or the tap after a payment
-        if (pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1 && loadGrant[0] != (byte) 1 && changeGrant[0] != (byte) 1) {
+        /* the PIN, or the owner's grant for this tap, or the tap after a payment; a card with no PIN
+         * and no owner is being set up and answers anyone, but one with an owner (1.16) wants the grant */
+        boolean granted = loadGrant[0] == (byte) 1 || changeGrant[0] == (byte) 1;
+        if (pinState[0] != (byte) 0 ? (pinVerifiedFlag[0] != (byte) 1 && !granted) : (ownerSet[0] == (byte) 1 && !granted)) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
@@ -2429,7 +2488,8 @@ public class CashuApplet extends Applet {
      * either under pieces already loaded would leave them unspendable or
      * unfindable.
      *
-     * Who may: on a card with NO owner, a verified PIN; on a card WITH an
+     * Who may: on a card with NO owner, a verified PIN (or any reader, where
+     * the card has no PIN at all: it is open while it is being set up); on a card WITH an
      * owner, the owner's proof over everything sent, whether or not the card
      * is empty (a terminal that holds the PIN can make a card empty, and must
      * not be able to set its own record then). The proof replaces the PIN: the
@@ -2443,7 +2503,8 @@ public class CashuApplet extends Applet {
     private void processSetCard(APDU apdu) {
         requireNotLocked();
         boolean owned = ownerSet[0] == (byte) 1;
-        if (!owned) requirePinSetAndVerified();
+        // an open card: the PIN, if it has one (a card may have none, 1.16: set up with no PIN, it is written by whoever holds it)
+        if (!owned) requirePinIfSet();
         short dataLen = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
         short at = ISO7816.OFFSET_CDATA;
@@ -2522,6 +2583,11 @@ public class CashuApplet extends Applet {
      * No PIN, and any funds: the owner's phone does not know the PIN, and sets
      * or removes the limit on a funded card. A proof for one number is no proof
      * for another, and a proof once used is no proof.
+     *
+     * The limit is 4 bytes (the day's), 8 (the day's and the limit on one
+     * payment) or, since 1.16, 12 (those two and the no-PIN allowance). A card
+     * with no PIN has no allowance to set: a 12-byte form with a number in the
+     * allowance is refused (`6985`), and one with a zero in it is the 8-byte form.
      */
     private void processSetLimitOwner(APDU apdu) {
         requireNotLocked();
@@ -2530,7 +2596,11 @@ public class CashuApplet extends Applet {
         byte[] buf = apdu.getBuffer();
         short at = requireOwnerProof(LABEL_SET_LIMIT, buf, dataLen);
         short len = (short)(ISO7816.OFFSET_CDATA + dataLen - at);
-        if (len != (short) 4 && len != (short) 8) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        if (len != (short) 4 && len != (short) 8 && len != (short) 12) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        // no allowance without a PIN: there is nothing for it to stand in front of
+        if (len == (short) 12 && pinState[0] == (byte) 0 && !isZero(buf, (short)(at + 8), (short) 4)) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
         writeLimit(buf, at, len);
     }
 
@@ -2541,29 +2611,42 @@ public class CashuApplet extends Applet {
      * One transaction: the limit and its window are all new or all old.
      */
     /*
-     * `len` is 4 or 8. Four bytes are the day's limit, as they always were,
-     * and the limit on one payment is left as it is. Eight are both: the
-     * day's, then that one. In that form a day's limit whose number is not
+     * `len` is 4, 8 or 12. Four bytes are the day's limit, as they always were,
+     * and the limit on one payment and the allowance are left as they are.
+     * Eight are the day's, then the limit on one payment; twelve add the
+     * no-PIN allowance. In those forms a day's limit whose number is not
      * changed keeps its window and what was signed for in it, so that setting
-     * the other does not begin the day again; a day's number that changes
-     * begins its window at `now` with nothing spent, as the four-byte form
-     * always does. The limit on one payment has no window to begin.
+     * the others does not begin the day again; a day's number that changes
+     * begins its window at `now` with nothing spent (the allowance's count
+     * too: the window is theirs both), as the four-byte form always does. An
+     * allowance whose number is not changed keeps its count; a new number
+     * counts from nothing in the window as it stands. The limit on one
+     * payment has no window to begin.
      */
     private void writeLimit(byte[] src, short at, short len) {
-        boolean both = len == (short) 8;
+        boolean both = len >= (short) 8;
+        boolean three = len == (short) 12;
         /* A day's limit set before the card has seen a block header begins a
          * window with no start (now = 0): the first header anchors it. Until
          * then the card spends its first day on trust (`requireUnderLimits`). */
         boolean dayChanged = !both || !sameBytes(src, at, cardRecord, CARD_LIMIT_OFFSET, (short) 4);
         boolean tapChanged = both && !sameBytes(src, (short)(at + 4), cardRecord, CARD_TAP_LIMIT_OFFSET, (short) 4);
+        boolean allowanceChanged = three && !sameBytes(src, (short)(at + 8), cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
         JCSystem.beginTransaction();
         if (dayChanged) {
             Util.arrayCopy(src, at, cardRecord, CARD_LIMIT_OFFSET, (short) 4);
             Util.arrayCopy(cardRecord, CARD_NOW_OFFSET, cardRecord, CARD_WINDOW_OFFSET, (short) 4);
-            Util.arrayFillNonAtomic(cardRecord, CARD_SPENT_OFFSET, (short) 4, (byte) 0);
+            Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_SPENT_OFFSET, (short) 4);
+            // the window is the allowance's as well, and begins again: what it counted goes with the old one
+            Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
         }
         if (tapChanged) {
             Util.arrayCopy(src, (short)(at + 4), cardRecord, CARD_TAP_LIMIT_OFFSET, (short) 4);
+        }
+        if (allowanceChanged) {
+            // a new number for the allowance counts from nothing, in the window it is in; the window itself is the day's, and stays
+            Util.arrayCopy(src, (short)(at + 8), cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
+            Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
         }
         JCSystem.commitTransaction();
     }
@@ -2628,8 +2711,9 @@ public class CashuApplet extends Applet {
             }
             JCSystem.beginTransaction();
             Util.arrayCopy(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET, (short) 4);
-            // a day's limit set before the card had seen a header: its window begins at this one
-            if (!isZero(cardRecord, CARD_LIMIT_OFFSET, (short) 4) && isZero(cardRecord, CARD_WINDOW_OFFSET, (short) 4)) {
+            // a day's limit, or an allowance, set before the card had seen a header: the window begins at this one
+            if ((!isZero(cardRecord, CARD_LIMIT_OFFSET, (short) 4) || !isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4))
+                && isZero(cardRecord, CARD_WINDOW_OFFSET, (short) 4)) {
                 Util.arrayCopy(scratch, X_NUM, cardRecord, CARD_WINDOW_OFFSET, (short) 4);
             }
             if (harder) Util.arrayCopy(buf, (short)(at + 72), cardRecord, CARD_BITS_OFFSET, (short) 4);
@@ -2758,19 +2842,26 @@ public class CashuApplet extends Applet {
     /**
      * SET_PIN: the PIN (4 to 8 bytes). Sets or replaces it, and unblocks.
      *
-     * For an OPEN card only: one with no owner and nothing unspent. No PIN
+     * For an OPEN card: one with no owner and nothing unspent. No PIN
      * and no proof is needed, because there is nothing on the card, and
-     * nobody whose card it is. On a card with an owner it is refused whether
-     * the card is empty or not: a terminal that holds the PIN can empty a card
-     * whose balance fits within the day's limit, and must not then be able to
-     * set a PIN of its own. The owner uses CHANGE_PIN.
+     * nobody whose card it is. On a card with an owner it is refused unless
+     * the card has no PIN and the owner's grant is in this tap (ALLOW_LOAD):
+     * ADD PIN (1.16), for a card that was set up with none, whatever it holds.
+     * A card with a PIN is refused (`6A91`) whether it is empty or not: a
+     * terminal that holds the PIN can empty a card whose balance fits within
+     * the day's limit, and must not then be able to set a PIN of its own. The
+     * owner uses CHANGE_PIN. A PIN that is added leaves the allowance at
+     * nothing: every payment asks for it until the owner sets one.
      */
     private void processSetPin(APDU apdu) {
         byte[] buf = apdu.getBuffer();
         boolean sealed = sealedForm(buf);
         requireNotLocked();
-        if (ownerSet[0] == (byte) 1) ISOException.throwIt(SW_OWNER_PROOF);
-        requireNothingUnspent();
+        if (ownerSet[0] == (byte) 1) {
+            if (pinState[0] != (byte) 0 || loadGrant[0] != (byte) 1) ISOException.throwIt(SW_OWNER_PROOF);
+        } else {
+            requireNothingUnspent();
+        }
 
         short pinLen = apdu.setIncomingAndReceive();
         if (sealed) {
@@ -2781,6 +2872,11 @@ public class CashuApplet extends Applet {
         }
         if (pinLen < PIN_MIN_LEN || pinLen > PIN_MAX_LEN) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        }
+        // a card with no PIN has no allowance (SET_LIMIT refuses one); it is nothing here all the same
+        if (pinState[0] == (byte) 0) {
+            Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
+            Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
         }
         pin.update(buf, ISO7816.OFFSET_CDATA, (byte) pinLen);
         pinState[0] = (byte) 1;
@@ -3130,7 +3226,8 @@ public class CashuApplet extends Applet {
     }
 
     /**
-     * D13 gate. Fires whenever a PIN exists and this session has not verified
+     * D13 gate, for what is still the PIN's alone (SPEND_ALL_AGAIN, a record
+     * written to an open card). Fires whenever a PIN exists and this session has not verified
      * it — and "exists" includes the blocked state (pinState 2), from which
      * VERIFY_PIN can never succeed. The earlier form checked `pinState == 1`,
      * so three wrong guesses turned the card into a no-PIN bearer card:
@@ -3140,6 +3237,56 @@ public class CashuApplet extends Applet {
         if (pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
+    }
+
+    /**
+     * Whether a payment signed now would be signed with no PIN on a card that
+     * has one (1.16): a PIN is set and has not been given in this tap. A card
+     * with no PIN is not in this case; it pays without one, and has no
+     * allowance. (The owner's grants sign nothing: a payment is the PIN's, or
+     * the allowance's.)
+     */
+    private boolean needsAllowance() {
+        return pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1;
+    }
+
+    /**
+     * SPEND_ALL_SIGN's gate (1.16, in place of D13's "a PIN is set and has not
+     * been given: refused"). Answers whether the payment is signed with no PIN
+     * on a card that has one (and so counts against the allowance), and
+     * refuses with `6A94` unless it may be.
+     *
+     * No PIN set: signed (false). The PIN given in this tap: signed (false).
+     * A PIN set and not given: signed under the allowance only, when the PIN
+     * is not blocked, there is an allowance, the day's window is current (or
+     * has not begun: a card with no header counts from set-up), and what has
+     * been signed for with no PIN in it, and this payment (the pieces less the
+     * change the card makes, `allNet`: what leaves the card for good), come to
+     * no more than the allowance. Over it the PIN is asked for the WHOLE
+     * payment, however little is over: a payment is never split. A blocked card
+     * has no allowance: nothing is signed for with no PIN until the owner has
+     * unblocked it. Refused, the payment in hand is given up, as a payment over
+     * a limit is, and nothing is written in the log: not a refusal over a
+     * limit, and no part of a run of them. What the day's no-PIN spending would
+     * be is left in scratch (X_NOPIN) for the commit.
+     */
+    private boolean requireAllowanceOrPin() {
+        if (!needsAllowance()) return false;
+        if (pinState[0] != (byte) 1 || isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4)) {
+            allState[0] = (byte) 0;
+            ISOException.throwIt(SW_PIN_NEEDED);
+        }
+        if (dayIsOver()) {
+            Util.arrayFillNonAtomic(scratch, X_NOPIN, (short) 4, (byte) 0);
+        } else {
+            Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_SPENT_OFFSET, scratch, X_NOPIN, (short) 4);
+        }
+        if (addUint32Carry(scratch, X_NOPIN, allNet, (short) 0) != 0
+            || cmpUint32(scratch, X_NOPIN, cardRecord, CARD_NOPIN_LIMIT_OFFSET) > 0) {
+            allState[0] = (byte) 0;
+            ISOException.throwIt(SW_PIN_NEEDED);
+        }
+        return true;
     }
 
     /**
@@ -3158,10 +3305,15 @@ public class CashuApplet extends Applet {
      * this tap, or waived by the owner for this tap (ALLOW_LOAD), or this tap
      * being the one after a payment (changeGrant: the change comes back with
      * no PIN). A blocked PIN waives nothing: the owner unblocks the card first.
+     *
+     * A card with no PIN (1.16) has none to type: it is put on by the owner's
+     * grant, or in the tap after a payment, and by nobody else.
      */
     private void requireLoadAuthority() {
-        if (pinState[0] != (byte) 1
-            || (pinVerifiedFlag[0] != (byte) 1 && loadGrant[0] != (byte) 1 && changeGrant[0] != (byte) 1)) {
+        boolean granted = loadGrant[0] == (byte) 1 || changeGrant[0] == (byte) 1;
+        if (pinState[0] == (byte) 0) {
+            if (!granted) ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        } else if (pinState[0] != (byte) 1 || (pinVerifiedFlag[0] != (byte) 1 && !granted)) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
     }
@@ -3281,13 +3433,14 @@ public class CashuApplet extends Applet {
      * For whoever the card is open to: the PIN verified in this tap, or the
      * owner's grant (ALLOW_LOAD). It says when the card was used and for how
      * much, which is more than a stranger's reader should be told. A card
-     * with no PIN yet has nothing in it, and answers anyone.
+     * with no PIN and no owner yet has nothing in it, and answers anyone; one
+     * with an owner and no PIN (1.16) has the owner's grant and no other.
      */
     private void processGetLog(APDU apdu) {
         byte[] buf = apdu.getBuffer();
         if (buf[ISO7816.OFFSET_P1] == (byte) 1) { processGetReceipts(apdu); return; }
         if (buf[ISO7816.OFFSET_P1] != (byte) 0) ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
-        if (pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1 && loadGrant[0] != (byte) 1) {
+        if ((pinState[0] != (byte) 0 || ownerSet[0] == (byte) 1) && pinVerifiedFlag[0] != (byte) 1 && loadGrant[0] != (byte) 1) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
         Util.arrayCopyNonAtomic(cardLog, (short) 0, buf, (short) 0, LOG_ANSWER_HEAD);
@@ -3312,10 +3465,10 @@ public class CashuApplet extends Applet {
      * or past what the ring holds answers the count alone).
      *
      * By the owner's grant, given in this tap, and nothing else: not the PIN,
-     * which a till has. (A card with no PIN yet has signed nothing.)
+     * which a till has. (A card with no PIN and no owner yet has signed nothing.)
      */
     private void processGetReceipts(APDU apdu) {
-        if (pinState[0] != (byte) 0 && loadGrant[0] != (byte) 1) {
+        if ((pinState[0] != (byte) 0 || ownerSet[0] == (byte) 1) && loadGrant[0] != (byte) 1) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
         byte[] buf = apdu.getBuffer();
@@ -3444,6 +3597,13 @@ public class CashuApplet extends Applet {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        // no lines at present: 1.15 lands in the window on its own
+        a[10] = (byte) 20; a[11] = (byte) 21; a[12] = (byte) 22; a[13] = (byte) 23;
+        a[14] = (byte) 24; a[15] = (byte) 25; a[16] = (byte) 26; a[17] = (byte) 27;
+        a[18] = (byte) 28; a[19] = (byte) 29; a[20] = (byte) 30; a[21] = (byte) 31;
+        a[22] = (byte) 32; a[23] = (byte) 33; a[24] = (byte) 34; a[25] = (byte) 35;
+        a[26] = (byte) 36; a[27] = (byte) 37; a[28] = (byte) 38; a[29] = (byte) 39;
+        a[30] = (byte) 40; a[31] = (byte) 41; a[32] = (byte) 42; a[33] = (byte) 43;
+        a[34] = (byte) 44; a[35] = (byte) 45; a[36] = (byte) 46; a[37] = (byte) 47;
+        a[38] = (byte) 48;
     }
 }

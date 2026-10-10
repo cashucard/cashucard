@@ -12,7 +12,12 @@ section 4. In short:
   signs its hash; nothing a reader sends reaches the signer.
 - `SIGN_ARBITRARY` is removed. `AUTH` proves the card is the card, over a
   tagged hash no piece's secret can equal.
-- Nothing is loaded onto a card with no PIN, or onto a card with no owner.
+- Nothing is loaded onto a card with no owner, or onto a card with no PIN but by
+  the owner's grant. (Software 1.16 makes the PIN optional. A card set up with
+  none pays without one, under its limits. A card with a PIN has a no-PIN
+  allowance: what it signs for in a day without the PIN, counted in the daily
+  limit's window. Over it the card answers `6A94` and the PIN is asked for the
+  whole payment.)
 - The card keeps a daily limit in permanent memory: the most it will sign for in
   one day, in sats (0 is none, and a new card has none). It keeps the day itself:
   a clock that only moves forward, the time written in the newest Bitcoin block

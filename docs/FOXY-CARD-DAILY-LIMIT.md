@@ -19,6 +19,12 @@ under a signature by a key in the card's record. This document is written for
 the clock of 1.15; section 11 keeps the account of the first design and says
 where 1.15 replaced it.
 
+From software 1.16 the PIN is optional, and a card that has one has a third
+limit, the no-PIN allowance: what it will sign for in a day without the PIN
+(section 6f). Where an older paragraph below says that a spend needs the PIN, it
+is describing a card of 1.15 or before, or a card with a PIN and no allowance;
+section 6f says what 1.16 does.
+
 ## 0. Why
 
 The first limit was on one PIN entry, kept in RAM and reset by `VERIFY_PIN`.
@@ -95,7 +101,9 @@ a newer block can end is a bound it cannot walk round (5).
 1. **The PIN spends and nothing else.** With the PIN a terminal can `SPEND`
    (up to the day's limit), `LOAD_PROOF` (change written back) and
    `CLEAR_SPENT`. On a card with an owner the PIN changes nothing else: not the
-   PIN, not the limit, not the record, not the owner.
+   PIN, not the limit, not the record, not the owner. (A card may have no PIN,
+   and then it spends without one; a card with a PIN spends up to its no-PIN
+   allowance without it. Section 6f.)
 2. **The owner's proof administers.** `CHANGE_PIN`, the owner's `SET_LIMIT`
    (`34`), `SET_OWNER`, `SET_CARD`, `ALLOW_LOAD` and `LOCK_CARD` need an ECDSA
    signature by the owner key over a label of the command, a nonce the card has
@@ -152,7 +160,9 @@ a newer block can end is a bound it cannot walk round (5).
    anything the PIN opens. A till still writes change back under the verified
    PIN as before.
 10. The rest of `FOXY-CARD-SPEC.md` 5.3: no signature without a slot burned;
-    the PIN gate first in every state; nothing loaded without a PIN set; every
+    the PIN gate first in every state (since 1.16, at the signature, with the
+    no-PIN allowance beside it: 6f); nothing loaded without a PIN set or the
+    owner's grant (a card with no PIN is loaded under the grant: 6f); every
     buffer at install and the status byte last.
 
 ## 4. What the card stores
@@ -172,11 +182,11 @@ mint and the set flag, and never the limit, the day, `now` or the block fields.
 | last header | 32 | the hash of the newest header taken, as Bitcoin shows a block hash, for the owner's screen. Offset 124. Written by `SET_HEADER` |
 | (unused) | 29 | zeros. With the two rows above, the 65 bytes where the time key was up to software 1.14; `GET_CARD` still answers those 65 bytes at offset 40 |
 | now | 4 | the time of the newest block header the card has taken, seconds, big-endian; 0 until it has taken one. Written only by `SET_HEADER`, and by nothing that lowers it |
-| window start | 4 | when the current day began; written by `SET_LIMIT`, by a `SPEND` that begins a new day, and by the first header taken after a limit was set while `now` was 0 (6) |
+| window start | 4 | when the current day began; written by `SET_LIMIT`, by a `SPEND` that begins a new day, and by the first header taken after a limit (or, since 1.16, an allowance) was set while `now` was 0 (6). The daily limit's window and the allowance's are this one |
 | spent today | 4 | what the card has signed for since the window began |
 | limit on one payment | 4 | the most the card signs for in one payment straight away, in sats, big-endian; **0 is no limit**. A larger payment waits (section 6a). Not in `GET_CARD`; `GET_INFO` with P1 = 1 says it |
-| (unused) | 4 | zeros. It was when the current tap began, when the limit above was counted against ten seconds of the clock |
-| (unused) | 4 | zeros. It was what had been signed for in that tap |
+| no-PIN allowance | 4 | **1.16.** The most the card signs for in one day without the PIN, in sats, big-endian, on a card that has a PIN; **0 is none**, and then every payment needs the PIN. Record offset 201. `GET_INFO` with P1 = 1 says it, to anyone (6f). It held when the tap began, when the limit above was counted against ten seconds of the clock, and was zeros from 1.5 to 1.15 |
+| no-PIN spent | 4 | **1.16.** What the card has signed for with no PIN since the window began; goes to 0 when the day turns, and with a new number for the allowance. Offset 205. It held what had been signed for in that tap, and was zeros from 1.5 to 1.15 |
 | mint | 1 + up to 80 | the mint's address, as text |
 
 The mint is at most 80 characters, not 96 as it was. The reason is one
@@ -359,7 +369,9 @@ What the phone does with the clock is in section 9.
 ## 6. The day
 
 **The window.** `SET_LIMIT`, by either path, writes the limit, sets the window
-start to `now` and spent-today to 0. It needs no clock: a card that has been
+start to `now` and spent-today to 0. (Since 1.16 the no-PIN allowance, 6f, shares
+this window and its day: it begins at the first payment when either limit is set,
+and both counts go to 0 when the day turns.) It needs no clock: a card that has been
 shown no block yet (`now` = 0) is given its limit like any other, and its window
 has no start until a header gives it one (below). On `SPEND`, after the PIN gate
 and the slot checks, when the limit is not 0:
@@ -531,7 +543,8 @@ that wants the card held no longer than it must chooses the pieces that
 overpay least.
 
 **Setting it.** `SET_LIMIT` with eight bytes of limit (the day's, then this
-one) sets both; four bytes set the day's and leave this one. It needs no clock,
+one) sets both, and twelve (1.16) add the no-PIN allowance (6f); four bytes set
+the day's and leave this one. It needs no clock,
 and neither does the day's (up to software 1.14 the day's did, unless it was 0:
 `6A92`). Bit 3 of `GET_INFO`'s capabilities byte says the card waits and does
 not refuse. The owner's phone lifts it to 0 with its proof to take money off its
@@ -541,7 +554,9 @@ own card, and puts it back, as it does the day's.
 it at bytes 30 to 33 only when the owner's grant (`ALLOW_LOAD`) has been given
 in this tap; to anyone else, the PIN verified or not, those bytes are zeros,
 which is also what a card with no such limit says. (The eight bytes after
-them, which were the window and its count, are zeros to everyone.) A terminal
+them, 34 to 41, were the window and its count and were zeros to everyone; since
+1.16 they are the no-PIN allowance and what is counted against it, and are said
+to anyone: 6f.) A terminal
 that was told the limit would ask for just under it, again and again, and
 never be made to wait.
 
@@ -937,6 +952,116 @@ was sent to it in the clear, and refusing one would only add a failure to the
 exposure. A phone that knows the sealed form uses no other with a card that
 has it.
 
+## 6f. The PIN is optional, and the no-PIN allowance (software 1.16)
+
+**A card may have no PIN.** It is set up with a record and an owner and no
+`SET_PIN`, and it pays without one. Its daily limit and its limit on one
+payment hold every payment, PIN or not; the owner's proof still administers
+everything. Such a card is cash to whoever holds it, up to those two limits, and
+the screens say so where a PIN is offered (SCREENS, B3 and B6). There is no
+allowance on a card with no PIN, because there is nothing for it to stand in
+front of, and no screen mentions one.
+
+**A card that has a PIN has a third limit, the no-PIN allowance:** how many sats
+a day it will sign for *without* the PIN. Only payments signed with no PIN count
+against it. With the PIN given in this tap a payment is as it was, bounded by the
+daily limit and counted by nothing here. When a PIN is added (below) the allowance
+is 0, so that every payment asks for the PIN until the owner sets one.
+
+**The record.** Eight bytes that were a window and a count of the limit on one
+payment until 1.5, and zeros from then to 1.15, are the allowance (offset 201,
+four bytes, big-endian, sats) and what has been signed for with no PIN in the
+current window (offset 205, four bytes). `GET_INFO` with P1 = 1 answers them at
+bytes 34 to 37 and 38 to 41, **to anyone**: a till needs them to know whether to
+ask for the PIN, and nothing is learned from them that trying would not tell. The
+limit on one payment (bytes 30 to 33) is still the owner's alone.
+
+**The window.** The allowance shares the day's window with the daily limit, whose
+clock is the newest block header the card has been shown (5). The window begins
+at the first payment when *either* the daily limit or the allowance is set; a day
+turning sets both counts to 0 in the transaction that signs the first payment of
+the new day, whether that payment is made with the PIN or without it. A card
+that has been shown no header (`now` = 0) has no window start and it does not end,
+as with the daily limit (6): what is signed for with no PIN counts from set-up
+until a header arrives and anchors the window, and the count is kept through that.
+That fails toward asking for the PIN.
+
+**The gate.** `SPEND_ALL_BEGIN` asks nothing of the PIN: a payment begun is of no
+use to anyone until it is signed. `SPEND_ALL_SIGN` asks, at its first answer, when
+the card knows what leaves it for good (`net`: the pieces less the change the card
+makes for itself, the figure the limits already use):
+
+| PIN state | Signs when |
+|---|---|
+| none set | always, up to the daily limit and the wait |
+| set, and given in this tap | always, up to the daily limit and the wait |
+| set, not given, not blocked | the window is current (or has no start) and what has been signed for with no PIN in it, plus `net`, is no more than the allowance. The sum is `net` and not the sats burned, and a sum past what four bytes hold is over |
+| set, not given, and the allowance is 0 | never, even for a payment that takes nothing |
+| blocked | never: a blocked card has no allowance until the owner has unblocked it |
+
+Otherwise the card answers **`6A94`**, gives the payment up (a `SPEND_ALL_SIGN`
+after it is `6985`, as after a refusal for the day) and leaves everything as it
+was. **Over the allowance the PIN is asked for the WHOLE payment**: a payment is
+never split into what the allowance covers and what it does not. With the PIN the
+payment is as it always was. A refusal for want of the PIN writes **nothing** in
+the card's log: it is neither a refusal over a limit nor part of a run of them,
+and three of them in ten seconds mark no tamper. The PIN is asked before the
+limits, so that a reader with no PIN cannot fill the log with refusals; a payment
+within the allowance and over the day's limit is refused `6A8F` and written down
+as any other. The word `6A94` is also `LOAD_PROOF`'s (a piece already on the
+card); the two commands are never confused. The daily limit and the limit on one
+payment apply to every payment as they did: a payment signed with no PIN within
+the limit on one payment waits for nothing, and one over it waits as ever; a
+second payment in the same time in the field is slowed as ever.
+
+The owner's grants (`ALLOW_LOAD` and the tap after a payment) sign nothing, as
+they never did: a payment is the PIN's, or the allowance's. A spend with no PIN
+whose sum wraps is `6A94` at `SPEND_ALL_BEGIN`, which is the one refusal that
+command makes for the PIN.
+
+**The last signature again.** `SPEND_ALL_AGAIN` gives the last signature to a
+reader with no PIN if it was given with no PIN, so that a till whose answer was
+lost does not need a PIN it never needed; one that was given with the PIN is still
+the PIN's, and on a card with no PIN it is open.
+
+**The log.** Bit 3 of a tap's flags (`0x08`) says a payment in the tap was signed
+with no PIN under the allowance, so that the owner's phone can say "no PIN" beside
+it. A payment on a card with no PIN is not marked: there is no PIN to be without.
+Entries are twenty bytes still, and receipts are as they were.
+
+**Setting it.** `SET_LIMIT`, the owner's form (`34`), takes twelve bytes: the
+day's limit, the limit on one payment and the allowance, then the proof as ever. A
+number that does not change keeps its window and its count, as eight bytes
+already promised: a new allowance counts from nothing in the window as it stands;
+a new day's limit begins the window again at `now` and takes both counts to 0,
+as the four-byte form always did. The four- and eight-byte forms leave the
+allowance as it is. On a card with no PIN a twelve-byte form with a number in the
+allowance is `6985`; with a zero in it, it is the eight-byte form.
+
+**Adding a PIN.** `SET_PIN` (`41`) on a card that has an owner and no PIN, with the
+owner's grant (`ALLOW_LOAD`) given in this tap, sets the PIN, sealed or in the
+clear exactly as at set-up, whatever the card holds. A card with a PIN refuses it
+(`6A91`), grant or none, and the owner uses `CHANGE_PIN`. The sealed form takes a
+nonce from `GET_NONCE` with P1 = 1 asked for after the grant (the grant's own
+proof used up the first). A new PIN has not been typed, so no session is verified,
+and the allowance is 0. `CHANGE_PIN`, whose proof is over the PIN itself, also gives a PIN to a card
+that has none.
+
+**A card with no PIN and an owner is the owner's.** Loading it (`LOAD_PROOF`,
+`CLEAR_SPENT`) wants the owner's grant or the tap after a payment, in which the
+change goes back; the log and the receipts want the grant. `LOCK_CARD` wants a
+PIN, and a card with none cannot be locked. A card with no PIN and no owner is
+open while it is empty, as any card with no owner is, and `SET_CARD` is written
+to it by anyone.
+
+**What it bounds.** A terminal that can tap the card with no PIN gets the allowance
+a day, and the day's limit stays the ceiling for everything. It buys a till one
+tap that pays, and a PIN pad only when a payment is over what the card will sign
+for unasked. It does not stop a thief with the card from taking the allowance each
+day until the holder has the card blocked or set the allowance to nothing; the
+holder chooses the figure. A card of 1.12 to 1.15 keeps asking for its PIN, and a
+phone must go on working with them: the software number says which is which.
+
 ## 7. The owner
 
 ### 7.1 The key
@@ -981,7 +1106,7 @@ had a hash:
 | Command | Label (ASCII) | Value |
 |---|---|---|
 | `CHANGE_PIN` | `FoxyCard/change-pin` | the new PIN's bytes |
-| `SET_LIMIT` (owner form, `34`) | `FoxyCard/set-limit` | the new limit, 4 bytes, big-endian; or 8, the day's and then the tap's (6a) |
+| `SET_LIMIT` (owner form, `34`) | `FoxyCard/set-limit` | the new limit, 4 bytes, big-endian; or 8, the day's and then the tap's (6a); or 12, those and the no-PIN allowance (6f) |
 | `SET_OWNER` (on a card that has an owner) | `FoxyCard/set-owner` | the new owner key, 65 bytes |
 | `SET_CARD` (on a card that has an owner) | `FoxyCard/set-card` | the data sent: unit, refund key, the 65 bytes where the time key was, mint length, mint. A phone of software 1.15 sends those 65 bytes as zeros and the card ignores them; a phone of an earlier software sends a key, and the card ignores that too. The proof is over the bytes as sent, either way |
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |
@@ -1038,28 +1163,28 @@ or changed from `FOXY-CARD-SPEC.md` 5.2 and the allowance draft.
 
 | INS | Command | Needs | Data sent | Answers |
 |---|---|---|---|---|
-| `01` | **GET_INFO** | | | 30 bytes: the draft's 17 (version 2, slots, unspent, spent, empty, capabilities, PIN state, format, tries left, locked, record set, limit 4, has owner 1), then `now` (4), window start (4), spent today (4), then whether this tap may load with no PIN (1; 8.2) With **P1 = 1**, 42 bytes: those thirty, then the tap limit, the tap start and spent this tap, 4 each (6a). The limit on one payment (bytes 30 to 33) is said only with the owner's grant given in this tap, and is zeros to anyone else (6a) |
+| `01` | **GET_INFO** | | | 30 bytes: the draft's 17 (version 2, slots, unspent, spent, empty, capabilities, PIN state, format, tries left, locked, record set, limit 4, has owner 1), then `now` (4), window start (4), spent today (4), then whether this tap may load with no PIN (1; 8.2) With **P1 = 1**, 42 bytes: those thirty, then the limit on one payment (30 to 33), the no-PIN allowance (34 to 37) and what has been signed for with no PIN in the window (38 to 41), 4 each (6a, 6f). The limit on one payment (bytes 30 to 33) is said only with the owner's grant given in this tap, and is zeros to anyone else (6a); the allowance and its count are said to anyone (6f). Up to 1.15 bytes 34 to 41 were zeros |
 | `10` | GET_PUBKEY | | | the card's 33-byte compressed key |
 | `11` `12` `13` `14` | GET_BALANCE, GET_PROOF_COUNT, GET_PROOF, GET_SLOT_STATUS | | | as before |
 | `15` | AUTH | | 16 random bytes | 16 of the card's own and a signature |
 | `16` | **GET_CARD** | | | format, record set, unit, limit (4), refund key (33), then 65 bytes at offset 40: the hardest header's `bits` (4), the newest header's hash (32) and 29 zeros (a time key up to software 1.14), mint length, mint |
 | `17` | **GET_PIECES** | | P1 = the first slot to report | one page: the first slot the page does not cover (1), then for each slot in the range that is not empty a tag (1) and, for an unspent slot, its 81 bytes (8.1). `6A83` for a P1 of 128 or more. With **P2 = 2** and one to three slot numbers as data: each of those slots whole (status and its 81 bytes), in the order asked; `6700` for none or more than three (8.1). With **P2 = 3**, the short listing: for each unspent slot its number (with `0x80` where its keyset and date follow), then the power of two it is worth or `FF` and its amount (6d). Any other P2 is `6A86` (P2 = 1 was the brief listing of a card of sixty-four places, 1.6) |
-| `18` | **GET_LOG** | the PIN verified in this tap, or the owner's grant; nothing on a card with no PIN yet. **P1 = 1 (receipts): the owner's grant only** | P2 with P1 = 1: how many receipts back from the newest to begin | the card's own log (6b): 16 bytes of counts, then up to eight taps of 20 bytes, newest first (16 bytes before software 1.15). With P1 = 1: the count of payments (4), then up to three receipts of 77 bytes, newest first (73 before 1.15). `6982` to anyone else; `6A86` for another P1 |
+| `18` | **GET_LOG** | the PIN verified in this tap, or the owner's grant; nothing on a card with no PIN and no owner yet; on a card with an owner and no PIN (1.16) the owner's grant. **P1 = 1 (receipts): the owner's grant only** | P2 with P1 = 1: how many receipts back from the newest to begin | the card's own log (6b): 16 bytes of counts, then up to eight taps of 20 bytes, newest first (16 bytes before software 1.15); bit 3 of an entry's flags (1.16) says a payment in the tap was signed with no PIN under the allowance. With P1 = 1: the count of payments (4), then up to three receipts of 77 bytes, newest first (73 before 1.15). `6982` to anyone else; `6A86` for another P1 |
 | `20` | ~~SPEND_PROOF~~ | | | gone with format 4 (6c): `6D00`. Up to format 3: P1 = the slot, the 64-byte signature over that piece's secret alone |
-| `22` | **SPEND_ALL_BEGIN** | PIN, if one is set | the places, a byte each, 1 to 32 | what they are worth (4). `6700` none; `6A96` more than 32; `6A83`, `6A88`, `6985` for a place out of range, empty, spent; `6A80` named twice, or of another date than the first; `6A8F` as the day's limit has it, on the sum (6c) |
+| `22` | **SPEND_ALL_BEGIN** | nothing (since 1.16 the PIN is asked at `24`; up to 1.15 it was asked here) | the places, a byte each, 1 to 128 | what they are worth (4). `6700` none; `6A96` more than 128; `6A83`, `6A88`, `6985` for a place out of range, empty, spent; `6A80` named twice, or of another date than the first; `6A8F` as the day's limit has it, on the sum (6c); `6A94` for a sum that wraps, with a PIN set and not given (6f) |
 | `23` | **SPEND_ALL_OUTPUTS** | a payment begun, and nothing sent since but these | 37 bytes for each output: amount (4), blinded message (33) | `6985` with no payment begun; `6700` for a length not a multiple of 37, and the payment is dropped |
-| `24` | **SPEND_ALL_SIGN** | a payment begun; PIN; the day's limit again | | while the payment is over the limit on one payment: two bytes, the waits still to come, and nothing burned (6a); sent again. Then the one 64-byte signature over every piece and every output; every place burned, the counts charged and the log written in the same transaction. `6985` with no payment begun; `6A96` if the transaction cannot hold it. **Not** opened by `ALLOW_LOAD`, nor by the tap after a payment. Notes, in permanent memory, that the card has paid: the next tap may load with no PIN (8.2) |
-| `25` | **SPEND_ALL_AGAIN** | PIN, if one is set | | the last signature `24` gave, again; `6A88` if none |
-| `30` | **LOAD_PROOF** | an owner; a PIN set, and verified or `ALLOW_LOAD` given in this tap or this tap being the one after a payment (8.2); a card record. No clock | 81 bytes; or two or three pieces end to end, 162 or 243 | `6982` with no verified PIN and no grant (the gate comes first); then `6A90` with no owner; `6A94` for a piece whose nonce is already in a slot, spent or not (checked last, after the length and the piece itself, and before anything is written) The answer is the slot of each piece stored, a byte each. Several pieces are taken in order, each as one alone would be: if the first cannot be stored the command is refused with its word; if a later one cannot, the ones before it stand and the answer is their slots only, and the terminal sends the rest again to hear why |
-| `31` | **CLEAR_SPENT** | the PIN, if one is set, or `ALLOW_LOAD` given in this tap, or the tap after a payment | | |
-| `32` | **SET_CARD** | no owner: PIN set and verified, nothing unspent. Owner: the owner's proof, nothing unspent | unit (1), refund key (33), 65 bytes the card does not read (zeros from a phone of software 1.15; a time key from an earlier one), mint length (1), mint; with an owner, proof length (1) and the proof first | `6A8D` if anything is unspent; `6A80` for a bad refund key; `6700` for a bad length. The 65 bytes are not checked, and `SET_CARD` no longer clears the clock, the window or what is spent |
+| `24` | **SPEND_ALL_SIGN** | a payment begun; no PIN set, or the PIN given in this tap, or the no-PIN allowance enough for the whole payment (6f); the day's limit again | | while the payment is over the limit on one payment: two bytes, the waits still to come, and nothing burned (6a); sent again. Then the one 64-byte signature over every piece and every output; every place burned, the counts charged and the log written in the same transaction. `6985` with no payment begun; `6A94` (1.16) with a PIN set and not given and the allowance not enough, the payment given up and nothing written in the log (6f); `6A96` if the transaction cannot hold it. **Not** opened by `ALLOW_LOAD`, nor by the tap after a payment. Notes, in permanent memory, that the card has paid: the next tap may load with no PIN (8.2) |
+| `25` | **SPEND_ALL_AGAIN** | the PIN, if one is set, unless the last signature was given with no PIN (1.16) | | the last signature `24` gave, again; `6A88` if none |
+| `30` | **LOAD_PROOF** | an owner; a PIN set, and verified or `ALLOW_LOAD` given in this tap or this tap being the one after a payment (8.2); on a card with no PIN (1.16), `ALLOW_LOAD` or the tap after a payment; a card record. No clock | 81 bytes; or two or three pieces end to end, 162 or 243 | `6982` with no verified PIN and no grant (the gate comes first); then `6A90` with no owner; `6A94` for a piece whose nonce is already in a slot, spent or not (checked last, after the length and the piece itself, and before anything is written) The answer is the slot of each piece stored, a byte each. Several pieces are taken in order, each as one alone would be: if the first cannot be stored the command is refused with its word; if a later one cannot, the ones before it stand and the answer is their slots only, and the terminal sends the rest again to hear why |
+| `31` | **CLEAR_SPENT** | the PIN, if one is set, or `ALLOW_LOAD` given in this tap, or the tap after a payment; a card with no PIN and an owner wants a grant (1.16) | | |
+| `32` | **SET_CARD** | no owner: the PIN verified, if one is set (1.16: a card with none is written by anyone while it has no owner), nothing unspent. Owner: the owner's proof, nothing unspent | unit (1), refund key (33), 65 bytes the card does not read (zeros from a phone of software 1.15; a time key from an earlier one), mint length (1), mint; with an owner, proof length (1) and the proof first | `6A8D` if anything is unspent; `6A80` for a bad refund key; `6700` for a bad length. The 65 bytes are not checked, and `SET_CARD` no longer clears the clock, the window or what is spent |
 | `33` | **SET_LIMIT, PIN form** | **a card with no owner**: PIN set and verified; nothing unspent. No clock | limit (4) | `6A91` on a card with an owner (use `34`); `6A8D` if anything is unspent. Eight bytes set the limit on one payment as well (6a). |
-| `34` | **SET_LIMIT, owner's form** | the owner's proof. **No PIN**, any funds. No clock | proof length (1), proof (DER), limit (4) | `6A90`, `6A91`; `6986` on a locked card. Eight bytes of limit (the day's, then the one payment's) set both (6a). |
+| `34` | **SET_LIMIT, owner's form** | the owner's proof. **No PIN**, any funds. No clock | proof length (1), proof (DER), limit (4) | `6A90`, `6A91`; `6986` on a locked card. Eight bytes of limit (the day's, then the one payment's) set both (6a); **twelve** (1.16) add the no-PIN allowance (6f), and on a card with no PIN a number in it is `6985`. Any other length is `6700` |
 | `35` | ~~SET_TIME~~ | | | gone in 1.15: `6D00`, and the instruction stays unassigned. Up to 1.14: a time (4), a signature length (1) and a signature (DER) by the time key, answered with the card's `now` |
 | `36` | **SET_HEADER** | nothing: no PIN, no owner, no record, any state | a Bitcoin block header, 80 bytes, as the network carries it (5.1) | the card's `now` (4, big-endian), whether the header was taken or was no later than the clock. `6A93` for too little work (its own, the floor's, or a quarter of the hardest taken); `6A80` for a `bits` no header could carry; `6700` for any length but 80. Drops a payment begun |
 | `37` | **TELL_TIME** | nothing: no PIN, no owner, no record, any state | the terminal's own clock, 4 bytes, big-endian seconds | nothing. `6700` for any length but 4. Kept for this time in the field and written into the receipts and the log entries made in it (5.3). Drops a payment begun |
 | `40` | VERIFY_PIN | | the PIN, 4 to 8 bytes; or, with **P1 = 1**, the PIN sealed (6e) | changes nothing about spending. Sealed: `6985` with no nonce asked for; an envelope that does not open costs a try, as a wrong PIN does. Any other P1 is `6A86` |
-| `41` | **SET_PIN** | **a card with no owner**, nothing unspent. No PIN, no proof | the PIN; or, with **P1 = 1**, the PIN sealed (6e) | sets or replaces the PIN and unblocks; `6A91` on a card with an owner (use `42`); `6A8D` if anything is unspent; `6986` locked. Sealed: `6985` with no nonce, `6A80` for an envelope that does not open |
+| `41` | **SET_PIN** | **a card with no owner**, nothing unspent. No PIN, no proof. Or (**ADD PIN**, 1.16) **a card with an owner and no PIN**, the owner's grant (`ALLOW_LOAD`) given in this tap, any funds | the PIN; or, with **P1 = 1**, the PIN sealed (6e) | sets or replaces the PIN and unblocks; `6A91` on a card with an owner that has a PIN, or has none and no grant (use `42`); `6A8D` if anything is unspent on a card with no owner; `6986` locked. The allowance is nothing. Sealed: `6985` with no nonce, `6A80` for an envelope that does not open |
 | `42` | **CHANGE_PIN** | the owner's proof. **No PIN, no session, any PIN state, any funds** | proof length (1), proof (DER), the new PIN; or, with **P1 = 1**, the same sealed, the PIN as its nine-byte block (6e) | sets the PIN and resets the tries; ends any verified session; `6A90`, `6A91`; `6986` locked. Sealed: the proof is over the PIN itself and the same nonce the seal is under; `6985` with no nonce, `6A80` for an envelope that does not open |
 | `43` | **SET_OWNER** | no owner: nothing unspent. Owner: the owner's proof, nothing unspent | 65 bytes, the owner's public key, uncompressed; with an owner, proof length (1) and the proof first | sets or replaces the owner; `6A8D` if anything is unspent; `6A91` with an owner and no good proof; `6A80` for a key not beginning `04`; `6700` other length; `6986` locked |
 | `44` | GET_NONCE | a card with an owner. No PIN | | 16 bytes, or `6A90`. With **P1 = 1**, on any card: the 16 bytes, the PIN key (33, compressed) and the card key's signature over it (64), for sealing a PIN (6e) |
@@ -1080,7 +1205,9 @@ transaction (6d), so that a payment may be of any number, and bit 6 says so.
 Bitcoin block headers (5): `SET_TIME` and the time key are gone, `SET_HEADER` and
 `TELL_TIME` are new, and a log entry and a receipt are four bytes longer for the
 time a terminal tells. No capability bit says so, since all eight are taken; the
-version does, and `SELECT` answers `01 0F`.
+version does, and `SELECT` answers `01 0F`. 1.16 makes the PIN optional and
+gives a card that has one the no-PIN allowance (6f): `SELECT` answers `01 10`,
+no capability bit changes, and the wire is otherwise 1.15's.
 
 **Every command in every state: the rule of section 3 worked through.** "Open"
 means nothing is needed beyond what the command's own row says; "refused" means
@@ -1092,13 +1219,14 @@ means nothing is needed beyond what the command's own row says; "refused" means
 | `SET_HEADER`, `TELL_TIME` | open: any state, locked or blocked (a header must show its work, 5.1) | same |
 | `GET_NONCE` | `6A90` | open (it only gives a number) |
 | `VERIFY_PIN` | as ever | as ever |
-| `SPEND_ALL_BEGIN`, `SPEND_ALL_SIGN`, `SPEND_ALL_AGAIN` | the PIN, if one is set (such a card holds nothing) | the PIN, up to the limits |
+| `SPEND_ALL_BEGIN` | open (since 1.16) | open (since 1.16) |
+| `SPEND_ALL_SIGN`, `SPEND_ALL_AGAIN` | the PIN, if one is set (such a card holds nothing) | no PIN set: open, up to the limits; the PIN, or the no-PIN allowance, up to the limits (6f) |
 | `SPEND_ALL_OUTPUTS` | open to a payment begun; `6985` otherwise | same |
-| `LOAD_PROOF` | **refused `6A90`** | PIN verified, or the `ALLOW_LOAD` grant in this tap, or this tap being the one after a payment (8.2) |
-| `CLEAR_SPENT` | the PIN, if one is set | the PIN, or either grant |
-| `SET_PIN` (`41`) | **open while nothing is unspent** (sets or replaces, unblocks) | **refused**, empty or not: the owner uses `CHANGE_PIN` |
+| `LOAD_PROOF` | **refused `6A90`** | PIN verified, or the `ALLOW_LOAD` grant in this tap, or this tap being the one after a payment (8.2); with no PIN set, the grant or the tap after a payment |
+| `CLEAR_SPENT` | the PIN, if one is set | the PIN, or either grant; with no PIN set, either grant |
+| `SET_PIN` (`41`) | **open while nothing is unspent** (sets or replaces, unblocks) | **refused**, empty or not (`6A91`), unless the card has no PIN and the owner's grant is in this tap (ADD PIN, 1.16): the owner otherwise uses `CHANGE_PIN` |
 | `CHANGE_PIN` (`42`) | `6A90` | the owner's proof, empty or not, any PIN state |
-| `SET_CARD` (`32`) | PIN set and verified, **while nothing is unspent** | **the owner's proof, and nothing unspent** (`6A8D`) |
+| `SET_CARD` (`32`) | the PIN verified if one is set (none: open), **while nothing is unspent** | **the owner's proof, and nothing unspent** (`6A8D`) |
 | `SET_LIMIT` (`33`, PIN form) | PIN set and verified, **while nothing is unspent** | **refused** |
 | `SET_LIMIT` (`34`) | `6A90` | the owner's proof, empty or not |
 | `SET_OWNER` (`43`) | **open while nothing is unspent** | **the owner's proof, and nothing unspent** |
@@ -1120,7 +1248,7 @@ Status words, in the part of `6Axx` ISO 7816-4 leaves unassigned:
 | `6A91` | the owner's proof is missing or is not the owner's, or this command is not open to a card with an owner. Costs no PIN tries, changes nothing, does not end the PIN session |
 | `6A92` | unused. It was "no time", for a card never told the time; since 1.15 a card spends its first day on trust (6) and nothing answers it |
 | `6A93` | little work: a `SET_HEADER` whose work is not enough, whether not its own difficulty's, under the floor, or under a quarter of the hardest header taken (5.1). Nothing changes. (Up to 1.14: "not the time", a `SET_TIME` whose signature was not the time key's) |
-| `6A94` | on the card already: a `LOAD_PROOF` of a piece whose 32-byte nonce is the nonce of any non-empty slot, spent or unspent. Nothing is written, and the amount stated is not looked at. A slot that `CLEAR_SPENT` has freed is empty, so that piece may be loaded again then |
+| `6A94` | on the card already: a `LOAD_PROOF` of a piece whose 32-byte nonce is the nonce of any non-empty slot, spent or unspent. Nothing is written, and the amount stated is not looked at. A slot that `CLEAR_SPENT` has freed is empty, so that piece may be loaded again then. **Also, since 1.16, the PIN is needed** (`SPEND_ALL_SIGN`, and `SPEND_ALL_BEGIN` for a sum that wraps): a PIN is set and was not given in this tap, and the no-PIN allowance does not cover the whole payment. A different command answers the same word, and the two are never confused. Nothing is signed, burned or counted, the payment is given up, and nothing is written in the log (6f) |
 
 `SET_HEADER` also answers `6A80` (ISO's own word for wrong data) for a `bits` no
 header could carry: a size of 0 or of more than 32, or a mantissa with its top
@@ -1373,14 +1501,17 @@ gets one day; a test checks that the page never receives an owner secret.
 ## 10. Set-up, and what is said
 
 - A card is set up on a card with no owner, by the phone that will be its owner.
-  The set-up asks for a PIN twice. **It does not ask for a limit and does not
-  suggest one.** A new card has no limit.
+  The set-up asks for a PIN twice, or for none (1.16: a card with no PIN pays
+  without one; 6f). **It does not ask for a limit and does not suggest one.** A
+  new card has no limit.
 - For a holder with no phone, the owner is the friend's phone. Set-up says, once,
   on the screen that makes this phone the owner: *This phone can reset this
   card's PIN and limit. Whoever holds the card and this phone's seed phrase holds
   its money.*
 - `SET_PIN` once; the holder never types the PIN anywhere but a till and, once, at
-  set-up. A changed PIN comes from the owner's phone.
+  set-up. A changed PIN comes from the owner's phone. A card set up with none is
+  given one later by the owner's phone (ADD PIN, `SET_PIN` under the owner's
+  grant, 6f), and until then pays without one.
 - No refund key for now: a lost card is cash gone. A blocked card is not, because
   the owner unblocks it.
 - Any card with no owner can be claimed by any reader in range, and that is fine:
@@ -1551,9 +1682,29 @@ seventy-seven; the flag for a clock moved twice in a tap is never set.
   those, waits as its sum says, and is charged to the day whole; 129 is `6A96`; a burn
   that fails is `6A96` with nothing burned. Each was broken on purpose in a copy of the
   applet, one change at a time (74 changes), and every change was caught by a test.
+- jCardSim, the PIN optional (1.16): a card set up with no PIN (record, owner, a
+  load under the owner's grant, limits, a payment with its signature again, the
+  change in the tap after, the log under the grant, a new record, a PIN added) and
+  every stranger's command on it refused; ADD PIN, clear and sealed, with money on
+  the card, refused with no grant, with a PIN, for a wrong length or an envelope
+  that does not open; the twelve-byte limit (every other length refused, a number
+  for the allowance on a card with no PIN `6985`, numbers that do not change keeping
+  their count); the allowance to the sat (to its limit signs, one sat more is
+  `6A94`; a payment is not split; a payment with the PIN counts for nothing; what
+  leaves the card, with change, is what is counted; an allowance of 0 asks for the
+  PIN even for a payment that takes nothing; a blocked card has none); the day
+  turning both counts, by a payment with no PIN and by one with it; the window
+  beginning on the allowance alone, and on a card that has seen no header and
+  anchoring at the first one with the count kept; the PIN asked before the limits,
+  so that a refusal for want of it writes nothing in the log and a run of them marks
+  no tamper, and a payment within the allowance and over the day refused as ever;
+  the wait and the second payment in a tap applying to a payment with no PIN; a sum
+  that wraps; the log's flag; the last signature again. The transcript has the
+  allowance, and the phone's model of the card is held to it.
 - The source-reading test: spent today and the slot's status change between one
   `beginTransaction` and its commit, with the signing after.
-- Vectors in `spec/vectors/`: an owner key and a proof for each label
+- Vectors in `spec/vectors/`: an owner key and a proof for each label, and one for
+  the limit's label over all twelve bytes
   (`owner.json`; ECDSA signatures are randomised, so each is one the card
   verified, and another implementation verifies it again); the transcript,
   extended (`transcript.json`), which the phone's JavaScript model of the card is
@@ -1580,6 +1731,12 @@ seventy-seven; the flag for a clock moved twice in a tap is never set.
 - **Nothing is bound that the owner has not set.** The day, and the limit on one
   payment (6a; the per-tap limit), each need the owner to have set a number, and
   a new card has neither: set-up asks for none (section 10).
+- **A card with no PIN is cash.** Whoever holds it can spend it, up to the day's
+  limit and the limit on one payment if the owner has set them, and the owner's
+  proof still administers it. A card with a PIN signs the no-PIN allowance a day
+  to whoever taps it, and no more without the PIN; a thief with the card has that
+  much a day until the holder sets the allowance to nothing or has the card
+  blocked (6f).
 - **A forged header.** Whoever spends the work of a header can show the card any
   time. On a card that has taken a header from the network the work is a quarter
   of a block's; on a card that has taken none it is the floor's, a quarter of a
