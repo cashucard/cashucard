@@ -2452,9 +2452,9 @@ public class CashuApplet extends Applet {
     private void processClearSpent(APDU apdu) {
         requireNotLocked();
         /* the PIN, or the owner's grant for this tap, or the tap after a payment; a card with no PIN
-         * and no owner is being set up and answers anyone, but one with an owner (1.16) wants the grant */
+         * (1.16) is freed by whoever holds it, as it is loaded by whoever holds it */
         boolean granted = loadGrant[0] == (byte) 1 || changeGrant[0] == (byte) 1;
-        if (pinState[0] != (byte) 0 ? (pinVerifiedFlag[0] != (byte) 1 && !granted) : (ownerSet[0] == (byte) 1 && !granted)) {
+        if (pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1 && !granted) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
@@ -3306,14 +3306,15 @@ public class CashuApplet extends Applet {
      * being the one after a payment (changeGrant: the change comes back with
      * no PIN). A blocked PIN waives nothing: the owner unblocks the card first.
      *
-     * A card with no PIN (1.16) has none to type: it is put on by the owner's
-     * grant, or in the tap after a payment, and by nobody else.
+     * A card with no PIN (1.16) has none to type, and is put on by whoever
+     * holds it: a top-up needs nobody's leave, as spending it needs nobody's.
+     * What is the owner's alone stays so (the limits, ADD PIN, the mint, the
+     * lock): those ask for the owner's proof, not a PIN.
      */
     private void requireLoadAuthority() {
+        if (pinState[0] == (byte) 0) return;
         boolean granted = loadGrant[0] == (byte) 1 || changeGrant[0] == (byte) 1;
-        if (pinState[0] == (byte) 0) {
-            if (!granted) ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
-        } else if (pinState[0] != (byte) 1 || (pinVerifiedFlag[0] != (byte) 1 && !granted)) {
+        if (pinState[0] != (byte) 1 || (pinVerifiedFlag[0] != (byte) 1 && !granted)) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
     }
@@ -3440,7 +3441,8 @@ public class CashuApplet extends Applet {
         byte[] buf = apdu.getBuffer();
         if (buf[ISO7816.OFFSET_P1] == (byte) 1) { processGetReceipts(apdu); return; }
         if (buf[ISO7816.OFFSET_P1] != (byte) 0) ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
-        if ((pinState[0] != (byte) 0 || ownerSet[0] == (byte) 1) && pinVerifiedFlag[0] != (byte) 1 && loadGrant[0] != (byte) 1) {
+        // the PIN verified in this tap or the owner's grant; a card with no PIN (1.16) shows its log to whoever holds it
+        if (pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1 && loadGrant[0] != (byte) 1) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
         Util.arrayCopyNonAtomic(cardLog, (short) 0, buf, (short) 0, LOG_ANSWER_HEAD);
@@ -3468,7 +3470,8 @@ public class CashuApplet extends Applet {
      * which a till has. (A card with no PIN and no owner yet has signed nothing.)
      */
     private void processGetReceipts(APDU apdu) {
-        if ((pinState[0] != (byte) 0 || ownerSet[0] == (byte) 1) && loadGrant[0] != (byte) 1) {
+        // the owner's grant; a card with no PIN (1.16) shows its receipts to whoever holds it
+        if (pinState[0] != (byte) 0 && loadGrant[0] != (byte) 1) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
         byte[] buf = apdu.getBuffer();
@@ -3604,6 +3607,13 @@ public class CashuApplet extends Applet {
         a[26] = (byte) 36; a[27] = (byte) 37; a[28] = (byte) 38; a[29] = (byte) 39;
         a[30] = (byte) 40; a[31] = (byte) 41; a[32] = (byte) 42; a[33] = (byte) 43;
         a[34] = (byte) 44; a[35] = (byte) 45; a[36] = (byte) 46; a[37] = (byte) 47;
+        a[38] = (byte) 48;
+        a[38] = (byte) 48;
+        a[38] = (byte) 48;
+        a[38] = (byte) 48;
+        a[38] = (byte) 48;
+        a[38] = (byte) 48;
+        a[38] = (byte) 48;
         a[38] = (byte) 48;
     }
 }

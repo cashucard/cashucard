@@ -840,11 +840,11 @@ class CashuAppletTest {
     // =========================================================================
 
     @Test
-    @DisplayName("Nothing is loaded onto a card with no PIN")
-    void testNoLoadWithoutPin() {
-        assertEquals(SW_SECURITY_NOT_SATIS, load(buildProof(KEYSET, 16, 1)).getSW());
-        assertEquals(SW_OK, setCard(MINT, REFUND), "but its record is written: a card is set up with no PIN, and with none is open while it is set up (1.16)");
-        assertEquals(SW_SECURITY_NOT_SATIS, load(buildProof(KEYSET, 16, 1)).getSW(), "and still nothing loads, with a record, with no PIN and no owner's grant");
+    @DisplayName("Nothing is loaded onto a card with no owner, PIN or no PIN: a card with no PIN (1.16) is loaded by whoever holds it once it has an owner")
+    void testNoLoadWithoutOwner() {
+        assertEquals(SW_NO_OWNER, load(buildProof(KEYSET, 16, 1)).getSW(), "no record, no owner: nothing loads");
+        assertEquals(SW_OK, setCard(MINT, REFUND), "its record is written: a card is set up with no PIN, and with none is open while it is set up (1.16)");
+        assertEquals(SW_NO_OWNER, load(buildProof(KEYSET, 16, 1)).getSW(), "a record and still no owner: nothing loads");
         assertEquals(0, info()[3], "no slot was taken");
     }
 
@@ -9471,7 +9471,7 @@ class CashuAppletTest {
         say(out, "a new card says what it is", "exact", SW_OK, info);
         say(out, "its key", "key", SW_OK, new CommandAPDU(CLA, INS_GET_PUBKEY, 0, 0, 256));
         say(out, "its record, not yet written", "exact", SW_OK, getCard);
-        say(out, "nothing loads with no PIN", "exact", SW_SECURITY_NOT_SATIS, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1));
+        say(out, "nothing loads onto a card with no owner (a card with no PIN is loaded by whoever holds it, once it has one)", "exact", SW_NO_OWNER, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1));
         // 1.15: the clock is block headers. A card with nothing set up asks no key, PIN, owner or record of a header, and refuses one that has not the work
         block(out, "a header of 79 bytes is not a header", SW_WRONG_LENGTH, Arrays.copyOf(tip, 79));
         block(out, "nor is one of 81", SW_WRONG_LENGTH, concat(tip, new byte[1]));
@@ -10127,11 +10127,6 @@ class CashuAppletTest {
         assertEquals(1, d[16], "an owner");
         assertEquals(T0, readUint32(d, 17), "and a clock");
         assertEquals(SW_PIN_NOT_SET, verify(TEST_PIN), "there is no PIN to give");
-        // a stranger loads nothing, clears nothing and reads nothing: a card that has an owner is the owner's
-        assertEquals(SW_SECURITY_NOT_SATIS, load(buildProof(KEYSET, 16, 1)).getSW(), "no PIN to give and no grant: nothing loads");
-        assertEquals(SW_SECURITY_NOT_SATIS, clearSpent(), "nor is a place freed");
-        assertEquals(SW_SECURITY_NOT_SATIS, logAnswer().getSW(), "the log is the owner's");
-        assertEquals(SW_SECURITY_NOT_SATIS, transmit(receiptsCommand()).getSW(), "and so are the receipts");
         assertEquals(SW_OWNER_PROOF, setPin(TEST_PIN), "no PIN is added by whoever is at the reader");
         assertEquals(SW_SECURITY_NOT_SATIS, lock(), "a card with no PIN is not locked (it has no PIN to give for it)");
         // the owner's phone: the grant, and a load
@@ -10167,7 +10162,6 @@ class CashuAppletTest {
         assertEquals(SW_OK, load(buildProof(KEYSET, 4, 4)).getSW(), "and a piece of change goes on");
         reselect();
         assertEquals(0, info()[29], "the load closed the window");
-        assertEquals(SW_SECURITY_NOT_SATIS, load(buildProof(KEYSET, 4, 5)).getSW(), "a later stranger's tap gets nothing");
         // the day's limit holds a payment with no PIN as it holds any other: refused, and written down
         assertEquals(SW_OK, setLimits(20, 0));
         tap();
@@ -10183,6 +10177,15 @@ class CashuAppletTest {
         assertEquals(SW_OK, spendAll(new int[] { 0, 2 }, new byte[0][]).getSW(), "the rest of the card, in one payment");
         assertEquals(SW_OK, allowLoad());
         assertEquals(SW_OK, clearSpent(), "the grant frees the places");
+        assertEquals(0, balance());
+        // a stranger, with no PIN to give and no grant, in a tap of their own: a card with no PIN is anyone's to fill, to look at and to spend
+        tap();
+        assertEquals(SW_OK, load(buildProof(KEYSET, 2, 9)).getSW(), "a stranger's top-up loads with no PIN and no grant");
+        assertEquals(2, balance());
+        assertEquals(SW_OK, logAnswer().getSW(), "the log is anyone's who holds the card");
+        assertEquals(SW_OK, transmit(receiptsCommand()).getSW(), "and so are the receipts");
+        assertEquals(SW_OK, spendAll(new int[] { 0 }, new byte[0][]).getSW(), "and the piece is anyone's to spend");
+        assertEquals(SW_OK, clearSpent(), "and the place anyone's to free");
         assertEquals(0, balance());
         // a new record, by the owner, on the emptied card; the owner replaced
         assertEquals(SW_OK, ownerSetCard(MINT, REFUND));

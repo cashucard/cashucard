@@ -97,7 +97,7 @@ CHANGE LIMIT.
    that this phone will be the card's owner, and a tap. It asks for no limit and
    suggests no figure: a new card has none. The one tap gives the card its PIN
    (if any), its record and, last, its owner key (5.6). Nothing can be
-   added to a card with no PIN but by the owner's grant, and nothing to a card
+   added to a card with no PIN by whoever holds it, and nothing to a card
    with no owner. Cards are set up as cash for now (6). A card with no PIN is
    given one later from ADD PIN; a card with a PIN may be given a no-PIN limit
    (5.7a).
@@ -279,7 +279,7 @@ nothing is made specially for it. It is not upstream's text.
 | SET_PIN | sets a PIN once (`6985` if one exists) | sets or replaces the PIN, and unblocks, only on a card with no owner and nothing unspent. No PIN, no proof. A card with an owner refuses it (`6A91`), unless it has no PIN and the owner's grant is in this tap (ADD PIN, software 1.16) |
 | CHANGE_PIN | the old PIN, in a verified session | the owner's proof and the new PIN only: no old PIN, no session, any PIN state, any funds. It sets the PIN, resets the tries and unblocks (5.6) |
 | SET_CARD | none | writes the card record (unit, refund key, mint; the 65 bytes where the time key was are sent and not read). On a card with no owner under the PIN (or none, if it has no PIN: software 1.16), on a card with an owner under the owner's proof; only with nothing unspent. Never touches the limit or the clock |
-| LOAD_PROOF | 77 bytes | 81 bytes, with the date; refused unless a PIN is set and verified or the owner has allowed loading for this tap (on a card with no PIN, the owner's grant or the tap after a payment); refused on a card with no owner. It asks nothing of the clock. Never touches the limit |
+| LOAD_PROOF | 77 bytes | 81 bytes, with the date; refused unless a PIN is set and verified or the owner has allowed loading for this tap (a card with no PIN, 1.16, takes a piece from whoever holds it); refused on a card with no owner. It asks nothing of the clock. Never touches the limit |
 | CLEAR_SPENT | as is | as is, or under the owner's grant for this tap |
 | LOCK_CARD | the PIN if one is set | a PIN set and verified, and the owner's proof (5.6) |
 | **SET_LIMIT** (`33`, `34`) | none | the daily limit (5.7): `34` by the owner's proof, on any card with an owner and any funds, with no PIN; `33` by the PIN, on a card with no owner while it is empty. 0 is no limit. Four bytes are the day's limit; eight are the day's and then the limit on ONE PAYMENT, which asks no clock and makes a larger payment wait (`FOXY-CARD-DAILY-LIMIT.md`, 6a); twelve (software 1.16) add the NO-PIN ALLOWANCE (5.7a), which a card with no PIN refuses (`6985`). None needs a clock to be set. (`33` was once a limit on one PIN entry, which a terminal that had the PIN walked round; it is not that) |
@@ -342,7 +342,7 @@ the command's own row says; "refused" means `6A91` unless another word is given.
 | `SPEND_ALL_BEGIN` | open (software 1.16) | open |
 | `SPEND_ALL_SIGN`, `SPEND_ALL_AGAIN` | the PIN, if one is set (such a card holds nothing) | no PIN set: open, up to the limits; the PIN, or the no-PIN allowance (5.7a), up to the limits |
 | `LOAD_PROOF` | refused `6A90` | PIN verified, or the `ALLOW_LOAD` grant in this tap |
-| `CLEAR_SPENT` | the PIN, if one is set | the PIN, or the grant (with no PIN set, the grant) |
+| `CLEAR_SPENT` | the PIN, if one is set | the PIN, or the grant; with no PIN set (1.16), anyone |
 | `SET_PIN` (`41`) | open while nothing is unspent (sets or replaces, unblocks) | refused, empty or not: the owner uses `CHANGE_PIN`; except a card with no PIN, under the owner's grant in this tap (ADD PIN) |
 | `CHANGE_PIN` (`42`) | `6A90` | the owner's proof, empty or not, any PIN state |
 | `SET_CARD` (`32`) | the PIN verified if one is set (none: open), while nothing is unspent | the owner's proof, and nothing unspent (`6A8D`) |
