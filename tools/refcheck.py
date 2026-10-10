@@ -10,14 +10,17 @@ Two things, both found on the chip (docs/FOXY-CARD-HARDWARE.md):
    must list the opener first, and the two are installed in that order
    (docs/HARDWARE_DEPLOYMENT.md).
 
-2. Even then, the card's applet installs only when the load file's size falls
-   in a window of each 256 bytes: from WINDOW_LOW to WINDOW_HIGH bytes past a
-   multiple of 256, as measured. The same code fails a few dozen bytes to
-   either side. `CashuApplet.sizeTheFile` is in the package for its length
-   alone, six bytes a line, and this check says how many lines to add or to
-   take away. The window was measured with the constructor as it is; a
-   constructor that allocates differently may move it, and then it has to be
-   found again on the chip.
+2. Even then, the card's applet installs at some sizes of the load file and
+   not at others, and the same code fails a few dozen bytes to either side of
+   a size that works. The rule is not known: it looked like a window of each
+   256 bytes (130 to 186 past a multiple) for files of 17.3 to 17.7 KB, and
+   files of 18.1 to 18.5 KB install at 203 and 249 past and fail at 139 to
+   176. So this check keeps what has been measured on the chip (SIZES) and
+   says which it is: a size known to install, a size known to fail, or one
+   not tried yet. `CashuApplet.sizeTheFile` is in the package for its length
+   alone, about six bytes a line, so that a build can be moved to a size
+   known to install; a size not tried yet is tried on the chip with
+   ~/.foxycard/install-try.sh, and the answer added here.
 
     python3 tools/refcheck.py <file.cap>
 """
@@ -27,12 +30,15 @@ import zipfile
 OPENER = bytes.fromhex('F0464F5859434152444D')
 LOADED = ['Header', 'Directory', 'Import', 'Applet', 'Class', 'Method',
           'StaticField', 'Export', 'ConstantPool', 'RefLocation']
-# the load file's size, past a multiple of 256, at which the card's applet is known to install (130 to 186) and
-# known not to (72 and below, 192 and above); a build is aimed at the middle
+# what the chip has answered, by the load file's size (refcheck's measure, the stored components): True installed,
+# False went 6F00 or mute at INSTALL. Measured on a J3R180 with the opener first.
+SIZES = {
+    17344: False, 17438: False, 17479: False, 17480: False, 17538: True, 17552: True, 17560: True, 17562: True,
+    17564: True, 17575: True, 17582: True, 17589: True, 17677: False, 17694: False, 17726: False,
+    18123: True, 18315: False, 18337: False, 18340: False, 18352: False, 18425: True,
+}
+NEAR = 8  # bytes: a size this close to one that failed is treated as that one
 PAGE = 256
-WINDOW_LOW = 130
-WINDOW_HIGH = 186
-AIM = (WINDOW_LOW + WINDOW_HIGH) // 2
 LINE = 6  # bytes one line of sizeTheFile adds
 
 
@@ -68,19 +74,26 @@ def main(argv):
     size = load_file_size(parts)
     past = size % PAGE
     listed = applets(parts['Applet']) if 'Applet' in parts else []
-    print('load file: %d bytes, %d past a multiple of %d (the chip installs at %d to %d); applets, in order: %s'
-          % (size, past, PAGE, WINDOW_LOW, WINDOW_HIGH, ', '.join(a.hex().upper() for a in listed)))
+    print('load file: %d bytes (%d past a multiple of %d); applets, in order: %s'
+          % (size, past, PAGE, ', '.join(a.hex().upper() for a in listed)))
     if not listed or listed[0] != OPENER:
         print('REFUSED: the opener (%s) must be the first applet listed, so that it is instantiated first.' % OPENER.hex().upper())
         return 1
-    if past < WINDOW_LOW or past > WINDOW_HIGH:
-        # the nearest point of the window ahead of or behind this size, and the lines of sizeTheFile that get there
-        more = (AIM - past) % PAGE
-        fewer = (past - AIM) % PAGE
-        print('REFUSED: the chip will not install a file of this size. Add %d lines to CashuApplet.sizeTheFile (about %d bytes), '
-              'or take %d away (about %d bytes), to land %d past a multiple of %d.'
-              % ((more + LINE - 1) // LINE, more, (fewer + LINE - 1) // LINE, fewer, AIM, PAGE))
+    good = sorted(s for s, ok in SIZES.items() if ok)
+    bad = sorted(s for s, ok in SIZES.items() if not ok)
+    if size in SIZES and SIZES[size]:
+        print('a size known to install on the chip.')
+        return 0
+    close = [s for s in bad if abs(s - size) <= NEAR]
+    if close:
+        nearest = min(good, key=lambda s: abs(s - size))
+        print('REFUSED: a file of %d bytes failed to install on the chip (this one is %d). The nearest size known to install is %d: '
+              'move CashuApplet.sizeTheFile by about %d bytes (%d lines), or try this size with ~/.foxycard/install-try.sh and add the answer to SIZES.'
+              % (close[0], size, nearest, nearest - size, (abs(nearest - size) + LINE - 1) // LINE))
         return 1
+    nearest = min(good, key=lambda s: abs(s - size))
+    print('a size not yet tried on the chip (the nearest known to install is %d bytes, %+d from this). Try it with ~/.foxycard/install-try.sh before shipping it, and add the answer to SIZES.'
+          % (nearest, nearest - size))
     return 0
 
 

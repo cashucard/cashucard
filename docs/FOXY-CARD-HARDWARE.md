@@ -47,39 +47,41 @@ package after it. `tools/refcheck.py` runs after every `ant cap` and refuses
 a file whose first applet is not the opener. Deleting goes the other way:
 the card's applet, the opener, then the package.
 
-## The load file's size must fall in a window of each 256 bytes
+## The load file's size decides whether the applet installs, and the rule is not known
 
 With the opener in place, whether the card's applet installs still turns on
 the load file's size, and not in one direction. Five builds of one version
 of the software failed at the card applet's INSTALL (`6F00`, or mute) while
 the version before it installed, and the code they ran at install was the
-same to the byte; what differed was the file's size. Measured, in bytes past
-a multiple of 256:
+same to the byte; what differed was the file's size.
 
-- installs: 130, 144, 168, 181, 186 (files of 14,760 to 17,589 bytes);
-- does not: 13, 30, 62, 71, 72, 192 (files of 17,344 to 17,726 bytes).
+For files of 17.3 to 17.7 KB it looked like a window of each 256 bytes,
+measured in bytes past a multiple of 256: installs at 130, 144, 168, 181 and
+186; not at 13, 30, 62, 71, 72 and 192. The proof that it was the size and
+nothing in the code: a file of 17,344 bytes that failed (192 past) installed
+at 17,552 (144 past) with nothing changed but a method, never called, added
+at its end; and a file that installed at 17,538 (130 past) failed at 17,677
+(13 past) with the same constructor.
 
-The proof that it is the size and nothing in the code: a file of 17,344
-bytes that failed (192 past) installed at 17,552 (144 past) with nothing
-changed but a method, never called, added at its end. And a file that
-installed at 17,538 (130 past) failed at 17,677 (13 past) with the same
-constructor. So there is a window of some 60 to 120 bytes in each 256, and
-the file has to land in it.
-
-The mechanism is not known for certain. What fits is that the chip places
-what the install makes (the applets' objects, which start where the package
-image ends) against pages of 256 bytes, and that some of it must not fall
-across a page edge, or must; where the image ends is set by the file's size,
-and so is everything after it. The window was measured with the constructor
-as it is: a constructor that allocates other objects, or in another order,
-may move it, and then it has to be found again on the chip, a few sizes at
-a time (an unused method at the end of the applet, six bytes a line, moves
-the size without moving anything else).
+The next version, 800 bytes larger, broke the window: files of 18,315,
+18,337, 18,340 and 18,352 bytes (139 to 176 past, inside it) went mute at
+INSTALL, some nine seconds in, while 18,123 (203 past) and 18,425 (249 past)
+installed in two seconds, and the version before, with the one new constant
+of the next added to it, installed at 17,582 (174 past). So the window moved
+with the size of the file, or was never a window of 256 bytes at all. The
+mechanism stays unknown: what fits is that the chip places what the install
+makes (the applets' objects, which start where the package image ends)
+against pages, and that something must not fall across an edge; where the
+image ends is set by the file's size.
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
-the package for its length alone; `tools/refcheck.py`, after every `ant cap`,
-refuses a file outside the window and says how many of that method's lines
-to add or to take away to land in the middle of it.
+the package for its length alone, about six bytes a line, so that a build
+can be moved to a size that is known to install; `tools/refcheck.py`, after
+every `ant cap`, keeps every size the chip has answered (`SIZES`) and says
+whether this build's size is one that installed, one that failed, or one not
+tried yet. A size not tried yet is tried on the chip with
+`~/.foxycard/install-try.sh`, and the answer is added to the table. A
+version is shipped at a size that installed.
 
 ## One transaction holds about a dozen status bytes
 

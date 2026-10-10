@@ -3600,20 +3600,6 @@ public class CashuApplet extends Applet {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        a[10] = (byte) 20; a[11] = (byte) 21; a[12] = (byte) 22; a[13] = (byte) 23;
-        a[14] = (byte) 24; a[15] = (byte) 25; a[16] = (byte) 26; a[17] = (byte) 27;
-        a[18] = (byte) 28; a[19] = (byte) 29; a[20] = (byte) 30; a[21] = (byte) 31;
-        a[22] = (byte) 32; a[23] = (byte) 33; a[24] = (byte) 34; a[25] = (byte) 35;
-        a[26] = (byte) 36; a[27] = (byte) 37; a[28] = (byte) 38; a[29] = (byte) 39;
-        a[30] = (byte) 40; a[31] = (byte) 41; a[32] = (byte) 42; a[33] = (byte) 43;
-        a[34] = (byte) 44; a[35] = (byte) 45; a[36] = (byte) 46; a[37] = (byte) 47;
-        a[38] = (byte) 48;
-        a[38] = (byte) 48;
-        a[38] = (byte) 48;
-        a[38] = (byte) 48;
-        a[38] = (byte) 48;
-        a[38] = (byte) 48;
-        a[38] = (byte) 48;
-        a[38] = (byte) 48;
+        // no lines at present: 1.16 installs at 203 past a multiple of 256 (and 249), and not at 139, 164 or 176
     }
 }
