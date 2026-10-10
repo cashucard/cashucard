@@ -328,8 +328,8 @@ has most of them as commands and answers):
 `21` (`SIGN_ARBITRARY`) stays unassigned. The applet's version is 1.1 and
 `FORMAT` is 3; a phone that knows only an earlier format refuses the card, as it
 does now for anything but its own. (That is how the rows not marked with a later
-software version were first written. The applet is now at 1.17, `SELECT` answers
-`01 11`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
+software version were first written. The applet is now at 1.18, `SELECT` answers
+`01 12`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
 section 8 differ, that one is what is built.)
 
 **Every command in every state.** "Open" means nothing is needed beyond what

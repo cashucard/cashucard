@@ -141,7 +141,9 @@ public class CashuApplet extends Applet {
     // 1.17 is RESET_CARD (0x51): the owner's proof wipes the card to what it was out of its packet, with a new key of its own, so that
     // another person may set it up. It keeps its clock and its software. Nothing unspent may be on it (6A8D), and a locked card
     // wants the PIN as well. The wire is otherwise 1.16's.
-    static final byte VERSION_MINOR = (byte) 0x11;
+    // 1.18 waits four signatures of the card's own work for each limit's worth over the limit past the first, where 1.13 to
+    // 1.17 waited three (the first limit's worth over is ten, as it was in 1.17). Nothing else is different: the wire is 1.17's.
+    static final byte VERSION_MINOR = (byte) 0x12;
     static final byte FORMAT        = (byte) 0x04;
 
     // -------------------------------------------------------------------------
@@ -649,8 +651,8 @@ public class CashuApplet extends Applet {
     // for the first limit's worth over the limit, and for every further limit's worth. Each change output
     // made (about 0.4 s) counts as one of them done. Within the limit there is no wait.
     static final short WAIT_OVER_SIGNS   = (short) 10;
-    static final short WAIT_MORE_SIGNS   = (short) 3;
-    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about nine minutes). */
+    static final short WAIT_MORE_SIGNS   = (short) 4;
+    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about twelve minutes). */
     static final short WAIT_UNITS_MOST = (short) 255;
     /** What 255 limits' worth waits: the most any payment does. */
     static final short WAIT_SIGNS_MOST = (short)(WAIT_OVER_SIGNS + WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 2));
@@ -2154,7 +2156,7 @@ public class CashuApplet extends Applet {
      * over it, see below), nothing, change or no change — that change is
      * coming is the phone's to say, not the card's; over L, WAIT_OVER_SIGNS
      * for the first limit's worth over (about seven seconds) and
-     * WAIT_MORE_SIGNS for every further one, whole or in part (two seconds
+     * WAIT_MORE_SIGNS for every further one, whole or in part (three seconds
      * each). The change outputs the card made (`made`), about 0.4 s of its
      * work each, count for what they cost: two signatures for every three.
      *

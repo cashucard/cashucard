@@ -473,7 +473,7 @@ out at the first `SPEND_ALL_SIGN`, when the change is known, and shaped
 the limit:
 
     S ≤ L                waits = 0                                                (change or no change)
-    S > L                waits = WAIT_OVER_SIGNS + WAIT_MORE_SIGNS × (ceil(S / L) − 2)   (10 + 3 for each further limit's worth: about seven seconds, then two each; 1.13 to 1.16 had 7, about five seconds)
+    S > L                waits = WAIT_OVER_SIGNS + WAIT_MORE_SIGNS × (ceil(S / L) − 2)   (10 + 4 for each further limit's worth: about seven seconds, then three each; 1.13 to 1.17 had 3 for each further one, 1.13 to 1.16 had 7 for the first, about five seconds)
 
 less the time the change outputs the card made in this payment took, two
 waits for every three outputs (software 1.14; an output is about two thirds of
@@ -490,14 +490,14 @@ in that money so many at another, so a payment of exactly the limit lands a
 few sats over, and that is not "over the limit". So a payment within the
 limit that makes no change goes at once (about two seconds in the hand, all of
 it reading and signing, plus about half a second for each change output the
-card makes); one over the limit about seven seconds longer, and two more for
+card makes); one over the limit about seven seconds longer, and three more for
 every further limit's worth. `L` of 0 is no limit. Past 255 limits a payment waits
-as 255 do, which is about nine minutes and so never. (Before 1.13, 1.12
+as 255 do (1022 waits), which is about twelve minutes and so never. (Before 1.13, 1.12
 counted four signatures for every limit's worth, a part counting as one;
 before 1.12 the first `L` was free and the pieces were counted whole.)
 
 **One payment a tap at full speed.** A second payment signed in the same time
-in the field waits as one over the limit does — about seven seconds, and two
+in the field waits as one over the limit does — about seven seconds, and three
 more for every limit's worth of it — whether or not there is a limit, unless
 the owner's grant (`ALLOW_LOAD`) is in the tap. A terminal that holds the PIN
 could otherwise take a limit's worth a second for as long as the card is held,
@@ -1211,7 +1211,11 @@ Bitcoin block headers (5): `SET_TIME` and the time key are gone, `SET_HEADER` an
 time a terminal tells. No capability bit says so, since all eight are taken; the
 version does, and `SELECT` answers `01 0F`. 1.16 makes the PIN optional and
 gives a card that has one the no-PIN allowance (6f): `SELECT` answers `01 10`,
-no capability bit changes, and the wire is otherwise 1.15's.
+no capability bit changes, and the wire is otherwise 1.15's. 1.17 adds
+`RESET_CARD` (SPEC 5.6a), and `SELECT` answers `01 11`. 1.18 makes the wait for
+each further limit's worth over the limit four signatures where it was three
+(6a): `SELECT` answers `01 12`, no capability bit changes, and the wire is
+otherwise 1.17's.
 
 **Every command in every state: the rule of section 3 worked through.** "Open"
 means nothing is needed beyond what the command's own row says; "refused" means

@@ -158,7 +158,7 @@ newest hash of a block header taken (a time key up to 1.14), the clock and the
 day, and the mint's address (up to 80 bytes). Apart from it the card keeps a
 65-byte owner public key, which nothing reads out. The applet's version was 1.1
 (`SELECT` answers `01 01`) and the format byte 3 when this was written; they are
-1.17 (`01 11`) and 4 now.
+1.18 (`01 12`) and 4 now.
 
 **The owner and its proof.** The holder's phone works the owner's private key out
 for each card as HMAC-SHA256 with the 64-byte BIP-39 seed as the key, over
