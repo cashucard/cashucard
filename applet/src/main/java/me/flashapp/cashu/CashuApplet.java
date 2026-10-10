@@ -50,6 +50,7 @@ import javacardx.crypto.*;
  *   0x44  GET_NONCE        — a fresh nonce for the owner's proof
  *   0x45  ALLOW_LOAD       — the owner's proof lets LOAD_PROOF and CLEAR_SPENT through, with no PIN, for this tap
  *   0x50  LOCK_CARD        — permanently disable write operations (PIN, and the owner's proof)
+ *   0x51  RESET_CARD       — back to a card out of its packet, for another person to set up (the owner's proof; nothing unspent; the PIN too if locked)
  *
  * What the fork changes, and why (the spec's section 4, and docs/FOXY-CARD-DAILY-LIMIT.md):
  *   - SPEND_PROOF takes no message. Upstream signed 32 bytes the reader
@@ -137,7 +138,10 @@ public class CashuApplet extends Applet {
     // with a PIN has a third limit, the NO-PIN ALLOWANCE: what it signs for in a day without the PIN, counted in the day's
     // window beside the daily limit; over it the signature is refused with 6A94 and the PIN is asked for the whole payment.
     // A PIN is added to a card that has an owner by the owner's grant (SET_PIN). The wire is otherwise 1.15's.
-    static final byte VERSION_MINOR = (byte) 0x10;
+    // 1.17 is RESET_CARD (0x51): the owner's proof wipes the card to what it was out of its packet, with a new key of its own, so that
+    // another person may set it up. It keeps its clock and its software. Nothing unspent may be on it (6A8D), and a locked card
+    // wants the PIN as well. The wire is otherwise 1.16's.
+    static final byte VERSION_MINOR = (byte) 0x11;
     static final byte FORMAT        = (byte) 0x04;
 
     // -------------------------------------------------------------------------
@@ -182,6 +186,7 @@ public class CashuApplet extends Applet {
     static final byte INS_GET_NONCE        = (byte) 0x44;
     static final byte INS_ALLOW_LOAD       = (byte) 0x45;
     static final byte INS_LOCK_CARD        = (byte) 0x50;
+    static final byte INS_RESET_CARD       = (byte) 0x51;
 
     // -------------------------------------------------------------------------
     // Proof slot layout constants (82 bytes per slot: upstream's 78 and a date)
@@ -326,8 +331,9 @@ public class CashuApplet extends Applet {
     // The log (persistent): the card's own account of what it has signed for
     // and what it has refused. A spend writes it, in the transaction that
     // burns the piece, and a spend refused for being over a limit writes it
-    // before it is refused. Nothing else does: no command sets it, moves it
-    // back or clears it, for the PIN or for the owner. The counts only go up,
+    // before it is refused. Nothing else does: no command sets it or moves it
+    // back, for the PIN or for the owner, and the one that clears it is
+    // RESET_CARD (1.17), which makes the card a new one. The counts only go up,
     // and stop at the top of four bytes.
     //
     // A tap, here, is one time in a reader's field: from the card being
@@ -375,7 +381,7 @@ public class CashuApplet extends Applet {
      * whole swap, piece for piece and output for output. It is what a holder
      * has to show for a payment they did not mean to make. Read with the
      * owner's grant and nothing less: a terminal that has the PIN cannot read
-     * it, and no command clears it. */
+     * it, and nothing clears it but RESET_CARD (1.17). */
     static final short RECEIPTS             = (short) 16;
     static final short RECEIPT_LEN          = (short) 77;
     static final short RECEIPTS_HEAD        = (short) 4;
@@ -421,6 +427,8 @@ public class CashuApplet extends Applet {
 
     // LOCK_CARD confirmation byte
     static final byte LOCK_CONFIRM_BYTE = (byte) 0xDE;
+    // RESET_CARD confirmation byte
+    static final byte RESET_CONFIRM_BYTE = (byte) 0xAD;
 
     // PIN constraints
     static final short PIN_MIN_LEN  = (short) 4;
@@ -615,6 +623,8 @@ public class CashuApplet extends Applet {
         'F','o','x','y','C','a','r','d','/','l','o','a','d' };
     private static final byte[] LABEL_LOCK = {   // FoxyCard/lock
         'F','o','x','y','C','a','r','d','/','l','o','c','k' };
+    private static final byte[] LABEL_RESET = {   // FoxyCard/reset
+        'F','o','x','y','C','a','r','d','/','r','e','s','e','t' };
     /* The least work a block header must show to be taken, as a header carries
      * its difficulty (`bits`, little-endian): 0x17087BC0, four times the
      * target of the network's blocks when this version was made (0x17021EF0),
@@ -638,9 +648,9 @@ public class CashuApplet extends Applet {
     // The wait (6a), in signatures of the card's own work (about 0.6 s each on the chip, 0.7 over NFC):
     // for the first limit's worth over the limit, and for every further limit's worth. Each change output
     // made (about 0.4 s) counts as one of them done. Within the limit there is no wait.
-    static final short WAIT_OVER_SIGNS   = (short) 7;
+    static final short WAIT_OVER_SIGNS   = (short) 10;
     static final short WAIT_MORE_SIGNS   = (short) 3;
-    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about eight minutes). */
+    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about nine minutes). */
     static final short WAIT_UNITS_MOST = (short) 255;
     /** What 255 limits' worth waits: the most any payment does. */
     static final short WAIT_SIGNS_MOST = (short)(WAIT_OVER_SIGNS + WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 2));
@@ -1069,6 +1079,7 @@ public class CashuApplet extends Applet {
             case INS_GET_NONCE:        processGetNonce(apdu);       break;
             case INS_ALLOW_LOAD:       processAllowLoad(apdu);      break;
             case INS_LOCK_CARD:        processLockCard(apdu);       break;
+            case INS_RESET_CARD:       processResetCard(apdu);      break;
             default:
                 ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
         }
@@ -2142,7 +2153,7 @@ public class CashuApplet extends Applet {
      * pieces less the card's own change): within L (or within a thirty-second
      * over it, see below), nothing, change or no change — that change is
      * coming is the phone's to say, not the card's; over L, WAIT_OVER_SIGNS
-     * for the first limit's worth over (about five seconds) and
+     * for the first limit's worth over (about seven seconds) and
      * WAIT_MORE_SIGNS for every further one, whole or in part (two seconds
      * each). The change outputs the card made (`made`), about 0.4 s of its
      * work each, count for what they cost: two signatures for every three.
@@ -2151,7 +2162,7 @@ public class CashuApplet extends Applet {
      * time in the field (`second`: one was, and the owner's grant is not in
      * this tap) is slowed as one over the limit is, limit or no limit. A
      * terminal that has the PIN could otherwise take a limit's worth a second
-     * for as long as the card is held; now each costs it about five seconds,
+     * for as long as the card is held; now each costs it about seven seconds,
      * or a fresh tap, which asks the PIN again. The owner's phone, which takes
      * a whole card off in more than one signature where its pieces have more
      * than one date, gives its grant first and is not slowed.
@@ -2459,6 +2470,12 @@ public class CashuApplet extends Applet {
         }
 
         byte[] buf = apdu.getBuffer();
+        buf[0] = (byte) freeSpent();
+        apdu.setOutgoingAndSend((short) 0, (short) 1);
+    }
+
+    /** Every spent place freed, as CLEAR_SPENT does it (and RESET_CARD): answers how many. */
+    private short freeSpent() {
         short freed = 0;
         for (short i = 0; i < MAX_PROOFS; i++) {
             short base = (short)(i * PROOF_SIZE);
@@ -2473,8 +2490,7 @@ public class CashuApplet extends Applet {
                 freed++;
             }
         }
-        buf[0] = (byte) freed;
-        apdu.setOutgoingAndSend((short) 0, (short) 1);
+        return freed;
     }
 
     /**
@@ -3215,6 +3231,88 @@ public class CashuApplet extends Applet {
         short at = requireOwnerProof(LABEL_LOCK, buf, dataLen);
         if ((short)(ISO7816.OFFSET_CDATA + dataLen) != at) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         cardLocked[0] = (byte) 1;
+    }
+
+    /**
+     * RESET_CARD (1.17): P1 = 0, P2 = the confirming byte (0xAD), and the owner's
+     * proof's length (1) and the proof, over "FoxyCard/reset" and no value.
+     *
+     * The card as it was out of its packet, for another person to set up: no PIN
+     * (three tries), no owner, no record, no limits, no allowance, no log, no
+     * receipts, no change owed or signature kept, and a new key pair of its own
+     * (the old key tied the last owner's payments to the next one's). It keeps
+     * its clock (the time and the header hash it was shown; the ratchet's bits go
+     * to nothing, as SET_CARD does) and its software.
+     *
+     * Order of the refusals: `6B00` for the P1 and P2; `6A90` with no owner; the
+     * proof (`6A91`; `6700` for anything after it); `6982` on a LOCKED card whose
+     * PIN has not been verified in this tap (a locked card resets for the owner's
+     * proof AND the PIN); `6A8D` with anything unspent on the card. A blocked PIN
+     * is no bar: the owner is resetting, not unblocking.
+     *
+     * Not one transaction, and not a long one: a chip's commit buffer holds about
+     * a dozen writes. The bulk is written outside any (the places, the log, the
+     * receipts, the openings, the record, the new keys), and the three things that
+     * say who the card is (locked, the PIN, the owner) and the change note are
+     * flipped in a transaction of four bytes, last of all. A card that leaves the
+     * field before that has the owner still, and the owner may reset it again; one
+     * that leaves after it is a new card, with at worst the old PIN's bytes and
+     * tries not yet cleared (nothing reads them with no PIN set, and SET_PIN
+     * replaces them). The lock goes first, then the PIN, then the owner, so that a
+     * locked card torn in the middle is not left locked with its PIN gone.
+     */
+    private void processResetCard(APDU apdu) {
+        byte[] buf = apdu.getBuffer();
+        if (buf[ISO7816.OFFSET_P1] != (byte) 0 || buf[ISO7816.OFFSET_P2] != RESET_CONFIRM_BYTE) {
+            ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        }
+        if (ownerSet[0] != (byte) 1) ISOException.throwIt(SW_NO_OWNER);
+        short dataLen = apdu.setIncomingAndReceive();
+        short at = requireOwnerProof(LABEL_RESET, buf, dataLen);
+        if ((short)(ISO7816.OFFSET_CDATA + dataLen) != at) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        if (cardLocked[0] == (byte) 1 && pinVerifiedFlag[0] != (byte) 1) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+        requireNothingUnspent();
+
+        // the places: the spent ones freed, as CLEAR_SPENT does it (nothing else is in one, and nothing unspent)
+        freeSpent();
+        // nothing of the last owner's taps: the log, the receipts, the change openings and the last signature (the burn list is the places of a payment finished, and nothing reads it)
+        Util.arrayFillNonAtomic(cardLog, (short) 0, LOG_LEN, (byte) 0);
+        Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);
+        Util.arrayFillNonAtomic(changeOpen, (short) 0, (short)(CHANGE_MOST * OPEN_LEN), (byte) 0);
+        Util.arrayFillNonAtomic(openState, (short) 0, CHANGE_MOST, (byte) 0);
+        Util.arrayFillNonAtomic(lastSig, (short) 0, (short) 65, (byte) 0);
+        /* The record, but for the clock: the time and the header's hash stay (the
+         * bits before the hash, the ratchet, go with the rest). */
+        Util.arrayFillNonAtomic(cardRecord, (short) 0, CARD_HEADER_OFFSET, (byte) 0);
+        Util.arrayFillNonAtomic(cardRecord, (short)(CARD_HEADER_OFFSET + 32), (short)(CARD_NOW_OFFSET - CARD_HEADER_OFFSET - 32), (byte) 0);
+        Util.arrayFillNonAtomic(cardRecord, CARD_WINDOW_OFFSET, (short)(CARD_RECORD_LEN - CARD_WINDOW_OFFSET), (byte) 0);
+        /* New keys, made as the constructor makes them (the same key objects, with
+         * their curve set, drawn again). The signature that vouched for the old PIN
+         * key is let go first, so that no card is left with a signature that is not
+         * over the key it holds: it is made again at the first asking. */
+        pinKeySig[0] = (byte) 0;
+        cardKeyPair.genKeyPair();
+        pinKeyPair.genKeyPair();
+
+        // who the card is, last of all
+        JCSystem.beginTransaction();
+        cardLocked[0] = (byte) 0;
+        pinState[0] = (byte) 0;
+        changeDue[0] = (byte) 0;
+        ownerSet[0] = (byte) 0;
+        JCSystem.commitTransaction();
+
+        // the old owner's key and PIN overwritten (nothing reads them now), and the PIN's tries back
+        ownerKey.setW(P256_G, (short) 0, EC_POINT_LEN);
+        pin.update(ZERO, (short) 0, (byte) 4);
+        // and this tap is a new card's: nothing the owner or the PIN had given in it, and a log to begin
+        pinVerifiedFlag[0] = (byte) 0;
+        loadGrant[0] = (byte) 0;
+        changeGrant[0] = (byte) 0;
+        tapOpen[0] = (byte) 0;
+        tapOpen[1] = (byte) 0;
     }
 
     // -------------------------------------------------------------------------

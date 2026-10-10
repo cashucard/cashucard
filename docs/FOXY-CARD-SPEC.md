@@ -282,6 +282,7 @@ nothing is made specially for it. It is not upstream's text.
 | LOAD_PROOF | 77 bytes | 81 bytes, with the date; refused unless a PIN is set and verified or the owner has allowed loading for this tap (a card with no PIN, 1.16, takes a piece from whoever holds it); refused on a card with no owner. It asks nothing of the clock. Never touches the limit |
 | CLEAR_SPENT | as is | as is, or under the owner's grant for this tap |
 | LOCK_CARD | the PIN if one is set | a PIN set and verified, and the owner's proof (5.6) |
+| **RESET_CARD** (`51`) | none | software 1.17: the owner's proof (and, on a locked card, the PIN given in this tap) wipes the card to what it was out of its packet, with a new key of its own, for another person to set up. Only with nothing unspent (5.6a) |
 | **SET_LIMIT** (`33`, `34`) | none | the daily limit (5.7): `34` by the owner's proof, on any card with an owner and any funds, with no PIN; `33` by the PIN, on a card with no owner while it is empty. 0 is no limit. Four bytes are the day's limit; eight are the day's and then the limit on ONE PAYMENT, which asks no clock and makes a larger payment wait (`FOXY-CARD-DAILY-LIMIT.md`, 6a); twelve (software 1.16) add the NO-PIN ALLOWANCE (5.7a), which a card with no PIN refuses (`6985`). None needs a clock to be set. (`33` was once a limit on one PIN entry, which a terminal that had the PIN walked round; it is not that) |
 | ~~SET_TIME~~ (`35`) | none | gone in software 1.15 (`6D00`). It told the card a time under the time key's signature |
 | **SET_HEADER** (`36`) | none | shows the card a Bitcoin block header (software 1.15). The card believes it for its work, and a later time in it moves the card's clock forward; it only moves forward (5.7) |
@@ -321,13 +322,14 @@ has most of them as commands and answers):
 | `43` | SET_OWNER | no owner: nothing unspent. Owner: the owner's proof, nothing unspent | 65 bytes, the owner's public key, uncompressed; with an owner, proof length (1) and the proof first | sets or replaces the owner; `6A8D` if anything is unspent; `6A91` with an owner and no good proof; `6A80` for a key not beginning `04`; `6700` other length; `6986` locked |
 | `44` | GET_NONCE | a card with an owner. No PIN | | 16 bytes, or `6A90` |
 | `45` | ALLOW_LOAD | the owner's proof, over `FoxyCard/load` and no value | proof length (1), proof | for the rest of this tap: `LOAD_PROOF` and `CLEAR_SPENT` need no verified PIN. `6A90`, `6A91`; `6986` locked |
+| `51` | RESET_CARD (software 1.17) | the owner's proof; on a locked card the PIN as well; nothing unspent | P1 = `00`, P2 = `AD`; proof length (1), proof (over `FoxyCard/reset` and no value), nothing after it | nothing. `6B00` for a P1 or P2 not those, before anything else; `6A90` with no owner; `6A91` with no good proof; `6700` for bytes after the proof; `6982` on a locked card whose PIN has not been given in this tap; `6A8D` with anything unspent. A blocked PIN is no bar |
 | `50` | LOCK_CARD | PIN set and verified; the owner's proof | P2 = `DE`; proof length (1), proof | `6982` with no verified PIN; `6A90` with no owner; `6A91` with no good proof |
 
 `21` (`SIGN_ARBITRARY`) stays unassigned. The applet's version is 1.1 and
 `FORMAT` is 3; a phone that knows only an earlier format refuses the card, as it
 does now for anything but its own. (That is how the rows not marked with a later
-software version were first written. The applet is now at 1.16, `SELECT` answers
-`01 10`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
+software version were first written. The applet is now at 1.17, `SELECT` answers
+`01 11`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
 section 8 differ, that one is what is built.)
 
 **Every command in every state.** "Open" means nothing is needed beyond what
@@ -351,6 +353,7 @@ the command's own row says; "refused" means `6A91` unless another word is given.
 | `SET_OWNER` (`43`) | open while nothing is unspent | the owner's proof, and nothing unspent |
 | `ALLOW_LOAD` (`45`) | `6A90` | the owner's proof |
 | `LOCK_CARD` (`50`) | `6A90` (after the PIN gate) | PIN set and verified, and the owner's proof |
+| `RESET_CARD` (`51`, software 1.17) | `6A90` | the owner's proof, nothing unspent; on a locked card the PIN as well |
 
 So the one thing a terminal with the PIN and an emptied card can still do is
 load pieces onto it (which the mint will refuse) and spend them. It cannot set
@@ -537,10 +540,11 @@ verifier.
 | `SET_CARD` (on a card that has an owner) | `FoxyCard/set-card` | the data sent: unit, refund key, the 65 bytes where the time key was (zeros from a phone of software 1.15; the card does not read them), mint length, mint |
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |
 | `LOCK_CARD` | `FoxyCard/lock` | nothing |
+| `RESET_CARD` (software 1.17) | `FoxyCard/reset` | nothing |
 
 So a proof for one command, or one value, is no proof for another, and an old or
 used proof fails. The data of an owner's command is `proof length (1) ‖ proof
-(DER) ‖ the value` (for `ALLOW_LOAD` and `LOCK_CARD`, the proof alone), so the
+(DER) ‖ the value` (for `ALLOW_LOAD`, `LOCK_CARD` and `RESET_CARD`, the proof alone), so the
 proof sits first and the value after it is exactly what the proof was made over.
 
 **Refusal.** `6A91` when no nonce was asked for in this tap, or the signature is
@@ -553,6 +557,38 @@ give. `LOCK_CARD` needs a PIN that is set and verified as well; a card with no
 PIN, or none verified in this tap, answers `6982`. The phone locks nothing:
 `LOCK_CARD` is for a tool, and the phone's gate refuses to carry instruction
 `50`.
+
+**5.6a. RESET_CARD (software 1.17).** An owner can factory-reset a card so that
+another person can set it up. `51`, P1 = `00`, P2 = `AD` (any other is `6B00`,
+as `LOCK_CARD`'s `DE`), the data the owner's proof over `FoxyCard/reset` and no
+value, and nothing after it (`6700`). It is refused in this order: the bytes;
+no owner (`6A90`); the proof (`6A91`); a LOCKED card whose PIN has not been
+given in this tap (`6982`: a locked card resets for the owner's proof and the
+PIN, and a locked card whose PIN is blocked cannot be reset); anything
+unspent on the card (`6A8D`, as `SET_CARD` refuses a record on a card that is
+not empty). A blocked PIN on a card that is not locked is no bar: the owner is
+resetting, not unblocking.
+
+The card then reads as a card out of its packet: no PIN (`GET_INFO` PIN state
+0, three tries), no owner, not locked, no record, no limits, no allowance, no
+window or spending, no places in use, no log, no receipts, no change owed or
+change note, no kept signature, and **a new key pair**: the card's own key
+(`GET_PUBKEY`) and the PIN key (`GET_NONCE` P1 = 1, whose signature by the card
+key is made again at the first asking). The old key would have tied one
+owner's payments to the next one's. What it keeps is its clock (the time, and
+the hash of the last block header it was shown; the ratchet's difficulty goes
+to nothing, as `SET_CARD` does it) and its software. The old owner's proofs
+fail (`6A90`), and set-up (`SET_PIN` or none, `SET_CARD`, `SET_OWNER`) is as on
+a new card. An opening of change still owed to the card goes with the rest:
+the pieces it would have come to are locked to the key that is gone, so the
+owner's phone finishes any (`GET_CHANGE`) before it resets.
+
+The wipe is one transaction of four bytes (the lock, the PIN state, the change
+note, the owner), after the keys are drawn, with everything else written
+outside any (a chip's commit buffer holds about a dozen writes). A card taken
+away before it has the owner still and is reset again; one taken away after it
+is a new card whose old PIN's bytes and tries may not be cleared yet, which
+nothing reads with no PIN set and `SET_PIN` replaces.
 
 **Who the owner is.** Whoever's words derived the key on the card: for a holder
 with a phone, their own; for a holder without one, the friend whose phone set the

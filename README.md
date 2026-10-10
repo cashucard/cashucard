@@ -135,6 +135,7 @@ Full reference: [`spec/APDU.md`](spec/APDU.md).
 | `B0` | `31` | CLEAR_SPENT | ✔ | Reclaim spent slots |
 | `B0` | `40`–`42` | VERIFY/SET/CHANGE_PIN | — / ✔ | PIN management |
 | `B0` | `50` | LOCK_CARD | ✔ | Irreversibly disable writes |
+| `B0` | `51` | RESET_CARD | owner's proof (+ PIN if locked) | Wipe the card to a new one, with a new key, for another person to set up (1.17) |
 
 **Spending is PIN-gated once a PIN is set** (D13, v0.2.0): `SPEND_PROOF`,
 `SIGN_ARBITRARY`, `LOAD_PROOF`, `CLEAR_SPENT` and `LOCK_CARD` answer `6982`

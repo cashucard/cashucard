@@ -105,10 +105,12 @@ a newer block can end is a bound it cannot walk round (5).
    and then it spends without one; a card with a PIN spends up to its no-PIN
    allowance without it. Section 6f.)
 2. **The owner's proof administers.** `CHANGE_PIN`, the owner's `SET_LIMIT`
-   (`34`), `SET_OWNER`, `SET_CARD`, `ALLOW_LOAD` and `LOCK_CARD` need an ECDSA
+   (`34`), `SET_OWNER`, `SET_CARD`, `ALLOW_LOAD`, `LOCK_CARD` and `RESET_CARD`
+   (1.17) need an ECDSA
    signature by the owner key over a label of the command, a nonce the card has
    just given, and the value. They need no PIN, because the owner's phone does
-   not know it (`LOCK_CARD` keeps its PIN as well). The signature is checked by
+   not know it (`LOCK_CARD` keeps its PIN as well, and so does `RESET_CARD` on a
+   locked card). The signature is checked by
    the card's native ECDSA verifier; the owner's private key never leaves the
    phone's native side.
 3. **A card with an owner is not open, empty or not; a card with none is open
@@ -471,7 +473,7 @@ out at the first `SPEND_ALL_SIGN`, when the change is known, and shaped
 the limit:
 
     S ≤ L                waits = 0                                                (change or no change)
-    S > L                waits = WAIT_OVER_SIGNS + WAIT_MORE_SIGNS × (ceil(S / L) − 2)   (7 + 3 for each further limit's worth: about five seconds, then two each)
+    S > L                waits = WAIT_OVER_SIGNS + WAIT_MORE_SIGNS × (ceil(S / L) − 2)   (10 + 3 for each further limit's worth: about seven seconds, then two each; 1.13 to 1.16 had 7, about five seconds)
 
 less the time the change outputs the card made in this payment took, two
 waits for every three outputs (software 1.14; an output is about two thirds of
@@ -488,18 +490,18 @@ in that money so many at another, so a payment of exactly the limit lands a
 few sats over, and that is not "over the limit". So a payment within the
 limit that makes no change goes at once (about two seconds in the hand, all of
 it reading and signing, plus about half a second for each change output the
-card makes); one over the limit about five seconds longer, and two more for
+card makes); one over the limit about seven seconds longer, and two more for
 every further limit's worth. `L` of 0 is no limit. Past 255 limits a payment waits
-as 255 do, which is about eight minutes and so never. (Before 1.13, 1.12
+as 255 do, which is about nine minutes and so never. (Before 1.13, 1.12
 counted four signatures for every limit's worth, a part counting as one;
 before 1.12 the first `L` was free and the pieces were counted whole.)
 
 **One payment a tap at full speed.** A second payment signed in the same time
-in the field waits as one over the limit does — about five seconds, and two
+in the field waits as one over the limit does — about seven seconds, and two
 more for every limit's worth of it — whether or not there is a limit, unless
 the owner's grant (`ALLOW_LOAD`) is in the tap. A terminal that holds the PIN
 could otherwise take a limit's worth a second for as long as the card is held,
-each payment signed at once; now each costs it five seconds, or a fresh tap,
+each payment signed at once; now each costs it seven seconds, or a fresh tap,
 which asks the PIN again. The owner's phone, which takes a whole card off in
 more than one signature where its pieces have more than one date, gives its
 grant first and is not slowed. The change tap and a refund are loads, not
@@ -1111,6 +1113,7 @@ had a hash:
 | `SET_CARD` (on a card that has an owner) | `FoxyCard/set-card` | the data sent: unit, refund key, the 65 bytes where the time key was, mint length, mint. A phone of software 1.15 sends those 65 bytes as zeros and the card ignores them; a phone of an earlier software sends a key, and the card ignores that too. The proof is over the bytes as sent, either way |
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |
 | `LOCK_CARD` | `FoxyCard/lock` | nothing |
+| `RESET_CARD` (1.17) | `FoxyCard/reset` | nothing |
 
 So a proof for one command, or one value, is no proof for another, and an old
 or used proof fails.
@@ -1190,6 +1193,7 @@ or changed from `FOXY-CARD-SPEC.md` 5.2 and the allowance draft.
 | `44` | GET_NONCE | a card with an owner. No PIN | | 16 bytes, or `6A90`. With **P1 = 1**, on any card: the 16 bytes, the PIN key (33, compressed) and the card key's signature over it (64), for sealing a PIN (6e) |
 | `45` | **ALLOW_LOAD** | the owner's proof, over `FoxyCard/load` and no value | proof length (1), proof | for the rest of this tap: `LOAD_PROOF` and `CLEAR_SPENT` need no verified PIN. `6A90`, `6A91`; `6986` locked |
 | `50` | LOCK_CARD | PIN set and verified; the owner's proof | P2 = `DE`; proof length (1), proof | as the draft |
+| `51` | RESET_CARD (1.17) | the owner's proof; a locked card also the PIN; nothing unspent | P1 = `00`, P2 = `AD`; proof length (1), proof over `FoxyCard/reset` | the card as out of its packet, with a new key (SPEC 5.6a); `6B00`, `6A90`, `6A91`, `6700`, `6982` locked and PIN not given, `6A8D` |
 
 `21` (`SIGN_ARBITRARY`) stays unassigned. The applet's version became 1.1 and
 `FORMAT` 3 with this design; a phone that knows only format 2 refuses the card,
@@ -1232,6 +1236,7 @@ means nothing is needed beyond what the command's own row says; "refused" means
 | `SET_OWNER` (`43`) | **open while nothing is unspent** | **the owner's proof, and nothing unspent** |
 | `ALLOW_LOAD` (`45`) | `6A90` | the owner's proof |
 | `LOCK_CARD` (`50`) | `6A90` (after the PIN gate) | PIN set and verified, and the owner's proof |
+| `RESET_CARD` (`51`, 1.17) | `6A90` | the owner's proof, nothing unspent (`6A8D`); on a locked card the PIN as well (`6982`) |
 
 So the one thing an attacker with the PIN and an emptied card can still do is
 load pieces onto it (which the mint will refuse) and spend them. It cannot set

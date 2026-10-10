@@ -429,6 +429,31 @@ Permanently disables all write operations. Useful for lost/stolen card mitigatio
 | 6982 | PIN set (or blocked) and not verified in this session |
 | 6985 | Card already locked |
 
+### RESET_CARD (0x51) — software 1.17
+
+Returns the card to what it was out of its packet, so that another person can set it up: no PIN (three tries), no owner, not locked, no record, no limits, no log or receipts, no places in use, and a new key pair of its own (the card's key and the PIN key). It keeps its clock (the time and the hash of the last block header) and its software.
+
+| Field | Value |
+|-------|-------|
+| CLA | B0 |
+| INS | 51 |
+| P1 | 00 |
+| P2 | AD (confirmation byte) |
+| Data | proof length (1), the owner's proof (ECDSA over `FoxyCard/reset`, the nonce just given, and no value); nothing after it |
+
+**Errors** (in the order they are checked):
+
+| SW | Meaning |
+|----|---------|
+| 6B00 | P1 is not 00 or P2 is not AD |
+| 6A90 | The card has no owner |
+| 6A91 | No nonce was asked for in this tap, or the proof is not the owner's |
+| 6700 | Bytes after the proof |
+| 6982 | The card is locked and the PIN has not been verified in this tap |
+| 6A8D | Anything unspent is on the card |
+
+A blocked PIN is no bar on a card that is not locked. The wipe is one transaction of four bytes, after the keys are drawn; see `docs/FOXY-CARD-SPEC.md` 5.6a.
+
 ---
 
 ## Error Code Summary

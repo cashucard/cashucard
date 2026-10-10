@@ -143,6 +143,7 @@ Class `B0` as yours. AID: package `F0 46 4F 58 59 43 41 52 44`, applet the same 
 | `44` GET_NONCE | none | no data; answers a fresh 16 bytes held in RAM. No PIN; `6A90` on a card with no owner |
 | `45` ALLOW_LOAD | none | the owner's proof (label `FoxyCard/load`). For the rest of that tap, `LOAD_PROOF` and `CLEAR_SPENT` need no PIN. Not `SPEND` |
 | `50` LOCK_CARD | the PIN if one is set; `P2 = DE` | a PIN set and verified, `P2 = DE`, and the owner's proof as data |
+| `51` RESET_CARD (1.17) | none | `P2 = AD`, and the owner's proof as data (label `FoxyCard/reset`); a locked card also wants the PIN in this tap (`6982`); nothing unspent (`6A8D`). The card is then as out of its packet, with a new key, and keeps only its clock; see SPEC 5.6a |
 
 New status words: `6A8F` over the day's limit (was "over the limit"), `6A90`
 no owner, `6A91` the owner's proof is missing or wrong, or the command is not
@@ -157,7 +158,7 @@ newest hash of a block header taken (a time key up to 1.14), the clock and the
 day, and the mint's address (up to 80 bytes). Apart from it the card keeps a
 65-byte owner public key, which nothing reads out. The applet's version was 1.1
 (`SELECT` answers `01 01`) and the format byte 3 when this was written; they are
-1.16 (`01 10`) and 4 now.
+1.17 (`01 11`) and 4 now.
 
 **The owner and its proof.** The holder's phone works the owner's private key out
 for each card as HMAC-SHA256 with the 64-byte BIP-39 seed as the key, over
@@ -177,6 +178,7 @@ end the PIN session.
 | `SET_CARD` (on a card with an owner) | `FoxyCard/set-card` | the data sent |
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |
 | `LOCK_CARD` | `FoxyCard/lock` | nothing |
+| `RESET_CARD` (1.17) | `FoxyCard/reset` | nothing |
 
 A proof for one command or value is no proof for another, and an old or used
 one fails (`6A91`). Nothing of the owner crosses the air: no secret is on the
