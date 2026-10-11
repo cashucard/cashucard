@@ -14,6 +14,7 @@ the old one is still drawn as it was printed.
 |---|---|---|---|
 | FL1 | Flash, first design: black card, the Flash bolt in a circle at its centre, chip at the top left, BEARER at the bottom right | Flash | yes |
 | FX1 | Foxy, first design: orange fur, a sleeping fox in a black circle at its centre, chip at the top left, ₿ and BEARER at the bottom right | Foxy | yes |
+| EL1 | Beaker, first design: black card, a beaker of orange liquid with a die in it and a sprout growing out of it at its centre, the liquid flowing and bubbling and the beaker swaying (still under Reduce Motion), chip at the top left, ₿ and BEARER at the bottom right | Foxy | yes |
 
 Where the wallet keeps them: `FC_DESIGNS` in `build/app/26f-flashcard.js` of
 the wallet repository (getfoxy/iOS, https://github.com/getfoxy/iOS), and the
