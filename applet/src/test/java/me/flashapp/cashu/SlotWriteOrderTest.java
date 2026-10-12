@@ -36,6 +36,13 @@ import java.util.regex.Pattern;
  * jCardSim cannot tear a write, so this is checked two ways, as D10 is: the
  * order is scanned in the source, and the states a tear can now leave are set
  * in the slot storage directly and shown to be harmless to every command.
+ *
+ * Software 1.20 keeps beside each place the mint's proof for its piece (`dleq`,
+ * one record of 96 bytes for each place). The status byte is still the commit,
+ * and the record is written before the place's data and so long before it: a
+ * tear then leaves an EMPTY place with some record beside it, which nothing
+ * serves, and the next load writes its own record over it, or zeros. The same two
+ * ways hold it.
  */
 class SlotWriteOrderTest {
 
@@ -231,6 +238,10 @@ class SlotWriteOrderTest {
     private byte[] hex;
     /** The card's own log (cardLog) and its receipts (cardReceipts), live: what a tear before their write leaves is set by putting back what they were. */
     private byte[] cardLog, cardReceipts;
+    /** The store of the mint's proofs (1.20), live: the set-up has reserved it. */
+    private byte[] proofStore;
+    /** The payment's note and its list of places, live: what a tear after the commit and before the marking leaves is set by hand. */
+    private byte[] burnPending, burnList;
 
     private void freshCard() throws Exception {
         ExposedRuntime runtime = new ExposedRuntime();
@@ -254,6 +265,16 @@ class SlotWriteOrderTest {
         java.lang.reflect.Field receiptField = CashuApplet.class.getDeclaredField("cardReceipts");
         receiptField.setAccessible(true);
         cardReceipts = (byte[]) receiptField.get(runtime.appletAt(aid));
+        java.lang.reflect.Field storeField = CashuApplet.class.getDeclaredField("dleq");
+        storeField.setAccessible(true);
+        proofStore = (byte[]) storeField.get(runtime.appletAt(aid));
+        assertTrue(proofStore != null && proofStore.length == 128 * 96, "the set-up reserved the store of the mint's proofs");
+        java.lang.reflect.Field pendingField = CashuApplet.class.getDeclaredField("burnPending");
+        pendingField.setAccessible(true);
+        burnPending = (byte[]) pendingField.get(runtime.appletAt(aid));
+        java.lang.reflect.Field listField = CashuApplet.class.getDeclaredField("burnList");
+        listField.setAccessible(true);
+        burnList = (byte[]) listField.get(runtime.appletAt(aid));
     }
 
     /** The card taken out of the field and put back: a new power-up, the applet selected, the PIN typed again. */
@@ -273,6 +294,18 @@ class SlotWriteOrderTest {
 
     private ResponseAPDU load(byte[] proof) {
         return send(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, proof, 0, proof.length, 1));
+    }
+
+    /** LOAD_PROOF with P1 = 1 (1.20): the piece and the mint's proof for it. */
+    private ResponseAPDU loadWithProof(byte[] piece, byte[] proof) {
+        return send(CashuAppletTest.loadWithProofCommand(piece, proof));
+    }
+
+    /** What GET_DLEQ answers for one place: 01 and the 96 bytes, or 00. */
+    private byte[] dleqAt(int place) {
+        ResponseAPDU r = send(CashuAppletTest.getDleqCommand(place, 255));
+        assertEquals(CashuAppletTest.SW_OK, r.getSW());
+        return r.getData();
     }
 
     /** A payment of that one piece: named, and signed for. The answer of whichever of the two refused, or the signature. */
@@ -513,5 +546,146 @@ class SlotWriteOrderTest {
         assertArrayEquals(new byte[82], slotBytes(0));
         assertArrayEquals(unspent, slotBytes(1));
         assertEquals(500, balance());
+    }
+
+    // ── the mint's proof kept beside each place (1.20) ───────────────────────
+
+    // A write into the store: a fill, whose first argument is the store, or a copy, whose third is.
+    private static final Pattern STORE_WRITE = Pattern.compile(
+        "Util\\.arrayFill(?:NonAtomic)?\\s*\\(\\s*dleq\\b|Util\\.arrayCopy(?:NonAtomic)?\\s*\\(\\s*[^,]+,\\s*[^,]+,\\s*dleq\\b");
+
+    /**
+     * Violations of the store's order in a source file: a write into the store (`dleq`) that comes, in a method, after a write to a
+     * place (`proofStorage`, its data or its status byte). The record goes first, so that a place that goes UNSPENT holds its own
+     * proof or zeros and never the one a piece before it left, and a tear leaves an EMPTY place, which nothing serves.
+     */
+    static List<String> storeWriteViolations(String rawSrc) {
+        String src = SchnorrHWMathTest.stripCommentsAndCharLiterals(rawSrc);
+        int[] method = methodBodies(src);
+        List<SlotWrite> places = slotWrites(rawSrc);
+        List<String> violations = new ArrayList<>();
+        Matcher store = STORE_WRITE.matcher(src);
+        while (store.find()) {
+            for (SlotWrite place : places) {
+                if (method[place.at] >= 0 && method[place.at] == method[store.start()] && place.at < store.start()) {
+                    violations.add("'" + store.group().trim() + "...' writes the store after the place was written ('" + place.text
+                        + "'): the record goes first, and the status byte last");
+                }
+            }
+        }
+        return violations;
+    }
+
+    @Test
+    @DisplayName("LOAD_PROOF writes the place's record in the store before the place's data and before its status byte, and no method writes the store after it has written a place")
+    void appletWritesTheRecordBeforeThePlace() throws Exception {
+        String src = new String(
+            java.nio.file.Files.readAllBytes(
+                SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")),
+            java.nio.charset.StandardCharsets.UTF_8);
+        List<String> violations = storeWriteViolations(src);
+        assertTrue(violations.isEmpty(), String.join("\n", violations));
+
+        // a scan that matched nothing would prove nothing: the load writes the record, and the reset zeros the store
+        String code = SchnorrHWMathTest.stripCommentsAndCharLiterals(src);
+        int from = code.indexOf("private short loadOne(");
+        String loadOne = code.substring(from, code.indexOf("private void processClearSpent(", from));
+        Matcher record = STORE_WRITE.matcher(loadOne);
+        assertTrue(record.find(), "the load writes the record");
+        int data = loadOne.indexOf("Util.arrayCopy(buf, in, proofStorage");
+        int status = loadOne.indexOf("STATUS_UNSPENT", data);
+        assertTrue(record.start() < data && data < status, "the record, then the place's data, then its status byte");
+        int hexAt = loadOne.lastIndexOf("slotHex");
+        assertTrue(hexAt < record.start(), "and the text for the hash was written before that");
+        int stores = 0;
+        Matcher all = STORE_WRITE.matcher(code);
+        while (all.find()) stores++;
+        assertEquals(3, stores, "the load's copy and fill of a record, and the reset's fill of the store: three writes in all");
+    }
+
+    @Test
+    @DisplayName("the scan of the store's order fails a record written after the data, after the status byte, and by a fill after either, and passes the record first")
+    void theScanOfTheStoreCanSayNo() {
+        String good = "class A { void load() {"
+            + " Util.arrayCopyNonAtomic(buf, proofAt, dleq, record, DLEQ_LEN);"
+            + " Util.arrayCopy(buf, in, proofStorage, (short)(base + PROOF_KEYSET_OFFSET), PROOF_DATA_LEN);"
+            + " proofStorage[(short)(base + PROOF_STATUS_OFFSET)] = STATUS_UNSPENT;"
+            + " } void reset() { Util.arrayFillNonAtomic(dleq, (short) 0, (short) 12288, (byte) 0); } }";
+        String afterData = "class A { void load() {"
+            + " Util.arrayCopy(buf, in, proofStorage, (short)(base + PROOF_KEYSET_OFFSET), PROOF_DATA_LEN);"
+            + " Util.arrayCopyNonAtomic(buf, proofAt, dleq, record, DLEQ_LEN);"
+            + " proofStorage[(short)(base + PROOF_STATUS_OFFSET)] = STATUS_UNSPENT;"
+            + " } }";
+        String afterStatus = "class A { void load() {"
+            + " Util.arrayCopy(buf, in, proofStorage, (short)(base + PROOF_KEYSET_OFFSET), PROOF_DATA_LEN);"
+            + " proofStorage[(short)(base + PROOF_STATUS_OFFSET)] = STATUS_UNSPENT;"
+            + " Util.arrayCopyNonAtomic(buf, proofAt, dleq, record, DLEQ_LEN);"
+            + " } }";
+        String fillAfterStatus = "class A { void clear() {"
+            + " proofStorage[(short)(base + PROOF_STATUS_OFFSET)] = STATUS_EMPTY;"
+            + " Util.arrayFillNonAtomic(dleq, record, DLEQ_LEN, (byte) 0);"
+            + " } }";
+        String elsewhere = "class A { void clear() {"
+            + " proofStorage[(short)(base + PROOF_STATUS_OFFSET)] = STATUS_EMPTY;"
+            + " } void reset() { Util.arrayFillNonAtomic(dleq, (short) 0, (short) 12288, (byte) 0); } }";
+
+        assertTrue(storeWriteViolations(good).isEmpty(), String.join("\n", storeWriteViolations(good)));
+        assertTrue(storeWriteViolations(elsewhere).isEmpty(), "a method of its own is not the load's: " + String.join("\n", storeWriteViolations(elsewhere)));
+        assertFalse(storeWriteViolations(afterData).isEmpty(), "a record after the data passed");
+        assertFalse(storeWriteViolations(afterStatus).isEmpty(), "a record after the status byte passed");
+        assertFalse(storeWriteViolations(fillAfterStatus).isEmpty(), "a fill after the status byte passed");
+    }
+
+    @Test
+    @DisplayName("a LOAD_PROOF torn after the place's record was written (the record goes first) leaves an EMPTY place with another piece's proof beside it, and so does junk or half a record: nothing serves it, a payment cannot name it, and the next load writes its own record over it, a plain one zeros")
+    void aTornLoadLeavesItsRecordBehindAndTheNextLoadWritesOverIt() throws Exception {
+        for (int junk = 0; junk < 3; junk++) {
+            for (boolean withProof : new boolean[] { false, true }) {
+                freshCard();
+                // What LOAD_PROOF leaves when the card goes after the record was written and before the place's data: some record beside
+                // place 0, which is still empty. Another piece's proof, or junk, or half a record.
+                if (junk == 0) System.arraycopy(CashuAppletTest.dleqProof(7), 0, proofStore, 0, 96);
+                else if (junk == 1) Arrays.fill(proofStore, 0, 96, (byte) 0xA5);
+                else Arrays.fill(proofStore, 0, 40, (byte) 1);
+                String what = "junk " + junk + (withProof ? ", the next load with a proof" : ", the next load plain");
+                assertEquals(0, statuses()[0], what);
+                assertEquals(0, balance(), what);
+                assertEquals(CashuAppletTest.SW_SLOT_EMPTY, proofAt(0).getSW(), what);
+                assertEquals(CashuAppletTest.SW_SLOT_EMPTY, spend(0).getSW(), what + ": an empty place is never paid with");
+                assertArrayEquals(new byte[] { 0 }, dleqAt(0), what + ": nor does it serve the record that is beside it");
+
+                byte[] mine = CashuAppletTest.dleqProof(8);
+                ResponseAPDU loaded = withProof ? loadWithProof(CashuAppletTest.PROOF_2, mine) : load(CashuAppletTest.PROOF_2);
+                assertEquals(CashuAppletTest.SW_OK, loaded.getSW(), what);
+                assertEquals(0, loaded.getData()[0], what + ": the empty place is reused");
+                assertArrayEquals(withProof ? CashuAppletTest.dleqHeld(mine) : new byte[] { 0 }, dleqAt(0), what + ": the piece's own proof, or none, and not what a tear left");
+                assertArrayEquals(withProof ? mine : new byte[96], Arrays.copyOfRange(proofStore, 0, 96), what + ": the whole record is the piece's own");
+                assertArrayEquals(CashuAppletTest.PROOF_2, Arrays.copyOfRange(proofAt(0).getData(), 1, 82), what);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("a payment torn between its commit and the marking of its places serves no proof for them: the next command marks them spent first, and GET_DLEQ answers 00 for each, while the piece beside them keeps its proof")
+    void aPaymentTornBeforeItsPlacesAreMarkedServesNoProof() throws Exception {
+        freshCard();
+        byte[] a = CashuAppletTest.dleqProof(1), b = CashuAppletTest.dleqProof(2);
+        assertEquals(CashuAppletTest.SW_OK, loadWithProof(CashuAppletTest.PROOF_1, a).getSW());
+        assertEquals(CashuAppletTest.SW_OK, loadWithProof(CashuAppletTest.PROOF_2, b).getSW());
+        assertArrayEquals(CashuAppletTest.dleqHeld(a), dleqAt(0));
+        byte[] storeBefore = proofStore.clone();
+        assertEquals(CashuAppletTest.SW_OK, spend(0).getSW());
+        assertArrayEquals(storeBefore, proofStore, "the payment wrote nothing to the store");
+        // the card went after the commit and before the marking: the note stands, the list names the place, and the status byte still says unspent
+        storage[0] = 1;
+        burnPending[0] = 1;
+        assertEquals(1, burnList[0], "the list names one place");
+        assertEquals(0, burnList[1], "place 0");
+        powerCycle();
+        assertArrayEquals(new byte[] { 0 }, dleqAt(0), "the place is spent, as its payment committed, before anything looks at it: no proof is given for it");
+        assertEquals(2, statuses()[0]);
+        assertEquals(0, burnPending[0], "and the note is taken down");
+        assertArrayEquals(CashuAppletTest.dleqHeld(b), dleqAt(1), "the piece beside it keeps its proof");
+        assertArrayEquals(storeBefore, proofStore, "and the store is as it was");
     }
 }

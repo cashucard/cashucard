@@ -63,6 +63,12 @@ ls -lh target/cashu-javacard-0.1.0.cap
 > the rest of what the chip has room for:
 > [FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md).
 
+> **Nothing more is asked of the install in software 1.20.** The 12,288 bytes that
+> hold the mint's proofs are not made at install: the chip would refuse the card's
+> applet if its constructor asked for them. The first `SET_CARD`, the card's set-up,
+> reserves them. A card that is refused them is set up all the same and works as a
+> card with no room for proofs.
+
 > **3.0.5 is a hard floor.** `SchnorrHW` performs the `k·G` scalar multiply with
 > `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY`, which was introduced in JavaCard 3.0.5
 > and does not exist in 3.0.4. A 3.0.4 kit cannot convert this applet, and a

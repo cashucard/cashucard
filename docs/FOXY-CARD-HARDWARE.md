@@ -83,6 +83,13 @@ Software 1.19 added the tag's applet and was larger again. A build whose load
 file was 19,269 bytes (69 past a multiple of 256) installed, and its tag
 answered as a phone reads it.
 
+Software 1.20, which keeps the mint's proof with each piece, installed at
+19,634 bytes (178 past a multiple of 256), the first size tried, in about two
+seconds. Its first `SET_CARD`, the one that reserves the 12,288 bytes of the
+store, took about 130 ms on the chip, and a `RESET_CARD`, which fills the
+store with zeros, about 270 ms (`tools/chip/proofstore.sh`, 27 checks, all
+held on the chip).
+
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build
 can be moved to a size that is known to install; `tools/refcheck.py`, after
@@ -91,6 +98,35 @@ whether this build's size is one that installed, one that failed, or one not
 tried yet. A size not tried yet is tried on the chip with
 `~/.foxycard/install-try.sh`, and the answer is added to the table. A
 version is shipped at a size that installed.
+
+## A constructor may ask for little more; the rest is asked for after the install
+
+The budget that makes the first applet small (above) is charged with what the
+constructor makes, and it is small. What was measured on the chip, in the
+constructor of the card's applet:
+
+| persistent memory asked for in the constructor, more than 1.19's | INSTALL |
+|---|---|
+| 300 bytes | installed |
+| 12,288 bytes | failed |
+
+The same 12,288 bytes, asked for by a command after the install (an array made in
+`SET_CARD`), were given. So the 12,288 bytes that hold the mint's proofs
+(software 1.20: [`FOXY-CARD-SPEC.md`](FOXY-CARD-SPEC.md) 5.9, [D15](DECISIONS.md#d15))
+are not made in the constructor. The first `SET_CARD` that goes through makes them,
+once, outside any transaction. A card that is refused them carries on without, and
+every use of the store is safe while it does not exist.
+
+No simulator has this limit, and a build that breaks it fails on the chip and
+nowhere else, so tests pin it: the store is null after install and made by the
+first `SET_CARD`; no constructor names it; the arrays the constructors make add up
+to 29,806 bytes, the figure of the build that installs, and a larger figure has to
+be measured on a card first; and the scan for allocations on the path of a command
+(D10) lets through that one guarded statement and nothing beside it. The 1.20 build
+itself has not been installed on the chip yet. `tools/chip` has a short case for
+that (`ProofStoreCheck.java`, run by `proofstore.sh`): it sets a blank card up, loads a
+piece with a proof and reads it back, loads a plain piece and reads `00`, pays, and
+resets the card, which ends blank.
 
 ## One transaction holds about a dozen status bytes
 
@@ -120,7 +156,8 @@ applet (above), so the two were never separated.
 ## Storage
 
 A clean card has 164,176 bytes free. Software 1.7 takes 45,096 of them for
-128 places and everything else. The figures come from the ISD's memory
+128 places and everything else; from software 1.20 the first `SET_CARD` takes
+12,288 more, for the mint's proofs. The figures come from the ISD's memory
 tag, which needs no key:
 
     00A4040000          (choose the card manager)

@@ -49,6 +49,8 @@ section 4. In short:
 - A slot carries a date and the card a refund key, so the pieces of a lost or
   blocked card can be taken back by whoever loaded them.
 - The card records the mint its pieces are at.
+- The card keeps the mint's NUT-12 proof with each piece that comes with one, for a
+  phone to read and check (software 1.20, `GET_DLEQ`); it checks nothing itself.
 - 64 slots of 82 bytes.
 
 The instructions and what each carries are in the spec's section 5.2, the owner

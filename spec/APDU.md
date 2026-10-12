@@ -66,7 +66,7 @@ Returns applet version, capabilities, and slot statistics. Always available with
 | 2 | PIN protection available |
 | 3–7 | Reserved (0) |
 
-**In Foxy's software** the answer is longer than these eight bytes (see `docs/FOXY-CARD-SPEC.md` 5.2). Asked with P1 = 1 the answer is 42 bytes. From 1.19, asked with P1 = 2 it is those 42 bytes and one more, the 43rd, which says whether the NFC tag is on: `00` on, `01` off.
+**In Foxy's software** the answer is longer than these eight bytes (see `docs/FOXY-CARD-SPEC.md` 5.2). Asked with P1 = 1 the answer is 42 bytes. From 1.19, asked with P1 = 2 it is those 42 bytes and one more, the 43rd, which says whether the NFC tag is on: `00` on, `01` off. From 1.20 `SELECT` answers `01 14` and those three answers are otherwise byte for byte what they were; nothing in them says whether the card has room for the mint's proofs (see [GET_DLEQ](#get_dleq-0x1a--software-120)).
 
 **PIN state 2 is not "no PIN".** A blocked card still has a PIN; it can never
 be verified again (`VERIFY_PIN` answers `6983`), so every PIN-gated command
@@ -174,6 +174,28 @@ Lightweight bulk status read. Returns a 1-byte status for every slot (0=empty, 1
 | P2 | 00 |
 | Le | 20 (32 bytes, one per slot) |
 | Response | 32 bytes: one status byte per slot |
+
+---
+
+### GET_DLEQ (0x1A) — software 1.20
+
+Gives back the mint's proof (NUT-12) that the card keeps with an unspent piece: `e` (32), `s` (32) and the blinding factor `r` (32), 96 bytes. The card does not check it and never uses it; a reader rebuilds the piece's secret, `Y = hash_to_curve(secret)`, `C' = C + r*K` and `B' = Y + r*G`, and checks the proof (`NUT-XX.md`, `docs/FOXY-CARD-SPEC.md` 5.9). No PIN, any state of the card, locked or not. It writes nothing.
+
+| Field | Value |
+|-------|-------|
+| CLA | B0 |
+| INS | 1A |
+| P1 | A slot (0 to 127) |
+| P2 | A second slot (0 to 127), or FF for none |
+| Le | 00 (256) |
+
+**Response.** For each slot asked, in the order asked: `01` and the 96 bytes (`e ‖ s ‖ r`) if the slot is unspent and its record is not zero; otherwise the single byte `00` (the slot is empty or spent, or holds a piece that came with no proof, or the card has no room for proofs). The same slot twice is answered twice. One slot is 1 or 97 bytes; two are 2 to 194.
+
+**Errors:**
+
+| SW | Meaning |
+|----|---------|
+| 6A83 | P1 is over 127, or P2 is over 127 and not FF; nothing is answered |
 
 ---
 
@@ -293,6 +315,8 @@ or holding the whole proof, never part of one marked unspent. The card does not
 check for duplicates, so after a `LOAD_PROOF` whose answer was lost the proof
 may or may not be on the card: read the slots (`GET_SLOT_STATUS`, `GET_PROOF`)
 before sending it again.
+
+**With P1 = 1 (Foxy's software 1.20): one piece and the mint's proof for it.** The data is exactly 177 bytes: the 81 bytes of a piece (`docs/FOXY-CARD-SPEC.md` 5.1; keyset, amount, nonce, `C`, date) and then `e ‖ s ‖ r`, 96 bytes. The answer is two bytes: the slot, then `01` if the proof was kept and `00` if the card has no room for proofs and went on without it. Any other length is `6700`; a proof of 96 zero bytes is `6A80` (zeros are what "no proof" is kept as); every other check, word and effect is that of a load of one piece, in the same order. A P1 other than 1 is as it was: one to three pieces of 81 bytes, the slot of each as the answer, and each piece stored that way is kept with no proof. The proof is written into the slot's record before the slot's data, and the status byte is still the last write.
 
 ---
 
@@ -454,7 +478,7 @@ Returns the card to what it was out of its packet, so that another person can se
 | 6982 | The card is locked and the PIN has not been verified in this tap |
 | 6A8D | Anything unspent is on the card |
 
-A blocked PIN is no bar on a card that is not locked. The wipe is one transaction of five bytes (the lock, the PIN state, the change note, the owner and the NFC tag's switch), after the keys are drawn; see `docs/FOXY-CARD-SPEC.md` 5.6a. It puts the NFC tag back on.
+From 1.20 it also fills the store of the mint's proofs with zeros, after the places are freed and outside the transaction. A blocked PIN is no bar on a card that is not locked. The wipe is one transaction of five bytes (the lock, the PIN state, the change note, the owner and the NFC tag's switch), after the keys are drawn; see `docs/FOXY-CARD-SPEC.md` 5.6a. It puts the NFC tag back on.
 
 ### SET_TAG (0x52) — software 1.19
 
@@ -543,6 +567,8 @@ JSON string of ~150 bytes; the card stores the nonce and a reader rebuilds the
 secret from it plus `GET_PUBKEY`. See [`NUT-XX.md`](NUT-XX.md).
 
 Total: 32 slots × 78 bytes = **2,496 bytes** EEPROM for proof storage.
+
+In Foxy's software the slot is 82 bytes (a 4-byte date after `C`), there are 128 of them, and `GET_PROOF` gives the slot and nothing more. From 1.20 the card also keeps, beside the slots and not part of them, 96 bytes for each slot: the mint's proof for the piece in it, `e ‖ s ‖ r`, in a store of 12,288 bytes that the first `SET_CARD` reserves. `GET_PROOF` does not give it; [`GET_DLEQ`](#get_dleq-0x1a--software-120) does, for an unspent slot.
 
 ---
 

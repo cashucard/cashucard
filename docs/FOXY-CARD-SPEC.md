@@ -172,7 +172,7 @@ into the app, which anyone could copy, and that last sentence was not true.
 | 1 | A blocked PIN took the PIN gate away | fixed (a blocked PIN counts as set) | keep; add a test that every gated command refuses in every PIN state |
 | 2 | `SPEND_PROOF` signs 32 bytes the reader supplies, not the stored piece's own message | still so | the card works the message out itself from the slot; the reader supplies nothing (5.2) |
 | 3 | `SIGN_ARBITRARY` signs anything and burns no slot, so SPENT enforces nothing | still there, behind the PIN | removed. Proving the card is the card gets its own command, whose signature cannot be a spend (5.2) |
-| 4 | No DLEQ on the card, so a piece cannot be checked without the mint | still so | not needed while the receiver is online; a place is left for it (phase 3) |
+| 4 | No DLEQ on the card, so a piece cannot be checked without the mint | still so | not needed while the receiver is online. From software 1.20 the card keeps the mint's proof for each piece, for a phone to read and check; the card checks nothing (5.9) |
 | 5 | Factory GlobalPlatform keys left on the card | provisioning, not the applet | the provisioning steps set new keys, and say so (5.4) |
 | 6 | The terminal showed paid when the swap had failed, and booked another's spend as settled | their terminal, not used here | Foxy's own rule: paid only when the mint has given this phone its pieces (8) |
 | 7 | Over-payment is the merchant's income; change is not returned in the payment | by design upstream | change goes back to the card in the same tap, or waits for it (8.2) |
@@ -253,7 +253,9 @@ A slot, 82 bytes (upstream's 78 and a date):
 | date | 4 | the locktime of this piece, 0 for none |
 
 128 slots (10,496 bytes, and 130 more a slot for the text a payment hashes);
-64 before software 1.7. Phase 3 adds 97 bytes a slot for the DLEQ.
+64 before software 1.7. From software 1.20 the card also keeps, for each place, 96
+bytes of the mint's proof for the piece in it (e, s and r: 5.9), in a store of its
+own that the first `SET_CARD` reserves, 12,288 bytes.
 
 The text of a piece's secret, which is what the card signs the hash of, is
 the text Foxy's Cashu library writes for a piece locked to one key:
@@ -266,9 +268,10 @@ nothing is made specially for it. It is not upstream's text.
 
 | Command | Upstream | Fork |
 |---|---|---|
-| SELECT | version | a new AID of our own, so the two applets cannot be mistaken for each other; answers its version (1.1 when first written, 1.19 now: `01 13`) |
+| SELECT | version | a new AID of our own, so the two applets cannot be mistaken for each other; answers its version (1.1 when first written, 1.20 now: `01 14`) |
 | GET_INFO | 8 bytes | 29: adds the format, tries left, locked, record set, the daily limit, whether the card has an owner, and the day (`now`, window start, spent today). With P1 = 1, 42: the limit on one payment (to the owner's grant only), the no-PIN allowance and what is counted against it (to anyone; software 1.16). With P1 = 2 (software 1.19), 43: those 42 and whether the NFC tag is on (to anyone; 5.8) |
 | GET_PUBKEY | as is | as is |
+| **GET_DLEQ** (`1A`) | none | software 1.20: the mint's proof kept with an unspent piece, for one place or two. No PIN. The card does not check it (5.9) |
 | GET_CARD | none | the card record, with the daily limit and, where the time key was, the clock's proof (the hardest `bits` and the newest header's hash) |
 | GET_SLOT_STATUS, GET_PROOF | as is | the slot with its date |
 | GET_BALANCE, GET_PROOF_COUNT | as is | as is |
@@ -279,7 +282,7 @@ nothing is made specially for it. It is not upstream's text.
 | SET_PIN | sets a PIN once (`6985` if one exists) | sets or replaces the PIN, and unblocks, only on a card with no owner and nothing unspent. No PIN, no proof. A card with an owner refuses it (`6A91`), unless it has no PIN and the owner's grant is in this tap (ADD PIN, software 1.16) |
 | CHANGE_PIN | the old PIN, in a verified session | the owner's proof and the new PIN only: no old PIN, no session, any PIN state, any funds. It sets the PIN, resets the tries and unblocks (5.6) |
 | SET_CARD | none | writes the card record (unit, refund key, mint; the 65 bytes where the time key was are sent and not read). On a card with no owner under the PIN (or none, if it has no PIN: software 1.16), on a card with an owner under the owner's proof; only with nothing unspent. Never touches the limit or the clock |
-| LOAD_PROOF | 77 bytes | 81 bytes, with the date; refused unless a PIN is set and verified or the owner has allowed loading for this tap (a card with no PIN, 1.16, takes a piece from whoever holds it); refused on a card with no owner. It asks nothing of the clock. Never touches the limit |
+| LOAD_PROOF | 77 bytes | 81 bytes, with the date; refused unless a PIN is set and verified or the owner has allowed loading for this tap (a card with no PIN, 1.16, takes a piece from whoever holds it); refused on a card with no owner. It asks nothing of the clock. Never touches the limit. With P1 = 1 (software 1.20), one piece and the mint's proof for it, 177 bytes (5.9) |
 | CLEAR_SPENT | as is | as is, or under the owner's grant for this tap |
 | LOCK_CARD | the PIN if one is set | a PIN set and verified, and the owner's proof (5.6) |
 | **RESET_CARD** (`51`) | none | software 1.17: the owner's proof (and, on a locked card, the PIN given in this tap) wipes the card to what it was out of its packet, with a new key of its own, for another person to set up. Only with nothing unspent (5.6a) |
@@ -308,8 +311,9 @@ has most of them as commands and answers):
 | `22` `23` `24` | SPEND_ALL_BEGIN, SPEND_ALL_OUTPUTS, SPEND_ALL_SIGN | `24`: no PIN set, or the PIN, or the no-PIN allowance (5.7a); `22` and `23` ask nothing | the places of a payment; then the swap's outputs, 37 bytes each; then nothing | **one** 64-byte signature over every piece and every output (NUT-11 `SIG_ALL`), with every place burned in the same transaction. The limits are held to what leaves the card: the pieces less the card's own change (`26`), worked out at the first SIGN, where the day refuses (`6A8F`) and the wait begins (00 01, "not yet"). Not opened by `ALLOW_LOAD` (FOXY-CARD-DAILY-LIMIT.md 6c) |
 | `26` | SPEND_ALL_CHANGE | as `22`; a payment begun, its outputs (`23`) all given | the amount (4) | one change output the card makes for itself (software 1.12): a fresh nonce, the secret in the card's own form (its key, the payment's date and refund key, `SIG_ALL`), hashed to the curve as NUT-00 says and blinded with a fresh factor; hashed into the message as an output, after the terminal's; the opening (amount, keyset, date, nonce, blinding factor) is kept until the piece is written back. Answers the blinded message, 33 bytes. At most 8 openings on a card. `6985` with no payment begun; `6A80` for nothing, or more change than the pieces come to; `6A84` with no opening free; the terminal's outputs after it are `6985`, and the payment is given up |
 | `19` | GET_CHANGE | nothing | P1 = the page, from 0 | the openings of the change the card has made for itself and not yet been handed, three to a page: a count (1), then for each the amount (4), the keyset (8), the date (4), the nonce (32) and the blinding factor (32). An opening whose piece is on the card by now is let go first. The phone that owes the change finishes the pieces with these; the owner's phone finishes change a till never handed over (NUT-09 restore). What they say lets a reader finish a piece locked to the card's key, which nobody but the card can spend |
+| `1A` | GET_DLEQ (software 1.20) | nothing: no PIN, any state, locked or not | P1 = a place (0 to 127); P2 = a second place, or `FF` for none | for each place asked, in the order asked: `01` and the 96 bytes e, s and r where the place is unspent and its record is not zero, and otherwise the single byte `00` (empty, spent, a piece that came with no proof, or a card with no room for proofs). At most 194 bytes. `6A83` for a P1 over 127, or a P2 over 127 and not `FF`, before anything is answered. The card does not check what it gives (5.9) |
 | `25` | SPEND_ALL_AGAIN | PIN, if one is set, unless the last signature was given with no PIN (software 1.16) | | the last signature given, again, for a terminal that never heard it |
-| `30` | LOAD_PROOF | an owner; a PIN set, and verified or `ALLOW_LOAD` given in this tap; a card record. No clock | 81 bytes | `6982` with no verified PIN and no grant (the gate comes first); then `6A90` with no owner; `6A94` for a piece whose nonce is already in a slot, spent or not (checked last, before anything is written) |
+| `30` | LOAD_PROOF | an owner; a PIN set, and verified or `ALLOW_LOAD` given in this tap; a card record. No clock | 81 bytes; or two or three pieces end to end; or, with P1 = 1 (software 1.20), one piece and its proof, 177 bytes | `6982` with no verified PIN and no grant (the gate comes first); then `6A90` with no owner; `6A94` for a piece whose nonce is already in a slot, spent or not (checked last, before anything is written). The answer is the place of each piece stored; with P1 = 1, two bytes: the place, then `01` where the proof was kept and `00` where the card has no room for proofs. `6700` for any length but 177 with P1 = 1; `6A80` for a proof of 96 zero bytes (5.9) |
 | `31` | CLEAR_SPENT | the PIN, if one is set, or `ALLOW_LOAD` given in this tap | | |
 | `32` | SET_CARD | no owner: the PIN verified if one is set (software 1.16: none, open), nothing unspent. Owner: the owner's proof, nothing unspent | unit (1), refund key (33), 65 bytes the card does not read (zeros from a phone of software 1.15; a time key from an earlier one), mint length (1), mint; with an owner, proof length (1) and the proof first | `6A8D` if anything is unspent; `6A80` for a bad refund key; `6700` for a bad length. The clock, the window and what is spent are left as they are |
 | `33` | SET_LIMIT, PIN form | a card with no owner: PIN set and verified; nothing unspent. No clock | limit (4), or eight bytes: the day's and then the one payment's | `6A91` on a card with an owner (use `34`); `6A8D` if anything is unspent |
@@ -330,8 +334,8 @@ has most of them as commands and answers):
 `21` (`SIGN_ARBITRARY`) stays unassigned. The applet's version is 1.1 and
 `FORMAT` is 3; a phone that knows only an earlier format refuses the card, as it
 does now for anything but its own. (That is how the rows not marked with a later
-software version were first written. The applet is now at 1.19, `SELECT` answers
-`01 13`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
+software version were first written. The applet is now at 1.20, `SELECT` answers
+`01 14`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
 section 8 differ, that one is what is built.)
 
 **Every command in every state.** "Open" means nothing is needed beyond what
@@ -339,7 +343,7 @@ the command's own row says; "refused" means `6A91` unless another word is given.
 
 | Command | Card with **no owner** | Card **with an owner** |
 |---|---|---|
-| `GET_INFO`, `GET_PUBKEY`, `GET_BALANCE`, `GET_PROOF_COUNT`, `GET_PROOF`, `GET_SLOT_STATUS`, `GET_PIECES`, `AUTH`, `GET_CARD` | open | open |
+| `GET_INFO`, `GET_PUBKEY`, `GET_BALANCE`, `GET_PROOF_COUNT`, `GET_PROOF`, `GET_SLOT_STATUS`, `GET_PIECES`, `GET_DLEQ` (1.20), `AUTH`, `GET_CARD` | open | open |
 | `SET_HEADER`, `TELL_TIME` | open: any state, locked or blocked (a header must show its work) | same |
 | `GET_NONCE` | `6A90` | open (it only gives a number) |
 | `VERIFY_PIN` | as ever | as ever |
@@ -416,7 +420,9 @@ bit set.
    payment): any reader in range can spend such a card up to its limits, and
    cannot write to it.
 6. Every buffer allocated at install, and the status byte written last, as
-   upstream's D10 and D14.
+   upstream's D10 and D14. One exception, since software 1.20: the store of the
+   mint's proofs is reserved by the first `SET_CARD`, once, because the chip
+   will not install an applet that asks for it in the constructor (5.9).
 7. **The PIN spends and nothing else; the owner's proof administers.** On a
    card with an owner the PIN can `SPEND` (up to the day's limit),
    `LOAD_PROOF` (change written back) and `CLEAR_SPENT`, and changes nothing
@@ -440,6 +446,12 @@ bit set.
    `CLEAR_SPENT` through for the rest of that tap, and nothing else: it never
    opens `SPEND`. It is held in transient memory, so a new SELECT or a reset
    ends it.
+10. **A place that is unspent holds its own proof, or zeros (software 1.20).** In
+    the store of the mint's proofs a place that is unspent has the proof its piece
+    came with, or 96 zero bytes if it came with none, and never another piece's.
+    `LOAD_PROOF` writes the place's record before anything else of the place, and
+    the status byte stays the last; nothing else writes the store but `RESET_CARD`,
+    which zeros it. No payment command writes it (5.9).
 
 ### 5.4 Provisioning
 
@@ -490,6 +502,16 @@ bit set.
   the same bytes from two cards; the switch (on by default; only the owner's proof, and nothing else, flips it; a refusal costs no PIN try;
   off makes the tag's name unselectable and on makes it selectable again; it survives a power cycle; `RESET_CARD` puts it back on; a payment
   works with it off); the instances deleted one by one; and no static field that refers to an object an instance made.
+- The mint's proof kept with a piece (software 1.20), in a class of its own: a piece loaded with its proof is given back with it, e then s then r;
+  a plain load reads `00`, and three plain pieces still answer three places; a place used again serves only its own proof (a plain piece into a
+  freed place reads `00`, a new proof reads the new one); `GET_DLEQ` for a spent place, an empty one, two places in one command (both, mixed, the
+  same twice), a place there is not, and before any `SET_CARD`; every refusal of the load, with the word a plain load gives, and nothing written
+  after any of them; the load under the change grant alone, as a plain load; a piece with a proof paying with the same signature bytes as one
+  without, and a payment, `CLEAR_SPENT` and a refused command writing nothing to the store; `RESET_CARD` zeroing it; the store null after install
+  and made by the first `SET_CARD`; `GET_INFO` as it was; and a long random history of loads, batches, payments, clears and power-ups, after
+  every step of which every unspent place holds its own record. The source is read for the order (the record before the place's data and its
+  status byte, torn states set by hand), for the one allocation (guarded, in `SET_CARD`, none in the constructor, the constructors' arrays
+  adding up to the build that installs) and for the methods that name the store (no payment command does).
 - BIP-340 vectors, as upstream. In `spec/vectors/`: an owner key and a proof for
   each label, and the transcript.
 - On a card, by hand: install, set up (PIN, record, owner), set a limit, load,
@@ -866,6 +888,112 @@ tag: `GET_NONCE`, then `B0 52 <p> 00 <Lc> <proof length> <proof> <p>` with `p` =
 the proof being the owner's signature over `"FoxyCard/tag" ‖ nonce ‖ <p>`, in the same tap as
 the nonce; a phone's gate carries instruction `52`, and its signer the label `tag`.
 
+### 5.9 The mint's proof, kept with each piece (software 1.20)
+
+Up to software 1.19 the card kept for each piece only what it needs to pay with: the
+keyset, the amount, the nonce, `C` and the date. A phone that read the card could ask the
+mint whether a piece was spent. It could not tell whether the piece was real: a made-up `C`
+looks like any other until the mint is asked to take it. From software 1.20 the card also
+keeps, for each piece, the mint's NUT-12 proof as a later holder needs it:
+
+| Field | Size | |
+|---|---|---|
+| e | 32 | the proof's challenge |
+| s | 32 | its response |
+| r | 32 | the blinding factor the piece was made with |
+
+96 bytes. **The card does not check the proof and never uses it.** It keeps what it is given
+and gives it back. Phones read it and check it. Paying is untouched: the secret the card
+builds and the message it signs are what they were, and no payment command writes the proof.
+
+**The store.** 128 records of 96 bytes, 12,288 in all, the record of place k at k * 96, as
+`e ‖ s ‖ r`. A record of 96 zero bytes means "no proof": the piece came with none.
+
+**It is reserved after install, by the first `SET_CARD`.** The chip will not install an applet
+whose constructor asks for this much more (a build whose constructor asked for 300 bytes
+more installed, and one that asked for 12,288 more did not), and it gave the same bytes
+asked for by a command after the install (`FOXY-CARD-HARDWARE.md`). So the store is not
+there at install. The first `SET_CARD` that goes through reserves it, once, before the record
+is written and outside any transaction. If the card refuses the room, that `SET_CARD` goes
+on without it and the card works as a card with no room for proofs: the load answers `00` for
+the proof, `GET_DLEQ` answers `00`, and nothing else is different. Every use of the store is
+safe while it is not there, and a later `SET_CARD` asks again. No simulator has the chip's
+limit, so tests pin the rule: the store is null after install, no constructor names it, the
+constructors' arrays come to the figure of the build that installs, and the one allocation is
+the guarded one in `SET_CARD`.
+
+**The rule.** A place that is unspent holds in the store its own proof, or 96 zero bytes, and
+never another piece's. `LOAD_PROOF` keeps it by order. It writes the place's record, the
+piece's proof or zeros for a piece that came with none (written only if the record is not
+zero already), before anything else of the place, and the status byte stays the last write
+and the commit (D14). A card taken away in between has an empty place with a record beside
+it, which nothing serves, and the next piece into the place writes its own record over it.
+`CLEAR_SPENT` and the payment commands do not touch the store, so a freed place keeps the
+record it had until the next piece comes. `RESET_CARD` fills the store with zeros after the
+places are freed, outside any transaction: a card taken away in the middle still has its
+owner, who may reset it again.
+
+**`LOAD_PROOF` with P1 = 1.** One piece and its proof. The data is exactly 81 + 96 = 177
+bytes: the piece as a plain load has it, then `e ‖ s ‖ r`. Any other length is `6700`. A
+proof of 96 zero bytes is `6A80`, since zeros are what "no proof" is kept as; the card looks
+at the proof no further. Everything else is exactly a load of one piece: the same checks in
+the same order, the same words, the same entry in the log, the same change-grant behaviour
+(the tap after a payment may put the change on with no PIN, and a piece that is the card's
+own change lets its opening go). The answer is two bytes: the place, then `01` where the proof
+was kept and `00` where the card has no store. A P1 other than 1 is what it was in 1.19: one
+to three pieces of 81 bytes, an answer of one place for each, and each piece stored that way
+has its record made zero. It is one piece to a command because a piece and its proof are 177
+bytes and a short APDU carries 255; two would not fit, and extended length is not something
+every reader and phone will carry.
+
+**`GET_DLEQ` (`1A`).** P1 = a place (0 to 127), P2 = a second place, or `FF` for none. No
+data, no PIN, any state of the card. For each place asked, in the order asked, the answer is
+`01` and the 96 bytes if the place is unspent and its record is not zero, and otherwise the
+single byte `00`: the place is empty or spent, or holds a piece that came with no proof, or
+the card has no store. The same place twice is answered twice. At most 194 bytes. `6A83` for
+a P1 over 127, or a P2 over 127 and not `FF`, before anything is answered. It never gives the
+proof of a spent piece.
+
+**What a reader does.** The card gives `e`, `s` and `r`; the reader has the rest, from
+`GET_PIECES` (keyset, amount, nonce, `C`, date), `GET_PUBKEY` and `GET_CARD` (the card's key
+and refund key) and the mint's keys. For a place `GET_DLEQ` answers:
+
+1. Rebuild the piece's secret, the NUT-10 text the card signs the hash of
+   (`FOXY-CARD-DAILY-LIMIT.md` 6c).
+2. `Y = hash_to_curve(secret)` (NUT-00).
+3. `K` is the mint's public key for the piece's amount in the piece's keyset (NUT-01).
+4. `C' = C + r*K`, and `B' = Y + r*G`.
+5. Check the proof as NUT-12 has it: `R1 = s*G - e*K`, `R2 = s*B' - e*C'`, and `e` must be the
+   hash NUT-12 names of `R1`, `R2`, `K` and `C'`.
+
+**What it shows, and what it does not.**
+
+- A piece whose proof checks is real: the mint's key for that amount signed this secret.
+  Nobody without that key can make a proof that checks, so a piece with a made-up `C` fails,
+  and so does a copy of a real piece from another card, since its secret names that card's
+  key and not this one's.
+- It does not show that the piece is unspent. The mint decides that, and the card cannot.
+- What "real" rests on is the mint's keys the reader holds and the check the reader makes.
+  It does not rest on the card, which checks nothing, or on whoever loaded the card.
+- A `00` is "not shown real", and not "fake". A piece put on plain, or on a card of earlier
+  software, cannot be checked this way, and the reader decides what that means to it.
+
+**Privacy.** The proof carries `r`. The mint made its signature for `B'` and answered with
+`C'`; given `r`, whoever has the mint's record of that issue can recompute `B'` and `C'` from
+the piece and tie the piece to the request that made it. That is so of any NUT-12 token that
+carries `r`, and a reader that hands `r` to the mint lets the mint make the tie. The card
+gives `r`, with no PIN, to any reader, for every unspent piece that has a proof, as
+`GET_CHANGE` already gives it for the change the card made for itself. A reader checks the
+proof on its own side and sends it nowhere.
+
+**What a phone needs to know to speak to a card of software 1.20.** `SELECT` answers `01 14`.
+`GET_INFO` is the 30, 42 and 43 bytes it was, byte for byte but for the version, and nothing
+in it says whether the card has its store: the answer to a load with P1 = 1 does, and so does
+`GET_DLEQ`. To load a piece with its proof: `B0 30 01 00 B1 <piece (81)> <e> <s> <r>`; the
+answer is `<place> 01`. To read: `B0 1A <place> FF 00` for one place, or the two places in P1
+and P2. A phone's gate has to carry instruction `1A`. `spec/vectors/transcript.json` has both
+commands as commands and answers.
+
 ## 6. A lost or blocked card is not lost money
 
 Upstream's position is that a card is cash: lose it and it is gone, and a
@@ -941,7 +1069,7 @@ A card can be made with no refund key, and is then cash, as upstream's.
     long as the tap.
 - The phone's gate carries only the instructions the page uses: `01 10 11 13 14
   15 16 20 30 31 32 34 36 37 40 41 42 43 44 45` (and, to speak to a card of software
-  1.19, `52`). `33` (the PIN form of the limit,
+  1.19, `52`; and, to read the mint's proofs on a card of software 1.20, `1A`). `33` (the PIN form of the limit,
   for a card with no owner) is not used by the phone and is not carried; `50`
   (`LOCK_CARD`) stays out.
 - Every tap that finds the card behind the network shows it the newest block
@@ -1098,8 +1226,11 @@ visit, where the owner has set one (5.7).
   receiver always asks the mint, but a later payment that picks one burns slots
   and spends a day's limit on nothing, and while such a piece is on the card it is
   not empty, so the owner cannot replace its owner or record until it is spent. A
-  fake piece looks unspent to a state check, so this waits on DLEQ on the card
-  (phase 3).
+  fake piece looks unspent to a state check. From software 1.20 the card can keep the
+  mint's proof for a piece, and a phone that reads it and checks it sees that a made-up
+  piece is not real before it is paid with (5.9). The card checks nothing, so this is the
+  phone's: a card loaded with no proofs, or by a terminal that gives the proofs it likes,
+  is as it was to a phone that does not check.
 - It cannot write a **copy** of a real piece. The card signs a piece's secret,
   which its nonce makes, and takes the amount on the terminal's word, so a copy
   stating an amount of 1 would have been spent for 1 and signed for the real
@@ -1147,7 +1278,7 @@ visit, where the owner has set one (5.7).
 | 1d | Screens (the limit's three steps), wording, snapshots; documents; phone checks | 2 days |
 | 1e | On real cards: install, timing, every flow, every pulled tap | 2 to 4 days, set by how many rounds the hardware needs |
 | 2 | A card at another mint; the PIN under a key; unblock by a second code | 1 to 2 weeks |
-| 3 | A receiver with no connection: DLEQ on the card, an issuer's certificate, a list of withdrawn cards | a design of its own; weeks |
+| 3 | A receiver with no connection: DLEQ on the card (kept with each piece since software 1.20: 5.9), an issuer's certificate, a list of withdrawn cards | a design of its own; weeks |
 
 Phase 1 is about three weeks of the way this project is worked now. The
 applet and the wallet can be written and tested without a card; phases 1b and

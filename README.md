@@ -30,6 +30,11 @@ What differs from upstream:
   commits it, so the number is not bounded by the chip's transaction (1.8).
 - The PIN is taken sealed: enciphered to a key the card keeps for that alone,
   under sixteen bytes of the card's that are good once (1.9).
+- The card keeps the mint's NUT-12 proof (`e`, `s` and `r`, 96 bytes) with each
+  piece that comes with one, and gives it back, for a phone to read and check
+  that the mint made the piece. The card checks nothing and never uses it; paying
+  is untouched (1.20). The room for it is reserved by the first `SET_CARD`, not at
+  install, which the chip would refuse.
 
 The applet has run on one real card, a J3R180. Read [`FORK.md`](FORK.md) first,
 and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) for the daily
@@ -128,10 +133,11 @@ Full reference: [`spec/APDU.md`](spec/APDU.md).
 | `B0` | `12` | GET_PROOF_COUNT | — | Count of non-empty slots |
 | `B0` | `13` | GET_PROOF | — | Full proof at a slot index |
 | `B0` | `14` | GET_SLOT_STATUS | — | One status byte per slot |
+| `B0` | `1A` | GET_DLEQ | — | The mint's proof kept with an unspent piece, for one place or two (1.20) |
 | `B0` | `22`–`24` | SPEND_ALL_BEGIN / OUTPUTS / SIGN | ✔ (if set) | One signature for a whole payment (NUT-11 `SIG_ALL`): the places, the swap's outputs, then every place marked spent and one 64-byte signature |
 | `B0` | `25` | SPEND_ALL_AGAIN | ✔ (if set) | The last signature given, again |
 | `B0` | `21` | SIGN_ARBITRARY | ✔ (if set) | Sign 32 bytes, consuming no proof |
-| `B0` | `30` | LOAD_PROOF | ✔ | Store a proof in the next free slot |
+| `B0` | `30` | LOAD_PROOF | ✔ | Store a proof in the next free slot (P1 = 1: one piece and the mint's proof for it, 1.20) |
 | `B0` | `31` | CLEAR_SPENT | ✔ | Reclaim spent slots |
 | `B0` | `40`–`42` | VERIFY/SET/CHANGE_PIN | — / ✔ | PIN management |
 | `B0` | `50` | LOCK_CARD | ✔ | Irreversibly disable writes |

@@ -19,7 +19,7 @@ get around it rather than through it.
 
 | # | Threat | Protected? | Notes |
 |---|---|---|---|
-| 1 | Passive read of card memory | **Partially** | An attacker gets keyset id, amount, nonce and `C` — the secret string is never stored on the card, but it is reconstructible from the nonce plus the card pubkey, so treat it as leaked too. What does not leak is the private key, so the proofs stay unspendable. Balance and history leak. |
+| 1 | Passive read of card memory | **Partially** | An attacker gets keyset id, amount, nonce and `C` — the secret string is never stored on the card, but it is reconstructible from the nonce plus the card pubkey, so treat it as leaked too. What does not leak is the private key, so the proofs stay unspendable. Balance and history leak. From software 1.20 a reader also gets the mint's proof for each unspent piece that has one, and so its blinding factor (#16). |
 | 2 | Hostile reader spends the card | **Once a PIN is set** | `SPEND_PROOF` and `SIGN_ARBITRARY` are gated on `VERIFY_PIN` in the same session (D13), and a failed PIN check ends that session. A card with no PIN set — the factory state — can be drained by anyone in NFC range, so the holder must set one before carrying value. Three wrong tries block the card; the gate keeps refusing in the blocked state (ENG-615 closed a bug where it stopped), and there is no unblock path (D13). That dead end is its own threat: see #14. |
 | 3 | Card lost or destroyed | ❌ **By design** | No seed, no backup, no recovery. See [D5](DECISIONS.md#d5). |
 | 4 | Cloning the chip | **Yes** | Cloning EEPROM copies the proofs but not the key; a clone cannot sign. Cards should be CC EAL 5+ to resist invasive extraction. |
@@ -34,6 +34,7 @@ get around it rather than through it.
 | 13 | Supply-chain / pre-personalised cards | ⚠️ **Unaddressed** | Nothing currently attests that a card's key was generated on-card by an untampered applet. |
 | 14 | Hostile reader blocks the PIN (3 unauthenticated APDUs), balance unrecoverable | ❌ **No** | `VERIFY_PIN` needs no authentication, so three wrong PINs from any reader in NFC range block the card. Once blocked, nothing can sign for its proofs: they are P2PK-locked to the card key with only a `sigflag` tag (no refund key, no locktime; [D5](DECISIONS.md#d5)'s recovery proposal is unmerged), and a reinstall regenerates the key. The balance is gone. Mitigations: small balances, a shielded sleeve, and `UNBLOCK_PIN` + PUK (ENG-617) before volume issuance. See below. |
 | 15 | Reading the NFC tag (software 1.19) | **Nothing of the card to read** | Any reader, with no PIN, gets the same bytes from every card: one web address. It names no card, key, owner or balance. A card on factory keys can have the tag's applet replaced by one carrying another address; rotating the card manager keys closes that. See below. |
+| 16 | A piece on the card that the mint never made (software 1.20) | **Checked by the reader, not by the card** | The card keeps the mint's NUT-12 proof for a piece and gives it back; it checks nothing. A reader that checks it, with the mint's keys, sees that a made-up `C` is not real, and a piece copied from another card is not real here. It does not show that a real piece is unspent. Reading the proof gives away `r`, which ties a piece to the request that made it if the mint is given it. See below. |
 
 ## The offline double-spend problem (#5)
 
@@ -172,6 +173,50 @@ address, so that a phone that reads the card is sent somewhere else. Rotating th
 manager keys (or locking the issuer domain) closes both, and it is part of set-up for the
 cards that are given to people.
 
+## The mint's proof kept with each piece (#16, software 1.20)
+
+From software 1.20 the card keeps, for a piece that is loaded with one, the mint's NUT-12
+proof: `e`, `s` and the blinding factor `r`, 96 bytes. `GET_DLEQ` gives it back, with no
+PIN, for an unspent piece (`FOXY-CARD-SPEC.md` 5.9, [D15](DECISIONS.md#d15)).
+
+**What "real" rests on.** A phone that reads a piece and its proof can rebuild the piece's
+secret, work out `C'` and `B'`, and check the proof against the mint's public key for the
+amount. A piece that passes was signed by that key, over that secret. So "this piece is
+real" rests on two things the reader has: the mint's keys, and the check it makes. It does
+not rest on the card, which checks nothing and hands back what it was given, and it does not
+rest on whoever loaded the card. A terminal that writes a piece with a made-up `C`, and any
+proof it likes, makes a piece that fails the check: nobody without the mint's key can make a
+proof that passes. A real piece copied from another card fails too, since its secret names
+that card's key.
+
+**What it does not show.**
+
+- That the piece is unspent. Only the mint knows, and a copy of a real piece passes the
+  check as the real piece does (#5).
+- That the mint will honour it (#8).
+- That a piece with no proof is fake. A piece put on plain, or a card of earlier software,
+  is "not shown real", and the reader decides what that means to it.
+- Anything, to a reader that does not check. The card does not refuse a piece whose proof
+  fails or is missing, and a terminal with the PIN can still write a piece the mint will
+  refuse (`FOXY-CARD-SPEC.md` 10). What changed is that a reader can now tell.
+
+**What it costs: `r`.** The proof carries the blinding factor. The mint made its signature for
+`B'`, and given `r`, whoever has the mint's record of that issue can recompute `B'` and `C'`
+from the piece and tie the piece to the request that made it. That is so of any NUT-12 token
+that carries `r`; here, any reader can read `r` for every unspent piece that has a proof,
+with no PIN, as `GET_CHANGE` already gives it for the change the card made for itself. A
+reader that hands `r` to the mint lets the mint make the tie; one that checks on its own
+side and sends the proof nowhere does not. The money is as safe as it was: a piece is
+spent only with the card's signature, and nothing here gives that.
+
+**The store.** One persistent array of 12,288 bytes, reserved by the first `SET_CARD` and
+not at install, because the chip will not install an applet that asks for that much more in
+its constructor (`FOXY-CARD-HARDWARE.md`). A card that is refused it works without. A place
+that is unspent holds its own proof or zeros and never another piece's: `LOAD_PROOF` writes
+the record before the place's data and the status byte last, `CLEAR_SPENT` and the payment
+commands write nothing to the store, and `RESET_CARD` zeros it. A card taken away in a load
+leaves an empty place with a record beside it, which nothing serves.
+
 ## What has and has not been tested
 
 **Verified in simulation (jCardSim) and by construction:**
@@ -180,6 +225,12 @@ cards that are given to people.
 - Slot lifecycle, PIN gating, APDU encodings
 - The tag (1.19), byte for byte, the switch and its refusals, and that nothing the tag
   says differs between two cards
+- The mint's proof kept with a piece (1.20): given back as it was loaded, never served for
+  a spent, empty or plain place, and never another piece's through any long history of
+  loads, payments and clears; every refusal of the load with nothing written; no payment
+  command writing the store; the store null after install and made by the first
+  `SET_CARD`; the order of the writes and the torn states. A reader's check of the proof is
+  not the card's and is tested where the reader is
 - The blocked PIN (applet 0.3): every gated command refuses, before and after
   further PIN attempts, and a failed PIN check ends the session
 - DLEQ verification, including the tagging attack it exists to catch
@@ -196,13 +247,22 @@ cards that are given to people.
   current PIN
 - The unverified-session gate: `LOAD_PROOF` and `CLEAR_SPENT` refuse on 0.1,
   `SPEND_PROOF` refuses on 0.2
+- The tag (1.19): installed under the NFC Forum's name beside the card's applet,
+  read from outside as a phone reads it, and read by a phone, which offered its
+  address
+- The mint's proof (1.20): the build installs, the first `SET_CARD` is given the
+  store after the install, a piece loaded with a proof gives the same 96 bytes
+  back, a plain piece and a place used again read `00`, a payment and a reset go
+  through, and `GET_INFO` is the length it was (`tools/chip/proofstore.sh`, 27
+  checks). Not run there: a card pulled away during the first `SET_CARD` or a
+  load with a proof, and the time a phone takes to load one piece a command
 
 An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
 2026-09-01 ([its report](HARDWARE_TEST_REPORT_2026-09-01.j3r452.md)).
 
 **Not yet run on silicon:**
-- The tag (1.19): its install under the NFC Forum's name beside the card's applet, the
-  shareable lookup between two applets of one package, and a phone reading it
+- The tag's switch (1.19): `SET_TAG` on a card, and with it the shareable lookup
+  between two applets of one package
 - A blocked PIN on any build: neither ENG-615 nor its 0.3 fix (the
   blocked-state gate and the failed-check session rule) has run on a card
 - `LOCK_CARD`, deliberately not run on a card holding value

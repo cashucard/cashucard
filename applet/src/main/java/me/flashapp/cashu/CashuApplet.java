@@ -30,12 +30,13 @@ import javacardx.crypto.*;
  *   0x17  GET_PIECES       — every slot's state and every unspent piece, a page at a time (P1 = the first slot)
  *   0x18  GET_LOG          — the card's own account of its taps: what it signed for, what it refused
  *   0x19  GET_CHANGE       — the change the card made for itself and has not been handed: the openings, a page at a time
+ *   0x1A  GET_DLEQ         — the mint's proof kept with an unspent piece, for one place or two (P1, P2; FF for none)
  *   0x22  SPEND_ALL_BEGIN  — the places a payment is made of, in order (one signature for all: NUT-11 SIG_ALL)
  *   0x23  SPEND_ALL_OUTPUTS — the swap's outputs, 37 bytes each, hashed into the message as they come
  *   0x26  SPEND_ALL_CHANGE — one change output the card makes for itself, locked to its own key; answers the blinded message
  *   0x24  SPEND_ALL_SIGN   — the one signature; every piece named is burned as it is given; with a PIN set, the PIN or the no-PIN allowance (6A94)
  *   0x25  SPEND_ALL_AGAIN  — the last signature given, again, for an answer lost on the air
- *   0x30  LOAD_PROOF       — store new proof (an owner, a time, and a PIN or the owner's grant)
+ *   0x30  LOAD_PROOF       — store new proof (an owner, a time, and a PIN or the owner's grant); with P1 = 1, one piece and the mint's proof for it
  *   0x31  CLEAR_SPENT      — free spent slots (PIN, or the owner's grant)
  *   0x32  SET_CARD         — write the card record (open card: PIN; owned card: the owner's proof; only with nothing unspent)
  *   0x33  SET_LIMIT        — the daily limit, by PIN: an open card only (no owner, nothing unspent)
@@ -150,7 +151,14 @@ public class CashuApplet extends Applet implements TagSwitch {
     // owner and a card just reset. GET_INFO has a new form, P1 = 2, whose 43rd byte says it; the answers to P1 = 0 and P1 = 1
     // are the 30 and the 42 bytes they were, whatever the tag's state, because the wallets that went before take the answer to
     // P1 = 1 as the long form only when it is exactly 42 bytes. The wire is otherwise 1.18's.
-    static final byte VERSION_MINOR = (byte) 0x13;
+    // 1.20 keeps the mint's proof with each piece. LOAD_PROOF with P1 = 1 takes one piece and, after it, the three numbers a later
+    // holder needs to check that the mint made the piece (NUT-12: e, s and the blinding factor r, 96 bytes), and GET_DLEQ (0x1A)
+    // gives them back for an unspent place. The card does not check the proof and never uses it, and a payment is what it was: no
+    // payment command writes them. The 12,288 bytes that hold them (`dleq`) are reserved by the first SET_CARD and NOT in the
+    // constructor, which the chip refuses to install with so much more in it (docs/FOXY-CARD-HARDWARE.md); the same bytes asked for
+    // after the install are given. Every use of `dleq` is safe while it is null (before the first SET_CARD, or after the card has
+    // refused the room). GET_INFO is 1.19's to the byte but for the version; a phone tells a 1.20 card by that.
+    static final byte VERSION_MINOR = (byte) 0x14;
     static final byte FORMAT        = (byte) 0x04;
 
     // -------------------------------------------------------------------------
@@ -167,6 +175,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte INS_GET_PIECES       = (byte) 0x17;
     static final byte INS_GET_LOG          = (byte) 0x18;
     static final byte INS_GET_CHANGE       = (byte) 0x19;
+    static final byte INS_GET_DLEQ         = (byte) 0x1A;
     // 0x20 was SPEND_PROOF: one piece, one signature over its secret alone. A
     // piece of format 4 says SIG_ALL in its secret, and a mint takes no such
     // signature for it. It answers 6D00 and stays unassigned.
@@ -235,6 +244,14 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short SHORT_MOST = (short) 18;
     /** The most pieces one LOAD_PROOF takes, and the most places GET_PIECES gives whole when asked for by name. */
     static final short BATCH_MOST = (short) 3;
+
+    /**
+     * The mint's proof for a piece (1.20), as a later holder needs it (NUT-12): e (32), s (32) and the blinding factor r (32), kept
+     * for each place in `dleq`, the place k's record at k * DLEQ_LEN. A record of zeros is "no proof". The card does not check it.
+     */
+    static final short DLEQ_LEN = (short) 96;
+    /** LOAD_PROOF with P1 = 1: one piece (81 bytes) and, after it, its proof (96). */
+    static final short LOAD_DLEQ_LEN = (short)(PROOF_DATA_LEN + DLEQ_LEN);
 
     // -------------------------------------------------------------------------
     // The card record (persistent): which mint, which unit, who may take the
@@ -690,6 +707,22 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private byte[] slotHex;
 
+    /**
+     * The mint's proof for each place (1.20): MAX_PROOFS records of DLEQ_LEN, e ‖ s ‖ r, the record of place k at k * DLEQ_LEN, and
+     * a record of zeros for a place with no proof. The card never checks a proof and never uses one: it is kept for the phone that
+     * reads the card, which checks it (GET_DLEQ).
+     *
+     * NOT allocated in the constructor, and null from install until the first SET_CARD, which reserves it (once, outside any
+     * transaction; if the card refuses the room it stays null and the card works as a card with no room for proofs). The chip
+     * refuses to install an applet whose constructor asks for this much more (+300 bytes installs, +12,288 does not:
+     * docs/FOXY-CARD-HARDWARE.md), and no simulator has that limit, so a test pins it. EVERY use of it is safe while it is null.
+     *
+     * The rule that keeps it honest: a place that is UNSPENT holds in it its own proof or zeros, never another piece's. LOAD_PROOF
+     * writes the record before the place's data and long before its status byte, the commit (`loadOne`), and nothing else writes
+     * it but RESET_CARD, which zeros it. CLEAR_SPENT and the payment commands do not touch it.
+     */
+    private byte[] dleq;
+
     /** Card locked flag — once set to 1, write operations are disabled */
     private byte[] cardLocked;   // 1-byte array (persistent)
 
@@ -1080,6 +1113,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             case INS_GET_PIECES:       processGetPieces(apdu);      break;
             case INS_GET_LOG:          processGetLog(apdu);         break;
             case INS_GET_CHANGE:       processGetChange(apdu);      break;
+            case INS_GET_DLEQ:         processGetDleq(apdu);        break;
             case INS_SPEND_ALL_BEGIN:   processSpendAllBegin(apdu);   break;
             case INS_SPEND_ALL_OUTPUTS: processSpendAllOutputs(apdu); break;
             case INS_SPEND_ALL_CHANGE:  processSpendAllChange(apdu);  break;
@@ -1882,6 +1916,43 @@ public class CashuApplet extends Applet implements TagSwitch {
         apdu.setOutgoingAndSend((short) 0, at);
     }
 
+    /**
+     * GET_DLEQ (1.20): the mint's proof kept with an unspent piece, for one place or two. No PIN, like GET_PIECES and
+     * GET_CHANGE: it is what the mint made for a piece that is already on the card for any reader to read, and what a reader
+     * does with it (checks that the mint made the piece) it does with the piece in hand.
+     *
+     * P1 is a place (0 to 127); P2 is a second place, or FF for none. No data. For each place asked, in the order asked, the
+     * answer is 01 and the 96 bytes (e, s, r) where the place is UNSPENT and its record is not zero, and otherwise the single
+     * byte 00: the place is empty or spent, or holds a piece that came with no proof, or the card has no room for proofs. The
+     * same place twice is answered twice. `6A83` for a place there is not (P1 over 127, or P2 over 127 and not FF), before
+     * anything is answered. At most 194 bytes.
+     *
+     * The card does not check the proof. Whoever reads it rebuilds the piece's secret, Y = hash_to_curve(secret), C' = C + r*K
+     * (K the mint's key for the amount), B' = Y + r*G, and checks NUT-12's equation on e, s, B' and C'.
+     */
+    private void processGetDleq(APDU apdu) {
+        byte[] buf = apdu.getBuffer();
+        // read before the answer is written over the command
+        short place = (short)(buf[ISO7816.OFFSET_P1] & 0xFF);
+        short second = (short)(buf[ISO7816.OFFSET_P2] & 0xFF);
+        short asked = second == (short) 0xFF ? (short) 1 : (short) 2;
+        if (place >= MAX_PROOFS || (asked == (short) 2 && second >= MAX_PROOFS)) ISOException.throwIt(SW_SLOT_OUT_OF_RANGE);
+        short at = 0;
+        for (short k = 0; k < asked; k++) {
+            short rec = (short)(place * DLEQ_LEN);
+            if (dleq != null
+                && proofStorage[(short)(place * PROOF_SIZE + PROOF_STATUS_OFFSET)] == STATUS_UNSPENT
+                && !isZero(dleq, rec, DLEQ_LEN)) {
+                buf[at++] = (byte) 1;
+                at = Util.arrayCopyNonAtomic(dleq, rec, buf, at, DLEQ_LEN);
+            } else {
+                buf[at++] = (byte) 0;
+            }
+            place = second;
+        }
+        apdu.setOutgoingAndSend((short) 0, at);
+    }
+
     /** The place holding a piece with the 32-byte nonce at `off` in `a`, spent or not, or -1. */
     private short slotWithNonce(byte[] a, short off) {
         for (short i = 0; i < MAX_PROOFS; i++) {
@@ -2387,17 +2458,25 @@ public class CashuApplet extends Applet implements TagSwitch {
          * The first that cannot be stored stops it: alone, or first, it is
          * refused with its own word, as it always was; after others, the
          * answer is the ones that did go on, and the terminal sends the rest
-         * again to hear why. The answer is the place of each piece stored. */
+         * again to hear why. The answer is the place of each piece stored.
+         *
+         * 1.20: with P1 = 1 it is one piece and, after its 81 bytes, the mint's proof for it (96): exactly 177 bytes, and
+         * nothing else is different. The answer is then two bytes, the place and a flag: 01 where the proof was kept, 00 where
+         * the card has no room for proofs and the piece went on without it. Any other P1 is what it always was; the card
+         * does not look at P1 beyond that. */
+        byte[] buf = apdu.getBuffer();
+        boolean withProof = buf[ISO7816.OFFSET_P1] == (byte) 1;
         short dataLen = apdu.setIncomingAndReceive();
-        if (dataLen < PROOF_DATA_LEN || dataLen > (short)(BATCH_MOST * PROOF_DATA_LEN)
-            || (short)(dataLen % PROOF_DATA_LEN) != (short) 0) {
+        if (withProof ? dataLen != LOAD_DLEQ_LEN
+            : (dataLen < PROOF_DATA_LEN || dataLen > (short)(BATCH_MOST * PROOF_DATA_LEN)
+               || (short)(dataLen % PROOF_DATA_LEN) != (short) 0)) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
-        byte[] buf = apdu.getBuffer();
-        short n = (short)(dataLen / PROOF_DATA_LEN);
+        short n = withProof ? (short) 1 : (short)(dataLen / PROOF_DATA_LEN);
         short done = 0;
         for (short k = 0; k < n; k++) {
-            short sw = loadOne(buf, (short)(ISO7816.OFFSET_CDATA + (short)(k * PROOF_DATA_LEN)), (short)(X_NUM + k));
+            short sw = loadOne(buf, (short)(ISO7816.OFFSET_CDATA + (short)(k * PROOF_DATA_LEN)), (short)(X_NUM + k),
+                               withProof ? (short)(ISO7816.OFFSET_CDATA + PROOF_DATA_LEN) : (short) -1);
             if (sw != (short) 0) {
                 if (k == (short) 0) ISOException.throwIt(sw);
                 break;
@@ -2421,6 +2500,11 @@ public class CashuApplet extends Applet implements TagSwitch {
             tapOpen[0] = (byte) 1;
         }
         Util.arrayCopyNonAtomic(scratch, X_NUM, buf, (short) 0, done);
+        if (withProof) {
+            // the place (one piece went on, or the first would have been refused) and whether its proof is kept
+            buf[1] = dleq != null ? (byte) 1 : (byte) 0;
+            done = (short) 2;
+        }
         apdu.setOutgoingAndSend((short) 0, done);
     }
 
@@ -2436,8 +2520,13 @@ public class CashuApplet extends Applet implements TagSwitch {
      * One piece, its 81 bytes at `in` in `buf`, into the first empty place.
      * Answers 0 and leaves the place's number in scratch[`out`], or answers
      * the status word it is refused with, having written nothing.
+     *
+     * `proofAt` (1.20) is where the mint's proof for the piece begins in `buf` (96 bytes), or -1 for a piece that comes with
+     * none. A proof of zeros is refused as a piece with a point that is none is: zeros are what "no proof" is kept as. The
+     * place's record is written, or made zero, before anything of the place and long before its status byte, so that an
+     * UNSPENT place holds its own proof or zeros and never another piece's, whatever the place held before.
      */
-    private short loadOne(byte[] buf, short in, short out) {
+    private short loadOne(byte[] buf, short in, short out, short proofAt) {
         short slot = emptySlot();
         if (slot < 0) return SW_NO_SPACE;
         /* A piece with a date names the card's refund key in its secret, so a
@@ -2447,10 +2536,11 @@ public class CashuApplet extends Applet implements TagSwitch {
             && cardRecord[CARD_REFUND_OFFSET] == (byte) 0) {
             return SW_NO_REFUND_KEY;
         }
-        // not a point, or worth nothing: not a piece
+        // not a point, or worth nothing, or a proof of nothing: not a piece
         byte c0 = buf[(short)(in + PROOF_C_OFFSET - 1)];
         if ((c0 != (byte) 0x02 && c0 != (byte) 0x03)
-            || isZero(buf, (short)(in + PROOF_AMOUNT_OFFSET - 1), (short) 4)) {
+            || isZero(buf, (short)(in + PROOF_AMOUNT_OFFSET - 1), (short) 4)
+            || (proofAt >= 0 && isZero(buf, proofAt, DLEQ_LEN))) {
             return ISO7816.SW_WRONG_DATA;
         }
         /* Not a piece that is here already. What the card signs is the piece's
@@ -2471,6 +2561,15 @@ public class CashuApplet extends Applet implements TagSwitch {
         Util.arrayCopyNonAtomic(scratch, X_HEX, slotHex, hex, (short) 64);
         toHex(buf, (short)(in + PROOF_C_OFFSET - 1), (short) 33);
         Util.arrayCopyNonAtomic(scratch, X_HEX, slotHex, (short)(hex + 64), (short) 66);
+        /* Its proof (1.20), in the place's record: the piece's own, or zeros. Before the data and long before the status
+         * byte, like the text above, so that a place that goes UNSPENT holds its own record and not the one a piece before it
+         * left (CLEAR_SPENT leaves a freed place's record as it was). A piece that comes with none makes the record zero, and
+         * writes only if it is not already. A card with no room for proofs (`dleq` is null) writes nothing. */
+        if (dleq != null) {
+            short rec = (short)(slot * DLEQ_LEN);
+            if (proofAt >= 0) Util.arrayCopyNonAtomic(buf, proofAt, dleq, rec, DLEQ_LEN);
+            else if (!isZero(dleq, rec, DLEQ_LEN)) Util.arrayFillNonAtomic(dleq, rec, DLEQ_LEN, (byte) 0);
+        }
         // The status byte is the slot's commit, written last (D14, ENG-620).
         // Util.arrayCopy into persistent memory is atomic, and so is a single
         // byte write, but the pair is not: with the status first, a card
@@ -2591,6 +2690,18 @@ public class CashuApplet extends Applet implements TagSwitch {
          * are not read: a phone of an earlier software still sends one, a later
          * one sends zeros, and the card's clock, which is block headers' now
          * (SET_HEADER), keeps its reading through a new record. */
+        /* The room for the mint's proofs (1.20) is reserved here, the first time the card is set up, and not at install: the
+         * chip refuses to install an applet whose constructor asks for this much more, and gives the same bytes asked for after
+         * it (docs/FOXY-CARD-HARDWARE.md). Once, and outside any transaction, so that nothing can undo it. If the
+         * card refuses the room, `dleq` stays null, the record is written all the same, and the card works as one with no room for
+         * proofs: every use of the store is safe while it is null. */
+        if (dleq == null) {
+            try {
+                dleq = new byte[(short)(MAX_PROOFS * DLEQ_LEN)];
+            } catch (SystemException e) {
+                dleq = null;
+            }
+        }
         JCSystem.beginTransaction();
         cardRecord[CARD_UNIT_OFFSET] = buf[at];
         Util.arrayCopy(buf, (short)(at + 1), cardRecord, CARD_REFUND_OFFSET, (short) 33);
@@ -3311,6 +3422,8 @@ public class CashuApplet extends Applet implements TagSwitch {
 
         // the places: the spent ones freed, as CLEAR_SPENT does it (nothing else is in one, and nothing unspent)
         freeSpent();
+        // and the mint's proofs that were kept with them (1.20): none is a place's now, and none is for the next owner to read
+        if (dleq != null) Util.arrayFillNonAtomic(dleq, (short) 0, (short)(MAX_PROOFS * DLEQ_LEN), (byte) 0);
         // nothing of the last owner's taps: the log, the receipts, the change openings and the last signature (the burn list is the places of a payment finished, and nothing reads it)
         Util.arrayFillNonAtomic(cardLog, (short) 0, LOG_LEN, (byte) 0);
         Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);
@@ -3776,6 +3889,6 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        // no lines at present: a 1.19 build of 19,269 bytes (69 past a multiple of 256) installs; 1.16 installs at 203 past a multiple of 256 (and 249), and not at 139, 164 or 176
+        // no lines at present: the 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build of 19,269 (69 past) did; 1.16 installs at 203 past a multiple of 256 (and 249), and not at 139, 164 or 176
     }
 }

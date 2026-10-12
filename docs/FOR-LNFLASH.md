@@ -107,7 +107,7 @@ since, the fault is in our reading.
 | 4 | A card with no PIN accepts loads and spends from any reader in range. | Nothing is loaded onto a card until a PIN is set and verified, nor onto a card with no owner. A card with no owner is open while it is empty: any reader can give it a PIN, a record and an owner, but it holds nothing and cannot be loaded. A card with an owner is its owner's, empty or not, so a terminal that has the PIN and empties a card cannot then claim it. Ours are set up before they leave our hands. |
 | 5 | A reader with the PIN can spend every slot in one tap. By design, but the holder has typed their PIN into somebody else's terminal. | Our first answer was a limit on what one PIN entry may spend. **It did not hold:** a terminal that has the PIN presents it again between spends, which reset the count, or sets the limit to nothing, because the PIN alone could. It is removed. Our second, an allowance that only went down and only an owner's proof raised, held against a terminal but stopped a card whose owner's phone was not at hand. The card now keeps a limit per day, with a day of its own: a clock (`now`) that only moves forward and is the time in the newest Bitcoin block header the card has been shown. Every spend adds the whole piece signed to what has been signed today, in the same transaction that burns the slot; a piece that would take today past the limit is refused before anything is signed; only the owner's proof sets or removes the limit. A terminal that has the PIN cannot start a new day by telling the card a later time: it has to bring a header of that time, and the card believes a header only for its work. (Up to 1.14 the time was signed by a key built into our app, so it was not secret, and the limit bound only honest terminals.) A card is cash. |
 | 6 | The card does not say which mint its pieces are at (an open question in your notes). | A card record names the mint. |
-| 7 | No DLEQ on the card, so a piece cannot be checked without the mint. | Unchanged. Our receiver is always online and always swaps before saying paid. |
+| 7 | No DLEQ on the card, so a piece cannot be checked without the mint. | Our receiver is always online and always swaps before saying paid. And from software 1.20 the card keeps the mint's NUT-12 proof (`e`, `s` and the blinding factor `r`, 96 bytes) with each piece that comes with one, and gives it back, so that a phone can check a piece offline. The card checks nothing and never uses it. |
 | 8 | The deployment guide installs with the card's factory GlobalPlatform keys and does not change them afterwards. A card left on them can have the applet deleted, and the money with it, by anyone with a reader. | Not the applet's to fix. Our provisioning steps will change them. |
 | 9 | In flash-pos, when we read it: an exact payment was shown as paid when the swap had failed, and a proof the mint reported as spent was booked as settled, whoever spent it. | Not our code, and you may have fixed it. Our rule is that paid means the mint has given this phone its own pieces. |
 | 10 | `CHANGE_PIN` needs a verified session and the old PIN, both of which a reader handed the PIN has. It can set a PIN the holder does not know, and the holder's wrong tries then block the card for good (your threat 14, by another road). | The owner's proof replaces both: the proof and the new PIN only, no old PIN and no session. A wrong proof costs no tries. The same command unblocks a blocked card. |
@@ -127,9 +127,10 @@ Class `B0` as yours. AID: package `F0 46 4F 58 59 43 41 52 44`, applet the same 
 | `13` GET_PROOF | 78-byte slot | 82: adds a 4-byte date |
 | `15` AUTH | none | reader sends 16 random bytes; card answers 16 of its own and a BIP-340 signature. No PIN |
 | `16` GET_CARD | none | the card record, with the daily limit and, where a time key was up to 1.14, the hardest difficulty and the hash of the newest block header the card has taken |
+| `1A` GET_DLEQ (1.20) | none | no PIN. `P1` a slot, `P2` a second slot or `FF`. For each slot asked: `01` and the 96 bytes (`e ‖ s ‖ r`) of the mint's proof kept with an unspent piece, or the single byte `00`; at most 194 bytes; `6A83` for a slot there is not. The card does not check what it gives |
 | `20` SPEND | slot + 32-byte message | slot only. With a limit set, refused (`6A8F`) for a piece that would take today past it; otherwise adds the piece's whole amount to what is spent today in the transaction that marks the slot spent. (Since format 4 a payment is `22`, `23`, `26` and `24`, one signature; from 1.16 the PIN is asked at `24`, and a card with a PIN signs up to its no-PIN allowance a day without it, a card with none always signs: `6A94` asks for the PIN) |
 | `21` SIGN_ARBITRARY | signs anything | removed (`6D00`) |
-| `30` LOAD_PROOF | 77 bytes | 81, with the date; needs an owner on the card, a card record, and a PIN set and verified or the owner's `ALLOW_LOAD` for the tap. It asks nothing of the clock. Never touches the limit |
+| `30` LOAD_PROOF | 77 bytes | 81, with the date; needs an owner on the card, a card record, and a PIN set and verified or the owner's `ALLOW_LOAD` for the tap. It asks nothing of the clock. Never touches the limit. With `P1 = 1` (1.20), 177 bytes: one piece and the mint's proof for it; the answer is the slot and `01` where the proof was kept |
 | `31` CLEAR_SPENT | the PIN if one is set | the PIN if one is set, or the owner's `ALLOW_LOAD` for the tap |
 | `32` SET_CARD | none | writes the record (unit, refund key, mint; sixty-five bytes where a time key was are sent and not read); a PIN on a card with no owner, the owner's proof on a card with one; refused while the card holds unspent pieces. Never touches the limit or the clock |
 | `33` SET_LIMIT, PIN form | none | the daily limit (4 bytes, big-endian; 0 is none), by the PIN, on a card with no owner and nothing unspent only. (`33` was once a limit on one PIN entry, removed; this is not that) |
@@ -159,7 +160,7 @@ newest hash of a block header taken (a time key up to 1.14), the clock and the
 day, and the mint's address (up to 80 bytes). Apart from it the card keeps a
 65-byte owner public key, which nothing reads out. The applet's version was 1.1
 (`SELECT` answers `01 01`) and the format byte 3 when this was written; they are
-1.19 (`01 13`) and 4 now.
+1.20 (`01 14`) and 4 now.
 
 **The owner and its proof.** The holder's phone works the owner's private key out
 for each card as HMAC-SHA256 with the 64-byte BIP-39 seed as the key, over
@@ -324,8 +325,9 @@ visit, where the owner has set one.
 - The same terminal can write onto the card pieces the mint will refuse, made up
   with a nonce no mint ever signed. They take nothing from anyone, since our
   receiver asks the mint, but a later payment that picks one burns slots and
-  spends a day's limit on nothing. A fake piece looks unspent to a state check, so
-  this waits on DLEQ on the card.
+  spends a day's limit on nothing. A fake piece looks unspent to a state check. From
+  1.20 the card can keep the mint's proof for a piece, and a phone that reads and
+  checks it sees that a made-up piece is not real; the card checks nothing.
 - It cannot write a copy of a real piece: the card signs a piece's secret, which
   its nonce makes, and takes the amount on the terminal's word, so a copy stating
   an amount of 1 would have been spent for 1 and signed for the real piece.

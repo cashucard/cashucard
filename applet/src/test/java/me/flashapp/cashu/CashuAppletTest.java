@@ -65,6 +65,8 @@ class CashuAppletTest {
     static final byte INS_SET_CARD         = (byte) 0x32;
     static final byte INS_GET_LOG          = (byte) 0x18;
     static final byte INS_GET_CHANGE        = (byte) 0x19;
+    /** GET_DLEQ (1.20): the mint's proof kept with an unspent piece, for the place P1 and, unless P2 is FF, the place P2. */
+    static final byte INS_GET_DLEQ          = (byte) 0x1A;
     static final byte INS_SPEND_ALL_CHANGE  = (byte) 0x26;
     static final byte INS_SET_LIMIT        = (byte) 0x33;   // by PIN: an open card only
     static final byte INS_SET_LIMIT_OWNER  = (byte) 0x34;
@@ -498,6 +500,27 @@ class CashuAppletTest {
     static CommandAPDU setTagCommand(byte[] proof, int p1) {
         return new CommandAPDU(CLA, INS_SET_TAG, p1, 0, ownerData(proof, new byte[] { (byte) p1 }));
     }
+    /**
+     * The mint's proof for a piece (1.20), as a later holder needs it: e, s and the blinding factor r, 96 bytes. Made from a seed so
+     * that two seeds make two proofs and none is all zeros. The card never checks it.
+     */
+    static byte[] dleqProof(int seed) {
+        byte[] p = new byte[96];
+        for (int i = 0; i < 96; i++) p[i] = (byte) (seed * 3 + i + 1);
+        return p;
+    }
+    /** LOAD_PROOF with P1 = 1 (1.20): the piece's 81 bytes and then its proof's 96. The answer is the place and 01 (kept) or 00 (the card has no room for proofs). */
+    static CommandAPDU loadWithProofCommand(byte[] piece, byte[] proof) {
+        return new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 0, concat(piece, proof), 256);
+    }
+    /** GET_DLEQ (1.20): the place P1 and the place P2, or FF (255) for no second. */
+    static CommandAPDU getDleqCommand(int first, int second) {
+        return new CommandAPDU(CLA, INS_GET_DLEQ, first, second, 256);
+    }
+    /** What GET_DLEQ answers for a place that holds an unspent piece with a proof: 01 and the proof. */
+    static byte[] dleqHeld(byte[] proof) {
+        return concat(new byte[] { 1 }, proof);
+    }
     /** The owner's phone switching the tag: a nonce, a proof over "FoxyCard/tag" and the byte, the command. */
     private int setTag(boolean off) {
         byte[] value = { (byte) (off ? 1 : 0) };
@@ -760,7 +783,7 @@ class CashuAppletTest {
         // what a phone sends: iOS chooses by the name in the app's Info.plist, and Foxy by the same ten bytes
         ResponseAPDU whole = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_HEX), 256));
         assertEquals(SW_OK, whole.getSW());
-        assertArrayEquals(new byte[] { 0x01, 0x13 }, whole.getData(), "the same answer either way: version 1.19");
+        assertArrayEquals(new byte[] { 0x01, 0x14 }, whole.getData(), "the same answer either way: version 1.20");
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_GET_INFO, 0, 0, 256)), "and its instructions follow");
     }
 
@@ -769,17 +792,17 @@ class CashuAppletTest {
     void testSelect() {
         ResponseAPDU resp = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR)));
         assertEquals(SW_OK, resp.getSW());
-        assertArrayEquals(new byte[] { 0x01, 0x13 }, resp.getData(), "version 1.19: the card answers as an NFC tag, which its owner switches off and on (1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
+        assertArrayEquals(new byte[] { 0x01, 0x14 }, resp.getData(), "version 1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
         assertNotEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(UPSTREAM_AID))),
             "an upstream reader must not find this applet under upstream's AID: the wire is not the same");
     }
 
     @Test
-    @DisplayName("GET_INFO on a new card: 30 bytes: version 1.19, 128 empty slots, no PIN, three tries, format 4, capabilities FF, no record, no limit, no owner, no block header seen, no change due")
+    @DisplayName("GET_INFO on a new card: 30 bytes: version 1.20, 128 empty slots, no PIN, three tries, format 4, capabilities FF, no record, no limit, no owner, no block header seen, no change due")
     void testInfoFresh() {
         byte[] d = info();
         assertEquals(30, d.length);
-        assertEquals(1, d[0]); assertEquals(19, d[1]);
+        assertEquals(1, d[0]); assertEquals(20, d[1]);
         assertEquals(MAX_PROOFS, d[2] & 0xFF);
         assertEquals(0, d[3]); assertEquals(0, d[4]);
         assertEquals(MAX_PROOFS, d[5] & 0xFF);
@@ -2530,19 +2553,32 @@ class CashuAppletTest {
 
     // ---- 1.8: a payment's places are marked after the transaction that commits it ---------------------
 
-    /** Every persistent array a command could change, by the applet's name for it. */
-    private static final String[] PERSISTENT = { "proofStorage", "slotHex", "cardLocked", "pinState", "cardRecord", "ownerSet", "changeDue",
+    /**
+     * Every persistent array a command could change, by the applet's name for it. `dleq` (1.20), the mint's proof for each place, is
+     * null until the first SET_CARD reserves it, so a copy of it is null then, and null is what it is compared with.
+     */
+    private static final String[] PERSISTENT = { "proofStorage", "slotHex", "dleq", "cardLocked", "pinState", "cardRecord", "ownerSet", "changeDue",
         "cardLog", "cardReceipts", "lastSig", "burnList", "burnPending" };
 
     /** All of what lasts, copied. */
     private java.util.Map<String, byte[]> persistent() throws Exception {
         java.util.Map<String, byte[]> m = new java.util.LinkedHashMap<>();
-        for (String name : PERSISTENT) m.put(name, field(name).clone());
+        for (String name : PERSISTENT) {
+            byte[] a = field(name);
+            m.put(name, a == null ? null : a.clone());
+        }
         return m;
     }
-    /** All of what lasts, put back as it was copied. */
+    /** All of what lasts, put back as it was copied (a store that was not yet there is left as it is, but zeroed). */
     private void putPersistent(java.util.Map<String, byte[]> m) throws Exception {
-        for (java.util.Map.Entry<String, byte[]> e : m.entrySet()) System.arraycopy(e.getValue(), 0, field(e.getKey()), 0, e.getValue().length);
+        for (java.util.Map.Entry<String, byte[]> e : m.entrySet()) {
+            byte[] live = field(e.getKey());
+            if (e.getValue() == null) {
+                if (live != null) Arrays.fill(live, (byte) 0);
+            } else {
+                System.arraycopy(e.getValue(), 0, live, 0, e.getValue().length);
+            }
+        }
     }
     private void assertPersistent(java.util.Map<String, byte[]> want, String what) throws Exception {
         for (String name : PERSISTENT) assertArrayEquals(want.get(name), field(name), what + ": " + name);
@@ -2680,7 +2716,7 @@ class CashuAppletTest {
                 // and the answer says what the marked places make it say
                 byte[] d = torn.getData();
                 if (name.equals("SELECT")) {
-                    assertArrayEquals(new byte[] { 0x01, 0x13 }, d, what);
+                    assertArrayEquals(new byte[] { 0x01, 0x14 }, d, what);
                 } else if (name.equals("GET_INFO")) {
                     assertEquals(others, d[3] & 0xFF, what + ": unspent");
                     assertEquals(n + others, d[4] & 0xFF, what + ": spent");
@@ -3792,7 +3828,7 @@ class CashuAppletTest {
         assertEquals(124, CashuApplet.CARD_HEADER_OFFSET);
         assertEquals(CashuApplet.CARD_BITS_OFFSET + 4 + 32 + 29, CashuApplet.CARD_NOW_OFFSET, "bits, hash and 29 zeros take the 65 bytes the time key had, and the clock is where it was");
         assertEquals(185, CashuApplet.CARD_NOW_OFFSET);
-        assertEquals(0x13, CashuApplet.VERSION_MINOR);
+        assertEquals(0x14, CashuApplet.VERSION_MINOR);
         assertEquals(212, CashuApplet.CARD_RECORD_LEN, "and the record is the length it was");
         assertEquals(212, field("cardRecord").length);
     }
@@ -6932,7 +6968,7 @@ class CashuAppletTest {
         readyWithLimit(0);
         byte[] more = infoTap();
         assertEquals(1, more[0]);
-        assertEquals(19, more[1], "version 1.19");
+        assertEquals(20, more[1], "version 1.20");
         assertEquals((byte) 0xFF, more[6], "capabilities FF: the limit on one payment is waited for, not refused, the 1.6 forms are there, so are 128 places with the short listing, a payment burned outside its transaction, and the PIN taken sealed");
         assertEquals(SW_OK, setLimits(1000, 100));
         assertEquals(100, paymentLimit());
@@ -7311,7 +7347,7 @@ class CashuAppletTest {
         assertEquals(SW_OK, changePin(NEW_PIN));
         assertEquals(SW_OK, verify(NEW_PIN));
         assertEquals(SW_OK, ownerSetCard(MINT, REFUND));
-        assertEquals(0x6D00, sw(new CommandAPDU(CLA, 0x1A, 0, 0, 256)), "there is no command beside it to write one with");
+        assertEquals(0x6D00, sw(new CommandAPDU(CLA, 0x1B, 0, 0, 256)), "there is no command beside it to write one with (0x1A, which was unassigned, is GET_DLEQ since 1.20, a read: the byte after it is the one tried)");
         transmit(new CommandAPDU(CLA, INS_GET_LOG, 1, 1, new byte[117], 256));
         assertArrayEquals(before, log(), "cleared slots, new limits, a new PIN, a new record, bytes sent with the command: the log is as it was");
     }
@@ -10135,6 +10171,51 @@ class CashuAppletTest {
         owner(out, "SET_TAG off, and left off for the rest", SW_OK, L_TAG, OWNER, new byte[] { 1 }, p -> setTagCommand(p, 1));
         say(out, "the info asked for the tag: off", "exact", SW_OK, infoTag);
 
+        /* 1.20: the mint's proof kept with a piece. LOAD_PROOF with P1 = 1 takes a piece and, after its 81 bytes, e, s and r (96) and answers the
+         * place and 01; GET_DLEQ gives the proof back for an unspent place (01 and the 96 bytes) and the single byte 00 for a place that is empty,
+         * spent, or holds a piece that came with none. The card does not check the proof, and a payment is what it was. The card is empty and
+         * the PIN is in force; everything put on is paid and freed again at the end, each payment the first of a time in the field. */
+        byte[] proofA = dleqProof(1), proofB = dleqProof(2), proofC = dleqProof(3);
+        byte[] mp0 = buildProof(KEYSET, 16, 111), mp1 = buildProof(KEYSET, 8, 112), mp2 = buildProof(KEYSET, 4, 113), mp3 = buildProof(KEYSET, 2, 114);
+        byte[] mp4 = buildProof(KEYSET, 1, 115), mp5 = buildProof(KEYSET, 1, 116);
+        byte[] none = { 0 };
+        sayReset(out, "taken away and put back: a new time in the field, for the mint's proofs");
+        say(out, "select", "exact", SW_OK, select);
+        say(out, "the PIN", "exact", SW_OK, verifyOk);
+        assertArrayEquals(none, say(out, "GET_DLEQ for a place with nothing in it: the single byte 00", "exact", SW_OK, getDleqCommand(0, 255)).getData());
+        assertArrayEquals(new byte[] { 0, 1 }, say(out, "a piece with its mint's proof: LOAD_PROOF with P1 = 1 answers its place and 01, the proof kept", "exact", SW_OK, loadWithProofCommand(mp0, proofA)).getData());
+        assertArrayEquals(dleqHeld(proofA), say(out, "GET_DLEQ for it: 01 and the 96 bytes, e, s and r", "exact", SW_OK, getDleqCommand(0, 255)).getData());
+        assertArrayEquals(new byte[] { 1 }, say(out, "a piece with none, put on as ever (P1 = 0)", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, mp1, 1)).getData());
+        assertArrayEquals(concat(dleqHeld(proofA), none), say(out, "GET_DLEQ for two places: the first's proof, then the single byte 00 for the plain piece", "exact", SW_OK, getDleqCommand(0, 1)).getData());
+        assertArrayEquals(concat(dleqHeld(proofA), dleqHeld(proofA)), say(out, "the same place twice is answered twice", "exact", SW_OK, getDleqCommand(0, 0)).getData());
+        assertArrayEquals(concat(none, dleqHeld(proofA)), say(out, "an empty place and then the piece with its proof, in the order asked", "exact", SW_OK, getDleqCommand(2, 0)).getData());
+        say(out, "a place there is not: 128", "exact", SW_SLOT_OUT_OF_RANGE, getDleqCommand(128, 255));
+        say(out, "nor a second place there is not: 0 and 128 (FF alone is no second place)", "exact", SW_SLOT_OUT_OF_RANGE, getDleqCommand(0, 128));
+        say(out, "nor 255 as the first place", "exact", SW_SLOT_OUT_OF_RANGE, getDleqCommand(255, 255));
+        say(out, "P1 = 1 with the 81 bytes of a plain piece is the wrong length", "exact", SW_WRONG_LENGTH, new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 0, mp2, 256));
+        say(out, "and with 176 bytes", "exact", SW_WRONG_LENGTH, new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 0, concat(mp2, new byte[95]), 256));
+        say(out, "and with 178", "exact", SW_WRONG_LENGTH, new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 0, concat(mp2, proofB, new byte[1]), 256));
+        say(out, "and with the 177 bytes of a piece and a proof of zeros: not a piece", "exact", SW_WRONG_DATA, loadWithProofCommand(mp2, new byte[96]));
+        say(out, "a piece that is on the card already is not written again, with a proof of its own or none", "exact", SW_PIECE_ON_CARD, loadWithProofCommand(mp0, proofB));
+        assertArrayEquals(dleqHeld(proofA), say(out, "and its proof is the one it came with", "exact", SW_OK, getDleqCommand(0, 255)).getData());
+        say(out, "P1 = 0 with 177 bytes is not a whole number of pieces", "exact", SW_WRONG_LENGTH, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, concat(mp2, proofB), 256));
+        assertArrayEquals(new byte[] { 2 }, say(out, "a P1 that is not 1 is what it always was: P1 = 2 puts on a plain piece", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 2, 0, mp2, 1)).getData());
+        assertArrayEquals(new byte[] { 3, 1 }, say(out, "a piece with a proof of its own", "exact", SW_OK, loadWithProofCommand(mp3, proofB)).getData());
+        assertArrayEquals(concat(dleqHeld(proofA), dleqHeld(proofB)), say(out, "GET_DLEQ for places 0 and 3", "exact", SW_OK, getDleqCommand(0, 3)).getData());
+        sayPay(out, "pay the first and the last, in one payment", SW_OK, 0, 0, 3);
+        assertArrayEquals(concat(none, none), say(out, "GET_DLEQ for the two that are spent: 00 each, the proof of a spent piece is not given", "exact", SW_OK, getDleqCommand(0, 3)).getData());
+        say(out, "CLEAR_SPENT", "exact", SW_OK, clear);
+        assertArrayEquals(new byte[] { 0 }, say(out, "a piece put on plain into the place that was freed", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, mp4, 1)).getData());
+        assertArrayEquals(none, say(out, "GET_DLEQ for it: 00, the proof the place held before is not served", "exact", SW_OK, getDleqCommand(0, 255)).getData());
+        assertArrayEquals(new byte[] { 3, 1 }, say(out, "a piece with a new proof into the next free place", "exact", SW_OK, loadWithProofCommand(mp5, proofC)).getData());
+        assertArrayEquals(concat(none, dleqHeld(proofC)), say(out, "GET_DLEQ for the two: 00, and the new proof, and not the old one", "exact", SW_OK, getDleqCommand(0, 3)).getData());
+        sayReset(out, "taken away and put back: a new time in the field, to pay what is left");
+        say(out, "select", "exact", SW_OK, select);
+        say(out, "the PIN", "exact", SW_OK, verifyOk);
+        assertArrayEquals(concat(dleqHeld(proofC), none), say(out, "the proofs are kept through the power: place 3, then place 0", "exact", SW_OK, getDleqCommand(3, 0)).getData());
+        sayPay(out, "pay what is on the card, the pieces with a proof and without", SW_OK, 0, 0, 1, 2, 3);
+        say(out, "CLEAR_SPENT: the card is empty again", "exact", SW_OK, clear);
+
         // the owner replaces itself, and locks
         say(out, "SET_OWNER with no proof", "exact", SW_OWNER_PROOF, setOwnerOpenCommand(OTHER_OWNER));
         say(out, "LOCK_CARD with no proof asked for", "exact", SW_OWNER_PROOF, lockCommand(new byte[8]));
@@ -10202,6 +10283,7 @@ class CashuAppletTest {
         owner(out, "the old owner's proof is no proof", SW_OWNER_PROOF, L_LOAD, OWNER, new byte[0], p -> allowLoadCommand(p));
         owner(out, "the new owner's is", SW_OK, L_LOAD, OTHER_OWNER, new byte[0], p -> allowLoadCommand(p));
         say(out, "a piece loads", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1));
+        assertArrayEquals(none, say(out, "and has no mint's proof of the last owner's to be given (1.20)", "exact", SW_OK, getDleqCommand(0, 255)).getData());
         owner(out, "RESET_CARD with a piece on the card", SW_CARD_IN_USE, L_RESET, OTHER_OWNER, new byte[0], p -> resetCommand(p));
 
         String text = out.toString();
@@ -11011,7 +11093,7 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("RESET_CARD wipes the card to what it was out of its packet, and every field is read back: no PIN, three tries, no owner, not locked, no record, limits, allowance, window or spending, no log, receipts, change, kept signature, change note or place; it keeps the clock (the time and the header's hash, the bits go to nothing); and it is one transaction")
+    @DisplayName("RESET_CARD wipes the card to what it was out of its packet, and every field is read back: no PIN, three tries, no owner, not locked, no record, limits, allowance, window or spending, no log, receipts, change, kept signature, change note, place or mint's proof (1.20); it keeps the clock (the time and the header's hash, the bits go to nothing); and it is one transaction")
     void testResetCardWipes() throws Exception {
         ownPinKey();
         aCardWithAHistory();
@@ -11034,13 +11116,14 @@ class CashuAppletTest {
 
         assertEquals(SW_OK, setTag(true), "the owner has switched the NFC tag off (1.19)");
         assertEquals(1, field("tagOff")[0], "and it is off before");
+        Arrays.fill(field("dleq"), (byte) 0x5A);        // the mint's proofs of the last owner's pieces (1.20), whatever they were
 
         long commits = runtime.commits;
         assertEquals(SW_OK, resetCard());
         assertEquals(1, runtime.commits - commits, "one transaction, five bytes: the lock, the PIN, the change note, the owner and the tag's switch");
 
         assertAllZero(field("proofStorage"), "the places");
-        for (String zero : new String[] { "cardLog", "cardReceipts", "changeOpen", "openState", "lastSig", "burnPending", "changeDue", "cardLocked", "pinState", "ownerSet", "tagOff" }) {
+        for (String zero : new String[] { "cardLog", "cardReceipts", "changeOpen", "openState", "lastSig", "burnPending", "changeDue", "cardLocked", "pinState", "ownerSet", "tagOff", "dleq" }) {
             assertAllZero(field(zero), zero);
         }
         assertEquals(0, field("pinKeySig")[0], "no signature over a PIN key stands");
@@ -11052,7 +11135,7 @@ class CashuAppletTest {
         byte[] d = info();
         assertEquals(30, d.length);
         byte[] fresh = new byte[30];
-        fresh[0] = 1; fresh[1] = 19; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
+        fresh[0] = 1; fresh[1] = 20; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
         System.arraycopy(u32(nowBefore), 0, fresh, 17, 4);
         assertArrayEquals(fresh, d, "GET_INFO: a new card, with the clock it had");
         assertEquals(nowBefore, now());

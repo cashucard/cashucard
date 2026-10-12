@@ -189,6 +189,21 @@ class SchnorrHWMathTest {
     };
 
     /**
+     * The allocations that are not install-time and are let through all the same (1.20), each by its file, by the method it is
+     * in and by the whole statement it is, so that nothing else in that method, or anywhere else, goes through with it:
+     * { file, the method's declaration, the statement }. There is one, the room for the mint's proofs. The chip will not install an
+     * applet whose constructor asks for that much more (+300 bytes installs, +12,288 does not: docs/FOXY-CARD-HARDWARE.md), and gives the
+     * same bytes asked for after the install, so SET_CARD reserves them. What this test exists to catch, an allocation that repeats on
+     * every command until the card's persistent memory is gone, cannot come of it: it is guarded so that it happens once in a card's
+     * life (`if (dleq == null)`), and a request the card refuses allocates nothing and leaves the store null. The statement is found
+     * ignoring white space, once, inside the method named; an allocation beside it is still refused.
+     */
+    private static final String[][] ONCE_ONLY_ALLOCATIONS = {
+        { "CashuApplet.java", "private void processSetCard(",
+          "if (dleq == null) { try { dleq = new byte[(short)(MAX_PROOFS * DLEQ_LEN)]; } catch (SystemException e) { dleq = null; } }" },
+    };
+
+    /**
      * JavaCard Classic allocates `new` in persistent EEPROM/Flash and never
      * collects it, so a single `new byte[]` on an APDU path leaks the card's
      * persistent memory a few dozen bytes per tap until every write command
@@ -220,7 +235,7 @@ class SchnorrHWMathTest {
             assertNoAllocationOutside(name,
                 new String(java.nio.file.Files.readAllBytes(p),
                     java.nio.charset.StandardCharsets.UTF_8),
-                installTime);
+                installTime, onceOnlyAllocations(name));
             scanned.add(name);
         }
 
@@ -293,6 +308,127 @@ class SchnorrHWMathTest {
         });
     }
 
+    /**
+     * The once-only waiver (1.20) is as narrow as it says: the statement, whole, once, in the method it was named for, and nothing beside
+     * it. A guard left off (it would allocate again at every SET_CARD), a second allocation next to it, a second copy of it, the same
+     * statement in another method, and a waiver for a statement that is not there are each refused.
+     */
+    @Test
+    @DisplayName("the once-only allocation is let through whole, once, in its own method, and nothing beside it: no guard, a second allocation, a second copy, another method and a missing statement are each refused")
+    void theOnceOnlyAllocationIsNarrow() {
+        String statement = "if (dleq == null) { try { dleq = new byte[96]; } catch (SystemException e) { dleq = null; } }";
+        String[] allowList = { "public static void install(", "private Fake()" };
+        String[][] once = { { "private void setCard(", statement } };
+        String clean =
+            "class Fake {\n"
+            + "    private byte[] dleq;\n"
+            + "    public static void install(byte[] a, short b, byte c) { new Fake(); }\n"
+            + "    private Fake() { }\n"
+            + "    private void setCard() {\n"
+            + "        " + statement + "\n"
+            + "    }\n"
+            + "    private void other() { }\n"
+            + "}\n";
+        assertNoAllocationOutside("Fake.java", clean, allowList, once);
+        // laid out another way: it is the statement that is let through, and not its spacing
+        assertNoAllocationOutside("Fake.java",
+            clean.replace(statement, "if (dleq == null) {\n    try {\n        dleq = new byte[96];\n    } catch (SystemException e) {\n        dleq = null;\n    }\n}"),
+            allowList, once);
+        // an allocation in the constructor is install-time, as ever
+        assertNoAllocationOutside("Fake.java", clean.replace("private Fake() { }", "private Fake() { dleq = new byte[4]; }"), allowList, once);
+
+        String[][] refused = {
+            // { what is wrong, the source, the part of the failure's message that says so }
+            { "no guard", clean.replace(statement, "dleq = new byte[96];"), "is not there, whole" },
+            { "guarded by the wrong test", clean.replace("dleq == null", "dleq != null"), "is not there, whole" },
+            { "a second allocation beside it", clean.replace(statement, statement + " byte[] t = new byte[4];"), "allocation outside the install-time methods" },
+            { "a second copy of it", clean.replace("private void other() { }", "private void other() { " + statement + " }"), "twice" },
+            { "the same statement in another method", clean.replace(statement, "").replace("private void other() { }", "private void other() { " + statement + " }"), "elsewhere" },
+            { "a waiver for a statement that is not there", clean.replace(statement, ""), "is not there, whole" },
+        };
+        for (String[] r : refused) {
+            org.opentest4j.AssertionFailedError failed = org.junit.jupiter.api.Assertions.assertThrows(org.opentest4j.AssertionFailedError.class,
+                () -> assertNoAllocationOutside("Fake.java", r[1], allowList, once), r[0] + " must fail");
+            org.junit.jupiter.api.Assertions.assertTrue(failed.getMessage().contains(r[2]), r[0] + ": the failure must say '" + r[2] + "', got: " + failed.getMessage());
+        }
+        // and without the waiver the same allocation is refused outright, as every allocation on the APDU path always was
+        org.junit.jupiter.api.Assertions.assertThrows(org.opentest4j.AssertionFailedError.class,
+            () -> assertNoAllocationOutside("Fake.java", clean, allowList), "no waiver, no allocation");
+    }
+
+    /**
+     * 1.20 reserves the store of the mint's proofs in SET_CARD, and nowhere else: the constructors name it nowhere, the one allocation
+     * is the guarded one in SET_CARD, it comes before the transaction that writes the record and outside any, and nothing else assigns
+     * the store. (The chip refuses an applet whose constructor asks for that much more; no simulator does, so the source is read.)
+     */
+    @Test
+    @DisplayName("the store of the mint's proofs is reserved in SET_CARD, guarded, before and outside its transaction, and no constructor or other method assigns it")
+    void theProofStoreIsReservedInSetCardAndNowhereElse() throws Exception {
+        String src = stripCommentsAndCharLiterals(new String(
+            java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        int[] constructor = bodyRange(src, "private CashuApplet()");
+        org.junit.jupiter.api.Assertions.assertFalse(src.substring(constructor[0], constructor[1]).contains("dleq"),
+            "the constructor does not name the store: asked for there, the chip refuses to install the applet");
+        int[] setCard = bodyRange(src, "private void processSetCard(");
+        String body = src.substring(setCard[0], setCard[1]);
+        int guard = body.indexOf("if (dleq == null)");
+        int allocation = body.indexOf("dleq = new byte[");
+        int begin = body.indexOf("JCSystem.beginTransaction()");
+        org.junit.jupiter.api.Assertions.assertTrue(guard > 0 && guard < allocation && allocation < begin,
+            "reserved once, behind its guard, before the transaction that writes the record");
+        org.junit.jupiter.api.Assertions.assertTrue(!body.substring(0, allocation).contains("beginTransaction"),
+            "and outside any transaction");
+        // every assignment to the store: the allocation, and the null the catch leaves it as
+        java.util.regex.Matcher assigned = java.util.regex.Pattern.compile("(?<![\\w.])dleq\\s*=(?!=)").matcher(src);
+        int assignments = 0;
+        while (assigned.find()) {
+            assignments++;
+            org.junit.jupiter.api.Assertions.assertTrue(assigned.start() > setCard[0] && assigned.start() < setCard[1],
+                "the store is assigned only in SET_CARD, near: ..." + src.substring(Math.max(0, assigned.start() - 60), Math.min(src.length(), assigned.start() + 40)).replaceAll("\\s+", " "));
+        }
+        org.junit.jupiter.api.Assertions.assertEquals(2, assignments, "the allocation, and the null the catch leaves it as");
+    }
+
+    /**
+     * The persistent arrays the constructors make, by their sizes: 29,806 bytes in 1.19, and the same in 1.20. The chip took +300 bytes
+     * more in a constructor and refused +12,288 (measured, docs/FOXY-CARD-HARDWARE.md), where the 12,288 bytes of the mint's proofs are
+     * given when asked for after the install. A figure past this one has to be measured on a card first.
+     */
+    @Test
+    @DisplayName("the constructors make 29,806 bytes of persistent arrays, 1.19's figure: the 12,288 of the mint's proofs are not among them, for the chip refuses a constructor that asks for that much more")
+    void theConstructorsAskForNoMorePersistentMemoryThanTheBuildThatInstalls() throws Exception {
+        String applet = stripCommentsAndCharLiterals(new String(
+            java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        String signer = stripCommentsAndCharLiterals(new String(
+            java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8));
+        java.util.Map<String, String> constants = constantExpressions(applet, signer);
+        int total = 0, arrays = 0;
+        String[][] constructors = { { "CashuApplet", "private CashuApplet()" }, { "SchnorrHW", "SchnorrHW(" } };
+        for (String[] c : constructors) {
+            String src = c[0].equals("CashuApplet") ? applet : signer;
+            int[] body = bodyRange(src, c[1]);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\bnew\\s+byte\\s*\\[([^\\]]+)\\]").matcher(src.substring(body[0], body[1]));
+            while (m.find()) {
+                total += evaluated(m.group(1), constants);
+                arrays++;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertEquals(29_806, total,
+            "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install). "
+            + "A larger figure has to be measured on a card first: +300 bytes installed, +12,288 did not.");
+        org.junit.jupiter.api.Assertions.assertEquals(20, arrays, "the parse found the 17 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
+        org.junit.jupiter.api.Assertions.assertTrue(total + 12_288 > 29_806 + 300, "and the store is the kind of figure the chip refuses there");
+    }
+
+    /** The once-only allocations registered for a source file: { the method's declaration, the statement } each. */
+    private static String[][] onceOnlyAllocations(String fileName) {
+        java.util.List<String[]> found = new java.util.ArrayList<>();
+        for (String[] entry : ONCE_ONLY_ALLOCATIONS) {
+            if (entry[0].equals(fileName)) found.add(new String[] { entry[1], entry[2] });
+        }
+        return found.toArray(new String[0][]);
+    }
+
     /** The install-time declarations registered for a source file. */
     private static String[] installTimeMethods(String fileName) {
         for (String[] entry : INSTALL_TIME_METHODS) {
@@ -313,14 +449,36 @@ class SchnorrHWMathTest {
      */
     private static void assertNoAllocationOutside(String fileName, String rawSrc,
                                                   String[] installTimeDeclarations) {
+        assertNoAllocationOutside(fileName, rawSrc, installTimeDeclarations, new String[0][]);
+    }
+
+    /**
+     * The same, and the once-only statements ({ method declaration, statement }) let through: each must be there, once, whole, inside
+     * the body of the method named.
+     */
+    private static void assertNoAllocationOutside(String fileName, String rawSrc,
+                                                  String[] installTimeDeclarations, String[][] onceOnly) {
         String src = stripCommentsAndCharLiterals(rawSrc);
 
-        int[][] allowedRanges = new int[installTimeDeclarations.length][];
+        int[][] allowedRanges = new int[installTimeDeclarations.length + onceOnly.length][];
         for (int i = 0; i < installTimeDeclarations.length; i++) {
             allowedRanges[i] = bodyRange(src, installTimeDeclarations[i]);
         }
+        for (int i = 0; i < onceOnly.length; i++) {
+            int[] method = bodyRange(src, onceOnly[i][0]);
+            int[] at = findIgnoringSpace(src, onceOnly[i][1], 0, src.length());
+            org.junit.jupiter.api.Assertions.assertNotNull(at,
+                "the once-only allocation of " + fileName + " is not there, whole: " + onceOnly[i][1]);
+            org.junit.jupiter.api.Assertions.assertTrue(at[0] > method[0] && at[1] < method[1],
+                "the once-only allocation of " + fileName + " is not in " + onceOnly[i][0] + " but elsewhere: " + onceOnly[i][1]);
+            org.junit.jupiter.api.Assertions.assertNull(findIgnoringSpace(src, onceOnly[i][1], at[1], src.length()),
+                "the once-only allocation of " + fileName + " is there twice: " + onceOnly[i][1]);
+            allowedRanges[installTimeDeclarations.length + i] = new int[] { at[0] - 1, at[1] };
+        }
 
-        assertOnlyCalledAtInstallTime(fileName, src, installTimeDeclarations, allowedRanges);
+        // a once-only statement is no install-time body: an install-time helper called from it would be called from the APDU path
+        assertOnlyCalledAtInstallTime(fileName, src, installTimeDeclarations,
+            java.util.Arrays.copyOf(allowedRanges, installTimeDeclarations.length));
 
         // `new byte[..]` plus the array-initializer form `byte[] x = { .. }`,
         // which allocates just the same but contains no `new` keyword.
@@ -483,6 +641,26 @@ class SchnorrHWMathTest {
             if (c == '}') d--;
         }
         return depth;
+    }
+
+    /**
+     * Where, in src from `from` to `to`, a run of characters begins that is `wanted` but for its white space: [start, end), or null.
+     */
+    private static int[] findIgnoringSpace(String src, String wanted, int from, int to) {
+        String w = wanted.replaceAll("\\s+", "");
+        for (int i = from; i < to; i++) {
+            if (Character.isWhitespace(src.charAt(i))) continue;
+            int a = i, b = 0;
+            while (a < to && b < w.length()) {
+                char c = src.charAt(a);
+                if (Character.isWhitespace(c)) { a++; continue; }
+                if (c != w.charAt(b)) break;
+                a++;
+                b++;
+            }
+            if (b == w.length()) return new int[] { i, a };
+        }
+        return null;
     }
 
     /** [openBraceIndex, closeBraceIndex] of the body following the given declaration. */

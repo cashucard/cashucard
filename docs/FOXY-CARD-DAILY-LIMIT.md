@@ -29,6 +29,11 @@ From software 1.19 the card also answers as an NFC tag carrying one web address,
 which its owner switches off and on with one more owner's command, `SET_TAG`
 (`FOXY-CARD-SPEC.md` 5.8). It touches nothing of the limits, the day or the clock.
 
+From software 1.20 the card also keeps the mint's NUT-12 proof with each piece that
+comes with one, for a phone to read (`GET_DLEQ`) and check (`FOXY-CARD-SPEC.md` 5.9).
+The card checks nothing and never uses it; a payment is what it was, and the limits,
+the day and the clock are untouched.
+
 ## 0. Why
 
 The first limit was on one PIN entry, kept in RAM and reset by `VERIFY_PIN`.
@@ -75,8 +80,8 @@ not a cheating one.
    nothing signed when a refusal can be known beforehand.
 
 Not goals: a limit that follows the price rather than the pieces signed
-(section 6); a check of pieces a terminal writes onto the card (DLEQ, phase
-3); a balance the holder can read without a phone (a screen; a separate
+(section 6); a check, by the card, of pieces a terminal writes onto it (DLEQ: since
+1.20 the card keeps the mint's proof for a phone to check, `FOXY-CARD-SPEC.md` 5.9); a balance the holder can read without a phone (a screen; a separate
 question); recovery of a lost card (no refund key for now); a clock that is
 exact (a block's time can lead the true time by up to two hours, 5.1).
 
@@ -1178,12 +1183,13 @@ or changed from `FOXY-CARD-SPEC.md` 5.2 and the allowance draft.
 | `16` | **GET_CARD** | | | format, record set, unit, limit (4), refund key (33), then 65 bytes at offset 40: the hardest header's `bits` (4), the newest header's hash (32) and 29 zeros (a time key up to software 1.14), mint length, mint |
 | `17` | **GET_PIECES** | | P1 = the first slot to report | one page: the first slot the page does not cover (1), then for each slot in the range that is not empty a tag (1) and, for an unspent slot, its 81 bytes (8.1). `6A83` for a P1 of 128 or more. With **P2 = 2** and one to three slot numbers as data: each of those slots whole (status and its 81 bytes), in the order asked; `6700` for none or more than three (8.1). With **P2 = 3**, the short listing: for each unspent slot its number (with `0x80` where its keyset and date follow), then the power of two it is worth or `FF` and its amount (6d). Any other P2 is `6A86` (P2 = 1 was the brief listing of a card of sixty-four places, 1.6) |
 | `18` | **GET_LOG** | the PIN verified in this tap, or the owner's grant; on a card with no PIN (1.16) anyone who holds it. **P1 = 1 (receipts): the owner's grant only; with no PIN, anyone** | P2 with P1 = 1: how many receipts back from the newest to begin | the card's own log (6b): 16 bytes of counts, then up to eight taps of 20 bytes, newest first (16 bytes before software 1.15); bit 3 of an entry's flags (1.16) says a payment in the tap was signed with no PIN under the allowance. With P1 = 1: the count of payments (4), then up to three receipts of 77 bytes, newest first (73 before 1.15). `6982` to anyone else; `6A86` for another P1 |
+| `1A` | GET_DLEQ (1.20) | nothing: no PIN, any state | P1 = a place (0 to 127); P2 = a second place, or `FF` for none | for each place asked, in order: `01` and the 96 bytes `e ‖ s ‖ r` of the mint's proof kept with the piece if the place is unspent and its record is not zero, otherwise the single byte `00`. At most 194 bytes. `6A83` for a place there is not. The card does not check what it gives (SPEC 5.9) |
 | `20` | ~~SPEND_PROOF~~ | | | gone with format 4 (6c): `6D00`. Up to format 3: P1 = the slot, the 64-byte signature over that piece's secret alone |
 | `22` | **SPEND_ALL_BEGIN** | nothing (since 1.16 the PIN is asked at `24`; up to 1.15 it was asked here) | the places, a byte each, 1 to 128 | what they are worth (4). `6700` none; `6A96` more than 128; `6A83`, `6A88`, `6985` for a place out of range, empty, spent; `6A80` named twice, or of another date than the first; `6A8F` as the day's limit has it, on the sum (6c); `6A94` for a sum that wraps, with a PIN set and not given (6f) |
 | `23` | **SPEND_ALL_OUTPUTS** | a payment begun, and nothing sent since but these | 37 bytes for each output: amount (4), blinded message (33) | `6985` with no payment begun; `6700` for a length not a multiple of 37, and the payment is dropped |
 | `24` | **SPEND_ALL_SIGN** | a payment begun; no PIN set, or the PIN given in this tap, or the no-PIN allowance enough for the whole payment (6f); the day's limit again | | while the payment is over the limit on one payment: two bytes, the waits still to come, and nothing burned (6a); sent again. Then the one 64-byte signature over every piece and every output; every place burned, the counts charged and the log written in the same transaction. `6985` with no payment begun; `6A94` (1.16) with a PIN set and not given and the allowance not enough, the payment given up and nothing written in the log (6f); `6A96` if the transaction cannot hold it. **Not** opened by `ALLOW_LOAD`, nor by the tap after a payment. Notes, in permanent memory, that the card has paid: the next tap may load with no PIN (8.2) |
 | `25` | **SPEND_ALL_AGAIN** | the PIN, if one is set, unless the last signature was given with no PIN (1.16) | | the last signature `24` gave, again; `6A88` if none |
-| `30` | **LOAD_PROOF** | an owner; a PIN set, and verified or `ALLOW_LOAD` given in this tap or this tap being the one after a payment (8.2); on a card with no PIN (1.16), whoever holds it; a card record. No clock | 81 bytes; or two or three pieces end to end, 162 or 243 | `6982` with no verified PIN and no grant (the gate comes first); then `6A90` with no owner; `6A94` for a piece whose nonce is already in a slot, spent or not (checked last, after the length and the piece itself, and before anything is written) The answer is the slot of each piece stored, a byte each. Several pieces are taken in order, each as one alone would be: if the first cannot be stored the command is refused with its word; if a later one cannot, the ones before it stand and the answer is their slots only, and the terminal sends the rest again to hear why |
+| `30` | **LOAD_PROOF** | an owner; a PIN set, and verified or `ALLOW_LOAD` given in this tap or this tap being the one after a payment (8.2); on a card with no PIN (1.16), whoever holds it; a card record. No clock | 81 bytes; or two or three pieces end to end, 162 or 243; or, with **P1 = 1** (1.20), one piece and the mint's proof for it, 177 bytes (SPEC 5.9) | `6982` with no verified PIN and no grant (the gate comes first); then `6A90` with no owner; `6A94` for a piece whose nonce is already in a slot, spent or not (checked last, after the length and the piece itself, and before anything is written) The answer is the slot of each piece stored, a byte each. Several pieces are taken in order, each as one alone would be: if the first cannot be stored the command is refused with its word; if a later one cannot, the ones before it stand and the answer is their slots only, and the terminal sends the rest again to hear why. With P1 = 1 the answer is two bytes, the slot and `01` where the proof was kept (`00` where the card has no room for proofs); any length but 177 is `6700`, a proof of 96 zero bytes is `6A80`, and the rest is a load of one piece |
 | `31` | **CLEAR_SPENT** | the PIN, if one is set, or `ALLOW_LOAD` given in this tap, or the tap after a payment; a card with no PIN (1.16) frees them for whoever holds it | | |
 | `32` | **SET_CARD** | no owner: the PIN verified, if one is set (1.16: a card with none is written by anyone while it has no owner), nothing unspent. Owner: the owner's proof, nothing unspent | unit (1), refund key (33), 65 bytes the card does not read (zeros from a phone of software 1.15; a time key from an earlier one), mint length (1), mint; with an owner, proof length (1) and the proof first | `6A8D` if anything is unspent; `6A80` for a bad refund key; `6700` for a bad length. The 65 bytes are not checked, and `SET_CARD` no longer clears the clock, the window or what is spent |
 | `33` | **SET_LIMIT, PIN form** | **a card with no owner**: PIN set and verified; nothing unspent. No clock | limit (4) | `6A91` on a card with an owner (use `34`); `6A8D` if anything is unspent. Eight bytes set the limit on one payment as well (6a). |
@@ -1224,6 +1230,10 @@ each further limit's worth over the limit four signatures where it was three
 otherwise 1.17's. 1.19 makes the card an NFC tag as well, which its owner can
 switch off (SPEC 5.8): `SET_TAG` is new, `GET_INFO` has a form of its own, P1 = 2, one byte longer than P1 = 1's,
 `SELECT` answers `01 13`, no capability bit changes, and the wire is otherwise 1.18's.
+1.20 keeps the mint's proof with each piece (SPEC 5.9): `GET_DLEQ` (`1A`) is new,
+`LOAD_PROOF` has a form of its own, P1 = 1, `SELECT` answers `01 14`, no capability bit
+changes, `GET_INFO` is 1.19's to the byte but for the version, and the wire is otherwise
+1.19's.
 
 **Every command in every state: the rule of section 3 worked through.** "Open"
 means nothing is needed beyond what the command's own row says; "refused" means
@@ -1231,7 +1241,7 @@ means nothing is needed beyond what the command's own row says; "refused" means
 
 | Command | Card with **no owner** | Card **with an owner** |
 |---|---|---|
-| `GET_INFO`, `GET_PUBKEY`, `GET_BALANCE`, `GET_PROOF_COUNT`, `GET_PROOF`, `GET_SLOT_STATUS`, `GET_PIECES`, `AUTH`, `GET_CARD` | open | open |
+| `GET_INFO`, `GET_PUBKEY`, `GET_BALANCE`, `GET_PROOF_COUNT`, `GET_PROOF`, `GET_SLOT_STATUS`, `GET_PIECES`, `GET_DLEQ` (1.20), `AUTH`, `GET_CARD` | open | open |
 | `SET_HEADER`, `TELL_TIME` | open: any state, locked or blocked (a header must show its work, 5.1) | same |
 | `GET_NONCE` | `6A90` | open (it only gives a number) |
 | `VERIFY_PIN` | as ever | as ever |
@@ -1504,9 +1514,10 @@ phone says it belongs to another phone's words.
   before anything is kept. The pieces are kept as a trusted row, with a pending
   entry, and swapped in when there is a route; if the mint says they were spent
   meanwhile, the entry is marked taken back and the person is told. "Paid" is
-  never said. A piece on a card carries no DLEQ proof (that is phase 3, section
-  13), so offline the phone cannot check the mint's signature on it: that is the
-  risk the question names. A switch of its own turns this off; plain ecash between
+  never said. A piece on a card of software before 1.20 carries no DLEQ proof, so
+  offline the phone cannot check the mint's signature on it: that is the risk the
+  question names. From 1.20 a card can keep the proof (`FOXY-CARD-SPEC.md` 5.9), and a
+  phone that reads it and checks it can. A switch of its own turns this off; plain ecash between
   two offline phones has its own, as before.
 
 **Tests on the phone.** The model in `tests/flashcard-card.js` grows the clock,
@@ -1776,7 +1787,10 @@ seventy-seven; the flag for a clock moved twice in a tap is never set.
   receiver always asks the mint, but a later payment that picks one burns slots and
   spends a day's limit on nothing, and while such a piece is on the card it is not
   empty, so the owner cannot replace its owner or record until it is spent. A fake
-  piece looks unspent to a state check, so this waits on DLEQ on the card (phase 3).
+  piece looks unspent to a state check. From 1.20 the card can keep the mint's proof
+  for a piece, and a phone that reads and checks it sees that a made-up piece is not
+  real (`FOXY-CARD-SPEC.md` 5.9); the card checks nothing, so a card loaded with no
+  proofs is as it was.
   Since 8.2, the reader that taps the card next after any payment can do the same
   once without the PIN: the nuisance is the same, and the reader is almost always
   the till that just had the PIN.

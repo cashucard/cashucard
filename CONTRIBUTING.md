@@ -125,6 +125,11 @@ CAP (JDK 17, `jc305u4_kit`) and its new hash in that guide.
    source under `applet/src/main/java/me/flashapp/cashu`. Each file needs an
    entry in that test's `INSTALL_TIME_METHODS` listing its install-time methods;
    a new file with no entry fails the test rather than going unchecked.
+   There is one exception, since software 1.20: the 12,288 bytes that hold the
+   mint's proofs are reserved by the first `SET_CARD`, because the chip will not
+   install an applet whose constructor asks for that much more
+   ([D15](docs/DECISIONS.md#d15)). The test lets through that one guarded
+   statement (`ONCE_ONLY_ALLOCATIONS`) and nothing beside it.
 6. **Local checks must be at least as strict as the mint's.** The card burns a
    slot *before* the mint sees anything, so a check looser than the mint's
    passes locally and still costs the proof. See
