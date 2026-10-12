@@ -33,6 +33,7 @@ get around it rather than through it.
 | 12 | Counterfeit physical cards | **Not a concern** | Value is bound to the chip's key. A look-alike with no valid chip holds nothing. |
 | 13 | Supply-chain / pre-personalised cards | ⚠️ **Unaddressed** | Nothing currently attests that a card's key was generated on-card by an untampered applet. |
 | 14 | Hostile reader blocks the PIN (3 unauthenticated APDUs), balance unrecoverable | ❌ **No** | `VERIFY_PIN` needs no authentication, so three wrong PINs from any reader in NFC range block the card. Once blocked, nothing can sign for its proofs: they are P2PK-locked to the card key with only a `sigflag` tag (no refund key, no locktime; [D5](DECISIONS.md#d5)'s recovery proposal is unmerged), and a reinstall regenerates the key. The balance is gone. Mitigations: small balances, a shielded sleeve, and `UNBLOCK_PIN` + PUK (ENG-617) before volume issuance. See below. |
+| 15 | Reading the NFC tag (software 1.19) | **Nothing of the card to read** | Any reader, with no PIN, gets the same bytes from every card: one web address. It names no card, key, owner or balance. A card on factory keys can have the tag's applet replaced by one carrying another address; rotating the card manager keys closes that. See below. |
 
 ## The offline double-spend problem (#5)
 
@@ -136,12 +137,49 @@ Mitigations today: small balances and a shielded sleeve. `UNBLOCK_PIN` gated by
 a provisioning PUK (ENG-617) is what removes the loss, and it blocks volume
 issuance.
 
+## The NFC tag (#15, software 1.19)
+
+From software 1.19 the card also answers as an NFC Forum Type 4 Tag carrying one web
+address, so that a phone with its screen on offers to open it (`FOXY-CARD-SPEC.md` 5.8).
+
+**What it reveals: nothing of the card.** The two files a reader can read are constants of
+the applet, the same on every card (the capability container, and a message of 22 bytes
+whose address is `https://getfoxy.io/card`). Nothing of the card's key, its owner, its PIN
+state, its limits or its balance is in them or can be reached through them: the tag applet
+holds no reference to the card's applet, keeps no state but the file chosen, and writes
+nothing (every instruction that writes is `6982`). It asks the card's applet one question,
+whether the tag is on, through a shareable interface of one method that answers a boolean
+and is not exported to any other package. The address could not be per card without
+becoming an identifier that anyone with a phone could read with no PIN; that is why it is
+not, and a change that made it so would be a regression of this property.
+
+What a reader does learn is that the card has a tag application and that its address is
+Foxy's page: it is a card made for Foxy. Its other name, the card applet's, can be selected
+by anyone as well and answers its version, so this adds little.
+
+**Who holds the switch.** The owner, by the owner's proof under its own label
+(`FoxyCard/tag`), with no PIN. A terminal that has been handed the PIN cannot turn the tag
+off or on, and a wrong proof costs no PIN try. A locked card refuses the command, so a
+locked card's tag stays as it was. `RESET_CARD` puts the tag back on. The switch is not a
+security control for the money: it exists so that a card kept in a phone's wallet case does
+not raise the offer every time the screen wakes. Off, the tag application refuses its
+name, and nothing else about the card changes.
+
+**A card left on factory keys.** Anyone with a reader and a card on factory keys can delete
+the card's applet and the money with it (`FOXY-CARD-SPEC.md` 5.4). They can equally delete
+the tag's applet and install another in its place, under the same name, carrying another
+address, so that a phone that reads the card is sent somewhere else. Rotating the card
+manager keys (or locking the issuer domain) closes both, and it is part of set-up for the
+cards that are given to people.
+
 ## What has and has not been tested
 
 **Verified in simulation (jCardSim) and by construction:**
 - BIP-340 signatures verify against an independent verifier and the spec's own vectors
 - Modular arithmetic matches `BigInteger` across random and edge inputs
 - Slot lifecycle, PIN gating, APDU encodings
+- The tag (1.19), byte for byte, the switch and its refusals, and that nothing the tag
+  says differs between two cards
 - The blocked PIN (applet 0.3): every gated command refuses, before and after
   further PIN attempts, and a failed PIN check ends the session
 - DLEQ verification, including the tagging attack it exists to catch
@@ -163,6 +201,8 @@ An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
 2026-09-01 ([its report](HARDWARE_TEST_REPORT_2026-09-01.j3r452.md)).
 
 **Not yet run on silicon:**
+- The tag (1.19): its install under the NFC Forum's name beside the card's applet, the
+  shareable lookup between two applets of one package, and a phone reading it
 - A blocked PIN on any build: neither ENG-615 nor its 0.3 fix (the
   blocked-state gate and the failed-check session rule) has run on a card
 - `LOCK_CARD`, deliberately not run on a card holding value

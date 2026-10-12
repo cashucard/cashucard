@@ -25,6 +25,10 @@ limit, the no-PIN allowance: what it will sign for in a day without the PIN
 is describing a card of 1.15 or before, or a card with a PIN and no allowance;
 section 6f says what 1.16 does.
 
+From software 1.19 the card also answers as an NFC tag carrying one web address,
+which its owner switches off and on with one more owner's command, `SET_TAG`
+(`FOXY-CARD-SPEC.md` 5.8). It touches nothing of the limits, the day or the clock.
+
 ## 0. Why
 
 The first limit was on one PIN entry, kept in RAM and reset by `VERIFY_PIN`.
@@ -1114,6 +1118,7 @@ had a hash:
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |
 | `LOCK_CARD` | `FoxyCard/lock` | nothing |
 | `RESET_CARD` (1.17) | `FoxyCard/reset` | nothing |
+| `SET_TAG` (1.19) | `FoxyCard/tag` | one byte: `00` tag on, `01` tag off |
 
 So a proof for one command, or one value, is no proof for another, and an old
 or used proof fails.
@@ -1166,7 +1171,7 @@ or changed from `FOXY-CARD-SPEC.md` 5.2 and the allowance draft.
 
 | INS | Command | Needs | Data sent | Answers |
 |---|---|---|---|---|
-| `01` | **GET_INFO** | | | 30 bytes: the draft's 17 (version 2, slots, unspent, spent, empty, capabilities, PIN state, format, tries left, locked, record set, limit 4, has owner 1), then `now` (4), window start (4), spent today (4), then whether this tap may load with no PIN (1; 8.2) With **P1 = 1**, 42 bytes: those thirty, then the limit on one payment (30 to 33), the no-PIN allowance (34 to 37) and what has been signed for with no PIN in the window (38 to 41), 4 each (6a, 6f). The limit on one payment (bytes 30 to 33) is said only with the owner's grant given in this tap, and is zeros to anyone else (6a); the allowance and its count are said to anyone (6f). Up to 1.15 bytes 34 to 41 were zeros |
+| `01` | **GET_INFO** | | | 30 bytes: the draft's 17 (version 2, slots, unspent, spent, empty, capabilities, PIN state, format, tries left, locked, record set, limit 4, has owner 1), then `now` (4), window start (4), spent today (4), then whether this tap may load with no PIN (1; 8.2) With **P1 = 1**, 42 bytes: those thirty, then the limit on one payment (30 to 33), the no-PIN allowance (34 to 37) and what has been signed for with no PIN in the window (38 to 41), 4 each (6a, 6f). With **P1 = 2** (1.19), 43 bytes: those 42 and byte 42, `00` when the NFC tag is on, `01` when it is off, said to anyone (SPEC 5.8); the answer to P1 = 1 is the same whatever the tag's state. The limit on one payment (bytes 30 to 33) is said only with the owner's grant given in this tap, and is zeros to anyone else (6a); the allowance and its count are said to anyone (6f). Up to 1.15 bytes 34 to 41 were zeros |
 | `10` | GET_PUBKEY | | | the card's 33-byte compressed key |
 | `11` `12` `13` `14` | GET_BALANCE, GET_PROOF_COUNT, GET_PROOF, GET_SLOT_STATUS | | | as before |
 | `15` | AUTH | | 16 random bytes | 16 of the card's own and a signature |
@@ -1194,6 +1199,7 @@ or changed from `FOXY-CARD-SPEC.md` 5.2 and the allowance draft.
 | `45` | **ALLOW_LOAD** | the owner's proof, over `FoxyCard/load` and no value | proof length (1), proof | for the rest of this tap: `LOAD_PROOF` and `CLEAR_SPENT` need no verified PIN. `6A90`, `6A91`; `6986` locked |
 | `50` | LOCK_CARD | PIN set and verified; the owner's proof | P2 = `DE`; proof length (1), proof | as the draft |
 | `51` | RESET_CARD (1.17) | the owner's proof; a locked card also the PIN; nothing unspent | P1 = `00`, P2 = `AD`; proof length (1), proof over `FoxyCard/reset` | the card as out of its packet, with a new key (SPEC 5.6a); `6B00`, `6A90`, `6A91`, `6700`, `6982` locked and PIN not given, `6A8D` |
+| `52` | SET_TAG (1.19) | the owner's proof; no PIN, any funds | P1 = `00` tag on, `01` off; P2 = `00`; proof length (1), proof over `FoxyCard/tag` and one byte, then that byte (the same as P1) | the NFC tag switched (SPEC 5.8); `6B00`, `6986` locked, `6A90`, `6A91`, `6700` |
 
 `21` (`SIGN_ARBITRARY`) stays unassigned. The applet's version became 1.1 and
 `FORMAT` 3 with this design; a phone that knows only format 2 refuses the card,
@@ -1215,7 +1221,9 @@ no capability bit changes, and the wire is otherwise 1.15's. 1.17 adds
 `RESET_CARD` (SPEC 5.6a), and `SELECT` answers `01 11`. 1.18 makes the wait for
 each further limit's worth over the limit four signatures where it was three
 (6a): `SELECT` answers `01 12`, no capability bit changes, and the wire is
-otherwise 1.17's.
+otherwise 1.17's. 1.19 makes the card an NFC tag as well, which its owner can
+switch off (SPEC 5.8): `SET_TAG` is new, `GET_INFO` has a form of its own, P1 = 2, one byte longer than P1 = 1's,
+`SELECT` answers `01 13`, no capability bit changes, and the wire is otherwise 1.18's.
 
 **Every command in every state: the rule of section 3 worked through.** "Open"
 means nothing is needed beyond what the command's own row says; "refused" means
@@ -1241,6 +1249,7 @@ means nothing is needed beyond what the command's own row says; "refused" means
 | `ALLOW_LOAD` (`45`) | `6A90` | the owner's proof |
 | `LOCK_CARD` (`50`) | `6A90` (after the PIN gate) | PIN set and verified, and the owner's proof |
 | `RESET_CARD` (`51`, 1.17) | `6A90` | the owner's proof, nothing unspent (`6A8D`); on a locked card the PIN as well (`6982`) |
+| `SET_TAG` (`52`, 1.19) | `6A90` | the owner's proof, empty or not, no PIN; `6986` on a locked card |
 
 So the one thing an attacker with the PIN and an emptied card can still do is
 load pieces onto it (which the mint will refuse) and spend them. It cannot set

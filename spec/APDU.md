@@ -66,6 +66,8 @@ Returns applet version, capabilities, and slot statistics. Always available with
 | 2 | PIN protection available |
 | 3–7 | Reserved (0) |
 
+**In Foxy's software** the answer is longer than these eight bytes (see `docs/FOXY-CARD-SPEC.md` 5.2). Asked with P1 = 1 the answer is 42 bytes. From 1.19, asked with P1 = 2 it is those 42 bytes and one more, the 43rd, which says whether the NFC tag is on: `00` on, `01` off.
+
 **PIN state 2 is not "no PIN".** A blocked card still has a PIN; it can never
 be verified again (`VERIFY_PIN` answers `6983`), so every PIN-gated command
 answers `6982` permanently. There is no unblock path in this profile. A reader
@@ -452,7 +454,48 @@ Returns the card to what it was out of its packet, so that another person can se
 | 6982 | The card is locked and the PIN has not been verified in this tap |
 | 6A8D | Anything unspent is on the card |
 
-A blocked PIN is no bar on a card that is not locked. The wipe is one transaction of four bytes, after the keys are drawn; see `docs/FOXY-CARD-SPEC.md` 5.6a.
+A blocked PIN is no bar on a card that is not locked. The wipe is one transaction of five bytes (the lock, the PIN state, the change note, the owner and the NFC tag's switch), after the keys are drawn; see `docs/FOXY-CARD-SPEC.md` 5.6a. It puts the NFC tag back on.
+
+### SET_TAG (0x52) — software 1.19
+
+Switches the card's NFC tag off or on (`docs/FOXY-CARD-SPEC.md` 5.8). The tag is on for a new card, a card with no owner and a card just reset, and off only when the owner has said so. The owner's proof, no PIN, any funds.
+
+| Field | Value |
+|-------|-------|
+| CLA | B0 |
+| INS | 52 |
+| P1 | 00 tag on, 01 tag off |
+| P2 | 00 |
+| Data | proof length (1), the owner's proof (ECDSA, P-256, SHA-256, DER, over `FoxyCard/tag`, the nonce just given and the one byte after the proof), then that one byte, the same as P1 |
+
+**Errors** (in the order they are checked):
+
+| SW | Meaning |
+|----|---------|
+| 6B00 | P1 is not 00 or 01, or P2 is not 00 (the nonce is left unspent) |
+| 6986 | The card is locked |
+| 6A90 | The card has no owner |
+| 6A91 | No nonce was asked for in this tap, or the proof is not the owner's for this label, nonce and byte; no PIN try is spent |
+| 6700 | Anything but one byte after the proof |
+| 6B00 | The byte after the proof is not P1 |
+
+Asking for the state the tag already has answers `9000` and writes nothing. `GET_INFO` with P1 = 2 says the state in its last byte (the 43rd): `00` on, `01` off. With P1 = 1 it answers the 42 bytes it always did, whatever the state.
+
+---
+
+## The NFC tag application — software 1.19
+
+A third applet of the package, `Tag`, answers as an NFC Forum Type 4 Tag (mapping version 2.0), read only, under the NFC Forum's own name, **not** the card's: `D2 76 00 00 85 01 01` (the instance AID given at install; the class AID in the package is `F0 46 4F 58 59 43 41 52 44 54`). It carries one web address, `https://getfoxy.io/card`, the same on every card. It takes class `00` and answers exactly:
+
+| Command | Answer |
+|---------|--------|
+| `00 A4 04 00 07 D2 76 00 00 85 01 01 [00]` (SELECT by name) | `9000`, no data; `6999` when the owner has switched the tag off |
+| `00 A4 00 0C 02 E1 03`, `00 A4 00 0C 02 E1 04` (SELECT file) | `9000`; any other file `6A82`; other P1 or P2 `6B00`; Lc not 2 `6700` |
+| `00 B0 <offset hi> <offset lo> <Le>` (READ BINARY) | the bytes of the file chosen from that offset, as many as asked and the file holds; an offset at or past the end `6B00`; no file chosen `6986` |
+| UPDATE BINARY (`D6`) and the other instructions that write (`0E D0 D7 DA DB DC DD E2`) | `6982` |
+| any other instruction | `6D00` (a class other than `00`: `6E00`) |
+
+The capability container (`E103`, 15 bytes) is `00 0F 20 00 3B 00 34 04 06 E1 04 00 16 00 FF`; the NDEF file (`E104`, 22 bytes) is `00 14 D1 01 10 55 04` followed by the 15 ASCII bytes of `getfoxy.io/card`.
 
 ---
 

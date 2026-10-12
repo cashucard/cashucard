@@ -41,11 +41,16 @@ instantiation as well as with everything the constructor allocates; the
 small applet pays the package's share in an INSTALL of its own.
 
 What the software does: the package holds two applets, `Opener` first (AID
-`F0464F5859434152444D`), which does nothing, and `CashuApplet`. The opener
-is instantiated with the load, and the card's applet is created from the
-package after it. `tools/refcheck.py` runs after every `ant cap` and refuses
-a file whose first applet is not the opener. Deleting goes the other way:
-the card's applet, the opener, then the package.
+`F0464F5859434152444D`), which does nothing, and `CashuApplet`; from software
+1.19 a third, `Tag` (class AID `F0464F58594341524454`), listed last, which is
+the card's NFC tag and is created last, under the NFC Forum's own name
+(`D2760000850101`) as its instance AID. The opener is instantiated with the load,
+and the card's applet is created from the package after it. `tools/refcheck.py`
+runs after every `ant cap` and refuses a file whose first applet is not the
+opener. Deleting goes the other way: the tag, the card's applet, the opener, then
+the package. The chip refuses to delete an instance that a static field of the
+package refers to, so none does (the tag asks the card's applet for a shareable
+interface at each selection and keeps nothing of it).
 
 ## The load file's size decides whether the applet installs, and the rule is not known
 
@@ -74,6 +79,10 @@ makes (the applets' objects, which start where the package image ends)
 against pages, and that something must not fall across an edge; where the
 image ends is set by the file's size.
 
+Software 1.19 added the tag's applet and was larger again. A build whose load
+file was 19,269 bytes (69 past a multiple of 256) installed, and its tag
+answered as a phone reads it.
+
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build
 can be moved to a size that is known to install; `tools/refcheck.py`, after
@@ -101,7 +110,10 @@ capability bit 6 asks it for 8 pieces a signature at most.
 
 The ISD reports about 2,486 bytes of free volatile memory on a clean card.
 The applet asks for 941 bytes cleared on deselect and 6 cleared on reset,
-and a unit test keeps it there. The first build of 1.9 asked for 1,030
+and a unit test keeps it there. The tag (1.19) is a second applet with one more
+byte cleared on deselect (the file chosen), which makes 942 in the card; the
+chip's limit was found between 941 (installs) and 1,030 (refused), and 942 has
+not yet been tried on it. The first build of 1.9 asked for 1,030
 and was refused at INSTALL with `6F00`; it was also the package's first
 applet (above), so the two were never separated.
 

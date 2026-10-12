@@ -50,15 +50,18 @@ cd cashu-javacard/applet
 ant cap
 ant cap -Djc.sdk=/path/to/jc305u4_kit   # explicit form
 
-# Output: target/cashu-javacard-0.1.0.cap, one file with two applets in it: the opener, and the card's
+# Output: target/cashu-javacard-0.1.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
 ls -lh target/cashu-javacard-0.1.0.cap
 ```
 
-> **Two applets, installed in order.** The chip refuses the card's applet as the
+> **Three applets, installed in order.** The chip refuses the card's applet as the
 > first instantiated from its package (no answer, or `6F00`); it takes it once a
 > small applet has been instantiated before it. So the file lists `Opener` first,
-> and the install is two commands (below). Measurements and the rest of what the
-> chip has room for: [FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md).
+> and the install is three commands (below): the opener, the card's applet, and the
+> NFC tag (software 1.19), which is `Tag`, listed last and made under the NFC
+> Forum's own name, `D2760000850101`, given as the instance AID. Measurements and
+> the rest of what the chip has room for:
+> [FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md).
 
 > **3.0.5 is a hard floor.** `SchnorrHW` performs the `k·G` scalar multiply with
 > `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY`, which was introduced in JavaCard 3.0.5
@@ -132,11 +135,19 @@ Don't install `958a8baa…` or any other 0.3 CAP.
 gp --install target/cashu-javacard-0.1.0.cap --applet F0464F5859434152444D
 # ...then create the card's applet from the loaded package
 gp --create F0464F58594341524401 --package F0464F585943415244 --applet F0464F58594341524401
+# ...then the NFC tag (software 1.19), under the NFC Forum's own name as its instance AID
+gp --create D2760000850101 --package F0464F585943415244 --applet F0464F58594341524454
 
 # Verify installation
 gp --list
-# Expected:
-#   APP: D276000085010201 (SELECTABLE)   ← our applet
+# Expected (among the rest):
+#   APP: F0464F5859434152444D (SELECTABLE)   ← the opener
+#   APP: F0464F58594341524401 (SELECTABLE)   ← our applet
+#   APP: D2760000850101 (SELECTABLE)         ← the tag
+
+# The tag, read as a phone reads it: its name, the capability container (15 bytes), the NDEF file (2, then 20 bytes)
+gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000214
+# Expected: 9000 / 9000 / 000F20003B00340406E104001600FF 9000 / 9000 / 0014 9000 / D101105504 + "getfoxy.io/card" 9000
 ```
 
 ---
@@ -168,15 +179,22 @@ gp --apdu B0100000
 ## Reinstall (delete + install)
 
 ```bash
-# Delete the card's applet, the opener, then the package (that order)
+# Delete the tag, the card's applet, the opener, then the package (that order)
+gp --delete D2760000850101         # the tag (software 1.19)
 gp --delete F0464F58594341524401   # the card's applet
 gp --delete F0464F5859434152444D   # the opener
 gp --delete F0464F585943415244     # the package
 
-# Re-install: the opener first
+# Re-install: the opener first, the tag last
 gp --install target/cashu-javacard-0.1.0.cap --applet F0464F5859434152444D
 gp --create F0464F58594341524401 --package F0464F585943415244 --applet F0464F58594341524401
+gp --create D2760000850101 --package F0464F585943415244 --applet F0464F58594341524454
 ```
+
+The chip refuses to delete an instance that something still refers to, which is why the
+instances go one by one and in this order, and why no static field of the package refers
+to an object an applet instance made (`Tag` holds no reference to the card's applet; it
+asks for a shareable interface at each selection and keeps nothing of it).
 
 ---
 
@@ -249,3 +267,13 @@ still P2PK-locked to a key whose card cannot sign, so none of them can be spent.
 | Package | `D2 76 00 00 85 01 02` |
 | Applet  | `D2 76 00 00 85 01 02 01` |
 | SELECT  | `00 A4 04 00 07 D2 76 00 00 85 01 02` |
+
+The AIDs of Foxy's software (1.9 on), which differ from the upstream ones above:
+
+| Element | AID (hex) |
+|---------|-----------|
+| Package | `F0 46 4F 58 59 43 41 52 44` |
+| Opener (instantiated first, does nothing) | `F0 46 4F 58 59 43 41 52 44 4D` |
+| Card's applet | `F0 46 4F 58 59 43 41 52 44 01` |
+| Tag, class (software 1.19; listed last in the file) | `F0 46 4F 58 59 43 41 52 44 54` |
+| Tag, instance (the NFC Forum's NDEF Tag Application; what a phone selects) | `D2 76 00 00 85 01 01` |

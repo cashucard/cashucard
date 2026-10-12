@@ -122,7 +122,7 @@ Full reference: [`spec/APDU.md`](spec/APDU.md).
 | CLA | INS | Command | PIN | Description |
 |---|---|---|---|---|
 | `00` | `A4` | SELECT | — | ISO SELECT by AID |
-| `B0` | `01` | GET_INFO | — | Version, slot counts, capabilities, PIN state |
+| `B0` | `01` | GET_INFO | — | Version, slot counts, capabilities, PIN state (P1 = 1 adds the limits; P1 = 2 adds whether the NFC tag is on, 1.19) |
 | `B0` | `10` | GET_PUBKEY | — | 33-byte compressed public key |
 | `B0` | `11` | GET_BALANCE | — | Sum of unspent amounts (uint32) |
 | `B0` | `12` | GET_PROOF_COUNT | — | Count of non-empty slots |
@@ -136,6 +136,7 @@ Full reference: [`spec/APDU.md`](spec/APDU.md).
 | `B0` | `40`–`42` | VERIFY/SET/CHANGE_PIN | — / ✔ | PIN management |
 | `B0` | `50` | LOCK_CARD | ✔ | Irreversibly disable writes |
 | `B0` | `51` | RESET_CARD | owner's proof (+ PIN if locked) | Wipe the card to a new one, with a new key, for another person to set up (1.17) |
+| `B0` | `52` | SET_TAG | owner's proof | Switch the card's NFC tag (one web address, the same on every card) off or on (1.19) |
 
 **Spending is PIN-gated once a PIN is set** (D13, v0.2.0): `SPEND_PROOF`,
 `SIGN_ARBITRARY`, `LOAD_PROOF`, `CLEAR_SPENT` and `LOCK_CARD` answer `6982`
@@ -168,12 +169,15 @@ downloaded for you:
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
-# → applet/target/cashu-javacard-0.1.0.cap   (two applets: the opener, then the card's)
+# → applet/target/cashu-javacard-0.1.0.cap   (three applets: the opener, the card's, then the NFC tag)
 ```
 
 The file holds a second, empty applet that is instantiated before the card's
 own: the chip refuses the card's applet as a package's first
-([`docs/FOXY-CARD-HARDWARE.md`](docs/FOXY-CARD-HARDWARE.md)).
+([`docs/FOXY-CARD-HARDWARE.md`](docs/FOXY-CARD-HARDWARE.md)). From software 1.19 it
+holds a third, the NFC tag (one web address, the same on every card, which the
+owner can switch off), listed last and made under the NFC Forum's own name
+([`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) 5.8).
 
 Override the kit with `-Djc.sdk=/path/to/jc305u4_kit`. Installing onto a card:
 [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).

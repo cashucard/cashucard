@@ -266,8 +266,8 @@ nothing is made specially for it. It is not upstream's text.
 
 | Command | Upstream | Fork |
 |---|---|---|
-| SELECT | version | a new AID of our own, so the two applets cannot be mistaken for each other; answers its version (1.1 when first written, 1.16 now: `01 10`) |
-| GET_INFO | 8 bytes | 29: adds the format, tries left, locked, record set, the daily limit, whether the card has an owner, and the day (`now`, window start, spent today). With P1 = 1, 42: the limit on one payment (to the owner's grant only), the no-PIN allowance and what is counted against it (to anyone; software 1.16) |
+| SELECT | version | a new AID of our own, so the two applets cannot be mistaken for each other; answers its version (1.1 when first written, 1.19 now: `01 13`) |
+| GET_INFO | 8 bytes | 29: adds the format, tries left, locked, record set, the daily limit, whether the card has an owner, and the day (`now`, window start, spent today). With P1 = 1, 42: the limit on one payment (to the owner's grant only), the no-PIN allowance and what is counted against it (to anyone; software 1.16). With P1 = 2 (software 1.19), 43: those 42 and whether the NFC tag is on (to anyone; 5.8) |
 | GET_PUBKEY | as is | as is |
 | GET_CARD | none | the card record, with the daily limit and, where the time key was, the clock's proof (the hardest `bits` and the newest header's hash) |
 | GET_SLOT_STATUS, GET_PROOF | as is | the slot with its date |
@@ -283,6 +283,7 @@ nothing is made specially for it. It is not upstream's text.
 | CLEAR_SPENT | as is | as is, or under the owner's grant for this tap |
 | LOCK_CARD | the PIN if one is set | a PIN set and verified, and the owner's proof (5.6) |
 | **RESET_CARD** (`51`) | none | software 1.17: the owner's proof (and, on a locked card, the PIN given in this tap) wipes the card to what it was out of its packet, with a new key of its own, for another person to set up. Only with nothing unspent (5.6a) |
+| **SET_TAG** (`52`) | none | software 1.19: the owner's proof switches the card's NFC tag off or on (5.8). No PIN, any funds. The tag itself is a third applet of the package, under the NFC Forum's own name |
 | **SET_LIMIT** (`33`, `34`) | none | the daily limit (5.7): `34` by the owner's proof, on any card with an owner and any funds, with no PIN; `33` by the PIN, on a card with no owner while it is empty. 0 is no limit. Four bytes are the day's limit; eight are the day's and then the limit on ONE PAYMENT, which asks no clock and makes a larger payment wait (`FOXY-CARD-DAILY-LIMIT.md`, 6a); twelve (software 1.16) add the NO-PIN ALLOWANCE (5.7a), which a card with no PIN refuses (`6985`). None needs a clock to be set. (`33` was once a limit on one PIN entry, which a terminal that had the PIN walked round; it is not that) |
 | ~~SET_TIME~~ (`35`) | none | gone in software 1.15 (`6D00`). It told the card a time under the time key's signature |
 | **SET_HEADER** (`36`) | none | shows the card a Bitcoin block header (software 1.15). The card believes it for its work, and a later time in it moves the card's clock forward; it only moves forward (5.7) |
@@ -296,7 +297,7 @@ has most of them as commands and answers):
 
 | INS | Command | Needs | Data sent | Answers |
 |---|---|---|---|---|
-| `01` | GET_INFO | | | 29 bytes: version (2), slots, unspent, spent, empty, capabilities, PIN state (0 none, 1 set, 2 blocked), format, tries left, locked, record set, limit (4), has owner (1); then `now` (4), window start (4), spent today (4); then whether this tap may put change on with no PIN (1), 30 bytes in all. With P1 = 1, 42: those thirty, then the limit on one payment (4, the owner's grant only, zeros to anyone else), the no-PIN allowance (4) and what has been signed for with no PIN in the window (4), both to anyone (software 1.16; zeros up to 1.15) |
+| `01` | GET_INFO | | | 29 bytes: version (2), slots, unspent, spent, empty, capabilities, PIN state (0 none, 1 set, 2 blocked), format, tries left, locked, record set, limit (4), has owner (1); then `now` (4), window start (4), spent today (4); then whether this tap may put change on with no PIN (1), 30 bytes in all. With P1 = 1, 42: those thirty, then the limit on one payment (4, the owner's grant only, zeros to anyone else), the no-PIN allowance (4) and what has been signed for with no PIN in the window (4), both to anyone (software 1.16; zeros up to 1.15). With P1 = 2 (software 1.19), 43: those 42, then whether the NFC tag is on (1: `00` on, `01` off, to anyone) |
 | `10` | GET_PUBKEY | | | the card's 33-byte compressed key |
 | `11` `12` `13` `14` | GET_BALANCE, GET_PROOF_COUNT, GET_PROOF, GET_SLOT_STATUS | | | as upstream, except that GET_PROOF returns the 82-byte slot |
 | `15` | AUTH | | 16 random bytes | 16 of the card's own and a signature |
@@ -323,13 +324,14 @@ has most of them as commands and answers):
 | `44` | GET_NONCE | a card with an owner. No PIN | | 16 bytes, or `6A90` |
 | `45` | ALLOW_LOAD | the owner's proof, over `FoxyCard/load` and no value | proof length (1), proof | for the rest of this tap: `LOAD_PROOF` and `CLEAR_SPENT` need no verified PIN. `6A90`, `6A91`; `6986` locked |
 | `51` | RESET_CARD (software 1.17) | the owner's proof; on a locked card the PIN as well; nothing unspent | P1 = `00`, P2 = `AD`; proof length (1), proof (over `FoxyCard/reset` and no value), nothing after it | nothing. `6B00` for a P1 or P2 not those, before anything else; `6A90` with no owner; `6A91` with no good proof; `6700` for bytes after the proof; `6982` on a locked card whose PIN has not been given in this tap; `6A8D` with anything unspent. A blocked PIN is no bar |
+| `52` | SET_TAG (software 1.19) | the owner's proof; no PIN, any funds | P1 = `00` tag on, `01` tag off; P2 = `00`; proof length (1), proof (over `FoxyCard/tag` and the one byte after it), then that one byte, the same as P1 | nothing. `6B00` for a P1 or P2 not those, before anything else; `6986` on a locked card; `6A90` with no owner; `6A91` with no good proof (no PIN try); `6700` for anything but one byte after the proof; `6B00` for a byte that is not P1. The state it already has is `9000` and writes nothing (5.8) |
 | `50` | LOCK_CARD | PIN set and verified; the owner's proof | P2 = `DE`; proof length (1), proof | `6982` with no verified PIN; `6A90` with no owner; `6A91` with no good proof |
 
 `21` (`SIGN_ARBITRARY`) stays unassigned. The applet's version is 1.1 and
 `FORMAT` is 3; a phone that knows only an earlier format refuses the card, as it
 does now for anything but its own. (That is how the rows not marked with a later
-software version were first written. The applet is now at 1.18, `SELECT` answers
-`01 12`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
+software version were first written. The applet is now at 1.19, `SELECT` answers
+`01 13`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
 section 8 differ, that one is what is built.)
 
 **Every command in every state.** "Open" means nothing is needed beyond what
@@ -354,6 +356,7 @@ the command's own row says; "refused" means `6A91` unless another word is given.
 | `ALLOW_LOAD` (`45`) | `6A90` | the owner's proof |
 | `LOCK_CARD` (`50`) | `6A90` (after the PIN gate) | PIN set and verified, and the owner's proof |
 | `RESET_CARD` (`51`, software 1.17) | `6A90` | the owner's proof, nothing unspent; on a locked card the PIN as well |
+| `SET_TAG` (`52`, software 1.19) | `6A90` | the owner's proof, empty or not, no PIN; `6986` on a locked card |
 
 So the one thing a terminal with the PIN and an emptied card can still do is
 load pieces onto it (which the mint will refuse) and spend them. It cannot set
@@ -445,7 +448,9 @@ bit set.
   before installing.
 - After installing: put the card's GlobalPlatform keys to new random ones and
   write them down, or lock the issuer domain. A card left on factory keys can
-  have the applet deleted, and the money with it, by anyone with a reader.
+  have the applet deleted, and the money with it, by anyone with a reader. It can
+  also have the tag's applet deleted and another put in its place, carrying another
+  address (5.8); rotating the keys closes both.
 - The card's key is made on the card at install and never leaves it.
 - The card's clock needs no provisioning: there is no key to write. A card
   begins with no header taken, and takes its first from whoever shows it one
@@ -480,6 +485,11 @@ bit set.
   empty; a wrong proof costs no PIN tries. A test reads the source and checks
   that what is spent today and the slot's status change between one
   `beginTransaction` and its commit, with the signing after.
+- The tag (software 1.19), in its own class of tests with the three applets installed in the order the chip is given them: the phone's whole
+  sequence byte for byte, both files, every offset and length, an unknown file, a read with no file chosen, every instruction that writes, and
+  the same bytes from two cards; the switch (on by default; only the owner's proof, and nothing else, flips it; a refusal costs no PIN try;
+  off makes the tag's name unselectable and on makes it selectable again; it survives a power cycle; `RESET_CARD` puts it back on; a payment
+  works with it off); the instances deleted one by one; and no static field that refers to an object an instance made.
 - BIP-340 vectors, as upstream. In `spec/vectors/`: an owner key and a proof for
   each label, and the transcript.
 - On a card, by hand: install, set up (PIN, record, owner), set a limit, load,
@@ -541,10 +551,11 @@ verifier.
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |
 | `LOCK_CARD` | `FoxyCard/lock` | nothing |
 | `RESET_CARD` (software 1.17) | `FoxyCard/reset` | nothing |
+| `SET_TAG` (software 1.19) | `FoxyCard/tag` | one byte: `00` tag on, `01` tag off |
 
 So a proof for one command, or one value, is no proof for another, and an old or
 used proof fails. The data of an owner's command is `proof length (1) ‖ proof
-(DER) ‖ the value` (for `ALLOW_LOAD`, `LOCK_CARD` and `RESET_CARD`, the proof alone), so the
+(DER) ‖ the value` (for `ALLOW_LOAD`, `LOCK_CARD` and `RESET_CARD`, the proof alone; for `SET_TAG`, the proof and then the one byte it was made over), so the
 proof sits first and the value after it is exactly what the proof was made over.
 
 **Refusal.** `6A91` when no nonce was asked for in this tap, or the signature is
@@ -572,7 +583,7 @@ resetting, not unblocking.
 The card then reads as a card out of its packet: no PIN (`GET_INFO` PIN state
 0, three tries), no owner, not locked, no record, no limits, no allowance, no
 window or spending, no places in use, no log, no receipts, no change owed or
-change note, no kept signature, and **a new key pair**: the card's own key
+change note, no kept signature, its NFC tag on (5.8), and **a new key pair**: the card's own key
 (`GET_PUBKEY`) and the PIN key (`GET_NONCE` P1 = 1, whose signature by the card
 key is made again at the first asking). The old key would have tied one
 owner's payments to the next one's. What it keeps is its clock (the time, and
@@ -583,8 +594,8 @@ a new card. An opening of change still owed to the card goes with the rest:
 the pieces it would have come to are locked to the key that is gone, so the
 owner's phone finishes any (`GET_CHANGE`) before it resets.
 
-The wipe is one transaction of four bytes (the lock, the PIN state, the change
-note, the owner), after the keys are drawn, with everything else written
+The wipe is one transaction of five bytes (the lock, the PIN state, the change
+note, the owner, the NFC tag's switch), after the keys are drawn, with everything else written
 outside any (a chip's commit buffer holds about a dozen writes). A card taken
 away before it has the owner still and is reset again; one taken away after it
 is a new card whose old PIN's bytes and tries may not be cleared yet, which
@@ -749,6 +760,112 @@ flags), so that the owner's phone can say so.
 A card of software 1.12 to 1.15 keeps asking for its PIN at every payment, and a
 phone must go on working with them.
 
+### 5.8 The card as an NFC tag (software 1.19)
+
+A phone with its screen on reads NFC tags by itself and offers to open the web
+address a tag carries. From software 1.19 every card also answers as an NFC Forum
+Type 4 Tag (mapping version 2.0), read only, carrying one address:
+
+    https://getfoxy.io/card
+
+so that a phone with Foxy opens the app and a phone without it opens that page.
+
+**The same on every card.** There is nothing per card in the address and there never
+will be: an address that named the card, its key, its owner or its balance would be an
+identifier that anyone with a phone could read with no PIN. Two cards answer a reader
+in the same bytes, and a card with money on it answers as one with none. What the tag
+tells a reader is that this is a card made for Foxy, and nothing else
+(`SECURITY-MODEL.md`, threat 15).
+
+**The applet.** A third applet of the package, `Tag` (class AID `F0 46 4F 58 59 43 41
+52 44 54`), listed after the opener and the card's applet, and instantiated on the card
+under the NFC Forum's own name, `D2 76 00 00 85 01 01`, given as the instance AID at
+install, since phones select the tag application by that name:
+
+    gp --create D2760000850101 --package F0464F585943415244 --applet F0464F58594341524454
+
+It keeps no secret and no state of its own but the file chosen (one byte of transient
+memory, cleared on deselect and when the application is selected), and it allocates
+nothing else. It answers exactly this, with class `00` (any other class is `6E00`):
+
+| Command | Bytes | Answer |
+|---|---|---|
+| SELECT by name | `00 A4 04 00 07 D2 76 00 00 85 01 01 [00]` | `9000`, no data (the runtime's); `6999` when the tag is off |
+| SELECT file | `00 A4 00 0C 02 E1 03`, or `... E1 04` | `9000`; any other file `6A82`; other P1 or P2 `6B00`; Lc not 2 `6700` |
+| READ BINARY | `00 B0 <offset hi> <offset lo> <Le>` | the bytes of the file chosen from that offset, as many as asked and the file holds (an Le past the end is answered with what there is); an offset at or past the end `6B00`; no file chosen `6986` |
+| UPDATE BINARY (`D6`), and the other instructions that write (`0E D0 D7 DA DB DC DD E2`) | | `6982` |
+| any other instruction | | `6D00` |
+
+The capability container (file `E103`, 15 bytes):
+
+    00 0F 20 00 3B 00 34 04 06 E1 04 00 16 00 FF
+
+its length (15), mapping version 2.0, MLe 59, MLc 52, and one NDEF file control TLV:
+file `E104`, at most 22 bytes, read access free, write access never. The NDEF file
+(`E104`, 22 bytes):
+
+    00 14  D1 01 10 55 04  67 65 74 66 6F 78 79 2E 69 6F 2F 63 61 72 64
+
+its message's length (20), then one short, well-known record of type `U` (a URI) whose
+payload is the prefix code `04` (`https://`) and the 15 ASCII bytes of `getfoxy.io/card`.
+A phone reads it by selecting the name, selecting `E103` and reading 15, selecting
+`E104`, reading 2 (the length) and reading 20 from offset 2.
+
+**The switch.** The card's owner can switch the tag off, and on again: a card kept in a
+phone's wallet case would otherwise raise the offer every time the screen wakes. The
+switch is one persistent byte of the card's applet. It is on for a new card, for a card
+with no owner and for a card just reset (`RESET_CARD` puts it back on in its last
+transaction, 5.6a), and off only when its owner has said so. The command is `SET_TAG`:
+
+| Field | Value |
+|---|---|
+| CLA, INS | `B0 52` |
+| P1 | `00` tag on, `01` tag off |
+| P2 | `00` |
+| Data | proof length (1), the owner's proof (DER), and one byte, the same as P1 |
+| Proof | ECDSA (P-256, SHA-256, DER) by the owner's key over `FoxyCard/tag` (12 bytes, `46 6F 78 79 43 61 72 64 2F 74 61 67`), the 16-byte nonce the card gave, and that one byte |
+
+It is refused in this order, with the words the neighbouring commands use: `6B00` for a
+P1 or P2 not those, before anything else (the nonce is left unspent); `6986` on a locked
+card; `6A90` with no owner; `6A91` when no nonce was asked for in this tap or the proof is
+not the owner's for this label, this nonce and this byte (it costs no PIN try, and the
+nonce is spent); `6700` for anything but one byte after the proof; `6B00` for a byte that is
+not P1. Asking for the state the tag has answers `9000` and writes nothing. No PIN is asked
+and none is spent: the owner's phone does not know it, and a terminal that has been handed
+the PIN must not be able to turn the tag off or on. It is allowed with money on the card.
+
+**GET_INFO.** The tag's state is said by a form of its own, P1 = 2: the 42 bytes that P1 = 1
+answers, and then byte 42, `00` when the tag is on and `01` when it is off. It is said to
+anyone (the tag shows as much to any reader). P1 = 0 is the thirty bytes and P1 = 1 the forty-two
+bytes they were in software 1.18, whatever the tag's state: a wallet written for 1.18 asks with
+P1 = 1 and takes the answer as the long form only when it is exactly 42 bytes, so growing that
+answer would have made it misread a 1.19 card (no limit on one payment, no allowance). Any
+other P1 is answered as it was, with the thirty bytes. Cards of software 1.18 and earlier have
+no tag: they answer `6D00` to `52`, and give the thirty bytes to P1 = 2.
+
+**How the tag knows.** At each selection the tag asks the card's applet whether it is on,
+through a shareable interface (`TagSwitch`, one method, `tagIsOn`) that the card's applet
+hands to any caller. The card's applet is looked up by its name (`JCSystem.lookupAID`,
+`F0 46 4F 58 59 43 41 52 44 01`) and its interface asked for
+(`getAppletShareableInterfaceObject`) then, and nothing of either is kept. When the tag is
+off the tag's `select` answers false, so the card refuses the tag application's name
+(`6999`) and a phone sees no tag. The card applet's own name is selectable whatever the
+switch says, and a payment is made as ever. If the card's applet is not there the tag is
+on. The interface is not exported: the two applets are of one package, and so of one
+context.
+
+**Deleting.** No static field of the package refers to an object an applet instance made,
+which the chip would refuse to delete (the statics are constants made when the package is
+loaded; the tag holds no reference to the card's applet). The instances are deleted one by
+one, the tag (`D2760000850101`), the card's applet, the opener, and then the package
+(`HARDWARE_DEPLOYMENT.md`).
+
+**What a phone needs to know to speak to a card of software 1.19.** `SELECT` answers
+`01 13`. `GET_INFO` with P1 = 1 is the 42 bytes it was; with P1 = 2 it is 43, the last `00` (tag on) or `01` (off). To switch the
+tag: `GET_NONCE`, then `B0 52 <p> 00 <Lc> <proof length> <proof> <p>` with `p` = `00` or `01`,
+the proof being the owner's signature over `"FoxyCard/tag" ‖ nonce ‖ <p>`, in the same tap as
+the nonce; a phone's gate carries instruction `52`, and its signer the label `tag`.
+
 ## 6. A lost or blocked card is not lost money
 
 Upstream's position is that a card is cash: lose it and it is gone, and a
@@ -816,14 +933,15 @@ A card can be made with no refund key, and is then cash, as upstream's.
     compressed public key (130 hex characters, uncompressed), for `SET_OWNER`;
   - `cardOwnerSign`: an ECDSA signature (DER, hex) by the owner key for that
     card, over `"FoxyCard/" + label ‖ nonce ‖ value`, where the label is one of
-    `change-pin`, `set-limit`, `set-owner`, `set-card`, `load`, the nonce is the
+    `change-pin`, `set-limit`, `set-owner`, `set-card`, `load`, `tag` (software 1.19), the nonce is the
     16 bytes the card gave and the value has the shape that label takes. Native
     refuses every other label (in particular `lock`) and every other
     shape, before it reads the seed, and answers the signature and nothing
     else. A proof is made in the tap that uses it, since its nonce lives only as
     long as the tap.
 - The phone's gate carries only the instructions the page uses: `01 10 11 13 14
-  15 16 20 30 31 32 34 36 37 40 41 42 43 44 45`. `33` (the PIN form of the limit,
+  15 16 20 30 31 32 34 36 37 40 41 42 43 44 45` (and, to speak to a card of software
+  1.19, `52`). `33` (the PIN form of the limit,
   for a card with no owner) is not used by the phone and is not carried; `50`
   (`LOCK_CARD`) stays out.
 - Every tap that finds the card behind the network shows it the newest block
@@ -1003,6 +1121,12 @@ visit, where the owner has set one (5.7).
   (`FOXY-CARD-DAILY-LIMIT.md` 5, 6 and 13).
 - A card with no owner can be claimed by any reader in range. It holds nothing and
   cannot be loaded (5.4).
+- **The NFC tag (software 1.19) is read by any reader, with no PIN.** It says the same
+  bytes on every card and nothing of the card, so it reveals that this is a card made
+  for Foxy and nothing else (5.8). A card kept on factory keys can have the tag's
+  applet replaced by one that carries another address; rotating the keys (5.4)
+  closes that. The owner can switch the tag off; a terminal that has the PIN cannot
+  switch it either way.
 - A holder with no phone has no balance they can read that a terminal did not
   draw. That is a screen, not a clock.
 - A pretend card can collect a PIN typed for it. AUTH lets a holder's own phone

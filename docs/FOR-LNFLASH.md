@@ -123,7 +123,7 @@ Class `B0` as yours. AID: package `F0 46 4F 58 59 43 41 52 44`, applet the same 
 
 | Command | Yours | Ours |
 |---|---|---|
-| `01` GET_INFO | 8 bytes | 29: adds format, tries left, locked, has-record, the daily limit, has-owner, then the day (`now`, window start, spent today). With P1 = 1, 42: the limit on one payment (owner's grant only), the no-PIN allowance and what is counted against it (anyone; 1.16) |
+| `01` GET_INFO | 8 bytes | 29: adds format, tries left, locked, has-record, the daily limit, has-owner, then the day (`now`, window start, spent today). With P1 = 1, 42: the limit on one payment (owner's grant only), the no-PIN allowance and what is counted against it (anyone; 1.16). With P1 = 2, 43 (1.19): those 42 and whether the NFC tag is on (anyone) |
 | `13` GET_PROOF | 78-byte slot | 82: adds a 4-byte date |
 | `15` AUTH | none | reader sends 16 random bytes; card answers 16 of its own and a BIP-340 signature. No PIN |
 | `16` GET_CARD | none | the card record, with the daily limit and, where a time key was up to 1.14, the hardest difficulty and the hash of the newest block header the card has taken |
@@ -144,6 +144,7 @@ Class `B0` as yours. AID: package `F0 46 4F 58 59 43 41 52 44`, applet the same 
 | `45` ALLOW_LOAD | none | the owner's proof (label `FoxyCard/load`). For the rest of that tap, `LOAD_PROOF` and `CLEAR_SPENT` need no PIN. Not `SPEND` |
 | `50` LOCK_CARD | the PIN if one is set; `P2 = DE` | a PIN set and verified, `P2 = DE`, and the owner's proof as data |
 | `51` RESET_CARD (1.17) | none | `P2 = AD`, and the owner's proof as data (label `FoxyCard/reset`); a locked card also wants the PIN in this tap (`6982`); nothing unspent (`6A8D`). The card is then as out of its packet, with a new key, and keeps only its clock; see SPEC 5.6a |
+| `52` SET_TAG (1.19) | none | `P1 = 00` tag on, `01` off, `P2 = 00`, and the owner's proof as data (label `FoxyCard/tag`) followed by the one byte the proof is over, the same as P1; no PIN, any funds; `6986` locked. The card also answers as an NFC Forum Type 4 Tag, under its own applet and the NFC Forum's name, carrying one web address, the same on every card; see SPEC 5.8 |
 
 New status words: `6A8F` over the day's limit (was "over the limit"), `6A90`
 no owner, `6A91` the owner's proof is missing or wrong, or the command is not
@@ -158,7 +159,7 @@ newest hash of a block header taken (a time key up to 1.14), the clock and the
 day, and the mint's address (up to 80 bytes). Apart from it the card keeps a
 65-byte owner public key, which nothing reads out. The applet's version was 1.1
 (`SELECT` answers `01 01`) and the format byte 3 when this was written; they are
-1.18 (`01 12`) and 4 now.
+1.19 (`01 13`) and 4 now.
 
 **The owner and its proof.** The holder's phone works the owner's private key out
 for each card as HMAC-SHA256 with the 64-byte BIP-39 seed as the key, over
@@ -179,6 +180,7 @@ end the PIN session.
 | `ALLOW_LOAD` | `FoxyCard/load` | nothing |
 | `LOCK_CARD` | `FoxyCard/lock` | nothing |
 | `RESET_CARD` (1.17) | `FoxyCard/reset` | nothing |
+| `SET_TAG` (1.19) | `FoxyCard/tag` | one byte: `00` tag on, `01` tag off |
 
 A proof for one command or value is no proof for another, and an old or used
 one fails (`6A91`). Nothing of the owner crosses the air: no secret is on the

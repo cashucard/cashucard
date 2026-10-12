@@ -19,7 +19,7 @@ import javacardx.crypto.*;
  * AID: F0 46 4F 58 59 43 41 52 44   ("FOXYCARD" after a proprietary F0)
  *
  * Command set:
- *   0x01  GET_INFO         — version, format, slot stats, PIN state, tries, limit, owner, the day; with P1 = 1, the tap limit (owner only) and the no-PIN allowance as well
+ *   0x01  GET_INFO         — version, format, slot stats, PIN state, tries, limit, owner, the day; with P1 = 1, the tap limit (owner only) and the no-PIN allowance as well; with P1 = 2, those and whether the NFC tag is on
  *   0x10  GET_PUBKEY       — 33-byte compressed secp256k1 card pubkey
  *   0x11  GET_BALANCE      — sum of unspent proof amounts (uint32)
  *   0x12  GET_PROOF_COUNT  — count of non-empty slots
@@ -51,6 +51,7 @@ import javacardx.crypto.*;
  *   0x45  ALLOW_LOAD       — the owner's proof lets LOAD_PROOF and CLEAR_SPENT through, with no PIN, for this tap
  *   0x50  LOCK_CARD        — permanently disable write operations (PIN, and the owner's proof)
  *   0x51  RESET_CARD       — back to a card out of its packet, for another person to set up (the owner's proof; nothing unspent; the PIN too if locked)
+ *   0x52  SET_TAG          — switch the card's NFC tag off or on (the owner's proof; no PIN; any funds)
  *
  * What the fork changes, and why (the spec's section 4, and docs/FOXY-CARD-DAILY-LIMIT.md):
  *   - SPEND_PROOF takes no message. Upstream signed 32 bytes the reader
@@ -89,7 +90,7 @@ import javacardx.crypto.*;
  * @see spec/APDU.md for full command reference
  * @see spec/NUT-XX.md for protocol specification
  */
-public class CashuApplet extends Applet {
+public class CashuApplet extends Applet implements TagSwitch {
 
     // -------------------------------------------------------------------------
     // Applet version
@@ -143,7 +144,13 @@ public class CashuApplet extends Applet {
     // wants the PIN as well. The wire is otherwise 1.16's.
     // 1.18 waits four signatures of the card's own work for each limit's worth over the limit past the first, where 1.13 to
     // 1.17 waited three (the first limit's worth over is ten, as it was in 1.17). Nothing else is different: the wire is 1.17's.
-    static final byte VERSION_MINOR = (byte) 0x12;
+    // 1.19 is the NFC tag. The card also answers as an NFC Forum Type 4 Tag carrying one web address, the same on every card (the
+    // applet `Tag`, instantiated under the NFC Forum's own name), and its owner switches that off and on with SET_TAG (0x52: the
+    // owner's proof under "FoxyCard/tag", no PIN, any funds). The switch is one persistent byte: on for a new card, a card with no
+    // owner and a card just reset. GET_INFO has a new form, P1 = 2, whose 43rd byte says it; the answers to P1 = 0 and P1 = 1
+    // are the 30 and the 42 bytes they were, whatever the tag's state, because the wallets that went before take the answer to
+    // P1 = 1 as the long form only when it is exactly 42 bytes. The wire is otherwise 1.18's.
+    static final byte VERSION_MINOR = (byte) 0x13;
     static final byte FORMAT        = (byte) 0x04;
 
     // -------------------------------------------------------------------------
@@ -189,6 +196,7 @@ public class CashuApplet extends Applet {
     static final byte INS_ALLOW_LOAD       = (byte) 0x45;
     static final byte INS_LOCK_CARD        = (byte) 0x50;
     static final byte INS_RESET_CARD       = (byte) 0x51;
+    static final byte INS_SET_TAG          = (byte) 0x52;
 
     // -------------------------------------------------------------------------
     // Proof slot layout constants (82 bytes per slot: upstream's 78 and a date)
@@ -627,6 +635,8 @@ public class CashuApplet extends Applet {
         'F','o','x','y','C','a','r','d','/','l','o','c','k' };
     private static final byte[] LABEL_RESET = {   // FoxyCard/reset
         'F','o','x','y','C','a','r','d','/','r','e','s','e','t' };
+    private static final byte[] LABEL_TAG = {   // FoxyCard/tag
+        'F','o','x','y','C','a','r','d','/','t','a','g' };
     /* The least work a block header must show to be taken, as a header carries
      * its difficulty (`bits`, little-endian): 0x17087BC0, four times the
      * target of the network's blocks when this version was made (0x17021EF0),
@@ -701,6 +711,13 @@ public class CashuApplet extends Applet {
      */
     private ECPublicKey ownerKey;
     private byte[] ownerSet;
+
+    /**
+     * Whether the owner has switched the card's NFC tag off (persistent): 0 is on, which a new card, a card with no
+     * owner and a card just reset all have, and 1 is off. Written only by SET_TAG and RESET_CARD; read by GET_INFO
+     * (P1 = 2) and by the tag applet, which asks at each selection (`tagIsOn`).
+     */
+    private byte[] tagOff;
 
     /**
      * That the card has signed for a payment since it was last tapped
@@ -887,6 +904,7 @@ public class CashuApplet extends Applet {
         cardRecord      = new byte[CARD_RECORD_LEN];
         authTagHash     = new byte[32];
         ownerSet        = new byte[1];
+        tagOff          = new byte[1];
         changeDue       = new byte[1];
         ownerKey        = newP256Key();
         ecdsa           = Signature.getInstance(Signature.ALG_ECDSA_SHA_256, false);
@@ -1082,6 +1100,7 @@ public class CashuApplet extends Applet {
             case INS_ALLOW_LOAD:       processAllowLoad(apdu);      break;
             case INS_LOCK_CARD:        processLockCard(apdu);       break;
             case INS_RESET_CARD:       processResetCard(apdu);      break;
+            case INS_SET_TAG:          processSetTag(apdu);         break;
             default:
                 ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
         }
@@ -1136,10 +1155,19 @@ public class CashuApplet extends Applet {
         buf[29] = changeGrant[0];
         /* P1 = 1 asks for the limit on one payment and the no-PIN allowance as
          * well: the limit on one payment (30..33), the allowance (34..37) and
-         * what has been signed for with no PIN in the day's window (38..41).
+         * what has been signed for with no PIN in the day's window (38..41), 42
+         * bytes in all.
          * Asked for, and not simply appended, so that a reader that knows the
-         * thirty bytes and checks for them still gets thirty. */
-        if (p1 == (byte) 1) {
+         * thirty bytes and checks for them still gets thirty.
+         *
+         * P1 = 2 (1.19) is the same 42 bytes and then one more, byte 42:
+         * whether the NFC tag is on (0 on, 1 off; the tag shows as much to any
+         * reader). It is a form of its own and not a 43rd byte of the answer to
+         * P1 = 1, because a reader that asks P1 = 1 takes the answer as the long
+         * form only when it is exactly 42 bytes: P1 = 1 is the 42 bytes it always
+         * was, whatever the tag's state. Any other P1 is answered as it was, with
+         * the thirty bytes. */
+        if (p1 == (byte) 1 || p1 == (byte) 2) {
             /* The limit on one payment is the holder's and is said to the
              * holder only: with the owner's grant given in this tap, and to
              * nobody else, not even under the PIN, which a till has. A
@@ -1156,10 +1184,14 @@ public class CashuApplet extends Applet {
             /* The allowance is said to anyone: a till needs it to know whether
              * to ask for the PIN, and nothing is learned from it that trying
              * would not tell. (Not the limit on one payment above: that one
-             * is waited for, and knowing it would be a way round the wait.) */
-            Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_LIMIT_OFFSET, buf, (short) 34, (short) 4);
-            Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_SPENT_OFFSET, buf, (short) 38, (short) 4);
-            apdu.setOutgoingAndSend((short) 0, (short) 42);
+             * is waited for, and knowing it would be a way round the wait.)
+             * It and what is counted against it are side by side in the record
+             * (CARD_NOPIN_LIMIT_OFFSET, CARD_NOPIN_SPENT_OFFSET), as they are
+             * in the answer (34..37, 38..41): one copy of eight bytes. */
+            Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_LIMIT_OFFSET, buf, (short) 34, (short) 8);
+            // the byte after them is sent by P1 = 2 alone
+            buf[42] = tagOff[0];
+            apdu.setOutgoingAndSend((short) 0, p1 == (byte) 2 ? (short) 43 : (short) 42);
             return;
         }
         apdu.setOutgoingAndSend((short) 0, (short) 30);
@@ -3242,9 +3274,9 @@ public class CashuApplet extends Applet {
      * The card as it was out of its packet, for another person to set up: no PIN
      * (three tries), no owner, no record, no limits, no allowance, no log, no
      * receipts, no change owed or signature kept, and a new key pair of its own
-     * (the old key tied the last owner's payments to the next one's). It keeps
-     * its clock (the time and the header hash it was shown; the ratchet's bits go
-     * to nothing, as SET_CARD does) and its software.
+     * (the old key tied the last owner's payments to the next one's), and its NFC
+     * tag on (1.19). It keeps its clock (the time and the header hash it was shown;
+     * the ratchet's bits go to nothing, as SET_CARD does) and its software.
      *
      * Order of the refusals: `6B00` for the P1 and P2; `6A90` with no owner; the
      * proof (`6A91`; `6700` for anything after it); `6982` on a LOCKED card whose
@@ -3255,8 +3287,8 @@ public class CashuApplet extends Applet {
      * Not one transaction, and not a long one: a chip's commit buffer holds about
      * a dozen writes. The bulk is written outside any (the places, the log, the
      * receipts, the openings, the record, the new keys), and the three things that
-     * say who the card is (locked, the PIN, the owner) and the change note are
-     * flipped in a transaction of four bytes, last of all. A card that leaves the
+     * say who the card is (locked, the PIN, the owner), the change note and the
+     * tag's switch are flipped in a transaction of five bytes, last of all. A card that leaves the
      * field before that has the owner still, and the owner may reset it again; one
      * that leaves after it is a new card, with at worst the old PIN's bytes and
      * tries not yet cleared (nothing reads them with no PIN set, and SET_PIN
@@ -3304,6 +3336,7 @@ public class CashuApplet extends Applet {
         pinState[0] = (byte) 0;
         changeDue[0] = (byte) 0;
         ownerSet[0] = (byte) 0;
+        tagOff[0] = (byte) 0;
         JCSystem.commitTransaction();
 
         // the old owner's key and PIN overwritten (nothing reads them now), and the PIN's tries back
@@ -3315,6 +3348,49 @@ public class CashuApplet extends Applet {
         changeGrant[0] = (byte) 0;
         tapOpen[0] = (byte) 0;
         tapOpen[1] = (byte) 0;
+    }
+
+    /**
+     * SET_TAG (1.19): P1 = 0 the card answers as an NFC tag, P1 = 1 it does not; P2 = 0. The data is the owner's
+     * proof's length (1), the proof (DER) and then one byte, the same as P1, which is what the proof is over:
+     * "FoxyCard/tag", the nonce the card gave and that byte.
+     *
+     * The owner's alone, and no PIN: a terminal that has been handed the PIN must not be able to turn the tag off
+     * (or on) for a holder who keeps the card in a phone's wallet case and would otherwise be offered the app
+     * every time the screen wakes. Allowed with money on the card. The tag is on for a new card, a card with no
+     * owner and a card just reset; asking for the state it has answers 9000 and writes nothing.
+     *
+     * Order of the refusals, with the words the neighbouring commands use: `6B00` for a P1 or P2 not those;
+     * `6986` on a locked card; `6A90` with no owner; the proof (`6A91`: no nonce asked for in this tap, or a
+     * proof that is not the owner's for this label, this nonce and this byte; it costs no PIN try); `6700` for
+     * anything but one byte after the proof; `6B00` for a byte that is not P1.
+     */
+    private void processSetTag(APDU apdu) {
+        byte[] buf = apdu.getBuffer();
+        byte want = buf[ISO7816.OFFSET_P1];
+        if ((want != (byte) 0 && want != (byte) 1) || buf[ISO7816.OFFSET_P2] != (byte) 0) {
+            ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        }
+        requireNotLocked();
+        if (ownerSet[0] != (byte) 1) ISOException.throwIt(SW_NO_OWNER);
+        short dataLen = apdu.setIncomingAndReceive();
+        short at = requireOwnerProof(LABEL_TAG, buf, dataLen);
+        if ((short)(ISO7816.OFFSET_CDATA + dataLen) != (short)(at + 1)) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        if (buf[at] != want) ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        if (tagOff[0] != want) tagOff[0] = want;
+    }
+
+    /** Whether the card is to answer as an NFC tag: asked by the tag applet at each of its selections (`TagSwitch`). */
+    public boolean tagIsOn() {
+        return tagOff[0] == (byte) 0;
+    }
+
+    /**
+     * The tag applet's way to ask `tagIsOn`. The bit is public (GET_INFO with P1 = 2 says it to anyone, and so does the tag), so any
+     * caller is answered; the one parameter is 0.
+     */
+    public Shareable getShareableInterfaceObject(AID clientAID, byte parameter) {
+        return parameter == (byte) 0 ? this : null;
     }
 
     // -------------------------------------------------------------------------
@@ -3700,6 +3776,6 @@ public class CashuApplet extends Applet {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        // no lines at present: 1.16 installs at 203 past a multiple of 256 (and 249), and not at 139, 164 or 176
+        // no lines at present: a 1.19 build of 19,269 bytes (69 past a multiple of 256) installs; 1.16 installs at 203 past a multiple of 256 (and 249), and not at 139, 164 or 176
     }
 }
