@@ -9320,7 +9320,7 @@ class CashuAppletTest {
         assertEquals(3, count(code, "nonceLive[0] = (byte) 0;"), "and used up by unseal (twice) and by the owner's proof");
         // ---- VERIFY_PIN, SET_PIN, CHANGE_PIN
         String v = body(code, "private void processVerifyPin(", "private void failPinCheck(").replaceAll("\\s+", " ");
-        String[] verify = { "boolean sealed = sealedForm(buf);", "if (pinState[0] == (byte) 0) ISOException.throwIt(SW_PIN_NOT_SET);", "if (pin.getTriesRemaining() == 0) ISOException.throwIt(SW_PIN_BLOCKED);",
+        String[] verify = { "boolean sealed = sealedForm(buf);", "if (pinState[0] == (byte) 0) ISOException.throwIt(SW_PIN_NOT_SET);", "if (pinState[0] == (byte) 2 || pin.getTriesRemaining() == 0) ISOException.throwIt(SW_PIN_BLOCKED);",
             "short pinLen = apdu.setIncomingAndReceive();", "pinLen = unseal(buf, pinLen, true);", "if (pinLen < 0) {", "rng.generateData(seal, S_HASH, (short) 8);",
             "pin.check(seal, S_HASH, (byte) 8);", "failPinCheck();", "if (pinLen != PIN_BLOCK_LEN) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);", "pinLen = unblockPin(buf, pinLen);",
             "if (pinLen < PIN_MIN_LEN || pinLen > PIN_MAX_LEN) {", "boolean ok = pin.check(buf, ISO7816.OFFSET_CDATA, (byte) pinLen);", "if (!ok) failPinCheck();", "pinVerifiedFlag[0] = (byte) 1;" };

@@ -746,6 +746,43 @@ JavaCard VM's own timing of a multiply, which is not specified constant.
 
 ---
 
+## <a id="d22"></a>D22 — The PIN's state byte is its commit: a torn CHANGE_PIN stays blocked
+
+**Found (reply notes to Foxy), verified in 1.20, fixed (ENG-673, fix 4c).**
+`CHANGE_PIN` writes the new PIN (`OwnerPIN.update`, which also refills the
+tries) and then `pinState = 1`. On a blocked card, a tear between the two left
+`pinState` 2 over a new PIN with three tries. `VERIFY_PIN` keyed on the counter
+alone, so the new PIN verified; the payment gate keyed on the verified flag and
+opened, while the load gate keyed on `pinState == 1` and refused. A card that
+`GET_INFO` called blocked paid, and could not be loaded.
+
+**Decided:** `pinState` is the PIN's commit byte, as a slot's status byte is
+the slot's ([D14](#d14)). It is written last, and every PIN gate reads it:
+`VERIFY_PIN` answers `6983` for state 2 before it checks anything (costing no
+try), `requirePinIfSet` refuses state 2 even under a verified flag, and a
+blocked card has no no-PIN allowance (`needsAllowance`). A card torn there is
+blocked until the owner's `CHANGE_PIN` is sent again, which is what the owner's
+phone does for a card that answers blocked. `SET_PIN` keeps the same order, for
+an open card torn while being unblocked.
+
+**And a transaction around both writes.** Java Card 3.0.5 does not say that
+`OwnerPIN.update` takes part in a transaction (its try counter and validated
+flag are specified not to), so the transaction may roll back only the state
+byte. Nothing relies on it: the commit byte is the fix, and the transaction is
+for a chip whose `OwnerPIN` does take part.
+
+**The same rule, the other tear.** A failed check whose counter decrement
+landed and whose `pinState = 2` did not (`failPinCheck` torn) leaves state 1
+over no tries. `VERIFY_PIN` already answered `6983` on the counter; the
+allowance now refuses it too, so a card blocked by its counter pays nothing
+without the PIN. (Found in the tear review, [D23](#d23).)
+
+**Tested** by setting the torn states directly (`ChangePinTearTest`, the
+ExposedRuntime pattern of `SlotWriteOrderTest`) and by source scans of the
+order; jCardSim cannot tear a write and its transactions do not roll back.
+
+---
+
 Small changes: open a PR and reference the decision id (e.g. "revisits D5").
 
 Changes that alter the product's shape — recovery, identity, custody, the

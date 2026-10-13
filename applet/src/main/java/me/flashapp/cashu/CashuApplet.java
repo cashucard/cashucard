@@ -2945,7 +2945,10 @@ public class CashuApplet extends Applet implements TagSwitch {
         byte[] buf = apdu.getBuffer();
         boolean sealed = sealedForm(buf);
         if (pinState[0] == (byte) 0) ISOException.throwIt(SW_PIN_NOT_SET);
-        if (pin.getTriesRemaining() == 0) ISOException.throwIt(SW_PIN_BLOCKED);
+        /* Blocked by the state byte OR the counter (D22). A CHANGE_PIN or SET_PIN torn after the PIN's
+         * write and before its state byte leaves state 2 over a new PIN with full tries: the state
+         * byte is the commit, and until it is written the card is as it was, blocked. */
+        if (pinState[0] == (byte) 2 || pin.getTriesRemaining() == 0) ISOException.throwIt(SW_PIN_BLOCKED);
 
         short pinLen = apdu.setIncomingAndReceive();
         if (sealed) {
@@ -3047,8 +3050,13 @@ public class CashuApplet extends Applet implements TagSwitch {
             Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
             Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
         }
+        /* The PIN, then its state byte, which is the commit (D22): torn between the two, a card that was
+         * blocked is still blocked (VERIFY_PIN reads the byte), and one that had no PIN still has none. In
+         * a transaction as well, for a chip whose OwnerPIN takes part in one; nothing relies on that. */
+        JCSystem.beginTransaction();
         pin.update(buf, ISO7816.OFFSET_CDATA, (byte) pinLen);
         pinState[0] = (byte) 1;
+        JCSystem.commitTransaction();
         // a new PIN has not been typed yet: any session that had verified the old one is over
         pinVerifiedFlag[0] = (byte) 0;
     }
@@ -3083,8 +3091,15 @@ public class CashuApplet extends Applet implements TagSwitch {
         short at = requireOwnerProof(LABEL_CHANGE_PIN, buf, dataLen);
         short newLen = (short)(ISO7816.OFFSET_CDATA + dataLen - at);
         if (newLen < PIN_MIN_LEN || newLen > PIN_MAX_LEN) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        /* The PIN, then pinState 1, its commit byte (D22). The PIN's write refills the tries; a card torn
+         * after it and before the byte has a new PIN that works under a state that still says blocked,
+         * and every PIN gate reads the byte (VERIFY_PIN, requirePinIfSet, needsAllowance): it is blocked
+         * until the owner's CHANGE_PIN is sent again, which is what the owner's phone does for a card
+         * that answers blocked. In a transaction as well, for a chip whose OwnerPIN takes part in one. */
+        JCSystem.beginTransaction();
         pin.update(buf, at, (byte) newLen);
         pinState[0] = (byte) 1;
+        JCSystem.commitTransaction();
         pinVerifiedFlag[0] = (byte) 0;
     }
 
@@ -3531,7 +3546,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * every gated command opened up the moment the PIN was blocked (ENG-615).
      */
     private void requirePinIfSet() {
-        if (pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1) {
+        // a blocked state refuses even a session that says verified (D22): the byte, not the flag, is the PIN's commit
+        if (pinState[0] == (byte) 2 || (pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1)) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
     }
@@ -3544,7 +3560,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * the allowance's.)
      */
     private boolean needsAllowance() {
-        return pinState[0] != (byte) 0 && pinVerifiedFlag[0] != (byte) 1;
+        // a blocked card's verified flag counts for nothing (D22): it goes to the allowance, which a blocked card does not have
+        return pinState[0] != (byte) 0 && (pinVerifiedFlag[0] != (byte) 1 || pinState[0] == (byte) 2);
     }
 
     /**
@@ -3569,7 +3586,9 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private boolean requireAllowanceOrPin() {
         if (!needsAllowance()) return false;
-        if (pinState[0] != (byte) 1 || isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4)) {
+        /* blocked by its state byte or by its counter (a failed check torn before failPinCheck wrote state 2,
+         * D23): no allowance */
+        if (pinState[0] != (byte) 1 || pin.getTriesRemaining() == 0 || isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4)) {
             allState[0] = (byte) 0;
             ISOException.throwIt(SW_PIN_NEEDED);
         }
