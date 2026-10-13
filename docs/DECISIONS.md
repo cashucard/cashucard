@@ -716,6 +716,68 @@ page a 2.0 card's tag opens is a product decision left open.
 
 ---
 
+## <a id="d20"></a>D20 — The clock walk is bounded: a rollover budget, REFRESH, an armed allowance, an anchored owner
+
+**Found (Foxy's reply, question 3; our shelved 0.7 plan, its decision 9),
+fixed (ENG-673, fix 4a).** In 1.20 the day's window rolls whenever a payment
+finds the card's clock a day past the window's start, and the clock is any
+block header with the work. The network makes a real header every ten minutes,
+for free. So a terminal that has been handed the PIN, and keeps the card, takes
+a day's limit for every day of headers it brings, and a reader with no PIN at
+all takes the no-PIN allowance a day: the daily limit bounds a day, not a
+visit. And a card whose owner was set before any header ran at `now = 0` and
+spent its first day on trust.
+
+**Decided:**
+
+- **A rollover budget.** The window rolls only while the rolls since the
+  owner's last `REFRESH` are fewer than the budget; past it, the window stays
+  where it is and what was signed for in it still counts. Default 7, 1 to 30,
+  set by a thirteenth byte on the owner's `SET_LIMIT` (`34`); a form without
+  it leaves the budget as it is. The first window a card begins (a limit or an
+  allowance set before any header, or an allowance set alone) is a beginning,
+  not a roll. A terminal with the PIN that walks the clock now gets the found
+  day and the budget's days, and no more until the owner's phone has seen the
+  card: with a budget of 2, three limits along ten real headers
+  (`ClockWalkTest`), where 1.20 gave eleven.
+- **REFRESH (`53`).** The owner's proof, under `CashuCard/refresh`, over a
+  block header; the header is held to every check `SET_HEADER` makes, taken as
+  `SET_HEADER` takes it (an older one moves nothing), and the rolls go to 0, in
+  one transaction. The owner's phone sends it with the tip whenever it is
+  online. No PIN; any funds; a locked card too, since a locked card still pays.
+  `53` was free at `88840aa`; Foxy signs off on the number in the PR.
+- **The allowance renews only when armed.** At a roll the no-PIN count goes to
+  nothing only if a PIN (`VERIFY_PIN`) or an owner's proof has been given since
+  it last did, and the roll spends the arming. A reader with no PIN gets one
+  allowance per arming, not one a day.
+- **The anchor.** `SET_OWNER` may carry a block header after the key (65 + 80
+  bytes). It is checked before anything is written (`6A93` refuses the owner
+  as well) and taken in the owner's transaction, with the rolls at 0. A card
+  set up so never runs at `now = 0`, never spends a first day on trust, and its
+  clock never goes back past its owner's header. Without the header
+  `SET_OWNER` is 1.20's: the wire Foxy's wallet already writes.
+
+**Where it is kept.** Three bytes of the 29 the record left as zeros after the
+last header's hash (`CARD_ROLLS_OFFSET` 156, `CARD_BUDGET_OFFSET` 157,
+`CARD_ARMED_OFFSET` 158), so the constructor asks for nothing more (the chip's
+install limit, [D17](#d17)), `RESET_CARD` clears them with the rest, a card's
+transactions cover them, and `GET_CARD` shows them to any reader as its bytes
+76, 77 and 78 (a budget of 0 there is the default, 7). `GET_INFO` is unchanged.
+
+**Rejected:** counting rolls against the clock's own movement (a terminal
+moves the clock); a roll per owner's proof of any kind (a proof for the load
+grant is given at a till's top-up, which is not the owner looking at the card);
+setting the budget back to 7 when the byte is absent (a 1.x wallet's twelve-byte
+`SET_LIMIT` would undo the owner's choice).
+
+**Cost accepted.** A holder who is offline for longer than the budget, and
+pays every day, finds the day's limit stops renewing; the app tells them to
+open it online and tap the card. `REFRESH` and the anchor need the phone to
+have a recent header (both apps: mempool.space, then blockstream.info; neither
+reachable, no header and the card keeps its clock).
+
+---
+
 ## <a id="d21"></a>D21 — The field multiply does the same work for every input
 
 **Decided (ENG-673):** `SchnorrHW.mul256x256` and `mulByDelta` have no branch

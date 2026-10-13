@@ -56,6 +56,7 @@ import javacardx.crypto.*;
  *   0x50  LOCK_CARD        — permanently disable write operations (PIN, and the owner's proof)
  *   0x51  RESET_CARD       — back to a card out of its packet, for another person to set up (the owner's proof; nothing unspent; the PIN too if locked)
  *   0x52  SET_TAG          — switch the card's NFC tag off or on (the owner's proof; no PIN; any funds)
+ *   0x53  REFRESH          — the owner's proof over a block header: the header is taken, and the rollover budget is full again (2.0)
  *
  * What the fork changes, and why (the spec's section 4, and docs/FOXY-CARD-DAILY-LIMIT.md):
  *   - SPEND_PROOF takes no message. Upstream signed 32 bytes the reader
@@ -214,6 +215,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte INS_LOCK_CARD        = (byte) 0x50;
     static final byte INS_RESET_CARD       = (byte) 0x51;
     static final byte INS_SET_TAG          = (byte) 0x52;
+    /** 2.0 (D20): the owner's proof over a block header; the header is taken as SET_HEADER takes it, and the rollover budget is full again. */
+    static final byte INS_REFRESH          = (byte) 0x53;
 
     // -------------------------------------------------------------------------
     // Proof slot layout constants (82 bytes per slot: upstream's 78 and a date)
@@ -285,6 +288,18 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 65 bytes held a time signer's key until 1.15.
     static final short CARD_BITS_OFFSET    = (short) 120;
     static final short CARD_HEADER_OFFSET  = (short) 124;
+    // 2.0 (D20), three of the 29 bytes after the hash, so that GET_CARD shows them (its bytes 76, 77, 78) and RESET_CARD
+    // clears them with the rest: how many times the day's window has rolled since the owner's last REFRESH (or the anchored
+    // SET_OWNER); the most it may roll before the next (0 is the default, ROLL_BUDGET_DEFAULT; 1 to ROLL_BUDGET_MOST); and
+    // whether the no-PIN allowance may begin again at the next roll (1 once a PIN or an owner's proof has been given since it
+    // last did). The 26 bytes after them are zeros.
+    static final short CARD_ROLLS_OFFSET   = (short) 156;
+    static final short CARD_BUDGET_OFFSET  = (short) 157;
+    static final short CARD_ARMED_OFFSET   = (short) 158;
+    static final byte  ROLL_BUDGET_DEFAULT = (byte) 7;
+    static final byte  ROLL_BUDGET_MOST    = (byte) 30;
+    /** A block header, as SET_HEADER, REFRESH and an anchored SET_OWNER take it. */
+    static final short HEADER_LEN          = (short) 80;
     // The latest block time the card has accepted, seconds, big-endian, 0 until
     // it has seen a header. SET_HEADER writes it; nothing lowers it.
     static final short CARD_NOW_OFFSET     = (short) 185;
@@ -660,6 +675,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         'C','a','s','h','u','C','a','r','d','/','l','o','c','k' };
     private static final byte[] LABEL_RESET = {   // CashuCard/reset
         'C','a','s','h','u','C','a','r','d','/','r','e','s','e','t' };
+    private static final byte[] LABEL_REFRESH = {   // CashuCard/refresh
+        'C','a','s','h','u','C','a','r','d','/','r','e','f','r','e','s','h' };
     private static final byte[] LABEL_TAG = {   // CashuCard/tag
         'C','a','s','h','u','C','a','r','d','/','t','a','g' };
     /* The least work a block header must show to be taken, as a header carries
@@ -1143,6 +1160,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             case INS_LOCK_CARD:        processLockCard(apdu);       break;
             case INS_RESET_CARD:       processResetCard(apdu);      break;
             case INS_SET_TAG:          processSetTag(apdu);         break;
+            case INS_REFRESH:          processRefresh(apdu);        break;
             default:
                 ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
         }
@@ -2081,10 +2099,16 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the first payment when either is set. When the day turns, what it
          * counted goes to nothing. */
         boolean windowed = limited || !isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
-        boolean newDay = windowed && dayIsOver();
+        /* 2.0 (D20): a day that is over begins again only while the rollover budget lasts (`windowRolls`), and the
+         * allowance begins again with it only if a PIN or an owner's proof has armed it since it last did. */
+        boolean newDay = windowed && windowRolls();
+        /* The first window a card begins (its start still 0: a limit or allowance set before any header, or an allowance
+         * set alone) is a beginning, not a roll: it spends no budget and needs no arming. */
+        boolean first = windowNotBegun();
+        boolean renew = newDay && (first || cardRecord[CARD_ARMED_OFFSET] == (byte) 1);
         if (!noPin) {
-            // not counted against the allowance: its count is what it was, or nothing in a new day
-            if (newDay) Util.arrayFillNonAtomic(scratch, X_NOPIN, (short) 4, (byte) 0);
+            // not counted against the allowance: its count is what it was, or nothing in a new day that renews it
+            if (renew) Util.arrayFillNonAtomic(scratch, X_NOPIN, (short) 4, (byte) 0);
             else Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_SPENT_OFFSET, scratch, X_NOPIN, (short) 4);
         }
 
@@ -2105,7 +2129,14 @@ public class CashuApplet extends Applet implements TagSwitch {
         try {
             JCSystem.beginTransaction();
             if (windowed) {
-                if (newDay) Util.arrayCopy(cardRecord, CARD_NOW_OFFSET, cardRecord, CARD_WINDOW_OFFSET, (short) 4);
+                if (newDay) {
+                    Util.arrayCopy(cardRecord, CARD_NOW_OFFSET, cardRecord, CARD_WINDOW_OFFSET, (short) 4);
+                    // one roll of the budget spent, and the allowance's arming with it if it began again (D20)
+                    if (!first) {
+                        cardRecord[CARD_ROLLS_OFFSET] = (byte)(cardRecord[CARD_ROLLS_OFFSET] + 1);
+                        if (renew) cardRecord[CARD_ARMED_OFFSET] = (byte) 0;
+                    }
+                }
                 if (limited) Util.arrayCopy(scratch, X_SUM, cardRecord, CARD_SPENT_OFFSET, (short) 4);
                 Util.arrayCopy(scratch, X_NOPIN, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
             }
@@ -2245,7 +2276,7 @@ public class CashuApplet extends Applet implements TagSwitch {
          * signs for counts up to the limit and then stops, until a header
          * arrives and the window is anchored at that block's time. */
         if (limited) {
-            if (dayIsOver()) {
+            if (windowRolls()) {
                 Util.arrayFillNonAtomic(scratch, X_SUM, (short) 4, (byte) 0);
             } else {
                 Util.arrayCopyNonAtomic(cardRecord, CARD_SPENT_OFFSET, scratch, X_SUM, (short) 4);
@@ -2765,10 +2796,15 @@ public class CashuApplet extends Applet implements TagSwitch {
         byte[] buf = apdu.getBuffer();
         short at = requireOwnerProof(LABEL_SET_LIMIT, buf, dataLen);
         short len = (short)(ISO7816.OFFSET_CDATA + dataLen - at);
-        if (len != (short) 4 && len != (short) 8 && len != (short) 12) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        if (len != (short) 4 && len != (short) 8 && len != (short) 12 && len != (short) 13) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         // no allowance without a PIN: there is nothing for it to stand in front of
-        if (len == (short) 12 && pinState[0] == (byte) 0 && !isZero(buf, (short)(at + 8), (short) 4)) {
+        if (len >= (short) 12 && pinState[0] == (byte) 0 && !isZero(buf, (short)(at + 8), (short) 4)) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+        // 2.0 (D20): a thirteenth byte is the rollover budget, 1 to 30 days between the owner's REFRESHes
+        if (len == (short) 13) {
+            byte budget = buf[(short)(at + 12)];
+            if (budget < (byte) 1 || budget > ROLL_BUDGET_MOST) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         }
         writeLimit(buf, at, len);
     }
@@ -2794,7 +2830,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private void writeLimit(byte[] src, short at, short len) {
         boolean both = len >= (short) 8;
-        boolean three = len == (short) 12;
+        boolean three = len >= (short) 12;
         /* A day's limit set before the card has seen a block header begins a
          * window with no start (now = 0): the first header anchors it. Until
          * then the card spends its first day on trust (`requireUnderLimits`). */
@@ -2817,7 +2853,33 @@ public class CashuApplet extends Applet implements TagSwitch {
             Util.arrayCopy(src, (short)(at + 8), cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
             Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
         }
+        // the rollover budget (2.0, D20), where the owner's form gave one; absent, it is left as it is (7 until set)
+        if (len == (short) 13) cardRecord[CARD_BUDGET_OFFSET] = src[(short)(at + 12)];
         JCSystem.commitTransaction();
+    }
+
+    /**
+     * REFRESH (0x53, 2.0, D20): the owner's proof's length (1), the proof (over "CashuCard/refresh", the nonce just
+     * given and the header), then a block header (80 bytes).
+     *
+     * The owner's phone, online, brings the tip. The header is held to everything SET_HEADER holds one to, and taken
+     * as SET_HEADER takes it (an older one moves nothing); then the rollover budget is full again: the window may roll
+     * its budget's days before the next REFRESH. One transaction: the header and the count. No PIN; any funds; a
+     * locked card too, since a locked card still pays and its day still turns. A wrong proof or a header without the
+     * work changes nothing. Answers the card's `now`, as SET_HEADER does.
+     */
+    private void processRefresh(APDU apdu) {
+        short dataLen = apdu.setIncomingAndReceive();
+        byte[] buf = apdu.getBuffer();
+        short at = requireOwnerProof(LABEL_REFRESH, buf, dataLen);
+        if ((short)(ISO7816.OFFSET_CDATA + dataLen - at) != HEADER_LEN) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        short how = checkHeader(buf, at);
+        JCSystem.beginTransaction();
+        writeHeader(buf, at, how);
+        cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;
+        JCSystem.commitTransaction();
+        Util.arrayCopyNonAtomic(cardRecord, CARD_NOW_OFFSET, buf, (short) 0, (short) 4);
+        apdu.setOutgoingAndSend((short) 0, (short) 4);
     }
 
     /**
@@ -2848,10 +2910,28 @@ public class CashuApplet extends Applet implements TagSwitch {
         short dataLen = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
         short at = ISO7816.OFFSET_CDATA;
-        if (dataLen != (short) 80) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        if (dataLen != HEADER_LEN) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        short how = checkHeader(buf, at);
+        if (how != (short) 0) {
+            JCSystem.beginTransaction();
+            writeHeader(buf, at, how);
+            JCSystem.commitTransaction();
+        }
+        Util.arrayCopyNonAtomic(cardRecord, CARD_NOW_OFFSET, buf, (short) 0, (short) 4);
+        apdu.setOutgoingAndSend((short) 0, (short) 4);
+    }
+
+    /**
+     * The checks a block header must pass, for SET_HEADER, REFRESH and an anchored SET_OWNER (D20): its own work, the
+     * floor, and a quarter of the hardest taken (`6A93` otherwise, `6A80` for bits no header could carry). Writes
+     * nothing. Leaves the header's time, big-endian, in scratch (X_NUM) and its hash, as Bitcoin shows one, in scratch
+     * (X_OUT), and answers what taking it would do: 0 nothing (it is not later than the clock), 1 move the clock, 2 move
+     * the clock and raise the hardest difficulty taken.
+     */
+    private short checkHeader(byte[] buf, short at) {
         // the work: the header hashed twice, the hash turned round into a big-endian number (Bitcoin reads it little-endian)
         sha.reset();
-        sha.doFinal(buf, at, (short) 80, scratch, X_MSG);
+        sha.doFinal(buf, at, HEADER_LEN, scratch, X_MSG);
         sha.reset();
         sha.doFinal(scratch, X_MSG, (short) 32, scratch, X_MSG);
         for (short i = 0; i < 32; i++) scratch[(short)(X_OUT + i)] = scratch[(short)(X_MSG + 31 - i)];
@@ -2872,25 +2952,27 @@ public class CashuApplet extends Applet implements TagSwitch {
         scratch[(short)(X_NUM + 1)] = buf[(short)(at + 70)];
         scratch[(short)(X_NUM + 2)] = buf[(short)(at + 69)];
         scratch[(short)(X_NUM + 3)] = buf[(short)(at + 68)];
-        if (cmpUint32(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET) > 0) {
-            boolean harder = !seen;
-            if (seen) {
-                targetOf(cardRecord, CARD_BITS_OFFSET, scratch, X_HEX);
-                harder = cmp256(scratch, (short)(X_OUT + 32), scratch, X_HEX) < 0;
-            }
-            JCSystem.beginTransaction();
-            Util.arrayCopy(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET, (short) 4);
-            // a day's limit, or an allowance, set before the card had seen a header: the window begins at this one
-            if ((!isZero(cardRecord, CARD_LIMIT_OFFSET, (short) 4) || !isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4))
-                && isZero(cardRecord, CARD_WINDOW_OFFSET, (short) 4)) {
-                Util.arrayCopy(scratch, X_NUM, cardRecord, CARD_WINDOW_OFFSET, (short) 4);
-            }
-            if (harder) Util.arrayCopy(buf, (short)(at + 72), cardRecord, CARD_BITS_OFFSET, (short) 4);
-            Util.arrayCopy(scratch, X_OUT, cardRecord, CARD_HEADER_OFFSET, (short) 32);
-            JCSystem.commitTransaction();
+        if (cmpUint32(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET) <= 0) return (short) 0;
+        if (!seen) return (short) 2;
+        targetOf(cardRecord, CARD_BITS_OFFSET, scratch, X_HEX);
+        return cmp256(scratch, (short)(X_OUT + 32), scratch, X_HEX) < 0 ? (short) 2 : (short) 1;
+    }
+
+    /**
+     * Takes a header that `checkHeader` has passed, as it answered (`how`), from what it left in scratch. Inside the
+     * caller's transaction: the clock, the window of a limit set before any header arrived, the hardest difficulty, and
+     * the hash, all new or all old.
+     */
+    private void writeHeader(byte[] buf, short at, short how) {
+        if (how == (short) 0) return;
+        Util.arrayCopy(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET, (short) 4);
+        // a day's limit, or an allowance, set before the card had seen a header: the window begins at this one
+        if ((!isZero(cardRecord, CARD_LIMIT_OFFSET, (short) 4) || !isZero(cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4))
+            && isZero(cardRecord, CARD_WINDOW_OFFSET, (short) 4)) {
+            Util.arrayCopy(scratch, X_NUM, cardRecord, CARD_WINDOW_OFFSET, (short) 4);
         }
-        Util.arrayCopyNonAtomic(cardRecord, CARD_NOW_OFFSET, buf, (short) 0, (short) 4);
-        apdu.setOutgoingAndSend((short) 0, (short) 4);
+        if (how == (short) 2) Util.arrayCopy(buf, (short)(at + 72), cardRecord, CARD_BITS_OFFSET, (short) 4);
+        Util.arrayCopy(scratch, X_OUT, cardRecord, CARD_HEADER_OFFSET, (short) 32);
     }
 
     /**
@@ -2972,8 +3054,10 @@ public class CashuApplet extends Applet implements TagSwitch {
         boolean ok = pin.check(buf, ISO7816.OFFSET_CDATA, (byte) pinLen);
         if (!ok) failPinCheck();
         // Nothing about spending is touched here: the PIN can be presented as
-        // often as its holder, or a terminal holding it, likes.
+        // often as its holder, or a terminal holding it, likes. It arms the
+        // no-PIN allowance to begin again at the next roll (D20), and nothing more.
         pinVerifiedFlag[0] = (byte) 1;
+        armAllowance();
     }
 
     /**
@@ -3115,6 +3199,14 @@ public class CashuApplet extends Applet implements TagSwitch {
      * it must not be taken over by emptying it. The key is kept and never read
      * out: nothing here answers with it. One transaction: the key and the flag
      * that it is there.
+     *
+     * 2.0 (D20): the key may be followed by a block header (80 bytes), the tip
+     * the phone setting the card up has seen. It is held to SET_HEADER's
+     * checks before anything is written, and taken in the same transaction as
+     * the key, with the rollover budget full: a card set up so never runs at
+     * `now = 0`, never spends a first day on trust, and refuses to move its
+     * clock back to any header older than its owner's. Without one the card
+     * is as 1.20 had it.
      */
     private void processSetOwner(APDU apdu) {
         requireNotLocked();
@@ -3128,8 +3220,13 @@ public class CashuApplet extends Applet implements TagSwitch {
             len = (short)(ISO7816.OFFSET_CDATA + dataLen - at);
         }
         requireNothingUnspent();
-        if (len != EC_POINT_LEN) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        // 2.0 (D20): the key, and after it, if the phone has one, a block header that anchors the card's clock
+        boolean anchored = len == (short)(EC_POINT_LEN + HEADER_LEN);
+        if (len != EC_POINT_LEN && !anchored) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         if (buf[at] != (byte) 0x04) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+        short headerAt = (short)(at + EC_POINT_LEN);
+        // the header's checks before anything is written: one without the work refuses the owner too (6A93)
+        short how = anchored ? checkHeader(buf, headerAt) : (short) 0;
         JCSystem.beginTransaction();
         try {
             ownerKey.setW(buf, at, EC_POINT_LEN);
@@ -3138,6 +3235,11 @@ public class CashuApplet extends Applet implements TagSwitch {
             ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         }
         ownerSet[0] = (byte) 1;
+        if (anchored) {
+            // the clock at a real block, and a full rollover budget: an owned card never starts at now = 0
+            writeHeader(buf, headerAt, how);
+            cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;
+        }
         JCSystem.commitTransaction();
     }
 
@@ -3371,6 +3473,8 @@ public class CashuApplet extends Applet implements TagSwitch {
             good = false;
         }
         if (!good) ISOException.throwIt(SW_OWNER_PROOF);
+        // the owner has seen the card: the no-PIN allowance may begin again at the next roll (D20)
+        armAllowance();
         return valueAt;
     }
 
@@ -3592,7 +3696,8 @@ public class CashuApplet extends Applet implements TagSwitch {
             allState[0] = (byte) 0;
             ISOException.throwIt(SW_PIN_NEEDED);
         }
-        if (dayIsOver()) {
+        // the allowance begins again with the day only when the day rolls and it is armed (D20)
+        if (windowRolls() && (cardRecord[CARD_ARMED_OFFSET] == (byte) 1 || windowNotBegun())) {
             Util.arrayFillNonAtomic(scratch, X_NOPIN, (short) 4, (byte) 0);
         } else {
             Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_SPENT_OFFSET, scratch, X_NOPIN, (short) 4);
@@ -3815,6 +3920,32 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private boolean dayIsOver() {
         return windowIsOver(cardRecord, CARD_WINDOW_OFFSET, DAY_SECONDS);
+    }
+
+    /**
+     * Whether a payment now begins a new day (2.0, D20): the day is over, and the window has rolled fewer times
+     * since the owner's last REFRESH (or anchored SET_OWNER) than the rollover budget allows. Past the budget the
+     * window stays where it is, and what was signed for in it still counts: a terminal that holds the PIN and
+     * walks the clock forward with headers gets the budget's days and no more, until the owner's phone has seen
+     * the card again.
+     */
+    private boolean windowRolls() {
+        if (!dayIsOver()) return false;
+        // a window not yet begun begins whatever the budget: that is no roll
+        if (windowNotBegun()) return true;
+        byte budget = cardRecord[CARD_BUDGET_OFFSET];
+        if (budget == (byte) 0) budget = ROLL_BUDGET_DEFAULT;
+        return (short)(cardRecord[CARD_ROLLS_OFFSET] & 0xFF) < budget;
+    }
+
+    /** Whether the day's window has never begun (its start is 0): its first beginning is no roll (D20). */
+    private boolean windowNotBegun() {
+        return isZero(cardRecord, CARD_WINDOW_OFFSET, (short) 4);
+    }
+
+    /** A PIN or an owner's proof has been given: the no-PIN allowance may begin again at the next roll (D20). One byte, written once. */
+    private void armAllowance() {
+        if (cardRecord[CARD_ARMED_OFFSET] != (byte) 1) cardRecord[CARD_ARMED_OFFSET] = (byte) 1;
     }
 
     /** Whether the window that began at `from[windowAt]` and lasts `seconds` (4, big-endian) has ended by the card's clock. */

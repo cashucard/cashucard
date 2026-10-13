@@ -4358,7 +4358,10 @@ class CashuAppletTest {
         assertArrayEquals(REFUND, Arrays.copyOfRange(c, 7, 40));
         assertArrayEquals(le32(TEST_BITS), Arrays.copyOfRange(c, 40, 44), "the hardest difficulty of any header taken, as a header carries it");
         assertEquals(blockHash(blockAt(T0)), toHex(Arrays.copyOfRange(c, 44, 76)), "the hash of the last header taken, as Bitcoin shows a block hash");
-        assertArrayEquals(new byte[29], Arrays.copyOfRange(c, 76, 105), "and zeros after");
+        // 2.0 (D20): the rolls since the owner's last REFRESH, the rollover budget (0: the default, 7) and whether the allowance is armed
+        // (the PIN verified in ready() armed it), then 26 zeros
+        assertArrayEquals(new byte[] { 0, 0, 1 }, Arrays.copyOfRange(c, 76, 79), "no roll, the default budget, armed");
+        assertArrayEquals(new byte[26], Arrays.copyOfRange(c, 79, 105), "and zeros after");
         assertEquals(MINT.length(), c[105] & 0xFF);
         assertEquals(MINT, new String(Arrays.copyOfRange(c, 106, 106 + MINT.length()), StandardCharsets.US_ASCII));
         assertArrayEquals(new byte[3], Arrays.copyOfRange(c, c.length - 3, c.length), "a record given without a design has none: three zeros");
@@ -5609,34 +5612,53 @@ class CashuAppletTest {
     @DisplayName("SET_HEADER is judged before anything is written and writes in one transaction: the length, the double hash turned round, the bits (6A80), the hash against its own target, the floor, a quarter of the best, then whether it is later than the clock; and then the clock, the window's anchor, the hardest bits and the last hash together; no PIN, owner, lock, record or log is looked at")
     void testSetHeaderIsJudgedBeforeItMoves() throws Exception {
         String code = appletCode();
-        String h = body(code, "private void processSetHeader(", "private static void targetOf(");
+        // 2.0 (D20): the checks are `checkHeader`, which SET_HEADER, REFRESH and an anchored SET_OWNER share, and the writes `writeHeader`, inside
+        // each caller's transaction. The order and the writes are pinned in each part.
+        String h = body(code, "private void processSetHeader(", "private short checkHeader(");
+        String c = body(code, "private short checkHeader(", "private void writeHeader(");
+        String w = body(code, "private void writeHeader(", "private static void targetOf(");
         int length = h.indexOf("SW_WRONG_LENGTH");
-        int hashed = h.indexOf("sha.doFinal(buf, at, (short) 80, scratch, X_MSG)");
-        int again = h.indexOf("sha.doFinal(scratch, X_MSG, (short) 32, scratch, X_MSG)");
-        int turned = h.indexOf("scratch[(short)(X_OUT + i)] = scratch[(short)(X_MSG + 31 - i)]");
-        int bits = h.indexOf("targetOf(buf, (short)(at + 72), scratch, (short)(X_OUT + 32))");
-        int own = h.indexOf("cmp256(scratch, X_OUT, scratch, (short)(X_OUT + 32)) > 0");
-        int floor = h.indexOf("targetOf(FLOOR_BITS, (short) 0, scratch, X_HEX)");
-        int overFloor = h.indexOf("cmp256(scratch, (short)(X_OUT + 32), scratch, X_HEX) > 0");
-        int quarter = h.indexOf("timesFour(scratch, X_HEX)");
-        int later = h.indexOf("cmpUint32(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET) > 0");
+        int checked = h.indexOf("checkHeader(buf, at)");
+        int hashed = c.indexOf("sha.doFinal(buf, at, HEADER_LEN, scratch, X_MSG)");
+        int again = c.indexOf("sha.doFinal(scratch, X_MSG, (short) 32, scratch, X_MSG)");
+        int turned = c.indexOf("scratch[(short)(X_OUT + i)] = scratch[(short)(X_MSG + 31 - i)]");
+        int bits = c.indexOf("targetOf(buf, (short)(at + 72), scratch, (short)(X_OUT + 32))");
+        int own = c.indexOf("cmp256(scratch, X_OUT, scratch, (short)(X_OUT + 32)) > 0");
+        int floor = c.indexOf("targetOf(FLOOR_BITS, (short) 0, scratch, X_HEX)");
+        int overFloor = c.indexOf("cmp256(scratch, (short)(X_OUT + 32), scratch, X_HEX) > 0");
+        int quarter = c.indexOf("timesFour(scratch, X_HEX)");
+        int later = c.indexOf("cmpUint32(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET) <= 0) return (short) 0");
         int begin = h.indexOf("JCSystem.beginTransaction()");
+        int written = h.indexOf("writeHeader(buf, at, how)");
         int commit = h.indexOf("JCSystem.commitTransaction()");
         int answer = h.indexOf("apdu.setOutgoingAndSend");
-        assertTrue(length > 0 && length < hashed && hashed < again && again < turned && turned < bits && bits < own && own < floor && floor < overFloor
-            && overFloor < quarter && quarter < later && later < begin && begin < commit && commit < answer,
-            "the length; the 80 bytes hashed and the hash hashed again and turned round; the bits worked out (6A80); the hash against them; the floor; the quarter of the best; whether it is later; then one transaction; then the answer");
-        assertEquals(3, count(h, "SW_LITTLE_WORK"), "6A93 is the answer to the hash over its own target, to a target over the floor, and to one over four times the best, and to nothing else");
-        String before = h.substring(0, begin), inside = h.substring(begin, commit);
-        assertEquals(0, count(before, "Util.arrayCopy("), "nothing that lasts is written before the transaction");
-        assertEquals(0, count(before, "arrayFill"), "nor filled (the helpers that work out a target write scratch, which is RAM)");
-        assertTrue(inside.contains("CARD_NOW_OFFSET") && inside.contains("CARD_WINDOW_OFFSET") && inside.contains("CARD_BITS_OFFSET") && inside.contains("CARD_HEADER_OFFSET"),
+        assertTrue(hashed > 0 && hashed < again && again < turned && turned < bits && bits < own && own < floor && floor < overFloor
+            && overFloor < quarter && quarter < later,
+            "checkHeader: the 80 bytes hashed and the hash hashed again and turned round; the bits worked out (6A80); the hash against them; the floor; the quarter of the best; whether it is later");
+        assertTrue(length > 0 && length < checked && checked < begin && begin < written && written < commit && commit < answer,
+            "SET_HEADER: the length; the checks; then one transaction, the header written in it; then the answer");
+        assertTrue(h.contains("if (how != (short) 0) {"), "SET_HEADER opens no transaction for a header that changes nothing");
+        assertEquals(3, count(c, "SW_LITTLE_WORK"), "6A93 is the answer to the hash over its own target, to a target over the floor, and to one over four times the best, and to nothing else");
+        assertEquals(0, count(h + c, "Util.arrayCopy("), "nothing that lasts is written by SET_HEADER or the checks themselves");
+        assertEquals(0, count(h + c, "arrayFill"), "nor filled (the helpers that work out a target write scratch, which is RAM)");
+        assertFalse(c.contains("beginTransaction") || c.contains("commitTransaction"), "the checks are outside any transaction");
+        assertTrue(w.contains("CARD_NOW_OFFSET") && w.contains("CARD_WINDOW_OFFSET") && w.contains("CARD_BITS_OFFSET") && w.contains("CARD_HEADER_OFFSET"),
             "the clock, the window's anchor, the hardest bits and the last hash are written together");
-        assertEquals(4, count(inside, "Util.arrayCopy("), "four writes, and no more");
-        assertEquals(0, count(h.substring(commit), "Util.arrayCopy("), "and nothing that lasts is written after it");
-        assertTrue(inside.indexOf("CARD_NOW_OFFSET") < inside.indexOf("CARD_WINDOW_OFFSET"), "the clock first: the window is anchored at the time it has just taken");
+        assertEquals(4, count(w, "Util.arrayCopy("), "four writes, and no more");
+        assertFalse(w.contains("beginTransaction") || w.contains("commitTransaction"), "writeHeader is inside its caller's transaction, and opens none of its own");
+        assertTrue(w.contains("if (how == (short) 0) return;"), "and writes nothing for a header that is not later");
+        assertTrue(w.indexOf("CARD_NOW_OFFSET") < w.indexOf("CARD_WINDOW_OFFSET"), "the clock first: the window is anchored at the time it has just taken");
         for (String gate : new String[] { "requirePin", "pinVerifiedFlag", "ownerSet", "requireOwnerProof", "requireNotLocked", "cardLocked", "CARD_SET_OFFSET", "loadGrant", "changeGrant", "logEntry", "cardLog", "tapOpen" }) {
-            assertFalse(h.contains(gate), "SET_HEADER looks at no " + gate + ": no key, PIN, owner or record, and it writes no log");
+            assertFalse((h + c + w).contains(gate), "SET_HEADER looks at no " + gate + ": no key, PIN, owner or record, and it writes no log");
+        }
+        // every caller of writeHeader runs the checks first and writes inside a transaction: SET_HEADER, REFRESH and an anchored SET_OWNER
+        assertEquals(4, count(code, "writeHeader("), "its declaration and three callers");
+        assertEquals(4, count(code, "checkHeader("), "its declaration and three callers");
+        for (String[] caller : new String[][] { { "private void processRefresh(", "private void processSetHeader(" }, { "private void processSetOwner(", "private void processGetNonce(" } }) {
+            String b = body(code, caller[0], caller[1]);
+            int ch = b.indexOf("checkHeader("), bg = b.indexOf("JCSystem.beginTransaction()"), wr = b.indexOf("writeHeader("), cm = b.indexOf("JCSystem.commitTransaction()");
+            assertTrue(ch > 0 && ch < bg && bg < wr && wr < cm, caller[0] + ": the checks, then the header written inside one transaction");
+            assertTrue(b.indexOf("cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;") > wr && b.indexOf("cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;") < cm, caller[0] + ": and the rollover budget full again, in the same transaction");
         }
         // targetOf and timesFour are the card's own arithmetic and write only RAM they are given
         String target = body(code, "private static void targetOf(", "private static void timesFour(");
@@ -5691,14 +5713,17 @@ class CashuAppletTest {
         readyWithoutAHeader(0);
         byte[] c = cardRecord();
         assertEquals(109 + MINT.length(), c.length, "the record's length is what it was");
-        assertArrayEquals(new byte[65], Arrays.copyOfRange(c, 40, 105), "no header yet: bits, hash and zeros are all zeros");
+        assertArrayEquals(new byte[38], Arrays.copyOfRange(c, 40, 78), "no header yet: bits, hash, the rolls and the budget are all zeros");
+        assertEquals(1, c[78], "the allowance armed by the PIN verified at set-up (2.0, D20)");
+        assertArrayEquals(new byte[26], Arrays.copyOfRange(c, 79, 105), "and zeros after");
         byte[] a = mine(T0 + 10, 0x1F0FFFFFL, 0);
         assertEquals(SW_OK, sw(setHeaderCommand(a)));
         c = cardRecord();
         assertArrayEquals(le32(0x1F0FFFFFL), Arrays.copyOfRange(c, 40, 44), "bits as the header carries them, little-endian");
         assertEquals(blockHash(a), toHex(Arrays.copyOfRange(c, 44, 76)), "the hash as Bitcoin shows it, big-endian: the double SHA-256 turned round");
         assertEquals(toHex(reversed(sha256(sha256(a)))), toHex(Arrays.copyOfRange(c, 44, 76)));
-        assertArrayEquals(new byte[29], Arrays.copyOfRange(c, 76, 105), "and 29 zeros");
+        assertArrayEquals(new byte[] { 0, 0, 1 }, Arrays.copyOfRange(c, 76, 79), "the rolls, the budget and the arming (2.0, D20): a header changes none of them");
+        assertArrayEquals(new byte[26], Arrays.copyOfRange(c, 79, 105), "and 26 zeros");
         assertEquals(MINT, new String(Arrays.copyOfRange(c, 106, c.length - 3), StandardCharsets.US_ASCII), "the mint is where it was");
         // the hash is of the last header that moved the clock; the bits are of the hardest
         byte[] b = mine(T0 + 20, 0x1F3FFFFCL, 0);
@@ -7955,8 +7980,12 @@ class CashuAppletTest {
             at = lineEnd;
         }
         assertEquals(1, writes, "one place writes the clock: " + writes);
-        String setHeader = body(code, "private void processSetHeader(", "private static void targetOf(");
-        assertTrue(setHeader.contains("cmpUint32(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET) > 0"), "SET_HEADER writes it only for a later time");
+        // since 2.0 (D20) the one place is writeHeader, which writes nothing for a header checkHeader did not find later than the clock
+        String checkHeader = body(code, "private short checkHeader(", "private void writeHeader(");
+        String writeHeader = body(code, "private void writeHeader(", "private static void targetOf(");
+        assertTrue(checkHeader.contains("cmpUint32(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET) <= 0) return (short) 0;")
+            && writeHeader.contains("if (how == (short) 0) return;") && writeHeader.contains("Util.arrayCopy(scratch, X_NUM, cardRecord, CARD_NOW_OFFSET"),
+            "SET_HEADER writes it only for a later time");
         String setCard = body(code, "private void processSetCard(", "private void processSetLimit(");
         assertFalse(setCard.contains("CARD_NOW_OFFSET") || setCard.contains("CARD_WINDOW_OFFSET") || setCard.contains("CARD_SPENT_OFFSET") || setCard.contains("newKey"),
             "and SET_CARD no longer clears it, or the window, or what was spent, whatever bytes it is sent where the time key was");
@@ -10474,8 +10503,8 @@ class CashuAppletTest {
     void testSetLimitTakesTheAllowance() throws Exception {
         ready();
         assertEquals(SW_OK, load(buildProof(KEYSET, 16, 1)).getSW());
-        // the shapes: 4, 8 and 12; nothing between, nothing past
-        for (int n : new int[] { 0, 1, 5, 9, 11, 13, 16 }) {
+        // the shapes: 4, 8, 12 and (2.0, D20) 13, the rollover budget after the allowance; nothing between, nothing past
+        for (int n : new int[] { 0, 1, 5, 9, 11, 14, 16 }) {
             byte[] v = new byte[n];
             assertEquals(SW_WRONG_LENGTH, sw(new CommandAPDU(CLA, INS_SET_LIMIT_OWNER, 0, 0, ownerData(ownerProof(L_LIMIT, OWNER, nonceBytes(), v), v))), n + " bytes");
         }

@@ -34,7 +34,7 @@ class AidVersionTest {
     static final String OLD_FOXY = "F0464F585943415244";
     static final String OLD_FOXY_APPLET = OLD_FOXY + "01";
     /** Every label and tag the applet hashes or verifies under, after "CashuCard/". */
-    static final String[] LABELS = { "auth", "change-pin", "set-limit", "set-owner", "set-card", "load", "lock", "reset", "tag", "seal", "pinkey" };
+    static final String[] LABELS = { "auth", "change-pin", "set-limit", "set-owner", "set-card", "load", "lock", "reset", "tag", "refresh", "seal", "pinkey" };
 
     private CardSimulator sim;
 
