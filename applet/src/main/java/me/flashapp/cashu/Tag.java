@@ -23,7 +23,7 @@ import javacard.framework.Shareable;
  * at run time.
  *
  * The applet is instantiated under the NFC Forum's own name, D2 76 00 00 85 01 01, given as the instance
- * AID at install (its class AID in the package is F0 46 4F 58 59 43 41 52 44 54), since phones select the
+ * AID at install (its class AID in the package is F0 43 41 53 48 55 43 41 52 44 54), since phones select the
  * tag application by that name. It answers exactly this and nothing else:
  *
  *     SELECT by name                  9000, no data (the runtime's)
@@ -45,9 +45,9 @@ import javacard.framework.Shareable;
  * loaded.
  */
 public final class Tag extends Applet {
-    /** The card's applet (`CashuApplet`): F0 46 4F 58 59 43 41 52 44, the package's name, and 01. */
+    /** The card's applet (`CashuApplet`): F0 43 41 53 48 55 43 41 52 44 ("CASHUCARD"), the package's name, and 01. Must match applet/build.xml (TagLookupTest). */
     private static final byte[] CARD_AID = {
-        (byte) 0xF0, 'F', 'O', 'X', 'Y', 'C', 'A', 'R', 'D', (byte) 0x01 };
+        (byte) 0xF0, 'C', 'A', 'S', 'H', 'U', 'C', 'A', 'R', 'D', (byte) 0x01 };
 
     /** The capability container (file E103), 15 bytes. */
     private static final byte[] CC = {

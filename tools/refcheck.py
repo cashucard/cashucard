@@ -28,7 +28,7 @@ Two things, both found on the chip (docs/FOXY-CARD-HARDWARE.md):
 import sys
 import zipfile
 
-OPENER = bytes.fromhex('F0464F5859434152444D')
+OPENER = bytes.fromhex('F04341534855434152444D')
 LOADED = ['Header', 'Directory', 'Import', 'Applet', 'Class', 'Method',
           'StaticField', 'Export', 'ConstantPool', 'RefLocation']
 # what the chip has answered, by the load file's size (refcheck's measure, the stored components): True installed,

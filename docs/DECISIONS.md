@@ -4,7 +4,7 @@ Each entry records a call that was made, what was rejected, and why. If you are
 about to change one of these, read the entry first — most were made against a
 real alternative, and several were made *after* getting it wrong once.
 
-Anchors are stable (`#d1` … `#d18`); other docs link to them. D15 and D16
+Anchors are stable (`#d1` … `#d24`); other docs link to them. D15 and D16
 are superseded by the 2.0 merge ([D18](#d18)) and kept for the record.
 
 ---
@@ -659,7 +659,7 @@ builds and hashes each piece's secret itself; `AUTH` proves the card over a
 tagged hash), adds an owner key, a daily limit with a clock taken from Bitcoin
 block headers, NUT-11 SIG_ALL payments with change, and the mint's NUT-12 proof
 kept with each piece. The design is theirs; the changes we made on top are D19
-to D23.
+to D24.
 
 **Superseded.** Our 0.5 `CLEAR_PIN` ([D15](#d15)) and 0.6 PUK ([D16](#d16)).
 The owner key is the authority above the PIN: its proof changes the PIN with no
@@ -673,6 +673,46 @@ separable from the slot layout and the payment commands they change.
 **Cost accepted.** 0.x cards cannot be updated in place: a card is reinstalled,
 which makes a new key, so its balance is swept first (`HARDWARE_DEPLOYMENT.md`).
 Both apps drop 0.x and say "This card needs an update" to a 0.x card.
+
+---
+
+## <a id="d19"></a>D19 — A neutral identity: AID F0 CASHUCARD, labels CashuCard/, version 2.0
+
+**Decided (ENG-673):** the package AID is `F0 43 41 53 48 55 43 41 52 44`
+("CASHUCARD" after the proprietary RID byte `F0`). Every instance AID derives
+from it as Foxy's derived from `F0 FOXYCARD`: the opener `…4D`, the card's
+applet `…01`, the tag's class `…54` (the tag is still instantiated under the
+NFC Forum's own `D2 76 00 00 85 01 01`, which phones select). Every label and
+tag that went into a hash or an owner's proof as `FoxyCard/…` is `CashuCard/…`:
+`auth`, `seal`, `pinkey`, and the owner's `change-pin`, `set-limit`,
+`set-owner`, `set-card`, `load`, `lock`, `reset` and `tag`. `SELECT` and
+`GET_INFO` answer version `02 00`.
+
+**Why a new AID and not either old one.** Our 0.x AID `D2 76 00 00 85 01 02`
+sits under the NFC Forum's RID, which is not ours to allocate under; Foxy's
+names one wallet. A proprietary `F0` AID that names the protocol belongs to
+neither. And a new AID is what makes the change safe on the wire: a 0.x or 1.x
+card does not answer it (`6A82` from a card's runtime), which is the signal both
+apps read as "this card needs an update", rather than a card that answers and
+then misreads every command.
+
+**Why the labels change with it.** An owner's proof under `FoxyCard/set-limit`
+is a proof for Foxy's cards; one protocol has one set of labels. The labels and
+the AID change in one commit so that no build ever has one without the other.
+
+**Why 2.0.** Our cards said 0.x and Foxy's 1.x. A major of 2 separates the
+shared wire from both, for a reader that checks the version after the AID.
+
+**The copy that fails silently.** `Tag.java` keeps its own copy of the card
+applet's AID for `JCSystem.getAppletShareableInterfaceObject`. Left at the old
+AID, the tag finds no card, takes itself to be on, and the owner's switch does
+nothing. `TagLookupTest` holds the copy to `applet/build.xml`, and
+`AidVersionTest` checks the build, the source and the old AIDs.
+
+**Cost accepted.** The AID is one byte longer, which moves the CAP's size; the
+size check (`tools/refcheck.py`) says whether the J3R180 has taken that size
+before. The tag still carries Foxy's address (`https://getfoxy.io/card`); which
+page a 2.0 card's tag opens is a product decision left open.
 
 ---
 

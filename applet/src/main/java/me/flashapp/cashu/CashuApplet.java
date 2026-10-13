@@ -12,11 +12,14 @@ import javacardx.crypto.*;
  * spend counters. Provides secp256k1 signing for NUT-11 P2PK spending
  * conditions.
  *
- * This is the Foxy fork (docs/FOXY-CARD-SPEC.md). It is not compatible on
- * the wire with upstream cashu-javacard, and has an AID of its own so the two
- * cannot be mistaken for each other:
+ * This is the shared Cashu card protocol, version 2.0: the Foxy wallet
+ * project's fork at software 1.20 (docs/FOXY-CARD-SPEC.md), merged back into
+ * cashu-javacard with a neutral identity and the fixes in docs/DECISIONS.md
+ * D18 to D24. It is not compatible on the wire with cashu-javacard 0.x nor
+ * with Foxy's 1.x, and has an AID of its own so that none of the three can be
+ * mistaken for another:
  *
- * AID: F0 46 4F 58 59 43 41 52 44   ("FOXYCARD" after a proprietary F0)
+ * AID: F0 43 41 53 48 55 43 41 52 44   ("CASHUCARD" after a proprietary F0)
  *
  * Command set:
  *   0x01  GET_INFO         — version, format, slot stats, PIN state, tries, limit, owner, the day; with P1 = 1, the tap limit (owner only) and the no-PIN allowance as well; with P1 = 2, those and whether the NFC tag is on
@@ -111,7 +114,12 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 1.1 is the daily limit, the owner key and the clock (docs/FOXY-CARD-DAILY-LIMIT.md).
     // FORMAT is what a reader checks before it reads a slot: 3 for this design
     // (2 was the allowance draft and the first limit).
-    static final byte VERSION_MAJOR = (byte) 0x01;
+    // 2.0 is the shared protocol (ENG-673, DECISIONS D18): Foxy's 1.20 under the neutral AID F0 CASHUCARD and the neutral
+    // labels "CashuCard/..." (D19), with the rollover budget, REFRESH, the armed allowance and the clock anchored at
+    // SET_OWNER (D20), a field multiply with no secret-dependent branch (D21), the PIN state as the PIN's commit byte (D22),
+    // the tear review (D23) and a floor of work recomputed for its own time (D24).
+    // The minor counts from 0 again: 2.0 is the first of the shared wire.
+    static final byte VERSION_MAJOR = (byte) 0x02;
     // 1.9 takes its PIN sealed: enciphered to a key the card keeps for that and nothing else, under
     // sixteen bytes of its own that are good once (see `unseal`). Capability bit 7 says so.
     // 1.8 burns a payment's pieces outside the transaction that commits the payment (see `finishBurn`):
@@ -147,7 +155,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 1.17 waited three (the first limit's worth over is ten, as it was in 1.17). Nothing else is different: the wire is 1.17's.
     // 1.19 is the NFC tag. The card also answers as an NFC Forum Type 4 Tag carrying one web address, the same on every card (the
     // applet `Tag`, instantiated under the NFC Forum's own name), and its owner switches that off and on with SET_TAG (0x52: the
-    // owner's proof under "FoxyCard/tag", no PIN, any funds). The switch is one persistent byte: on for a new card, a card with no
+    // owner's proof under "CashuCard/tag", no PIN, any funds). The switch is one persistent byte: on for a new card, a card with no
     // owner and a card just reset. GET_INFO has a new form, P1 = 2, whose 43rd byte says it; the answers to P1 = 0 and P1 = 1
     // are the 30 and the 42 bytes they were, whatever the tag's state, because the wallets that went before take the answer to
     // P1 = 1 as the long form only when it is exactly 42 bytes. The wire is otherwise 1.18's.
@@ -158,7 +166,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // constructor, which the chip refuses to install with so much more in it (docs/FOXY-CARD-HARDWARE.md); the same bytes asked for
     // after the install are given. Every use of `dleq` is safe while it is null (before the first SET_CARD, or after the card has
     // refused the room). GET_INFO is 1.19's to the byte but for the version; a phone tells a 1.20 card by that.
-    static final byte VERSION_MINOR = (byte) 0x14;
+    static final byte VERSION_MINOR = (byte) 0x00;
     static final byte FORMAT        = (byte) 0x04;
 
     // -------------------------------------------------------------------------
@@ -317,10 +325,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     /** GET_NONCE with P1 = 1: the nonce (16), the PIN key (33, compressed), the card key's signature over it (64). */
     static final short PIN_KEY_ANSWER      = (short) 113;
     private static final byte[] SEAL_LABEL = {
-        'F', 'o', 'x', 'y', 'C', 'a', 'r', 'd', '/', 's', 'e', 'a', 'l'
+        'C', 'a', 's', 'h', 'u', 'C', 'a', 'r', 'd', '/', 's', 'e', 'a', 'l'
     };
     private static final byte[] PINKEY_LABEL = {
-        'F', 'o', 'x', 'y', 'C', 'a', 'r', 'd', '/', 'p', 'i', 'n', 'k', 'e', 'y'
+        'C', 'a', 's', 'h', 'u', 'C', 'a', 'r', 'd', '/', 'p', 'i', 'n', 'k', 'e', 'y'
     };
     // `seal` (RAM; the first S_LEN bytes of `scratch`): the point the two keys share (65), a block of the hash (32), and the two single bytes the hash takes (a counter, the instruction)
     private static final short S_POINT = (short) 0;
@@ -632,28 +640,28 @@ public class CashuApplet extends Applet implements TagSwitch {
         '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f' };
     /** AUTH's tag: the message signed is SHA-256(SHA-256(tag) || SHA-256(tag) || ...). */
     private static final byte[] AUTH_TAG = {
-        'F','o','x','y','C','a','r','d','/','a','u','t','h' };
+        'C','a','s','h','u','C','a','r','d','/','a','u','t','h' };
 
     // The owner's proofs: an ECDSA signature (P-256, SHA-256, DER) by the owner
     // key over label || nonce || value. One label for each command, so a proof
     // made for one is of no use to another, and the value being set is inside
     // what is signed, so a proof made for one value is of no use for another.
-    private static final byte[] LABEL_CHANGE_PIN = {   // FoxyCard/change-pin
-        'F','o','x','y','C','a','r','d','/','c','h','a','n','g','e','-','p','i','n' };
-    private static final byte[] LABEL_SET_LIMIT = {   // FoxyCard/set-limit
-        'F','o','x','y','C','a','r','d','/','s','e','t','-','l','i','m','i','t' };
-    private static final byte[] LABEL_SET_OWNER = {   // FoxyCard/set-owner
-        'F','o','x','y','C','a','r','d','/','s','e','t','-','o','w','n','e','r' };
-    private static final byte[] LABEL_SET_CARD = {   // FoxyCard/set-card
-        'F','o','x','y','C','a','r','d','/','s','e','t','-','c','a','r','d' };
-    private static final byte[] LABEL_LOAD = {   // FoxyCard/load
-        'F','o','x','y','C','a','r','d','/','l','o','a','d' };
-    private static final byte[] LABEL_LOCK = {   // FoxyCard/lock
-        'F','o','x','y','C','a','r','d','/','l','o','c','k' };
-    private static final byte[] LABEL_RESET = {   // FoxyCard/reset
-        'F','o','x','y','C','a','r','d','/','r','e','s','e','t' };
-    private static final byte[] LABEL_TAG = {   // FoxyCard/tag
-        'F','o','x','y','C','a','r','d','/','t','a','g' };
+    private static final byte[] LABEL_CHANGE_PIN = {   // CashuCard/change-pin
+        'C','a','s','h','u','C','a','r','d','/','c','h','a','n','g','e','-','p','i','n' };
+    private static final byte[] LABEL_SET_LIMIT = {   // CashuCard/set-limit
+        'C','a','s','h','u','C','a','r','d','/','s','e','t','-','l','i','m','i','t' };
+    private static final byte[] LABEL_SET_OWNER = {   // CashuCard/set-owner
+        'C','a','s','h','u','C','a','r','d','/','s','e','t','-','o','w','n','e','r' };
+    private static final byte[] LABEL_SET_CARD = {   // CashuCard/set-card
+        'C','a','s','h','u','C','a','r','d','/','s','e','t','-','c','a','r','d' };
+    private static final byte[] LABEL_LOAD = {   // CashuCard/load
+        'C','a','s','h','u','C','a','r','d','/','l','o','a','d' };
+    private static final byte[] LABEL_LOCK = {   // CashuCard/lock
+        'C','a','s','h','u','C','a','r','d','/','l','o','c','k' };
+    private static final byte[] LABEL_RESET = {   // CashuCard/reset
+        'C','a','s','h','u','C','a','r','d','/','r','e','s','e','t' };
+    private static final byte[] LABEL_TAG = {   // CashuCard/tag
+        'C','a','s','h','u','C','a','r','d','/','t','a','g' };
     /* The least work a block header must show to be taken, as a header carries
      * its difficulty (`bits`, little-endian): 0x17087BC0, four times the
      * target of the network's blocks when this version was made (0x17021EF0),
@@ -2386,7 +2394,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The reader sends 16 random bytes. The card answers 16 of its own and a
      * BIP-340 signature over
      *
-     *   SHA-256( SHA-256("FoxyCard/auth") || SHA-256("FoxyCard/auth")
+     *   SHA-256( SHA-256("CashuCard/auth") || SHA-256("CashuCard/auth")
      *            || reader's 16 || card's 16 || the card's key, compressed )
      *
      * No PIN: it spends nothing and says only what GET_PUBKEY already has. It
@@ -3141,7 +3149,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * fresh bytes (as GET_NONCE gives, and the same ones: one asking serves an
      * owner's proof and the sealing of the command that carries it), the PIN
      * key (33 bytes, compressed), and the card's own key's signature over
-     * SHA-256("FoxyCard/pinkey" || that key) (64 bytes, BIP-340), by which a
+     * SHA-256("CashuCard/pinkey" || that key) (64 bytes, BIP-340), by which a
      * terminal that knows the card's key knows the PIN key is the card's.
      *
      * No PIN and no owner: a card with no owner has a PIN to be set. The
@@ -3195,7 +3203,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The secret is the x of the point the sender's key and the card's PIN
      * key share. A block is SHA-256 of
      *
-     *   "FoxyCard/seal" || i (1) || the secret (32) || the sender's key (65)
+     *   "CashuCard/seal" || i (1) || the secret (32) || the sender's key (65)
      *     || the card's sixteen bytes (16) || the instruction (1) [ || more ]
      *
      * Block 0, with the sealed bytes as `more`, is the tag (its first
@@ -3293,7 +3301,7 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /**
      * ALLOW_LOAD: the owner's proof's length (1) and the proof, over
-     * "FoxyCard/load" and no value.
+     * "CashuCard/load" and no value.
      *
      * For the rest of this tap, and only this tap (the grant is in transient
      * memory), LOAD_PROOF and CLEAR_SPENT need no verified PIN. The owner's
@@ -3380,7 +3388,7 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /**
      * RESET_CARD (1.17): P1 = 0, P2 = the confirming byte (0xAD), and the owner's
-     * proof's length (1) and the proof, over "FoxyCard/reset" and no value.
+     * proof's length (1) and the proof, over "CashuCard/reset" and no value.
      *
      * The card as it was out of its packet, for another person to set up: no PIN
      * (three tries), no owner, no record, no limits, no allowance, no log, no
@@ -3466,7 +3474,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * SET_TAG (1.19): P1 = 0 the card answers as an NFC tag, P1 = 1 it does not; P2 = 0. The data is the owner's
      * proof's length (1), the proof (DER) and then one byte, the same as P1, which is what the proof is over:
-     * "FoxyCard/tag", the nonce the card gave and that byte.
+     * "CashuCard/tag", the nonce the card gave and that byte.
      *
      * The owner's alone, and no PIN: a terminal that has been handed the PIN must not be able to turn the tag off
      * (or on) for a holder who keeps the card in a phone's wallet case and would otherwise be offered the app

@@ -60,8 +60,8 @@ import java.util.Arrays;
  */
 class TagTest {
 
-    static final String OPENER_HEX = "F0464F5859434152444D";
-    static final String CARD_HEX = "F0464F58594341524401";
+    static final String OPENER_HEX = "F04341534855434152444D";
+    static final String CARD_HEX = "F043415348554341524401";
     static final String TAG_HEX = "D2760000850101";
     /** What the install command carries for the tag: the instance AID's length and the AID, then no privileges and no parameters. */
     static final byte[] TAG_INSTALL = hexToBytes("07" + TAG_HEX + "0000");
@@ -113,7 +113,7 @@ class TagTest {
         return r.getData();
     }
 
-    /** The owner's phone switching the tag: a nonce, a proof by the owner's key over "FoxyCard/tag" and the byte, the command. */
+    /** The owner's phone switching the tag: a nonce, a proof by the owner's key over "CashuCard/tag" and the byte, the command. */
     private int switchTag(boolean off) {
         byte[] value = { (byte) (off ? 1 : 0) };
         return sw(setTagCommand(ownerProof(L_TAG, OWNER, nonce(), value), off ? 1 : 0));
@@ -392,11 +392,11 @@ class TagTest {
     }
 
     @Test
-    @DisplayName("SET_TAG is 0x52 and its label is FoxyCard/tag: P1 = 00 on, 01 off, P2 = 00, the owner's proof, and then the byte again, which the proof is over")
+    @DisplayName("SET_TAG is 0x52 and its label is CashuCard/tag: P1 = 00 on, 01 off, P2 = 00, the owner's proof, and then the byte again, which the proof is over")
     void testTheCommand() {
         assertEquals(0x52, CashuApplet.INS_SET_TAG);
         assertEquals(0x52, INS_SET_TAG);
-        assertEquals("466f7879436172642f746167", toHex("FoxyCard/tag".getBytes(StandardCharsets.US_ASCII)), "the label's twelve bytes");
+        assertEquals("4361736875436172642f746167", toHex("CashuCard/tag".getBytes(StandardCharsets.US_ASCII)), "the label's thirteen bytes");
         owned();
         // the proof is made here from the description and nothing in the applet: label || nonce || the byte
         byte[] n = nonce();
@@ -503,7 +503,7 @@ class TagTest {
         assertEquals(0x6999, selectTag().getSW(), "the tag application refuses its name");
         ResponseAPDU card = selectCard();
         assertEquals(SW_OK, card.getSW(), "the card's own name is selected");
-        assertArrayEquals(new byte[] { 0x01, 0x14 }, card.getData(), "and answers its version, 1.20");
+        assertArrayEquals(new byte[] { 0x02, 0x00 }, card.getData(), "and answers its version, 2.0");
         assertEquals(1, infoTag().getData()[42], "and says the tag is off");
         assertEquals(0x6999, selectTag().getSW(), "the tag asks at each selection, and it is still off");
         selectCard();
@@ -617,8 +617,8 @@ class TagTest {
     void testAReaderOfSoftware118SeesNothingNew() {
         owned();
         byte[] limits = concat(CashuAppletTest.u32(1000), CashuAppletTest.u32(100), CashuAppletTest.u32(50));
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x34, 0, 0, ownerData(ownerProof("FoxyCard/set-limit", OWNER, nonce(), limits), limits))), "the owner sets all three limits");
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x45, 0, 0, ownerData(ownerProof("FoxyCard/load", OWNER, nonce(), new byte[0]), new byte[0]))), "and gives the grant, so that the limit on one payment is said");
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x34, 0, 0, ownerData(ownerProof("CashuCard/set-limit", OWNER, nonce(), limits), limits))), "the owner sets all three limits");
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x45, 0, 0, ownerData(ownerProof("CashuCard/load", OWNER, nonce(), new byte[0]), new byte[0]))), "and gives the grant, so that the limit on one payment is said");
         long[] on = readAsAWalletOf118Does(info().getData(), infoTap().getData());
         assertNotNull(on, "with the tag on, the long form is taken");
         assertArrayEquals(new long[] { 100, 50, 0 }, on, "the limit on one payment, the allowance, and nothing counted against it");

@@ -43,7 +43,7 @@ import java.util.Arrays;
  * check held and 1 if one did not, 2 if the card is not blank or cannot be reached. It sends nothing a phone does not send.
  */
 public final class ProofStoreCheck {
-    private static final String AID = "F0464F58594341524401";
+    private static final String AID = "F043415348554341524401";
     private static final byte[] KEYSET = hex("0059534ce0bfa19a");
     private static final byte[] NONE = { 0 };
 
@@ -131,12 +131,12 @@ public final class ProofStoreCheck {
             && Arrays.equals(data(send(0xB0, 0x1A, 1, 0xFF, null, 0), 0x9000), cat(new byte[] { 1 }, proof(7))));
 
         // empty the card, with the owner's grant so that a second payment in this tap is not slowed, and reset it by the owner's proof
-        say("the owner's grant for this tap", sw(send(0xB0, 0x45, 0, 0, ownerData(owner, "FoxyCard/load", new byte[0]), -1)) == 0x9000);
+        say("the owner's grant for this tap", sw(send(0xB0, 0x45, 0, 0, ownerData(owner, "CashuCard/load", new byte[0]), -1)) == 0x9000);
         byte[] again = pay(new int[] { 0, 1 });
         say("the two pieces left are paid", again != null && again.length == 64);
         say("CLEAR_SPENT frees them", Arrays.equals(data(send(0xB0, 0x31, 0, 0, null, 1), 0x9000), new byte[] { 2 }));
         began = System.nanoTime();
-        int reset = sw(send(0xB0, 0x51, 0, 0xAD, ownerData(owner, "FoxyCard/reset", new byte[0]), -1));
+        int reset = sw(send(0xB0, 0x51, 0, 0xAD, ownerData(owner, "CashuCard/reset", new byte[0]), -1));
         System.out.println("      RESET_CARD took " + (System.nanoTime() - began) / 1000000 + " ms (it zeros the 12,288 bytes of the store)");
         say("RESET_CARD by the owner's proof", reset == 0x9000);
         byte[] blank = data(send(0xB0, 0x01, 0, 0, null, 0), 0x9000);

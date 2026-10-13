@@ -43,7 +43,7 @@ import java.nio.charset.StandardCharsets;
  * of the commands carries the card's PIN.
  */
 public final class CardServer {
-    static final String APPLET = "F0464F58594341524401";
+    static final String APPLET = "F043415348554341524401";
 
     /** "plain" as the second argument: the one key every jCardSim card has, as before `ownKey`. */
     private static boolean plain = false;

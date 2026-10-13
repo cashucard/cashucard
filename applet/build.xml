@@ -174,7 +174,7 @@ compromised or truncated download.
                 sources="${src.dir}"
                 package="me.flashapp.cashu"
                 version="0.1"
-                aid="F0:46:4F:58:59:43:41:52:44"
+                aid="F0:43:41:53:48:55:43:41:52:44"
                 output="${cap.file}">
                 <!-- The opener FIRST: the chip takes the card's applet only after a small one has been
                      instantiated from the package (docs/FOXY-CARD-HARDWARE.md). gp installs one applet
@@ -182,11 +182,11 @@ compromised or truncated download.
                      The tag LAST: it is instantiated under the NFC Forum's own AID, D2760000850101,
                      given as the instance AID at install, and not under the AID listed here. -->
                 <applet class="me.flashapp.cashu.Opener"
-                        aid="F0:46:4F:58:59:43:41:52:44:4D"/>
+                        aid="F0:43:41:53:48:55:43:41:52:44:4D"/>
                 <applet class="me.flashapp.cashu.CashuApplet"
-                        aid="F0:46:4F:58:59:43:41:52:44:01"/>
+                        aid="F0:43:41:53:48:55:43:41:52:44:01"/>
                 <applet class="me.flashapp.cashu.Tag"
-                        aid="F0:46:4F:58:59:43:41:52:44:54"/>
+                        aid="F0:43:41:53:48:55:43:41:52:44:54"/>
             </cap>
         </javacard>
         <echo message="CAP file: ${cap.file} (three applets: install the opener first, and make the tag under the NFC Forum's name)"/>
@@ -213,15 +213,15 @@ compromised or truncated download.
                 sources="${src.dir}"
                 package="me.flashapp.cashu"
                 version="0.1"
-                aid="F0:46:4F:58:59:43:41:52:44"
+                aid="F0:43:41:53:48:55:43:41:52:44"
                 output="${target.dir}/cashu-javacard-0.1.0-debug.cap"
                 debug="true">
                 <applet class="me.flashapp.cashu.Opener"
-                        aid="F0:46:4F:58:59:43:41:52:44:4D"/>
+                        aid="F0:43:41:53:48:55:43:41:52:44:4D"/>
                 <applet class="me.flashapp.cashu.CashuApplet"
-                        aid="F0:46:4F:58:59:43:41:52:44:01"/>
+                        aid="F0:43:41:53:48:55:43:41:52:44:01"/>
                 <applet class="me.flashapp.cashu.Tag"
-                        aid="F0:46:4F:58:59:43:41:52:44:54"/>
+                        aid="F0:43:41:53:48:55:43:41:52:44:54"/>
             </cap>
         </javacard>
     </target>
@@ -251,7 +251,7 @@ compromised or truncated download.
     <target name="delete" description="Delete CashuApplet from connected card">
         <exec executable="gp" failonerror="true">
             <arg value="--delete"/>
-            <arg value="F0464F58594341524401"/>
+            <arg value="F043415348554341524401"/>
         </exec>
     </target>
 

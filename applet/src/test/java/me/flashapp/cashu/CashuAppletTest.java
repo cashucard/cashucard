@@ -40,8 +40,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CashuAppletTest {
 
-    static final String AID_HEX = "F0464F58594341524401";  // the applet's, for AIDUtil
-    static final String AID_STR = "F0464F585943415244";      // the package's: SELECT matches by prefix
+    static final String AID_HEX = "F043415348554341524401";  // the applet's, for AIDUtil
+    static final String AID_STR = "F0434153485543415244";      // the package's: SELECT matches by prefix
     static final String UPSTREAM_AID = "D2760000850102";
     static final byte   CLA     = (byte) 0xB0;
 
@@ -218,8 +218,8 @@ class CashuAppletTest {
     static final byte[] REFUND = hexToBytes("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798");
     static final byte[] NO_REFUND = new byte[33];
 
-    static final String L_PIN = "FoxyCard/change-pin", L_LIMIT = "FoxyCard/set-limit", L_LOCK = "FoxyCard/lock",
-        L_LOAD = "FoxyCard/load", L_OWNER = "FoxyCard/set-owner", L_CARD = "FoxyCard/set-card", L_RESET = "FoxyCard/reset", L_TAG = "FoxyCard/tag";
+    static final String L_PIN = "CashuCard/change-pin", L_LIMIT = "CashuCard/set-limit", L_LOCK = "CashuCard/lock",
+        L_LOAD = "CashuCard/load", L_OWNER = "CashuCard/set-owner", L_CARD = "CashuCard/set-card", L_RESET = "CashuCard/reset", L_TAG = "CashuCard/tag";
     static final String[] OWNER_LABELS = { L_PIN, L_LIMIT, L_LOCK, L_LOAD, L_OWNER, L_CARD, L_RESET, L_TAG };
 
     /** A runtime that hands the test its applet, so what a command cannot reach can be set or read directly. */
@@ -521,7 +521,7 @@ class CashuAppletTest {
     static byte[] dleqHeld(byte[] proof) {
         return concat(new byte[] { 1 }, proof);
     }
-    /** The owner's phone switching the tag: a nonce, a proof over "FoxyCard/tag" and the byte, the command. */
+    /** The owner's phone switching the tag: a nonce, a proof over "CashuCard/tag" and the byte, the command. */
     private int setTag(boolean off) {
         byte[] value = { (byte) (off ? 1 : 0) };
         return sw(setTagCommand(ownerProof(L_TAG, OWNER, nonceBytes(), value), off ? 1 : 0));
@@ -783,7 +783,7 @@ class CashuAppletTest {
         // what a phone sends: iOS chooses by the name in the app's Info.plist, and Foxy by the same ten bytes
         ResponseAPDU whole = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_HEX), 256));
         assertEquals(SW_OK, whole.getSW());
-        assertArrayEquals(new byte[] { 0x01, 0x14 }, whole.getData(), "the same answer either way: version 1.20");
+        assertArrayEquals(new byte[] { 0x02, 0x00 }, whole.getData(), "the same answer either way: version 2.0");
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_GET_INFO, 0, 0, 256)), "and its instructions follow");
     }
 
@@ -792,17 +792,17 @@ class CashuAppletTest {
     void testSelect() {
         ResponseAPDU resp = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR)));
         assertEquals(SW_OK, resp.getSW());
-        assertArrayEquals(new byte[] { 0x01, 0x14 }, resp.getData(), "version 1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
+        assertArrayEquals(new byte[] { 0x02, 0x00 }, resp.getData(), "version 2.0: the shared protocol (D18), Foxy's 1.20 under the neutral AID with the fixes of D19 to D24 (1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
         assertNotEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(UPSTREAM_AID))),
             "an upstream reader must not find this applet under upstream's AID: the wire is not the same");
     }
 
     @Test
-    @DisplayName("GET_INFO on a new card: 30 bytes: version 1.20, 128 empty slots, no PIN, three tries, format 4, capabilities FF, no record, no limit, no owner, no block header seen, no change due")
+    @DisplayName("GET_INFO on a new card: 30 bytes: version 2.0, 128 empty slots, no PIN, three tries, format 4, capabilities FF, no record, no limit, no owner, no block header seen, no change due")
     void testInfoFresh() {
         byte[] d = info();
         assertEquals(30, d.length);
-        assertEquals(1, d[0]); assertEquals(20, d[1]);
+        assertEquals(2, d[0]); assertEquals(0, d[1]);
         assertEquals(MAX_PROOFS, d[2] & 0xFF);
         assertEquals(0, d[3]); assertEquals(0, d[4]);
         assertEquals(MAX_PROOFS, d[5] & 0xFF);
@@ -2716,7 +2716,7 @@ class CashuAppletTest {
                 // and the answer says what the marked places make it say
                 byte[] d = torn.getData();
                 if (name.equals("SELECT")) {
-                    assertArrayEquals(new byte[] { 0x01, 0x14 }, d, what);
+                    assertArrayEquals(new byte[] { 0x02, 0x00 }, d, what);
                 } else if (name.equals("GET_INFO")) {
                     assertEquals(others, d[3] & 0xFF, what + ": unspent");
                     assertEquals(n + others, d[4] & 0xFF, what + ": spent");
@@ -3828,7 +3828,8 @@ class CashuAppletTest {
         assertEquals(124, CashuApplet.CARD_HEADER_OFFSET);
         assertEquals(CashuApplet.CARD_BITS_OFFSET + 4 + 32 + 29, CashuApplet.CARD_NOW_OFFSET, "bits, hash and 29 zeros take the 65 bytes the time key had, and the clock is where it was");
         assertEquals(185, CashuApplet.CARD_NOW_OFFSET);
-        assertEquals(0x14, CashuApplet.VERSION_MINOR);
+        assertEquals(0x02, CashuApplet.VERSION_MAJOR);
+        assertEquals(0x00, CashuApplet.VERSION_MINOR);
         assertEquals(212, CashuApplet.CARD_RECORD_LEN, "and the record is the length it was");
         assertEquals(212, field("cardRecord").length);
     }
@@ -5981,7 +5982,7 @@ class CashuAppletTest {
     @DisplayName("SET_TIME is gone: 0x35 answers 6D00 whatever it is sent - a time under a signature of the old form, nothing, any P1 and P2 - and moves nothing")
     void testSetTimeIsGone() throws Exception {
         ready();
-        byte[] sig = FORMER_TIME_KEY.sign(concat("FoxyCard/time".getBytes(StandardCharsets.US_ASCII), u32(T0 + 10)));
+        byte[] sig = FORMER_TIME_KEY.sign(concat("CashuCard/time".getBytes(StandardCharsets.US_ASCII), u32(T0 + 10)));
         byte[] old = concat(u32(T0 + 10), new byte[] { (byte) sig.length }, sig);
         assertEquals(SW_INS_NOT_SUPPORTED, sw(new CommandAPDU(CLA, INS_WAS_SET_TIME, 0, 0, old, 4)), "a signed time of the old form");
         assertEquals(SW_INS_NOT_SUPPORTED, sw(new CommandAPDU(CLA, INS_WAS_SET_TIME, 0, 0, 256)), "nothing");
@@ -5990,7 +5991,7 @@ class CashuAppletTest {
         assertEquals(T0, now(), "and the clock is where it was");
         // and the card does not name 6A92 any more, nor the time key, nor anything that judged a clock told twice
         String code = appletCode();
-        for (String gone : new String[] { "processSetTime", "INS_SET_TIME", "LABEL_TIME", "CLOCK_JUMP", "timeTold", "SW_NO_TIME", "SW_NOT_THE_TIME", "timeKey", "CARD_TIMEKEY_OFFSET", "FoxyCard/time" }) {
+        for (String gone : new String[] { "processSetTime", "INS_SET_TIME", "LABEL_TIME", "CLOCK_JUMP", "timeTold", "SW_NO_TIME", "SW_NOT_THE_TIME", "timeKey", "CARD_TIMEKEY_OFFSET", "CashuCard/time" }) {
             assertFalse(code.contains(gone), gone + " is gone from the applet's code");
         }
         assertFalse(code.toLowerCase().contains("6a92"), "and nothing names 6A92");
@@ -6967,8 +6968,8 @@ class CashuAppletTest {
     void testTheCardRemembersNothingOfThePaymentLimit() throws Exception {
         readyWithLimit(0);
         byte[] more = infoTap();
-        assertEquals(1, more[0]);
-        assertEquals(20, more[1], "version 1.20");
+        assertEquals(2, more[0]);
+        assertEquals(0, more[1], "version 2.0");
         assertEquals((byte) 0xFF, more[6], "capabilities FF: the limit on one payment is waited for, not refused, the 1.6 forms are there, so are 128 places with the short listing, a payment burned outside its transaction, and the PIN taken sealed");
         assertEquals(SW_OK, setLimits(1000, 100));
         assertEquals(100, paymentLimit());
@@ -7987,7 +7988,7 @@ class CashuAppletTest {
     // =========================================================================
 
     private byte[] authMessage(byte[] reader, byte[] card, byte[] key) throws Exception {
-        byte[] tag = sha256("FoxyCard/auth".getBytes(StandardCharsets.US_ASCII));
+        byte[] tag = sha256("CashuCard/auth".getBytes(StandardCharsets.US_ASCII));
         java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
         d.update(tag); d.update(tag); d.update(reader); d.update(card); d.update(key);
         return d.digest();
@@ -8081,7 +8082,7 @@ class CashuAppletTest {
         byte[] reader = hexToBytes("a0a1a2a3a4a5a6a7a8a9aaabacadaeaf");
         byte[] auth = transmit(new CommandAPDU(CLA, INS_AUTH, 0, 0, reader, 80)).getData();
         byte[] cardNonce = Arrays.copyOfRange(auth, 0, 16);
-        out.append(" ],\n \"auth\": {\"tag\": \"FoxyCard/auth\", \"readerNonce\": \"").append(toHex(reader))
+        out.append(" ],\n \"auth\": {\"tag\": \"CashuCard/auth\", \"readerNonce\": \"").append(toHex(reader))
            .append("\", \"cardNonce\": \"").append(toHex(cardNonce))
            .append("\", \"message\": \"").append(toHex(authMessage(reader, cardNonce, key)))
            .append("\", \"signature\": \"").append(toHex(Arrays.copyOfRange(auth, 16, 80))).append("\"}\n}\n");
@@ -8140,7 +8141,7 @@ class CashuAppletTest {
     // classpath. A sealed command's data is E (65, 04 || X || Y) || the clear data under a keystream || a tag (16), where
     //
     //   shared    = the x of (the sender's scalar) times (the card's PIN key)
-    //   block(i, more) = SHA-256("FoxyCard/seal" || i (1) || shared (32) || E (65) || nonce (16) || INS (1) || more)
+    //   block(i, more) = SHA-256("CashuCard/seal" || i (1) || shared (32) || E (65) || nonce (16) || INS (1) || more)
     //   tag       = the first 16 bytes of block(0, ct)
     //   keystream = block(1) || block(2) || ...      clear = ct XOR keystream
     //
@@ -8190,7 +8191,7 @@ class CashuAppletTest {
     static byte[] sealBlock(int i, byte[] shared, byte[] e, byte[] nonce, int ins, byte[] more) {
         try {
             java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
-            d.update("FoxyCard/seal".getBytes(StandardCharsets.US_ASCII));
+            d.update("CashuCard/seal".getBytes(StandardCharsets.US_ASCII));
             d.update((byte) i);
             d.update(shared);
             d.update(e);
@@ -8318,7 +8319,7 @@ class CashuAppletTest {
     private static final int VERIFY_INS = INS_VERIFY_PIN & 0xFF, SET_INS = INS_SET_PIN & 0xFF, CHANGE_INS = INS_CHANGE_PIN & 0xFF;
 
     @Test
-    @DisplayName("GET_NONCE with P1 = 1 answers 113 bytes: the nonce (16), the PIN key as a compressed secp256k1 point (33) and the card key's BIP-340 signature (64) over SHA-256(\"FoxyCard/pinkey\" || those 33 bytes); the key is a point on the curve, and is not the card's signing key")
+    @DisplayName("GET_NONCE with P1 = 1 answers 113 bytes: the nonce (16), the PIN key as a compressed secp256k1 point (33) and the card key's BIP-340 signature (64) over SHA-256(\"CashuCard/pinkey\" || those 33 bytes); the key is a point on the curve, and is not the card's signing key")
     void testGetNonceWithP1Of1GivesTheNonceThePinKeyAndTheCardsSignature() throws Exception {
         simulator = freshCard();
         ownPinKey();
@@ -8330,10 +8331,10 @@ class CashuAppletTest {
         assertNotNull(decompressed(k.key), "and on the curve");
         assertArrayEquals(compressed(ecMulTest(PIN_D, SECP_GX, SECP_GY)), k.key, "it is the key the applet holds");
         assertFalse(Arrays.equals(k.key, cardKey()), "and not the card's signing key");
-        byte[] digest = sha256(concat("FoxyCard/pinkey".getBytes(StandardCharsets.US_ASCII), k.key));
+        byte[] digest = sha256(concat("CashuCard/pinkey".getBytes(StandardCharsets.US_ASCII), k.key));
         assertTrue(schnorrVerify(extractPubkeyX(cardKey()), digest, k.sig), "the card key's signature over SHA-256(label || key)");
-        assertFalse(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("FoxyCard/pinkey".getBytes(StandardCharsets.US_ASCII), anotherPinKey())), k.sig), "and over no other key");
-        assertFalse(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("FoxyCard/seal".getBytes(StandardCharsets.US_ASCII), k.key)), k.sig), "nor under another label");
+        assertFalse(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("CashuCard/pinkey".getBytes(StandardCharsets.US_ASCII), anotherPinKey())), k.sig), "and over no other key");
+        assertFalse(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("CashuCard/seal".getBytes(StandardCharsets.US_ASCII), k.key)), k.sig), "nor under another label");
         assertFalse(schnorrVerify(extractPubkeyX(k.key), digest, k.sig), "and it is not the PIN key's signature");
         assertArrayEquals(k.nonce, field("ownerNonce"), "the nonce is the one the owner's proof is over: the same buffer");
         assertTrue(nonceLive(), "and it is live");
@@ -11040,7 +11041,7 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("RESET_CARD takes the owner's proof over \"FoxyCard/reset\" and no value, and nothing else: a proof over a value, or data after the proof, is 6700; no data at all is 6A91; nothing changes")
+    @DisplayName("RESET_CARD takes the owner's proof over \"CashuCard/reset\" and no value, and nothing else: a proof over a value, or data after the proof, is 6700; no data at all is 6A91; nothing changes")
     void testResetCardTakesTheProofAndNothingElse() throws Exception {
         ready();
         Object before = persistent();
@@ -11135,7 +11136,7 @@ class CashuAppletTest {
         byte[] d = info();
         assertEquals(30, d.length);
         byte[] fresh = new byte[30];
-        fresh[0] = 1; fresh[1] = 20; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
+        fresh[0] = 2; fresh[1] = 0; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
         System.arraycopy(u32(nowBefore), 0, fresh, 17, 4);
         assertArrayEquals(fresh, d, "GET_INFO: a new card, with the clock it had");
         assertEquals(nowBefore, now());
@@ -11178,7 +11179,7 @@ class CashuAppletTest {
         assertArrayEquals(compressed(w), keyBefore, "the planted key is the card's");
         PinKey oldPin = askPinKey();
         assertEquals(1, field("pinKeySig")[0]);
-        assertTrue(schnorrVerify(extractPubkeyX(keyBefore), sha256(concat("FoxyCard/pinkey".getBytes(StandardCharsets.US_ASCII), oldPin.key)), oldPin.sig));
+        assertTrue(schnorrVerify(extractPubkeyX(keyBefore), sha256(concat("CashuCard/pinkey".getBytes(StandardCharsets.US_ASCII), oldPin.key)), oldPin.sig));
         assertEquals(SW_OK, resetCard());
         assertFalse(Arrays.equals(keyBefore, cardKey()), "GET_PUBKEY is another key");
         assertEquals(33, cardKey().length);
@@ -11186,9 +11187,9 @@ class CashuAppletTest {
         PinKey newPin = askPinKey();
         assertFalse(Arrays.equals(oldPin.key, newPin.key), "the PIN key is another key");
         assertEquals(1, field("pinKeySig")[0], "and its signature is made again at the asking");
-        assertTrue(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("FoxyCard/pinkey".getBytes(StandardCharsets.US_ASCII), newPin.key)), newPin.sig), "the new card key vouches for the new PIN key");
-        assertFalse(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("FoxyCard/pinkey".getBytes(StandardCharsets.US_ASCII), oldPin.key)), oldPin.sig), "and not for the old");
-        assertFalse(schnorrVerify(extractPubkeyX(keyBefore), sha256(concat("FoxyCard/pinkey".getBytes(StandardCharsets.US_ASCII), newPin.key)), newPin.sig), "nor does the old key");
+        assertTrue(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("CashuCard/pinkey".getBytes(StandardCharsets.US_ASCII), newPin.key)), newPin.sig), "the new card key vouches for the new PIN key");
+        assertFalse(schnorrVerify(extractPubkeyX(cardKey()), sha256(concat("CashuCard/pinkey".getBytes(StandardCharsets.US_ASCII), oldPin.key)), oldPin.sig), "and not for the old");
+        assertFalse(schnorrVerify(extractPubkeyX(keyBefore), sha256(concat("CashuCard/pinkey".getBytes(StandardCharsets.US_ASCII), newPin.key)), newPin.sig), "nor does the old key");
         // it proves it is the card: AUTH under the new key
         byte[] reader = new byte[16];
         Arrays.fill(reader, (byte) 0x5A);
