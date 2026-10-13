@@ -194,7 +194,7 @@ class ClockWalkTest {
     void theDefaultBudgetIsSeven() {
         setUp(0, 100, 0, 2, 12, 100);
         assertEquals(2, budget());
-        // a twelve-byte SET_LIMIT (a 1.x wallet's) sets the budget back to its default: 0 on the card, which it reads as 7
+        // a twelve-byte SET_LIMIT (a wallet on the 2.0 AID that does not send the byte) sets the budget back to its default: 0 on the card, which it reads as 7
         byte[] twelve = CashuAppletTest.concat(CashuAppletTest.u32(100), CashuAppletTest.u32(0), CashuAppletTest.u32(0));
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_LIMIT_OWNER, 0, 0,
             CashuAppletTest.ownerData(CashuAppletTest.ownerProof(CashuAppletTest.L_LIMIT, CashuAppletTest.OWNER, nonce(), twelve), twelve))));
@@ -224,6 +224,23 @@ class ClockWalkTest {
         }
         assertEquals(SW_OK, setLimits(100, 0, 12));
         assertEquals(12, budget(), "thirteen bytes: the budget given");
+    }
+
+    @Test
+    @DisplayName("absent means 7 tightens too: an owner's budget of 30 cut by a twelve-byte SET_LIMIT rolls seven times along the walk, where 30 rolled all ten")
+    void aFormWithoutTheByteTightensABudgetOfThirtyToSeven() {
+        setUp(0, 100, 0, 30, 12, 100);
+        assertEquals(30, budget(), "an owner who gave a holder who is offline for weeks a month of rolls");
+        // a wallet on the 2.0 AID that does not send the budget byte sets the limits again, with the same twelve bytes
+        byte[] twelve = CashuAppletTest.concat(CashuAppletTest.u32(100), CashuAppletTest.u32(0), CashuAppletTest.u32(0));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_LIMIT_OWNER, 0, 0,
+            CashuAppletTest.ownerData(CashuAppletTest.ownerProof(CashuAppletTest.L_LIMIT, CashuAppletTest.OWNER, nonce(), twelve), twelve))));
+        assertEquals(0, budget(), "the owner's 30 is gone: 0 on the card, read as 7");
+        int[] next = { 0 };
+        int got = 0;
+        for (int i = 0; i <= 10; i++) got += pinScriptAt(H.get(i), next);
+        assertEquals(8, got, "the found day and seven rolls; the owner's 30 would have rolled all ten and paid eleven");
+        assertEquals(7, rolls(), "the day's limit stops renewing after a week of headers, not a month");
     }
 
     @Test

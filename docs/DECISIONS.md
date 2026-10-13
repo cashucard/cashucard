@@ -784,7 +784,7 @@ transactions cover them, and `GET_CARD` shows them to any reader as its bytes
 moves the clock); a roll per owner's proof of any kind (a proof for the load
 grant is given at a till's top-up, which is not the owner looking at the card);
 leaving the budget as it is when the byte is absent. That was this PR's first
-version, so that a 1.x wallet's twelve-byte `SET_LIMIT` would not undo the
+version, so that a wallet that does not send the byte would not undo the
 owner's choice; the architect's decision 2 had already settled "absent means
 7", and both apps code to it. Under it every `SET_LIMIT` says what the budget
 is afterwards, and the cost is the one below.
@@ -793,11 +793,22 @@ is afterwards, and the cost is the one below.
 pays every day, finds the day's limit stops renewing; the app tells them to
 open it online and tap the card. `REFRESH` and the anchor need the phone to
 have a recent header (both apps: mempool.space, then blockstream.info; neither
-reachable, no header and the card keeps its clock). A 1.x wallet sends the
-twelve-byte `SET_LIMIT`, so each limit it sets puts the budget back to 7: an
-owner who chose 1 to 6 days gets a looser bound until a 2.0 phone sets it
-again (`ClockWalkTest.aFormWithoutTheByteSetsTheBudgetBackToSeven`). Foxy
-reviews this in the PR.
+reachable, no header and the card keeps its clock). A 1.x wallet never
+sends a `SET_LIMIT` to a 2.0 card, because it does not find the 2.0 AID
+([D19](#d19)). The wallet this rule reaches is one moved to the CashuCard AID
+and labels that does not send the budget byte yet, which is the state Foxy's
+wallet passes through on its way to 2.0. Each 4-, 8- or 12-byte `SET_LIMIT`
+it sends puts the budget back to 7, in both directions:
+
+- an owner's budget of 1 to 6 is loosened to 7, so a terminal with the PIN
+  gets more days' limits out of a walk until a phone that sends the byte sets
+  it again (`ClockWalkTest.aFormWithoutTheByteSetsTheBudgetBackToSeven`);
+- an owner's budget of 8 to 30 is tightened to 7, so a holder the owner gave
+  a longer budget because they are offline for weeks finds the day's limit
+  stops renewing after a week, not a month, and has to come online and tap
+  the card sooner (`ClockWalkTest.aFormWithoutTheByteTightensABudgetOfThirtyToSeven`).
+
+The second takes spending away from a holder. Foxy reviews both in the PR.
 
 **And a new way to strand funds.** In 1.20 a holder who had lost the owner
 key could still spend the card down, one daily limit a day; our reply to
