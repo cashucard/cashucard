@@ -1,380 +1,613 @@
-# APDU Command Reference
+# APDU Command Reference — Cashu card protocol 2.0
 
-JavaCard Cashu Applet — AID: `D2 76 00 00 85 01 02`
+The wire of the shared Cashu card protocol, version 2.0: the applet in this
+repository (`applet/src/main/java/me/flashapp/cashu/CashuApplet.java`), which is
+the Foxy wallet project's software 1.20 with a neutral identity and the fixes in
+[`docs/DECISIONS.md`](../docs/DECISIONS.md) D18 to D24. Version 2.0 is not
+compatible with the 0.x applet that this file used to describe, nor with Foxy's
+1.x: it has an AID of its own, so that neither can be mistaken for it.
 
-All commands use `CLA = B0` unless noted. All multi-byte integers are big-endian.
+Class `B0` for every applet command. Numbers are big-endian unless a row says
+otherwise (a block header's own fields are little-endian, as the network carries
+them). `cardctl.py` (`tools/cardctl`) drives the commands it names below, and
+`test_spec_consistency.py` holds this file, `cardctl.py` and the applet to each
+other on every push. The design and the reasons for it are in
+[`docs/FOXY-CARD-SPEC.md`](../docs/FOXY-CARD-SPEC.md) section 5 and
+[`docs/FOXY-CARD-DAILY-LIMIT.md`](../docs/FOXY-CARD-DAILY-LIMIT.md); where they
+and this file differ, this file is the 2.0 wire.
 
 ---
 
 ## SELECT APPLICATION
 
-Issued by reader before any other command. Standard ISO 7816-4 SELECT.
-
 | Field | Value |
-|-------|-------|
-| CLA | 00 |
-| INS | A4 |
-| P1 | 04 |
-| P2 | 00 |
-| Lc | 07 |
-| Data | `D2 76 00 00 85 01 02` |
-| Response | 2-byte applet version (`MM mm`) + `90 00` |
+|---|---|
+| CLA | `00` |
+| INS | `A4` |
+| P1 | `04` (select by name) |
+| P2 | `00` |
+| Lc | `0A` |
+| Data | `F0 43 41 53 48 55 43 41 52 44` (the package AID, "CASHUCARD" after the proprietary RID byte `F0`) |
+| Le | `00` |
 
-The Data field above is the 7-byte **package** AID. ISO 7816-4 SELECT does
-prefix matching, so it also selects the applet instance. Readers that decline
-partial matches must retry with the full 8-byte **applet** AID
-`D2 76 00 00 85 01 02 01` (Lc `08`) — that is exactly what `cardctl` does: the
-7-byte form first, the 8-byte form as a fallback on any error. A reader that
-sends neither selects nothing, and every subsequent command fails in a way that
-looks like an uninstalled applet.
+**Response:** 2 bytes, the applet version: `02 00`.
+
+The applet's instance AID is the package AID and `01`:
+`F0 43 41 53 48 55 43 41 52 44 01`. A reader that declines a partial name selects
+it whole. The package also holds the opener (`F0 43 41 53 48 55 43 41 52 44 4D`,
+installed first: [`HARDWARE_DEPLOYMENT.md`](../docs/HARDWARE_DEPLOYMENT.md)) and
+the NFC tag (class `F0 43 41 53 48 55 43 41 52 44 54`, instantiated under the NFC
+Forum's own `D2 76 00 00 85 01 01`).
+
+A card that answers `6A82` (the card's runtime: no such application) to this
+name is not a 2.0 card. The 0.x applet answered `D2 76 00 00 85 01 02` and Foxy's
+1.x `F0 46 4F 58 59 43 41 52 44`; both are "this card needs an update", and an
+app spends nothing from such a card.
 
 ---
 
-## Category 0x1x — Read (no authentication required)
+## Commands, by INS
+
+| INS | Command | Needs | Section |
+|---|---|---|---|
+| `01` | GET_INFO | nothing | [GET_INFO](#get_info-0x01) |
+| `10` | GET_PUBKEY | nothing | [GET_PUBKEY](#get_pubkey-0x10) |
+| `11` | GET_BALANCE | nothing | [GET_BALANCE](#get_balance-0x11) |
+| `12` | GET_PROOF_COUNT | nothing | [GET_PROOF_COUNT](#get_proof_count-0x12) |
+| `13` | GET_PROOF | nothing | [GET_PROOF](#get_proof-0x13) |
+| `14` | GET_SLOT_STATUS | nothing | [GET_SLOT_STATUS](#get_slot_status-0x14) |
+| `15` | AUTH | nothing | [AUTH](#auth-0x15) |
+| `16` | GET_CARD | nothing | [GET_CARD](#get_card-0x16) |
+| `17` | GET_PIECES | nothing | [GET_PIECES](#get_pieces-0x17) |
+| `18` | GET_LOG | the PIN, or the owner's grant | [GET_LOG](#get_log-0x18) |
+| `19` | GET_CHANGE | nothing | [GET_CHANGE](#get_change-0x19) |
+| `1A` | GET_DLEQ | nothing | [GET_DLEQ](#get_dleq-0x1a) |
+| `22` | SPEND_ALL_BEGIN | nothing | [SPEND_ALL_BEGIN](#spend_all_begin-0x22) |
+| `23` | SPEND_ALL_OUTPUTS | a payment begun | [SPEND_ALL_OUTPUTS](#spend_all_outputs-0x23) |
+| `24` | SPEND_ALL_SIGN | the PIN, or the no-PIN allowance, or no PIN set | [SPEND_ALL_SIGN](#spend_all_sign-0x24) |
+| `25` | SPEND_ALL_AGAIN | the PIN, unless the last signature needed none | [SPEND_ALL_AGAIN](#spend_all_again-0x25) |
+| `26` | SPEND_ALL_CHANGE | a payment begun | [SPEND_ALL_CHANGE](#spend_all_change-0x26) |
+| `30` | LOAD_PROOF | an owner and a record; the PIN, or a grant | [LOAD_PROOF](#load_proof-0x30) |
+| `31` | CLEAR_SPENT | the PIN, or a grant | [CLEAR_SPENT](#clear_spent-0x31) |
+| `32` | SET_CARD | open card: the PIN; owned: the owner's proof | [SET_CARD](#set_card-0x32) |
+| `33` | SET_LIMIT_PIN | open card, nothing unspent, the PIN | [SET_LIMIT_PIN](#set_limit_pin-0x33) |
+| `34` | SET_LIMIT | the owner's proof | [SET_LIMIT](#set_limit-0x34) |
+| `36` | SET_HEADER | nothing | [SET_HEADER](#set_header-0x36) |
+| `37` | TELL_TIME | nothing | [TELL_TIME](#tell_time-0x37) |
+| `40` | VERIFY_PIN | nothing | [VERIFY_PIN](#verify_pin-0x40) |
+| `41` | SET_PIN | open card; or ADD PIN under the grant | [SET_PIN](#set_pin-0x41) |
+| `42` | CHANGE_PIN | the owner's proof | [CHANGE_PIN](#change_pin-0x42) |
+| `43` | SET_OWNER | open card; or the old owner's proof | [SET_OWNER](#set_owner-0x43) |
+| `44` | GET_NONCE | an owner (P1 = 0) | [GET_NONCE](#get_nonce-0x44) |
+| `45` | ALLOW_LOAD | the owner's proof | [ALLOW_LOAD](#allow_load-0x45) |
+| `50` | LOCK_CARD | the PIN and the owner's proof | [LOCK_CARD](#lock_card-0x50) |
+| `51` | RESET_CARD | the owner's proof | [RESET_CARD](#reset_card-0x51) |
+| `52` | SET_TAG | the owner's proof | [SET_TAG](#set_tag-0x52) |
+| `53` | REFRESH | the owner's proof | [REFRESH](#refresh-0x53) |
+
+Not assigned, and answered `6D00`: `20` (0.x's `SPEND_PROOF`, gone with format 4),
+`21` (0.x's `SIGN_ARBITRARY`, removed: it signed anything and burned nothing),
+`35` (Foxy's `SET_TIME`, gone in 1.15). The 0.x `CLEAR_PIN`, `SET_PUK` and
+`UNBLOCK_PIN` were `43`, `44` and `45`, which are `SET_OWNER`, `GET_NONCE` and
+`ALLOW_LOAD` here; a 0.x reader's bytes there change nothing a PIN could gain
+(D18).
+
+---
+
+## The owner's proof
+
+A card with an owner holds a NIST P-256 public key (`SET_OWNER`). The owner's
+commands carry an ECDSA signature (P-256, SHA-256, DER) by the owner's private key
+over
+
+    label (ASCII) ‖ nonce (16) ‖ value
+
+where the nonce is the last `GET_NONCE` answer in this tap (one try per nonce,
+right or wrong) and the value is exactly the bytes after the proof. The data of an
+owner's command is `proof length (1) ‖ proof (DER, at most 72) ‖ value`.
+
+| Command | Label | Value |
+|---|---|---|
+| `CHANGE_PIN` | `CashuCard/change-pin` | the new PIN's bytes |
+| `SET_LIMIT` | `CashuCard/set-limit` | 4, 8, 12 or 13 bytes: see [SET_LIMIT](#set_limit-0x34) |
+| `SET_OWNER` (on an owned card) | `CashuCard/set-owner` | the new owner key (65), and the anchor header (80) if sent |
+| `SET_CARD` (on an owned card) | `CashuCard/set-card` | the record as sent |
+| `ALLOW_LOAD` | `CashuCard/load` | nothing |
+| `LOCK_CARD` | `CashuCard/lock` | nothing |
+| `RESET_CARD` | `CashuCard/reset` | nothing |
+| `SET_TAG` | `CashuCard/tag` | one byte: `00` on, `01` off |
+| `REFRESH` | `CashuCard/refresh` | the block header (80) |
+
+A missing, wrong or used proof is `6A91`; it costs no PIN try, changes nothing
+and does not end the PIN session. A card with no owner answers `6A90`. A good
+proof also arms the no-PIN allowance ([The clock and the limits](#the-clock-and-the-limits)).
+
+Two more tags are hashed by the card: `CashuCard/auth` ([AUTH](#auth-0x15)) and
+`CashuCard/seal`, `CashuCard/pinkey` (the sealed PIN, [VERIFY_PIN](#verify_pin-0x40)).
+A phone derives a card's owner key as
+`HMAC-SHA256(seed, "CashuCard/owner" ‖ 0x00 ‖ card key (33))` mod n
+(`FOXY-CARD-SPEC.md` 5.6, with the 2.0 label); the card never sees it.
+
+---
+
+## Category 0x0x / 0x1x — Read (no authentication required)
 
 ### GET_INFO (0x01)
 
-Returns applet version, capabilities, and slot statistics. Always available without authentication.
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 01 |
-| P1 | 00 |
-| P2 | 00 |
-| Le | 00 |
+|---|---|
+| CLA | `B0` |
+| INS | `01` |
+| P1 | `00`, `01` or `02` |
+| P2 | `00` |
+| Lc | — |
+| Le | `00` |
 
-**Response (9 bytes):**
+**Response:** 30 bytes with P1 = `00` (any P1 but 1 and 2), 42 with P1 = `01`, 43 with P1 = `02`.
 
-| Offset | Length | Description |
-|--------|--------|-------------|
-| 0 | 1 | Major version |
-| 1 | 1 | Minor version |
-| 2 | 1 | Max proof slots |
-| 3 | 1 | Unspent proof count |
-| 4 | 1 | Spent proof count |
-| 5 | 1 | Empty slot count |
-| 6 | 1 | Capabilities flags (see below) |
-| 7 | 1 | PIN state (0=unset, 1=set, 2=locked — the PIN is blocked, tries exhausted; 1 returns to 0 only through `CLEAR_PIN`, and 2 returns to 1 only through `UNBLOCK_PIN`) |
-| 8 | 1 | PUK state (0=unset, 1=set, 2=exhausted — ten wrong PUKs; terminal). Applet 0.6 and later; a 0.5 card answers 8 bytes |
+| Byte | Field | Meaning |
+|---|---|---|
+| 0 | version major | `02` |
+| 1 | version minor | `00` |
+| 2 | max slots | 128 (`0x80`) |
+| 3 | unspent | slots holding an unspent piece |
+| 4 | spent | slots spent and not yet freed |
+| 5 | empty | free slots |
+| 6 | capabilities | `FF` |
+| 7 | PIN state | 0 none, 1 set, 2 blocked |
+| 8 | format | `04` (SIG_ALL pieces) |
+| 9 | tries left | 0 to 3 |
+| 10 | locked | 1 after `LOCK_CARD` |
+| 11 | record set | 1 after `SET_CARD` |
+| 12–15 | daily limit | sats; 0 is none |
+| 16 | has owner | 1 after `SET_OWNER` |
+| 17–20 | now | the card's clock: the newest block header's time, seconds; 0 before any |
+| 21–24 | window start | when the day's window began |
+| 25–28 | spent today | sats signed for in the window |
+| 29 | change grant | 1 when this tap may load the change of the last payment with no PIN |
+| 30–33 | payment limit | P1 ≥ 1: the limit on one payment, only with the owner's grant in this tap, zeros otherwise |
+| 34–37 | no-PIN allowance | P1 ≥ 1: sats a day the card signs for without its PIN |
+| 38–41 | no-PIN spent | P1 ≥ 1: what has been signed for without the PIN in the window |
+| 42 | tag off | P1 = 2: `00` the NFC tag is on, `01` off |
 
-Byte 8 was appended by applet 0.6 (D16), so a reader built for the 8-byte
-answer parses a 0.6 card unchanged. A reader that needs the PUK state reads
-capability bit 4 (or the response length) before it reads byte 8.
-
-**Capabilities flags (byte 6):**
-
-| Bit | Meaning |
-|-----|---------|
-| 0 | secp256k1 native (1) or software (0) |
-| 1 | Schnorr signing supported |
-| 2 | PIN protection available |
-| 3 | `CLEAR_PIN` (0x43) supported — applet 0.5 and later; a build without it answers 0x43 with `6D00` |
-| 4 | PUK: `SET_PUK` (0x44) and `UNBLOCK_PIN` (0x45) supported, and byte 8 present — applet 0.6 and later; a build without it answers both with `6D00` |
-| 5–7 | Reserved (0) |
-
-**In Foxy's software** the answer is longer than these eight bytes (see `docs/FOXY-CARD-SPEC.md` 5.2). Asked with P1 = 1 the answer is 42 bytes. From 1.19, asked with P1 = 2 it is those 42 bytes and one more, the 43rd, which says whether the NFC tag is on: `00` on, `01` off. From 1.20 `SELECT` answers `01 14` and those three answers are otherwise byte for byte what they were; nothing in them says whether the card has room for the mint's proofs (see [GET_DLEQ](#get_dleq-0x1a--software-120)).
-
-**PIN state 2 is not "no PIN".** A blocked card still has a PIN; it can never
-be verified again (`VERIFY_PIN` answers `6983`), so every PIN-gated command
-answers `6982` until the PIN is unblocked. `UNBLOCK_PIN` (0x45) with the
-card's PUK is the one path out (D16); `CLEAR_PIN` is not one: it needs a
-verified session, which a blocked card can never grant. A card with no PUK
-(byte 8 = 0, or an applet before 0.6) or an exhausted one (byte 8 = 2) has no
-path out, and its balance is stranded. A reader must treat 2 as "a PIN
-exists", never as 0.
-
-**PUK state is the card's, not the PIN's.** The PUK is set once, at
-personalisation, and survives `CLEAR_PIN` and the `SET_PIN` after it: one
-PUK per card, for every PIN the holder sets. The card never reveals it, so
-the personaliser records it off the card (see
-[Personalisation](#personalisation)).
-
-**PIN state 1 is not for keeps.** The holder can remove the PIN with
-`CLEAR_PIN` (D15), after which the card answers 0 again and spends with no
-PIN, as a never-personalised card does. Read byte 7 on every tap; a reader
-that remembers a card as PIN-set will prompt for a PIN the card no longer has
-(`VERIFY_PIN` answers `6984`), and one that remembers it as PIN-free will send
-a spend the card refuses with `6982`.
-
----
+Capability bits (byte 6), all set on 2.0: bit 0 secp256k1 key made on the card,
+bit 1 BIP-340 signing, bit 2 a PIN, bit 3 the limit on one payment waits and does
+not refuse, bit 4 several pieces to a `LOAD_PROOF` and `GET_PIECES` by name, bit 5
+128 places, bit 6 a payment's places burned outside its transaction, bit 7 the PIN
+taken sealed.
 
 ### GET_PUBKEY (0x10)
 
-Returns the card's secp256k1 public key (compressed, 33 bytes). This key is generated once at install and never exported in private form. Used by the mint to set NUT-11 P2PK spending conditions.
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 10 |
-| P1 | 00 |
-| P2 | 00 |
-| Le | 21 |
-| Response | 33-byte compressed public key |
+|---|---|
+| CLA | `B0` |
+| INS | `10` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `21` |
 
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 9000 | OK |
-| 6F00 | Key encoding not recognised (hardware error) |
-
----
+**Response:** the card's secp256k1 public key, 33 bytes compressed. Every piece on
+the card is locked to it (NUT-11).
 
 ### GET_BALANCE (0x11)
 
-Returns the sum of all unspent proof amounts as a 4-byte big-endian uint32. Unit matches the keyset unit (sats or cents).
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 11 |
-| P1 | 00 |
-| P2 | 00 |
-| Le | 04 |
-| Response | 4-byte uint32 (big-endian) |
+|---|---|
+| CLA | `B0` |
+| INS | `11` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `04` |
 
----
+**Response:** 4 bytes, the sum of the unspent pieces' amounts, in the card's unit.
 
 ### GET_PROOF_COUNT (0x12)
 
-Returns a 1-byte count of total proof slots that are non-empty (unspent + spent).
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 12 |
-| P1 | 00 |
-| P2 | 00 |
-| Le | 01 |
-| Response | 1-byte count |
+|---|---|
+| CLA | `B0` |
+| INS | `12` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `01` |
 
----
+**Response:** 1 byte, the number of slots that are not empty (unspent or spent).
 
 ### GET_PROOF (0x13)
 
-Returns full proof data at a given slot index. Slot must be non-empty.
-
-A spent slot is returned as the card holds it, and that is not always a proof:
-a card pulled mid-`CLEAR_SPENT` leaves a slot that still reads `02` with some
-of its data zeroed (see [CLEAR_SPENT](#clear_spent-0x31)).
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 13 |
-| P1 | Slot index (0-based) |
-| P2 | 00 |
-| Le | 4E (78 bytes) |
+|---|---|
+| CLA | `B0` |
+| INS | `13` |
+| P1 | slot (0–127) |
+| P2 | `00` |
+| Le | `52` |
 
-**Response (78 bytes):**
+**Response:** 82 bytes, the slot as the [Proof Slot Layout](#proof-slot-layout)
+has it.
 
-| Offset | Length | Description |
-|--------|--------|-------------|
-| 0 | 1 | Status: `01`=unspent, `02`=spent |
-| 1 | 8 | Keyset ID — the NUT-02 id as 8 **raw** bytes, e.g. `00 59 53 4c e0 bf a1 9a` for `0059534ce0bfa19a` |
-| 9 | 4 | Amount (big-endian uint32) |
-| 13 | 32 | Nonce — the 32-byte nonce from the NUT-10 P2PK secret, **not** the secret string |
-| 45 | 33 | C point (compressed secp256k1) |
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 1 | Status — `00` empty, `01` unspent, `02` spent |
+| 1 | 8 | Keyset ID — the NUT-02 id's first 8 bytes, raw (not ASCII) |
+| 9 | 4 | Amount — uint32, big-endian |
+| 13 | 32 | Nonce — the NUT-10 P2PK secret's nonce, raw (the card rebuilds the secret from it) |
+| 45 | 33 | C — the mint's unblinded signature, a compressed point |
+| 78 | 4 | Date — the piece's locktime, seconds; 0 for none |
 
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 6A83 | Slot index out of range |
-| 6A88 | Slot is empty |
-
----
+`6A83` for a slot out of range. A spent slot whose `CLEAR_SPENT` was cut short
+still answers, with some fields zeroed: its bytes are not a proof.
 
 ### GET_SLOT_STATUS (0x14)
 
-Lightweight bulk status read. Returns a 1-byte status for every slot (0=empty, 1=unspent, 2=spent), allowing the reader to enumerate without reading full proof data.
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `14` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `80` |
+
+**Response:** 128 bytes, one status byte per slot.
+
+### AUTH (0x15)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 14 |
-| P1 | 00 |
-| P2 | 00 |
-| Le | 20 (32 bytes, one per slot) |
-| Response | 32 bytes: one status byte per slot |
+|---|---|
+| CLA | `B0` |
+| INS | `15` |
+| P1 | `00` |
+| P2 | `00` |
+| Lc | `10` |
+| Data | 16 random bytes of the reader's |
+| Le | `50` |
+
+**Response:** 80 bytes: 16 random bytes of the card's, then a BIP-340 signature
+(64) by the card key over
+
+    SHA-256( T ‖ T ‖ reader (16) ‖ card (16) ‖ card key (33, compressed) ),  T = SHA-256("CashuCard/auth")
+
+It proves the reader holds the card that has that key. No PIN, and nothing is
+burned: the message is 129 bytes behind a tag, and no piece's secret (text
+beginning `["P2PK"`) hashes to it. `6700` for any length but 16.
+
+### GET_CARD (0x16)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `16` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `00` |
+
+**Response:** 109 bytes and the mint.
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 1 | format, `04` |
+| 1 | 1 | record set |
+| 2 | 1 | unit, `00` sat |
+| 3 | 4 | daily limit |
+| 7 | 33 | refund key, or zeros |
+| 40 | 4 | the hardest header's `bits`, little-endian, as a header carries it; zeros before any |
+| 44 | 32 | the hash of the last header taken, as Bitcoin shows a block hash |
+| 76 | 1 | rolls: how often the day's window has rolled since the owner's last `REFRESH` |
+| 77 | 1 | rollover budget: 1 to 30; `00` is the default, 7 |
+| 78 | 1 | allowance armed: 1 when the no-PIN allowance may begin again at the next roll |
+| 79 | 26 | zeros |
+| 105 | 1 | mint length |
+| 106 | n | mint, as text (at most 77) |
+| 106 + n | 3 | the card's design, three characters, or zeros |
+
+### GET_PIECES (0x17)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `17` |
+| P1 | the first slot to report (0–127) |
+| P2 | `00` pages; `02` named slots; `03` the short listing |
+| Le | `00` |
+
+**Response.** P2 = `00`: one page, at most 255 bytes: the first slot the page does
+not cover (1; 128 is the end), then for each slot in range that is not empty a tag
+(1: the slot, with `0x80` where it is spent) and, for an unspent slot, its 81 bytes
+after the status. P2 = `02` with one to three slot numbers as data: each slot
+whole (82), in the order asked. P2 = `03`: for each unspent slot its number (with
+`0x80` where its keyset and date follow), then the power of two it is worth, or
+`FF` and its amount (4). `FOXY-CARD-DAILY-LIMIT.md` 6d and 8.1 have the forms
+byte for byte. `6A83` for a P1 of 128 or more; `6A86` for another P2.
+
+### GET_LOG (0x18)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `18` |
+| P1 | `00` the log; `01` the receipts |
+| P2 | with P1 = 1, how many receipts back to begin |
+| Le | `00` |
+
+**Response.** P1 = `00`: 16 bytes of counts (taps, sats signed for, refusals,
+tampers), then up to eight tap entries of 20 bytes, newest first: the clock (4),
+sats signed for (4), pieces signed (1), refused (1), flags (1), pieces put on
+(1), sats put on (4), the time the terminal told (4). P1 = `01`: the count of
+payments (4), then up to three receipts of 77 bytes, newest first: the clock
+(4), the time told (4), sats (4), the SHA-256 of the message signed (32), the
+first output's blinded message (33). Needs the PIN verified in this tap or the
+owner's grant (receipts: the grant only); on a card with no PIN, anyone. `6982`
+otherwise.
+
+### GET_CHANGE (0x19)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `19` |
+| P1 | page, from 0 |
+| P2 | `00` |
+| Le | `00` |
+
+**Response:** a count (1), then up to three openings of 80 bytes: the amount (4),
+the keyset (8), the date (4), the nonce (32) and the blinding factor r (32) of a
+change output the card made for itself (`SPEND_ALL_CHANGE`), signed for and not
+yet back on the card. An opening whose piece is on the card is let go first. A
+phone finishes the change piece from these and the mint's signature, and loads
+it; the piece is locked to the card's key, so nothing else can spend it.
+
+### GET_DLEQ (0x1A)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `1A` |
+| P1 | a slot (0–127) |
+| P2 | a second slot, or `FF` |
+| Le | `00` |
+
+**Response:** for each slot asked, in order: `01` and the 96 bytes `e ‖ s ‖ r` of
+the mint's NUT-12 proof kept with an unspent piece, or `00` (empty, spent, loaded
+without one, or no room for proofs). At most 194 bytes. `6A83` for a slot out of
+range. The card checks nothing: the phone checks the proof with the mint's keys.
 
 ---
 
-### GET_DLEQ (0x1A) — software 1.20
+## Category 0x2x — Spend (one signature for a payment: NUT-11 SIG_ALL)
 
-Gives back the mint's proof (NUT-12) that the card keeps with an unspent piece: `e` (32), `s` (32) and the blinding factor `r` (32), 96 bytes. The card does not check it and never uses it; a reader rebuilds the piece's secret, `Y = hash_to_curve(secret)`, `C' = C + r*K` and `B' = Y + r*G`, and checks the proof (`NUT-XX.md`, `docs/FOXY-CARD-SPEC.md` 5.9). No PIN, any state of the card, locked or not. It writes nothing.
+A payment is `SPEND_ALL_BEGIN`, the swap's outputs (`SPEND_ALL_OUTPUTS`), the
+card's own change (`SPEND_ALL_CHANGE`, any number up to the openings free), then
+`SPEND_ALL_SIGN`. Any other command in between gives the payment up. The one
+signature is over the NUT-11 `SIG_ALL` message: every piece's secret and `C`,
+then every output's amount and blinded message, in order. Every piece on a 2.0
+card is a format-4 P2PK secret locked to the card key with `["sigflag","SIG_ALL"]`
+(the [NUT-XX](NUT-XX.md) secret), so the mint takes this one signature for all of
+them.
+
+### SPEND_ALL_BEGIN (0x22)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 1A |
-| P1 | A slot (0 to 127) |
-| P2 | A second slot (0 to 127), or FF for none |
-| Le | 00 (256) |
+|---|---|
+| CLA | `B0` |
+| INS | `22` |
+| P1 | `00` |
+| P2 | `00` |
+| Lc | the number of slots, 1–128 |
+| Data | the slots, a byte each, in the order their pieces go into the message |
+| Le | `04` |
 
-**Response.** For each slot asked, in the order asked: `01` and the 96 bytes (`e ‖ s ‖ r`) if the slot is unspent and its record is not zero; otherwise the single byte `00` (the slot is empty or spent, or holds a piece that came with no proof, or the card has no room for proofs). The same slot twice is answered twice. One slot is 1 or 97 bytes; two are 2 to 194.
+**Response:** 4 bytes, what the pieces are worth together. `6700` for none;
+`6A96` for more than 128; `6A83`, `6A88`, `6985` for a slot out of range, empty or
+spent; `6A80` for a slot named twice or of another date than the first; `6A8F`
+over the day's limit on the sum.
 
-**Errors:**
+### SPEND_ALL_OUTPUTS (0x23)
 
-| SW | Meaning |
-|----|---------|
-| 6A83 | P1 is over 127, or P2 is over 127 and not FF; nothing is answered |
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `23` |
+| P1 | `00` |
+| P2 | `00` |
+| Lc | a multiple of 37 |
+| Data | for each output: amount (4) ‖ blinded message B_ (33) |
+
+Hashed into the message as they come (the amount in decimal, then B_ in hex).
+`6985` with no payment begun; `6700` for a length not a multiple of 37, and the
+payment is dropped.
+
+### SPEND_ALL_CHANGE (0x26)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `26` |
+| P1 | `00` |
+| P2 | `00` |
+| Lc | `04` |
+| Data | the change amount (4) |
+| Le | `21` |
+
+**Response:** 33 bytes, the blinded message of a change output the card makes for
+itself: a fresh nonce, the secret in the card's own form (its key, the payment's
+date and refund key, `SIG_ALL`), hashed to the curve as NUT-00 says and blinded
+with a fresh r. The opening is kept ([GET_CHANGE](#get_change-0x19)). The day's
+limit and the no-PIN allowance count what leaves the card: the pieces less this
+change. `6985` with no payment begun; `6A80` for 0, or change past the pieces;
+`6A84` with no opening free.
+
+### SPEND_ALL_SIGN (0x24)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `24` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `40` |
+
+**Response:** the 64-byte BIP-340 signature over the whole payment; every slot named
+is burned, the day's count charged and the log written in the same commit. While
+the payment is over the limit on one payment the card answers `00 01` ("not yet")
+and the terminal sends `SIGN` again; the wait is the card's own work and burns
+nothing. `6985` with no payment begun; `6A94` with a PIN set and not given in this
+tap and the no-PIN allowance not enough for the whole payment (nothing written,
+the payment given up); `6A8F` over the day's limit; `6A96` if the commit cannot
+hold it.
+
+### SPEND_ALL_AGAIN (0x25)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `25` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `40` |
+
+**Response:** the last signature `SPEND_ALL_SIGN` gave, again, for an answer lost
+on the air. The PIN if one is set, unless that signature was given with no PIN.
+`6A88` if the card has never signed.
 
 ---
 
-## Category 0x2x — Spend (PIN required if PIN is set — Profile B+)
-
-If a PIN is set, the reader must call `VERIFY_PIN (0x40)` within the same NFC session before any spend or sign command (D13). "A PIN is set" includes the blocked state (GET_INFO byte 7 = 2): `VERIFY_PIN` can never succeed there, so every spend and sign command answers `6982` until `UNBLOCK_PIN (0x45)` replaces the PIN with the card's PUK (D16) — permanently, on a card with no PUK. Cards provisioned without a PIN keep tap-and-go behaviour, and so does a card whose holder has removed the PIN with `CLEAR_PIN (0x43)` (D15). The PIN session flag is transient: cleared on card deselect / tap end, by any failed PIN or PUK check, and by a successful `CLEAR_PIN` or `UNBLOCK_PIN` (see [Session State](#session-state-transient)).
-
-### SPEND_PROOF (0x20)
-
-Atomically marks a proof as spent (irreversible) and returns a NUT-11 P2PK Schnorr signature. The signature proves the card authorised this spend. The reader submits the proof + signature to the Cashu mint for redemption.
-
-This is the **core payment operation**.
-
-**PIN:** if a PIN is set, `VERIFY_PIN` must precede this command in the same
-session (D13). A blocked PIN counts as set, and refuses until `UNBLOCK_PIN`
-(for good, on a card with no PUK). The gate runs *before* the slot burn, so a
-wrong, missing or blocked PIN never consumes a proof.
-
-| Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 20 |
-| P1 | Slot index |
-| P2 | 00 |
-| Lc | 20 |
-| Data | 32-byte message = SHA-256(UTF8(Proof.secret)) — see the note below |
-| Le | 40 |
-| Response | 64-byte Schnorr signature (R \|\| s, 32 bytes each) |
-
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 6985 | Proof already spent — double-spend blocked |
-| 6A88 | Slot is empty |
-| 6A83 | Slot index out of range |
-| 6982 | PIN set (or blocked) and not verified in this session; once the PIN is blocked, until `UNBLOCK_PIN` |
-| 6F00 | Signing failed (hardware error) |
-
-**Note on message construction:** The reader computes
-
-```
-msg = SHA-256(UTF8(Proof.secret))
-```
-
-where `Proof.secret` is the reconstructed NUT-10 P2PK secret string — see
-[NUT-XX.md — SPEND_PROOF Message Construction](NUT-XX.md#spend_proof--message-construction)
-for the canonical definition and the reconstruction rules. That secret embeds
-the proof's 32-byte nonce, which is what makes the message unique per proof and
-so makes a captured signature useless against any other proof.
-
----
-
-### SIGN_ARBITRARY (0x21)
-
-Signs any 32-byte message with the card private key **without** consuming a proof. Used for:
-- NUT-11 proof-of-ownership challenges (wallet queries card capability)
-- Card authentication during provisioning
-- Future NUT extensions requiring card identity proofs
-
-**PIN:** gated like `SPEND_PROOF` (D13) — the signature is a spend
-authorisation under the card's key, so an unverified session must not be able
-to mint one. `6982` when a PIN is set (or blocked) and unverified in this
-session.
-
-| Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 21 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | 20 |
-| Data | 32-byte message |
-| Le | 40 |
-| Response | 64-byte Schnorr signature (R \|\| s) |
-
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 6982 | PIN set (or blocked) and not verified in this session; once the PIN is blocked, until `UNBLOCK_PIN` |
-| 6F00 | Signing failed |
-
----
-
-## Category 0x3x — Write (PIN required if PIN is set)
-
-If PIN is set, the reader must call `VERIFY_PIN (0x40)` within the same NFC session before calling write commands. "PIN is set" includes the blocked state (GET_INFO byte 7 = 2), in which every write command answers `6982` until `UNBLOCK_PIN (0x45)` (D16). A card with no PIN — never personalised, or cleared with `CLEAR_PIN (0x43)` — writes without one. The PIN session flag is transient: cleared on card deselect / tap end, by any failed PIN or PUK check, and by a successful `CLEAR_PIN` or `UNBLOCK_PIN` (see [Session State](#session-state-transient)).
+## Category 0x3x — Write
 
 ### LOAD_PROOF (0x30)
 
-Stores a new proof in the next available empty slot. Used during card top-up (funding at flash-pos or via flash-mobile).
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 30 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | 4D (77 bytes) |
-| Data | 8-byte keyset_id (raw) + 4-byte amount + 32-byte nonce + 33-byte C point |
-| Le | 01 |
-| Response | 1-byte slot index assigned |
+|---|---|
+| CLA | `B0` |
+| INS | `30` |
+| P1 | `00`; `01` with the mint's proof |
+| P2 | `00` |
+| Lc | `51` (81), or 162 or 243 for two or three pieces; `B1` (177) with P1 = 1 |
+| Data | for each piece: keyset_id (8) ‖ amount (4) ‖ nonce (32) ‖ C (33) ‖ date (4); with P1 = 1, one piece then e ‖ s ‖ r (96) |
+| Le | `01` per piece; `02` with P1 = 1 |
 
-**Errors:**
+| Field | Size | |
+|---|---|---|
+| keyset_id | 8 | the NUT-02 id's first 8 bytes, raw |
+| amount | 4 | uint32 |
+| nonce | 32 | the P2PK secret's nonce |
+| C | 33 | compressed point |
+| date | 4 | locktime, seconds, or 0 |
 
-| SW | Meaning |
-|----|---------|
-| 6982 | Security condition not satisfied (PIN set or blocked, and not verified in this session) |
-| 6986 | Card locked (`LOCK_CARD`) — writes disabled |
-| 6A84 | No space — all slots occupied |
+**Response:** the slot of each piece stored; with P1 = 1, the slot and `01` where
+the proof was kept (`00` with no room for proofs).
 
-**Write order.** The card stores the 77 bytes, then marks the slot unspent
-(D14, applet 0.4 and later; a card whose `SELECT` answers below `00 04` may
-mark it first). A card that leaves the field mid-command leaves the slot empty
-or holding the whole proof, never part of one marked unspent. The card does not
-check for duplicates, so after a `LOAD_PROOF` whose answer was lost the proof
-may or may not be on the card: read the slots (`GET_SLOT_STATUS`, `GET_PROOF`)
-before sending it again.
-
-**With P1 = 1 (Foxy's software 1.20): one piece and the mint's proof for it.** The data is exactly 177 bytes: the 81 bytes of a piece (`docs/FOXY-CARD-SPEC.md` 5.1; keyset, amount, nonce, `C`, date) and then `e ‖ s ‖ r`, 96 bytes. The answer is two bytes: the slot, then `01` if the proof was kept and `00` if the card has no room for proofs and went on without it. Any other length is `6700`; a proof of 96 zero bytes is `6A80` (zeros are what "no proof" is kept as); every other check, word and effect is that of a load of one piece, in the same order. A P1 other than 1 is as it was: one to three pieces of 81 bytes, the slot of each as the answer, and each piece stored that way is kept with no proof. The proof is written into the slot's record before the slot's data, and the status byte is still the last write.
-
----
+Needs, in this order: a PIN verified in this tap, or the owner's grant
+(`ALLOW_LOAD`) in this tap, or this tap being the one after a payment (the change),
+or a card with no PIN (`6982` otherwise, before anything else); an owner (`6A90`);
+a record (`6A8C`); a refund key for a dated piece (`6A8E`); a nonce not already in
+any slot, spent or not (`6A94`). `6A84` with no slot free; `6A80` for a C that is
+not a point, or a proof of 96 zeros; `6700` for a bad length. The status byte is
+written last ([D14](../docs/DECISIONS.md#d14)).
 
 ### CLEAR_SPENT (0x31)
 
-Garbage-collects all spent proof slots, freeing them for new proofs. Called after a top-up cycle to reclaim slot space. Requires PIN.
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `31` |
+| P1 | `00` |
+| P2 | `00` |
+| Le | `01` |
+
+**Response:** 1 byte, the number of slots freed. Every spent slot's data is zeroed,
+then its status byte set empty, slot by slot ([D14](../docs/DECISIONS.md#d14)). A
+card pulled away part way leaves a slot spent with any part of its data zeroed:
+`GET_PROOF` still answers it, and its bytes are not a proof. Only the zeroed bytes
+set such a slot apart, so a reader that uses a spent slot's data checks it first.
+`cardctl dump` (0.x cards) skips a spent slot that fails the card file's slot
+checks ([`CARD-FILE.md`](CARD-FILE.md#slot)). The slot checks catch a zeroed
+amount and a `C` that is no longer a point. A tear that zeroed only keyset or
+nonce bytes, or part of `C` whose x still lands on the curve, passes them, and
+`dump` writes that slot as spent. The PIN if one is set, or either grant.
+
+### SET_CARD (0x32)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 31 |
-| P1 | 00 |
-| P2 | 00 |
-| Le | 01 |
-| Response | 1-byte count of slots freed |
+|---|---|
+| CLA | `B0` |
+| INS | `32` |
+| P1 | `00` |
+| P2 | `00` |
+| Data | on an owned card: proof length (1) ‖ proof; then unit (1) ‖ refund key (33) ‖ 65 bytes not read ‖ mint length (1) ‖ mint ‖ [design (3)] |
 
-**Errors:**
+Writes the record. Open card: the PIN if one is set; owned card: the owner's proof
+over the record. Only with nothing unspent (`6A8D`). `6A80` for a bad refund key or
+design; `6700` for a bad length. Never touches the limits or the clock. The first
+`SET_CARD` reserves the store of the mints' proofs.
 
-| SW | Meaning |
-|----|---------|
-| 6982 | Security condition not satisfied (PIN set or blocked, and not verified in this session) |
-| 6986 | Card locked (`LOCK_CARD`) — writes disabled |
+### SET_LIMIT_PIN (0x33)
 
-**Write order.** Each spent slot's data is zeroed, then the slot is marked
-empty (D14, applet 0.4 and later). A tear leaves a slot still spent, which the
-next `CLEAR_SPENT` frees. Until then `GET_PROOF` returns the slot with status
-`02` and some fields zeroed; the fill is not atomic, so which of them are
-zeroed is not defined. Once `CLEAR_SPENT` has touched a spent slot, its data is
-not a proof. Only the zeroed bytes set such a slot apart, so a reader that uses
-a spent slot's data checks it first. `cardctl dump` skips a spent slot that
-fails the card file's slot checks ([`CARD-FILE.md`](CARD-FILE.md#slot)). The
-slot checks catch a zeroed amount and a `C` that is no longer a point. A tear
-that zeroed only keyset or nonce bytes, or part of `C` whose x still lands on
-the curve, passes them, and `dump` writes that slot as spent.
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `33` |
+| P1 | `00` |
+| P2 | `00` |
+| Data | the day's limit (4), or eight bytes: the day's and the one payment's |
+
+The PIN form, for an open card (no owner, nothing unspent, the PIN set and
+verified). `6A91` on an owned card; `6A8D` with anything unspent; `6700` for
+another length.
+
+### SET_LIMIT (0x34)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `34` |
+| P1 | `00` |
+| P2 | `00` |
+| Data | proof length (1) ‖ proof ‖ value |
+
+The owner's form; no PIN, any funds. The value:
+
+| Bytes | Field | |
+|---|---|---|
+| 0–3 | daily limit | sats; 0 is none. A new number begins a window at `now` |
+| 4–7 | payment limit | (8, 12 or 13 bytes) sats; a payment over it waits, by the card's own work, for every limit's worth past the first |
+| 8–11 | no-PIN allowance | (12 or 13 bytes) sats a day signed for without the PIN; `6985` for a number on a card with no PIN |
+| 12 | rollover budget | (13 bytes) 1 to 30: how often the window may roll between the owner's `REFRESH`es; `6A80` outside that. Absent, the budget is left as it is (7 until set) |
+
+`6A90`, `6A91`; `6986` locked; `6700` for a length other than 4, 8, 12 or 13.
+
+### SET_HEADER (0x36)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `36` |
+| P1 | `00` |
+| P2 | `00` |
+| Lc | `50` |
+| Data | a Bitcoin block header, 80 bytes, as the network carries it |
+| Le | `04` |
+
+**Response:** the card's `now`, 4 bytes. No PIN, no owner, any state. The card
+hashes the header twice with SHA-256; the hash, read little-endian, must be at or
+under the target its own `bits` name, at or under the floor built into the applet
+(`bits` `0x17087BC0`, a quarter of the network's work at height 971,100: D24) and,
+once a header has been taken, at or under four times the target of the hardest
+taken (`6A93` otherwise; `6A80` for `bits` no header could carry; `6700` for any
+length but 80). A later time moves `now` forward; an older header changes
+nothing.
+
+### TELL_TIME (0x37)
+
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `37` |
+| P1 | `00` |
+| P2 | `00` |
+| Lc | `04` |
+| Data | the terminal's clock, seconds |
+
+A note for the receipts and the log of this tap; trusted for nothing.
 
 ---
 
@@ -382,250 +615,99 @@ the curve, passes them, and `dump` writes that slot as spent.
 
 ### VERIFY_PIN (0x40)
 
-Verifies the provisioning PIN. On success, sets a transient session flag that permits the PIN-gated commands (spend, sign, write) for the remainder of this NFC tap, and resets the retry counter. On failure, decrements the retry counter and clears the session flag: a session that had verified is no longer authenticated, as with `OwnerPIN.check`.
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 40 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | 04–08 |
-| Data | PIN bytes (4–8 bytes) |
+|---|---|
+| CLA | `B0` |
+| INS | `40` |
+| P1 | `00`; `01` sealed |
+| P2 | `00` |
+| Data | the PIN, 4–8 bytes; with P1 = 1, the PIN sealed (`FOXY-CARD-DAILY-LIMIT.md` 6e, under `CashuCard/seal` and `CashuCard/pinkey`) |
 
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 63 CX | Wrong PIN — X retries remaining (e.g. `63 C2` = 2 retries left); the session's verification ends |
-| 6983 | PIN blocked — max retries exhausted, GET_INFO byte 7 now 2. Answered by the try that exhausts the counter (not `63 C0`) and by every `VERIFY_PIN` after it, until `UNBLOCK_PIN` (0x45) replaces the PIN with the PUK (D16) |
-| 6984 | PIN not set (use SET_PIN first) |
-
----
+Success opens the PIN's commands for this tap and arms the no-PIN allowance.
+Wrong: `63CX` with X tries left; the try that exhausts the counter blocks the card
+(`6983`), and so does every `VERIFY_PIN` after it. `6984` with no PIN set. **A
+card whose PIN state is 2 answers `6983` before it checks anything, whatever its
+counter** ([D22](../docs/DECISIONS.md#d22)): the state byte is the PIN's commit.
+Only the owner's `CHANGE_PIN` unblocks it.
 
 ### SET_PIN (0x41)
 
-Sets the provisioning PIN. May only be called **once per PIN lifecycle**: at card personalization, and again only after `CLEAR_PIN` has removed the PIN (D15). Subsequent PIN changes use `CHANGE_PIN`. If called when PIN is already set, returns `6985` — and a blocked PIN counts as set, so `SET_PIN` can never re-key a blocked card. The new PIN starts with the full try count.
-
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 41 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | 04–08 |
-| Data | New PIN bytes |
+|---|---|
+| CLA | `B0` |
+| INS | `41` |
+| P1 | `00`; `01` sealed |
+| P2 | `00` |
+| Data | the PIN, 4–8 bytes |
 
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 6985 | PIN already set (or blocked) — use CHANGE_PIN |
-| 6986 | Card locked (`LOCK_CARD`) |
-| 6700 | Wrong data length (PIN must be 4–8 bytes) |
-
----
+Sets or replaces the PIN and unblocks, on an open card with nothing unspent; on an
+owned card only when it has no PIN and the owner's grant is in this tap (ADD PIN).
+`6A91` otherwise on an owned card; `6A8D` with anything unspent; `6986` locked;
+`6700` for a PIN of another length.
 
 ### CHANGE_PIN (0x42)
 
-Changes the PIN. Requires the current PIN to be verified first in this session.
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `42` |
+| P1 | `00`; `01` sealed |
+| P2 | `00` |
+| Data | proof length (1) ‖ proof ‖ the new PIN (4–8) |
 
-The card checks the current PIN in the data field again. A wrong one costs a
-try and answers `63CX`, exactly as `VERIFY_PIN` does, and it ends the
-session's verification: the next `CHANGE_PIN` answers `6982` until
-`VERIFY_PIN` succeeds again, and that success resets the counter. So
-`CHANGE_PIN` cannot run the counter down on its own; `6983` is listed below
-because it shares `VERIFY_PIN`'s failure handling, and a reader should handle
-it the same way.
+The owner's proof over the new PIN; no old PIN, no session, any PIN state, any
+funds. Sets the PIN, refills the tries, unblocks, and ends any verified session.
+The PIN is written, then the PIN state, in one transaction: the state byte is the
+commit, so a card torn between them is still blocked and the owner sends it again
+(D22). `6A90`, `6A91`; `6986` locked; `6700` for a PIN of another length.
+
+### SET_OWNER (0x43)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 42 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | Variable |
-| Data | 1-byte old PIN length + old PIN + new PIN (4–8 bytes each) |
+|---|---|
+| CLA | `B0` |
+| INS | `43` |
+| P1 | `00` |
+| P2 | `00` |
+| Data | on an owned card: proof length (1) ‖ proof; then the owner's P-256 key (65, `04 ‖ X ‖ Y`) ‖ [an anchor header (80)] |
 
-**Errors:**
+Gives the card its owner, on a card with nothing unspent (`6A8D`): with no proof on
+a card that has none, with the old owner's proof on one that has. **The anchor
+(2.0, D20):** a block header after the key is held to `SET_HEADER`'s checks before
+anything is written (`6A93` refuses the owner too) and taken in the same
+transaction as the key, with the rollover count at 0. A card set up with one never
+runs at `now = 0`. `6A80` for a key not beginning `04`; `6700` for a length other
+than 65 or 145 after the proof; `6986` locked.
 
-| SW | Meaning |
-|----|---------|
-| 6982 | Current PIN not verified in this session (always the case once the PIN is blocked, or after a failed check) |
-| 63 CX | Wrong current PIN — X retries remaining; the session's verification ends |
-| 6983 | PIN blocked — tries exhausted, GET_INFO byte 7 now 2 |
-| 6986 | Card locked (`LOCK_CARD`) |
-| 6700 | Wrong data length |
-
----
-
-### CLEAR_PIN (0x43)
-
-Removes the PIN (D15, applet 0.5). Requires the current PIN to be verified
-first in this session, and presented again in the data field. On success the
-card is as `SET_PIN` found it: GET_INFO byte 7 is `0`, the try counter is
-back at its limit, every PIN-gated command runs with no PIN (the D12
-tap-and-go behaviour), `VERIFY_PIN` answers `6984`, and `SET_PIN` may be
-called again. The session's verification ends with the PIN it verified: a
-`SET_PIN` in the same session gates spending at once, until `VERIFY_PIN`
-succeeds with the new PIN.
-
-The card checks the PIN in the data field again, with `CHANGE_PIN`'s failure
-handling: a wrong one costs a try, answers `63CX`, and ends the session's
-verification, so the next `CLEAR_PIN` answers `6982` until `VERIFY_PIN`
-succeeds again. `CLEAR_PIN` cannot run the counter down on its own; `6983`
-is listed below because the failure handling is shared.
-
-**A blocked PIN cannot be cleared.** The verified session this command needs
-is one a blocked card never grants (`VERIFY_PIN` answers `6983`), so a card
-whose GET_INFO byte 7 is `2` answers `6982` here, with the right PIN, in
-every session. Anything else would be an unblock path open to whoever holds
-the card, since `VERIFY_PIN` is unauthenticated (ENG-615; D13). The unblock
-path is [`UNBLOCK_PIN`](#unblock_pin-0x45), gated by the PUK (D16).
-
-**The PUK is not cleared.** `CLEAR_PIN` removes the PIN and nothing else:
-GET_INFO byte 8 is unchanged, `SET_PUK` still answers `6A89`, and after the
-next `SET_PIN` the same PUK drives `UNBLOCK_PIN`.
-
-**Write order.** There is one persistent write: the PIN state byte, set to
-`0` after the PIN check, which the card writes atomically. A card that
-leaves the field mid-command is PIN-set or it is not. The try counter is not
-written by this command; the successful check that precedes the write has
-already reset it to its limit (that is `OwnerPIN.check`'s contract), which
-is what "the try counter is back at its limit" above rests on. Nothing reads
-the counter behind state `0` in any case: `VERIFY_PIN` stops at `6984`, and
-the next `SET_PIN` starts its PIN with the full try count.
+### GET_NONCE (0x44)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 43 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | Variable |
-| Data | 1-byte PIN length + PIN (4–8 bytes); Lc must be exactly one more than the PIN length |
+|---|---|
+| CLA | `B0` |
+| INS | `44` |
+| P1 | `00`; `01` the PIN key |
+| P2 | `00` |
+| Le | `10`; `71` with P1 = 1 |
 
-**Errors:**
+**Response:** 16 fresh random bytes for one owner's proof (`6A90` with no owner).
+With P1 = 1, on any card: the 16 bytes, the PIN key (33, compressed) and the card
+key's BIP-340 signature over `SHA-256("CashuCard/pinkey" ‖ PIN key)` (64), 113 in
+all, for sealing a PIN.
 
-| SW | Meaning |
-|----|---------|
-| 6982 | Current PIN not verified in this session (always the case once the PIN is blocked, after a failed check, or when no PIN is set) |
-| 63 CX | Wrong PIN — X retries remaining; the session's verification ends |
-| 6983 | PIN blocked — tries exhausted, GET_INFO byte 7 now 2 |
-| 6986 | Card locked (`LOCK_CARD`) |
-| 6700 | Wrong data length (no length byte, PIN length outside 4–8, or Lc ≠ 1 + PIN length) |
-
----
-
-### SET_PUK (0x44)
-
-Sets the provisioning PUK (D16, applet 0.6), once per card. The PUK is the
-one credential that can replace a PIN the holder has lost or blocked (see
-[`UNBLOCK_PIN`](#unblock_pin-0x45)), so who may set it is the whole of this
-command's design:
-
-- **GET_INFO byte 7 = 0 (no PIN):** anyone, with no session. This is the
-  personalisation order: `SET_PUK`, then `SET_PIN`.
-- **Byte 7 = 1 (PIN set):** only a session that has verified the PIN
-  (`6982` otherwise). Without that gate a reader in range could attach a PUK
-  of its own to a personalised card, block the PIN with three guesses, and
-  unblock it with the PUK it chose. The other personalisation order is
-  therefore `SET_PIN`, `VERIFY_PIN`, `SET_PUK`.
-- **Byte 7 = 2 (PIN blocked):** never. The gate is the verified session,
-  which a blocked card never grants, so the reader that blocked a card cannot
-  arm its own recovery. A blocked card with no PUK is stranded, as every card
-  before 0.6 is.
-- **Byte 8 ≠ 0:** never (`6A89`). A PUK is not changed, not replaced, and an
-  exhausted one (byte 8 = 2) is not re-armed, by anyone.
-
-The card never reveals the PUK. The personaliser records it off the card at
-the moment it is set; where (the backend card registry, ENG-618) is not the
-card's concern. `SET_PUK` does not open or end a session, and does not touch
-the PIN or its try counter.
-
-**Write order.** The PUK value is written first, then GET_INFO byte 8 is set
-to `1`, as a single byte the card writes atomically (D14). A card that leaves
-the field between the two holds a PUK that nothing reads — `UNBLOCK_PIN`
-stops at byte 8 = 0 with `6A82` — and the next `SET_PUK` overwrites it.
+### ALLOW_LOAD (0x45)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 44 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | Variable |
-| Data | 1-byte PUK length + PUK (8–12 bytes, digits as bytes like the PIN); Lc must be exactly one more than the PUK length |
+|---|---|
+| CLA | `B0` |
+| INS | `45` |
+| P1 | `00` |
+| P2 | `00` |
+| Data | proof length (1) ‖ proof |
 
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 6A89 | PUK already set, or exhausted — a PUK is set once |
-| 6982 | PIN set (or blocked) and not verified in this session |
-| 6986 | Card locked (`LOCK_CARD`) |
-| 6700 | Wrong data length (no length byte, PUK length outside 8–12, or Lc ≠ 1 + PUK length) |
-
----
-
-### UNBLOCK_PIN (0x45)
-
-Replaces the PIN, authorised by the PUK (D16, applet 0.6). The only path out
-of GET_INFO byte 7 = 2: a blocked PIN gates every command until this
-succeeds (ENG-615), and nothing else — not `CLEAR_PIN`, not `SET_PIN`, not
-a reinstall with the balance intact — takes a card out of that state. It
-also serves a PIN the holder has forgotten on a card that is not blocked:
-byte 7 = 1 goes to 1 with the new PIN, byte 7 = 2 goes to 1, and the holder
-cannot tell the two cases apart, so the card does not either.
-
-No `VERIFY_PIN` precedes it: the PUK is the authority, and the card this
-command rescues cannot open a session. On success GET_INFO byte 7 is `1`,
-the new PIN's try counter is at its limit (3), the old PIN is gone, byte 8
-is unchanged (a successful unblock does not consume the PUK; the same PUK
-unblocks the card again), and **no session is open**: the command proved the
-PUK, not the new PIN, so the session's verification — if there was one — ends,
-and the holder sends `VERIFY_PIN` with the new PIN as usual.
-
-**A wrong PUK** ends the session's PIN verification (as every failed check
-does), costs one of the PUK's ten tries, and answers `63 CX` with the PUK
-tries left: `63 C9` after the first wrong PUK. Unlike `VERIFY_PIN`, the try
-that exhausts the counter answers `63 C0`, so a reader counting down sees the
-count reach zero; it also sets byte 8 to `2`, after which every `UNBLOCK_PIN`
-answers `6983` before any check runs, with the right PUK, in every session.
-Exhaustion is terminal: `SET_PUK` refuses an exhausted card (`6A89`), so a
-card that has lost its PUK to guessing has lost its recovery path, and a PIN
-blocked on it is stranded. The PIN and its counter are never touched by a
-failed `UNBLOCK_PIN`.
-
-**Write order.** The PUK is checked first; nothing is written on a wrong PUK
-but the PUK's own try counter (and byte 8, after the exhausting try). On a
-right PUK the new PIN is written with its counter at the limit, then GET_INFO
-byte 7 is set to `1`, last, as a single byte the card writes atomically (D14).
-A card that leaves the field before that byte is `2` over the new PIN: the
-card refuses `VERIFY_PIN` with `6983` on byte 7 alone (not only on an empty
-counter), every gate holds, and the next `UNBLOCK_PIN` with the same PUK
-finishes it. Nothing a reader can do with the torn card differs from what it
-could do with the blocked one.
-
-| Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 45 |
-| P1 | 00 |
-| P2 | 00 |
-| Lc | Variable |
-| Data | 1-byte PUK length + PUK (8–12 bytes) + 1-byte new PIN length + new PIN (4–8 bytes); Lc must be exactly 2 + PUK length + new PIN length |
-
-**Errors:**
-
-| SW | Meaning |
-|----|---------|
-| 6A82 | PUK not set (GET_INFO byte 8 = 0) — nothing can unblock this card |
-| 6983 | PUK exhausted (byte 8 = 2) — ten wrong PUKs; terminal. In this command the blocked authentication method is always the PUK, never the PIN |
-| 6984 | PIN not set — nothing to unblock or replace; use `SET_PIN` |
-| 63 CX | Wrong PUK — X PUK tries remaining (`63 C0` on the try that exhausts it, which also sets byte 8 to 2); the session's PIN verification ends |
-| 6986 | Card locked (`LOCK_CARD`) — refused before the PUK gate, so no try is spent; a blocked PIN on a locked card stays blocked |
-| 6700 | Wrong data length (a length byte missing, PUK length outside 8–12, new PIN length outside 4–8, or Lc ≠ 2 + PUK length + new PIN length) |
+The owner's proof over `CashuCard/load`: for the rest of this tap, `LOAD_PROOF` and
+`CLEAR_SPENT` need no PIN, `SET_PIN` may add one to a card with none, and
+`GET_INFO` says the limit on one payment. Never a payment. `6A90`, `6A91`; `6986`
+locked.
 
 ---
 
@@ -633,228 +715,192 @@ could do with the blocked one.
 
 ### LOCK_CARD (0x50)
 
-Permanently disables all write operations. Useful for lost/stolen card mitigation if the card is recovered. **Irreversible.** Requires PIN when one is set; a blocked PIN counts as set, so a blocked card cannot be locked. A locked card keeps the PIN and the PUK it has: `SET_PIN`, `CHANGE_PIN`, `CLEAR_PIN`, `SET_PUK` and `UNBLOCK_PIN` all answer `6986` — so a PIN that is blocked *after* the lock stays blocked, PUK or no PUK; the lock is the holder's irreversible choice and the PUK does not override it.
+| Field | Value |
+|---|---|
+| CLA | `B0` |
+| INS | `50` |
+| P1 | `00` |
+| P2 | `DE` (the confirmation byte) |
+| Data | proof length (1) ‖ proof |
+
+For good: no more loads, clears, records, limits, PINs or owners. A PIN set and
+verified, and the owner's proof over `CashuCard/lock`. `6982` without the PIN;
+`6B00` for another P2; `6985` already locked.
+
+### RESET_CARD (0x51)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 50 |
-| P1 | 00 |
-| P2 | DE (deadbeef confirmation byte) |
+|---|---|
+| CLA | `B0` |
+| INS | `51` |
+| P1 | `00` |
+| P2 | `AD` (the confirmation byte) |
+| Data | proof length (1) ‖ proof |
 
-**Errors:**
+The owner's proof over `CashuCard/reset`, on a card with nothing unspent: the card
+as out of its packet, with a new key, keeping its clock. A locked card also wants
+the PIN in this tap (`6982`). `6B00`, `6A90`, `6A91`, `6700`, `6A8D`.
 
-| SW | Meaning |
-|----|---------|
-| 6982 | PIN set (or blocked) and not verified in this session |
-| 6985 | Card already locked |
-
-### RESET_CARD (0x51) — software 1.17
-
-Returns the card to what it was out of its packet, so that another person can set it up: no PIN (three tries), no owner, not locked, no record, no limits, no log or receipts, no places in use, and a new key pair of its own (the card's key and the PIN key). It keeps its clock (the time and the hash of the last block header) and its software.
+### SET_TAG (0x52)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 51 |
-| P1 | 00 |
-| P2 | AD (confirmation byte) |
-| Data | proof length (1), the owner's proof (ECDSA over `FoxyCard/reset`, the nonce just given, and no value); nothing after it |
+|---|---|
+| CLA | `B0` |
+| INS | `52` |
+| P1 | `00` on; `01` off |
+| P2 | `00` |
+| Data | proof length (1) ‖ proof ‖ the byte P1 says |
 
-**Errors** (in the order they are checked):
+The owner's proof over `CashuCard/tag` and the byte. Switches the card's NFC tag.
+`6B00`, `6986` locked, `6A90`, `6A91`, `6700`.
 
-| SW | Meaning |
-|----|---------|
-| 6B00 | P1 is not 00 or P2 is not AD |
-| 6A90 | The card has no owner |
-| 6A91 | No nonce was asked for in this tap, or the proof is not the owner's |
-| 6700 | Bytes after the proof |
-| 6982 | The card is locked and the PIN has not been verified in this tap |
-| 6A8D | Anything unspent is on the card |
-
-From 1.20 it also fills the store of the mint's proofs with zeros, after the places are freed and outside the transaction. A blocked PIN is no bar on a card that is not locked. The wipe is one transaction of five bytes (the lock, the PIN state, the change note, the owner and the NFC tag's switch), after the keys are drawn; see `docs/FOXY-CARD-SPEC.md` 5.6a. It puts the NFC tag back on.
-
-### SET_TAG (0x52) — software 1.19
-
-Switches the card's NFC tag off or on (`docs/FOXY-CARD-SPEC.md` 5.8). The tag is on for a new card, a card with no owner and a card just reset, and off only when the owner has said so. The owner's proof, no PIN, any funds.
+### REFRESH (0x53)
 
 | Field | Value |
-|-------|-------|
-| CLA | B0 |
-| INS | 52 |
-| P1 | 00 tag on, 01 tag off |
-| P2 | 00 |
-| Data | proof length (1), the owner's proof (ECDSA, P-256, SHA-256, DER, over `FoxyCard/tag`, the nonce just given and the one byte after the proof), then that one byte, the same as P1 |
+|---|---|
+| CLA | `B0` |
+| INS | `53` |
+| P1 | `00` |
+| P2 | `00` |
+| Lc | proof length + 81 |
+| Data | proof length (1) ‖ proof ‖ a Bitcoin block header (80) |
+| Le | `04` |
 
-**Errors** (in the order they are checked):
-
-| SW | Meaning |
-|----|---------|
-| 6B00 | P1 is not 00 or 01, or P2 is not 00 (the nonce is left unspent) |
-| 6986 | The card is locked |
-| 6A90 | The card has no owner |
-| 6A91 | No nonce was asked for in this tap, or the proof is not the owner's for this label, nonce and byte; no PIN try is spent |
-| 6700 | Anything but one byte after the proof |
-| 6B00 | The byte after the proof is not P1 |
-
-Asking for the state the tag already has answers `9000` and writes nothing. `GET_INFO` with P1 = 2 says the state in its last byte (the 43rd): `00` on, `01` off. With P1 = 1 it answers the 42 bytes it always did, whatever the state.
+**Response:** the card's `now`, 4 bytes. 2.0 ([D20](../docs/DECISIONS.md#d20)): the
+owner's proof over `CashuCard/refresh` and the header. The header is held to
+everything `SET_HEADER` holds one to and taken as it takes one (an older header
+moves nothing); then the rollover count goes to 0, in the same transaction. No
+PIN; any funds; a locked card too. `6A90`, `6A91`, `6A93`, `6A80`; `6700` for a
+header of another length.
 
 ---
 
-## The NFC tag application — software 1.19
+## The NFC tag application
 
-A third applet of the package, `Tag`, answers as an NFC Forum Type 4 Tag (mapping version 2.0), read only, under the NFC Forum's own name, **not** the card's: `D2 76 00 00 85 01 01` (the instance AID given at install; the class AID in the package is `F0 46 4F 58 59 43 41 52 44 54`). It carries one web address, `https://getfoxy.io/card`, the same on every card. It takes class `00` and answers exactly:
+A third applet of the package, instantiated under the NFC Forum's
+`D2 76 00 00 85 01 01`: a read-only NFC Forum Type 4 Tag carrying one web address,
+the same on every card (`FOXY-CARD-SPEC.md` 5.8). It answers its own `SELECT`,
+`SELECT` of files `E103` and `E104` and `READ BINARY`, and nothing else. It finds
+the card's applet by the AID `F0 43 41 53 48 55 43 41 52 44 01` to ask whether the
+owner has switched it off.
 
-| Command | Answer |
-|---------|--------|
-| `00 A4 04 00 07 D2 76 00 00 85 01 01 [00]` (SELECT by name) | `9000`, no data; `6999` when the owner has switched the tag off |
-| `00 A4 00 0C 02 E1 03`, `00 A4 00 0C 02 E1 04` (SELECT file) | `9000`; any other file `6A82`; other P1 or P2 `6B00`; Lc not 2 `6700` |
-| `00 B0 <offset hi> <offset lo> <Le>` (READ BINARY) | the bytes of the file chosen from that offset, as many as asked and the file holds; an offset at or past the end `6B00`; no file chosen `6986` |
-| UPDATE BINARY (`D6`) and the other instructions that write (`0E D0 D7 DA DB DC DD E2`) | `6982` |
-| any other instruction | `6D00` (a class other than `00`: `6E00`) |
+---
 
-The capability container (`E103`, 15 bytes) is `00 0F 20 00 3B 00 34 04 06 E1 04 00 16 00 FF`; the NDEF file (`E104`, 22 bytes) is `00 14 D1 01 10 55 04` followed by the 15 ASCII bytes of `getfoxy.io/card`.
+## The clock and the limits
+
+The card's clock (`now`) is the time in the newest block header it has taken
+([SET_HEADER](#set_header-0x36), [REFRESH](#refresh-0x53), the anchored
+[SET_OWNER](#set_owner-0x43)), and it only moves forward. Three limits, all the
+owner's ([SET_LIMIT](#set_limit-0x34)), all off on a new card:
+
+- **The daily limit** bounds what leaves the card in the day's window: 86,400
+  seconds from the window's start. A payment that would take the window past it is
+  `6A8F`, with nothing signed or burned.
+- **The limit on one payment** makes a larger payment wait, by the card's own work.
+- **The no-PIN allowance**, on a card with a PIN, is what it signs for in the window
+  without the PIN. Over it, `6A94`, and the PIN is asked for the whole payment.
+
+**What bounds a walked clock (2.0, D20).** A payment that finds the day over begins
+a new window, and that is a roll, only while the rolls since the owner's last
+`REFRESH` (or anchored `SET_OWNER`) are fewer than the rollover budget (default 7,
+1 to 30, `SET_LIMIT`'s thirteenth byte). Past it the window stays where it is, and
+what was signed for in it still counts, until the owner's phone sends `REFRESH`.
+The first window a card begins (its start still 0) is not a roll. At a roll the
+no-PIN count begins again only if the allowance is armed, by a `VERIFY_PIN` or an
+owner's proof since it last did, and the roll spends the arming. `GET_CARD` bytes
+76 to 78 say the rolls, the budget and the arming.
 
 ---
 
 ## Error Code Summary
 
 | SW | Meaning |
-|----|---------|
-| 90 00 | Success |
-| 63 CX | Wrong PIN, X retries remaining (the session's verification ends); from `UNBLOCK_PIN`, wrong PUK, X PUK tries remaining |
-| 67 00 | Wrong length (Lc/Le) |
-| 69 82 | Security condition not satisfied (PIN set or blocked, and not verified in this session) |
-| 69 83 | Authentication method blocked (PIN blocked, GET_INFO byte 7 = 2; from `UNBLOCK_PIN`, PUK exhausted, byte 8 = 2) |
-| 69 84 | Referenced data not usable (PIN not set) |
-| 69 85 | Conditions not satisfied (already spent / already set / card already locked) |
-| 69 86 | Command not allowed (card locked by `LOCK_CARD` — writes disabled) |
-| 6A 82 | File not found (PUK not set — `UNBLOCK_PIN` has nothing to check against) |
-| 6A 83 | Record not found (slot out of range) |
-| 6A 84 | Not enough memory (no empty slots) |
-| 6A 88 | Referenced data not found (slot empty) |
-| 6A 89 | File already exists (PUK already set or exhausted — `SET_PUK` is once per card) |
-| 6D 00 | Instruction not supported |
-| 6E 00 | Class not supported |
-| 6F 00 | No precise diagnosis (hardware / crypto error) |
+|---|---|
+| 9000 | Success |
+| 6700 | Wrong length |
+| 6982 | Security status not satisfied: the PIN (or a grant) needed and not given in this tap |
+| 6983 | PIN blocked: the counter spent, or the PIN state 2 |
+| 6984 | PIN not set |
+| 6985 | Conditions not satisfied: already spent, no payment begun, allowance on a card with no PIN, already locked |
+| 6986 | Card locked |
+| 6A80 | Wrong data: not a point, a bad refund key, bits no header could carry, a budget outside 1–30 |
+| 6A82 | Not found (the card's runtime): no applet of this name — a 0.x or 1.x card |
+| 6A83 | Slot out of range |
+| 6A84 | No space: no slot, or no change opening, free |
+| 6A86 | Incorrect P1 or P2 |
+| 6A88 | Slot empty, or no signature to give again |
+| 6A8C | No card record |
+| 6A8D | Card in use: something unspent where only an empty card may be changed |
+| 6A8E | A dated piece on a card with no refund key |
+| 6A8F | Over the day's limit |
+| 6A90 | No owner |
+| 6A91 | The owner's proof missing, wrong or used, or a command not open to an owned card |
+| 6A93 | Too little work in a block header |
+| 6A94 | A piece already on the card (`LOAD_PROOF`); the PIN needed for this payment (`SPEND_ALL_SIGN`) |
+| 6A96 | Too many places for one signature |
+| 6B00 | Wrong P1/P2 (a missing confirmation byte) |
+| 6D00 | Instruction not supported |
+| 6E00 | Class not supported |
+| 6F00 | Signing failed |
+| 63CX | Wrong PIN, X tries left |
 
 ---
 
 ## Proof Slot Layout
 
-Each proof occupies exactly **78 bytes** of persistent EEPROM:
-
 ```
-Offset  Len  Field
-------  ---  -----
-0       1    Status (00=empty, 01=unspent, 02=spent)
-1       8    Keyset ID (NUT-02 id as 8 RAW bytes, e.g. 00 59 53 4c e0 bf a1 9a)
-9       4    Amount (big-endian uint32)
-13      32   Nonce (32-byte nonce from the NUT-10 P2PK secret)
-45      33   C point (compressed secp256k1, 02/03 prefix)
+Offset  Size  Field
+──────  ────  ─────────────────────────────────────────
+0       1     status      (00 empty, 01 unspent, 02 spent; written last)
+1       8     keyset_id   (raw, the NUT-02 id's first 8 bytes)
+9       4     amount      (uint32, big-endian)
+13      32    nonce       (raw; the card rebuilds the P2PK secret from it)
+45      33    C           (compressed point)
+78      4     date        (locktime, seconds; 0 for none)
+──────  ────
+Total:  82 bytes per slot × 128 slots
 ```
 
-The keyset id is stored **raw**, not as ASCII text. A NUT-02 id is 16 hex
-characters, which is 8 bytes raw but 16 bytes as ASCII — storing it as text
-would fit only half the id and match no keyset at the mint.
-
-The 32-byte field is the **nonce**, not the secret. A NUT-10 P2PK secret is a
-JSON string of ~150 bytes; the card stores the nonce and a reader rebuilds the
-secret from it plus `GET_PUBKEY`. See [`NUT-XX.md`](NUT-XX.md).
-
-Total: 32 slots × 78 bytes = **2,496 bytes** EEPROM for proof storage.
-
-In Foxy's software the slot is 82 bytes (a 4-byte date after `C`), there are 128 of them, and `GET_PROOF` gives the slot and nothing more. From 1.20 the card also keeps, beside the slots and not part of them, 96 bytes for each slot: the mint's proof for the piece in it, `e ‖ s ‖ r`, in a store of 12,288 bytes that the first `SET_CARD` reserves. `GET_PROOF` does not give it; [`GET_DLEQ`](#get_dleq-0x1a--software-120) does, for an unspent slot.
+The secret the card rebuilds, and signs the hash of within the `SIG_ALL` message,
+is [NUT-XX](NUT-XX.md)'s format-4 secret. A piece loaded with the mint's proof also
+has 96 bytes (`e ‖ s ‖ r`) beside its slot ([GET_DLEQ](#get_dleq-0x1a)).
 
 ---
 
 ## Session State (Transient)
 
-The following flags are held in transient RAM and cleared on card deselect:
-
-| Flag | Set by | Cleared by |
-|------|--------|-----------|
-| `pin_verified` | VERIFY_PIN (success) | Deselect / tap end / any failed PIN check (VERIFY_PIN, CHANGE_PIN or CLEAR_PIN) / any failed PUK check (UNBLOCK_PIN) / CLEAR_PIN or UNBLOCK_PIN (success — the verified PIN no longer exists) |
+Gone with the tap (`CLEAR_ON_DESELECT`): the PIN verified, the owner's nonce and
+whether it is live, the owner's load grant, the change grant taken at `SELECT`, a
+payment begun and its places, sum and change. Gone with the power: the time the
+terminal told, and whether this time in the field has paid.
 
 ---
 
 ## Personalisation
 
-A card leaves the factory with no PIN and no PUK (GET_INFO bytes 7 and 8
-both `0`). The recommended order is `SET_PUK`, then `SET_PIN`: with no PIN on
-the card `SET_PUK` needs no session, and the card is never in the field with
-a PIN it cannot recover. The other order works too — `SET_PIN`, `VERIFY_PIN`,
-`SET_PUK` — and is the one for a card personalised before 0.6 existed, whose
-holder adds a PUK in their own session.
+A 2.0 card is set up in one tap, owner last, so a set-up cut short is finished by
+the next:
 
-**Verify bytes 7 and 8 are both `0` before `SET_PUK`; a card that is not is
-not yours to issue.** `SET_PUK` is free on a card with no PIN, so a card that
-already reports a PUK (byte 8 = `1`) and no PIN (byte 7 = `0`) is one that
-somebody else armed between the factory and your reader — one APDU in NFC
-range is enough. The `6A89` your own `SET_PUK` then gets is not a duplicate
-run: whoever holds that PUK can block the issued card's PIN with three wrong
-tries and `UNBLOCK_PIN` it to a PIN of their choosing, and the balance is
-theirs ([SECURITY-MODEL #16](../docs/SECURITY-MODEL.md)). The PUK cannot be
-replaced; do not issue the card, reinstall the CAP (which regenerates the key
-and clears both states) and personalise again.
+1. `SET_PIN` (or none: a card may have no PIN), `VERIFY_PIN`.
+2. `SET_CARD`: unit, refund key, mint.
+3. `SET_OWNER` with the tip header as its anchor.
+4. `GET_NONCE`, `SET_LIMIT` (thirteen bytes, with the rollover budget), if the
+   holder wants limits.
 
-```
-Personaliser                    Card
-  |                              |
-  |--- SELECT APPLICATION -----> |
-  |<-- 00 06 90 00 -------------|
-  |--- GET_INFO (0x01) --------> |
-  |<-- … 1F 00 00 + 90 00 ------|  (caps, PIN unset, PUK unset: yours to issue)
-  |--- SET_PUK (0x44) ---------> |  (8–12 digits; generated, not chosen)
-  |<-- 90 00 -------------------|
-  |--- SET_PIN (0x41) ---------> |  (the holder's PIN)
-  |<-- 90 00 -------------------|
-  |--- GET_INFO (0x01) --------> |
-  |<-- … 1F 01 01 + 90 00 ------|  (caps, PIN set, PUK set)
-```
-
-The PUK is generated by the personaliser and **recorded off the card** at the
-moment `SET_PUK` succeeds; the card never reveals it, and a PUK that is not
-recorded is a PUK that does not exist. Its custody is the backend card
-registry's (ENG-618), which releases it to the card's owning account after
-authentication; the card does not assume anything about where it lives, only
-that `UNBLOCK_PIN` is answered by whoever presents it. One PUK serves every
-PIN the holder sets afterwards: `CLEAR_PIN` and `SET_PIN` leave it in place.
-
----
+An unowned empty card may be claimed by the first phone that sets it up
+([`SECURITY-MODEL.md`](../docs/SECURITY-MODEL.md)); a card leaves the issuer
+owned, or is set up in the holder's hands.
 
 ## Provisioning Flow (Top-Up)
 
-```
-Reader                          Card
-  |                              |
-  |--- SELECT APPLICATION -----> |
-  |<-- 90 00 -------------------|
-  |--- VERIFY_PIN (0x40) ------> |  (PIN set at personalization)
-  |<-- 90 00 -------------------|
-  |--- CLEAR_SPENT (0x31) -----> |  (reclaim spent slots)
-  |<-- count + 90 00 -----------|
-  |--- LOAD_PROOF (0x30) ------> |  (repeat for each proof)
-  |<-- slot_idx + 90 00 --------|
-  |--- GET_BALANCE (0x11) -----> |  (verify new balance)
-  |<-- balance + 90 00 ---------|
-```
+The owner's phone: `GET_NONCE`, `ALLOW_LOAD`, then `LOAD_PROOF` (P1 = 1 with the
+mint's proof) for format-4 pieces locked to the card key, three to a command
+without proofs or one with. When online, `REFRESH` with the tip.
 
 ## Payment Flow (Offline Spend)
 
-```
-POS Terminal                    Card
-  |                              |
-  |--- SELECT APPLICATION -----> |
-  |<-- 90 00 -------------------|
-  |--- GET_BALANCE (0x11) -----> |
-  |<-- balance + 90 00 ---------|
-  |--- GET_SLOT_STATUS (0x14) -> |
-  |<-- slot statuses -----------|
-  |--- GET_PROOF (0x13, idx) --> |  (read proof to pay with)
-  |<-- proof data + 90 00 ------|
-  |--- SPEND_PROOF (0x20, idx) > |  (sign + mark spent atomically)
-  |<-- 64-byte signature --------|
-  |                              |
-  [Terminal submits proof + sig to Cashu mint via Lightning/HTTP]
-```
+A till: `SET_HEADER` with the tip when it has one; `GET_INFO` (P1 = 1: the no-PIN
+allowance), `GET_PIECES` (P2 = 3), `AUTH`; `SPEND_ALL_BEGIN`, `SPEND_ALL_OUTPUTS`,
+`SPEND_ALL_CHANGE`, `SPEND_ALL_SIGN` (with `VERIFY_PIN` first unless the
+allowance covers the payment); swap at the mint; load the change in the next tap
+(the change grant) or the same one.
