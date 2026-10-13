@@ -784,6 +784,24 @@ owner who chose 1 to 6 days gets a looser bound until a 2.0 phone sets it
 again (`ClockWalkTest.aFormWithoutTheByteSetsTheBudgetBackToSeven`). Foxy
 reviews this in the PR.
 
+**And a new way to strand funds.** In 1.20 a holder who had lost the owner
+key could still spend the card down, one daily limit a day; our reply to
+Foxy (question 3, "Losing the owner's words") relied on that. In 2.0 only
+the owner's proof refills the budget (`REFRESH`, or an anchored `SET_OWNER`,
+which also needs the old owner's proof), and nothing else lifts the limit
+(the owner's `SET_LIMIT`) or empties the card (`RESET_CARD`). So on a card
+with a daily limit and no owner key, the window stops rolling after the
+budget's rolls and stays where it is: what can still be paid is about
+(budget + 1) daily limits after the owner's last proof, and anything above
+that is stuck for good (`ClockWalkTest.aPinScriptGetsTheBudgetAndNoMore`
+shows the stop: 3 of 12 pieces with a budget of 2). A card with no daily
+limit is not affected. The architect's decision 14 falls back to a random
+per-card owner key kept only in the phone's Keychain when a user has no
+backed-up seed, so a lost or wiped phone is enough to cause this.
+flash-mobile's "This card's owner key lives only on this phone" copy has to
+say so, and an owner who cannot back the key up should be steered to no
+daily limit or a small balance (SECURITY-MODEL #14, #17).
+
 ---
 
 ## <a id="d21"></a>D21 — The field multiply does the same work for every input
