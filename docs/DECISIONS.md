@@ -845,6 +845,37 @@ order; jCardSim cannot tear a write and its transactions do not roll back.
 
 ---
 
+## <a id="d23"></a>D23 — The tear review of 2.0: every write outside a transaction, site by site
+
+**Decided (ENG-673, fix 4d):** every persistent write in `CashuApplet` that is
+not inside a `JCSystem` transaction was listed and reviewed against the
+[D14](#d14) rule: a multi-field write commits a single byte last, or is one
+transaction. The list is pinned by `SlotWriteOrderTest.everyWriteOutsideATransactionIsReviewed`,
+which counts such writes per method and fails on any method that gains one
+until it is reviewed here. One violation was found, and fixed in
+[D22](#d22); the rest hold, for these reasons:
+
+| Site | Writes outside | Why a tear there is safe |
+|---|---|---|
+| `loadOne` | the proof record, the hex text, the data, the status byte, then `changeDue` | Status byte last ([D14](#d14), [D17](#d17)): a tear leaves an EMPTY place, which nothing serves. `changeDue` is cleared after the commit: a tear leaves the change grant standing for one more tap, which opens loading only, never a payment (tested). |
+| `freeSpent` | the data zeroed, then the status byte | D14: a tear leaves a SPENT place, never counted or signed for; the next `CLEAR_SPENT` finishes it. |
+| `processSpendAllSign` | `burnList` | Written before the payment's transaction and read only while `burnPending` is set, which that transaction sets. A tear before it has burned nothing. |
+| `finishBurn` | each place's status byte | After the payment's commit: idempotent (a byte written twice is the same byte), redone from the top at the next command, and `burnPending` is cleared in a transaction of its own after them. |
+| `processSpendAllChange`, `blindChange` | an EMPTY opening's amount, keyset, date, nonce and `r`, then `openState` DRAFT | The state byte is the opening's commit: a torn opening stays EMPTY, which `GET_CHANGE` never serves, and the next change writes it whole (tested). |
+| `processSpendAllBegin`, `processGetChange`, `clearOpening` | one state byte per opening | Single bytes, each atomic; a draft let go or a pending opening released is the same state at the next pass. |
+| `failPinCheck` | `pinState` 2 | One byte, after the JCRE's own decrement of the counter. Torn between them, the card is state 1 over no tries: `VERIFY_PIN` and, since D22, the allowance read that as blocked. |
+| `processSetPin` | the allowance and its count zeroed | On a card with no PIN, before the PIN's transaction: each copy atomic, and a card with no PIN has no allowance to lose. |
+| `processResetCard` | the bulk wipes and the new keys | Then who the card is, in one transaction, last (Foxy's design): torn before it, the card is still its owner's, empty, and the owner resets it again. The wipe takes the rollover bytes ([D20](#d20)) with it. |
+| `processLockCard`, `processSetTag`, `armAllowance` | one byte | Atomic. |
+| `writeHeader`, `logEntry` | several | Helpers: every caller holds a transaction around them (pinned in `CashuAppletTest`). |
+| `initCardKeypair`, `initPinKey` | the key pairs | Install time: no card exists until `install` returns. |
+
+**What a scan cannot see.** The review is of the source. jCardSim cannot tear a
+write, and no 2.0 card has been pulled away mid-command on purpose; the states
+a tear leaves are set by hand in the tests and shown harmless, as in D14.
+
+---
+
 Small changes: open a PR and reference the decision id (e.g. "revisits D5").
 
 Changes that alter the product's shape — recovery, identity, custody, the

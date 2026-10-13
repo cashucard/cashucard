@@ -275,6 +275,16 @@ class SlotWriteOrderTest {
         java.lang.reflect.Field listField = CashuApplet.class.getDeclaredField("burnList");
         listField.setAccessible(true);
         burnList = (byte[]) listField.get(runtime.appletAt(aid));
+        applet = runtime.appletAt(aid);
+    }
+
+    /** The applet, for the arrays the D23 tests set by hand. */
+    private Applet applet;
+
+    private byte[] live(String name) throws Exception {
+        java.lang.reflect.Field f = CashuApplet.class.getDeclaredField(name);
+        f.setAccessible(true);
+        return (byte[]) f.get(applet);
     }
 
     /** The card taken out of the field and put back: a new power-up, the applet selected, the PIN typed again. */
@@ -687,5 +697,143 @@ class SlotWriteOrderTest {
         assertEquals(0, burnPending[0], "and the note is taken down");
         assertArrayEquals(CashuAppletTest.dleqHeld(b), dleqAt(1), "the piece beside it keeps its proof");
         assertArrayEquals(storeBefore, proofStore, "and the store is as it was");
+    }
+
+    // ── D23 (fix 4d): every persistent write outside a transaction, reviewed ─────────────────────────────────────
+
+    /**
+     * The applet's persistent state: the arrays made with `new` in the constructor (and `dleq`, made by the first
+     * SET_CARD), and the key and PIN objects. A write to any of them outside a JCSystem transaction lasts as it is
+     * written, one call at a time, and a tear between two such calls is a state the card must tolerate.
+     */
+    static final String[] PERSISTENT = { "proofStorage", "slotHex", "dleq", "cardLocked", "pinState", "cardRecord", "ownerSet", "tagOff",
+        "changeDue", "cardLog", "cardReceipts", "changeOpen", "openState", "lastSig", "burnList", "burnPending", "pinKeySig" };
+
+    /**
+     * Every method with a persistent write outside a transaction, the number of such writes in it, and why a tear between them
+     * is safe: the review of D23, one line a site. A method that gains such a write, or a new method with one, fails the test
+     * until it is reviewed here and in docs/DECISIONS.md D23.
+     */
+    static final String[][] REVIEWED = {
+        { "initCardKeypair", "1", "install time: no card exists until install() returns" },
+        { "initPinKey", "1", "install time" },
+        { "processSpendAllBegin", "1", "one byte per opening (a draft let go), each atomic; a tear leaves drafts the next BEGIN lets go" },
+        { "processSpendAllChange", "4", "an EMPTY opening's fields, then openState DRAFT: the state byte is the opening's commit" },
+        { "blindChange", "1", "r of the opening SPEND_ALL_CHANGE is filling, before its state byte" },
+        { "processGetChange", "1", "one byte: a pending opening whose piece is back on the card, let go" },
+        { "clearOpening", "1", "one byte: the opening of change just loaded, let go" },
+        { "processSpendAllSign", "2", "burnList, read only while burnPending is set, and burnPending is set in the payment's transaction after it" },
+        { "finishBurn", "1", "status bytes of a committed payment, idempotent, before burnPending is cleared in a transaction of its own" },
+        { "loadOne", "7", "D14/D17: record, hex, data, then the status byte last; changeDue after it (a tear leaves the change grant for one more tap, which opens loading only)" },
+        { "freeSpent", "2", "D14: data zeroed, then the status byte EMPTY last" },
+        { "writeHeader", "4", "a helper: every caller holds a transaction around it (CashuAppletTest pins the callers)" },
+        { "failPinCheck", "1", "one byte; the counter's decrement before it is the JCRE's, and a tear between leaves a counter at 0, which VERIFY_PIN and the allowance read as blocked (D22)" },
+        { "processSetPin", "2", "the allowance zeroed on a card with no PIN, before the PIN's transaction: each copy atomic, and a card with no PIN has no allowance" },
+        { "processLockCard", "1", "one byte" },
+        { "processResetCard", "14", "the bulk wipes, then who the card is in one transaction, last: torn before it, the card is still its owner's, who resets it again" },
+        { "processSetTag", "1", "one byte" },
+        { "logEntry", "4", "a helper: every caller holds a transaction around it" },
+        { "armAllowance", "1", "one byte (D20)" },
+    };
+
+    @Test
+    @DisplayName("D23: every persistent write outside a transaction is in a method reviewed for tearing, and each reviewed method has the number of them it was reviewed with")
+    void everyWriteOutsideATransactionIsReviewed() throws Exception {
+        String src = new String(java.nio.file.Files.readAllBytes(SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")),
+            java.nio.charset.StandardCharsets.UTF_8);
+        java.util.Map<String, Integer> found = writesOutsideTransactions(src);
+        java.util.Map<String, Integer> reviewed = new java.util.TreeMap<>();
+        for (String[] r : REVIEWED) reviewed.put(r[0], Integer.parseInt(r[1]));
+        assertEquals(reviewed, new java.util.TreeMap<>(found), "the methods with writes outside a transaction, and how many: review a change in DECISIONS D23 and here");
+    }
+
+    @Test
+    @DisplayName("D23: the inventory counts a write outside a transaction, not one inside, and not one inside a transaction whose catch aborts it")
+    void theInventoryCanSayNo() {
+        String src = "class A {\n"
+            + "    private void inside() { JCSystem.beginTransaction(); cardRecord[0] = 1; Util.arrayCopy(a, (short) 0, cardLog, (short) 0, (short) 4); JCSystem.commitTransaction(); }\n"
+            + "    private void outside() { pinState[0] = (byte) 1; Util.arrayFillNonAtomic(cardLog, (short) 0, (short) 4, (byte) 0); }\n"
+            + "    private void aborted() { JCSystem.beginTransaction(); try { k.setW(b, o, l); } catch (CryptoException e) { JCSystem.abortTransaction(); ISOException.throwIt(x); } ownerSet[0] = (byte) 1; JCSystem.commitTransaction(); }\n"
+            + "    private void reads() { if (pinState[0] == (byte) 1) { x = cardRecord[0]; } Util.arrayCopyNonAtomic(cardRecord, (short) 0, buf, (short) 0, (short) 4); }\n"
+            + "}\n";
+        java.util.Map<String, Integer> found = writesOutsideTransactions(src);
+        assertEquals(java.util.Collections.singletonMap("outside", 2), found);
+    }
+
+    /** Method name -> the persistent writes in it that are not between a beginTransaction and its commitTransaction. */
+    static java.util.Map<String, Integer> writesOutsideTransactions(String rawSrc) {
+        String src = SchnorrHWMathTest.stripCommentsAndCharLiterals(rawSrc);
+        StringBuilder alt = new StringBuilder();
+        for (String a : PERSISTENT) alt.append(alt.length() == 0 ? "" : "|").append(a);
+        String names = "(?:" + alt + ")";
+        Pattern write = Pattern.compile(
+            "\\b" + names + "\\s*\\[[^\\]]*\\]\\s*(?:[-+|&^]|<<|>>)?=(?!=)"
+            + "|Util\\.arrayCopy(?:NonAtomic)?\\s*\\([^;]*?,[^;]*?,\\s*" + names + "\\s*,"
+            + "|Util\\.arrayFill(?:NonAtomic)?\\s*\\(\\s*" + names + "\\s*,"
+            + "|\\baddUint32Stop\\s*\\(\\s*(?:cardLog|cardReceipts)\\s*,"
+            + "|\\b(?:ownerKey\\.setW|cardKeyPair\\.genKeyPair|pinKeyPair\\.genKeyPair|pin\\.update)\\s*\\(");
+        Pattern method = Pattern.compile("\\n    (?:private|public|protected|static)[^\\n;=]*?(\\w+)\\s*\\([^)]*\\)\\s*\\{");
+        java.util.Map<String, Integer> out = new java.util.LinkedHashMap<>();
+        Matcher m = method.matcher(src);
+        while (m.find()) {
+            int open = m.end() - 1, depth = 0, close = open;
+            for (int i = open; i < src.length(); i++) {
+                char c = src.charAt(i);
+                if (c == '{') depth++;
+                else if (c == '}' && --depth == 0) { close = i; break; }
+            }
+            String body = src.substring(open, close);
+            Matcher w = write.matcher(body);
+            int outside = 0;
+            while (w.find()) {
+                String before = body.substring(0, w.start());
+                int begun = count(before, "JCSystem.beginTransaction()"), committed = count(before, "JCSystem.commitTransaction()");
+                if (begun <= committed) outside++;
+            }
+            if (outside > 0) out.merge(m.group(1), outside, Integer::sum);
+        }
+        return out;
+    }
+
+    private static int count(String s, String what) {
+        int n = 0;
+        for (int at = s.indexOf(what); at >= 0; at = s.indexOf(what, at + 1)) n++;
+        return n;
+    }
+
+    @Test
+    @DisplayName("D23: a SPEND_ALL_CHANGE torn before its opening's state byte leaves an EMPTY opening with bytes in it: GET_CHANGE serves nothing, and the next change takes the opening whole")
+    void aTornChangeOpeningIsNeverServed() throws Exception {
+        freshCard();
+        byte[] changeOpen = live("changeOpen"), openState = live("openState");
+        java.util.Arrays.fill(changeOpen, 0, CashuApplet.OPEN_LEN, (byte) 0x5A);   // the amount, keyset, date, nonce and r of a change never committed
+        assertEquals(CashuApplet.OPEN_EMPTY, openState[0], "the state byte, the commit, was never written");
+        powerCycle();
+        ResponseAPDU change = send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_CHANGE, 0, 0, 256));
+        assertEquals(CashuAppletTest.SW_OK, change.getSW());
+        assertEquals(0, change.getData()[0], "no opening is served");
+        assertEquals(1, change.getData().length);
+        // a payment that makes change takes the first EMPTY opening and writes all of it, the state byte last
+        assertEquals(CashuAppletTest.SW_OK, load(CashuAppletTest.PROOF_1).getSW());
+        assertEquals(CashuAppletTest.SW_OK, send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4)).getSW());
+        assertEquals(CashuAppletTest.SW_OK, send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_CHANGE, 0, 0, CashuAppletTest.u32(500), 256)).getSW());
+        assertEquals(CashuApplet.OPEN_DRAFT, openState[0], "the opening, now a draft");
+        assertEquals(500, CashuAppletTest.readUint32(changeOpen, CashuApplet.OPEN_AMOUNT), "its amount is this change's, not the torn one's");
+        assertTrue(changeOpen[CashuApplet.OPEN_R] != 0x5A || changeOpen[CashuApplet.OPEN_R + 1] != 0x5A, "and its r is new");
+    }
+
+    @Test
+    @DisplayName("D23: a change load torn after its status byte and before changeDue is cleared leaves the change grant for one more tap: it opens loading, and no payment")
+    void aTornChangeLoadLeavesTheGrantForLoadingOnly() throws Exception {
+        freshCard();
+        assertEquals(CashuAppletTest.SW_OK, load(CashuAppletTest.PROOF_1).getSW());
+        live("changeDue")[0] = 1;   // the note a payment leaves, still standing as a tear after the change's status byte would leave it
+        sim.reset();
+        assertEquals(CashuAppletTest.SW_OK, send(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, CashuAppletTest.hexToBytes(CashuAppletTest.AID_STR))).getSW());
+        assertEquals(CashuAppletTest.SW_PIN_NEEDED, send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4)).getSW() == CashuAppletTest.SW_OK
+            ? send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64)).getSW() : -1, "no payment without the PIN: the grant is not the PIN");
+        assertEquals(1, storage[CashuAppletTest.SLOT * 0] , "the piece is unspent");
+        assertEquals(CashuAppletTest.SW_OK, load(CashuAppletTest.PROOF_2).getSW(), "a load, which the grant is for");
+        assertEquals(0, live("changeDue")[0], "and the load that used it takes the note down");
     }
 }
