@@ -1,8 +1,9 @@
-# cardctl — host-side driver for the Cashu JavaCard applet
+# cardctl — host-side driver for the Cashu card applet, protocol 2.0
 
-A PC/SC command-line tool that speaks the full command set in
-[`spec/APDU.md`](../../spec/APDU.md), over either a contact or a contactless
-reader.
+A PC/SC command-line tool that speaks protocol 2.0 as
+[`spec/APDU.md`](../../spec/APDU.md) has it, over either a contact or a
+contactless reader: the reads, `AUTH`, the owner's commands (with a P-256
+owner key, `p256.py`), the clock, loads and the PIN.
 
 Until this existed there was **no way to talk to a card at all** — the applet
 had been exercised only under jCardSim, which cannot surface EEPROM exhaustion,
@@ -46,46 +47,45 @@ python3 cardctl.py readers      # is the reader visible?
 python3 cardctl.py selftest     # the one that matters
 ```
 
-`selftest` is the card-arrival test. It selects the applet, reads the public
-key, asks the card to sign random messages, and **verifies each signature
-against BIP-340** — then checks that two signatures over the *same* message use
-different nonces, which is a real security property rather than a nicety (a
-nonce that is a pure function of `(d, msg)` lets a fault injector recover the
-private key from two signatures).
+`selftest` is the card-arrival test. It selects the applet, reads `GET_INFO`,
+the public key and the record, asks the card to prove itself with `AUTH` over
+random bytes of ours, and **verifies each signature against BIP-340** — then
+checks that two `AUTH`s over the *same* bytes use different nonces, which is a
+real security property rather than a nicety (a nonce that is a pure function of
+`(d, msg)` lets a fault injector recover the private key from two signatures).
+`AUTH` burns nothing and needs no PIN.
 
 ```
-PASS  SELECT applet  — version 0.4
-PASS  GET_INFO  — v0.4, 32 slots, PIN unset
-PASS  Schnorr capability advertised  — caps=0x07
+PASS  SELECT applet  — version 2.0
+PASS  GET_INFO  — v2.0, 128 slots, PIN set, owner yes
+PASS  format 4 (SIG_ALL pieces)  — format 4
+PASS  Schnorr capability advertised  — caps=0xFF
 PASS  GET_PUBKEY well-formed  — 02a1b2c3d4e5f60718…  (33 bytes)
-PASS  SIGN_ARBITRARY + BIP-340 verify [1/3]
+PASS  AUTH + BIP-340 verify [1/3]
 ...
-All 11 checks passed on physical hardware.
+All 13 checks passed on physical hardware.
 ```
 
-On a card with a PIN set, pass `--pin`: spend and sign are PIN-gated (D13),
-so the signing rounds need a verified session.
+Pass `--pin` to check the PIN as well. A card that is not protocol 2.0 fails at
+`SELECT applet` (a 0.x or Foxy 1.x card does not even answer the 2.0 AID: it
+needs an update, and its balance is swept first). A card whose PIN is blocked
+(`GET_INFO` byte 7 = 2) fails at `PIN state`: no payment signs until the owner's
+`change-pin` sets a new PIN, which unblocks it (no PUK on 2.0: [D18](../../docs/DECISIONS.md#d18)).
 
-Every card below applet 0.4 fails `selftest` at `SELECT applet`, blocked or
-not. Builds below 0.3 gate with `pinState == 1`, so three wrong `VERIFY_PIN`s
-from any reader in range switch the PIN check off (ENG-615). A 0.3 card may run
-the build `main` tracked before the ENG-620 fix, which writes a slot's status
-byte before its data ([D14](../../docs/DECISIONS.md#d14)), and nothing on the
-card tells it apart from another 0.3 build. Either way, sweep the balance and
-reinstall the 0.4 CAP, except that a 0.3 card whose PIN is blocked cannot be
-swept. A card whose PIN is blocked (`GET_INFO` byte 7 = 2) also fails before
-any signing round, since no PIN can verify on it again; on 0.3 to 0.5 that
-means the balance is stranded (SECURITY-MODEL #14). On 0.6 with a PUK set
-(byte 8 = 1) it is not: `selftest` names `unblock-pin`, and the balance is a
-`verify-pin` away once the PIN is replaced (D16). A 0.6 card with no PUK, or
-an exhausted one, is as stranded as a 0.5 card.
+`info` says the owner, the clock, the limits and the rollover budget
+([D20](../../docs/DECISIONS.md#d20)): `rollover budget : 2 of 7 rolls since the
+owner's last refresh`. At 7 of 7 the day's window stands until the owner's
+`refresh` with the tip header.
 
-| `info` on 0.6 | meaning |
-|---|---|
-| `PUK : unset` | no PUK yet; `set-puk` works (with `--pin` if the card has a PIN) |
-| `PUK : set` | `unblock-pin` recovers a blocked PIN |
-| `PUK : exhausted` | ten wrong PUKs; no recovery path, no new PUK |
-| `PUK : none (applet 0.5 …)` | the card has no PUK byte at all; reinstall for one |
+## The owner key
+
+The owner's commands (`set-owner` on an owned card, `set-card` on an owned card,
+`set-limit`, `change-pin`, `refresh`, `load --owner`, `set-pin --owner`, `lock`)
+sign a proof with `--owner-key`, a 32-byte P-256 private key in hex. Without it,
+cardctl signs with its **TEST key** (`p256.TEST_OWNER_PRIVATE`, derived from a
+fixed string in `p256.py`) and says so on stderr: anyone with this repository
+holds it, so it is for bench cards only. A card handed to a person is owned by
+the holder's phone.
 
 ## Loading the applet
 
@@ -94,8 +94,7 @@ CAP and use [GlobalPlatformPro](https://github.com/martinpaljak/GlobalPlatformPr
 
 ```bash
 cd applet && ant clean cap
-gp -install target/cashu-javacard-0.1.0.cap
-gp -list
+# three applets, the opener first: docs/HARDWARE_DEPLOYMENT.md has the commands
 ```
 
 **The card must be JavaCard 3.0.5 or later** — the applet needs
@@ -112,34 +111,34 @@ reader is the more reliable way to install, leaving NFC for tap testing.
 |---|---|
 | `readers` | list PC/SC readers |
 | `-t`/`--timing` (any command) | time every APDU to stderr, summary table at exit |
-| `selftest [--rounds N] [--pin P]` | full hardware check incl. BIP-340 verification |
-| `info` | version, slot counts, capabilities, PIN state, balance |
+| `selftest [--rounds N] [--pin P]` | full hardware check incl. BIP-340 verification of `AUTH` |
+| `info` | version, slots, PIN, owner, record, clock, limits, rollover budget, balance |
 | `pubkey` | 33-byte compressed public key |
 | `balance` | sum of unspent proof amounts |
-| `slots [--all]` | per-slot status |
-| `proof <slot>` | decode one proof slot |
-| `sign [--message HEX]` | SIGN_ARBITRARY, then verify |
-| `spend <slot> [--message HEX]` | SPEND_PROOF, verify, confirm the slot flipped to spent |
-| `load --keyset ID --amount N [--nonce HEX] [--c HEX] [--pin P]` | LOAD_PROOF. `ID` is the full 16-hex-char NUT-02 keyset id. |
-| `load-file PATH [--pin P]` | LOAD_PROOF every proof in a card file. Refuses if the file is for a different card, or if the card has too few free slots. Re-runnable: proofs already on the card are skipped, spent ones are never written back. |
-| `dump --mint URL [--unit U] [--out PATH] [--force] [--unspent-only]` | Write the card's slots out as a card file. `--out` refuses to overwrite without `--force`. |
+| `auth` | `AUTH`, then verify the signature |
+| `slots [--all]` | per-slot status (128 slots) |
+| `proof <slot>` | decode one 82-byte proof slot, with its date |
+| `load --keyset ID --amount N [--nonce HEX] [--c HEX] [--date T] [--pin P \| --owner]` | `LOAD_PROOF`. `ID` is the full 16-hex-char NUT-02 keyset id. `--owner` loads under the owner's grant (`ALLOW_LOAD`), no PIN |
 | `clear-spent [--pin P]` | free spent slots |
-| `verify-pin` / `set-pin` / `change-pin` | PIN management |
-| `clear-pin --pin` | remove the PIN; the card is a bearer card again (applet 0.5, D15). Verifies the PIN first, refuses a card without the capability bit |
-| `set-puk --puk P [--pin Q]` | set the provisioning PUK, once (applet 0.6, D16). Needs `--pin` on a card that has a PIN (verified first); on a card with no PIN `--pin` is ignored with a notice, so a script may pass it uniformly. Refuses a card without the capability bit, one whose PUK is already set or exhausted, and a blocked card with no PUK. A card that reports a PUK **and no PIN** is refused with a different message: nobody you trust set that PUK, do not issue the card, reinstall the CAP (spec/APDU.md, Personalisation; SECURITY-MODEL #16). Record the PUK off the card: it is never read back |
-| `unblock-pin --puk P --new-pin N` | replace a blocked or forgotten PIN with the PUK (applet 0.6, D16). Sends no `VERIFY_PIN`; refuses, before spending a PUK try, a card with no PUK, an exhausted PUK, no PIN, or no capability bit. A `63 CX` here is reported as a wrong **PUK** with X PUK tries left (terminal at 0), and `6983` as the PUK exhausted — re-check `--puk`, not `--new-pin`. The new PIN then needs `verify-pin` as usual |
-| `lock [--yes]` | **irreversibly** disable writes |
+| `verify-pin PIN` | verify the PIN for this tap |
+| `set-pin PIN [--owner]` | set the PIN on an open card; `--owner` adds one to an owned card with none (ADD PIN) |
+| `change-pin NEW` | the owner sets a new PIN: no old PIN, any state; unblocks a blocked card |
+| `set-card --mint URL [--refund HEX] [--pin P]` | write the record (the owner's proof on an owned card) |
+| `set-owner [--anchor HEADER] [--old-owner-key HEX]` | give the card its owner (the public half of `--owner-key`), anchored at a block header |
+| `set-limit --day N [--payment N --allowance N [--budget R]]` | the owner's limits; `--budget` (1–30) is the rollover budget, and needs the two before it |
+| `set-header --header HEX` | `SET_HEADER`: show the card a block header |
+| `refresh --header HEX` | `REFRESH`: the owner's proof over the tip header; the rollover budget is full again |
+| `lock --pin P [--yes]` | **irreversibly** disable writes: the PIN and the owner's proof |
+| `dump --mint URL [--unit U] [--out PATH] [--force] [--unspent-only]` | **0.x cards only**: write the card's slots out as a card file. `--out` refuses to overwrite without `--force` |
+| `load-file PATH [--pin P]` | **0.x cards only**: `LOAD_PROOF` every proof in a card file. Refuses a file for another card or too few free slots; re-runnable |
 | `apdu <hex>` | send a raw APDU |
 
-Breaking changes to `load` (if you have a provisioning script written against an
-earlier revision, all three fail loudly rather than silently):
-
-- `--secret` was renamed `--nonce`. The value is unchanged — the card stores
-  32 bytes of P2PK *nonce*, and a reader rebuilds the full NUT-10 secret from
-  the nonce plus `GET_PUBKEY`.
-- `--keyset-hex` was removed. Hex is now the only interpretation of `--keyset`,
-  so the flag had no meaning left; pass the full 16-hex-char id to `--keyset`.
-- `Card.get_proof()` returns that field under the key `nonce`, not `secret`.
+Gone with the 0.x wire ([D18](../../docs/DECISIONS.md#d18)): `sign`
+(`SIGN_ARBITRARY`, which signed anything and burned nothing), `spend`
+(`SPEND_PROOF`; a 2.0 payment is `SPEND_ALL_*` with a mint's outputs, which a
+till drives), `clear-pin`, `set-puk` and `unblock-pin`. Their opcodes `43`, `44`,
+`45` are `SET_OWNER`, `GET_NONCE` and `ALLOW_LOAD` on 2.0, so they must not come
+back; `test_apdu.py` checks the parser refuses them.
 
 Global flags: `-r/--reader N` to pick a reader, `-v/--verbose` to log every APDU
 to stderr — use `-v` when a command misbehaves, since the raw exchange usually
@@ -154,28 +153,31 @@ table (count, min, median, max, total) follows at exit, even when the command
 fails partway.
 
 ```bash
-python3 cardctl.py --timing selftest --rounds 10    # 12 signatures, 1 table
-python3 cardctl.py -t spend 0                        # one SPEND_PROOF, timed
+python3 cardctl.py --timing selftest --rounds 10    # 12 AUTH signatures, 1 table
+python3 cardctl.py -t refresh --header <hex>         # GET_NONCE + one ECDSA verify + a header, timed
 ```
+
+2.0 changed the field multiply ([D21](../../docs/DECISIONS.md#d21)): re-measure
+`AUTH` on the J3R180 before a release.
 
 Compare like with like: a contact reader, the ACR122U over RF and a phone over
 NFC all give different numbers for the same card, and the phone adds field
 discovery that none of these capture. The median is the figure to quote.
 
-## A warning about `spend`
-
-`SPEND_PROOF` is **irreversible**: the card marks the slot spent before it
-returns the signature, and nothing can unmark it. On a card holding real
-proofs, `spend` burns one. Use `sign` for signature testing — it exercises the
-same signing path without consuming anything.
+## A warning about `load`
 
 `load` without `--c` inserts a random placeholder in place of the mint's
 signature. That is fine for exercising storage and slot management, but such a
-proof can never be redeemed at a mint.
+proof can never be redeemed at a mint. A 2.0 card signs only format-4 `SIG_ALL`
+pieces locked to its key ([`spec/NUT-XX.md`](../../spec/NUT-XX.md)); `load`
+writes whatever it is given, so a real top-up is a wallet's NUT-11 swap first.
 
-## Card files
+## Card files (0.x cards only)
 
-`dump` and `load-file` speak the interchange format in
+Card files describe the 0.x applet's pieces (no date, the 0.x secret), so `dump`
+and `load-file` select the 0.x AID and refuse any other card
+([`spec/CARD-FILE.md`](../../spec/CARD-FILE.md)): they are kept for the sweep of
+0.x cards (docs/HARDWARE_DEPLOYMENT.md). They speak the interchange format in
 [`spec/CARD-FILE.md`](../../spec/CARD-FILE.md), the intended contract with
 cashu-client's `serializeCardFile` / `parseCardFile`. `test_card_file.py` parses
 the spec and asserts this driver's parser and writer against the published field
@@ -220,13 +222,14 @@ refuses the whole dump.
 
 ```bash
 python3 test_bip340.py            # verifier: spec vectors, reference round-trip, mutations
+python3 test_p256.py              # the owner's ECDSA: RFC 6979 vectors and the card's own (spec/vectors/owner.json)
 python3 test_apdu.py              # every command's bytes, against spec/APDU.md
-python3 test_spec_consistency.py  # cardctl vs spec/APDU.md, parsed from the doc
+python3 test_spec_consistency.py  # cardctl vs spec/APDU.md, NUT-XX.md and the applet, parsed
 python3 test_card_file.py         # card file read/write, against spec/CARD-FILE.md
 python3 test_hwtest_65byte_pubkey.py  # host-side pubkey normalisation used by hwtest_65byte_pubkey.py
 ```
 
-All five run without a reader or a card. The BIP-340 tests matter more than they
+All six run without a reader or a card. The BIP-340 tests matter more than they
 look: `selftest`'s verdict is only as trustworthy as the verifier behind it, so
 that verifier is checked against the specification's own vectors, round-tripped
 against an independent reference signer, and mutation-tested to prove it can
@@ -238,7 +241,8 @@ the check behind section 8 of
 on a card whose `GET_PUBKEY` returns a 65-byte uncompressed point (the applet
 before #23) it normalises the key on the host, confirms the point is on
 secp256k1, and then runs the same sign/verify and nonce-freshness rounds as
-`selftest`. It sends only SELECT, GET_PUBKEY and SIGN_ARBITRARY.
+`selftest`. It sends only SELECT, GET_PUBKEY and SIGN_ARBITRARY, so it is a
+0.x tool: it selects the 0.x applet and refuses any other card.
 
 ```bash
 python3 hwtest_65byte_pubkey.py -r 1   # reader index, as for cardctl

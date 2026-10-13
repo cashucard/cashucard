@@ -19,6 +19,11 @@ Run from tools/cardctl with the same venv and reader index as cardctl:
 
     python hwtest_65byte_pubkey.py -r 1
 
+It is a record of a 0.x card and stays one: SIGN_ARBITRARY (0x21) is gone in
+protocol 2.0 (DECISIONS D18), so this script selects the 0.x AID and refuses a
+card that is not 0.x. For a 2.0 card, `cardctl selftest` checks the same
+things over AUTH.
+
 Every line the script prints is quoted verbatim in the report's section 8
 results block. Exit status is 0 only if every check passed. The applet-side
 fix (#23) makes GET_PUBKEY return 33 bytes, which this script also accepts, so
@@ -118,7 +123,11 @@ def main() -> int:
     args = p.parse_args()
 
     card = cardctl.Card(reader_index=args.reader, verbose=args.verbose)
-    card.select()
+    version = card.select(legacy=True)
+    if not version or version[0] != 0:
+        raise SystemExit("this script is for the 0.x applet; a 2.0 card is checked by `cardctl selftest`")
+    # SIGN_ARBITRARY, which only the 0.x applet has (cardctl 2.0 does not send it)
+    card.sign = lambda msg: card.send(0x21, data=msg, le=0x40, context="SIGN_ARBITRARY")
     return 0 if run(card, args.rounds) else 1
 
 
