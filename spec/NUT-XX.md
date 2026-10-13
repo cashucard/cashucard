@@ -192,9 +192,12 @@ A card whose owner was set with an anchor header never runs on an unset clock.
   someone who obtained its signature twice; it can only refuse to sign twice.
 - **Mint trust.** The mint is trusted for solvency (NUT-06 operators should
   publish reserves).
-- **Side channels.** The card's arithmetic on its key and nonces has no
-  secret-dependent branches (DECISIONS D21); the chip's EC and RSA engines are the
-  vendor's.
+- **Side channels.** The two byte-array multiplies on the card's key and nonces
+  (`mul256x256`, `mulByDelta`) have no secret-dependent branch (DECISIONS D21).
+  The modular reductions on the same signing path still branch on values derived
+  from the key and the nonce (`reduce512toModN`, `addModN`, `reduceModN`, `sub32`,
+  `cmp32`); they are an open item (SECURITY-MODEL, open item 5), and no timing has
+  been measured on silicon. The chip's EC and RSA engines are the vendor's.
 
 ---
 

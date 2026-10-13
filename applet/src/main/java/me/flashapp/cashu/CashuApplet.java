@@ -117,7 +117,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // (2 was the allowance draft and the first limit).
     // 2.0 is the shared protocol (ENG-673, DECISIONS D18): Foxy's 1.20 under the neutral AID F0 CASHUCARD and the neutral
     // labels "CashuCard/..." (D19), with the rollover budget, REFRESH, the armed allowance and the clock anchored at
-    // SET_OWNER (D20), a field multiply with no secret-dependent branch (D21), the PIN state as the PIN's commit byte (D22),
+    // SET_OWNER (D20), a field multiply with no secret-dependent branch (D21; the reductions still branch, SECURITY-MODEL open item 5), the PIN state as the PIN's commit byte (D22),
     // the tear review (D23) and a floor of work recomputed for its own time (D24).
     // The minor counts from 0 again: 2.0 is the first of the shared wire.
     static final byte VERSION_MAJOR = (byte) 0x02;

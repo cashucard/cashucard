@@ -176,6 +176,57 @@ class SchnorrHWMathTest {
         org.junit.jupiter.api.Assertions.assertFalse(branchyMultiplies(anIf).isEmpty(), "an if in mulByDelta passed");
     }
 
+    /**
+     * D21's reach (review of PR #34). D21 took the branches out of the two multiplies and nothing else: the reductions on
+     * the same signing path still branch on values derived from the key and the nonce (e·d, k + e·d, k). An earlier
+     * spec sentence claimed the card's arithmetic had no secret-dependent branches at all, which a reviewer would read as
+     * "no timing analysis needed". This holds the documents to the source: every helper here that still branches is
+     * named as open in SECURITY-MODEL item 5, and neither the spec nor the threat table claims more than the multiplies.
+     * When a helper is made branch-free, this fails until it leaves the list and the documents.
+     */
+    static final String[] OPEN_BRANCHING_REDUCTIONS = { "reduce512toModN", "addModN", "reduceModN", "sub32", "cmp32", "mulSmallByDelta" };
+
+    @Test
+    @DisplayName("D21's reach: the reductions that still branch are open in SECURITY-MODEL item 5, and no document claims the whole arithmetic is branch-free")
+    void theReductionsThatStillBranchAreListedAsOpen() throws Exception {
+        String src = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")),
+            java.nio.charset.StandardCharsets.UTF_8));
+        java.nio.file.Path root = mainSourceDir().toAbsolutePath().normalize();
+        for (int i = 0; i < 7; i++) root = root.getParent();   // <repo>/applet/src/main/java/me/flashapp/cashu -> <repo>
+        String model = flat(root.resolve("docs").resolve("SECURITY-MODEL.md"));
+        String nut = flat(root.resolve("spec").resolve("NUT-XX.md"));
+        String decisions = flat(root.resolve("docs").resolve("DECISIONS.md"));
+        int from = model.indexOf("5. **Side-channel review**");
+        int to = model.indexOf("6. **", from);
+        org.junit.jupiter.api.Assertions.assertTrue(from >= 0 && to > from, "SECURITY-MODEL has open item 5");
+        String item5 = model.substring(from, to);
+        int d21 = decisions.indexOf("D21 — ");
+        String d21Text = decisions.substring(d21, decisions.indexOf("D22 — ", d21));
+        java.util.List<String> problems = new java.util.ArrayList<>();
+        for (String name : OPEN_BRANCHING_REDUCTIONS) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("static\\s+\\w+\\s+" + name + "\\(").matcher(src);
+            if (!m.find()) { problems.add(name + " is not in SchnorrHW"); continue; }
+            int[] body = bodyRange(src, m.group());
+            String b = src.substring(body[0], body[1]);
+            boolean branches = java.util.regex.Pattern.compile("\\b(if|while|continue|break)\\b").matcher(b).find() || b.contains("?");
+            if (!branches) problems.add(name + " no longer branches: take it out of OPEN_BRANCHING_REDUCTIONS, SECURITY-MODEL item 5 and D21's reach");
+            if (!item5.contains("`" + name + "`")) problems.add(name + " branches and is not named in SECURITY-MODEL open item 5");
+            if (!d21Text.contains(name)) problems.add(name + " branches and is not named in D21's 'What this does not reach'");
+        }
+        if (nut.contains("arithmetic on its key and nonces has no secret-dependent branches")) {
+            problems.add("spec/NUT-XX.md claims the card's whole arithmetic has no secret-dependent branches; D21 covers the multiplies only");
+        }
+        if (model.contains("Mitigated in our arithmetic")) {
+            problems.add("SECURITY-MODEL #19 calls timing 'Mitigated in our arithmetic'; the reductions still branch");
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
+    /** A document's text with every run of whitespace made one space, so that a phrase wrapped across lines is found. */
+    private static String flat(java.nio.file.Path p) throws java.io.IOException {
+        return new String(java.nio.file.Files.readAllBytes(p), java.nio.charset.StandardCharsets.UTF_8).replaceAll("\\s+", " ");
+    }
+
     /** `continue`, `if`, `while`, `break`, `?` or `return` in the bodies of mul256x256 and mulByDelta: each a branch whose timing could follow a byte of the operands. */
     static java.util.List<String> branchyMultiplies(String rawSrc) {
         String src = stripCommentsAndCharLiterals(rawSrc);

@@ -810,9 +810,15 @@ item 5).
 **Cost accepted.** A zero row now costs what any row costs, about one row in
 256 on random input; the carry write is cheaper than the loop it replaces.
 Re-measure `cardctl --timing` on the J3R180 before release. What this does not
-reach: the chip's own `KeyAgreement` and RSA engines, which do the point
-multiply and the field exponentiations, and whose timing is NXP's; and the
-JavaCard VM's own timing of a multiply, which is not specified constant.
+reach: the modular reductions on the same signing path, which still branch on
+values derived from the key and the nonce (`reduce512toModN` over e·d,
+`addModN` over k + e·d, `reduceModN` over k, the `sub32` and `cmp32` they
+call, and `mulSmallByDelta`'s overflow check; listed as open in SECURITY-MODEL item 5, and held to the source by
+`SchnorrHWMathTest`): so the signing path as a whole is not free of
+secret-dependent branches, and nothing in 2.0 says it is; the chip's own
+`KeyAgreement` and RSA engines, which do the point multiply and the field
+exponentiations, and whose timing is NXP's; and the JavaCard VM's own timing
+of a multiply, which is not specified constant.
 
 ---
 

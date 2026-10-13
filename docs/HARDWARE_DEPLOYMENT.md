@@ -257,8 +257,8 @@ and the money with it, by anyone with a reader.
 | SHA-256 | `MessageDigest.ALG_SHA_256` |
 | k·G scalar multiply | `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY` |
 | BIP-340 aux randomness | `RandomData.ALG_SECURE_RANDOM` |
-| 256-bit mulModN | Schoolbook 256×256, no secret-dependent branch ([D21](DECISIONS.md#d21)), + 2-level DELTA reduction |
-| 256-bit addModN | Carry-propagation + conditional subtract |
+| 256-bit mulModN | Schoolbook 256×256, no secret-dependent branch ([D21](DECISIONS.md#d21)), + 2-level DELTA reduction (which still branches: SECURITY-MODEL open item 5) |
+| 256-bit addModN | Carry-propagation + conditional subtract (a secret-dependent branch: open item 5) |
 
 DELTA = 2^256 mod n = `0x00...01 45512319 50B75FC4 402DA173 2FC9BEBF`
 

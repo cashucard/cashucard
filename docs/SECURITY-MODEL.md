@@ -37,7 +37,7 @@ get around it rather than through it.
 | 16 | A piece on the card that the mint never made (software 1.20) | **Checked by the reader, not by the card** | The card keeps the mint's NUT-12 proof for a piece and gives it back; it checks nothing. A reader that checks it, with the mint's keys, sees that a made-up `C` is not real, and a piece copied from another card is not real here. It does not show that a real piece is unspent. Reading the proof gives away `r`, which ties a piece to the request that made it if the mint is given it. See below. |
 | 17 | A terminal with the PIN walks the card's clock with real block headers | **Bounded by the rollover budget** (2.0) | Real headers are free, so in 1.20 every header a day later began a new day and a new limit. In 2.0 the window rolls at most the rollover budget's times (default 7) between the owner's `REFRESH`es; past it the day stands. The no-PIN allowance renews only once per arming (a PIN or an owner's proof), so a reader with no PIN gets one allowance per arming. [D20](DECISIONS.md#d20). |
 | 18 | An unowned empty card is claimed by the first phone that sets it up | **Accepted for v1** | A card out of its packet has no owner and holds nothing, so any reader in range can give it a PIN, a record and an owner of its own (`SET_OWNER`, no proof). Nothing is lost: the card cannot be loaded until it has an owner. A card set up in its holder's hands, by the holder's phone ("Set up this card"), is that holder's; cards issued by Flash leave the issuer owned or are set up at hand-over. A claimed card is reset by its claimant only. |
-| 19 | Timing the card's signatures to learn its key | **Mitigated in our arithmetic**; not measured | `AUTH` gives any reader as many timed signatures as it asks for. The byte-array field multiplies on the nonce and the key have no secret-dependent branch ([D21](DECISIONS.md#d21)); the chip's EC and RSA engines, which do the point multiply, are NXP's. No timing has been measured on silicon. |
+| 19 | Timing the card's signatures to learn its key | **Partially**: the multiplies only; not measured | `AUTH` gives any reader as many timed signatures as it asks for. The two byte-array field multiplies on the nonce and the key have no secret-dependent branch ([D21](DECISIONS.md#d21)). The modular reductions on the same path still do (`reduce512toModN`, `addModN`, `reduceModN`, `sub32`, `cmp32`; open item 5). The chip's EC and RSA engines, which do the point multiply, are NXP's. No timing has been measured on silicon. |
 
 ## The offline double-spend problem (#5)
 
@@ -230,7 +230,9 @@ leaves an empty place with a record beside it, which nothing serves.
   budget; the no-PIN allowance renews once per arming; an anchored owner's clock is
   never 0
 - The field multiplies against `BigInteger` on operands full of zero bytes, and a
-  source scan for secret-dependent branches (2.0, D21)
+  source scan for secret-dependent branches in the two multiplies (2.0, D21); the
+  reductions' branches are listed as open (item 5), and a scan holds the list to
+  the source
 - A `SIG_ALL` payment through the bridge, with the card's own change, swapped at a
   Nutshell 0.20.3 mint, with the mint's DLEQ checked from what the card keeps (CI)
 - DLEQ verification, including the tagging attack it exists to catch
@@ -296,10 +298,23 @@ a few hundred taps. Treat simulator results accordingly — see
 4. **Card attestation** (#13) — no proof a key was generated on-card by genuine
    firmware.
 5. **Side-channel review** of `SchnorrHW` — the modular arithmetic was written
-   for correctness. Since 2.0 the two byte-array multiplies have no
-   secret-dependent branch ([D21](DECISIONS.md#d21)), but nothing has been
-   measured on silicon, and the chip's own EC and RSA engines are not ours to
-   analyse.
+   for correctness. Since 2.0 the two byte-array multiplies (`mul256x256`,
+   `mulByDelta`) have no secret-dependent branch ([D21](DECISIONS.md#d21)).
+   The reductions on the signing path still branch on values derived from the
+   key and the nonce, and are open:
+   - `reduce512toModN`, over e·d: the carry fold's `while (carry != 0)` and the
+     final `while (cmp32(out, N) >= 0)` subtract;
+   - `addModN`, over k + e·d: the subtract of n on `carry != 0 || cmp32(out, N) >= 0`;
+   - `reduceModN`, over k: the subtract of n on `cmp32(k, N) >= 0`;
+   - `sub32`: a branch on each byte's borrow;
+   - `cmp32`: returns at the first byte that differs;
+   - `mulSmallByDelta`: an `if` on each byte of its overflow check (never taken
+     for any input the reduction makes).
+
+   The fix is a fixed-iteration reduction with masked subtracts, scanned in the
+   source as the multiplies are (`SchnorrHWMathTest` holds this list to the
+   source). Nothing has been measured on silicon, and the chip's own EC and RSA
+   engines are not ours to analyse.
 6. **Trustless proof of reserves** — upgrade the attestation to signed
    statements from the reserve wallets.
 
