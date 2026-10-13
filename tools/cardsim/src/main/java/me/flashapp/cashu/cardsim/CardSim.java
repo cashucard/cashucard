@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 /**
- * cardsim: the real CashuApplet in jCardSim, served over loopback HTTP.
+ * cardsim: the real CashuApplet, protocol 2.0, in jCardSim, served over loopback HTTP.
  *
  * <pre>
  *   java -jar tools/cardsim/target/cardsim.jar [--port 9876]
@@ -31,60 +31,60 @@ import java.util.function.Supplier;
  * earlier run would be talking to a card holding that run's state. Android
  * reaches the bridge through {@code adb reverse tcp:9876 tcp:9876}.
  *
+ * <p>This is the contract flash-pos and flash-mobile pin by {@code CASHU_JAVACARD_REF}:
+ * the four routes below, their bodies, and client.cjs.
+ *
  * <h2>API</h2>
  *
  * All bodies are JSON. Hex is case-insensitive in, upper case out for APDU
- * fields and lower case for the card-file-shaped fields of {@code /state}.
+ * fields and lower case for the slot fields of {@code /state}.
  *
  * <dl>
- *   <dt>{@code POST /apdu}  {"hex": "00A4040007D2760000850102"}</dt>
- *   <dd>{@code 200 {"hex": "00069000", "sw": "9000"}} — the applet's answer,
- *       data‖SW, through the active version mask. A non-9000 status word is
- *       still a 200: the transport worked, the card refused. 400 for bad
- *       JSON or bad hex. <b>Never retried</b> by this server or by
- *       client.cjs: a replayed LOAD_PROOF burns a slot and a replayed
- *       SPEND_PROOF answers 6985.</dd>
+ *   <dt>{@code POST /apdu}  {"hex": "00A404000AF0434153485543415244"}</dt>
+ *   <dd>{@code 200 {"hex": "02009000", "sw": "9000"}} — the applet's answer,
+ *       data‖SW. A non-9000 status word is still a 200: the transport worked,
+ *       the card refused. 400 for bad JSON or bad hex. <b>Never retried</b> by
+ *       this server or by client.cjs: a replayed LOAD_PROOF burns a slot, and a
+ *       replayed SPEND_ALL_SIGN of a payment already signed answers 6985 (the
+ *       signature is had again with SPEND_ALL_AGAIN).</dd>
  *
  *   <dt>{@code POST /reset}</dt>
- *   <dd>A brand-new card: fresh simulator, install, SELECT, mask back to the
- *       real version, {@code generation + 1}. Answers {@code /state}.
- *       <b>The key does not change</b>: jCardSim draws every keypair from an
- *       unseeded generator, so each install yields the same pubkey. Proofs
- *       minted to it in an earlier run are already spent at the mint if that
- *       run redeemed them. Loaders mint per run, after reading
+ *   <dd>A brand-new card: fresh simulator, the opener, the card's applet and
+ *       the NFC tag installed, SELECT, {@code generation + 1}. Answers
+ *       {@code /state}. <b>The key does not change</b>: jCardSim draws every
+ *       keypair from an unseeded generator, so each install yields the same
+ *       pubkey. Proofs minted to it in an earlier run are already spent at the
+ *       mint if that run redeemed them. Loaders mint per run, after reading
  *       {@code pubkey} from {@code /state}.</dd>
  *
- *   <dt>{@code POST /fixture}  {pin?, puk?, proofs?, spentSlots?, blockedPin?, appletVersion?}</dt>
+ *   <dt>{@code POST /fixture}  {pin?, mint?, refundKey?, owner?, ownerKey?, anchor?, headers?, proofs?, spentSlots?, limits?, blockedPin?}</dt>
  *   <dd>Additive on the current card (so: {@code /reset}, read
- *       {@code /state.pubkey}, mint, {@code /fixture}). Fully validated
- *       before the first APDU — 400 {@code {"error"}} with the card untouched.
- *       A step the applet refuses answers 409
+ *       {@code /state.pubkey}, mint format-4 SIG_ALL pieces locked to it, then
+ *       {@code /fixture}). Fully validated against the card as it is before
+ *       the first APDU — 400 {@code {"error"}} with the card untouched,
+ *       including for the 0.x keys {@code puk} and {@code appletVersion}. A step
+ *       the applet refuses answers 409
  *       {@code {"error": "<step>", "sw": "6985", "state": {...}}} and
  *       {@code /state.fixtureError} keeps the step until the next fixture or
  *       reset. On success, answers {@code /state}. Ends with a SELECT, so the
- *       app's first command finds an unverified session. {@code spentSlots}
- *       are spent on the <i>card</i> only (SPEND_PROOF over 32 zero bytes);
- *       the mint still holds those proofs live. {@code proofs},
- *       {@code spentSlots} and {@code puk} are accepted only while the card
- *       has no PIN; after a PIN fixture, {@code /reset} first (LOAD_PROOF,
- *       SPEND_PROOF and SET_PUK are PIN-gated and answer 409 {@code 6982}).
- *       A fixture without {@code appletVersion} keeps the mask the previous
- *       fixture set; only {@code /reset} restores the real version, and
- *       {@code puk} is checked against that effective mask (400 while the
- *       card is masked to a build with no SET_PUK, whether the version came
- *       in this body or an earlier one). See Fixture.java for the schema and
+ *       app's first command finds a fresh session. {@code owner: true} sets the
+ *       deterministic TEST owner key (OwnerKey.TEST, the same as cardctl's and
+ *       client.cjs's), which the bridge then signs the owner's proofs with for
+ *       {@code limits} and for loading. {@code spentSlots} are spent on the
+ *       <i>card</i> only, by a payment of the piece with no outputs; the mint
+ *       still holds those pieces live. See Fixture.java for the schema and
  *       SimCard.applyFixture for the order.</dd>
  *
  *   <dt>{@code GET /state}</dt>
- *   <dd>{@code {generation, appletVersion, realVersion, deterministicKey:
- *       true, pubkey, balance, pinState, pukState, counts: {unspent, spent,
- *       empty}, slots: [{slot, status, keysetId?, amount?, nonce?, C?}],
- *       fixtureError?: {step, sw}}}, read through non-PIN-gated commands,
- *       unmasked, without touching the session. {@code counts} is GET_INFO's
- *       own tally (bytes 3-5), for a loader that asserts "one unspent"
- *       without reducing over {@code slots}. {@code generation} moves on
- *       every reset and fixture, so a loader can tell a card it set up from
- *       one another run left behind.</dd>
+ *   <dd>{@code {generation, deterministicKey: true, version, pubkey, balance,
+ *       pinState, tries, locked, hasOwner, ownerKey?, testOwner, recordSet,
+ *       mint?, now, windowStart, spentToday, dailyLimit, allowance, nopinSpent,
+ *       rolls, rollBudget, allowanceArmed, lastHeader, counts: {unspent, spent,
+ *       empty}, slots: [{slot, status, keysetId?, amount?, nonce?, C?, date?,
+ *       dleq?: {e, s, r}}] (128 of them), fixtureError?: {step, sw}}}, read
+ *       through commands that need no PIN and change nothing, without touching
+ *       the session. {@code generation} moves on every reset and fixture, so a
+ *       loader can tell a card it set up from one another run left behind.</dd>
  * </dl>
  *
  * Unknown path: 404. Wrong method: 405. Anything the server did not expect:
@@ -92,32 +92,26 @@ import java.util.function.Supplier;
  *
  * <h2>Sessions</h2>
  *
- * SELECT starts a session. The applet's PIN-verified flag is a
- * CLEAR_ON_DESELECT transient, so a re-SELECT drops a verified session the
- * way a new NFC tap does; the fake transport sends SELECT on every tap and
- * there is no "tap" endpoint. {@code /state} never sends SELECT.
+ * SELECT starts a session. The applet's PIN-verified flag, the owner's nonce
+ * and the owner's load grant are CLEAR_ON_DESELECT transients, so a re-SELECT
+ * drops them the way a new NFC tap does; the fake transport sends SELECT on
+ * every tap and there is no "tap" endpoint. {@code /state} never sends SELECT.
  *
- * <h2>Version masks</h2>
+ * <h2>The other bridge</h2>
  *
- * {@code appletVersion} of 0.4 or 0.5 makes the card answer SELECT and
- * GET_INFO as that build would and refuse the instructions it lacked with
- * 6D00; everything else reaches the real applet. See VersionMask.java.
- * The mask gates {@code /apdu} only: a fixture's steps go straight to the
- * applet, which is why {@code puk} is refused up front under a mask without
- * SET_PUK rather than answered 6D00. The other order is deliberately legal:
- * a card that already holds a PUK can be masked to 0.4 or 0.5 afterwards
- * (VersionMaskTest.stateIsUnmasked relies on it to show {@code /state}
- * reads the real GET_INFO under a mask). That card holds what no 0.4 build
- * could; a loader that wants a faithful old card resets before masking.
+ * Foxy's fork also has {@code tools/cardsim/run.sh}: the same applet behind a
+ * line protocol on port 47431 ({@code applet/src/test/java/.../CardServer.java}),
+ * for Foxy's iOS Simulator build, with {@code ctl.sh} to take the card off the
+ * reader. That is Foxy's wallet's transport, kept as it is; this HTTP bridge is
+ * the one the Flash apps and the CI pin.
  *
  * <h2>Threads</h2>
  *
  * One handler thread. jCardSim keeps its runtime in a ThreadLocal, so the
  * simulator is constructed on that thread, inside {@link #start(int)}, and
- * every APDU, reset and fixture runs there. A card that cannot be built (an
- * applet version VersionMask.TABLE does not know) fails {@code start()}
- * before "listening" is ever printed, rather than answering 500 to every
- * request. Concurrent requests are served one at a time.
+ * every APDU, reset and fixture runs there. A card that cannot be built fails
+ * {@code start()} before "listening" is ever printed, rather than answering 500
+ * to every request. Concurrent requests are served one at a time.
  */
 public final class CardSim {
 
@@ -235,7 +229,7 @@ public final class CardSim {
 
     private void handleFixture(HttpExchange ex) throws IOException {
         SimCard c = card();
-        Fixture f = Fixture.parse(body(ex), c.real(), c.mask());
+        Fixture f = Fixture.parse(body(ex), c.context());
         try {
             c.applyFixture(f);
         } catch (FixtureException e) {
@@ -310,8 +304,7 @@ public final class CardSim {
             System.exit(1);
             return;
         } catch (IllegalStateException e) {
-            // VersionMask.real() on an applet the TABLE does not know, or a
-            // SELECT that did not answer 9000 after install.
+            // a SELECT that did not answer a 2.x version after install
             System.err.println("cardsim: could not build the card: " + e.getMessage());
             System.exit(1);
             return;

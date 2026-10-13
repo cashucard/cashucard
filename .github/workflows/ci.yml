@@ -47,7 +47,7 @@ jobs:
     # A wedged bridge used to hang this job for the 360-minute default; the
     # client's own 5 s request deadline makes a wedge fail fast, and this is
     # the backstop for anything the client does not cover (the jar start, mvn).
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -84,16 +84,37 @@ jobs:
           echo "::error::cardsim did not answer /state within 30 s"
           exit 1
 
+      # The 2.0 AID (F0 CASHUCARD) answers version 02 00.
       - name: Smoke-test SELECT over HTTP
         run: |
-          curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A4040007D2760000850102"}' \
-            | grep -q '"hex":"00069000"'
+          curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
+            | grep -q '"hex":"02009000"'
 
       # The integration cases in client.test.cjs run only with CARDSIM_URL;
       # the e2e-tools job runs the same file without it and gets the pure
       # cases alone, so that job stays jar-free.
       - name: Client tests against the bridge
         run: CARDSIM_URL=http://127.0.0.1:9876 node --test tools/cardsim/client.test.cjs
+
+      # The architect's decision 6 (ENG-673): a real SIG_ALL swap at a mint, with
+      # DLEQ checked and the keyset id the mint uses. Nutshell 0.20.3 is the public
+      # release nearest forge's 0.20.3.1, the version both apps pin; FakeWallet
+      # pays every quote. Pinned by tag, as the apps pin it.
+      - name: Start a Nutshell 0.20.3 mint
+        run: |
+          docker run -d --name nutshell -p 127.0.0.1:3338:3338 \
+            -e MINT_BACKEND_BOLT11_SAT=FakeWallet -e MINT_LISTEN_HOST=0.0.0.0 -e MINT_LISTEN_PORT=3338 \
+            -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY cashubtc/nutshell:0.20.3 poetry run mint
+          for i in $(seq 1 120); do
+            curl -sf localhost:3338/v1/keysets > /dev/null && exit 0
+            sleep 1
+          done
+          docker logs nutshell
+          echo "::error::the mint did not answer /v1/keysets within 120 s"
+          exit 1
+
+      - name: SIG_ALL swap at the mint, through the bridge
+        run: CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3338 node --test tools/cardsim/e2e-swap.test.cjs
 
       # The app repos build this repo from a pinned ref for now; the artifact
       # is for a human pulling a jar off a run (release asset later).
@@ -119,7 +140,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # All three suites run with no reader, no card and no pyscard: cardctl imports
+      # All six suites run with no reader, no card and no pyscard: cardctl imports
       # pyscard lazily precisely so the APDU encodings and the BIP-340 verifier
       # can be checked anywhere. That matters because the verifier is what
       # `cardctl selftest` trusts when it declares a physical card's signature
@@ -129,6 +150,7 @@ jobs:
         working-directory: tools/cardctl
         run: |
           python test_bip340.py
+          python test_p256.py
           python test_apdu.py
           python test_spec_consistency.py
           python test_card_file.py
@@ -155,10 +177,11 @@ jobs:
         with:
           node-version: '22'
 
-      # Argument parsing for tools/e2e-melt.cjs, and the pure half of
-      # tools/cardsim/client.test.cjs (encoders, parsers, no-retry). Needs no
-      # card, no cashu-client build and no bridge: the cardsim integration
-      # cases skip without CARDSIM_URL (the cardsim job runs them).
+      # Argument parsing for tools/e2e-melt.cjs (a 0.x tool), the pure half of
+      # tools/cardsim/client.test.cjs (encoders, parsers, no-retry) and the
+      # Cashu arithmetic in tools/cardsim/cashu-crypto.test.cjs. Needs no card,
+      # no cashu-client build, no bridge and no mint: the integration cases skip
+      # without CARDSIM_URL / MINT_URL (the cardsim job runs them).
       # The glob is quoted so node, not the shell, expands it (Node 21+ treats
       # positional args as file paths, so a bare directory does not work).
       - name: Run tests

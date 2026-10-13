@@ -17,7 +17,11 @@
  * SIGN_ARBITRARY, which does not consume a slot.
  *
  * Recovered proofs (minted back + change) are written next to the card file as
- * <card-file>.melt-<quote-id>.json; an existing file is never overwritten.
+ * <card-file>.melt-<quote-id>.json; an existing file is never overwritten. *
+ * A 0.x TOOL. It drives the 0.x applet through cardctl's `spend` (SPEND_PROOF), which protocol 2.0 removed (DECISIONS
+ * D18), so it runs only with CARDCTL set to cardctl.py from a 0.x checkout (git show 7a96102:tools/cardctl/cardctl.py),
+ * against a 0.x card: the one use left is the sweep of a 0.x field card (docs/HARDWARE_DEPLOYMENT.md). A 2.0 card is
+ * paid with one SIG_ALL signature and swapped at a mint by tools/cardsim/e2e-swap.test.cjs.
  */
 const path = require("path")
 const fs = require("fs")
@@ -75,6 +79,7 @@ async function main() {
   try {
     ;({ mint: MINT, slot: SLOT, cardFile: CARDFILE, invoice: INVOICE } = parseArgs(process.argv.slice(2)))
   } catch (e) { die(e.message) }
+  if (!process.env.CARDCTL) die("e2e-melt is a 0.x tool: set CARDCTL to cardctl.py from a 0.x checkout (cardctl 2.0 has no `spend`). A 2.0 card: tools/cardsim/e2e-swap.test.cjs")
   cc = require(CLIENT_DIST)
   const file = cc.parseCardFile(fs.readFileSync(CARDFILE, "utf-8"))
   const slot = file.slots[SLOT] || die(`card file has no slot ${SLOT}`)
