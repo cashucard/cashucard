@@ -281,6 +281,38 @@ A merchant may optionally verify proof validity offline without contacting the m
 
 This offline check provides strong assurance that the proof was legitimately issued by the mint and authorized by this specific card. It does not prevent double-spend from a cloned card.
 
+The equation in step 2 uses the mint's private key for the amount, which no holder has. What a holder can check with the mint's public keys is a DLEQ proof (NUT-12), and from Foxy's software 1.20 the card can keep one for each piece:
+
+### The mint's DLEQ proof on the card (Foxy's software 1.20)
+
+The mint's blind signature comes with a proof, `(e, s)`, that it was made with the key the mint publishes for the amount. A holder who later wants to check it also needs `r`, the blinding factor the piece was made with. The card can keep these 96 bytes for each piece, `e ‖ s ‖ r` (32 each), and give them back. **The card does not check the proof and never uses it.** It is storage. The reader checks.
+
+**On the card.** A store of one 96-byte record for each slot (12,288 bytes for 128 slots), the record of slot k at `k * 96`. A record of 96 zero bytes means the piece came with no proof. The store is reserved by the first `SET_CARD` and not at install, because the chip will not install an applet whose constructor asks for that much more; a card that is refused the room works as a card with no room for proofs (see `docs/FOXY-CARD-HARDWARE.md`).
+
+**The invariant.** A slot that is unspent holds in the store its own proof, or 96 zero bytes, and never another piece's. `LOAD_PROOF` writes the slot's record before the slot's data, and the status byte stays the last write (the commit); `CLEAR_SPENT` and the spend commands do not touch the store; `RESET_CARD` fills it with zeros.
+
+**Two commands** (`APDU.md` has the bytes):
+
+- `LOAD_PROOF` with `P1 = 1`: one piece (81 bytes) and its proof (96), 177 bytes exactly. Any other length is `6700`, and a proof of 96 zero bytes is `6A80`. Otherwise it is a load of one piece. The answer is the slot, then `01` if the proof was kept and `00` if the card has no room for proofs.
+- `GET_DLEQ` (`INS 0x1A`): `P1` a slot, `P2` a second slot or `FF`. For each slot asked: `01` and the 96 bytes if the slot is unspent and its record is not zero, otherwise the single byte `00`. No PIN. The proof of a spent piece is not given.
+
+**What a reader does,** for a slot with a proof, holding the piece (keyset, amount, nonce, `C`, date), the card's key and the mint's public keys:
+
+```
+secret = the NUT-10 text of the piece, as the card builds it for signing
+Y      = hash_to_curve(secret)                  # NUT-00
+K      = the mint's public key for the amount   # NUT-01, in the piece's keyset
+C'     = C + r*K
+B'     = Y + r*G
+R1     = s*G  - e*K
+R2     = s*B' - e*C'
+valid  = (e == hash_e(R1, R2, K, C'))           # NUT-12
+```
+
+A piece for which `valid` holds was signed by the mint's key for that amount, over this secret. A made-up `C` cannot pass; neither can a real piece copied from another card, whose secret names that card's key. The proof does not show that the piece is unspent: only the mint knows. A slot with no proof is not shown real, and is not shown fake.
+
+**Privacy.** `r` is in the proof. Whoever holds the mint's record of the blind signature for `B'` can recompute `B'` and `C'` from the piece and `r`, and so tie the piece to the request that made it. That holds for any NUT-12 token that carries `r`. The card gives it to any reader, with no PIN, so a reader should check on its own side and not hand `r` to the mint.
+
 ---
 
 ## Denomination Handling and Change
@@ -424,6 +456,7 @@ A card MAY provide a PIN unblocking key. In this implementation `SET_PUK (0x44)`
 **Mitigation**: 
 - The card does not validate proofs at load time (it has no mint pubkey)
 - Proof validity is enforced by the mint at redemption time
+- From Foxy's software 1.20 the card can keep the mint's DLEQ proof for each piece, and a reader that checks it (above) sees that a fabricated piece is not real. The card still checks nothing.
 - Users should only provision from trusted sources (their own wallet or the Flash app)
 - PIN protection on `LOAD_PROOF` ensures only authorized provisioners can write to the card
 
@@ -526,6 +559,7 @@ The following design questions are open for community discussion:
 - [NUT-06][06]: Mint info
 - [NUT-10][10]: Spending conditions
 - [NUT-11][11]: Pay to Public Key (P2PK)
+- [NUT-12][12]: Offline ecash signature validation (DLEQ proofs), used by Foxy's software 1.20
 - [cashubtc/Numo](https://github.com/cashubtc/Numo): Android Cashu NFC POS (Profile A reference)
 - [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard): Profile B reference implementation
 - [NXP JCOP4 SmartMX3 (JavaCard 3.0.5+)](https://www.nxp.com/products/security-and-authentication/secure-service-2go/jcop-4): Example Profile B chip (CC EAL 5+). `ALG_EC_SVDP_DH_PLAIN_XY` is 3.0.5+, so 3.0.4 parts cannot run this applet
@@ -539,3 +573,4 @@ The following design questions are open for community discussion:
 [06]: https://github.com/cashubtc/nuts/blob/main/06.md
 [10]: https://github.com/cashubtc/nuts/blob/main/10.md
 [11]: https://github.com/cashubtc/nuts/blob/main/11.md
+[12]: https://github.com/cashubtc/nuts/blob/main/12.md

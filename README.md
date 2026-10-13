@@ -1,3 +1,49 @@
+# Foxy card
+
+This is the Foxy fork of [`lnflash/cashu-javacard`](https://github.com/lnflash/cashu-javacard):
+a JavaCard applet that holds Cashu ecash on a card, for the
+[Foxy](https://github.com/getfoxy/iOS) iPhone wallet. It is **not compatible on
+the wire** with upstream's applet, and has an AID of its own so that neither can
+be taken for the other.
+
+What differs from upstream:
+
+- A spend takes no message from the reader: the card builds the slot's secret
+  and signs its hash. `SIGN_ARBITRARY` is gone, and `AUTH` proves the card is
+  the card.
+- Nothing is loaded onto a card with no owner, or onto one with no PIN but by
+  the owner's grant. The PIN is optional (1.16): a card set up with none pays
+  without one, and a card with one has a no-PIN allowance, what it will sign for
+  in a day without the PIN; over it, the PIN is asked for the whole payment.
+- The card has an owner, a P-256 public key worked out on the holder's phone
+  from its seed. Only that phone can change the PIN, unblock the card, set the
+  limit or add funds with no PIN.
+- The card keeps a daily limit and a clock that only moves forward. The clock is
+  the time written in the newest Bitcoin block header the card has been shown
+  (1.15), believed for its proof of work and for nothing else, so a terminal
+  cannot start a new day by telling the card it is later. The documents say what
+  that does and does not bound.
+- A slot carries a date and a refund key; the card records its mint; 128 slots
+  of 82 bytes (64 before software 1.7).
+- A payment is one signature for as many pieces as it is made of (NUT-11
+  SIG_ALL), and its pieces are marked spent outside the transaction that
+  commits it, so the number is not bounded by the chip's transaction (1.8).
+- The PIN is taken sealed: enciphered to a key the card keeps for that alone,
+  under sixteen bytes of the card's that are good once (1.9).
+- The card keeps the mint's NUT-12 proof (`e`, `s` and `r`, 96 bytes) with each
+  piece that comes with one, and gives it back, for a phone to read and check
+  that the mint made the piece. The card checks nothing and never uses it; paying
+  is untouched (1.20). The room for it is reserved by the first `SET_CARD`, not at
+  install, which the chip would refuse.
+
+The applet has run on one real card, a J3R180. Read [`FORK.md`](FORK.md) first,
+and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) for the daily
+limit, the clock and the owner key in full. Everything under the line below is
+upstream's README as it was at the fork, and describes upstream's wire, as do
+`spec/` and `tools/cardctl`.
+
+---
+
 # cashu-javacard
 
 A JavaCard applet implementing the [Cashu](https://cashu.space) ecash protocol
@@ -81,21 +127,25 @@ Full reference: [`spec/APDU.md`](spec/APDU.md).
 | CLA | INS | Command | PIN | Description |
 |---|---|---|---|---|
 | `00` | `A4` | SELECT | — | ISO SELECT by AID |
-| `B0` | `01` | GET_INFO | — | Version, slot counts, capabilities, PIN state |
+| `B0` | `01` | GET_INFO | — | Version, slot counts, capabilities, PIN state (P1 = 1 adds the limits; P1 = 2 adds whether the NFC tag is on, 1.19) |
 | `B0` | `10` | GET_PUBKEY | — | 33-byte compressed public key |
 | `B0` | `11` | GET_BALANCE | — | Sum of unspent amounts (uint32) |
 | `B0` | `12` | GET_PROOF_COUNT | — | Count of non-empty slots |
 | `B0` | `13` | GET_PROOF | — | Full proof at a slot index |
 | `B0` | `14` | GET_SLOT_STATUS | — | One status byte per slot |
-| `B0` | `20` | SPEND_PROOF | ✔ (if set) | Mark spent + return 64-byte signature |
+| `B0` | `1A` | GET_DLEQ | — | The mint's proof kept with an unspent piece, for one place or two (1.20) |
+| `B0` | `22`–`24` | SPEND_ALL_BEGIN / OUTPUTS / SIGN | ✔ (if set) | One signature for a whole payment (NUT-11 `SIG_ALL`): the places, the swap's outputs, then every place marked spent and one 64-byte signature |
+| `B0` | `25` | SPEND_ALL_AGAIN | ✔ (if set) | The last signature given, again |
 | `B0` | `21` | SIGN_ARBITRARY | ✔ (if set) | Sign 32 bytes, consuming no proof |
-| `B0` | `30` | LOAD_PROOF | ✔ | Store a proof in the next free slot |
+| `B0` | `30` | LOAD_PROOF | ✔ | Store a proof in the next free slot (P1 = 1: one piece and the mint's proof for it, 1.20) |
 | `B0` | `31` | CLEAR_SPENT | ✔ | Reclaim spent slots |
 | `B0` | `40`–`42` | VERIFY/SET/CHANGE_PIN | — / ✔ | PIN management |
 | `B0` | `43` | CLEAR_PIN | ✔ | Remove the PIN; the card is bearer again (applet 0.5) |
 | `B0` | `44` | SET_PUK | ✔ (if set) | Set the provisioning PUK, once (applet 0.6) |
 | `B0` | `45` | UNBLOCK_PIN | PUK | Replace a blocked or forgotten PIN with the PUK (applet 0.6) |
 | `B0` | `50` | LOCK_CARD | ✔ | Irreversibly disable writes |
+| `B0` | `51` | RESET_CARD | owner's proof (+ PIN if locked) | Wipe the card to a new one, with a new key, for another person to set up (1.17) |
+| `B0` | `52` | SET_TAG | owner's proof | Switch the card's NFC tag (one web address, the same on every card) off or on (1.19) |
 
 **Spending is PIN-gated once a PIN is set** (D13, v0.2.0): `SPEND_PROOF`,
 `SIGN_ARBITRARY`, `LOAD_PROOF`, `CLEAR_SPENT` and `LOCK_CARD` answer `6982`
@@ -136,8 +186,15 @@ downloaded for you:
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
-# → applet/target/cashu-javacard-0.1.0.cap
+# → applet/target/cashu-javacard-0.1.0.cap   (three applets: the opener, the card's, then the NFC tag)
 ```
+
+The file holds a second, empty applet that is instantiated before the card's
+own: the chip refuses the card's applet as a package's first
+([`docs/FOXY-CARD-HARDWARE.md`](docs/FOXY-CARD-HARDWARE.md)). From software 1.19 it
+holds a third, the NFC tag (one web address, the same on every card, which the
+owner can switch off), listed last and made under the NFC Forum's own name
+([`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) 5.8).
 
 Override the kit with `-Djc.sdk=/path/to/jc305u4_kit`. Installing onto a card:
 [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).

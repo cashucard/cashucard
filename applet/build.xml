@@ -160,8 +160,8 @@ compromised or truncated download.
       -Djc.sdk=/path/to/jc305u4_kit.
 
       AID breakdown:
-        Package AID : D2 76 00 00 85 01 02      (7 bytes)
-        Applet  AID : D2 76 00 00 85 01 02 01   (8 bytes, package + 01)
+        Package AID : F0 46 4F 58 59 43 41 52 44      (9 bytes)
+        Applet  AID : F0 46 4F 58 59 43 41 52 44 01   (10 bytes, package + 01)
 
       The package AID is also the SELECT AID used by NFC readers.
     -->
@@ -174,13 +174,33 @@ compromised or truncated download.
                 sources="${src.dir}"
                 package="me.flashapp.cashu"
                 version="0.1"
-                aid="D2:76:00:00:85:01:02"
+                aid="F0:46:4F:58:59:43:41:52:44"
                 output="${cap.file}">
+                <!-- The opener FIRST: the chip takes the card's applet only after a small one has been
+                     instantiated from the package (docs/FOXY-CARD-HARDWARE.md). gp installs one applet
+                     at a time from a file with three: see docs/HARDWARE_DEPLOYMENT.md for the commands.
+                     The tag LAST: it is instantiated under the NFC Forum's own AID, D2760000850101,
+                     given as the instance AID at install, and not under the AID listed here. -->
+                <applet class="me.flashapp.cashu.Opener"
+                        aid="F0:46:4F:58:59:43:41:52:44:4D"/>
                 <applet class="me.flashapp.cashu.CashuApplet"
-                        aid="D2:76:00:00:85:01:02:01"/>
+                        aid="F0:46:4F:58:59:43:41:52:44:01"/>
+                <applet class="me.flashapp.cashu.Tag"
+                        aid="F0:46:4F:58:59:43:41:52:44:54"/>
             </cap>
         </javacard>
-        <echo message="CAP file: ${cap.file}"/>
+        <echo message="CAP file: ${cap.file} (three applets: install the opener first, and make the tag under the NFC Forum's name)"/>
+        <!-- The Descriptor and Debug components are for tools off the card; the chip keeps nothing of them, so they
+             are taken out to shorten the load. Then the file's size is checked against what the chip installs
+             (docs/FOXY-CARD-HARDWARE.md): the opener first, and a size in the window of each 256 bytes. -->
+        <exec executable="python3" dir="${basedir}/.." failonerror="true">
+            <arg value="tools/stripcap.py"/>
+            <arg value="applet/${cap.file}"/>
+        </exec>
+        <exec executable="python3" dir="${basedir}/.." failonerror="true">
+            <arg value="tools/refcheck.py"/>
+            <arg value="applet/${cap.file}"/>
+        </exec>
     </target>
 
     <!-- ── Debug cap (includes line-number table) ─────────────────────── -->
@@ -193,11 +213,15 @@ compromised or truncated download.
                 sources="${src.dir}"
                 package="me.flashapp.cashu"
                 version="0.1"
-                aid="D2:76:00:00:85:01:02"
+                aid="F0:46:4F:58:59:43:41:52:44"
                 output="${target.dir}/cashu-javacard-0.1.0-debug.cap"
                 debug="true">
+                <applet class="me.flashapp.cashu.Opener"
+                        aid="F0:46:4F:58:59:43:41:52:44:4D"/>
                 <applet class="me.flashapp.cashu.CashuApplet"
-                        aid="D2:76:00:00:85:01:02:01"/>
+                        aid="F0:46:4F:58:59:43:41:52:44:01"/>
+                <applet class="me.flashapp.cashu.Tag"
+                        aid="F0:46:4F:58:59:43:41:52:44:54"/>
             </cap>
         </javacard>
     </target>
@@ -227,7 +251,7 @@ compromised or truncated download.
     <target name="delete" description="Delete CashuApplet from connected card">
         <exec executable="gp" failonerror="true">
             <arg value="--delete"/>
-            <arg value="D276000085010201"/>
+            <arg value="F0464F58594341524401"/>
         </exec>
     </target>
 

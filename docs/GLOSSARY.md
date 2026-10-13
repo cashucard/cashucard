@@ -32,7 +32,9 @@ unblinds. The mint never sees what it signed. Done entirely on the *host*, never
 on the card ([D3](DECISIONS.md#d3)).
 
 **Blinding factor (`r`)** — the random scalar used to blind. The client must
-keep it to unblind, and to verify DLEQ later.
+keep it to unblind, and to verify DLEQ later. It is part of the DLEQ proof a
+third party needs, so the card keeps it beside `e` and `s`; whoever hands `r` to the
+mint lets the mint tie the piece to the request that made it.
 
 **Mint / Melt / Swap** — the three mint operations. *Mint* = create proofs (pay
 an invoice, get ecash). *Melt* = destroy proofs (spend ecash, pay an invoice).
@@ -128,7 +130,9 @@ given key may spend it.
 it comes from `SPEND_PROOF`.
 
 **DLEQ** — discrete-log equality proof. Proves the mint signed with its
-published key rather than a per-user one.
+published key rather than a per-user one. From Foxy's software 1.20 the card keeps
+the mint's proof (`e`, `s` and the blinding factor `r`, 96 bytes) with each piece
+and gives it back (`GET_DLEQ`); the card never checks it, the reader does.
 
 **`sigflag` / `n_sigs`** — NUT-11 tags controlling *what* is signed
 (`SIG_INPUTS` vs `SIG_ALL`) and *how many* signatures are required. Both are

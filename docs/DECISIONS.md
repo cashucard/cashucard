@@ -4,7 +4,8 @@ Each entry records a call that was made, what was rejected, and why. If you are
 about to change one of these, read the entry first — most were made against a
 real alternative, and several were made *after* getting it wrong once.
 
-Anchors are stable (`#d1` … `#d16`); other docs link to them.
+Anchors are stable (`#d1` … `#d18`); other docs link to them. D15 and D16
+are superseded by the 2.0 merge ([D18](#d18)) and kept for the record.
 
 ---
 
@@ -194,6 +195,15 @@ because the runtime cannot.
 The general lesson, which applies to every change in `applet/`: *a passing
 simulator suite is not evidence about silicon.*
 
+**One exception, since software 1.20 ([D17](#d17)):** the 12,288 bytes that hold
+the mint's proofs are reserved by the first `SET_CARD`, not at install, because
+the chip will not install an applet whose constructor asks for that much more.
+The scan lets through that one statement and nothing beside it: it is guarded so
+that it happens once in a card's life (`if (dleq == null)`), and a request the
+card refuses allocates nothing, so it cannot leak a few dozen bytes a tap, which
+is what the rule is for. A second allocation next to it, an unguarded one, and
+the same statement in any other method are each still refused.
+
 ---
 
 ## <a id="d11"></a>D11 — DLEQ is verified client-side, and unlinkability is not assumed
@@ -209,6 +219,10 @@ on faith.
 
 The mint is trusted for solvency. It is explicitly *not* trusted for
 unlinkability.
+
+Since software 1.20 the card carries the proof with each piece ([D17](#d17)) so
+that the check can be made on a piece read from the card. The card still checks
+nothing: the verification is the reader's, as above.
 
 ---
 
@@ -358,7 +372,11 @@ fails it ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md#install)).
 
 ---
 
-## <a id="d15"></a>D15 — A holder can take the PIN off a personalised card (qualifies D13)
+## <a id="d15"></a>D15 — A holder can take the PIN off a personalised card (qualifies D13; SUPERSEDED by D18)
+
+> **Superseded in 2.0 ([D18](#d18)).** `CLEAR_PIN` is gone with the 0.x wire.
+> On the shared protocol the owner key is the authority above the PIN: the
+> owner's proof changes or removes it. The entry below is the 0.5 record.
 
 `CLEAR_PIN` (`0x43`, applet 0.5) removes the PIN from a card that has one.
 The card goes back to where `SET_PIN` found it: `pinState` 0, a fresh try
@@ -442,7 +460,11 @@ there is no in-place upgrade.
 
 ---
 
-## <a id="d16"></a>D16 — A provisioning PUK unblocks the PIN (resolves D13's lockout)
+## <a id="d16"></a>D16 — A provisioning PUK unblocks the PIN (resolves D13's lockout; SUPERSEDED by D18)
+
+> **Superseded in 2.0 ([D18](#d18)).** The PUK is gone with the 0.x wire. A
+> blocked card is unblocked by the owner's proof (`CHANGE_PIN`, which needs no
+> old PIN), from the holder's phone. The entry below is the 0.6 record.
 
 `SET_PUK` (`0x44`) gives a card a PUK, once, at personalisation. `UNBLOCK_PIN`
 (`0x45`) replaces the PIN — blocked or forgotten — on presentation of that
@@ -553,6 +575,106 @@ regenerating its key.
 
 ---
 
+
+## <a id="d17"></a>D17 — The mint's proof is kept with each piece, reserved after install, one piece a command
+
+**Decided:** from software 1.20 the card keeps, for each piece, the mint's NUT-12
+proof as a later holder needs it: `e`, `s` and the blinding factor `r`, 96 bytes
+(`GET_DLEQ`, `LOAD_PROOF` with `P1 = 1`: [`FOXY-CARD-SPEC.md`](FOXY-CARD-SPEC.md) 5.9).
+The card does not check the proof and never uses it.
+
+**Why the card carries it.** Without it a phone that reads the card can ask the
+mint whether a piece is spent and cannot tell whether it is real: a made-up `C`
+looks like any other until the mint is asked to take it. With it the phone checks
+the piece itself, with the mint's keys, before it pays with the piece or takes it
+in. The proof is made once, when the mint signs the piece, and the card is the one
+place that can keep it with the piece.
+
+**Why the card does not check it** ([D3](#d3), [D11](#d11)). The check needs the
+mint's public key for the amount, which changes with every keyset, and the card
+has no mint's keys and no room to keep a mint's directory. And a card that checked
+would be one more thing to believe: a card that said yes is a card that could say
+yes to anything. The reader that checks is the one that needs to know. So the card
+stores the 96 bytes and gives them back, and a record of zeros means "no proof".
+
+**Why after install and not in the constructor** ([D10](#d10)). The chip refused to
+install a build whose constructor asked for 12,288 bytes more than 1.19's, and
+installed one that asked for 300 more
+([`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md)). The same bytes asked for by a
+command after the install were given. No simulator has the limit, which is why it
+is pinned by tests that read the source and look at the card (null after install,
+reserved by the first `SET_CARD`). The reservation is guarded, so it happens once;
+it is outside any transaction, so nothing can undo it; and if the card refuses it
+the `SET_CARD` goes on and the card works as a card with no room for proofs. So
+every use of the store is safe while it is null.
+
+**Why one piece to a command.** A piece with its proof is 177 bytes, and a short
+APDU carries 255. Two would not fit, and extended length is not something every
+reader and phone will carry (the same reason a plain batch stops at three pieces
+of 81 bytes). `LOAD_PROOF` with `P1 = 1` is one piece and its proof, and any
+other P1 is the plain form it always was. A command to each piece is slower than
+a batch of three (a batch took 0.19 s on the chip: [`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md));
+the one-piece form has not been timed there.
+
+**Why zeros are refused as a proof.** A record of zeros is how the card says "no
+proof". If a load could store zeros and answer "kept", the answer would be false.
+A proof of 96 zero bytes is `6A80`, as a `C` that is no point is.
+
+**Why a piece's record is written first.** The rule is that a place that is
+unspent holds its own proof or zeros and never another piece's. A freed place
+keeps the record it had (`CLEAR_SPENT` and the payment commands write nothing to
+the store: no write was added to a payment), so the next piece into it must write
+its own record, or zeros, before anything else of the place, with the status byte
+still last ([D14](#d14)). A tear then leaves an empty place with a record beside
+it, which nothing serves.
+
+**Why `GET_DLEQ` has no PIN, and gives nothing for a spent piece.** It gives what
+the mint made for a piece that is already on the card for any reader to read
+(`GET_PIECES` has the rest of the piece with no PIN). It gives the proof of an
+unspent piece only: a spent piece's proof is of no use to anyone and is not given.
+
+**Cost accepted:** `r` is in the proof, so a reader that hands the proof to the mint
+lets the mint tie the piece to the request that made it, as with any NUT-12 token;
+and the card gives `r` to any reader with no PIN
+([`SECURITY-MODEL.md`](SECURITY-MODEL.md) #16). 12,288 bytes of the card's storage,
+which the chip has.
+
+---
+
+## <a id="d18"></a>D18 — One card protocol with Foxy: their 1.20 is the base of 2.0
+
+**Decided (ENG-673):** the applet in this repository is the Foxy wallet
+project's fork ([getfoxy/card](https://github.com/getfoxy/card) at `88840aa`,
+software 1.20), merged back with a real `git merge` so their history and
+authorship stay in `git log`. Flash and Foxy speak one wire from here, called
+**2.0**. The fork's applet, its tests, `spec/vectors/` and its documents
+(`docs/FOXY-CARD-*.md`, `docs/FOR-LNFLASH.md`, `FORK.md`) came in as they were;
+our `tools/cardsim` bridge and `tools/cardctl` were kept and ported to 2.0.
+
+**Credit.** The fork's review of applet 0.4 (`docs/FOR-LNFLASH.md` section 3)
+found the two weaknesses that mattered most here: `SPEND_PROOF` signed a hash
+the reader chose, and `SIGN_ARBITRARY` signed anything without burning a slot,
+so the card's SPENT flag protected nothing. Their applet fixes both (the card
+builds and hashes each piece's secret itself; `AUTH` proves the card over a
+tagged hash), adds an owner key, a daily limit with a clock taken from Bitcoin
+block headers, NUT-11 SIG_ALL payments with change, and the mint's NUT-12 proof
+kept with each piece. The design is theirs; the changes we made on top are D19
+to D23.
+
+**Superseded.** Our 0.5 `CLEAR_PIN` ([D15](#d15)) and 0.6 PUK ([D16](#d16)).
+The owner key is the authority above the PIN: its proof changes the PIN with no
+old PIN and unblocks a blocked card, from the holder's phone. A PUK in a
+registry was a second bearer secret for the same job.
+
+**Rejected:** keeping 0.x and adding Foxy's fixes one by one. Two wires for one
+kind of card, from two teams, would have stayed two; and the fixes are not
+separable from the slot layout and the payment commands they change.
+
+**Cost accepted.** 0.x cards cannot be updated in place: a card is reinstalled,
+which makes a new key, so its balance is swept first (`HARDWARE_DEPLOYMENT.md`).
+Both apps drop 0.x and say "This card needs an update" to a 0.x card.
+
+---
 
 Small changes: open a PR and reference the decision id (e.g. "revisits D5").
 

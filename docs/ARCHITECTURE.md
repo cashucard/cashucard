@@ -93,7 +93,7 @@ So the split is:
 | Blinding, unblinding, denomination splitting | `cashu-client` (host) |
 | Mint HTTP: quotes, mint, melt, swap, checkstate | `cashu-client` (host) |
 | DLEQ verification | `cashu-client` (host) |
-| Proof storage, slot lifecycle | **Applet** |
+| Proof storage, slot lifecycle; from software 1.20 also the mint's DLEQ proof kept with each piece, which the applet stores and gives back and never checks | **Applet** |
 | The private key, and BIP-340 signing | **Applet** |
 | Single-spend enforcement (on-card) | **Applet** |
 | APDU transport | `cardctl` (host) |
