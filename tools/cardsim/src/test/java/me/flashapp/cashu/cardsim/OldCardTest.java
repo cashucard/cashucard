@@ -12,9 +12,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * The 0.x bridge could mask its card as applet 0.4 or 0.5, so the apps could test their old-card paths. On 2.0 the
  * masks are gone (D18): a 0.x or Foxy 1.x card does not answer the 2.0 AID at all, and an app shows "This card needs
  * an update". What the masks were for is asked of the 2.0 bridge here: the old card is told apart by its AID, the old
- * opcodes reach 2.0 commands that refuse them, and the fixture refuses the old keys by name.
+ * opcodes reach 2.0 commands that refuse them, and the fixture refuses the old keys by name. It was VersionMaskTest
+ * until the review of PR #34; it is named for what it tests now.
  */
-class VersionMaskTest {
+class OldCardTest {
 
     static final byte[] SELECT_0X = Hex.parse("00A4040007D2760000850102");
     static final byte[] SELECT_FOXY = Hex.parse("00A4040009F0464F585943415244");

@@ -36,8 +36,10 @@ import java.util.List;
  *    ALLOW_LOAD on 2.0, and a 0.6 reader's bytes there change nothing.
  * 3. The write order, scanned in the source as D14's is: CHANGE_PIN checks the
  *    proof before it writes, and commits pinState after the PIN (D22).
+ *
+ * It was PukTest (D16) until 2.0; it is named for what it tests now.
  */
-class PukTest {
+class OwnerUnblockTest {
 
     private static final byte CLA = CashuAppletTest.CLA;
     private static final int SW_OK = CashuAppletTest.SW_OK;

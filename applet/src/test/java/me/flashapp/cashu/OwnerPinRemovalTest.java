@@ -35,8 +35,10 @@ import java.util.List;
  *    harmless: no command reads the counter behind a card with no PIN, and a
  *    PIN added later starts with three fresh tries. And a successful
  *    OwnerPIN.check refills the counter by itself, which the applet leans on.
+ *
+ * It was ClearPinTest (D15) until 2.0; it is named for what it tests now.
  */
-class ClearPinTest {
+class OwnerPinRemovalTest {
 
     private static final byte CLA = CashuAppletTest.CLA;
     private static final int SW_OK = CashuAppletTest.SW_OK;

@@ -69,7 +69,7 @@ class CardSimHttpTest {
         HttpResponse<String> r = post("/apdu", "{\"hex\":\"00A4040007D2760000850102\"}");
         assertEquals(200, r.statusCode());
         String sw = json(r).get("sw").getAsString();
-        assertTrue(sw.equals("6A82") || sw.equals("6999") || sw.equals("6E00"), sw);   // see VersionMaskTest.oldAidsAreNotFound
+        assertTrue(sw.equals("6A82") || sw.equals("6999") || sw.equals("6E00"), sw);   // see OldCardTest.oldAidsAreNotFound
     }
 
     @Test

@@ -664,7 +664,10 @@ to D24.
 **Superseded.** Our 0.5 `CLEAR_PIN` ([D15](#d15)) and 0.6 PUK ([D16](#d16)).
 The owner key is the authority above the PIN: its proof changes the PIN with no
 old PIN and unblocks a blocked card, from the holder's phone. A PUK in a
-registry was a second bearer secret for the same job.
+registry was a second bearer secret for the same job. Their suites are
+ported to 2.0 under names for what they now test: `ClearPinTest` is
+`OwnerPinRemovalTest` and `PukTest` is `OwnerUnblockTest` (D15 and D16 name
+them as they were), and the cardsim's `VersionMaskTest` is `OldCardTest`.
 
 **Rejected:** keeping 0.x and adding Foxy's fixes one by one. Two wires for one
 kind of card, from two teams, would have stayed two; and the fixes are not
