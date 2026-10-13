@@ -284,7 +284,7 @@ class SchnorrHWSignTest {
         schnorr.sign(dirtyPriv, dirtyPub, msg, (short) 0, new byte[64], (short) 0);
 
         // d = 3: 31 leading zero bytes, i.e. squarely in the class of keys a
-        // leading-zero-stripping card mis-reports.
+        // leading-zero-stripping card misreports.
         byte[] d = CashuAppletTest.hexToBytes((String) KEYS[0][0]);
         byte[] w = CashuAppletTest.hexToBytes((String) KEYS[0][1]);
         byte[] pubX = java.util.Arrays.copyOfRange(w, 1, 33);

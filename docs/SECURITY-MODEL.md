@@ -20,21 +20,24 @@ get around it rather than through it.
 | # | Threat | Protected? | Notes |
 |---|---|---|---|
 | 1 | Passive read of card memory | **Partially** | An attacker gets keyset id, amount, nonce and `C` — the secret string is never stored on the card, but it is reconstructible from the nonce plus the card pubkey, so treat it as leaked too. What does not leak is the private key, so the proofs stay unspendable. Balance and history leak. From software 1.20 a reader also gets the mint's proof for each unspent piece that has one, and so its blinding factor (#16). |
-| 2 | Hostile reader spends the card | **Once a PIN is set** | `SPEND_PROOF` and `SIGN_ARBITRARY` are gated on `VERIFY_PIN` in the same session (D13), and a failed PIN check ends that session. A card with no PIN set — the factory state — can be drained by anyone in NFC range, so the holder must set one before carrying value. Three wrong tries block the card; the gate keeps refusing in the blocked state (ENG-615 closed a bug where it stopped), and there is no unblock path (D13). That dead end is its own threat: see #14. |
+| 2 | Hostile reader spends the card | **Up to the owner's limits** (2.0) | A payment (`SPEND_ALL_SIGN`) needs the PIN given in this tap, or fits the no-PIN allowance, or the card has no PIN; a failed PIN check ends the session. A blocked card has no allowance, by its state byte or by its counter ([D22](DECISIONS.md#d22)). What leaves the card is held to the daily limit, counted against a clock of Bitcoin block headers, and the window rolls at most the rollover budget's times between the owner's refreshes (#17, [D20](DECISIONS.md#d20)). A card with no PIN is cash to whoever holds it, under the same limits. |
 | 3 | Card lost or destroyed | ❌ **By design** | No seed, no backup, no recovery. See [D5](DECISIONS.md#d5). |
 | 4 | Cloning the chip | **Yes** | Cloning EEPROM copies the proofs but not the key; a clone cannot sign. Cards should be CC EAL 5+ to resist invasive extraction. |
 | 5 | Offline double-spend from copied data | ❌ **No** | Fundamental. An offline merchant cannot know a proof was already melted. See below. |
-| 6 | Replaying a signature on another proof | **Yes** | The signed message is `sha256(secret)`, unique per proof. A signature does not transfer. |
+| 6 | Replaying a signature on another proof | **Yes** | The card signs the NUT-11 `SIG_ALL` message of one payment: every input's secret and `C` and every output. A signature is good for that swap and no other, and the card rebuilds every secret from its own key and the slot, so a reader chooses nothing it signs. `AUTH` signs a tagged hash no secret can equal. There is no command that signs a reader's bytes (0.x's `SIGN_ARBITRARY` is gone, D18). |
 | 7 | Malicious mint tagging users | **Yes** | NUT-12 DLEQ, verified client-side. See [D11](DECISIONS.md#d11). |
 | 8 | Mint insolvency | **Monitored, not prevented** | The mint is trusted for solvency. See below. |
 | 9 | Malicious terminal | **Partially** | Cannot forge proofs or spend them elsewhere. Can lie about the amount, or take the tap and never settle — ordinary merchant risk. |
 | 10 | Fault injection to recover the key | **Mitigated** | Aux randomness in the nonce prevents the two-signatures-same-`k` recovery. See [D9](DECISIONS.md#d9). |
-| 11 | Tear-off (card pulled mid-write) | **Yes, by write order** (applet 0.4 on); not yet on silicon | Every slot write changes the data first and commits the status byte last, as a single byte the JCRE writes atomically ([D14](DECISIONS.md#d14)). A card whose `SELECT` answers below `00 04` may write the status byte first and needs the CAP reinstalled. A torn `LOAD_PROOF` leaves the slot empty and a torn `CLEAR_SPENT` leaves it spent; neither state is counted in the balance or signed for. The empty slot's bytes are never read. The half-cleared spent slot still answers `GET_PROOF`, as status `02` with some fields zeroed, and its data is not a proof: a reader that uses a spent slot's data must check it ([`spec/APDU.md`](../spec/APDU.md#clear_spent-0x31)), and `cardctl dump` skips one that fails. `SPEND_PROOF` writes only the status byte, before it signs ([D7](DECISIONS.md#d7)): a tear after the burn loses that signature, which flash-pos re-derives with `SIGN_ARBITRARY` (`resignWitness`). The order is enforced by a source scan and the torn states are tested in jCardSim; no card has been pulled mid-write. |
+| 11 | Tear-off (card pulled mid-write) | **Yes, by write order**; not yet on silicon | Every multi-field persistent write commits a single byte last, or is one transaction ([D14](DECISIONS.md#d14)); every write outside a transaction is listed and reviewed in [D23](DECISIONS.md#d23), and a test fails on any new one. A torn `LOAD_PROOF` leaves the slot empty and a torn `CLEAR_SPENT` leaves it spent; neither is counted or signed for. A payment's places are burned by one committed byte (`burnPending`) and marked after it, at the next command if the card left. A torn `CHANGE_PIN` leaves the card blocked, not open (D22). The orders are scanned in the source and the torn states set by hand in jCardSim; no card has been pulled mid-write. |
 | 12 | Counterfeit physical cards | **Not a concern** | Value is bound to the chip's key. A look-alike with no valid chip holds nothing. |
 | 13 | Supply-chain / pre-personalised cards | ⚠️ **Unaddressed** | Nothing currently attests that a card's key was generated on-card by an untampered applet. |
-| 14 | Hostile reader blocks the PIN (3 unauthenticated APDUs), balance unrecoverable | ❌ **No** | `VERIFY_PIN` needs no authentication, so three wrong PINs from any reader in NFC range block the card. Once blocked, nothing can sign for its proofs: they are P2PK-locked to the card key with only a `sigflag` tag (no refund key, no locktime; [D5](DECISIONS.md#d5)'s recovery proposal is unmerged), and a reinstall regenerates the key. The balance is gone. Mitigations: small balances, a shielded sleeve, and `UNBLOCK_PIN` + PUK (ENG-617) before volume issuance. See below. |
+| 14 | Hostile reader blocks the PIN (3 unauthenticated APDUs) | **Mitigated by the owner** (2.0) | `VERIFY_PIN` needs no authentication, so three wrong PINs from any reader in range block the card. The owner's phone unblocks it: `CHANGE_PIN` with the owner's proof sets a new PIN with no old one, any state, any funds, and a wrong proof costs no PIN try. A card whose owner has lost their seed cannot be unblocked; its balance is stranded. (0.6's PUK is gone with the 0.x wire, D18.) |
 | 15 | Reading the NFC tag (software 1.19) | **Nothing of the card to read** | Any reader, with no PIN, gets the same bytes from every card: one web address. It names no card, key, owner or balance. A card on factory keys can have the tag's applet replaced by one carrying another address; rotating the card manager keys closes that. See below. |
 | 16 | A piece on the card that the mint never made (software 1.20) | **Checked by the reader, not by the card** | The card keeps the mint's NUT-12 proof for a piece and gives it back; it checks nothing. A reader that checks it, with the mint's keys, sees that a made-up `C` is not real, and a piece copied from another card is not real here. It does not show that a real piece is unspent. Reading the proof gives away `r`, which ties a piece to the request that made it if the mint is given it. See below. |
+| 17 | A terminal with the PIN walks the card's clock with real block headers | **Bounded by the rollover budget** (2.0) | Real headers are free, so in 1.20 every header a day later began a new day and a new limit. In 2.0 the window rolls at most the rollover budget's times (default 7) between the owner's `REFRESH`es; past it the day stands. The no-PIN allowance renews only once per arming (a PIN or an owner's proof), so a reader with no PIN gets one allowance per arming. [D20](DECISIONS.md#d20). |
+| 18 | An unowned empty card is claimed by the first phone that sets it up | **Accepted for v1** | A card out of its packet has no owner and holds nothing, so any reader in range can give it a PIN, a record and an owner of its own (`SET_OWNER`, no proof). Nothing is lost: the card cannot be loaded until it has an owner. A card set up in its holder's hands, by the holder's phone ("Set up this card"), is that holder's; cards issued by Flash leave the issuer owned or are set up at hand-over. A claimed card is reset by its claimant only. |
+| 19 | Timing the card's signatures to learn its key | **Mitigated in our arithmetic**; not measured | `AUTH` gives any reader as many timed signatures as it asks for. The byte-array field multiplies on the nonce and the key have no secret-dependent branch ([D21](DECISIONS.md#d21)); the chip's EC and RSA engines, which do the point multiply, are NXP's. No timing has been measured on silicon. |
 
 ## The offline double-spend problem (#5)
 
@@ -85,81 +88,46 @@ Honest limits: this is an **operator attestation**, not a trustless proof of
 reserves. A holder cannot cryptographically verify it. Signed attestations from
 the reserve wallets would be the next step.
 
-## PIN-gated spending, and the blocked PIN (#2, #14)
+## The PIN, the owner, and the blocked PIN (#2, #14)
 
-Spending is PIN-gated once a PIN is set ([D13](DECISIONS.md#d13), which
-superseded the no-PIN [D12](DECISIONS.md#d12) and resolved the decision D12
-had left open under ENG-209). `SPEND_PROOF`, `SIGN_ARBITRARY`, `LOAD_PROOF`,
-`CLEAR_SPENT` and `LOCK_CARD` answer `6982` until `VERIFY_PIN` succeeds in the
-same NFC session.
-The gate is the first statement of the spend handler, so a wrong, missing or
-blocked PIN never consumes a proof. The unverified-session case is proven on
-silicon (applet 0.2 on the J3R180, in the
-[hardware report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)).
+**2.0's rule: the PIN spends, and the owner administers** (`FOXY-CARD-SPEC.md`
+5.3 rule 7, [D18](DECISIONS.md#d18)). A payment is asked its PIN at the
+signature (`SPEND_ALL_SIGN`), not when it is begun, because what leaves the card
+is only known there. A card with a PIN signs without it only up to the no-PIN
+allowance the owner has set, and answers `6A94` over it, for the whole payment. A
+card with no PIN signs under its daily limit and its limit on one payment, and is
+cash to whoever holds it. The PIN is asked before the limits, so a reader with no
+PIN cannot fill the card's log. `FOXY-CARD-DAILY-LIMIT.md` 6f has the whole.
 
-The gate does not cover a card with **no PIN**. Cards ship without one, and
-until one is set a reader in range can drain the card. Setting a PIN is the
-holder's first job. Since applet 0.5 the holder can also take it off again:
-`CLEAR_PIN` ([D15](DECISIONS.md#d15)) needs a verified session and the PIN
-once more, costs a try when the PIN is wrong, and returns the card to the
-no-PIN state above by the holder's choice. It is not an unblock path: a
-blocked card never grants the session it needs. The unblock path is
-`UNBLOCK_PIN` with the PUK (applet 0.6, [D16](DECISIONS.md#d16)); see #14.
+Everything else is the owner's: changing the PIN, the limits, the record or the
+owner, adding funds with no PIN, refreshing the card, locking or resetting it. Each
+needs an ECDSA proof by the owner's P-256 key over a label, a fresh nonce and the
+value, which only the holder's phone can make. A terminal that has been handed the
+PIN cannot set a PIN of its own, change a limit, or take the card over by emptying
+it: a card with an owner is its owner's, empty or not.
 
-**Software 1.16 moved the gate, and made the PIN optional.** In the Foxy fork a
-spend is asked its PIN at the signature (`SPEND_ALL_SIGN`), not when it is begun,
-because what leaves the card is only known there. A card with a PIN signs without
-it only up to the no-PIN allowance the owner has set (a day's worth, counted in
-the daily limit's window), and answers `6A94` over it, for the whole payment; a
-blocked card has no allowance, and the answer is the same. A card with no PIN
-signs, under its daily limit and its limit on one payment, and is cash to whoever
-holds it. Neither writes anything but a signature: the PIN is asked before the
-limits, so a reader with no PIN cannot fill the card's log.
-`FOXY-CARD-DAILY-LIMIT.md` 6f has the whole.
+**A blocked PIN is the owner's to unblock (#14).** Three wrong PINs, from any reader
+in range, block the card; every PIN gate then refuses, and the card has no no-PIN
+allowance. The owner's `CHANGE_PIN` sets a new PIN with no old one, which unblocks
+it. The PIN state byte is the PIN's commit: a `CHANGE_PIN` torn between the PIN and
+the byte leaves the card blocked, and the owner sends it again
+([D22](DECISIONS.md#d22)). A card whose owner has lost the seed cannot be
+unblocked, and its balance is stranded: nothing but the card key signs for its
+pieces, and their dated refund path is switched off in the apps for now
+(`FOXY-CARD-SPEC.md` 6).
 
-**The blocked state had its own bug (ENG-615).** Every build before applet 0.3
-gated on `pinState == 1`, and a blocked card has `pinState == 2`, so three
-wrong PINs *removed* the gate: the card reported itself blocked and spent
-without asking (0.1 builds from before D13 gate no spend at all, and their
-write gate opened the same way). A failed PIN check also left a verified
-session verified, so the session that blocked the card could keep spending.
-Applet 0.3 gates whenever a PIN exists in any state, and a failed check ends
-the session's verification, the way `OwnerPIN.check` resets its own validated
-flag. The 0.3 behaviour is verified in jCardSim only; it has not yet run on
-silicon. A card whose `SELECT` answers anything below `00 03` (`00 01` or
-`00 02`) runs a vulnerable build and needs the CAP reinstalled, and since
-[D14](DECISIONS.md#d14) so does one answering `00 03` (#11). Sweep it first: a
-reinstall regenerates the key the proofs are locked to.
+**The ENG-615 lesson holds.** 0.x builds before 0.3 gated with `pinState == 1`, so
+a blocked PIN *removed* the gate; and a failed check left a verified session
+verified. 2.0 gates whenever a PIN exists in any state, refuses state 2 even under
+a verified flag, and a failed check ends the session. Foxy's suite walks every gated
+command through every PIN state.
 
-**A blocked card without a PUK strands its balance (#14).** `VERIFY_PIN` is
-unauthenticated, so any reader in NFC range can send the three wrong PINs.
-Nothing but the card key can sign for the card's proofs: the P2PK secret
-carries only a `sigflag` tag, with no refund key and no locktime, and D5's
-recovery proposal is not merged. ENG-615 therefore turned "three wrong PINs =
-theft" into "three wrong PINs = destruction of funds". The thief gets nothing,
-and on a card with no PUK the holder loses the balance.
-
-**With a PUK the holder gets the card back (#14, D16).** Applet 0.6 adds
-`SET_PUK`, once at personalisation, and `UNBLOCK_PIN`, which replaces the PIN
-— blocked or forgotten — on presentation of the PUK, with no session and
-without consuming the PUK. The PUK has ten tries and is then exhausted for
-good (#15), and leaking it hands that one card's PIN to whoever holds the card
-(#16), so its custody is the whole of its security: the personaliser generates
-it, records it off the card at the moment `SET_PUK` succeeds, and the backend
-card registry (ENG-618) releases it to the owning account after
-authentication. The card never reveals it and never assumes where it lives.
-`SET_PUK` is gated so no one can attach a PUK the holder did not sanction: a
-card with no PIN takes one freely (the personalisation order), a card with a
-PIN only in the holder's verified session, a blocked card never — so the
-reader that blocked a card cannot arm its own recovery. `UNBLOCK_PIN` writes
-the new PIN and its full counter first and commits the PIN state last
-([D14](DECISIONS.md#d14)); a card torn between the two refuses `VERIFY_PIN` on
-the state byte alone and is finished by the next `UNBLOCK_PIN`. All of it is
-verified in jCardSim only.
-
-Mitigations for a card without a PUK: small balances and a shielded sleeve.
-Volume issuance is no longer blocked on the applet; it is blocked on the
-registry holding the PUKs (ENG-618) and on the flash-mobile unblock flow.
+**0.x cards.** A card on the 0.x applet (`SELECT` answers `00 0X` under
+`D2 76 00 00 85 01 02`) does not answer the 2.0 AID; both apps show "This card
+needs an update" and neither spends from it. Its balance is swept with the 0.x app
+releases before it is reinstalled ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md)).
+The 0.x threats (`SIGN_ARBITRARY`, the reader-chosen `SPEND_PROOF` message, the
+PUK's custody) end with the 0.x wire.
 
 ## The NFC tag (#15, software 1.19)
 
@@ -254,8 +222,17 @@ leaves an empty place with a record beside it, which nothing serves.
   command writing the store; the store null after install and made by the first
   `SET_CARD`; the order of the writes and the torn states. A reader's check of the proof is
   not the card's and is tested where the reader is
-- The blocked PIN (applet 0.3): every gated command refuses, before and after
-  further PIN attempts, and a failed PIN check ends the session
+- The blocked PIN: every gated command refuses, before and after further PIN
+  attempts, and a failed PIN check ends the session; the owner's `CHANGE_PIN`
+  unblocks; a torn `CHANGE_PIN` stays blocked (2.0, D22)
+- The clock walk (2.0, D20): along real mainnet headers, a terminal with the PIN
+  gets the found day and the rollover budget's days and no more; `REFRESH` fills the
+  budget; the no-PIN allowance renews once per arming; an anchored owner's clock is
+  never 0
+- The field multiplies against `BigInteger` on operands full of zero bytes, and a
+  source scan for secret-dependent branches (2.0, D21)
+- A `SIG_ALL` payment through the bridge, with the card's own change, swapped at a
+  Nutshell 0.20.3 mint, with the mint's DLEQ checked from what the card keeps (CI)
 - DLEQ verification, including the tagging attack it exists to catch
 - NUT-11 witness checks: wrong key, wrong proof, corrupted signature, `n_sigs`
 
@@ -288,9 +265,9 @@ An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
   between two applets of one package
 - A blocked PIN on any build: neither ENG-615 nor its 0.3 fix (the
   blocked-state gate and the failed-check session rule) has run on a card
-- `SET_PUK` and `UNBLOCK_PIN` (applet 0.6, [D16](DECISIONS.md#d16)): the PUK
-  lifecycle, the recovery of a blocked PIN, and the torn `UNBLOCK_PIN` state
-  are tested in jCardSim only
+- Anything of 2.0 itself: the build has not been installed on a card, and its
+  load file is a size the J3R180 has not been tried at
+- `REFRESH`, the anchored `SET_OWNER` and the rollover budget on a card
 - `LOCK_CARD`, deliberately not run on a card holding value
 - EEPROM wear and lifetime
 - A card pulled mid-write: the slot write order ([D14](DECISIONS.md#d14)) is
@@ -308,19 +285,14 @@ a few hundred taps. Treat simulator results accordingly — see
 
 ## Open items
 
-1. **PUK custody and the unblock flow** (ENG-618, #14, #16) — the applet
-   side shipped in 0.6 ([D16](DECISIONS.md#d16)); what still blocks volume
-   issuance is the backend card registry that holds each card's PUK and
-   releases it to the owning account, and the flash-mobile screen that
-   drives `UNBLOCK_PIN` with it. Until then a 0.6 card whose PUK was recorded
-   nowhere is a 0.5 card.
-2. **Tear-off on silicon** (#11) — the write order is analysed and enforced
-   ([D14](DECISIONS.md#d14)); pulling a card mid-`LOAD_PROOF`,
-   mid-`CLEAR_SPENT` and mid-`UNBLOCK_PIN` on hardware is still owed.
-3. **Recovery** (#3) — [PR #4](https://github.com/lnflash/cashu-javacard/pull/4),
-   closed unmerged, is the starting point; see [D5](DECISIONS.md#d5) for the
-   flaw to fix first. A refund path would also rescue the balance of a
-   blocked card that has no PUK (#14).
+1. **2.0 on silicon** — install the 2.0 CAP on the J3R180, `cardctl selftest` and
+   `--timing` (the multiply changed, D21), then the field-card sweep and reinstall
+   (`HARDWARE_DEPLOYMENT.md`). Operator-run, with the card.
+2. **Tear-off on silicon** (#11) — the write orders are analysed and enforced
+   ([D14](DECISIONS.md#d14), [D23](DECISIONS.md#d23)); pulling a card mid-load,
+   mid-clear, mid-payment and mid-`CHANGE_PIN` on hardware is still owed.
+3. **Recovery** (#3) — the dated refund path is in the applet and switched off in
+   the apps; see [D5](DECISIONS.md#d5) and `FOXY-CARD-SPEC.md` 6.
 4. **Card attestation** (#13) — no proof a key was generated on-card by genuine
    firmware.
 5. **Side-channel review** of `SchnorrHW` — the modular arithmetic was written

@@ -126,12 +126,13 @@ Two fields here are easy to get wrong, and both make proofs unspendable:
   the card's public key. See [`spec/NUT-XX.md`](../spec/NUT-XX.md) —
   *Reconstructing the full Proof from card storage*.
 
-32 slots × 78 bytes = **2,496 bytes** of proof storage, plus the EC keypair and
-applet code. The `amount` unit follows the keyset — sats for a `sat` keyset,
-cents for `usd`.
+Protocol 2.0: 128 slots × 82 bytes (the 78 above and a 4-byte date) = **10,496
+bytes** of proof storage, 130 bytes a slot more of the hex text a payment hashes,
+and, reserved by the first `SET_CARD`, 96 bytes a slot for the mint's DLEQ proof.
+The `amount` unit follows the keyset — sats for a `sat` keyset, cents for `usd`.
 
-`MAX_PROOFS = 32` is a real constraint on the product, not just the code: a
-Cashu balance is split into powers of two, so 32 slots comfortably holds a
+`MAX_PROOFS = 128` is a real constraint on the product, not just the code: a
+Cashu balance is split into powers of two, so 128 slots comfortably holds a
 useful balance but is not unlimited. `cashu-client`'s `splitIntoDenominations`
 takes a `maxSlots` argument for exactly this reason.
 
@@ -154,7 +155,10 @@ and what the open alternative is.
 
 ## Spend protection
 
-`SPEND_PROOF` writes `STATUS_SPENT` to the slot **before** it signs. No APDU can
+A 2.0 payment (`SPEND_ALL_SIGN`) signs in RAM, then commits one byte that burns
+every place it names (with the day's count, the log and the signature kept for
+`SPEND_ALL_AGAIN`), and only then answers; the places' status bytes are marked
+after the commit, or at the next command if the card left the field. No APDU can
 reset a slot to unspent — the command does not exist. `CLEAR_SPENT` zeroes
 already-spent slots to reclaim space; it does not undo a spend.
 
@@ -164,11 +168,11 @@ Two honest caveats:
    "non-resettable hardware spend counter", which overstates it.
 2. **Tear-off is analysed, not yet tested on hardware.** No slot write is
    wrapped in a `JCSystem` transaction. Every slot write changes the data first
-   and the status byte last, and `SPEND_PROOF` writes only the status byte,
-   before it signs ([D14](DECISIONS.md#d14)). A card pulled between the burn and
-   the signature keeps the burn and loses the signature; flash-pos re-derives it
-   with `SIGN_ARBITRARY`. No card has been pulled mid-write on purpose: see
-   [`SECURITY-MODEL.md`](SECURITY-MODEL.md) #11.
+   and the status byte last ([D14](DECISIONS.md#d14)), and every write outside a
+   transaction is reviewed in [D23](DECISIONS.md#d23). A card pulled as a
+   payment's answer is on the air has burned the places and kept the signature:
+   the terminal asks again with `SPEND_ALL_AGAIN`. No card has been pulled
+   mid-write on purpose: see [`SECURITY-MODEL.md`](SECURITY-MODEL.md) #11.
 
 ## The two flows
 
@@ -177,13 +181,13 @@ Two honest caveats:
 ```
 1. cashu-client: requestMintQuote(mint, amount, unit)     → bolt11 invoice
 2. (pay the invoice by any means)
-3. cashu-client: splitIntoDenominations(amount, maxSlots) → [64, 16, 4, …]
-4. cashu-client: createBlindedMessage(keysetId, amt, cardPubkey)
-                 ↳ builds the NUT-10 P2PK secret locked to the CARD's key
-5. cashu-client: mintProofs(...)                          → blind signatures
-6. cashu-client: unblindSignature(...) + proofDLEQFromBlindSignature(...)
-7. cashu-client: verifyProofDLEQ(...)                     → offline check
-8. cardctl:      LOAD_PROOF × n                           → written to slots
+3. wallet: split the amount into powers of two            → [64, 16, 4, …]
+4. wallet: blind each format-4 secret, SIG_ALL, locked to the CARD's key
+                 ↳ spec/NUT-XX.md, "The card piece"
+5. wallet: mint                                             → blind signatures with DLEQ
+6. wallet: unblind, check the DLEQ                          → offline check
+7. owner's phone: GET_NONCE, ALLOW_LOAD, LOAD_PROOF (P1 = 1) × n
+                                                             → written to slots with the mint's proof
 ```
 
 Step 4 is the pivot: the host locks each proof to a key it does not control.
@@ -192,20 +196,21 @@ From that moment the proof is only spendable by that card.
 ### Spending at a terminal
 
 ```
-1. terminal: GET_SLOT_STATUS / GET_PROOF          → read proofs off the card
-2. cashu-client: requestMeltQuote(mint, invoice)  → amount + fee reserve
-3. cashu-client: selectProofsForMelt(...)         → minimal covering set
-4. cashu-client: p2pkMessageToSign(proof)         → sha256(secret)
-5. card:     SPEND_PROOF(slot, message)           → marks SPENT, returns 64-byte sig
-6. cashu-client: attachP2PKWitness(proof, [sig])  → NUT-11 witness
-7. cashu-client: meltProofs(...)                  → mint pays the invoice
+1. terminal: SET_HEADER (the tip), GET_INFO, GET_PIECES, GET_DLEQ, AUTH
+                                                  → the card, its pieces checked offline
+2. terminal: pick pieces, make the swap's outputs
+3. card:     SPEND_ALL_BEGIN / OUTPUTS / CHANGE   → the card makes its own change outputs
+4. card:     SPEND_ALL_SIGN (VERIFY_PIN first unless the allowance covers it)
+                                                  → every place burned, one SIG_ALL signature
+5. terminal: swap at the mint, the signature as the first input's witness
+6. terminal: unblind the change, LOAD_PROOF it back (the tap after a payment needs no PIN)
 ```
 
-Steps 5 and 6 are the whole reason the card exists: the signature that unlocks
-the proof can only be produced by the chip.
+Step 4 is the whole reason the card exists: the signature that unlocks the
+pieces can only be produced by the chip, and only for the swap it was shown.
 
-Note the ordering hazard — **the card burns its slot at step 5, before the mint
-has accepted anything at step 7.** That asymmetry is why `cashu-client` refuses
+Note the ordering hazard — **the card burns its places at step 4, before the mint
+has accepted anything at step 5.** That asymmetry is why `cashu-client` refuses
 locally rather than optimistically submitting; see
 [`DECISIONS.md`](DECISIONS.md#d7).
 
