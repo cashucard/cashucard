@@ -16,7 +16,8 @@
  * <card-file>.change-<slot-nonce-prefix>.json; an existing file is never
  * overwritten.
  *
- * Env overrides: CLIENT_DIST (cashu-client build), CARDCTL, CARDCTL_PY. *
+ * Env overrides: CLIENT_DIST (cashu-client build), CARDCTL, CARDCTL_PY.
+ *
  * A 0.x TOOL. It drives the 0.x applet through cardctl's `spend` (SPEND_PROOF), which protocol 2.0 removed (DECISIONS
  * D18), so it runs only with CARDCTL set to cardctl.py from a 0.x checkout (git show 7a96102:tools/cardctl/cardctl.py),
  * against a 0.x card: the one use left is the sweep of a 0.x field card (docs/HARDWARE_DEPLOYMENT.md). A 2.0 card is

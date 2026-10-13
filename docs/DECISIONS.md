@@ -674,6 +674,18 @@ separable from the slot layout and the payment commands they change.
 which makes a new key, so its balance is swept first (`HARDWARE_DEPLOYMENT.md`).
 Both apps drop 0.x and say "This card needs an update" to a 0.x card.
 
+**The hardware e2e tools stay 0.x.** The architect's decision 5 was to take
+Foxy's `tools/e2e-melt.cjs` and `tools/e2e-redeem.cjs` as "already on their
+wire" and delete ours. They are not on it: at `88840aa` both are byte-identical
+to ours at `7a96102`, and both drive the 0.x applet's `SPEND_PROOF` through
+cardctl's `spend`, which 2.0 removed. Neither tree has a 2.0 version. So they
+are kept as 0.x tools for the one job left for them, the sweep of the funded
+0.x field card before it is reinstalled (`HARDWARE_DEPLOYMENT.md`). Each
+refuses to run unless `CARDCTL` points at a 0.x `cardctl.py`. The 2.0 e2e is
+`tools/cardsim/e2e-swap.test.cjs`: one `SIG_ALL` signature and a swap at a real
+mint, in CI. A 2.0 hardware e2e (melt and redeem over `SPEND_ALL_*`) is not in
+this PR. It comes when a 2.0 card is on the bench.
+
 ---
 
 ## <a id="d19"></a>D19 — A neutral identity: AID F0 CASHUCARD, labels CashuCard/, version 2.0
