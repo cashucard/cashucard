@@ -88,11 +88,164 @@ class SimCardTest {
     // ── fresh card ──────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("a fresh card answers SELECT by the CASHUCARD AID with 02 00 9000")
+    @DisplayName("a fresh card answers SELECT by the card's applet's whole AID, F0 CASHUCARD 01, with 02 00 9000")
     void selectAnswersVersion() {
         assertEquals("02009000", Hex.format(card.transmit(SimCard.SELECT)));
-        assertEquals("00A404000AF0434153485543415244", Hex.format(SimCard.SELECT));
+        assertEquals("00A404000BF043415348554341524401", Hex.format(SimCard.SELECT));
         assertEquals("2.0", card.state().get("version").getAsString());
+    }
+
+    @Test
+    @DisplayName("SELECT by the package AID alone reaches the opener, as on the chip: 9000 with no version, then 6D00 (ENG-681)")
+    void packageAidReachesTheOpener() {
+        assertEquals("00A404000AF0434153485543415244", Hex.format(SimCard.SELECT_PACKAGE));
+        assertEquals("9000", Hex.format(card.transmit(SimCard.SELECT_PACKAGE)), "the opener answers its SELECT, no body");
+        assertEquals("6D00", Hex.format(card.transmit(GET_INFO_LONG)), "and refuses the next command");
+        assertEquals("9000", Hex.format(card.transmit(Hex.parse("00A404000AF043415348554341524400"))), "with an Le as well");
+        assertEquals("6D00", Hex.format(card.transmit(GET_PUBKEY_LE21)));
+        // the whole AID then reaches the card's applet, and the card answers again
+        assertEquals("02009000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals(43, data(card.transmit(GET_INFO_LONG)).length);
+        // the opener by its own whole AID is the same applet
+        assertEquals("9000", Hex.format(card.transmit(Hex.parse("00A404000B" + SimCard.OPENER_HEX))));
+        assertEquals("6D00", Hex.format(card.transmit(GET_INFO_LONG)));
+    }
+
+    @Test
+    @DisplayName("with the opener or the tag selected, state() still reads the card, and the app's selection is kept")
+    void stateReadsTheCardWhereverTheSelectionIs() {
+        assertEquals(SimCard.AID_HEX, card.selected());
+        assertEquals("9000", Hex.format(card.transmit(SimCard.SELECT_PACKAGE)));
+        assertEquals(SimCard.OPENER_HEX, card.selected(), "the package AID selected the opener");
+        assertEquals("2.0", card.state().get("version").getAsString());
+        assertEquals(SimCard.OPENER_HEX, card.selected());
+        assertEquals("6D00", Hex.format(card.transmit(GET_INFO_LONG)), "the opener is still what the app reaches");
+
+        assertEquals(0x9000, SimCard.sw(card.transmit(Hex.parse("00A4040007" + SimCard.TAG_HEX + "00"))));
+        assertEquals(SimCard.TAG_HEX, card.selected());
+        assertEquals("2.0", card.state().get("version").getAsString());
+        assertEquals(SimCard.TAG_HEX, card.selected());
+        // a SELECT that finds nothing leaves the selection where it was
+        card.transmit(Hex.parse("00A4040007D2760000850102"));
+        assertEquals(SimCard.TAG_HEX, card.selected());
+    }
+
+    static final byte[] SELECT_TAG = Hex.parse("00A4040007" + SimCard.TAG_HEX + "00");
+    static final byte[] SELECT_NDEF_FILE = Hex.parse("00A4000C02E104");
+    static final byte[] READ_NDEF = Hex.parse("00B0000016");
+
+    @Test
+    @DisplayName("with a file chosen on the tag, state() keeps it chosen: the app's next READ BINARY reads the same bytes")
+    void stateKeepsTheTagsChosenFile() {
+        assertEquals(0x9000, SimCard.sw(card.transmit(SELECT_TAG)));
+        assertEquals("9000", Hex.format(card.transmit(SELECT_NDEF_FILE)));
+        byte[] before = card.transmit(READ_NDEF);
+        assertEquals(0x9000, SimCard.sw(before));
+        assertEquals(24, before.length, "the NDEF file's 22 bytes and the status word");
+
+        assertEquals("2.0", card.state().get("version").getAsString());
+        assertEquals(SimCard.TAG_HEX, card.selected());
+        assertArrayEquals(before, card.transmit(READ_NDEF), "the file the app chose is still chosen after /state");
+
+        // and a fixture's check (context()) does the same
+        card.context();
+        assertArrayEquals(before, card.transmit(READ_NDEF), "and after the fixture's read of the card");
+    }
+
+    @Test
+    @DisplayName("with no file chosen on the tag, state() chooses none: READ BINARY is refused before it and after it")
+    void stateChoosesNoFileOnTheTag() {
+        assertEquals(0x9000, SimCard.sw(card.transmit(SELECT_TAG)));
+        assertEquals("6986", Hex.format(card.transmit(READ_NDEF)), "no file chosen yet");
+        card.state();
+        assertEquals("6986", Hex.format(card.transmit(READ_NDEF)), "still none after /state");
+
+        // a file chosen in an earlier selection of the tag is not brought back: a new SELECT cleared it on the chip
+        assertEquals("9000", Hex.format(card.transmit(SELECT_NDEF_FILE)));
+        assertEquals(0x9000, SimCard.sw(card.transmit(SELECT_TAG)));
+        card.state();
+        assertEquals("6986", Hex.format(card.transmit(READ_NDEF)), "the tag selected again has no file chosen");
+
+        // nor across a stay on another instance
+        assertEquals("9000", Hex.format(card.transmit(SELECT_NDEF_FILE)));
+        assertEquals("02009000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals(0x9000, SimCard.sw(card.transmit(SELECT_TAG)));
+        card.state();
+        assertEquals("6986", Hex.format(card.transmit(READ_NDEF)));
+
+        // a refused SELECT of a file leaves the chosen file as it was, as the tag does
+        assertEquals("9000", Hex.format(card.transmit(SELECT_NDEF_FILE)));
+        assertEquals("6A82", Hex.format(card.transmit(Hex.parse("00A4000C02E105"))));
+        card.state();
+        assertEquals(24, card.transmit(READ_NDEF).length, "E104 is still the file chosen");
+    }
+
+    @Test
+    @DisplayName("a fixture refused partway through, applied with a file chosen on the tag, leaves the card's applet selected, and state() keeps it so")
+    void refusedFixtureWithTheTagSelected() throws FixtureException {
+        apply("{\"pin\":\"1234\"}");
+        assertEquals(0x9000, SimCard.sw(card.transmit(SELECT_TAG)));
+        assertEquals("9000", Hex.format(card.transmit(SELECT_NDEF_FILE)));
+        assertEquals(SimCard.TAG_HEX, card.selected());
+
+        FixtureException e = assertThrows(FixtureException.class, () -> apply("{\"pin\":\"9999\"}"), "VERIFY_PIN of another PIN");
+        assertEquals("VERIFY_PIN", e.step);
+        assertEquals(0x63C2, e.sw);
+        assertEquals(SimCard.AID_HEX, card.selected(), "the fixture's SELECT moved the selection to the card's applet");
+
+        byte[] before = card.transmit(READ_NDEF);
+        assertEquals("6E00", Hex.format(before), "READ BINARY reaches the card's applet, which has no such class");
+        assertEquals(SimCard.AID_HEX, card.selected());
+        card.state();
+        assertArrayEquals(before, card.transmit(READ_NDEF), "state() does not move the app back onto the tag");
+        assertEquals(SimCard.AID_HEX, card.selected());
+    }
+
+    @Test
+    @DisplayName("a fixture applied with the opener selected sets the card up and leaves the card's applet selected")
+    void fixtureWithTheOpenerSelected() throws FixtureException {
+        assertEquals("9000", Hex.format(card.transmit(SimCard.SELECT_PACKAGE)));
+        apply("{" + SETUP + "}");
+        assertEquals(SimCard.AID_HEX, card.selected());
+        assertEquals(1, card.state().get("pinState").getAsInt());
+        assertEquals(43, data(card.transmit(GET_INFO_LONG)).length, "the app's next command reaches the card");
+    }
+
+    @Test
+    @DisplayName("jCardSim alone gives the package AID to the card's applet (it sorts AIDs), which is why the bridge resolves it")
+    void jCardSimAloneDoesNotMatchTheChip() {
+        com.licel.jcardsim.smartcardio.CardSimulator raw = new com.licel.jcardsim.smartcardio.CardSimulator();
+        raw.installApplet(com.licel.jcardsim.utils.AIDUtil.create(SimCard.OPENER_HEX), me.flashapp.cashu.Opener.class);
+        raw.installApplet(com.licel.jcardsim.utils.AIDUtil.create(SimCard.AID_HEX), me.flashapp.cashu.CashuApplet.class);
+        assertEquals("02009000", Hex.format(raw.transmitCommand(SimCard.SELECT_PACKAGE)),
+            "if jCardSim ever gives the first instance the partial name itself, SimCard.resolveSelect can go");
+        // the bridge, with the opener made first, answers as the chip does (a new SimCard: jCardSim's runtime is per
+        // simulator, and the one made last is the current one)
+        assertEquals("9000", Hex.format(new SimCard().transmit(SimCard.SELECT_PACKAGE)));
+    }
+
+    @Test
+    @DisplayName("resolveSelect: a partial name becomes the whole AID of the first instance made; everything else passes through")
+    void resolveSelectRewritesOnlyPartialNames() {
+        assertEquals("00A404000B" + SimCard.OPENER_HEX, Hex.format(SimCard.resolveSelect(SimCard.SELECT_PACKAGE)));
+        assertEquals("00A404000B" + SimCard.OPENER_HEX + "00",
+            Hex.format(SimCard.resolveSelect(Hex.parse("00A404000A" + SimCard.PACKAGE_HEX + "00"))), "Le kept");
+        assertEquals("00A404000B" + SimCard.OPENER_HEX, Hex.format(SimCard.resolveSelect(Hex.parse("00A4040005F043415348"))),
+            "a shorter prefix too");
+        assertEquals("00A4040007" + SimCard.TAG_HEX + "00",
+            Hex.format(SimCard.resolveSelect(Hex.parse("00A4040006D2760000850100"))), "the tag, the only instance it begins");
+        for (String same : new String[] {
+                "00A404000B" + SimCard.AID_HEX,             // a whole AID
+                "00A404000B" + SimCard.OPENER_HEX,
+                "00A4040007" + SimCard.TAG_HEX + "00",
+                "00A4040007D2760000850102",                 // the 0.x AID: begins no instance
+                "00A4040009F0464F585943415244",             // Foxy's
+                "00A404020A" + SimCard.PACKAGE_HEX,         // next occurrence
+                "00A4040004F0434153",                       // shorter than an AID may be
+                "00A4000C02E103",                           // SELECT by file id
+                "B001020000" }) {
+            assertEquals(same, Hex.format(SimCard.resolveSelect(Hex.parse(same))), same);
+        }
     }
 
     @Test

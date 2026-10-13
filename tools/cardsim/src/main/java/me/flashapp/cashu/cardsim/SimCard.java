@@ -15,6 +15,25 @@ import java.util.Arrays;
  * chip has them (the opener, the card's applet, and the NFC tag under the NFC Forum's own name), driven with raw APDU
  * bytes so that the bytes the app sends are the bytes the applet sees.
  *
+ * <p><b>A partial name reaches the first instance, as on the chip.</b> A J3R180 gives a SELECT by a partial AID to the
+ * first instance it made whose AID begins with the name: a SELECT by the package AID {@code F0 CASHUCARD} reaches the
+ * opener, made first, which answers 9000 with no version and 6D00 to everything after (ENG-681, DECISIONS D25).
+ * jCardSim instead keeps its applets in a map sorted by AID and gives a partial name to the lowest that matches, which
+ * here is the card's applet ({@code …44 01} sorts before {@code …44 4D}); left alone it would answer 02 00 where the
+ * chip does not. So {@link #transmit} resolves a partial SELECT by name itself, against {@link #INSTANCES} in the
+ * order {@link #install()} made them, and hands jCardSim the whole AID of the instance the chip would pick. Only a
+ * SELECT by name for the first or only occurrence (P1 04, P2's low bits 00) is resolved; a whole AID, a name that
+ * begins no instance, and "next occurrence" pass through unchanged.
+ *
+ * <p><b>The bridge's own reads find the card's applet wherever the app left the selection.</b> {@link #state()} and the
+ * fixture's checks read the card's applet; when the app has selected another instance (the opener, by the package AID,
+ * or the tag), they select the card's applet for the reads and then select the app's instance again, so the app's next
+ * command reaches what it reached before. Selecting the tag again clears the file it had chosen (CLEAR_ON_DESELECT), so
+ * when the app had chosen one the bridge sends the app's last SELECT of that file again as well, and a READ BINARY after
+ * {@code /state} reads what it would have read without it. {@link #applyFixture} selects the card's applet first in
+ * that case, and records the selection as soon as that SELECT is answered, so a fixture refused partway through leaves
+ * the bridge knowing the card's applet is selected; a fixture that succeeds ends with a SELECT of the card's applet.
+ *
  * <p><b>Thread confinement.</b> jCardSim keeps the active runtime in a {@code ThreadLocal}
  * ({@code SimulatorSystem.currentRuntime}), set when the simulator is constructed. Every call on this object — the
  * constructor included — must come from the same thread. {@link CardSim} guarantees that by building it lazily inside
@@ -30,12 +49,17 @@ import java.util.Arrays;
  */
 final class SimCard {
 
-    /** The package AID, "CASHUCARD" after F0 (D19); SELECT matches it as a prefix of the applet's. */
+    /** The package AID, "CASHUCARD" after F0 (D19): a prefix of the opener's AID and the card's applet's. */
     static final String PACKAGE_HEX = "F0434153485543415244";
     static final String AID_HEX = PACKAGE_HEX + "01";
     static final String OPENER_HEX = PACKAGE_HEX + "4D";
     static final String TAG_HEX = "D2760000850101";
-    static final byte[] SELECT = Hex.parse("00A404000A" + PACKAGE_HEX);
+    /** The instances, in the order {@link #install()} makes them and a chip is given them: the opener first (D25). */
+    static final String[] INSTANCES = { OPENER_HEX, AID_HEX, TAG_HEX };
+    /** SELECT by the card's applet's whole AID, as a reader sends it (D25): answers 02 00. */
+    static final byte[] SELECT = Hex.parse("00A404000B" + AID_HEX);
+    /** SELECT by the package AID alone: a partial name, which reaches the opener (9000, no version). */
+    static final byte[] SELECT_PACKAGE = Hex.parse("00A404000A" + PACKAGE_HEX);
     /** The tag's install parameters: its instance AID's length and the AID, then no privileges and no parameters. */
     private static final byte[] TAG_INSTALL = Hex.parse("07" + TAG_HEX + "0000");
 
@@ -62,6 +86,14 @@ final class SimCard {
     }
 
     private CardSimulator sim;
+    /** The instance the last successful SELECT by name reached, as an {@link #INSTANCES} entry. */
+    private String selected;
+    /**
+     * The app's last successful SELECT of a file on the tag (P1 00, P2 0C) since the tag was last selected, or null. The
+     * tag keeps the file chosen in CLEAR_ON_DESELECT memory, so {@link #onTheCard} sends this again after it selects
+     * the tag again.
+     */
+    private byte[] tagFile;
     private long generation;
     private FixtureException fixtureError;
     /** The owner key a fixture set, so later fixtures can sign the owner's proofs; null when the card has none or a key the bridge does not hold. */
@@ -74,13 +106,16 @@ final class SimCard {
 
     private void install() {
         sim = new CardSimulator();
-        sim.installApplet(AIDUtil.create(OPENER_HEX), Opener.class);
-        sim.installApplet(AIDUtil.create(AID_HEX), CashuApplet.class);
-        sim.installApplet(AIDUtil.create(TAG_HEX), Tag.class, TAG_INSTALL, (short) 0, (byte) TAG_INSTALL.length);
+        // INSTANCES' order: the opener first, as the chip needs it and as resolveSelect gives partial names out
+        sim.installApplet(AIDUtil.create(INSTANCES[0]), Opener.class);
+        sim.installApplet(AIDUtil.create(INSTANCES[1]), CashuApplet.class);
+        sim.installApplet(AIDUtil.create(INSTANCES[2]), Tag.class, TAG_INSTALL, (short) 0, (byte) TAG_INSTALL.length);
         byte[] resp = sim.transmitCommand(SELECT);
         if (sw(resp) != SW_OK || resp.length != 4 || resp[0] != 2) {
             throw new IllegalStateException("SELECT after install answered " + Hex.format(resp) + ", not a 2.x applet");
         }
+        selected = AID_HEX;
+        tagFile = null;
         fixtureError = null;
         owner = null;
     }
@@ -100,7 +135,103 @@ final class SimCard {
         if (command == null || command.length < 4) {
             throw new IllegalArgumentException("an APDU is at least CLA INS P1 P2 (4 bytes)");
         }
-        return sim.transmitCommand(command);
+        byte[] resolved = resolveSelect(command);
+        byte[] resp = sim.transmitCommand(resolved);
+        boolean ok = resp.length >= 2 && sw(resp) == SW_OK;
+        // any SELECT by name that is answered selects an instance afresh, the tag's chosen file with it
+        if (ok && isSelectByName(resolved)) tagFile = null;
+        String instance = instanceSelectedBy(resolved);
+        if (instance != null && ok) selected = instance;
+        if (ok && TAG_HEX.equals(selected) && isSelectFile(resolved)) tagFile = resolved.clone();
+        return resp;
+    }
+
+    /** A SELECT by name (P1 04) in the interindustry class, which the runtime takes as selecting an instance. */
+    static boolean isSelectByName(byte[] command) {
+        return command.length >= 4 && (command[0] & 0x80) == 0 && command[1] == (byte) 0xA4 && command[2] == 0x04;
+    }
+
+    /** The tag's SELECT of a file (Tag.chooseFile): CLA 00, INS A4, P1 00, P2 0C. */
+    static boolean isSelectFile(byte[] command) {
+        return command.length >= 4 && command[0] == 0x00 && command[1] == (byte) 0xA4 && command[2] == 0x00
+                && command[3] == 0x0C;
+    }
+
+    /** The instance a SELECT by name for the first occurrence names by its whole AID, or null for any other command. */
+    static String instanceSelectedBy(byte[] command) {
+        if (command.length < 6 || (command[0] & 0x80) != 0 || command[1] != (byte) 0xA4 || command[2] != 0x04
+                || (command[3] & 0x03) != 0) {
+            return null;
+        }
+        int lc = command[4] & 0xFF;
+        if (command.length < 5 + lc) return null;
+        String name = Hex.format(command, 5, lc);
+        for (String instance : INSTANCES) if (instance.equals(name)) return instance;
+        return null;
+    }
+
+    /** The instance the app's last SELECT reached (the card's applet after install, reset and every fixture). */
+    String selected() {
+        return selected;
+    }
+
+    /**
+     * Run the bridge's reads on the card's applet. When the app has another instance selected, SELECT the card's
+     * applet for them and the app's instance again after, so the app's next command reaches what it did before. The
+     * card's applet was deselected when the app left it, so its session (CLEAR_ON_DESELECT) is already gone. The opener
+     * keeps nothing across a selection. The tag keeps the file chosen, which a new selection clears, so when the app had
+     * chosen one its SELECT of that file is sent again after the tag's: the app's next READ BINARY reads the same file.
+     */
+    private <T> T onTheCard(java.util.function.Supplier<T> reads) {
+        if (AID_HEX.equals(selected)) return reads.get();
+        String back = selected;
+        byte[] resp = raw(SELECT);
+        if (resp.length < 2 || sw(resp) != SW_OK) throw new IllegalStateException("SELECT of the card's applet answered " + Hex.format(resp));
+        try {
+            return reads.get();
+        } finally {
+            byte[] aid = Hex.parse(back);
+            byte[] again = new byte[5 + aid.length];
+            again[1] = (byte) 0xA4;
+            again[2] = 0x04;
+            again[4] = (byte) aid.length;
+            System.arraycopy(aid, 0, again, 5, aid.length);
+            raw(again);
+            if (TAG_HEX.equals(back) && tagFile != null) raw(tagFile);
+        }
+    }
+
+    /**
+     * A SELECT by a partial name, rewritten to the whole AID of the first instance in {@link #INSTANCES} that begins
+     * with it, which is the instance a chip selects (see the class comment). Anything else is returned as it is: a
+     * command that is not a SELECT by name for the first occurrence, a whole AID, a name of fewer than 5 or more than
+     * 16 bytes, and a name that begins no instance. The rewritten command keeps CLA, P2 and any Le.
+     */
+    static byte[] resolveSelect(byte[] command) {
+        if (command.length < 6 || (command[0] & 0x80) != 0 || command[1] != (byte) 0xA4 || command[2] != 0x04
+                || (command[3] & 0x03) != 0) {
+            return command;
+        }
+        int lc = command[4] & 0xFF;
+        if (lc < 5 || lc > 16 || command.length < 5 + lc) return command;
+        byte[] name = Arrays.copyOfRange(command, 5, 5 + lc);
+        byte[][] instances = new byte[INSTANCES.length][];
+        for (int i = 0; i < INSTANCES.length; i++) {
+            instances[i] = Hex.parse(INSTANCES[i]);
+            if (Arrays.equals(instances[i], name)) return command;
+        }
+        for (byte[] aid : instances) {
+            if (aid.length > lc && Arrays.equals(Arrays.copyOf(aid, lc), name)) {
+                byte[] le = Arrays.copyOfRange(command, 5 + lc, command.length);
+                byte[] out = new byte[5 + aid.length + le.length];
+                System.arraycopy(command, 0, out, 0, 4);
+                out[4] = (byte) aid.length;
+                System.arraycopy(aid, 0, out, 5, aid.length);
+                System.arraycopy(le, 0, out, 5 + aid.length, le.length);
+                return out;
+            }
+        }
+        return command;
     }
 
     private byte[] raw(byte[] command) {
@@ -109,6 +240,10 @@ final class SimCard {
 
     /** The card as it is, for checking a fixture before it is applied. Reads only. */
     Fixture.Context context() {
+        return onTheCard(this::readContext);
+    }
+
+    private Fixture.Context readContext() {
         byte[] info = data(raw(GET_INFO), "GET_INFO");
         byte[] record = data(raw(GET_CARD), "GET_CARD");
         boolean refund = false;
@@ -139,6 +274,13 @@ final class SimCard {
         generation++;
         fixtureError = null;
         try {
+            if (!AID_HEX.equals(selected)) {
+                expect("SELECT", SELECT, SW_OK);
+                // the selection moved here, whatever a later step does: a refused step must not leave the bridge
+                // thinking the app still has the opener or the tag (and its chosen file) selected
+                selected = AID_HEX;
+                tagFile = null;
+            }
             if (f.pin != null) {
                 // the PIN is set on a card that has none, and on a card that has one it is the PIN to verify
                 if (data(raw(GET_INFO), "GET_INFO")[7] == 0) expect("SET_PIN", apdu(0x41, 0, 0, f.pin, -1), SW_OK);
@@ -194,6 +336,8 @@ final class SimCard {
                 expect("VERIFY_PIN", apdu(0x40, 0, 0, wrong, -1), 0x6983);
             }
             expect("SELECT", SELECT, SW_OK);
+            selected = AID_HEX;
+            tagFile = null;
         } catch (FixtureException e) {
             fixtureError = e;
             throw e;
@@ -218,6 +362,10 @@ final class SimCard {
      * touches the session.
      */
     JsonObject state() {
+        return onTheCard(this::readState);
+    }
+
+    private JsonObject readState() {
         JsonObject s = new JsonObject();
         s.addProperty("generation", generation);
         s.addProperty("deterministicKey", true);
