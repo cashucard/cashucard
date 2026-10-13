@@ -876,6 +876,31 @@ a tear leaves are set by hand in the tests and shown harmless, as in D14.
 
 ---
 
+## <a id="d24"></a>D24 — FLOOR_BITS is a quarter of the work of the newest header in the vectors
+
+**Decided (ENG-673):** `FLOOR_BITS`, the least work any block header must
+show before a card that has taken none believes it, is four times the target
+(a quarter of the work) of the newest mainnet header in
+`spec/vectors/headers.json`. For 2.0 that header is height 971,100 (bits
+`0x17021EF0`), and the floor is `0x17087BC0`: the same as Foxy's 1.15 value,
+because the network's difficulty had not moved by a retarget's worth between
+the two. `FloorBitsTest` works the floor out from the vectors and holds the
+applet to it.
+
+**The procedure, at each release** (v2.0.0 included): add the tip's header to
+`spec/vectors/headers.json` (taken from a block explorer and checked: its hash
+is the double SHA-256 of its 80 bytes), run `FloorBitsTest`, and set
+`FLOOR_BITS` to what it asks for. A floor from the release's own time means a
+card set up years later starts from its own era, and the ratchet (a quarter of
+the hardest header taken) carries it from there.
+
+**Why a quarter, and not the network's own target.** A header at the tip's
+difficulty must always pass, and the difficulty moves by up to four times a
+retarget; a quarter of the work leaves room for the network to fall and still
+costs a forger a quarter of a block's work (about 2^77 hashes) per day it buys.
+
+---
+
 Small changes: open a PR and reference the decision id (e.g. "revisits D5").
 
 Changes that alter the product's shape — recovery, identity, custody, the

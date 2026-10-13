@@ -689,7 +689,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * for a new card as the ratchet is for a used one. Set in each version to a
      * quarter of its own time's, so that a card set up years from now starts
      * from its own era; the network's difficulty has never fallen by three
-     * quarters, and a fall that deep would stall every card's ratchet alike. */
+     * quarters, and a fall that deep would stall every card's ratchet alike.
+     * 2.0 (D24): recomputed from the newest header in spec/vectors/headers.json
+     * (height 971,100, bits 0x17021EF0): four times its target is 0x17087BC0,
+     * the same as 1.15's, and FloorBitsTest holds the two together. */
     private static final byte[] FLOOR_BITS = { (byte) 0xC0, (byte) 0x7B, (byte) 0x08, (byte) 0x17 };
 
     /** 86 400 seconds, big-endian: how long a day is. */
