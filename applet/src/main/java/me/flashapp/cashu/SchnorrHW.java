@@ -519,6 +519,16 @@ final class SchnorrHW {
     /**
      * Schoolbook 256×256 → 512-bit unsigned multiplication.
      * a[32], b[32] → out[64], all big-endian.
+     *
+     * The same work for every input (D21). The operands are secret: the
+     * nonce and the key pass through here, and AUTH lets any reader ask for
+     * as many signatures as it likes and time each one. So there is no
+     * branch and no loop whose length depends on a byte of either operand:
+     * a row of zeros is multiplied like any other row, and a row's carry is
+     * written, not propagated. It can be written: the rows run from the low
+     * byte up, row i writes columns i+1 .. i+32, and no row before it has
+     * written column i, so the carry out of row i (at most 255) is the whole
+     * of column i.
      */
     private static void mul256x256(byte[] a, short aOff,
                                    byte[] b, short bOff,
@@ -532,7 +542,6 @@ final class SchnorrHW {
         Util.arrayFillNonAtomic(out, outOff, (short)64, (byte)0);
         for (short i = 31; i >= 0; i--) {
             short ai = (short)(a[(short)(aOff+i)] & 0xFF);
-            if (ai == 0) continue;
             short carry = 0;
             for (short j = 31; j >= 0; j--) {
                 short bj  = (short)(b[(short)(bOff+j)] & 0xFF);
@@ -542,13 +551,8 @@ final class SchnorrHW {
                 out[pos]  = (byte)(prod & 0xFF);
                 carry     = (short)((prod >> 8) & 0xFF);
             }
-            // propagate carry into upper bytes
-            short pos = (short)(outOff + i);
-            while (carry != 0 && pos >= outOff) {
-                short s = (short)((short)(out[pos] & 0xFF) + carry);
-                out[pos--] = (byte)(s & 0xFF);
-                carry      = (short)((s >> 8) & 0xFF);
-            }
+            // column i is untouched until now: the carry is all of it
+            out[(short)(outOff + i)] = (byte) carry;
         }
     }
 
@@ -563,8 +567,8 @@ final class SchnorrHW {
     private static void mulByDelta(byte[] a, short aOff, byte[] out, short outOff) {
         Util.arrayFillNonAtomic(out, outOff, (short)64, (byte)0);
         for (short i = 31; i >= 0; i--) {
+            // no early way out for a zero byte of `a`, which is secret (D21): see mul256x256
             short ai = (short)(a[(short)(aOff+i)] & 0xFF);
-            if (ai == 0) continue;
             short carry = 0;
             for (short j = 31; j >= DELTA_FROM; j--) {
                 short bj  = (short)(DELTA[j] & 0xFF);
@@ -574,13 +578,11 @@ final class SchnorrHW {
                 out[pos]  = (byte)(prod & 0xFF);
                 carry     = (short)((prod >> 8) & 0xFF);
             }
-            // the carry out of the last column written, into the columns above it
-            short pos = (short)(outOff + i + DELTA_FROM);
-            while (carry != 0 && pos >= outOff) {
-                short s = (short)((short)(out[pos] & 0xFF) + carry);
-                out[pos--] = (byte)(s & 0xFF);
-                carry      = (short)((s >> 8) & 0xFF);
-            }
+            /* the carry out of the last column written: row i writes columns
+             * i+DELTA_FROM+1 .. i+32, the row before it ended at column
+             * i+DELTA_FROM+1, so column i+DELTA_FROM is untouched and the
+             * carry (at most 255) is all of it */
+            out[(short)(outOff + i + DELTA_FROM)] = (byte) carry;
         }
     }
 

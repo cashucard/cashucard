@@ -96,6 +96,103 @@ class SchnorrHWMathTest {
         }
     }
 
+    // ── D21: the field multiply does the same work for every input ───────────
+
+    /** An operand with each byte zeroed with probability `zeros` in 1: the inputs an early exit on a zero byte would run faster on. */
+    private static byte[] sparse(Random r, int zeros) {
+        byte[] b = new byte[32];
+        r.nextBytes(b);
+        for (int k = 0; k < 32; k++) if (r.nextInt(zeros) == 0) b[k] = 0;
+        return b;
+    }
+
+    @Test
+    @DisplayName("D21: mulModN matches BigInteger on operands full of zero bytes, a zero high or low half, and single-byte operands")
+    void mulModNWithZeroBytesMatchesBigInteger() {
+        Random r = new Random(0x0D21L);
+        for (int i = 0; i < 2000; i++) {
+            byte[] a = sparse(r, 1 + (i % 4)), b = sparse(r, 1 + ((i / 4) % 4));
+            if (i % 50 == 0) java.util.Arrays.fill(a, 0, 16, (byte) 0);       // a zero high half
+            if (i % 50 == 1) java.util.Arrays.fill(b, 16, 32, (byte) 0);      // a zero low half
+            if (i % 50 == 2) { java.util.Arrays.fill(a, (byte) 0); a[r.nextInt(32)] = (byte) (1 + r.nextInt(255)); }
+            BigInteger av = from32(a).mod(N), bv = from32(b).mod(N);
+            byte[] out = new byte[32];
+            SchnorrHW.mulModN(to32(av), (short) 0, to32(bv), (short) 0, out, (short) 0, work(), (short) 0);
+            assertEquals(av.multiply(bv).mod(N), from32(out), "iteration " + i + " a=" + av.toString(16) + " b=" + bv.toString(16));
+        }
+    }
+
+    @Test
+    @DisplayName("D21: the raw 512-bit products, mul256x256 and mulByDelta, match BigInteger with zero bytes in the secret operand")
+    void theRawProductsMatchBigInteger() throws Exception {
+        java.lang.reflect.Method mul = SchnorrHW.class.getDeclaredMethod("mul256x256",
+            byte[].class, short.class, byte[].class, short.class, byte[].class, short.class);
+        java.lang.reflect.Method byDelta = SchnorrHW.class.getDeclaredMethod("mulByDelta",
+            byte[].class, short.class, byte[].class, short.class);
+        mul.setAccessible(true);
+        byDelta.setAccessible(true);
+        BigInteger delta = BigInteger.ONE.shiftLeft(256).subtract(N);
+        Random r = new Random(0x0D21DL);
+        for (int i = 0; i < 2000; i++) {
+            byte[] a = sparse(r, 1 + (i % 5)), b = sparse(r, 1 + ((i / 5) % 5));
+            if (i == 0) java.util.Arrays.fill(a, (byte) 0);
+            if (i == 1) java.util.Arrays.fill(a, (byte) 0xFF);
+            if (i == 2) { java.util.Arrays.fill(a, (byte) 0xFF); java.util.Arrays.fill(b, (byte) 0xFF); }
+            byte[] out = new byte[64];
+            java.util.Arrays.fill(out, (byte) 0x5A);    // whatever was there before is written over
+            mul.invoke(null, a, (short) 0, b, (short) 0, out, (short) 0);
+            assertEquals(from32(a).multiply(from32(b)), new BigInteger(1, out), "a×b at " + i);
+            byte[] d = new byte[64];
+            java.util.Arrays.fill(d, (byte) 0xA5);
+            byDelta.invoke(null, a, (short) 0, d, (short) 0);
+            assertEquals(from32(a).multiply(delta), new BigInteger(1, d), "a×DELTA at " + i);
+        }
+    }
+
+    @Test
+    @DisplayName("D21: neither multiply has a branch or a loop on a byte of its operands (no continue, no if, no while), read in the source")
+    void theMultipliesHaveNoSecretDependentBranch() throws Exception {
+        String src = new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")),
+            java.nio.charset.StandardCharsets.UTF_8);
+        java.util.List<String> violations = branchyMultiplies(src);
+        org.junit.jupiter.api.Assertions.assertTrue(violations.isEmpty(), String.join("\n", violations));
+    }
+
+    @Test
+    @DisplayName("D21: the scan fails the old early exit, the old carry loop and an if on an operand byte")
+    void theBranchScanCanSayNo() {
+        String rest = " private static void mulByDelta(byte[] a, short aOff, byte[] out, short outOff) {"
+            + " for (short i = 31; i >= 0; i--) { short ai = (short)(a[i] & 0xFF); short carry = 0;"
+            + " for (short j = 31; j >= DELTA_FROM; j--) { carry = 0; } out[i] = (byte) carry; } }";
+        String good = "class A { private static void mul256x256(byte[] a, short aOff, byte[] b, short bOff, byte[] out, short outOff) {"
+            + " for (short i = 31; i >= 0; i--) { short ai = (short)(a[i] & 0xFF); short carry = 0;"
+            + " for (short j = 31; j >= 0; j--) { carry = 0; } out[i] = (byte) carry; } }" + rest + " }";
+        String earlyExit = good.replace("short ai = (short)(a[i] & 0xFF);", "short ai = (short)(a[i] & 0xFF); if (ai == 0) continue;");
+        String carryLoop = good.replace("out[i] = (byte) carry; } }" + rest, "while (carry != 0 && pos >= outOff) { carry = 0; } } }" + rest);
+        String anIf = good.replace(rest, rest.replace("short carry = 0;", "short carry = 0; if (ai > 1) carry = 1;"));
+        org.junit.jupiter.api.Assertions.assertTrue(branchyMultiplies(good).isEmpty(), String.join("\n", branchyMultiplies(good)));
+        org.junit.jupiter.api.Assertions.assertFalse(branchyMultiplies(earlyExit).isEmpty(), "the early exit passed");
+        org.junit.jupiter.api.Assertions.assertFalse(branchyMultiplies(carryLoop).isEmpty(), "the carry loop passed");
+        org.junit.jupiter.api.Assertions.assertFalse(branchyMultiplies(anIf).isEmpty(), "an if in mulByDelta passed");
+    }
+
+    /** `continue`, `if`, `while`, `break`, `?` or `return` in the bodies of mul256x256 and mulByDelta: each a branch whose timing could follow a byte of the operands. */
+    static java.util.List<String> branchyMultiplies(String rawSrc) {
+        String src = stripCommentsAndCharLiterals(rawSrc);
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String name : new String[] { "mul256x256(byte[]", "mulByDelta(byte[]" }) {
+            int decl = src.indexOf("static void " + name);
+            if (decl < 0) { out.add("no " + name + " in the source"); continue; }
+            int[] body = bodyRange(src, "static void " + name);
+            String b = src.substring(body[0], body[1]);
+            for (String w : new String[] { "continue", "if", "while", "break", "return" }) {
+                if (java.util.regex.Pattern.compile("\\b" + w + "\\b").matcher(b).find()) out.add(name + " has `" + w + "`");
+            }
+            if (b.contains("?")) out.add(name + " has a conditional expression");
+        }
+        return out;
+    }
+
     /**
      * The odd-y normalisation d = n - d is picked at random by the card's key
      * generation (P.y parity), so the applet-level tests only exercise it about

@@ -324,7 +324,10 @@ a few hundred taps. Treat simulator results accordingly — see
 4. **Card attestation** (#13) — no proof a key was generated on-card by genuine
    firmware.
 5. **Side-channel review** of `SchnorrHW` — the modular arithmetic was written
-   for correctness, with no constant-time analysis.
+   for correctness. Since 2.0 the two byte-array multiplies have no
+   secret-dependent branch ([D21](DECISIONS.md#d21)), but nothing has been
+   measured on silicon, and the chip's own EC and RSA engines are not ours to
+   analyse.
 6. **Trustless proof of reserves** — upgrade the attestation to signed
    statements from the reserve wallets.
 

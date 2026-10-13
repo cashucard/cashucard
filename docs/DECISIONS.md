@@ -716,6 +716,36 @@ page a 2.0 card's tag opens is a product decision left open.
 
 ---
 
+## <a id="d21"></a>D21 — The field multiply does the same work for every input
+
+**Decided (ENG-673):** `SchnorrHW.mul256x256` and `mulByDelta` have no branch
+and no loop whose length depends on a byte of an operand. The `if (ai == 0)
+continue;` that skipped a row of zeros is gone from both, and so is the
+`while (carry != 0 …)` that carried a row's overflow upward: the carry is
+written into its column, which no earlier row has touched (rows run from the
+low byte up; row `i` of the full product writes columns `i+1 … i+32`, and of
+the product by DELTA columns `i+16 … i+32`), so the carry, at most 255, is the
+whole of that column. The result is the same number; `SchnorrHWMathTest` holds
+both products to `BigInteger` on operands full of zero bytes, and scans the two
+bodies for `continue`, `if`, `while`, `break`, `return` and `?`.
+
+**Why it matters here.** The operands of these products are the signing nonce
+and the card key. A row skipped for a zero byte makes a signature measurably
+faster for some nonces, and leaked nonce bytes are how ECDSA and Schnorr keys
+are recovered with lattices. `AUTH` signs for any reader, with no PIN, as often
+as it is asked: an unlimited supply of timed signatures. The 0.x applet had
+the same early exit; it was never measured on silicon (SECURITY-MODEL, open
+item 5).
+
+**Cost accepted.** A zero row now costs what any row costs, about one row in
+256 on random input; the carry write is cheaper than the loop it replaces.
+Re-measure `cardctl --timing` on the J3R180 before release. What this does not
+reach: the chip's own `KeyAgreement` and RSA engines, which do the point
+multiply and the field exponentiations, and whose timing is NXP's; and the
+JavaCard VM's own timing of a multiply, which is not specified constant.
+
+---
+
 Small changes: open a PR and reference the decision id (e.g. "revisits D5").
 
 Changes that alter the product's shape — recovery, identity, custody, the
