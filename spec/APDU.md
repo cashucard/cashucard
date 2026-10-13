@@ -571,7 +571,7 @@ The owner's form; no PIN, any funds. The value:
 | 0–3 | daily limit | sats; 0 is none. A new number begins a window at `now` |
 | 4–7 | payment limit | (8, 12 or 13 bytes) sats; a payment over it waits, by the card's own work, for every limit's worth past the first |
 | 8–11 | no-PIN allowance | (12 or 13 bytes) sats a day signed for without the PIN; `6985` for a number on a card with no PIN |
-| 12 | rollover budget | (13 bytes) 1 to 30: how often the window may roll between the owner's `REFRESH`es; `6A80` outside that. Absent, the budget is left as it is (7 until set) |
+| 12 | rollover budget | (13 bytes) 1 to 30: how often the window may roll between the owner's `REFRESH`es; `6A80` outside that. Absent (4, 8 or 12 bytes), the budget is set back to its default, 7 |
 
 `6A90`, `6A91`; `6986` locked; `6700` for a length other than 4, 8, 12 or 13.
 

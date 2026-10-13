@@ -190,19 +190,40 @@ class ClockWalkTest {
     }
 
     @Test
-    @DisplayName("the default budget is seven: a card whose owner gave no budget rolls seven times along the walk and no more")
+    @DisplayName("the default budget is seven: an owner's budget of 2 set back by a twelve-byte SET_LIMIT (absent means 7) rolls seven times along the walk and no more")
     void theDefaultBudgetIsSeven() {
-        setUp(0, 100, 0, 7, 12, 100);
-        // the budget byte is 7 as given; a twelve-byte SET_LIMIT leaves it, and a card that never had one reads 0, which is 7
+        setUp(0, 100, 0, 2, 12, 100);
+        assertEquals(2, budget());
+        // a twelve-byte SET_LIMIT (a 1.x wallet's) sets the budget back to its default: 0 on the card, which it reads as 7
         byte[] twelve = CashuAppletTest.concat(CashuAppletTest.u32(100), CashuAppletTest.u32(0), CashuAppletTest.u32(0));
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_LIMIT_OWNER, 0, 0,
             CashuAppletTest.ownerData(CashuAppletTest.ownerProof(CashuAppletTest.L_LIMIT, CashuAppletTest.OWNER, nonce(), twelve), twelve))));
-        assertEquals(7, budget(), "a form without the byte leaves the budget as it was");
+        assertEquals(0, budget(), "a form without the byte sets the budget back to the default (architect's decision 2: absent means 7)");
         int[] next = { 0 };
         int got = 0;
         for (int i = 0; i <= 10; i++) got += pinScriptAt(H.get(i), next);
-        assertEquals(8, got, "the found day and seven rolls");
+        assertEquals(8, got, "the found day and seven rolls, not the owner's earlier two");
         assertEquals(7, rolls());
+    }
+
+    @Test
+    @DisplayName("absent means 7: the 4-, 8- and 12-byte owner's SET_LIMIT each set a budget of 5 back to the default; the 13-byte form sets what it carries")
+    void aFormWithoutTheByteSetsTheBudgetBackToSeven() {
+        setUp(0, 100, 0, 5, 0, 0);
+        byte[][] forms = {
+            CashuAppletTest.u32(100),
+            CashuAppletTest.concat(CashuAppletTest.u32(100), CashuAppletTest.u32(0)),
+            CashuAppletTest.concat(CashuAppletTest.u32(100), CashuAppletTest.u32(0), CashuAppletTest.u32(0)),
+        };
+        for (byte[] value : forms) {
+            assertEquals(SW_OK, setLimits(100, 0, 5));
+            assertEquals(5, budget());
+            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_LIMIT_OWNER, 0, 0,
+                CashuAppletTest.ownerData(CashuAppletTest.ownerProof(CashuAppletTest.L_LIMIT, CashuAppletTest.OWNER, nonce(), value), value))), value.length + " bytes");
+            assertEquals(0, budget(), value.length + " bytes: the budget is the default again (0 on the card, read as 7)");
+        }
+        assertEquals(SW_OK, setLimits(100, 0, 12));
+        assertEquals(12, budget(), "thirteen bytes: the budget given");
     }
 
     @Test

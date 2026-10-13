@@ -2791,6 +2791,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * payment) or, since 1.16, 12 (those two and the no-PIN allowance). A card
      * with no PIN has no allowance to set: a 12-byte form with a number in the
      * allowance is refused (`6985`), and one with a zero in it is the 8-byte form.
+     * 2.0 (D20) adds a thirteenth byte, the rollover budget (1 to 30); a form
+     * without it sets the budget to its default, 7.
      */
     private void processSetLimitOwner(APDU apdu) {
         requireNotLocked();
@@ -2819,7 +2821,9 @@ public class CashuApplet extends Applet implements TagSwitch {
      * One transaction: the limit and its window are all new or all old.
      */
     /*
-     * `len` is 4, 8 or 12. Four bytes are the day's limit, as they always were,
+     * `len` is 4, 8, 12 or 13 (the owner's form only: the rollover budget,
+     * D20; every shorter form sets the budget back to its default, 7). Four
+     * bytes are the day's limit, as they always were,
      * and the limit on one payment and the allowance are left as they are.
      * Eight are the day's, then the limit on one payment; twelve add the
      * no-PIN allowance. In those forms a day's limit whose number is not
@@ -2856,8 +2860,10 @@ public class CashuApplet extends Applet implements TagSwitch {
             Util.arrayCopy(src, (short)(at + 8), cardRecord, CARD_NOPIN_LIMIT_OFFSET, (short) 4);
             Util.arrayCopy(ZERO, (short) 0, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
         }
-        // the rollover budget (2.0, D20), where the owner's form gave one; absent, it is left as it is (7 until set)
-        if (len == (short) 13) cardRecord[CARD_BUDGET_OFFSET] = src[(short)(at + 12)];
+        /* The rollover budget (2.0, D20): the owner's thirteenth byte, or, absent, the default (0, read as
+         * ROLL_BUDGET_DEFAULT). Every form without the byte sets it back to 7: the architect's decision 2 (ENG-673),
+         * which both apps code to, so that a SET_LIMIT always says what the budget is afterwards. */
+        cardRecord[CARD_BUDGET_OFFSET] = len == (short) 13 ? src[(short)(at + 12)] : (byte) 0;
         JCSystem.commitTransaction();
     }
 

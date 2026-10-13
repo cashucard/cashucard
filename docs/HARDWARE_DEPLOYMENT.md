@@ -59,8 +59,8 @@ ls -lh target/cashu-javacard-2.0.0.cap
 The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
 keeps nothing of it) and checks the load file's size against what the J3R180 has
 been seen to install (`tools/refcheck.py`, from
-[FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.0 build is **20,057 bytes**
-(89 past a multiple of 256), a size not yet tried on the chip: refcheck says so and
+[FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.0 build is **20,060 bytes**
+(92 past a multiple of 256), a size not yet tried on the chip: refcheck says so and
 passes it. Install it on a test card first; if the chip refuses it, move it with
 `CashuApplet.sizeTheFile` to a size known to install and add the answer to
 refcheck's table.
@@ -100,7 +100,7 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 2.0**, sha256
-`35124bfcb5aceb80f0e2ee4d8ad3d5f862efdc2b6f9455b89c91bca1577b7761`
+`59f66673a0dda7993c2e2e432e5e3e3d8203cf09c7edb3a4f79e5016a90db787`
 (`applet/target/cashu-javacard-2.0.0.cap`). A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
 timestamp into `META-INF/MANIFEST.MF`. Every other entry is byte-identical when

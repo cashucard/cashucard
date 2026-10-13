@@ -734,7 +734,8 @@ spent its first day on trust.
   owner's last `REFRESH` are fewer than the budget; past it, the window stays
   where it is and what was signed for in it still counts. Default 7, 1 to 30,
   set by a thirteenth byte on the owner's `SET_LIMIT` (`34`); a form without
-  it leaves the budget as it is. The first window a card begins (a limit or an
+  it (4, 8 or 12 bytes, and the PIN form `33`) sets the budget back to 7, as
+  the architect's decision 2 (ENG-673) has it. The first window a card begins (a limit or an
   allowance set before any header, or an allowance set alone) is a beginning,
   not a roll. A terminal with the PIN that walks the clock now gets the found
   day and the budget's days, and no more until the owner's phone has seen the
@@ -767,14 +768,21 @@ transactions cover them, and `GET_CARD` shows them to any reader as its bytes
 **Rejected:** counting rolls against the clock's own movement (a terminal
 moves the clock); a roll per owner's proof of any kind (a proof for the load
 grant is given at a till's top-up, which is not the owner looking at the card);
-setting the budget back to 7 when the byte is absent (a 1.x wallet's twelve-byte
-`SET_LIMIT` would undo the owner's choice).
+leaving the budget as it is when the byte is absent. That was this PR's first
+version, so that a 1.x wallet's twelve-byte `SET_LIMIT` would not undo the
+owner's choice; the architect's decision 2 had already settled "absent means
+7", and both apps code to it. Under it every `SET_LIMIT` says what the budget
+is afterwards, and the cost is the one below.
 
 **Cost accepted.** A holder who is offline for longer than the budget, and
 pays every day, finds the day's limit stops renewing; the app tells them to
 open it online and tap the card. `REFRESH` and the anchor need the phone to
 have a recent header (both apps: mempool.space, then blockstream.info; neither
-reachable, no header and the card keeps its clock).
+reachable, no header and the card keeps its clock). A 1.x wallet sends the
+twelve-byte `SET_LIMIT`, so each limit it sets puts the budget back to 7: an
+owner who chose 1 to 6 days gets a looser bound until a 2.0 phone sets it
+again (`ClockWalkTest.aFormWithoutTheByteSetsTheBudgetBackToSeven`). Foxy
+reviews this in the PR.
 
 ---
 

@@ -28,10 +28,14 @@ import java.util.Set;
  *   "headers":    ["<80-byte header>", …],   // optional: SET_HEADER, in order (real mainnet headers: the floor is built in)
  *   "proofs":     [{ "keysetId", "amount", "nonce", "C", "date"?, "dleq"?: { "e", "s", "r" } }, …],   // optional, at most 128
  *   "spentSlots": [1],                       // optional, indexes into "proofs": spent on the card by a payment of that piece
- *   "limits":     { "day", "payment", "allowance", "rollBudget" },   // optional, needs an owner: SET_LIMIT, 13 bytes
+ *   "limits":     { "day", "payment", "allowance", "rollBudget" },   // optional, needs an owner: SET_LIMIT, always 13 bytes
  *   "blockedPin": true                       // optional, needs "pin": three wrong VERIFY_PINs
  * }
  * </pre>
+ *
+ * {@code limits} always sends the owner's thirteen-byte SET_LIMIT: a key left out is 0 (no limit, no allowance), and
+ * {@code rollBudget} left out is 7, the same default the card applies to a form without the byte (D20; the
+ * architect's decision 2, "absent means 7"). tools/cardsim/README.md has the whole schema.
  *
  * The pieces are format-4 SIG_ALL pieces locked to the card key (spec/NUT-XX.md), minted by the caller at a mint
  * after reading {@code /state.pubkey}; with {@code dleq} they are loaded with the mint's proof (LOAD_PROOF P1 = 1).
