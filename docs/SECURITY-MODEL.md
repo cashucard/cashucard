@@ -234,7 +234,9 @@ leaves an empty place with a record beside it, which nothing serves.
   reductions' branches are listed as open (item 5), and a scan holds the list to
   the source
 - A `SIG_ALL` payment through the bridge, with the card's own change, swapped at a
-  Nutshell 0.20.3 mint, with the mint's DLEQ checked from what the card keeps (CI)
+  Nutshell 0.20.3 mint, with the mint's DLEQ checked from what the card keeps (CI),
+  once on forge's keyset shape (an 8-byte id, no fee) and once on a v2 keyset (a
+  33-byte id, a fee of 100), each length asserted
 - DLEQ verification, including the tagging attack it exists to catch
 - NUT-11 witness checks: wrong key, wrong proof, corrupted signature, `n_sigs`
 

@@ -116,7 +116,8 @@ cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consisten
 ```
 
 CI runs all of it on every push, plus the bridge's client cases against the jar
-and a `SIG_ALL` swap at a Nutshell 0.20.3 mint, and checks the tracked CAP is built
+and a `SIG_ALL` swap at two Nutshell 0.20.3 mints (forge's shape, an 8-byte
+keyset id with no fee, and a fresh v2 keyset, 33 bytes with a fee), and checks the tracked CAP is built
 from this source. **A green suite is not evidence about silicon** — jCardSim runs
 on the JVM with a garbage collector and cannot reproduce EEPROM exhaustion, torn
 writes or hardware crypto framing. See [D10](docs/DECISIONS.md#d10).

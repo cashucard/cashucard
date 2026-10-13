@@ -113,8 +113,42 @@ jobs:
           echo "::error::the mint did not answer /v1/keysets within 120 s"
           exit 1
 
-      - name: SIG_ALL swap at the mint, through the bridge
-        run: CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3338 node --test tools/cardsim/e2e-swap.test.cjs
+      # A fresh 0.20.3 makes a NUT-02 v2 keyset: a 33-byte `01…` id, input_fee_ppk 100 (its default).
+      - name: SIG_ALL swap at the mint, through the bridge (v2 keyset, 33-byte id, fee 100)
+        run: |
+          CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3338 EXPECT_KEYSET_ID_BYTES=33 EXPECT_INPUT_FEE_PPK=100 \
+            node --test tools/cardsim/e2e-swap.test.cjs
+
+      # Forge's active sat keyset is what the apps meet in production: an 8-byte `00…` id with
+      # input_fee_ppk 0, made by an older Nutshell and served by 0.20.3.1 (GET /v1/keysets, 2026-10-12).
+      # The architect's decision 6 asks the e2e to prove that length. Reproduced here the way forge got
+      # it: the keyset is made by the same image told it is 0.19.2 (which makes pre-v2 ids), then the
+      # mint is restarted as plain 0.20.3 on the same database, which keeps the id it finds there.
+      - name: Start a Nutshell 0.20.3 mint on a pre-v2 keyset (forge's shape)
+        run: |
+          docker volume create nutv1
+          start() {
+            docker run -d --name nutv1 -p 127.0.0.1:3339:3338 -v nutv1:/app/data \
+              -e MINT_BACKEND_BOLT11_SAT=FakeWallet -e MINT_LISTEN_HOST=0.0.0.0 -e MINT_LISTEN_PORT=3338 \
+              -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY -e MINT_INPUT_FEE_PPK=0 "$@" cashubtc/nutshell:0.20.3 poetry run mint
+            for i in $(seq 1 120); do
+              curl -sf localhost:3339/v1/keysets > /dev/null && return 0
+              sleep 1
+            done
+            docker logs nutv1
+            echo "::error::the pre-v2 mint did not answer /v1/keysets within 120 s"
+            exit 1
+          }
+          start -e VERSION=0.19.2
+          docker rm -f nutv1
+          start
+          curl -s localhost:3339/v1/info | grep -q '"version":"Nutshell/0.20.3"' || { echo "::error::the restarted mint is not 0.20.3"; exit 1; }
+          curl -s localhost:3339/v1/keysets
+
+      - name: SIG_ALL swap at the mint, through the bridge (forge's shape, 8-byte id, fee 0)
+        run: |
+          CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3339 EXPECT_KEYSET_ID_BYTES=8 EXPECT_INPUT_FEE_PPK=0 \
+            node --test tools/cardsim/e2e-swap.test.cjs
 
       # The app repos build this repo from a pinned ref for now; the artifact
       # is for a human pulling a jar off a run (release asset later).

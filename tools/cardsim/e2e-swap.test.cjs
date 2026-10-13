@@ -3,11 +3,32 @@
 // The 2.0 card against a real mint (DECISIONS D18; the architect's decision 6): pieces minted at a Nutshell mint,
 // format-4 SIG_ALL secrets locked to the card's key, their DLEQ checked; loaded with the mint's proof; paid with one
 // card signature over the inputs, a till's outputs and the card's own change; the swap accepted by the mint; the
-// change unblinded, checked and loaded back. Runs only with both a bridge and a mint:
+// change unblinded, checked and loaded back. Runs only with both a bridge and a mint, and the keyset the mint is
+// expected to use, which the test asserts rather than accepts (the architect's decision 6: prove the keyset-id length
+// forge's active keyset uses):
 //
+//   EXPECT_KEYSET_ID_BYTES   8 or 33: the length of the mint's active sat keyset id (required)
+//   EXPECT_INPUT_FEE_PPK     that keyset's input_fee_ppk (optional; asserted when given)
+//
+// Forge's active sat keyset is 8 bytes (`00…`, a pre-v2 id) with input_fee_ppk 0 (GET /v1/keysets, 2026-10-12): a
+// Nutshell 0.20.3 serving a keyset an older release made, which CI reproduces by making the keyset first as 0.19.2
+// (VERSION=0.19.2) and then restarting plain 0.20.3 on the same database. A fresh 0.20.3 makes a 33-byte `01…` id with
+// a fee of 100, and CI runs that too:
+//
+//   # forge's shape: 8-byte id, no fee
+//   docker volume create nutv1
+//   docker run -d --name nutv1 -p 127.0.0.1:3339:3338 -v nutv1:/app/data -e MINT_BACKEND_BOLT11_SAT=FakeWallet \
+//     -e MINT_LISTEN_HOST=0.0.0.0 -e MINT_LISTEN_PORT=3338 -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY -e MINT_INPUT_FEE_PPK=0 \
+//     -e VERSION=0.19.2 cashubtc/nutshell:0.20.3 poetry run mint        # wait for /v1/keysets, then:
+//   docker rm -f nutv1 && docker run -d --name nutv1 … (the same, without VERSION)
+//   CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3339 EXPECT_KEYSET_ID_BYTES=8 EXPECT_INPUT_FEE_PPK=0 \
+//     node --test tools/cardsim/e2e-swap.test.cjs
+//
+//   # a fresh 0.20.3: 33-byte id, fee 100
 //   docker run -d -p 127.0.0.1:3338:3338 -e MINT_BACKEND_BOLT11_SAT=FakeWallet -e MINT_LISTEN_HOST=0.0.0.0 \
 //     -e MINT_LISTEN_PORT=3338 -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY cashubtc/nutshell:0.20.3 poetry run mint
-//   CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3338 node --test tools/cardsim/e2e-swap.test.cjs
+//   CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3338 EXPECT_KEYSET_ID_BYTES=33 EXPECT_INPUT_FEE_PPK=100 \
+//     node --test tools/cardsim/e2e-swap.test.cjs
 //
 // Nutshell 0.20.3 is the public release nearest forge's 0.20.3.1, the mint both apps pin. Zero dependencies: the
 // Cashu arithmetic is cashu-crypto.cjs.
@@ -20,6 +41,17 @@ const cc = require("./cashu-crypto.cjs")
 const CARDSIM = process.env.CARDSIM_URL
 const MINT = process.env.MINT_URL
 const run = { skip: CARDSIM && MINT ? false : "set CARDSIM_URL and MINT_URL to swap at a mint" }
+
+/** The keyset shape the run must find, from EXPECT_KEYSET_ID_BYTES (8 or 33, required) and EXPECT_INPUT_FEE_PPK (optional). */
+function expectedKeyset(env = process.env) {
+  const bytes = Number(env.EXPECT_KEYSET_ID_BYTES)
+  if (![8, 33].includes(bytes)) {
+    throw new Error(`set EXPECT_KEYSET_ID_BYTES to 8 (forge's pre-v2 keyset) or 33 (a NUT-02 v2 keyset), got ${JSON.stringify(env.EXPECT_KEYSET_ID_BYTES)}`)
+  }
+  const fee = env.EXPECT_INPUT_FEE_PPK === undefined || env.EXPECT_INPUT_FEE_PPK === "" ? undefined : Number(env.EXPECT_INPUT_FEE_PPK)
+  if (fee !== undefined && !(Number.isInteger(fee) && fee >= 0)) throw new Error(`EXPECT_INPUT_FEE_PPK must be a whole number, got ${env.EXPECT_INPUT_FEE_PPK}`)
+  return { bytes, fee }
+}
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -55,10 +87,13 @@ test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with on
   await sim.waitReady()
 
   // the mint's active sat keyset, and the length of its id (8 bytes on older mints, 33 from NUT-02 v2)
+  const expected = expectedKeyset()
   const { keysets } = await mint("GET", "/v1/keysets")
   const keyset = keysets.find(k => k.active && k.unit === "sat")
   assert.ok(keyset, "an active sat keyset")
-  assert.ok([16, 66].includes(keyset.id.length), `a NUT-02 keyset id is 8 or 33 bytes, got ${keyset.id}`)
+  assert.equal(keyset.id.length / 2, expected.bytes, `the mint's active sat keyset id is ${expected.bytes} bytes (EXPECT_KEYSET_ID_BYTES), got ${keyset.id}`)
+  assert.equal(keyset.id.slice(0, 2), expected.bytes === 8 ? "00" : "01", "a pre-v2 id begins 00, a v2 id 01")
+  if (expected.fee !== undefined) assert.equal(keyset.input_fee_ppk || 0, expected.fee, "input_fee_ppk (EXPECT_INPUT_FEE_PPK)")
   console.log(`# mint keyset ${keyset.id} (${keyset.id.length / 2} bytes), input_fee_ppk ${keyset.input_fee_ppk || 0}`)
   const stored = keyset.id.slice(0, 16)
   assert.equal(expandKeyset(stored, keysets).id, keyset.id, "the card's 8 bytes name exactly this keyset")
@@ -171,4 +206,12 @@ test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with on
   const after = await sim.state()
   assert.equal(after.balance, 64 - 48 + changeTotal, "the change is back on the card")
   assert.deepEqual(await sim.getChange(0), [], "and its openings let go")
+})
+
+test("the run names the keyset it expects: EXPECT_KEYSET_ID_BYTES is 8 or 33, and a fee is a whole number", () => {
+  assert.deepEqual(expectedKeyset({ EXPECT_KEYSET_ID_BYTES: "8", EXPECT_INPUT_FEE_PPK: "0" }), { bytes: 8, fee: 0 })
+  assert.deepEqual(expectedKeyset({ EXPECT_KEYSET_ID_BYTES: "33" }), { bytes: 33, fee: undefined })
+  assert.throws(() => expectedKeyset({}), /EXPECT_KEYSET_ID_BYTES/)
+  assert.throws(() => expectedKeyset({ EXPECT_KEYSET_ID_BYTES: "16" }), /8 \(forge's pre-v2 keyset\) or 33/)
+  assert.throws(() => expectedKeyset({ EXPECT_KEYSET_ID_BYTES: "8", EXPECT_INPUT_FEE_PPK: "-1" }), /whole number/)
 })
