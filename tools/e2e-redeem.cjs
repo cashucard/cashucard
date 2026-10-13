@@ -17,6 +17,11 @@
  * overwritten.
  *
  * Env overrides: CLIENT_DIST (cashu-client build), CARDCTL, CARDCTL_PY.
+ *
+ * A 0.x TOOL. It drives the 0.x applet through cardctl's `spend` (SPEND_PROOF), which protocol 2.0 removed (DECISIONS
+ * D18), so it runs only with CARDCTL set to cardctl.py from a 0.x checkout (git show 7a96102:tools/cardctl/cardctl.py),
+ * against a 0.x card: the one use left is the sweep of a 0.x field card (docs/HARDWARE_DEPLOYMENT.md). A 2.0 card is
+ * paid with one SIG_ALL signature and swapped at a mint by tools/cardsim/e2e-swap.test.cjs.
  */
 const path = require("path")
 const fs = require("fs")
@@ -27,6 +32,8 @@ const CLIENT_DIST = process.env.CLIENT_DIST || path.resolve(REPO, "../cashu-clie
 const PY = process.env.CARDCTL_PY || path.resolve(REPO, "tools/cardctl/.venv/bin/python")
 const CARDCTL = process.env.CARDCTL || path.resolve(REPO, "tools/cardctl/cardctl.py")
 
+const die0 = m => { console.error(`FAIL: ${m}`); process.exit(1) }
+if (!process.env.CARDCTL) die0("e2e-redeem is a 0.x tool: set CARDCTL to cardctl.py from a 0.x checkout (cardctl 2.0 has no `spend`). A 2.0 card: tools/cardsim/e2e-swap.test.cjs")
 const cc = require(CLIENT_DIST)
 
 const [, , MINT, SLOT_ARG, CARDFILE] = process.argv

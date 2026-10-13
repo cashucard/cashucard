@@ -1,3 +1,5 @@
+> This is upstream's own report of their applet on their hardware (lnflash/cashu-javacard), kept as received. It is not a report on the Foxy fork.
+
 # Cashu JavaCard 实体硬件测试报告
 
 - **测试日期：** 2026-09-01（UTC+08:00）

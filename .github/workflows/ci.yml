@@ -47,7 +47,7 @@ jobs:
     # A wedged bridge used to hang this job for the 360-minute default; the
     # client's own 5 s request deadline makes a wedge fail fast, and this is
     # the backstop for anything the client does not cover (the jar start, mvn).
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -84,16 +84,71 @@ jobs:
           echo "::error::cardsim did not answer /state within 30 s"
           exit 1
 
+      # The 2.0 AID (F0 CASHUCARD) answers version 02 00.
       - name: Smoke-test SELECT over HTTP
         run: |
-          curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A4040007D2760000850102"}' \
-            | grep -q '"hex":"00069000"'
+          curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
+            | grep -q '"hex":"02009000"'
 
       # The integration cases in client.test.cjs run only with CARDSIM_URL;
       # the e2e-tools job runs the same file without it and gets the pure
       # cases alone, so that job stays jar-free.
       - name: Client tests against the bridge
         run: CARDSIM_URL=http://127.0.0.1:9876 node --test tools/cardsim/client.test.cjs
+
+      # The architect's decision 6 (ENG-673): a real SIG_ALL swap at a mint, with
+      # DLEQ checked and the keyset id the mint uses. Nutshell 0.20.3 is the public
+      # release nearest forge's 0.20.3.1, the version both apps pin; FakeWallet
+      # pays every quote. Pinned by tag, as the apps pin it.
+      - name: Start a Nutshell 0.20.3 mint
+        run: |
+          docker run -d --name nutshell -p 127.0.0.1:3338:3338 \
+            -e MINT_BACKEND_BOLT11_SAT=FakeWallet -e MINT_LISTEN_HOST=0.0.0.0 -e MINT_LISTEN_PORT=3338 \
+            -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY cashubtc/nutshell:0.20.3 poetry run mint
+          for i in $(seq 1 120); do
+            curl -sf localhost:3338/v1/keysets > /dev/null && exit 0
+            sleep 1
+          done
+          docker logs nutshell
+          echo "::error::the mint did not answer /v1/keysets within 120 s"
+          exit 1
+
+      # A fresh 0.20.3 makes a NUT-02 v2 keyset: a 33-byte `01…` id, input_fee_ppk 100 (its default).
+      - name: SIG_ALL swap at the mint, through the bridge (v2 keyset, 33-byte id, fee 100)
+        run: |
+          CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3338 EXPECT_KEYSET_ID_BYTES=33 EXPECT_INPUT_FEE_PPK=100 \
+            node --test tools/cardsim/e2e-swap.test.cjs
+
+      # Forge's active sat keyset is what the apps meet in production: an 8-byte `00…` id with
+      # input_fee_ppk 0, made by an older Nutshell and served by 0.20.3.1 (GET /v1/keysets, 2026-10-12).
+      # The architect's decision 6 asks the e2e to prove that length. Reproduced here the way forge got
+      # it: the keyset is made by the same image told it is 0.19.2 (which makes pre-v2 ids), then the
+      # mint is restarted as plain 0.20.3 on the same database, which keeps the id it finds there.
+      - name: Start a Nutshell 0.20.3 mint on a pre-v2 keyset (forge's shape)
+        run: |
+          docker volume create nutv1
+          start() {
+            docker run -d --name nutv1 -p 127.0.0.1:3339:3338 -v nutv1:/app/data \
+              -e MINT_BACKEND_BOLT11_SAT=FakeWallet -e MINT_LISTEN_HOST=0.0.0.0 -e MINT_LISTEN_PORT=3338 \
+              -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY -e MINT_INPUT_FEE_PPK=0 "$@" cashubtc/nutshell:0.20.3 poetry run mint
+            for i in $(seq 1 120); do
+              curl -sf localhost:3339/v1/keysets > /dev/null && return 0
+              sleep 1
+            done
+            docker logs nutv1
+            echo "::error::the pre-v2 mint did not answer /v1/keysets within 120 s"
+            exit 1
+          }
+          start -e VERSION=0.19.2
+          docker rm -f nutv1
+          start
+          curl -s localhost:3339/v1/info | grep -q '"version":"Nutshell/0.20.3"' || { echo "::error::the restarted mint is not 0.20.3"; exit 1; }
+          curl -s localhost:3339/v1/keysets
+
+      - name: SIG_ALL swap at the mint, through the bridge (forge's shape, 8-byte id, fee 0)
+        run: |
+          CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3339 EXPECT_KEYSET_ID_BYTES=8 EXPECT_INPUT_FEE_PPK=0 \
+            node --test tools/cardsim/e2e-swap.test.cjs
 
       # The app repos build this repo from a pinned ref for now; the artifact
       # is for a human pulling a jar off a run (release asset later).
@@ -119,7 +174,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # All three suites run with no reader, no card and no pyscard: cardctl imports
+      # All six suites run with no reader, no card and no pyscard: cardctl imports
       # pyscard lazily precisely so the APDU encodings and the BIP-340 verifier
       # can be checked anywhere. That matters because the verifier is what
       # `cardctl selftest` trusts when it declares a physical card's signature
@@ -129,6 +184,7 @@ jobs:
         working-directory: tools/cardctl
         run: |
           python test_bip340.py
+          python test_p256.py
           python test_apdu.py
           python test_spec_consistency.py
           python test_card_file.py
@@ -155,10 +211,11 @@ jobs:
         with:
           node-version: '22'
 
-      # Argument parsing for tools/e2e-melt.cjs, and the pure half of
-      # tools/cardsim/client.test.cjs (encoders, parsers, no-retry). Needs no
-      # card, no cashu-client build and no bridge: the cardsim integration
-      # cases skip without CARDSIM_URL (the cardsim job runs them).
+      # Argument parsing for tools/e2e-melt.cjs (a 0.x tool), the pure half of
+      # tools/cardsim/client.test.cjs (encoders, parsers, no-retry) and the
+      # Cashu arithmetic in tools/cardsim/cashu-crypto.test.cjs. Needs no card,
+      # no cashu-client build, no bridge and no mint: the integration cases skip
+      # without CARDSIM_URL / MINT_URL (the cardsim job runs them).
       # The glob is quoted so node, not the shell, expands it (Node 21+ treats
       # positional args as file paths, so a bare directory does not work).
       - name: Run tests
@@ -200,16 +257,19 @@ jobs:
       # move the tracked one aside first: the CAP the next steps look at is then
       # this commit's source, freshly converted, or nothing at all.
       - name: Set the tracked CAP aside
-        run: mv applet/target/cashu-javacard-0.1.0.cap "$RUNNER_TEMP/tracked.cap"
+        run: mv applet/target/cashu-javacard-2.0.0.cap "$RUNNER_TEMP/tracked.cap"
 
       # 3.0.5 is the floor: SchnorrHW needs ALG_EC_SVDP_DH_PLAIN_XY, which does
-      # not exist in 3.0.4.
+      # not exist in 3.0.4. The target also runs tools/stripcap.py (the
+      # Descriptor component out) and tools/refcheck.py, the size check against
+      # what the J3R180 has installed (docs/FOXY-CARD-HARDWARE.md), which fails
+      # the build for the opener not first or a size known to fail on the chip.
       - name: Convert CAP
         run: ant -f applet/build.xml cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
 
       - name: Assert CAP was produced
         run: |
-          cap=applet/target/cashu-javacard-0.1.0.cap
+          cap=applet/target/cashu-javacard-2.0.0.cap
           test -s "$cap" || { echo "::error::$cap was not produced"; exit 1; }
           ls -l "$cap"
 
@@ -224,9 +284,9 @@ jobs:
           tracked="$RUNNER_TEMP/tracked.cap"
           mkdir "$RUNNER_TEMP/tracked" "$RUNNER_TEMP/built"
           unzip -q "$tracked" -d "$RUNNER_TEMP/tracked"
-          unzip -q applet/target/cashu-javacard-0.1.0.cap -d "$RUNNER_TEMP/built"
+          unzip -q applet/target/cashu-javacard-2.0.0.cap -d "$RUNNER_TEMP/built"
           diff -r -x MANIFEST.MF "$RUNNER_TEMP/tracked" "$RUNNER_TEMP/built" || {
-            echo "::error::the tracked CAP was not built from this source: run ant cap, commit applet/target/cashu-javacard-0.1.0.cap, and publish its sha256 in docs/HARDWARE_DEPLOYMENT.md"
+            echo "::error::the tracked CAP was not built from this source: run ant cap, commit applet/target/cashu-javacard-2.0.0.cap, and publish its sha256 in docs/HARDWARE_DEPLOYMENT.md"
             exit 1
           }
           sha=$(sha256sum "$tracked" | cut -c1-64)
@@ -240,5 +300,5 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: cashu-javacard-cap
-          path: applet/target/cashu-javacard-0.1.0.cap
+          path: applet/target/cashu-javacard-2.0.0.cap
           if-no-files-found: error

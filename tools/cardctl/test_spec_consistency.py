@@ -1,83 +1,72 @@
 #!/usr/bin/env python3
 """
-Asserts that spec/APDU.md, cardctl.py and CashuApplet.java still agree.
+Asserts that spec/APDU.md, spec/NUT-XX.md, cardctl.py and CashuApplet.java
+still agree, for protocol 2.0.
 
 This repo's characteristic bug is not a crash — it is a document and an
-implementation drifting apart while both look fine on their own. It has
-happened three times:
+implementation drifting apart while both look fine on their own. It happened
+three times on the 0.x wire:
 
   * `keyset_id` documented as ASCII bytes, so the driver ASCII-encoded it and
     stored half a NUT-02 id. Every test passed; every loaded proof was
     unspendable.
   * the 32-byte field documented as the "secret", which cannot fit — it is the
     nonce.
-  * `SPEND_PROOF`'s message documented as
-    `SHA-256(keyset_id || secret || amount || recipient_pubkey)` while NUT-XX
-    specified `SHA256(UTF8(Proof.secret))`.
+  * `SPEND_PROOF`'s message documented as something other than what NUT-XX
+    specified.
 
-Each one was found by a human reading two files side by side. That does not
-scale and it is not reliable. These tests do it on every push.
+Each one was found by a human reading two files side by side. These tests do
+it on every push, for the 2.0 wire.
 
 Three artefacts have to agree, so all three are read here:
 
-  * spec/APDU.md is *parsed*, never imported from — a shared constant cannot
-    catch a doc that lies, and the doc is what implementers read. Both copies
-    of the proof layout in it (the GET_PROOF response table and the
-    "Proof Slot Layout" block) are parsed and cross-asserted, because a second
-    copy nobody checks is just a second place for the same bug to live.
-  * cardctl.py is *driven*, not read: the documented header (CLA/INS/P1/P2),
-    Lc/Le, response sizes and field order are checked against the bytes the real
-    encoder puts on the wire, SELECT included. Summing field lengths would leave
-    the field *order* unconstrained, and a misordered load strands money on a
-    card permanently. Every documented command is driven — two completeness
-    ratchets (`test_every_documented_command_is_driven_through_the_encoder` and
-    `test_every_command_with_a_fixed_length_is_length_checked`) fail the day a
-    command is added to the doc and to cardctl but not to the case tables,
-    because a hand-maintained list of what to check is a list that stops being
-    complete.
-  * CashuApplet.java's layout constants are scraped with a regex — no JVM
-    needed — because the applet is the copy that actually writes EEPROM, and a
-    symmetric offset change there would otherwise pass every suite in the repo.
+  * spec/APDU.md (and NUT-XX.md) is *parsed*, never imported from — a shared
+    constant cannot catch a doc that lies, and the doc is what implementers read.
+  * cardctl.py is *driven*, not read: the documented header, Lc/Le, response
+    sizes and field order are checked against the bytes the real encoder puts
+    on the wire. Completeness ratchets fail the day a command cardctl drives is
+    added to the doc and to cardctl but not to the case tables here.
+  * CashuApplet.java's constants are scraped with a regex — no JVM needed —
+    because the applet is the copy that writes EEPROM.
 
-One more document is read for one value: docs/HARDWARE_DEPLOYMENT.md, for the
-applet version a good card answers `SELECT` with, which the applet and
-`cardctl selftest`'s floor must share with it.
+docs/HARDWARE_DEPLOYMENT.md is read for the version a good card answers.
 
 Runs with no card, no reader and no pyscard.
 """
+import json
 import pathlib
 import re
 import sys
 import traceback
 
 import cardctl
-from test_apdu import make_card
+import p256
+from test_apdu import make_card, INFO_43, CARD_ANSWER
 
-SPEC_DIR = pathlib.Path(__file__).resolve().parents[2] / "spec"
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+SPEC_DIR = ROOT / "spec"
 APDU_MD = SPEC_DIR / "APDU.md"
 NUT_XX_MD = SPEC_DIR / "NUT-XX.md"
-APPLET_JAVA = (
-    pathlib.Path(__file__).resolve().parents[2]
-    / "applet" / "src" / "main" / "java" / "me" / "flashapp" / "cashu" / "CashuApplet.java"
-)
-DEPLOYMENT_MD = pathlib.Path(__file__).resolve().parents[2] / "docs" / "HARDWARE_DEPLOYMENT.md"
+SECRET_JSON = SPEC_DIR / "vectors" / "secret.json"
+APPLET_JAVA = ROOT / "applet" / "src" / "main" / "java" / "me" / "flashapp" / "cashu" / "CashuApplet.java"
+DEPLOYMENT_MD = ROOT / "docs" / "HARDWARE_DEPLOYMENT.md"
 
-# The field names used to compare descriptions written in three different
-# houses ("Keyset ID — the NUT-02 id…", "8-byte keyset_id (raw)",
-# "PROOF_KEYSET_OFFSET"). Order matters: "Nonce — … from the NUT-10 P2PK
-# secret" must resolve as the nonce, and every description is scanned for the
-# bare "c" of the C point last so it cannot swallow another field.
 _FIELD_KEYWORDS = (
     ("status", r"status"),
     ("keyset_id", r"keyset"),
     ("amount", r"amount"),
     ("nonce", r"nonce"),
+    ("date", r"date"),
     ("c", r"\bc\b"),
 )
 
 
 def _apdu_text() -> str:
     return APDU_MD.read_text(encoding="utf-8")
+
+
+def _applet_text() -> str:
+    return APPLET_JAVA.read_text(encoding="utf-8")
 
 
 def _heading_body(pattern: str) -> str:
@@ -88,14 +77,7 @@ def _heading_body(pattern: str) -> str:
 
 
 def _section(name: str) -> str:
-    """
-    The body of `### NAME (0xII)`.
-
-    The opcode is matched as a wildcard rather than baked into a split key: with
-    the opcode hardcoded, editing a heading to `### GET_PROOF (0x19)` produced
-    one useful failure and five cascading `list index out of range`, so a
-    maintainer saw six red tests and no cause.
-    """
+    """The body of `### NAME (0xII)`, the opcode matched as a wildcard."""
     m = re.search(
         rf"^### {name} \(0x[0-9A-Fa-f]{{2}}\)\s*$(.*?)(?=^#{{2,3}} |\Z)",
         _apdu_text(), re.M | re.S,
@@ -104,12 +86,15 @@ def _section(name: str) -> str:
     return m.group(1)
 
 
-def _hex_spans(text: str) -> list:
-    """Every backticked run of hex pairs in `text`, as bytes.
+def _row(section: str, field: str) -> str:
+    """The value of `| field | value |` in a command's header table, backticks stripped."""
+    m = re.search(rf"^\| {re.escape(field)} \| (.+?) \|$", section, re.M)
+    assert m, f"no `{field}` row"
+    return m.group(1).replace("`", "").strip()
 
-    Used to find AIDs wherever prose puts them, so documenting the fallback AID
-    does not have to happen in one exact sentence shape.
-    """
+
+def _hex_spans(text: str) -> list:
+    """Every backticked run of hex pairs in `text`, as bytes."""
     spans = []
     for span in re.findall(r"`([0-9A-Fa-f][0-9A-Fa-f ]*)`", text):
         cleaned = span.replace(" ", "")
@@ -125,8 +110,22 @@ def _command_headings() -> list:
     return headings
 
 
+def _applet_ins() -> dict:
+    return {n: int(v, 16) for n, v in re.findall(r"static final byte INS_(\w+)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})", _applet_text())}
+
+
+def _applet_shorts() -> dict:
+    return {n: int(v) for n, v in re.findall(r"static final short (\w+)\s*=\s*\(short\)\s*(\d+)\s*;", _applet_text())}
+
+
+def _applet_label(name: str) -> str:
+    """A label byte array in the applet, as text: LABEL_X = { 'C','a', ... }."""
+    m = re.search(rf"(?:static final byte\[\] {name}) = \{{(.*?)\}};", _applet_text(), re.S)
+    assert m, f"no {name} in {APPLET_JAVA.name}"
+    return "".join(re.findall(r"'(.)'", m.group(1)))
+
+
 def _canonical(description: str, where: str) -> str:
-    """Reduce a prose field description to the field it names."""
     text = description.lower()
     for name, pattern in _FIELD_KEYWORDS:
         if re.search(pattern, text):
@@ -134,15 +133,14 @@ def _canonical(description: str, where: str) -> str:
     raise AssertionError(f"{where}: cannot tell which field {description!r} describes")
 
 
+# ── the command set ───────────────────────────────────────────────────────────
 def test_every_documented_command_matches_its_ins_constant():
-    """`### GET_PROOF (0x13)` must equal `INS_GET_PROOF = 0x13`."""
+    """`### GET_PROOF (0x13)` must equal `INS_GET_PROOF = 0x13` in cardctl."""
     for name, hex_value in _command_headings():
         const = f"INS_{name}"
         assert hasattr(cardctl, const), f"{APDU_MD.name} documents {name} but cardctl has no {const}"
-        documented = int(hex_value, 16)
-        actual = getattr(cardctl, const)
-        assert actual == documented, (
-            f"{name}: spec says 0x{documented:02X}, cardctl.{const} is 0x{actual:02X}"
+        assert getattr(cardctl, const) == int(hex_value, 16), (
+            f"{name}: spec says 0x{hex_value}, cardctl.{const} is 0x{getattr(cardctl, const):02X}"
         )
 
 
@@ -151,1134 +149,431 @@ def test_every_ins_constant_is_documented():
     documented = {n for n, _ in _command_headings()}
     implemented = {n[4:] for n in dir(cardctl) if n.startswith("INS_")}
     missing = implemented - documented
-    assert not missing, f"cardctl implements undocumented commands: {sorted(missing)}"
+    assert not missing, f"cardctl has undocumented commands: {sorted(missing)}"
 
 
-def test_documented_cla_matches():
-    """The header sentence must state the CLA the driver actually sends."""
-    text = _apdu_text()
-    stated = f"CLA = {cardctl.CLA:02X}"
-    assert f"`{stated}`" in text or f"CLA = `{cardctl.CLA:02X}`" in text, (
-        f"APDU.md no longer states {stated} in the expected form"
-    )
-
-
-def test_select_application_matches_the_apdu_the_driver_sends():
+def test_the_applet_opcodes_match_the_spec_and_the_driver():
     """
-    SELECT is a `##` heading with no opcode, so every other check in this file
-    skips it — and it is the one command that has to work before any other can.
-    A single wrong AID byte in this table (`…85 01 03`) selects nothing, and the
-    driver then reports "The applet is probably not installed on this card",
-    pointing the operator at the card instead of at the doc.
+    The applet's INS constants, by opcode, against the spec's headings. Names may
+    differ only where the applet says SET_LIMIT_OWNER for the owner's form, which
+    the spec and cardctl call SET_LIMIT (and SET_LIMIT_PIN for the open card's).
     """
-    body = _heading_body("SELECT APPLICATION")
-
-    fields = {}
-    for field in ("CLA", "INS", "P1", "P2", "Lc"):
-        m = re.search(rf"^\| {field} \| ([0-9A-Fa-f]{{2}}) \|$", body, re.M)
-        assert m, f"SELECT APPLICATION's table has no parsable {field} row"
-        fields[field] = int(m.group(1), 16)
-
-    data = re.search(r"^\| Data \| `([0-9A-Fa-f ]+)` \|$", body, re.M)
-    assert data, "SELECT APPLICATION's table has no parsable Data row"
-    documented_aid = bytes.fromhex(data.group(1).replace(" ", ""))
-
-    assert documented_aid == cardctl.PACKAGE_AID, (
-        f"SELECT's Data row is {documented_aid.hex()}, cardctl.PACKAGE_AID is "
-        f"{cardctl.PACKAGE_AID.hex()}"
-    )
-    assert fields["Lc"] == len(cardctl.PACKAGE_AID), (
-        f"SELECT documents Lc {fields['Lc']:02X} for a {len(cardctl.PACKAGE_AID)}-byte AID"
-    )
-
-    # The whole documented header, driven through the real selector.
-    card = make_card([(b"\x00\x01", 0x9000)])
-    card.select()
-    documented_apdu = bytes(
-        [fields["CLA"], fields["INS"], fields["P1"], fields["P2"], fields["Lc"]]
-    ) + documented_aid
-    assert card.connection.last == documented_apdu, (
-        f"spec's SELECT is {documented_apdu.hex()}, cardctl sends "
-        f"{card.connection.last.hex()}"
-    )
-
-    # cardctl.select() retries with the 8-byte applet AID when the 7-byte
-    # package AID is refused. A reader built from a doc that omits the fallback
-    # fails on exactly the cards that decline partial matches.
-    assert cardctl.APPLET_AID in _hex_spans(body), (
-        f"SELECT APPLICATION does not document the {len(cardctl.APPLET_AID)}-byte fallback AID "
-        f"{cardctl.APPLET_AID.hex()} that cardctl.select() actually tries"
+    applet = _applet_ins()
+    rename = {"SET_LIMIT": "SET_LIMIT_PIN", "SET_LIMIT_OWNER": "SET_LIMIT"}
+    applet = {rename.get(n, n): v for n, v in applet.items()}
+    documented = {n: int(v, 16) for n, v in _command_headings()}
+    assert applet == documented, (
+        f"applet and spec disagree: only in applet {sorted(set(applet.items()) - set(documented.items()))}, "
+        f"only in spec {sorted(set(documented.items()) - set(applet.items()))}"
     )
 
 
-def test_every_command_table_repeats_the_right_cla_and_ins():
-    """
-    Each command's own table is what a reader author copies from. A single
-    `| CLA | B1 |` there yields 6E00 from the card, and the header sentence
-    above would still be correct.
-    """
+def test_the_ins_summary_table_matches_the_headings():
+    body = _heading_body("Commands, by INS")
+    rows = re.findall(r"^\| `([0-9A-F]{2})` \| ([A-Z_]+) \|", body, re.M)
+    assert rows, "could not parse the INS summary table"
+    assert sorted((n, int(v, 16)) for v, n in rows) == sorted((n, int(v, 16)) for n, v in _command_headings()), rows
+
+
+def test_the_unassigned_opcodes_are_documented_and_absent():
+    """0x.20 SPEND_PROOF, 0x21 SIGN_ARBITRARY and 0x35 SET_TIME are gone: documented as 6D00, in no constant anywhere."""
+    body = _heading_body("Commands, by INS")
+    for gone in ("`20`", "`21`", "`35`"):
+        assert gone in body.split("Not assigned")[1], f"{gone} is not documented as unassigned"
+    assert "6D00" in body
+    used = set(_applet_ins().values()) | {getattr(cardctl, n) for n in dir(cardctl) if n.startswith("INS_")}
+    assert not ({0x20, 0x21, 0x35} & used), sorted(hex(x) for x in {0x20, 0x21, 0x35} & used)
+
+
+def test_the_cla_is_stated_and_every_command_table_repeats_it_and_its_ins():
+    assert f"Class `{cardctl.CLA:02X}`" in _apdu_text(), "APDU.md no longer states the class byte"
     for name, hex_value in _command_headings():
         section = _section(name)
-
-        cla = re.search(r"^\| CLA \| ([0-9A-Fa-f]{2}) \|$", section, re.M)
-        assert cla, f"{name}'s table has no parsable CLA row"
-        assert int(cla.group(1), 16) == cardctl.CLA, (
-            f"{name}: table says CLA {cla.group(1)}, cardctl sends {cardctl.CLA:02X}"
-        )
-
-        ins = re.search(r"^\| INS \| ([0-9A-Fa-f]{2}) \|$", section, re.M)
-        assert ins, f"{name}'s table has no parsable INS row"
-        assert int(ins.group(1), 16) == int(hex_value, 16), (
-            f"{name}: heading says 0x{hex_value}, its table says {ins.group(1)}"
-        )
+        assert int(_row(section, "CLA"), 16) == cardctl.CLA, f"{name}: wrong CLA"
+        assert int(_row(section, "INS"), 16) == int(hex_value, 16), f"{name}: heading and table disagree"
 
 
+# ── SELECT and the version ────────────────────────────────────────────────────
+def test_select_application_matches_the_apdu_the_driver_sends():
+    """
+    SELECT is the one command that has to work before any other. A single wrong
+    AID byte in this table selects nothing, and the driver then reports a card
+    that needs an update.
+    """
+    body = _heading_body("SELECT APPLICATION")
+    fields = {f: int(_row(body, f).split()[0], 16) for f in ("CLA", "INS", "P1", "P2", "Lc")}
+    data = re.search(r"^\| Data \| `([0-9A-Fa-f ]+)`", body, re.M)
+    assert data, "SELECT APPLICATION's table has no parsable Data row"
+    aid = bytes.fromhex(data.group(1).replace(" ", ""))
+    assert aid == cardctl.PACKAGE_AID, f"spec's AID {aid.hex()} != cardctl's {cardctl.PACKAGE_AID.hex()}"
+    assert fields["Lc"] == len(cardctl.PACKAGE_AID)
+    card = make_card([(b"\x02\x00", 0x9000)])
+    card.select()
+    documented = bytes([fields["CLA"], fields["INS"], fields["P1"], fields["P2"], fields["Lc"]]) + aid
+    assert card.connection.last == documented, f"spec {documented.hex()} != cardctl {card.connection.last.hex()}"
+    # the fallback cardctl tries, and the withdrawn AIDs, are documented
+    spans = _hex_spans(body)
+    assert cardctl.APPLET_AID in spans, "the applet's whole AID (the fallback) is not documented"
+    assert cardctl.LEGACY_PACKAGE_AID in spans, "the 0.x AID is not named as withdrawn"
+    # and the build installs the card's applet under that AID
+    build = (ROOT / "applet" / "build.xml").read_text(encoding="utf-8")
+    assert 'aid="' + ":".join(f"{b:02X}" for b in cardctl.APPLET_AID) + '"' in build
+
+
+def test_the_applet_version_is_the_one_the_spec_the_guide_and_selftest_expect():
+    """
+    SELECT's version is all an installed card reports about its build, so every
+    copy of it must agree: the applet's, the spec's SELECT response, the guide's
+    answers for a good card, and `cardctl selftest`'s floor, which passes it and
+    nothing below.
+    """
+    version = dict(re.findall(r"static final byte VERSION_(MAJOR|MINOR)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})", _applet_text()))
+    major, minor = int(version["MAJOR"], 16), int(version["MINOR"], 16)
+    assert (major, minor) == (2, 0)
+    assert f"`{major:02X} {minor:02X}`" in _heading_body("SELECT APPLICATION"), "the spec's SELECT response"
+    guide = DEPLOYMENT_MD.read_text(encoding="utf-8")
+    tracked = re.search(r"The CAP tracked in this repo is \*\*applet version (\d+)\.(\d+)\*\*", guide)
+    assert tracked and (int(tracked.group(1)), int(tracked.group(2))) == (major, minor), "the guide's tracked version"
+    answers = re.findall(r"`SELECT` must answer `([0-9A-F]{2}) ([0-9A-F]{2})`", guide)
+    answers += re.findall(r"^# Response: ([0-9A-F]{2})([0-9A-F]{2}) 9000\b", guide, re.M)
+    answers += re.findall(r"^# Response: ([0-9A-F]{2}) ([0-9A-F]{2})(?: [0-9A-F]{2}){28}\s*$", guide, re.M)
+    assert len(answers) == 3, f"expected the guide's three version answers, found {answers}"
+    for hi, lo in answers:
+        assert (int(hi, 16), int(lo, 16)) == (major, minor), f"the guide shows {hi} {lo}"
+    ok, detail = cardctl._select_verdict(bytes([major, minor]))
+    assert ok and detail == f"version {major}.{minor}", detail
+    assert cardctl.SELFTEST_MIN_VERSION == (major, minor)
+    assert not cardctl._select_verdict(bytes([1, 20]))[0], "selftest passes Foxy's 1.20"
+
+
+# ── the slot ──────────────────────────────────────────────────────────────────
 def _proof_layout() -> dict:
-    """Parse the GET_PROOF response table into {offset: (length, description)}."""
     rows = re.findall(r"^\| (\d+) \| (\d+) \| (.+?) \|$", _section("GET_PROOF"), re.M)
     assert rows, "could not parse the GET_PROOF response table"
     return {int(off): (int(ln), desc) for off, ln, desc in rows}
 
 
 def _proof_slot_layout_block() -> dict:
-    """Parse the fenced `## Proof Slot Layout` block into {offset: (length, description)}."""
     body = _heading_body("Proof Slot Layout")
     fence = re.search(r"```\n(.*?)```", body, re.S)
     assert fence, "the Proof Slot Layout section no longer contains a fenced layout block"
     rows = re.findall(r"^(\d+)\s+(\d+)\s+(.+)$", fence.group(1), re.M)
-    assert rows, "could not parse the Proof Slot Layout block"
     return {int(off): (int(ln), desc.strip()) for off, ln, desc in rows}
 
 
-def _assert_field_wording(layout: dict, where: str) -> None:
+def test_the_proof_layout_matches_the_parser_the_applet_and_its_other_copy():
     """
-    The exact wording that caused two of the three historical bugs: a keyset id
-    described as ASCII stores half a NUT-02 id, and a 32-byte field described as
-    the secret cannot hold a ~150-byte NUT-10 P2PK JSON string.
+    The offsets the spec publishes must be the offsets get_proof slices and the
+    applet writes. A symmetric offset change inside the applet passes the Java
+    suite, so the applet is scraped here too.
     """
-    _, keyset = layout[1]
-    assert "raw" in keyset.lower(), f"{where}: keyset row no longer says raw: {keyset!r}"
-    assert "ascii" not in keyset.lower(), (
-        f"{where}: keyset row describes ASCII encoding again — that stores half an id: {keyset!r}"
-    )
-    _, nonce = layout[13]
-    assert "nonce" in nonce.lower(), f"{where}: offset-13 row no longer says nonce: {nonce!r}"
-
-
-def test_proof_slot_size_matches():
-    layout = _proof_layout()
-    last = max(layout)
-    total = last + layout[last][0]
-    assert total == cardctl.PROOF_SIZE, (
-        f"spec proof slot totals {total} bytes, cardctl.PROOF_SIZE is {cardctl.PROOF_SIZE}"
-    )
-
-
-def test_proof_field_offsets_and_lengths_match_the_parser():
-    """
-    The offsets the spec publishes must be the offsets get_proof actually
-    slices. A silent disagreement here is the keyset-truncation bug's shape.
-    """
-    layout = _proof_layout()
-    expected = {0: 1, 1: 8, 9: 4, 13: 32, 45: 33}
-    assert {off: ln for off, (ln, _) in layout.items()} == expected, (
-        f"proof layout changed: {[(o, l) for o, (l, _) in sorted(layout.items())]}"
-    )
-
-    # Drive the real parser with a body whose every field is distinguishable,
-    # then assert each landed where the spec says it does.
-    body = (
-        bytes([0x01])
-        + bytes.fromhex("0059534ce0bfa19a")
-        + (1234).to_bytes(4, "big")
-        + bytes(range(32))
-        + b"\x02" + bytes(range(1, 33))
-    )
-    assert len(body) == cardctl.PROOF_SIZE
-
+    table, block = _proof_layout(), _proof_slot_layout_block()
+    expected = {0: 1, 1: 8, 9: 4, 13: 32, 45: 33, 78: 4}
+    assert {o: l for o, (l, _) in table.items()} == expected, sorted(table.items())
+    assert {o: l for o, (l, _) in block.items()} == expected, sorted(block.items())
+    for layout, where in ((table, "GET_PROOF table"), (block, "slot layout block")):
+        assert "raw" in layout[1][1].lower() and "ascii" not in layout[1][1].lower().replace("not ascii", ""), where
+        assert "nonce" in layout[13][1].lower(), f"{where}: the 32-byte field is the nonce"
+        assert "date" in layout[78][1].lower(), f"{where}: offset 78 is the date"
+    body = (bytes([0x01]) + bytes.fromhex("0059534ce0bfa19a") + (1234).to_bytes(4, "big") + bytes(range(32))
+            + b"\x02" + bytes(range(1, 33)) + (1900000000).to_bytes(4, "big"))
+    assert len(body) == cardctl.PROOF_SIZE == 82
     p = make_card([(body, 0x9000)]).get_proof(0)
-
-    assert p["keyset_id"] == "0059534ce0bfa19a", p["keyset_id"]
-    assert p["amount"] == 1234
-    assert p["nonce"] == bytes(range(32))
-    assert p["c"] == b"\x02" + bytes(range(1, 33))
-
-
-def test_both_copies_of_the_proof_layout_in_apdu_md_agree():
-    """
-    APDU.md publishes the layout twice: the GET_PROOF response table and the
-    `## Proof Slot Layout` block. Only the table used to be parsed, so the
-    section actually titled for the layout could be rewritten to reintroduce
-    the secret-vs-nonce bug verbatim with every test still green.
-    """
-    table = _proof_layout()
-    block = _proof_slot_layout_block()
-    assert {off: ln for off, (ln, _) in block.items()} == {off: ln for off, (ln, _) in table.items()}, (
-        "the Proof Slot Layout block disagrees with the GET_PROOF response table: "
-        f"{sorted((o, l) for o, (l, _) in block.items())} vs "
-        f"{sorted((o, l) for o, (l, _) in table.items())}"
-    )
-    _assert_field_wording(table, "GET_PROOF response table")
-    _assert_field_wording(block, "Proof Slot Layout block")
-
-
-def test_proof_slot_layout_totals_match_the_driver():
-    """The EEPROM budget the spec advertises must be slots × slot size."""
-    body = _heading_body("Proof Slot Layout")
-
-    size = re.search(r"exactly \*\*(\d+) bytes\*\*", body)
-    assert size, "the Proof Slot Layout section no longer states the slot size in bytes"
-    assert int(size.group(1)) == cardctl.PROOF_SIZE, (
-        f"spec says a slot is {size.group(1)} bytes, cardctl.PROOF_SIZE is {cardctl.PROOF_SIZE}"
-    )
-
-    total = re.search(r"(\d+) slots [x×] (\d+) bytes = \*\*([\d,]+) bytes\*\*", body)
-    assert total, "the Proof Slot Layout section no longer states the EEPROM total"
-    slots, per_slot, advertised = (
-        int(total.group(1)), int(total.group(2)), int(total.group(3).replace(",", ""))
-    )
-    assert slots == cardctl.MAX_PROOFS, (
-        f"spec says {slots} slots, cardctl.MAX_PROOFS is {cardctl.MAX_PROOFS}"
-    )
-    assert per_slot == cardctl.PROOF_SIZE, (
-        f"spec's total is computed from {per_slot} bytes per slot, cardctl.PROOF_SIZE is "
-        f"{cardctl.PROOF_SIZE}"
-    )
-    assert advertised == slots * per_slot, (
-        f"{slots} × {per_slot} is {slots * per_slot}, but the spec advertises {advertised}"
-    )
-
-
-def test_keyset_id_is_documented_as_raw_bytes_not_ascii():
-    """
-    The exact wording that caused the truncation bug. A NUT-02 id is 16 hex
-    chars; ASCII-encoded, only half of it fits the 8-byte field.
-    """
-    _, desc = _proof_layout()[1]
-    assert "raw" in desc.lower(), f"keyset row no longer says raw: {desc!r}"
-    assert "ascii" not in desc.lower(), (
-        f"keyset row describes ASCII encoding again — that stores half an id: {desc!r}"
-    )
-
-
-def test_the_32_byte_field_is_documented_as_the_nonce():
-    """A NUT-10 P2PK secret is ~150 bytes of JSON and cannot live in 32."""
-    _, desc = _proof_layout()[13]
-    assert "nonce" in desc.lower(), f"offset-13 row no longer says nonce: {desc!r}"
-
-
-def test_spend_proof_message_matches_nut_xx():
-    """
-    APDU.md once documented a bespoke
-    `SHA-256(keyset_id || secret || amount || recipient_pubkey)` while NUT-XX
-    specified `SHA256(UTF8(Proof.secret))`. Following the wrong one yields a
-    signature the mint rejects.
-    """
-    section = _section("SPEND_PROOF")
-    assert "SHA-256(UTF8(Proof.secret))" in section, (
-        "SPEND_PROOF message construction no longer matches NUT-XX"
-    )
-    assert "recipient_pubkey" not in section, (
-        "the bespoke recipient_pubkey message construction is back in APDU.md"
-    )
-
-    # The `| Data |` row specifically, not just the section. The prose note
-    # below the table carries a second copy of the construction, so with only
-    # section-wide checks the row a reader author actually copies could be
-    # rewritten to any wrong message that avoids the word `recipient_pubkey` —
-    # and on this command that is unrecoverable: the slot is marked spent
-    # before the signature comes back, the mint rejects the redemption, and no
-    # error appears anywhere on the card side.
-    data = re.search(r"^\| Data \| (.+?) \|$", section, re.M)
-    assert data, "SPEND_PROOF has no parsable Data row"
-    assert "SHA-256(UTF8(Proof.secret))" in data.group(1), (
-        f"SPEND_PROOF's Data row no longer states the NUT-XX message: {data.group(1)!r}"
-    )
-
-    # Unconditional on purpose. NUT-XX is a placeholder name, so the file gets
-    # renamed the day the NUT is numbered — and a `if NUT_XX_MD.exists():`
-    # guard turned that rename into a silent pass, with APDU.md's link left
-    # dangling and the canonical definition unchecked. Failing here is what
-    # forces the link to be updated with the file.
-    assert NUT_XX_MD.exists(), (
-        f"{NUT_XX_MD} is missing — the canonical SPEND_PROOF message has no home. If the NUT "
-        "was renumbered, update this path and APDU.md's link to it together."
-    )
-    nut = NUT_XX_MD.read_text(encoding="utf-8")
-    assert "SHA256(UTF8(Proof.secret))" in nut or "SHA-256(UTF8(Proof.secret))" in nut, \
-        "NUT-XX.md no longer states the canonical SPEND_PROOF message"
-    assert "NUT-XX.md" in _apdu_text(), (
-        "APDU.md no longer links to the canonical SPEND_PROOF message definition"
-    )
-
-
-def _length_row(name: str, field: str) -> int:
-    """
-    Parse `| Le | 4E (78 bytes) |` out of a command table, returning 0x4E.
-
-    Where the row spells the value both ways, the two must agree — the hex is
-    what a reader puts on the wire and the decimal is what a human reads.
-    """
-    m = re.search(
-        rf"^\| {field} \| ([0-9A-Fa-f]{{2}})(?: \((\d+) bytes[^)]*\))? \|$",
-        _section(name), re.M,
-    )
-    assert m, f"could not parse {name}'s {field} row"
-    if m.group(2) is not None:
-        assert int(m.group(1), 16) == int(m.group(2)), (
-            f"{name} {field}: hex {m.group(1)} and decimal {m.group(2)} disagree"
-        )
-    return int(m.group(1), 16)
-
-
-def _param_row(name: str, field: str) -> str:
-    """The raw cell text of a command table's `P1`/`P2` row."""
-    m = re.search(rf"^\| {field} \| (.+?) \|$", _section(name), re.M)
-    assert m, f"could not parse {name}'s {field} row"
-    return m.group(1).strip()
-
-
-def _param_byte(name: str, field: str) -> int:
-    """
-    Parse `| P2 | DE (deadbeef confirmation byte) |` out of a command table.
-
-    A trailing parenthetical is prose for the reader; the leading hex pair is
-    what goes on the wire.
-    """
-    value = _param_row(name, field)
-    m = re.fullmatch(r"`?([0-9A-Fa-f]{2})`?(?: \(.*\))?", value)
-    assert m, f"{name}'s {field} row is not a literal byte: {value!r}"
-    return int(m.group(1), 16)
-
-
-def _wire(method: str, *args, response: bytes = b"") -> tuple:
-    """Run a real Card method against a fake reader; return (P1, P2, Lc, Le)."""
-    card = make_card([(response, 0x9000)])
-    getattr(card, method)(*args)
-    apdu = card.connection.last
-    assert apdu[:2] == bytes([cardctl.CLA, apdu[1]]) and len(apdu) >= 4, apdu.hex()
-    p1, p2 = apdu[2], apdu[3]
-    if len(apdu) == 4:
-        return p1, p2, None, None
-    if len(apdu) == 5:
-        return p1, p2, None, apdu[4]
-    lc = apdu[4]
-    assert len(apdu) >= 5 + lc, f"{method}: Lc {lc} exceeds the APDU it was sent in"
-    return p1, p2, lc, apdu[5 + lc] if len(apdu) > 5 + lc else None
-
-
-_PROOF_BODY = b"\x01" + bytes(8) + bytes(4) + bytes(32) + b"\x02" + bytes(32)
-
-# (command, method, args, canned response). Every command whose table states an
-# Lc or Le in the fixed `XX` form.
-_LENGTH_CASES = (
-    ("GET_INFO", "get_info", (), bytes(8)),
-    # get_pubkey() validates the point encoding, so the canned reply must parse.
-    ("GET_PUBKEY", "get_pubkey", (), b"\x02" + bytes(32)),
-    ("GET_BALANCE", "get_balance", (), bytes(4)),
-    ("GET_PROOF_COUNT", "get_proof_count", (), b"\x00"),
-    ("GET_PROOF", "get_proof", (0,), _PROOF_BODY),
-    ("GET_SLOT_STATUS", "get_slot_status", (), bytes(32)),
-    ("SPEND_PROOF", "spend_proof", (0, bytes(32)), bytes(64)),
-    ("SIGN_ARBITRARY", "sign", (bytes(32),), bytes(64)),
-    ("LOAD_PROOF", "load_proof", (bytes(8), 1, bytes(32), b"\x02" + bytes(32)), b"\x00"),
-    ("CLEAR_SPENT", "clear_spent", (), b"\x00"),
-)
-
-# Commands whose Lc is a documented *range* rather than a single byte:
-# VERIFY_PIN and SET_PIN document `Lc | 04–08`. There is no single sent byte to
-# compare, but the endpoints are directly comparable to the applet's
-# PIN_MIN_LEN/PIN_MAX_LEN — see test_pin_length_ranges_match_the_applet.
-_RANGE_LENGTH = {"VERIFY_PIN", "SET_PIN"}
-
-# The commands deliberately absent from both _LENGTH_CASES and _RANGE_LENGTH,
-# and why — these sets are the only sanctioned way out of the completeness
-# ratchet below, so the reason has to live here rather than in a comment nobody
-# re-reads:
-#
-#   * CHANGE_PIN documents `Lc | Variable` — old PIN length prefix + two PINs
-#     of 4–8 bytes each, so even its endpoints are not a single pair.
-#     test_apdu.py pins its encoding against the driver.
-#   * CLEAR_PIN documents `Lc | Variable` — PIN length prefix + one PIN of 4–8
-#     bytes, so its Lc is 05–09: one more than the PIN range, and not the
-#     PIN_MIN_LEN..PIN_MAX_LEN pair _RANGE_LENGTH compares against. The
-#     framing is pinned in test_apdu.py, and the prefix-plus-PIN shape is
-#     checked against CHANGE_PIN's below.
-#   * LOCK_CARD is a bare 4-byte APDU — it carries no data and expects no
-#     response body, so it documents neither Lc nor Le. Its P2 is the
-#     confirmation byte, checked in test_lock_card_p2_is_the_confirmation_byte.
-#   * SET_PUK documents `Lc | Variable` — PUK length prefix + one PUK of 8–12
-#     bytes, CLEAR_PIN's framing over the PUK range. The framing is pinned in
-#     test_apdu.py and the range against the applet's PUK_MIN_LEN/PUK_MAX_LEN
-#     in test_puk_length_ranges_match_the_applet below.
-#   * UNBLOCK_PIN documents `Lc | Variable` — PUK length prefix + PUK + new
-#     PIN length prefix + new PIN, so its Lc spans both ranges. Pinned in
-#     test_apdu.py and checked below with SET_PUK's.
-_NOT_FIXED_LENGTH = {"CHANGE_PIN", "CLEAR_PIN", "LOCK_CARD", "SET_PUK", "UNBLOCK_PIN"}
-
-# Every documented command, driven through the real encoder. The five above are
-# absent from _LENGTH_CASES but their headers are still checked, so they are
-# added back here.
-_WIRE_CASES = _LENGTH_CASES + (
-    ("VERIFY_PIN", "verify_pin", (b"1234",), b""),
-    ("SET_PIN", "set_pin", (b"1234",), b""),
-    ("CHANGE_PIN", "change_pin", (b"1234", b"5678"), b""),
-    ("CLEAR_PIN", "clear_pin", (b"1234",), b""),
-    ("SET_PUK", "set_puk", (b"12345678",), b""),
-    ("UNBLOCK_PIN", "unblock_pin", (b"12345678", b"1234"), b""),
-    ("LOCK_CARD", "lock_card", (), b""),
-)
-
-
-def test_clear_pin_is_change_pin_without_the_new_pin():
-    """
-    CLEAR_PIN's data is documented as CHANGE_PIN's old-PIN framing with
-    nothing after it, and the applet reads it that way: `[len][pin]`, Lc
-    exactly 1 + len. The two encoders have to agree on the prefix, or a reader
-    built from one doc section sends the other command's bytes. The applet's
-    own exact-length rule is pinned in CashuAppletTest.
-    """
-    change = make_card([(b"", 0x9000)])
-    change.change_pin(b"1234", b"5678")
-    clear = make_card([(b"", 0x9000)])
-    clear.clear_pin(b"1234")
-    sent_change, sent_clear = change.connection.last, clear.connection.last
-    assert sent_clear[5:] == sent_change[5:5 + 1 + 4], (
-        f"CLEAR_PIN sends {sent_clear[5:].hex()}, CHANGE_PIN's old-PIN field is "
-        f"{sent_change[5:10].hex()}"
-    )
-    assert sent_clear[4] == 1 + 4, f"CLEAR_PIN's Lc is {sent_clear[4]}, expected 1 + len(pin)"
-
-    row = re.search(r"^\| Data \| (.+?) \|$", _section("CLEAR_PIN"), re.M)
-    assert row, "CLEAR_PIN has no parsable Data row"
-    assert "1-byte PIN length" in row.group(1) and "4–8" in row.group(1), row.group(1)
-    assert re.search(r"^\| Lc \| Variable \|$", _section("CLEAR_PIN"), re.M), (
-        "CLEAR_PIN's Lc is no longer documented as Variable; if it became a range, move it "
-        "from _NOT_FIXED_LENGTH and say how the range relates to PIN_MIN_LEN/PIN_MAX_LEN"
-    )
-
-
-def _puk_limits() -> dict:
-    src = APPLET_JAVA.read_text(encoding="utf-8")
-    limits = {
-        n: int(v) for n, v in
-        re.findall(r"static final short (PUK_MIN_LEN|PUK_MAX_LEN)\s*=\s*\(short\)\s*(\d+)", src)
-    }
-    assert set(limits) == {"PUK_MIN_LEN", "PUK_MAX_LEN"}, (
-        f"could not scrape PUK limits from {APPLET_JAVA.name}: {limits}"
-    )
-    return limits
-
-
-def test_puk_length_ranges_match_the_applet():
-    """
-    SET_PUK and UNBLOCK_PIN document the PUK as `8–12 bytes` and the applet
-    enforces PUK_MIN_LEN/PUK_MAX_LEN (D16). A personalisation tool built from
-    a doc that said `6–12` would set a 6-digit PUK, get 6700, and ship the
-    card with no PUK: exactly the card UNBLOCK_PIN exists to prevent. The new
-    PIN in UNBLOCK_PIN is a PIN, so its range is the PIN's.
-    """
-    puk = _puk_limits()
-    pin_src = APPLET_JAVA.read_text(encoding="utf-8")
-    pin = {
-        n: int(v) for n, v in
-        re.findall(r"static final short (PIN_MIN_LEN|PIN_MAX_LEN)\s*=\s*\(short\)\s*(\d+)", pin_src)
-    }
-    for name in ("SET_PUK", "UNBLOCK_PIN"):
-        row = re.search(r"^\| Data \| (.+?) \|$", _section(name), re.M)
-        assert row, f"{name} has no parsable Data row"
-        m = re.search(r"PUK \((\d+)[–-](\d+) bytes", row.group(1))
-        assert m, f"{name}'s Data row no longer gives the PUK length as a range: {row.group(1)!r}"
-        assert (int(m.group(1)), int(m.group(2))) == (puk["PUK_MIN_LEN"], puk["PUK_MAX_LEN"]), (
-            f"{name} documents a {m.group(1)}–{m.group(2)} byte PUK, applet enforces "
-            f"{puk['PUK_MIN_LEN']}–{puk['PUK_MAX_LEN']}"
-        )
-        assert re.search(r"^\| Lc \| Variable \|$", _section(name), re.M), (
-            f"{name}'s Lc is no longer documented as Variable; if it became a range, move it "
-            "from _NOT_FIXED_LENGTH and say how the range relates to PUK_MIN_LEN/PUK_MAX_LEN"
-        )
-    row = re.search(r"^\| Data \| (.+?) \|$", _section("UNBLOCK_PIN"), re.M)
-    m = re.search(r"new PIN \((\d+)[–-](\d+) bytes", row.group(1))
-    assert m, f"UNBLOCK_PIN's Data row no longer gives the new PIN length as a range: {row.group(1)!r}"
-    assert (int(m.group(1)), int(m.group(2))) == (pin["PIN_MIN_LEN"], pin["PIN_MAX_LEN"]), (
-        f"UNBLOCK_PIN documents a {m.group(1)}–{m.group(2)} byte new PIN, applet enforces "
-        f"{pin['PIN_MIN_LEN']}–{pin['PIN_MAX_LEN']}"
-    )
-
-    # The PUK framing is CLEAR_PIN's over the PUK, and UNBLOCK_PIN is that
-    # framing twice: Lc exactly 1 + len(puk) and 2 + len(puk) + len(pin).
-    puk_bytes, pin_bytes = b"1234567890", b"5678"
-    one = make_card([(b"", 0x9000)])
-    one.set_puk(puk_bytes)
-    sent = one.connection.last
-    assert sent[4] == 1 + len(puk_bytes) and sent[5] == len(puk_bytes) and sent[6:] == puk_bytes, sent.hex()
-    two = make_card([(b"", 0x9000)])
-    two.unblock_pin(puk_bytes, pin_bytes)
-    sent = two.connection.last
-    assert sent[4] == 2 + len(puk_bytes) + len(pin_bytes), sent.hex()
-    assert sent[5] == len(puk_bytes) and sent[6:6 + len(puk_bytes)] == puk_bytes, sent.hex()
-    assert sent[6 + len(puk_bytes)] == len(pin_bytes) and sent[7 + len(puk_bytes):] == pin_bytes, sent.hex()
-
-# Commands whose P1 carries a caller-chosen slot index rather than a fixed byte.
-# These are the two that move money: a P1 documented as a literal `00` sends a
-# reader author to slot 0 on every tap, which for SPEND_PROOF is an irreversible
-# spend of the wrong proof.
-_SLOT_INDEXED = {"GET_PROOF", "SPEND_PROOF"}
-
-# The response body size each command's prose advertises. Tied to the driver's
-# constants where the driver has one, so a coordinated doc+encoder edit still has
-# to face cardctl's model of the card.
-_RESPONSE_SIZES = {
-    "GET_INFO": 9,
-    "GET_PUBKEY": 33,
-    "GET_BALANCE": 4,
-    "GET_PROOF_COUNT": 1,
-    "GET_PROOF": cardctl.PROOF_SIZE,
-    "GET_SLOT_STATUS": cardctl.MAX_PROOFS,
-    "SPEND_PROOF": 64,
-    "SIGN_ARBITRARY": 64,
-    "LOAD_PROOF": 1,
-    "CLEAR_SPENT": 1,
-}
-
-
-def test_every_documented_command_is_driven_through_the_encoder():
-    """
-    The completeness ratchet for _WIRE_CASES. Without it, command #15 arrives
-    with a documented section, an INS constant, and not one byte of its header
-    ever compared against the wire — and the suite reports success.
-    """
-    driven = {name for name, _, _, _ in _WIRE_CASES}
-    documented = {name for name, _ in _command_headings()}
-    assert driven == documented, (
-        f"_WIRE_CASES does not drive {sorted(documented - driven)}"
-        + (f" and drives undocumented {sorted(driven - documented)}" if driven - documented else "")
-    )
-
-
-def test_every_command_with_a_fixed_length_is_length_checked():
-    """
-    The completeness ratchet for _LENGTH_CASES. This suite exists because
-    GET_PROOF was documented `Le 4D (77 bytes)`; a hand-maintained tuple with no
-    ratchet lets that exact bug back in on the next command added, with all
-    tests green. `test_every_ins_constant_is_documented` forces the *section* to
-    exist; nothing forced it to be length-checked.
-    """
-    covered = {name for name, _, _, _ in _LENGTH_CASES}
-    documented = {name for name, _ in _command_headings()}
-    excused = _NOT_FIXED_LENGTH | _RANGE_LENGTH
-    assert not covered & excused, (
-        f"{sorted(covered & excused)} is both length-checked and excused from being "
-        "length-checked — drop it from _NOT_FIXED_LENGTH/_RANGE_LENGTH"
-    )
-    assert covered | excused == documented, (
-        f"_LENGTH_CASES does not cover {sorted(documented - covered - excused)}"
-    )
-
-
-def test_every_command_with_a_response_body_is_size_checked():
-    """The same ratchet for _RESPONSE_SIZES, which tracks _LENGTH_CASES."""
-    assert set(_RESPONSE_SIZES) == {name for name, _, _, _ in _LENGTH_CASES}, (
-        "_RESPONSE_SIZES and _LENGTH_CASES have drifted apart: "
-        f"{sorted(set(_RESPONSE_SIZES) ^ {name for name, _, _, _ in _LENGTH_CASES})}"
-    )
-
-
-def test_fixed_p1_and_p2_match_the_bytes_cardctl_sends():
-    """
-    P1 and P2 were never compared against the wire. Rewriting SPEND_PROOF's
-    `| P1 |` row to a literal `00` therefore passed: a reader author built from
-    that doc irreversibly spends slot 0 on every tap regardless of which proof
-    the terminal picked, and the same edit to GET_PROOF makes every read return
-    slot 0.
-    """
-    for name, method, args, response in _WIRE_CASES:
-        p1, p2, _, _ = _wire(method, *args, response=response)
-        for field, sent in (("P1", p1), ("P2", p2)):
-            if name in _SLOT_INDEXED and field == "P1":
-                continue  # covered by the slot-index test below
-            assert _param_byte(name, field) == sent, (
-                f"{name}: spec's {field} is {_param_byte(name, field):02X}, cardctl sends "
-                f"{sent:02X}"
-            )
-
-
-def test_slot_indexed_commands_document_and_send_p1_as_the_slot():
-    """The two commands that move money must take the slot from the caller."""
-    driven = {name for name, _, _, _ in _LENGTH_CASES}
-    assert _SLOT_INDEXED <= driven, (
-        f"_SLOT_INDEXED names commands that are not driven here: {sorted(_SLOT_INDEXED - driven)}"
-    )
-    for name, method, args, response in _LENGTH_CASES:
-        if name not in _SLOT_INDEXED:
-            continue
-        documented = _param_row(name, "P1")
-        assert "slot" in documented.lower(), (
-            f"{name}'s P1 row no longer describes a slot index: {documented!r} — a reader built "
-            "from that sends a fixed P1 to every card"
-        )
-        assert not re.fullmatch(r"`?[0-9A-Fa-f]{2}`?", documented), (
-            f"{name}'s P1 is documented as the literal byte {documented!r}, but it carries the "
-            "caller's slot index"
-        )
-        slot = 5
-        p1, p2, _, _ = _wire(method, slot, *args[1:], response=response)
-        assert p1 == slot, f"{name}: asked for slot {slot}, cardctl put {p1} in P1"
-        assert _param_byte(name, "P2") == p2, (
-            f"{name}: spec's P2 is {_param_byte(name, 'P2'):02X}, cardctl sends {p2:02X}"
-        )
-
-
-def test_lock_card_p2_is_the_confirmation_byte():
-    """
-    LOCK_CARD is irreversible and its only guard is the P2 confirmation byte.
-    Nothing tied the documented `DE` to cardctl.LOCK_CONFIRM_BYTE, so the two
-    could drift and a reader's lock would be rejected — or worse, a doc change
-    to a byte the card does not require would suggest the guard is arbitrary.
-    """
-    assert _param_byte("LOCK_CARD", "P2") == cardctl.LOCK_CONFIRM_BYTE, (
-        f"spec's LOCK_CARD P2 is {_param_byte('LOCK_CARD', 'P2'):02X}, "
-        f"cardctl.LOCK_CONFIRM_BYTE is {cardctl.LOCK_CONFIRM_BYTE:02X}"
-    )
-    card = make_card([(b"", 0x9000)])
-    card.lock_card()
-    assert card.connection.last == bytes([
-        cardctl.CLA, cardctl.INS_LOCK_CARD,
-        _param_byte("LOCK_CARD", "P1"), cardctl.LOCK_CONFIRM_BYTE,
-    ]), card.connection.last.hex()
-
-
-def _documented_response_sizes(name: str) -> list:
-    """
-    Every response-body size the section states, in order.
-
-    Two forms carry it: the `| Response |` row's leading `N-byte`/`N bytes`, and
-    the `**Response (N bytes):**` header above a field table. Sizes deeper in the
-    row are describing sub-fields ("R || s, 32 bytes each") and are handled
-    separately.
-    """
-    section = _section(name)
-    sizes = [int(n) for n in re.findall(r"\*\*Response \((\d+) bytes\)", section)]
-    row = re.search(r"^\| Response \| (.+?) \|$", section, re.M)
-    if row:
-        lead = re.match(r"(\d+)[- ]bytes?\b", row.group(1).strip())
-        assert lead, (
-            f"{name}'s Response row no longer opens with its size in bytes: {row.group(1)!r}"
-        )
-        sizes.append(int(lead.group(1)))
-    return sizes
-
-
-def test_every_documented_response_size_matches_the_driver():
-    """
-    Only Lc/Le were checked, so the response prose could say anything. Verified
-    by mutation, all green before this test: GET_PUBKEY's `33-byte compressed
-    public key` → `32-byte` (a reader reads a truncated key, sets the NUT-11
-    P2PK condition to a key nobody holds, and the funds are unspendable);
-    GET_SLOT_STATUS's `32 bytes: one status byte per slot` → `16 bytes` (slots
-    16–31 invisible, balance looks halved); GET_PROOF's `**Response (78
-    bytes):**` → `(77 bytes)`.
-    """
-    for name, expected in sorted(_RESPONSE_SIZES.items()):
-        sizes = _documented_response_sizes(name)
-        assert sizes, f"{name} documents no response size at all"
-        for size in sizes:
-            assert size == expected, (
-                f"{name}: spec advertises a {size}-byte response, the driver expects {expected}"
-            )
-
-        # `(R || s, 32 bytes each)` — a component size stated after the total has
-        # to multiply back out to it.
-        each = re.search(
-            r"\|\s*Response\s*\|[^|\n]*?\(([^)]*?)(\d+) bytes each\)",
-            _section(name),
-        )
-        if each:
-            parts = each.group(1).count(r"\|\|") + 1
-            assert parts * int(each.group(2)) == expected, (
-                f"{name}: {parts} components of {each.group(2)} bytes is "
-                f"{parts * int(each.group(2))}, but the response is {expected} bytes"
-            )
-
-
-def test_documented_le_matches_the_documented_response_size():
-    """
-    The two halves of every read command's contract. GET_INFO is excluded on
-    purpose: it documents `Le 00`, the ISO shorthand for "up to 256 bytes",
-    which is not its 8-byte response size.
-    """
-    for name, expected in sorted(_RESPONSE_SIZES.items()):
-        if name == "GET_INFO":
-            continue
-        assert _length_row(name, "Le") == expected, (
-            f"{name}: spec asks for Le {_length_row(name, 'Le'):02X} but advertises a "
-            f"{expected}-byte response"
-        )
-
-
-def test_every_documented_length_matches_the_bytes_cardctl_sends():
-    """
-    Every command's Lc/Le, not just LOAD_PROOF's. Documenting GET_PROOF as
-    `Le 4D (77 bytes)` costs the last byte of the C point, and the mint rejects
-    the redemption — the failure looks like a bad card, not a bad doc.
-    """
-    for name, method, args, response in _LENGTH_CASES:
-        _, _, sent_lc, sent_le = _wire(method, *args, response=response)
-        for field, sent in (("Lc", sent_lc), ("Le", sent_le)):
-            documented = re.search(rf"^\| {field} \|", _section(name), re.M)
-            assert bool(documented) == (sent is not None), (
-                f"{name}: spec {'documents' if documented else 'omits'} {field} but cardctl "
-                f"{'sends' if sent is not None else 'omits'} it"
-            )
-            if sent is not None:
-                assert _length_row(name, field) == sent, (
-                    f"{name}: spec's {field} is "
-                    f"{_length_row(name, field):02X}, cardctl sends {sent:02X}"
-                )
-
-    # The two lengths that are also constants, asserted against the constants so
-    # a coordinated edit to doc and encoder still has to face the driver's model
-    # of the card.
-    assert _length_row("GET_PROOF", "Le") == cardctl.PROOF_SIZE
-    assert _length_row("GET_SLOT_STATUS", "Le") == cardctl.MAX_PROOFS
-    assert _length_row("LOAD_PROOF", "Lc") == cardctl.PROOF_SIZE - 1
-
-
-def _documented_load_proof_fields() -> list:
-    """LOAD_PROOF's Data row as ordered (length, canonical name) pairs."""
-    row = re.search(r"^\| Data \| (.+?) \|$", _section("LOAD_PROOF"), re.M)
-    assert row, "could not parse LOAD_PROOF's Data row"
-    fields = re.findall(r"(\d+)-byte (\w+)", row.group(1))
-    assert fields, f"LOAD_PROOF's Data row lists no `N-byte name` fields: {row.group(1)!r}"
-    return [(int(n), _canonical(name, "LOAD_PROOF Data row")) for n, name in fields]
+    assert (p["keyset_id"], p["amount"], p["nonce"], p["c"], p["date"]) == (
+        "0059534ce0bfa19a", 1234, bytes(range(32)), b"\x02" + bytes(range(1, 33)), 1900000000)
+    consts = _applet_shorts()
+    java = {"status": "PROOF_STATUS_OFFSET", "keyset_id": "PROOF_KEYSET_OFFSET", "amount": "PROOF_AMOUNT_OFFSET",
+            "nonce": "PROOF_NONCE_OFFSET", "c": "PROOF_C_OFFSET", "date": "PROOF_DATE_OFFSET"}
+    for offset, (_, desc) in table.items():
+        const = java[_canonical(desc, "GET_PROOF table")]
+        assert consts[const] == offset, f"applet {const} is {consts[const]}, spec {offset}"
+    assert consts["PROOF_SIZE"] == cardctl.PROOF_SIZE and consts["PROOF_DATA_LEN"] == cardctl.PROOF_SIZE - 1
+    assert consts["MAX_PROOFS"] == cardctl.MAX_PROOFS == 128
+    assert f"{cardctl.PROOF_SIZE} bytes per slot × {cardctl.MAX_PROOFS} slots" in _heading_body("Proof Slot Layout")
 
 
 def test_load_proof_documents_the_fields_in_the_order_it_sends_them():
+    """A misordered load strands money on a card for good."""
+    section = _section("LOAD_PROOF")
+    rows = re.findall(r"^\| (keyset_id|amount|nonce|C|date) \| (\d+) \|", section, re.M)
+    assert [r[0] for r in rows] == ["keyset_id", "amount", "nonce", "C", "date"], rows
+    sizes = [int(r[1]) for r in rows]
+    assert sum(sizes) == cardctl.PROOF_SIZE - 1 == int(re.search(r"^51 \((\d+)\)", _row(section, "Lc")).group(1))
+    card = make_card([(b"\x00", 0x9000)])
+    card.load_proof(bytes.fromhex("0059534ce0bfa19a"), 4, bytes(range(32)), b"\x03" + bytes(range(32)), 7)
+    data = card.connection.last[5:5 + 81]
+    at = 0
+    sent = {}
+    for (name, _), size in zip(rows, sizes):
+        sent[name] = data[at:at + size]
+        at += size
+    assert sent["keyset_id"] == bytes.fromhex("0059534ce0bfa19a") and int.from_bytes(sent["amount"], "big") == 4
+    assert sent["nonce"] == bytes(range(32)) and sent["C"] == b"\x03" + bytes(range(32))
+    assert int.from_bytes(sent["date"], "big") == 7
+
+
+# ── the secret, which the card signs ────────────────────────────────────────
+def _applet_secret_parts() -> dict:
+    out = {}
+    for name in ("SECRET_1", "SECRET_2", "SECRET_3", "SECRET_DATE", "SECRET_REFUND", "SECRET_END_DATED", "SECRET_END"):
+        out[name] = _applet_label(name)
+    return out
+
+
+def test_the_nut_xx_secret_is_the_one_the_applet_builds_and_the_vectors_sign():
     """
-    Summing the field lengths leaves the *order* unconstrained: a Data row
-    reading `amount + keyset_id + C + nonce` sums to the same 77 bytes. A
-    firmware or reader author following that misparses all four fields, and
-    every proof loaded through it is unspendable — money stranded on the card
-    with no error anywhere.
+    The secret text is the wire between the card and every wallet that loads it:
+    the card signs the hash of exactly this. NUT-XX's text, the applet's byte
+    arrays and the vectors the applet's suite wrote must be one text.
     """
-    # The row's own wording, before its structure. This is the third copy of
-    # the keyset description in APDU.md — the two proof layouts are guarded by
-    # _assert_field_wording, but this row was only parsed for field order, so
-    # `(raw)` could become `(ascii)` with every test green. That is historical
-    # bug #1 verbatim, in the table of the command that writes EEPROM.
-    row = re.search(r"^\| Data \| (.+?) \|$", _section("LOAD_PROOF"), re.M).group(1).lower()
-    assert "raw" in row, (
-        f"LOAD_PROOF's Data row no longer says the keyset id is raw: {row!r}"
-    )
-    assert "ascii" not in row, (
-        f"LOAD_PROOF's Data row describes ASCII encoding again — that stores half an id: {row!r}"
-    )
-
-    layout = _proof_layout()
-    # The status byte is read-only state, never sent on load.
-    expected = [
-        (ln, _canonical(desc, "GET_PROOF response table"))
-        for off, (ln, desc) in sorted(layout.items()) if off != 0
-    ]
-    assert _documented_load_proof_fields() == expected, (
-        f"LOAD_PROOF's Data row is {_documented_load_proof_fields()} but the proof layout is "
-        f"{expected}"
-    )
+    parts = _applet_secret_parts()
+    nonce, key, refund, date = "ab" * 32, "02" + "cd" * 32, "03" + "ef" * 32, "1900000000"
+    plain = parts["SECRET_1"] + nonce + parts["SECRET_2"] + key + parts["SECRET_3"] + parts["SECRET_END"]
+    dated = (parts["SECRET_1"] + nonce + parts["SECRET_2"] + key + parts["SECRET_3"] + parts["SECRET_DATE"] + date
+             + parts["SECRET_REFUND"] + refund + parts["SECRET_END_DATED"])
+    nut = NUT_XX_MD.read_text(encoding="utf-8")
+    nut_plain = re.search(r'^(\["P2PK",\{"nonce":"<64 hex>","data":"<66 hex P_card>","tags":\[\["sigflag","SIG_ALL"\]\]\}\])$', nut, re.M)
+    nut_dated = re.search(r'^(\["P2PK",\{"nonce":"<64 hex>","data":"<66 hex P_card>","tags":\[\["locktime","<decimal>"\],\["refund","<66 hex>"\],\["sigflag","SIG_ALL"\]\]\}\])$', nut, re.M)
+    assert nut_plain and nut_dated, "NUT-XX no longer states the two secret forms"
+    assert nut_plain.group(1).replace("<64 hex>", nonce).replace("<66 hex P_card>", key) == plain
+    assert (nut_dated.group(1).replace("<64 hex>", nonce, 1).replace("<66 hex P_card>", key)
+            .replace("<decimal>", date).replace("<66 hex>", refund)) == dated
+    vectors = json.loads(SECRET_JSON.read_text(encoding="utf-8"))
+    for piece in vectors["pieces"]:
+        if piece["date"]:
+            want = (parts["SECRET_1"] + piece["nonce"] + parts["SECRET_2"] + vectors["cardKey"] + parts["SECRET_3"]
+                    + parts["SECRET_DATE"] + str(piece["date"]) + parts["SECRET_REFUND"] + vectors["refundKey"] + parts["SECRET_END_DATED"])
+        else:
+            want = parts["SECRET_1"] + piece["nonce"] + parts["SECRET_2"] + vectors["cardKey"] + parts["SECRET_3"] + parts["SECRET_END"]
+        assert piece["secret"] == want, piece["secret"]
 
 
-def test_load_proof_sends_each_field_where_the_spec_says_it_goes():
-    """The documented order, driven through the real encoder byte for byte."""
-    keyset = b"\x01" * 8
-    # A power of two: load_proof enforces valid denominations since #19,
-    # and 1024's big-endian bytes (00 00 04 00) are still position-distinct.
-    amount = 1024
-    nonce = bytes(range(32))
-    c = b"\x02" + bytes(range(1, 33))
-    values = {
-        "keyset_id": keyset,
-        "amount": amount.to_bytes(4, "big"),
-        "nonce": nonce,
-        "c": c,
-    }
-
-    card = make_card([(b"\x07", 0x9000)])
-    assert card.load_proof(keyset, amount, nonce, c) == 7
-    sent = card.connection.last
-    payload = sent[5:5 + sent[4]]
-
-    offset = 0
-    for length, name in _documented_load_proof_fields():
-        assert payload[offset:offset + length] == values[name], (
-            f"spec puts {name} at offset {offset} of LOAD_PROOF's payload; cardctl sends "
-            f"{payload[offset:offset + length].hex()} there"
-        )
-        offset += length
-    assert offset == len(payload), (
-        f"the documented fields cover {offset} of {len(payload)} sent bytes"
-    )
-    assert offset == cardctl.PROOF_SIZE - 1
+def test_the_sig_all_message_is_stated_as_the_card_hashes_it():
+    nut = NUT_XX_MD.read_text(encoding="utf-8")
+    assert "msg = secret_0 ‖ C_0 ‖ … ‖ secret_n ‖ C_n ‖ amount_0 ‖ B_0 ‖ … ‖ amount_m ‖ B_m" in nut
+    assert "signature is over the NUT-11 `SIG_ALL` message: every piece's secret and `C`," in " ".join(_apdu_text().split()), \
+        "APDU.md no longer says what the one signature is over"
 
 
-def _applet_constants() -> dict:
-    """
-    Scrape CashuApplet.java's layout constants. A regex, not a JVM: this suite
-    has to run in the Python job, and the applet is the copy that writes EEPROM.
-    """
-    src = APPLET_JAVA.read_text(encoding="utf-8")
-    consts = {
-        n: int(v) for n, v in
-        re.findall(r"static final short (PROOF_\w+|MAX_PROOFS)\s*=\s*\(short\)\s*(\d+)", src)
-    }
-    assert consts, f"could not scrape layout constants from {APPLET_JAVA.name}"
-    return consts
-
-
-def test_applet_layout_constants_match_the_spec_and_the_driver():
-    """
-    The applet is the third party to this contract, and nothing else checks it:
-    CashuAppletTest round-trips bytes 1..77 as an opaque blob, so a *symmetric*
-    offset change inside the applet passes the Java suite, passes cardctl, and
-    would pass every other test here — on the firmware holding bearer money.
-    """
-    consts = _applet_constants()
-    layout = _proof_layout()
-
-    assert "PROOF_SECRET_OFFSET" not in APPLET_JAVA.read_text(encoding="utf-8"), (
-        "the 32-byte field is the nonce, not the secret — a NUT-10 P2PK secret is ~150 bytes of "
-        "JSON. Rename PROOF_SECRET_OFFSET to PROOF_NONCE_OFFSET."
-    )
-
-    assert consts.get("PROOF_SIZE") == cardctl.PROOF_SIZE, (
-        f"applet PROOF_SIZE is {consts.get('PROOF_SIZE')}, cardctl.PROOF_SIZE is "
-        f"{cardctl.PROOF_SIZE}"
-    )
-    assert consts.get("PROOF_DATA_LEN") == cardctl.PROOF_SIZE - 1, (
-        f"applet PROOF_DATA_LEN is {consts.get('PROOF_DATA_LEN')}, but a load carries "
-        f"{cardctl.PROOF_SIZE - 1} bytes"
-    )
-    assert consts.get("MAX_PROOFS") == cardctl.MAX_PROOFS, (
-        f"applet MAX_PROOFS is {consts.get('MAX_PROOFS')}, cardctl.MAX_PROOFS is "
-        f"{cardctl.MAX_PROOFS}"
-    )
-
-    java_name = {
-        "status": "PROOF_STATUS_OFFSET",
-        "keyset_id": "PROOF_KEYSET_OFFSET",
-        "amount": "PROOF_AMOUNT_OFFSET",
-        "nonce": "PROOF_NONCE_OFFSET",
-        "c": "PROOF_C_OFFSET",
-    }
-    for offset, (_, desc) in sorted(layout.items()):
-        const = java_name[_canonical(desc, "GET_PROOF response table")]
-        assert const in consts, f"{APPLET_JAVA.name} has no {const}"
-        assert consts[const] == offset, (
-            f"spec puts {const[6:-7].lower()} at offset {offset}, applet {const} is "
-            f"{consts[const]}"
-        )
+# ── GET_INFO and GET_CARD ─────────────────────────────────────────────────────
+def _byte_table(section: str) -> list:
+    """`| 12–15 | name | meaning |` rows as (first, last, name)."""
+    rows = []
+    for a, b, name in re.findall(r"^\| (\d+)(?:[–-](\d+))? \| ([^|]+?) \|", section, re.M):
+        rows.append((int(a), int(b) if b else int(a), name.strip()))
+    assert rows, "no byte table"
+    return rows
 
 
 def test_get_info_response_table_matches_the_decoder():
     """
-    GET_INFO's response table is the only documented decoder layout that had no
-    check, while get_info() hardcodes every offset. Three green mutations
-    before this test: swapping the unspent/spent rows (a POS shows spent proofs
-    as spendable), relabelling offset 2 as the PIN state (a reader enumerates
-    0-2 slots and misses 29 proofs), and swapping capability bits 0 and 1 (a
-    reader concludes the card cannot sign Schnorr and refuses to spend).
+    Every documented byte of GET_INFO is driven through decode_info with a body
+    whose fields are all different, and each field must land where the table
+    puts it: a swap of two rows (unspent and spent, say) fails here.
     """
-    section = _section("GET_INFO")
-    rows = re.findall(r"^\| (\d+) \| (\d+) \| (.+?) \|$", section, re.M)
-    assert rows, "could not parse GET_INFO's response table"
-    layout = {int(off): (int(ln), desc) for off, ln, desc in rows}
-
-    # The table must tile the documented response exactly: contiguous one-byte
-    # fields covering all 9 bytes, so a row added or dropped fails before the
-    # per-field checks do.
-    assert sorted(layout) == list(range(_RESPONSE_SIZES["GET_INFO"])), (
-        f"GET_INFO's table offsets are {sorted(layout)}, expected 0..{_RESPONSE_SIZES['GET_INFO'] - 1}"
-    )
-    assert all(ln == 1 for ln, _ in layout.values()), "GET_INFO fields are all single bytes"
-
-    # Every byte distinguishable, driven through the real decoder.
-    info = make_card([(bytes([9, 8, 7, 6, 5, 4, 0x01, 1, 2]), 0x9000)]).get_info()
-    assert info["version"] == "9.8"
-    assert info["max_slots"] == 7
-    assert info["unspent"] == 6
-    assert info["spent"] == 5
-    assert info["empty"] == 4
-    assert info["secp256k1_native"] is True
-    assert info["schnorr"] is False
-    assert info["pin_state"] == "set"
-    assert info["puk_state"] == "exhausted"
-    # Byte 8 was appended by 0.6 (D16): the eight-byte answer of every earlier
-    # build still decodes, and reports the PUK as absent rather than unset.
-    assert make_card([(bytes([9, 8, 7, 6, 5, 4, 0x01, 1]), 0x9000)]).get_info()["puk_state"] is None
-
-    # The three PUK states the doc names are the three the decoder names, in
-    # the doc's order (0, 1, 2).
-    puk_desc = layout[8][1]
-    for value, name in cardctl.PUK_STATE_NAMES.items():
-        assert f"{value}={name}" in puk_desc, (
-            f"GET_INFO byte 8 is described as {puk_desc!r}, expected it to say {value}={name}"
-        )
-    assert "pin" not in puk_desc.lower().replace("unblock_pin", ""), (
-        f"GET_INFO byte 8 describes the PIN, not the PUK: {puk_desc!r}"
-    )
-
-    # Each documented description must name the field the decoder reads there.
-    keywords = {
-        0: "major", 1: "minor", 2: "max", 3: "unspent", 4: "spent",
-        5: "empty", 6: "capabilit", 7: "pin", 8: "puk",
+    rows = _byte_table(_section("GET_INFO"))
+    covered = sorted({i for a, b, _ in rows for i in range(a, b + 1)})
+    assert covered == list(range(43)), f"GET_INFO's table covers {covered}"
+    sizes = re.findall(r"(\d+) bytes with P1 = `00`.*?(\d+) with P1 = `01`, (\d+) with P1 = `02`", _section("GET_INFO"))
+    assert sizes == [("30", "42", "43")], sizes
+    info = cardctl.decode_info(INFO_43)
+    expect = {
+        "version major": info["version_tuple"][0], "version minor": info["version_tuple"][1],
+        "max slots": info["max_slots"], "unspent": info["unspent"], "spent": info["spent"], "empty": info["empty"],
+        "capabilities": info["caps_raw"], "PIN state": 1 if info["pin_state"] == "set" else None,
+        "format": info["format"], "tries left": info["tries"], "locked": int(info["locked"]),
+        "record set": int(info["record_set"]), "daily limit": info["daily_limit"], "has owner": int(info["has_owner"]),
+        "now": info["now"], "window start": info["window_start"], "spent today": info["spent_today"],
+        "change grant": int(info["change_grant"]), "payment limit": info["payment_limit"],
+        "no-PIN allowance": info["allowance"], "no-PIN spent": info["nopin_spent"], "tag off": int(info["tag_off"]),
     }
-    for off, (_, desc) in sorted(layout.items()):
-        assert keywords[off] in desc.lower(), (
-            f"GET_INFO offset {off} is described as {desc!r}, expected it to mention "
-            f"{keywords[off]!r}"
-        )
-    # Offset 3 is unspent, not spent — "unspent" contains "spent", so pin the
-    # distinction both ways round.
-    assert "unspent" in layout[3][1].lower() and "unspent" not in layout[4][1].lower()
-
-    bits = re.findall(r"^\| (\d)(?:–\d)? \| (.+?) \|$", section.split("**Capabilities flags")[1], re.M)
-    bit_desc = {int(b): d.lower() for b, d in bits}
-    assert "secp256k1" in bit_desc.get(0, ""), (
-        f"capability bit 0 no longer names secp256k1: {bit_desc.get(0)!r}"
-    )
-    assert "schnorr" in bit_desc.get(1, ""), (
-        f"capability bit 1 no longer names Schnorr: {bit_desc.get(1)!r}"
-    )
-    assert "clear_pin" in bit_desc.get(3, ""), (
-        f"capability bit 3 no longer names CLEAR_PIN: {bit_desc.get(3)!r}"
-    )
-    assert "unblock_pin" in bit_desc.get(4, "") and "set_puk" in bit_desc.get(4, ""), (
-        f"capability bit 4 no longer names SET_PUK and UNBLOCK_PIN: {bit_desc.get(4)!r}"
-    )
-    # And the decoder reads those two bits where the doc puts them.
-    caps = make_card([(bytes([0, 6, 32, 0, 0, 32, 0x18, 0, 0]), 0x9000)]).get_info()
-    assert caps["clear_pin"] is True and caps["unblock_pin"] is True
-    assert caps["secp256k1_native"] is False and caps["schnorr"] is False
-    assert cardctl.CAP_CLEAR_PIN == 1 << 3 and cardctl.CAP_UNBLOCK_PIN == 1 << 4
+    for a, b, name in rows:
+        assert name in expect, f"GET_INFO documents {name!r}, which decode_info does not decode"
+        assert int.from_bytes(INFO_43[a:b + 1], "big") == expect[name], f"{name} at {a}..{b}"
+    # the applet answers the documented sizes
+    src = _applet_text()
+    assert "p1 == (byte) 2 ? (short) 43 : (short) 42" in src and "apdu.setOutgoingAndSend((short) 0, (short) 30);" in src
 
 
-def _applet_ins() -> dict:
-    """Scrape the applet's INS_* dispatch bytes — the values the card acts on."""
-    ins = {
-        n: int(v, 16) for n, v in
-        re.findall(
-            r"static final byte (INS_\w+)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})",
-            APPLET_JAVA.read_text(encoding="utf-8"),
-        )
-    }
-    assert ins, f"could not scrape INS constants from {APPLET_JAVA.name}"
-    return ins
+def test_get_card_table_matches_the_decoder_and_the_applets_rollover_bytes():
+    rows = {(a, b): name for a, b, name in
+            [(int(o), int(o) + int(l) - 1, n.strip()) for o, l, n in
+             re.findall(r"^\| (\d+) \| (\d+) \| ([^|]+?) \|", _section("GET_CARD"), re.M)]}
+    assert rows[(76, 76)].startswith("rolls") and rows[(77, 77)].startswith("rollover budget") and rows[(78, 78)].startswith("allowance armed"), rows
+    card = cardctl.decode_card(CARD_ANSWER)
+    assert (CARD_ANSWER[76], CARD_ANSWER[77], CARD_ANSWER[78]) == (card["rolls"], card["budget_raw"], int(card["armed"]))
+    consts = _applet_shorts()
+    # GET_CARD's byte 40 is the record's CARD_BITS_OFFSET: its 65 bytes are copied whole
+    shift = consts["CARD_BITS_OFFSET"] - 40
+    assert consts["CARD_ROLLS_OFFSET"] - shift == 76
+    assert consts["CARD_BUDGET_OFFSET"] - shift == 77
+    assert consts["CARD_ARMED_OFFSET"] - shift == 78
+    assert "Util.arrayCopyNonAtomic(cardRecord, CARD_BITS_OFFSET, buf, (short) 40, (short) 65);" in _applet_text()
 
 
-def test_applet_opcodes_match_the_spec_and_the_driver():
-    """
-    The applet's opcode table decides which handler runs, and nothing compared
-    it to anything. SPEND_PROOF (0x20) and SIGN_ARBITRARY (0x21) have
-    byte-identical wire shapes — Lc 20, 32-byte data, Le 40, 64-byte response —
-    so transposing those two constants in the applet passes every suite in the
-    repo while a terminal sending SPEND_PROOF gets a valid signature back and
-    the proof is never marked spent: a silent double-spend on a bearer card.
-    """
-    applet = _applet_ins()
-    for name, hex_value in _command_headings():
-        const = f"INS_{name}"
-        assert const in applet, f"{APPLET_JAVA.name} has no {const}"
-        documented = int(hex_value, 16)
-        assert applet[const] == documented == getattr(cardctl, const), (
-            f"{name}: spec 0x{documented:02X}, applet 0x{applet[const]:02X}, "
-            f"cardctl 0x{getattr(cardctl, const):02X}"
-        )
-    # The reverse: an opcode only the applet knows about is an undocumented
-    # command on firmware holding bearer money.
-    assert set(applet) == {f"INS_{n}" for n, _ in _command_headings()}, (
-        f"applet implements opcodes the spec does not document: "
-        f"{sorted(set(applet) - {f'INS_{n}' for n, _ in _command_headings()})}"
-    )
+# ── the owner's proof ─────────────────────────────────────────────────────────
+def test_the_owner_labels_match_the_applet_and_the_driver():
+    body = _heading_body("The owner's proof")
+    rows = re.findall(r"^\| `([A-Z_]+)`[^|]*\| `(CashuCard/[a-z-]+)` \|", body, re.M)
+    documented = {cmd: label for cmd, label in rows}
+    expect = {"CHANGE_PIN": "CHANGE_PIN", "SET_LIMIT": "SET_LIMIT", "SET_OWNER": "SET_OWNER", "SET_CARD": "SET_CARD",
+              "ALLOW_LOAD": "LOAD", "LOCK_CARD": "LOCK", "RESET_CARD": "RESET", "SET_TAG": "TAG", "REFRESH": "REFRESH"}
+    assert set(documented) == set(expect), sorted(documented)
+    for command, short in expect.items():
+        label = documented[command]
+        assert _applet_label(f"LABEL_{short}") == label, f"applet's LABEL_{short} is not {label}"
+        assert getattr(cardctl, f"LABEL_{short}") == label, f"cardctl.LABEL_{short} is not {label}"
+    assert _applet_label("AUTH_TAG") == cardctl.AUTH_TAG == "CashuCard/auth"
+    assert _applet_label("SEAL_LABEL") == "CashuCard/seal" and _applet_label("PINKEY_LABEL") == "CashuCard/pinkey"
+    for tag in ("`CashuCard/auth`", "`CashuCard/seal`", "`CashuCard/pinkey`"):
+        assert tag in body, tag
+
+
+def test_owner_commands_send_proof_length_proof_then_value():
+    """The data layout the spec states for every owner's command, through the real encoder."""
+    assert "proof length (1) ‖ proof (DER, at most 72) ‖ value" in _heading_body("The owner's proof")
+    nonce = bytes(range(16))
+    card = make_card([(nonce, 0x9000)])
+    card.set_limit(p256.TEST_OWNER_PRIVATE, 100, 0, 0, 7)
+    data = card.connection.last[5:]
+    n = data[0]
+    assert n <= 72 and data[1 + n:] == (100).to_bytes(4, "big") + bytes(8) + b"\x07"
+    assert p256.verify(p256.public_key(p256.TEST_OWNER_PRIVATE), b"CashuCard/set-limit" + nonce + data[1 + n:], data[1:1 + n])
+
+
+def test_set_limit_forms_and_the_budget_range_match_the_applet():
+    section = _section("SET_LIMIT")
+    assert "4, 8, 12 or 13" in section and "1 to 30" in section
+    src = _applet_text()
+    assert "len != (short) 4 && len != (short) 8 && len != (short) 12 && len != (short) 13" in src
+    most = re.search(r"static final byte\s+ROLL_BUDGET_MOST\s*=\s*\(byte\)\s*(\d+);", src)
+    default = re.search(r"static final byte\s+ROLL_BUDGET_DEFAULT\s*=\s*\(byte\)\s*(\d+);", src)
+    assert int(most.group(1)) == cardctl.ROLL_BUDGET_MOST == 30
+    assert int(default.group(1)) == cardctl.ROLL_BUDGET_DEFAULT == 7
+    assert "default 7" in _heading_body("The clock and the limits")
+    assert [len(cardctl.limit_value(1)), len(cardctl.limit_value(1, 0)), len(cardctl.limit_value(1, 0, 0)),
+            len(cardctl.limit_value(1, 0, 0, 7))] == [4, 8, 12, 13]
+
+
+def test_refresh_and_the_anchor_take_an_80_byte_header():
+    assert int(_row(_section("SET_HEADER"), "Lc"), 16) == cardctl.HEADER_LEN == 80
+    assert "a Bitcoin block header (80)" in _row(_section("REFRESH"), "Data")
+    assert "an anchor header (80)" in _row(_section("SET_OWNER"), "Data")
+    assert _applet_shorts()["HEADER_LEN"] == 80
+    card = make_card([(bytes(16), 0x9000), (bytes(4), 0x9000)])
+    card.refresh(p256.TEST_OWNER_PRIVATE, bytes(80))
+    sent = card.connection.last
+    assert sent[1] == 0x53 and sent[-1] == int(_row(_section("REFRESH"), "Le"), 16)
+
+
+def test_the_floor_the_spec_states_is_the_applets():
+    m = re.search(r"FLOOR_BITS = \{ \(byte\) 0x([0-9A-F]{2}), \(byte\) 0x([0-9A-F]{2}), \(byte\) 0x([0-9A-F]{2}), \(byte\) 0x([0-9A-F]{2}) \}", _applet_text())
+    bits = "".join(reversed(m.groups()))
+    assert f"`0x{bits}`" in _section("SET_HEADER"), bits
+
+
+# ── the bytes cardctl sends, against the tables ──────────────────────────────
+# Every command cardctl drives, as (spec section, Card method, arguments, the
+# answer to give it). The completeness ratchet below fails the day a Card
+# method that sends a documented command is not in this table.
+_DRIVEN = [
+    ("GET_INFO", "get_info", (), [INFO_43]),
+    ("GET_PUBKEY", "get_pubkey", (), [b"\x02" + bytes(32)]),
+    ("GET_BALANCE", "get_balance", (), [bytes(4)]),
+    ("GET_PROOF_COUNT", "get_proof_count", (), [b"\x00"]),
+    ("GET_PROOF", "get_proof", (0,), [bytes(82)]),
+    ("GET_SLOT_STATUS", "get_slot_status", (), [bytes(128)]),
+    ("AUTH", "auth", (bytes(16),), [bytes(80)]),
+    ("GET_CARD", "get_card", (), [CARD_ANSWER]),
+    ("GET_NONCE", "get_nonce", (), [bytes(16)]),
+    ("SET_HEADER", "set_header", (bytes(80),), [bytes(4)]),
+    ("LOAD_PROOF", "load_proof", (bytes(8), 1, bytes(32), b"\x02" + bytes(32)), [b"\x00"]),
+    ("CLEAR_SPENT", "clear_spent", (), [b"\x00"]),
+    ("VERIFY_PIN", "verify_pin", (b"1234",), [b""]),
+    ("SET_PIN", "set_pin", (b"1234",), [b""]),
+    ("SET_CARD", "set_card", ("https://m",), [b""]),
+    ("SET_OWNER", "set_owner", (p256.public_key(p256.TEST_OWNER_PRIVATE),), [b""]),
+    ("CHANGE_PIN", "change_pin", (p256.TEST_OWNER_PRIVATE, b"1234"), [bytes(16), b""]),
+    ("SET_LIMIT", "set_limit", (p256.TEST_OWNER_PRIVATE, 1), [bytes(16), b""]),
+    ("ALLOW_LOAD", "allow_load", (p256.TEST_OWNER_PRIVATE,), [bytes(16), b""]),
+    ("REFRESH", "refresh", (p256.TEST_OWNER_PRIVATE, bytes(80)), [bytes(16), bytes(4)]),
+    ("LOCK_CARD", "lock_card", (p256.TEST_OWNER_PRIVATE,), [bytes(16), b""]),
+]
+
+
+def _drive(method, args, answers):
+    card = make_card([(a, 0x9000) for a in answers])
+    getattr(card, method)(*args)
+    return card.connection.last
+
+
+def test_every_driven_command_matches_its_header_table():
+    """CLA, INS, a fixed P1/P2, a fixed Lc and the Le, each as the table has it."""
+    for name, method, args, answers in _DRIVEN:
+        section = _section(name)
+        sent = _drive(method, args, answers)
+        assert sent[0] == cardctl.CLA and sent[1] == getattr(cardctl, f"INS_{name}"), name
+        for field, at in (("P1", 2), ("P2", 3)):
+            value = _row(section, field)
+            fixed = re.match(r"^([0-9A-F]{2})(?:;|$| \()", value)
+            if fixed and name != "GET_INFO":
+                assert sent[at] == int(fixed.group(1), 16), f"{name}: {field} is {sent[at]:02X}, table says {value}"
+        if name == "GET_INFO":
+            assert sent[2] == 0x02, "cardctl asks for the long form, P1 = 2"
+        le_row = re.search(r"^\| Le \| (.+?) \|$", section, re.M)
+        if le_row:
+            le = re.match(r"^`([0-9A-F]{2})`", le_row.group(1))
+            if le:
+                assert sent[-1] == int(le.group(1), 16), f"{name}: Le {sent[-1]:02X}, table says {le_row.group(1)}"
+
+
+def test_every_command_cardctl_sends_is_in_the_driven_table():
+    """The ratchet: a Card method that sends an instruction must be driven above."""
+    import inspect
+    driven = {m for _, m, _, _ in _DRIVEN}
+    src = inspect.getsource(cardctl.Card)
+    senders = set(re.findall(r"\n    def (\w+)\(self[^)]*\)[^:]*:(?:(?!\n    def ).)*?(?:self\.send\(INS_|owner_command\(INS_|self\.send\(\s*INS_)", src, re.S))
+    senders -= {"owner_command", "send", "transmit", "select"}
+    missing = senders - driven
+    assert not missing, f"Card methods that send a command but are not driven here: {sorted(missing)}"
 
 
 def test_pin_length_ranges_match_the_applet():
-    """
-    VERIFY_PIN and SET_PIN document `Lc | 04–08`, and the applet enforces
-    PIN_MIN_LEN/PIN_MAX_LEN. Documenting `04–16` was green before this test: a
-    personalization tool built from the doc sets a 12-byte PIN, SET_PIN
-    returns 6700, and the card ships unpersonalized — loud, but loud at
-    manufacturing time, on a batch.
-    """
-    src = APPLET_JAVA.read_text(encoding="utf-8")
-    limits = {
-        n: int(v) for n, v in
-        re.findall(r"static final short (PIN_MIN_LEN|PIN_MAX_LEN)\s*=\s*\(short\)\s*(\d+)", src)
-    }
-    assert set(limits) == {"PIN_MIN_LEN", "PIN_MAX_LEN"}, (
-        f"could not scrape PIN limits from {APPLET_JAVA.name}: {limits}"
-    )
-
-    for name in sorted(_RANGE_LENGTH):
-        m = re.search(r"^\| Lc \| (\d+)[–-](\d+) \|$", _section(name), re.M)
-        assert m, f"{name} no longer documents its Lc as a range"
-        low, high = int(m.group(1)), int(m.group(2))
-        assert (low, high) == (limits["PIN_MIN_LEN"], limits["PIN_MAX_LEN"]), (
-            f"{name} documents Lc {low:02d}–{high:02d}, applet enforces "
-            f"{limits['PIN_MIN_LEN']}–{limits['PIN_MAX_LEN']}"
-        )
+    shorts = _applet_shorts()
+    assert (shorts["PIN_MIN_LEN"], shorts["PIN_MAX_LEN"]) == (cardctl.PIN_MIN_LEN, cardctl.PIN_MAX_LEN) == (4, 8)
+    for name in ("VERIFY_PIN", "SET_PIN"):
+        assert "4–8 bytes" in _row(_section(name), "Data"), name
+    assert "the new PIN (4–8)" in _row(_section("CHANGE_PIN"), "Data")
 
 
-def test_the_applet_version_is_the_one_the_guide_and_selftest_expect():
-    """
-    SELECT's applet version is all an installed card reports about its build,
-    so three copies of it have to agree: the applet's, the one the deployment
-    guide tells an operator a good card answers, and `cardctl selftest`'s
-    floor. `main` once tracked a 0.3 CAP with the old slot write order while a
-    0.3 build with the fix answered SELECT alike (ENG-620, D14). The version
-    moved to 0.4 so the two could be told apart, which only helps if the guide
-    and the floor moved with it: a guide still saying `00 03` passes the card
-    the bump exists to catch.
-
-    The floor is cardctl.SELFTEST_MIN_VERSION, and it was the tracked version
-    while every build below it was one a card is reinstalled from (D13, D14).
-    A version bump that leaves the floor where it was has to say why, here:
-    0.5 added CLEAR_PIN (D15) and 0.6 added SET_PUK and UNBLOCK_PIN (D16),
-    and neither fixed anything, so a 0.4 or 0.5 card is sound and stays
-    installed; selftest passes it and names the missing commands. The floor
-    must still sit at or below the tracked version, fail the version under
-    it, and pass the tracked one.
-    """
-    version = dict(re.findall(
-        r"static final byte VERSION_(MAJOR|MINOR)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})",
-        APPLET_JAVA.read_text(encoding="utf-8"),
-    ))
-    assert set(version) == {"MAJOR", "MINOR"}, (
-        f"could not scrape the applet version from {APPLET_JAVA.name}"
-    )
-    major, minor = int(version["MAJOR"], 16), int(version["MINOR"], 16)
-
-    guide = DEPLOYMENT_MD.read_text(encoding="utf-8")
-    tracked = re.search(r"The CAP tracked in this repo is \*\*applet version (\d+)\.(\d+)\*\*", guide)
-    assert tracked, f"{DEPLOYMENT_MD.name} no longer names the tracked CAP's applet version"
-    assert (int(tracked.group(1)), int(tracked.group(2))) == (major, minor), (
-        f"{DEPLOYMENT_MD.name} tracks applet {tracked.group(1)}.{tracked.group(2)}, "
-        f"{APPLET_JAVA.name} is {major}.{minor}"
-    )
-    # Every SELECT and GET_INFO answer the guide shows for a good card: the
-    # install rule, the SELECT response (`MMmm 9000`) and GET_INFO's 8 bytes.
-    answers = re.findall(r"`SELECT` must answer `([0-9A-F]{2}) ([0-9A-F]{2})`", guide)
-    answers += re.findall(r"^# Response: ([0-9A-F]{2})([0-9A-F]{2}) 9000\b", guide, re.M)
-    # GET_INFO's answer is version + the rest of its documented size, so a
-    # guide still showing the 8-byte answer of a 0.5 card fails here.
-    answers += re.findall(
-        r"^# Response: ([0-9A-F]{2}) ([0-9A-F]{2})(?: [0-9A-F]{2}){%d}\s*$"
-        % (_RESPONSE_SIZES["GET_INFO"] - 2), guide, re.M)
-    assert len(answers) == 3, (
-        f"expected the guide's three version answers (the install rule, SELECT and "
-        f"GET_INFO), found {answers}"
-    )
-    for hi, lo in answers:
-        assert (int(hi, 16), int(lo, 16)) == (major, minor), (
-            f"{DEPLOYMENT_MD.name} shows a good card answering {hi} {lo}, the applet "
-            f"answers {major:02X} {minor:02X}"
-        )
-
-    ok, detail = cardctl._select_verdict(bytes([major, minor]))
-    assert ok, f"selftest fails the applet this repo builds: {detail}"
-    assert detail == f"version {major}.{minor}", (
-        f"selftest passes the tracked applet with a caveat it should not need: {detail}"
-    )
-
-    floor = cardctl.SELFTEST_MIN_VERSION
-    assert floor <= (major, minor), (
-        f"selftest's floor {floor} is above the tracked applet {major}.{minor}"
-    )
-    # The guide-mentions-every-passed-version loop below walks minors under
-    # one major. With the floor at 0.4 and the applet at 1.0, range(4, 0) is
-    # empty and the ratchet checks nothing while still passing, so the loop
-    # must be rewritten over (major, minor) pairs when the floor and the
-    # applet part ways on the major, and this assertion is what says so.
-    assert floor[0] == major, (
-        f"selftest's floor {floor} and the tracked applet {major}.{minor} differ in "
-        f"major version: the versions-between loop in this test walks minors under one "
-        f"major and would silently check nothing; rewrite it over (major, minor) pairs"
-    )
-    assert cardctl._select_verdict(bytes(floor))[0], f"selftest fails its own floor {floor}"
-    if floor[1]:
-        ok, detail = cardctl._select_verdict(bytes([floor[0], floor[1] - 1]))
-        assert not ok, (
-            f"selftest passes applet {floor[0]}.{floor[1] - 1}, below its floor "
-            f"{floor[0]}.{floor[1]}: {detail}"
-        )
-    # The guide tells an operator what a card between the floor and the
-    # tracked version is missing, so a selftest pass on it is not read as
-    # "nothing to do".
-    for v in range(floor[1], minor):
-        assert _select_answer(major, v) in guide, (
-            f"{DEPLOYMENT_MD.name} says nothing about a card answering {major:02X} {v:02X}, "
-            f"which selftest passes though it is below the tracked {major}.{minor}"
-        )
+def test_lock_card_p2_is_the_confirmation_byte():
+    assert int(_row(_section("LOCK_CARD"), "P2").split()[0], 16) == cardctl.LOCK_CONFIRM_BYTE == 0xDE
+    assert "static final byte LOCK_CONFIRM_BYTE = (byte) 0xDE;" in _applet_text()
 
 
-def _select_answer(major, minor):
-    """
-    The two-byte `SELECT` answer the deployment guide writes for an applet
-    version, in the guide's own notation: `MM mm`, each a two-digit upper-case
-    hex byte in backticks, as in `00 04` or `01 00`.
-    """
-    return f"`{major:02X} {minor:02X}`"
-
-
-def test_select_answer_spells_the_guide_notation_for_any_version():
-    """
-    The versions-between loop above once hardcoded the major as `00` (and spelt
-    the minor as `0{v}`), so it passed only while both the floor and the applet
-    sat under major 0. With the floor at 1.0 and the applet at 1.2, it demanded
-    `00 00` and `00 01` in a guide that correctly says `01 00`, and blamed the
-    guide for a sentence it had; at minor 10 the `0{v}` spelling asked for
-    `00 010`. The notation must be the guide's for every (major, minor).
-    """
-    assert _select_answer(0, 4) == "`00 04`"
-    assert _select_answer(1, 0) == "`01 00`"
-    assert _select_answer(1, 2) == "`01 02`"
-    assert _select_answer(0, 10) == "`00 0A`"
-    assert _select_answer(0, 255) == "`00 FF`"
-    # And the guide's current text is written in exactly this notation.
-    guide = DEPLOYMENT_MD.read_text(encoding="utf-8")
-    assert _select_answer(*cardctl.SELFTEST_MIN_VERSION) in guide, (
-        f"{DEPLOYMENT_MD.name} does not mention the floor "
-        f"{cardctl.SELFTEST_MIN_VERSION} in the `MM mm` notation this test expects"
-    )
-
-
+# ── status words ──────────────────────────────────────────────────────────────
 def test_every_documented_status_word_is_translated_by_cardctl():
-    """
-    cardctl turns a status word into the sentence an operator reads at the
-    reader, from a table kept by hand. APDU.md documents `6986` (a write to a
-    card locked by LOCK_CARD) in its error tables, and the table had no entry
-    for it, so that failure read "unknown status word". Every status word an
-    APDU.md table documents must translate, and every translation must be for
-    a status word the spec documents.
-    """
-    documented = {
-        first + second for first, second in
-        re.findall(r"^\| (6[0-9A-F]|90) ?([0-9A-F]{2}|CX) \|", _apdu_text(), re.M)
-    }
-    # Guard the parse itself: a table reformat that matches nothing must fail
-    # here, not pass by checking an empty set.
-    assert {"9000", "63CX", "6982", "6983", "6986", "6A88"} <= documented, sorted(documented)
-
+    documented = {first + second for first, second in
+                  re.findall(r"^\| (6[0-9A-F]|90) ?([0-9A-F]{2}|CX) \|", _heading_body("Error Code Summary"), re.M)}
+    assert {"9000", "63CX", "6982", "6983", "6986", "6A88", "6A8F", "6A90", "6A91", "6A93", "6A94"} <= documented, sorted(documented)
     for sw in sorted(documented):
         if sw == "63CX":
             for tries in range(4):
                 assert f"{tries} retries remaining" in cardctl.describe_sw(0x63C0 | tries)
             continue
-        assert cardctl.describe_sw(int(sw, 16)) != "unknown status word", (
-            f"APDU.md documents {sw}, and cardctl.describe_sw has no translation for it"
-        )
-
+        assert cardctl.describe_sw(int(sw, 16)) != "unknown status word", f"cardctl cannot translate {sw}"
     undocumented = {f"{sw:04X}" for sw in cardctl.SW_MEANINGS} - documented
-    assert not undocumented, (
-        f"cardctl translates status words APDU.md does not document: {sorted(undocumented)}"
-    )
+    assert not undocumented, f"cardctl translates status words the spec does not document: {sorted(undocumented)}"
+
+
+def test_every_applet_status_word_is_documented():
+    words = {v.upper() for v in re.findall(r"static final short SW_\w+\s*=\s*\(short\)\s*0x([0-9A-Fa-f]{4})", _applet_text())}
+    words -= {"63C2", "63C1", "63C0"}   # 63CX
+    words -= {"6A92", "6A95"}           # unused: never answered (CashuAppletTest checks)
+    documented = {first + second for first, second in
+                  re.findall(r"^\| (6[0-9A-F]|90) ?([0-9A-F]{2}|CX) \|", _heading_body("Error Code Summary"), re.M)}
+    missing = words - documented
+    assert not missing, f"the applet answers status words the spec does not document: {sorted(missing)}"
 
 
 if __name__ == "__main__":
@@ -1290,13 +585,6 @@ if __name__ == "__main__":
             try:
                 fn()
                 print(f"PASS  {name}")
-            # Matches test_apdu.py's runner deliberately: cardctl reports
-            # operator errors by raising SystemExit (which derives from
-            # BaseException, so it needs naming separately or an exiting test
-            # kills the run with no summary), and a parser/command mismatch
-            # surfaces as AttributeError. Printing the type and a traceback for
-            # non-assertion failures is what turns "list index out of range"
-            # into a line number.
             except (SystemExit, Exception) as exc:
                 failures += 1
                 print(f"FAIL  {name}: {type(exc).__name__}: {exc}")

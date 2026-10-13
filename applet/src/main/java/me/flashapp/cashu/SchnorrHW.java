@@ -138,6 +138,7 @@ final class SchnorrHW {
     // ── Crypto objects (allocated once) ───────────────────────────────────
     private final MessageDigest sha256;
     private final KeyAgreement  ecdh;      // ALG_EC_SVDP_DH_PLAIN_XY
+    private final KeyAgreement  gm;        // ALG_EC_PACE_GM: [s]G + H, the chip's point addition, for a change output's blinding (1.12)
     private final ECPrivateKey  tmpPriv;   // reused temp key for k
     private final RandomData    rng;       // BIP-340 auxiliary randomness (step 2)
     // NB: there is deliberately no ECPublicKey for the generator. R = k*G is
@@ -178,6 +179,7 @@ final class SchnorrHW {
         setECParams(tmpPriv, null);
 
         ecdh = KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false);
+        gm   = KeyAgreement.getInstance(KeyAgreement.ALG_EC_PACE_GM, false);
 
         // BIP-340 auxiliary randomness. Allocated once, like everything else on
         // the signing path.
@@ -216,10 +218,13 @@ final class SchnorrHW {
         // DELTA is defined as 2^256 − N, i.e. N + DELTA must be exactly 2^256:
         // a 256-bit sum of zero with a carry out. mulModN's whole reduction
         // rests on that identity, so it is checked rather than commented.
-        // Uses sc as scratch — allocated already, and nothing has signed yet at
-        // install time. probeEcdhFraming() clobbers the same bytes below.
+        // Uses sc as scratch: allocated already, and nothing has signed yet.
         if (add32(N, (short)0, DELTA, (short)0, sc, (short)0) != (short)1) {
             ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        }
+        // and DELTA's first bytes are zero, which the product by it (`mulByDelta`) leaves out
+        for (short i = 0; i < DELTA_FROM; i++) {
+            if (DELTA[i] != (byte)0) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
         }
         for (short i = 0; i < 32; i++) {
             if (sc[i] != (byte)0) {
@@ -227,72 +232,19 @@ final class SchnorrHW {
             }
         }
 
-        // SHA256("BIP0340/aux")  — tag is 11 ASCII bytes
+        // The three tags, hashed once. Written out here rather than kept as
+        // constants of the class: each constant is one more entry in the
+        // package's constant pool, and the chip takes only so many at an
+        // install (docs/FOXY-CARD-HARDWARE.md). A fresh digest is in its
+        // initial state, and doFinal leaves it there for the next.
         byte[] tagAux = { 'B','I','P','0','3','4','0','/','a','u','x' };
-        sha256.reset();
         sha256.doFinal(tagAux, (short)0, (short)11, tagHashAux, (short)0);
-
-        // SHA256("BIP0340/nonce")  — tag is 13 ASCII bytes
         byte[] tagNonce = { 'B','I','P','0','3','4','0','/','n','o','n','c','e' };
-        sha256.reset();
         sha256.doFinal(tagNonce, (short)0, (short)13, tagHashNonce, (short)0);
-
-        // SHA256("BIP0340/challenge")  — tag is 17 ASCII bytes
         byte[] tagChallenge = {
             'B','I','P','0','3','4','0','/','c','h','a','l','l','e','n','g','e'
         };
-        sha256.reset();
         sha256.doFinal(tagChallenge, (short)0, (short)17, tagHashChallenge, (short)0);
-
-        // Probe using the transient scratchpad rather than a fresh array: a
-        // `new byte[80]` here would be persistent EEPROM that is orphaned the
-        // moment init() returns and never reclaimed, which is precisely what
-        // the memory-discipline note on this class forbids. `sc` is already
-        // allocated, is 256 B, and nothing has signed yet at install time.
-        probeEcdhFraming(sc);
-    }
-
-    /**
-     * Verify once, at install time, that ALG_EC_SVDP_DH_PLAIN_XY returns the
-     * 65-byte {@code 04 ‖ X ‖ Y} framing that sign() indexes into.
-     *
-     * Deliberately scoped to the ECDH framing and nothing else. An earlier
-     * version also asserted that {@code getS} left-pads to 32 bytes, which was
-     * wrong twice over: it asserted it on {@code tmpPriv} — a key loaded here
-     * by {@code setS}, not the {@code cardPrivKey} that {@code sign()} actually
-     * reads — so a card that echoes back whatever length setS was handed while
-     * reporting a stripped length for generated keys sailed through the probe
-     * and failed in sign(); and a card returning fewer than 32 bytes is
-     * spec-legal, so the check refused to install on hardware that works.
-     * sign() right-aligns the scalar instead.
-     *
-     * The framing is a property of the card, not of the message, so a card that
-     * returns the bare 64-byte X‖Y is wrong on the very first tap and wrong on
-     * every tap after it. Discovering that inside sign() is far too late:
-     * CashuApplet marks the proof SPENT before it calls doSign, so an
-     * incompatible card would burn one slot per attempt and hand back 6F00 each
-     * time until the balance was gone — with the proofs unredeemable, because
-     * they are P2PK-locked to a key whose card can no longer sign. Throwing here
-     * fails the {@code gp --install} instead, before a single proof is loaded.
-     *
-     * @param probe scratch of at least 80 bytes, owned by the caller. Sized well
-     *              above the expected 65 so that a card returning more trips the
-     *              length check below rather than an
-     *              ArrayIndexOutOfBoundsException. Its first 80 bytes are
-     *              clobbered.
-     */
-    private void probeEcdhFraming(byte[] probe) {
-        // Zero the scalar explicitly — the buffer is shared scratch, not a
-        // freshly allocated (and therefore zeroed) array.
-        Util.arrayFillNonAtomic(probe, (short)0, (short)80, (byte)0);
-        probe[31] = (byte)0x02;              // throwaway scalar d = 2, so R = 2G
-        tmpPriv.setS(probe, (short)0, (short)32);
-
-        ecdh.init(tmpPriv);
-        short len = ecdh.generateSecret(G, (short)0, (short)65, probe, (short)0);
-        if (len != (short)65 || probe[0] != (byte)0x04) {
-            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
-        }
     }
 
     // ── Public API ────────────────────────────────────────────────────────
@@ -408,9 +360,8 @@ final class SchnorrHW {
         // unexpected framing would silently shift both by one byte and emit
         // well-formed signatures that no mint can verify.
         //
-        // probeEcdhFraming() already rejected such a card at install time, so
-        // this is a cheap assert on a condition that cannot change between taps;
-        // it is not the place the incompatibility is meant to be discovered.
+        // A card that frames it otherwise is found out here, at its first
+        // signature, and signs nothing.
         short rLen = ecdh.generateSecret(G, (short)0, (short)65, sc, SC_TMP);
         if (rLen != (short)65 || sc[SC_TMP] != (byte)0x04) {
             ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
@@ -468,12 +419,39 @@ final class SchnorrHW {
     // ── Modular arithmetic ────────────────────────────────────────────────
 
     /**
+     * The point a private key and a public point share (04 || X || Y), by this
+     * class's own key agreement. For the applet's PIN key: one key agreement
+     * object on the card, and the one whose framing was checked at install.
+     * Signing sets its own key before every use, so nothing is left over
+     * from this.
+     */
+    short agree(ECPrivateKey priv, byte[] pub, short pubOff, short pubLen, byte[] out, short outOff) {
+        ecdh.init(priv);
+        return ecdh.generateSecret(pub, pubOff, pubLen, out, outOff);
+    }
+
+    /**
+     * out = [s]G + H by the chip (TR-03111's generic mapping, which is a
+     * scalar multiplication and a point addition in one): 65 bytes,
+     * 04 || x || y. `s` is 32 bytes under n; `h` a point on the curve, 65
+     * bytes uncompressed. For a change output's blinding (1.12).
+     */
+    void addToG(byte[] s, short sOff, byte[] h, short hOff, byte[] out, short outOff) {
+        tmpPriv.setS(s, sOff, (short) 32);
+        gm.init(tmpPriv);
+        short len = gm.generateSecret(h, hOff, (short) 65, out, outOff);
+        if (len != (short) 65 || out[outOff] != (byte) 0x04) {
+            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        }
+    }
+
+    /**
      * Compute a mod n in-place (a is 32 bytes, big-endian).
      *
      * If a ≥ n, subtracts n (at most once, since callers guarantee a < 2n
      * after the tagged-hash reduction step).
      */
-    private static void reduceModN(byte[] a, short aOff) {
+    static void reduceModN(byte[] a, short aOff) {
         if (cmp32(a, aOff, N, (short)0) >= 0) {
             sub32(a, aOff, N, (short)0, a, aOff);
         }
@@ -541,6 +519,16 @@ final class SchnorrHW {
     /**
      * Schoolbook 256×256 → 512-bit unsigned multiplication.
      * a[32], b[32] → out[64], all big-endian.
+     *
+     * The same work for every input (D21). The operands are secret: the
+     * nonce and the key pass through here, and AUTH lets any reader ask for
+     * as many signatures as it likes and time each one. So there is no
+     * branch and no loop whose length depends on a byte of either operand:
+     * a row of zeros is multiplied like any other row, and a row's carry is
+     * written, not propagated. It can be written: the rows run from the low
+     * byte up, row i writes columns i+1 .. i+32, and no row before it has
+     * written column i, so the carry out of row i (at most 255) is the whole
+     * of column i.
      */
     private static void mul256x256(byte[] a, short aOff,
                                    byte[] b, short bOff,
@@ -554,7 +542,6 @@ final class SchnorrHW {
         Util.arrayFillNonAtomic(out, outOff, (short)64, (byte)0);
         for (short i = 31; i >= 0; i--) {
             short ai = (short)(a[(short)(aOff+i)] & 0xFF);
-            if (ai == 0) continue;
             short carry = 0;
             for (short j = 31; j >= 0; j--) {
                 short bj  = (short)(b[(short)(bOff+j)] & 0xFF);
@@ -564,13 +551,38 @@ final class SchnorrHW {
                 out[pos]  = (byte)(prod & 0xFF);
                 carry     = (short)((prod >> 8) & 0xFF);
             }
-            // propagate carry into upper bytes
-            short pos = (short)(outOff + i);
-            while (carry != 0 && pos >= outOff) {
-                short s = (short)((short)(out[pos] & 0xFF) + carry);
-                out[pos--] = (byte)(s & 0xFF);
-                carry      = (short)((s >> 8) & 0xFF);
+            // column i is untouched until now: the carry is all of it
+            out[(short)(outOff + i)] = (byte) carry;
+        }
+    }
+
+    /**
+     * out[64] = a[32] × DELTA: the schoolbook product of `mul256x256`, over
+     * DELTA's seventeen significant bytes only. Its first DELTA_FROM bytes
+     * are zero (2^256 − n is a 129-bit number), and multiplying by them was
+     * nearly half of every signature's time: three of the four products a
+     * signature makes are by DELTA. `init()` checks the zeros are there.
+     */
+    private static final short DELTA_FROM = (short) 15;
+    private static void mulByDelta(byte[] a, short aOff, byte[] out, short outOff) {
+        Util.arrayFillNonAtomic(out, outOff, (short)64, (byte)0);
+        for (short i = 31; i >= 0; i--) {
+            // no early way out for a zero byte of `a`, which is secret (D21): see mul256x256
+            short ai = (short)(a[(short)(aOff+i)] & 0xFF);
+            short carry = 0;
+            for (short j = 31; j >= DELTA_FROM; j--) {
+                short bj  = (short)(DELTA[j] & 0xFF);
+                short pos = (short)(outOff + i + j + 1);
+                short cur = (short)(out[pos] & 0xFF);
+                short prod = (short)((short)(ai * bj) + cur + carry);
+                out[pos]  = (byte)(prod & 0xFF);
+                carry     = (short)((prod >> 8) & 0xFF);
             }
+            /* the carry out of the last column written: row i writes columns
+             * i+DELTA_FROM+1 .. i+32, the row before it ended at column
+             * i+DELTA_FROM+1, so column i+DELTA_FROM is untouched and the
+             * carry (at most 255) is all of it */
+            out[(short)(outOff + i + DELTA_FROM)] = (byte) carry;
         }
     }
 
@@ -591,10 +603,10 @@ final class SchnorrHW {
         // p = p_hi * 2^256 + p_lo
         // Step 1: t = p_hi * DELTA  (256×32-eff → 256 bits after mod-n reduction)
         // t fits in 48 bytes worst-case, but we compute mod-n in two steps.
-        mul256x256(p, pOff, DELTA, (short)0, work, tOff);
+        mulByDelta(p, pOff, work, tOff);
         // t = (p_hi * DELTA)_hi * 2^256 + (p_hi * DELTA)_lo
         // Apply identity again to t_hi part:
-        mul256x256(work, tOff, DELTA, (short)0, work, t2Off);
+        mulByDelta(work, tOff, work, t2Off);
         // t2_hi * DELTA < 2^128 * 2^128 = 2^256 < 2n → directly add, then subtract
         // Sum = t2_lo + t[32..63] + p[pOff+32..pOff+63]
         // But t2_hi is tiny (< 2^127), its contribution via DELTA:
@@ -651,7 +663,7 @@ final class SchnorrHW {
     private static void mulSmallByDelta(byte[] a, short aOff,
                                         byte[] out, short outOff,
                                         byte[] work, short workOff) {
-        mul256x256(a, aOff, DELTA, (short)0, work, workOff);
+        mulByDelta(a, aOff, work, workOff);
         for (short i = 0; i < 32; i++) {
             if (work[(short)(workOff + i)] != (byte)0) {
                 ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);

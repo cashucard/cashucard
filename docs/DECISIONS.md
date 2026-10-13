@@ -4,7 +4,8 @@ Each entry records a call that was made, what was rejected, and why. If you are
 about to change one of these, read the entry first — most were made against a
 real alternative, and several were made *after* getting it wrong once.
 
-Anchors are stable (`#d1` … `#d16`); other docs link to them.
+Anchors are stable (`#d1` … `#d24`); other docs link to them. D15 and D16
+are superseded by the 2.0 merge ([D18](#d18)) and kept for the record.
 
 ---
 
@@ -194,6 +195,15 @@ because the runtime cannot.
 The general lesson, which applies to every change in `applet/`: *a passing
 simulator suite is not evidence about silicon.*
 
+**One exception, since software 1.20 ([D17](#d17)):** the 12,288 bytes that hold
+the mint's proofs are reserved by the first `SET_CARD`, not at install, because
+the chip will not install an applet whose constructor asks for that much more.
+The scan lets through that one statement and nothing beside it: it is guarded so
+that it happens once in a card's life (`if (dleq == null)`), and a request the
+card refuses allocates nothing, so it cannot leak a few dozen bytes a tap, which
+is what the rule is for. A second allocation next to it, an unguarded one, and
+the same statement in any other method are each still refused.
+
 ---
 
 ## <a id="d11"></a>D11 — DLEQ is verified client-side, and unlinkability is not assumed
@@ -209,6 +219,10 @@ on faith.
 
 The mint is trusted for solvency. It is explicitly *not* trusted for
 unlinkability.
+
+Since software 1.20 the card carries the proof with each piece ([D17](#d17)) so
+that the check can be made on a piece read from the card. The card still checks
+nothing: the verification is the reader's, as above.
 
 ---
 
@@ -358,7 +372,11 @@ fails it ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md#install)).
 
 ---
 
-## <a id="d15"></a>D15 — A holder can take the PIN off a personalised card (qualifies D13)
+## <a id="d15"></a>D15 — A holder can take the PIN off a personalised card (qualifies D13; SUPERSEDED by D18)
+
+> **Superseded in 2.0 ([D18](#d18)).** `CLEAR_PIN` is gone with the 0.x wire.
+> On the shared protocol the owner key is the authority above the PIN: the
+> owner's proof changes or removes it. The entry below is the 0.5 record.
 
 `CLEAR_PIN` (`0x43`, applet 0.5) removes the PIN from a card that has one.
 The card goes back to where `SET_PIN` found it: `pinState` 0, a fresh try
@@ -442,7 +460,11 @@ there is no in-place upgrade.
 
 ---
 
-## <a id="d16"></a>D16 — A provisioning PUK unblocks the PIN (resolves D13's lockout)
+## <a id="d16"></a>D16 — A provisioning PUK unblocks the PIN (resolves D13's lockout; SUPERSEDED by D18)
+
+> **Superseded in 2.0 ([D18](#d18)).** The PUK is gone with the 0.x wire. A
+> blocked card is unblocked by the owner's proof (`CHANGE_PIN`, which needs no
+> old PIN), from the holder's phone. The entry below is the 0.6 record.
 
 `SET_PUK` (`0x44`) gives a card a PUK, once, at personalisation. `UNBLOCK_PIN`
 (`0x45`) replaces the PIN — blocked or forgotten — on presentation of that
@@ -553,6 +575,389 @@ regenerating its key.
 
 ---
 
+
+## <a id="d17"></a>D17 — The mint's proof is kept with each piece, reserved after install, one piece a command
+
+**Decided:** from software 1.20 the card keeps, for each piece, the mint's NUT-12
+proof as a later holder needs it: `e`, `s` and the blinding factor `r`, 96 bytes
+(`GET_DLEQ`, `LOAD_PROOF` with `P1 = 1`: [`FOXY-CARD-SPEC.md`](FOXY-CARD-SPEC.md) 5.9).
+The card does not check the proof and never uses it.
+
+**Why the card carries it.** Without it a phone that reads the card can ask the
+mint whether a piece is spent and cannot tell whether it is real: a made-up `C`
+looks like any other until the mint is asked to take it. With it the phone checks
+the piece itself, with the mint's keys, before it pays with the piece or takes it
+in. The proof is made once, when the mint signs the piece, and the card is the one
+place that can keep it with the piece.
+
+**Why the card does not check it** ([D3](#d3), [D11](#d11)). The check needs the
+mint's public key for the amount, which changes with every keyset, and the card
+has no mint's keys and no room to keep a mint's directory. And a card that checked
+would be one more thing to believe: a card that said yes is a card that could say
+yes to anything. The reader that checks is the one that needs to know. So the card
+stores the 96 bytes and gives them back, and a record of zeros means "no proof".
+
+**Why after install and not in the constructor** ([D10](#d10)). The chip refused to
+install a build whose constructor asked for 12,288 bytes more than 1.19's, and
+installed one that asked for 300 more
+([`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md)). The same bytes asked for by a
+command after the install were given. No simulator has the limit, which is why it
+is pinned by tests that read the source and look at the card (null after install,
+reserved by the first `SET_CARD`). The reservation is guarded, so it happens once;
+it is outside any transaction, so nothing can undo it; and if the card refuses it
+the `SET_CARD` goes on and the card works as a card with no room for proofs. So
+every use of the store is safe while it is null.
+
+**Why one piece to a command.** A piece with its proof is 177 bytes, and a short
+APDU carries 255. Two would not fit, and extended length is not something every
+reader and phone will carry (the same reason a plain batch stops at three pieces
+of 81 bytes). `LOAD_PROOF` with `P1 = 1` is one piece and its proof, and any
+other P1 is the plain form it always was. A command to each piece is slower than
+a batch of three (a batch took 0.19 s on the chip: [`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md));
+the one-piece form has not been timed there.
+
+**Why zeros are refused as a proof.** A record of zeros is how the card says "no
+proof". If a load could store zeros and answer "kept", the answer would be false.
+A proof of 96 zero bytes is `6A80`, as a `C` that is no point is.
+
+**Why a piece's record is written first.** The rule is that a place that is
+unspent holds its own proof or zeros and never another piece's. A freed place
+keeps the record it had (`CLEAR_SPENT` and the payment commands write nothing to
+the store: no write was added to a payment), so the next piece into it must write
+its own record, or zeros, before anything else of the place, with the status byte
+still last ([D14](#d14)). A tear then leaves an empty place with a record beside
+it, which nothing serves.
+
+**Why `GET_DLEQ` has no PIN, and gives nothing for a spent piece.** It gives what
+the mint made for a piece that is already on the card for any reader to read
+(`GET_PIECES` has the rest of the piece with no PIN). It gives the proof of an
+unspent piece only: a spent piece's proof is of no use to anyone and is not given.
+
+**Cost accepted:** `r` is in the proof, so a reader that hands the proof to the mint
+lets the mint tie the piece to the request that made it, as with any NUT-12 token;
+and the card gives `r` to any reader with no PIN
+([`SECURITY-MODEL.md`](SECURITY-MODEL.md) #16). 12,288 bytes of the card's storage,
+which the chip has.
+
+---
+
+## <a id="d18"></a>D18 — One card protocol with Foxy: their 1.20 is the base of 2.0
+
+**Decided (ENG-673):** the applet in this repository is the Foxy wallet
+project's fork ([getfoxy/card](https://github.com/getfoxy/card) at `88840aa`,
+software 1.20), merged back with a real `git merge` so their history and
+authorship stay in `git log`. Flash and Foxy speak one wire from here, called
+**2.0**. The fork's applet, its tests, `spec/vectors/` and its documents
+(`docs/FOXY-CARD-*.md`, `docs/FOR-LNFLASH.md`, `FORK.md`) came in as they were;
+our `tools/cardsim` bridge and `tools/cardctl` were kept and ported to 2.0.
+
+**Credit.** The fork's review of applet 0.4 (`docs/FOR-LNFLASH.md` section 3)
+found the two weaknesses that mattered most here: `SPEND_PROOF` signed a hash
+the reader chose, and `SIGN_ARBITRARY` signed anything without burning a slot,
+so the card's SPENT flag protected nothing. Their applet fixes both (the card
+builds and hashes each piece's secret itself; `AUTH` proves the card over a
+tagged hash), adds an owner key, a daily limit with a clock taken from Bitcoin
+block headers, NUT-11 SIG_ALL payments with change, and the mint's NUT-12 proof
+kept with each piece. The design is theirs; the changes we made on top are D19
+to D24.
+
+**Superseded.** Our 0.5 `CLEAR_PIN` ([D15](#d15)) and 0.6 PUK ([D16](#d16)).
+The owner key is the authority above the PIN: its proof changes the PIN with no
+old PIN and unblocks a blocked card, from the holder's phone. A PUK in a
+registry was a second bearer secret for the same job. Their suites are
+ported to 2.0 under names for what they now test: `ClearPinTest` is
+`OwnerPinRemovalTest` and `PukTest` is `OwnerUnblockTest` (D15 and D16 name
+them as they were), and the cardsim's `VersionMaskTest` is `OldCardTest`.
+
+**Rejected:** keeping 0.x and adding Foxy's fixes one by one. Two wires for one
+kind of card, from two teams, would have stayed two; and the fixes are not
+separable from the slot layout and the payment commands they change.
+
+**Cost accepted.** 0.x cards cannot be updated in place: a card is reinstalled,
+which makes a new key, so its balance is swept first (`HARDWARE_DEPLOYMENT.md`).
+Both apps drop 0.x and say "This card needs an update" to a 0.x card.
+
+**The hardware e2e tools stay 0.x.** The architect's decision 5 was to take
+Foxy's `tools/e2e-melt.cjs` and `tools/e2e-redeem.cjs` as "already on their
+wire" and delete ours. They are not on it: at `88840aa` both are byte-identical
+to ours at `7a96102`, and both drive the 0.x applet's `SPEND_PROOF` through
+cardctl's `spend`, which 2.0 removed. Neither tree has a 2.0 version. So they
+are kept as 0.x tools for the one job left for them, the sweep of the funded
+0.x field card before it is reinstalled (`HARDWARE_DEPLOYMENT.md`). Each
+refuses to run unless `CARDCTL` points at a 0.x `cardctl.py`. The 2.0 e2e is
+`tools/cardsim/e2e-swap.test.cjs`: one `SIG_ALL` signature and a swap at a real
+mint, in CI. A 2.0 hardware e2e (melt and redeem over `SPEND_ALL_*`) is not in
+this PR. It comes when a 2.0 card is on the bench.
+
+---
+
+## <a id="d19"></a>D19 — A neutral identity: AID F0 CASHUCARD, labels CashuCard/, version 2.0
+
+**Decided (ENG-673):** the package AID is `F0 43 41 53 48 55 43 41 52 44`
+("CASHUCARD" after the proprietary RID byte `F0`). Every instance AID derives
+from it as Foxy's derived from `F0 FOXYCARD`: the opener `…4D`, the card's
+applet `…01`, the tag's class `…54` (the tag is still instantiated under the
+NFC Forum's own `D2 76 00 00 85 01 01`, which phones select). Every label and
+tag that went into a hash or an owner's proof as `FoxyCard/…` is `CashuCard/…`:
+`auth`, `seal`, `pinkey`, and the owner's `change-pin`, `set-limit`,
+`set-owner`, `set-card`, `load`, `lock`, `reset` and `tag`. `SELECT` and
+`GET_INFO` answer version `02 00`.
+
+**Why a new AID and not either old one.** Our 0.x AID `D2 76 00 00 85 01 02`
+sits under the NFC Forum's RID, which is not ours to allocate under; Foxy's
+names one wallet. A proprietary `F0` AID that names the protocol belongs to
+neither. And a new AID is what makes the change safe on the wire: a 0.x or 1.x
+card does not answer it (`6A82` from a card's runtime), which is the signal both
+apps read as "this card needs an update", rather than a card that answers and
+then misreads every command.
+
+**Why the labels change with it.** An owner's proof under `FoxyCard/set-limit`
+is a proof for Foxy's cards; one protocol has one set of labels. The labels and
+the AID change in one commit so that no build ever has one without the other.
+
+**Why 2.0.** Our cards said 0.x and Foxy's 1.x. A major of 2 separates the
+shared wire from both, for a reader that checks the version after the AID.
+
+**The copy that fails silently.** `Tag.java` keeps its own copy of the card
+applet's AID for `JCSystem.getAppletShareableInterfaceObject`. Left at the old
+AID, the tag finds no card, takes itself to be on, and the owner's switch does
+nothing. `TagLookupTest` holds the copy to `applet/build.xml`, and
+`AidVersionTest` checks the build, the source and the old AIDs.
+
+**Cost accepted.** The AID is one byte longer, which moves the CAP's size; the
+size check (`tools/refcheck.py`) says whether the J3R180 has taken that size
+before. The tag still carries Foxy's address (`https://getfoxy.io/card`); which
+page a 2.0 card's tag opens is a product decision left open.
+
+---
+
+## <a id="d20"></a>D20 — The clock walk is bounded: a rollover budget, REFRESH, an armed allowance, an anchored owner
+
+**Found (Foxy's reply, question 3; our shelved 0.7 plan, its decision 9),
+fixed (ENG-673, fix 4a).** In 1.20 the day's window rolls whenever a payment
+finds the card's clock a day past the window's start, and the clock is any
+block header with the work. The network makes a real header every ten minutes,
+for free. So a terminal that has been handed the PIN, and keeps the card, takes
+a day's limit for every day of headers it brings, and a reader with no PIN at
+all takes the no-PIN allowance a day: the daily limit bounds a day, not a
+visit. And a card whose owner was set before any header ran at `now = 0` and
+spent its first day on trust.
+
+**Decided:**
+
+- **A rollover budget.** The window rolls only while the rolls since the
+  owner's last `REFRESH` are fewer than the budget; past it, the window stays
+  where it is and what was signed for in it still counts. Default 7, 1 to 30,
+  set by a thirteenth byte on the owner's `SET_LIMIT` (`34`); a form without
+  it (4, 8 or 12 bytes, and the PIN form `33`) sets the budget back to 7, as
+  the architect's decision 2 (ENG-673) has it. The first window a card begins (a limit or an
+  allowance set before any header, or an allowance set alone) is a beginning,
+  not a roll. A terminal with the PIN that walks the clock now gets the found
+  day and the budget's days, and no more until the owner's phone has seen the
+  card: with a budget of 2, three limits along ten real headers
+  (`ClockWalkTest`), where 1.20 gave eleven.
+- **REFRESH (`53`).** The owner's proof, under `CashuCard/refresh`, over a
+  block header; the header is held to every check `SET_HEADER` makes, taken as
+  `SET_HEADER` takes it (an older one moves nothing), and the rolls go to 0, in
+  one transaction. The owner's phone sends it with the tip whenever it is
+  online. No PIN; any funds; a locked card too, since a locked card still pays.
+  `53` was free at `88840aa`; Foxy signs off on the number in the PR.
+- **The allowance renews only when armed.** At a roll the no-PIN count goes to
+  nothing only if a PIN (`VERIFY_PIN`) or an owner's proof has been given since
+  it last did, and the roll spends the arming. A reader with no PIN gets one
+  allowance per arming, not one a day.
+- **The anchor.** `SET_OWNER` may carry a block header after the key (65 + 80
+  bytes). It is checked before anything is written (`6A93` refuses the owner
+  as well) and taken in the owner's transaction, with the rolls at 0. A card
+  set up so never runs at `now = 0`, never spends a first day on trust, and its
+  clock never goes back past its owner's header. Without the header
+  `SET_OWNER` is 1.20's: the wire Foxy's wallet already writes.
+
+**Where it is kept.** Three bytes of the 29 the record left as zeros after the
+last header's hash (`CARD_ROLLS_OFFSET` 156, `CARD_BUDGET_OFFSET` 157,
+`CARD_ARMED_OFFSET` 158), so the constructor asks for nothing more (the chip's
+install limit, [D17](#d17)), `RESET_CARD` clears them with the rest, a card's
+transactions cover them, and `GET_CARD` shows them to any reader as its bytes
+76, 77 and 78 (a budget of 0 there is the default, 7). `GET_INFO` is unchanged.
+
+**Rejected:** counting rolls against the clock's own movement (a terminal
+moves the clock); a roll per owner's proof of any kind (a proof for the load
+grant is given at a till's top-up, which is not the owner looking at the card);
+leaving the budget as it is when the byte is absent. That was this PR's first
+version, so that a wallet that does not send the byte would not undo the
+owner's choice; the architect's decision 2 had already settled "absent means
+7", and both apps code to it. Under it every `SET_LIMIT` says what the budget
+is afterwards, and the cost is the one below.
+
+**Cost accepted.** A holder who is offline for longer than the budget, and
+pays every day, finds the day's limit stops renewing; the app tells them to
+open it online and tap the card. `REFRESH` and the anchor need the phone to
+have a recent header (both apps: mempool.space, then blockstream.info; neither
+reachable, no header and the card keeps its clock). A 1.x wallet never
+sends a `SET_LIMIT` to a 2.0 card, because it does not find the 2.0 AID
+([D19](#d19)). The wallet this rule reaches is one moved to the CashuCard AID
+and labels that does not send the budget byte yet, which is the state Foxy's
+wallet passes through on its way to 2.0. Each 4-, 8- or 12-byte `SET_LIMIT`
+it sends puts the budget back to 7, in both directions:
+
+- an owner's budget of 1 to 6 is loosened to 7, so a terminal with the PIN
+  gets more days' limits out of a walk until a phone that sends the byte sets
+  it again (`ClockWalkTest.aFormWithoutTheByteSetsTheBudgetBackToSeven`);
+- an owner's budget of 8 to 30 is tightened to 7, so a holder the owner gave
+  a longer budget because they are offline for weeks finds the day's limit
+  stops renewing after a week, not a month, and has to come online and tap
+  the card sooner (`ClockWalkTest.aFormWithoutTheByteTightensABudgetOfThirtyToSeven`).
+
+The second takes spending away from a holder. Foxy reviews both in the PR.
+
+**And a new way to strand funds.** In 1.20 a holder who had lost the owner
+key could still spend the card down, one daily limit a day; our reply to
+Foxy (question 3, "Losing the owner's words") relied on that. In 2.0 only
+the owner's proof refills the budget (`REFRESH`, or an anchored `SET_OWNER`,
+which also needs the old owner's proof), and nothing else lifts the limit
+(the owner's `SET_LIMIT`) or empties the card (`RESET_CARD`). So on a card
+with a daily limit and no owner key, the window stops rolling after the
+budget's rolls and stays where it is: what can still be paid is about
+(budget + 1) daily limits after the owner's last proof, and anything above
+that is stuck for good (`ClockWalkTest.aPinScriptGetsTheBudgetAndNoMore`
+shows the stop: 3 of 12 pieces with a budget of 2). A card with no daily
+limit is not affected. The architect's decision 14 falls back to a random
+per-card owner key kept only in the phone's Keychain when a user has no
+backed-up seed, so a lost or wiped phone is enough to cause this.
+flash-mobile's "This card's owner key lives only on this phone" copy has to
+say so, and an owner who cannot back the key up should be steered to no
+daily limit or a small balance (SECURITY-MODEL #14, #17).
+
+---
+
+## <a id="d21"></a>D21 — The field multiply does the same work for every input
+
+**Decided (ENG-673):** `SchnorrHW.mul256x256` and `mulByDelta` have no branch
+and no loop whose length depends on a byte of an operand. The `if (ai == 0)
+continue;` that skipped a row of zeros is gone from both, and so is the
+`while (carry != 0 …)` that carried a row's overflow upward: the carry is
+written into its column, which no earlier row has touched (rows run from the
+low byte up; row `i` of the full product writes columns `i+1 … i+32`, and of
+the product by DELTA columns `i+16 … i+32`), so the carry, at most 255, is the
+whole of that column. The result is the same number; `SchnorrHWMathTest` holds
+both products to `BigInteger` on operands full of zero bytes, and scans the two
+bodies for `continue`, `if`, `while`, `break`, `return` and `?`.
+
+**Why it matters here.** The operands of these products are the signing nonce
+and the card key. A row skipped for a zero byte makes a signature measurably
+faster for some nonces, and leaked nonce bytes are how ECDSA and Schnorr keys
+are recovered with lattices. `AUTH` signs for any reader, with no PIN, as often
+as it is asked: an unlimited supply of timed signatures. The 0.x applet had
+the same early exit; it was never measured on silicon (SECURITY-MODEL, open
+item 5).
+
+**Cost accepted.** A zero row now costs what any row costs, about one row in
+256 on random input; the carry write is cheaper than the loop it replaces.
+Re-measure `cardctl --timing` on the J3R180 before release. What this does not
+reach: the modular reductions on the same signing path, which still branch on
+values derived from the key and the nonce (`reduce512toModN` over e·d,
+`addModN` over k + e·d, `reduceModN` over k, the `sub32` and `cmp32` they
+call, and `mulSmallByDelta`'s overflow check; listed as open in SECURITY-MODEL item 5, and held to the source by
+`SchnorrHWMathTest`): so the signing path as a whole is not free of
+secret-dependent branches, and nothing in 2.0 says it is; the chip's own
+`KeyAgreement` and RSA engines, which do the point multiply and the field
+exponentiations, and whose timing is NXP's; and the JavaCard VM's own timing
+of a multiply, which is not specified constant.
+
+---
+
+## <a id="d22"></a>D22 — The PIN's state byte is its commit: a torn CHANGE_PIN stays blocked
+
+**Found (reply notes to Foxy), verified in 1.20, fixed (ENG-673, fix 4c).**
+`CHANGE_PIN` writes the new PIN (`OwnerPIN.update`, which also refills the
+tries) and then `pinState = 1`. On a blocked card, a tear between the two left
+`pinState` 2 over a new PIN with three tries. `VERIFY_PIN` keyed on the counter
+alone, so the new PIN verified; the payment gate keyed on the verified flag and
+opened, while the load gate keyed on `pinState == 1` and refused. A card that
+`GET_INFO` called blocked paid, and could not be loaded.
+
+**Decided:** `pinState` is the PIN's commit byte, as a slot's status byte is
+the slot's ([D14](#d14)). It is written last, and every PIN gate reads it:
+`VERIFY_PIN` answers `6983` for state 2 before it checks anything (costing no
+try), `requirePinIfSet` refuses state 2 even under a verified flag, and a
+blocked card has no no-PIN allowance (`needsAllowance`). A card torn there is
+blocked until the owner's `CHANGE_PIN` is sent again, which is what the owner's
+phone does for a card that answers blocked. `SET_PIN` keeps the same order, for
+an open card torn while being unblocked.
+
+**And a transaction around both writes.** Java Card 3.0.5 does not say that
+`OwnerPIN.update` takes part in a transaction (its try counter and validated
+flag are specified not to), so the transaction may roll back only the state
+byte. Nothing relies on it: the commit byte is the fix, and the transaction is
+for a chip whose `OwnerPIN` does take part.
+
+**The same rule, the other tear.** A failed check whose counter decrement
+landed and whose `pinState = 2` did not (`failPinCheck` torn) leaves state 1
+over no tries. `VERIFY_PIN` already answered `6983` on the counter; the
+allowance now refuses it too, so a card blocked by its counter pays nothing
+without the PIN. (Found in the tear review, [D23](#d23).)
+
+**Tested** by setting the torn states directly (`ChangePinTearTest`, the
+ExposedRuntime pattern of `SlotWriteOrderTest`) and by source scans of the
+order; jCardSim cannot tear a write and its transactions do not roll back.
+
+---
+
+## <a id="d23"></a>D23 — The tear review of 2.0: every write outside a transaction, site by site
+
+**Decided (ENG-673, fix 4d):** every persistent write in `CashuApplet` that is
+not inside a `JCSystem` transaction was listed and reviewed against the
+[D14](#d14) rule: a multi-field write commits a single byte last, or is one
+transaction. The list is pinned by `SlotWriteOrderTest.everyWriteOutsideATransactionIsReviewed`,
+which counts such writes per method and fails on any method that gains one
+until it is reviewed here. One violation was found, and fixed in
+[D22](#d22); the rest hold, for these reasons:
+
+| Site | Writes outside | Why a tear there is safe |
+|---|---|---|
+| `loadOne` | the proof record, the hex text, the data, the status byte, then `changeDue` | Status byte last ([D14](#d14), [D17](#d17)): a tear leaves an EMPTY place, which nothing serves. `changeDue` is cleared after the commit: a tear leaves the change grant standing for one more tap, which opens loading only, never a payment (tested). |
+| `freeSpent` | the data zeroed, then the status byte | D14: a tear leaves a SPENT place, never counted or signed for; the next `CLEAR_SPENT` finishes it. |
+| `processSpendAllSign` | `burnList` | Written before the payment's transaction and read only while `burnPending` is set, which that transaction sets. A tear before it has burned nothing. |
+| `finishBurn` | each place's status byte | After the payment's commit: idempotent (a byte written twice is the same byte), redone from the top at the next command, and `burnPending` is cleared in a transaction of its own after them. |
+| `processSpendAllChange`, `blindChange` | an EMPTY opening's amount, keyset, date, nonce and `r`, then `openState` DRAFT | The state byte is the opening's commit: a torn opening stays EMPTY, which `GET_CHANGE` never serves, and the next change writes it whole (tested). |
+| `processSpendAllBegin`, `processGetChange`, `clearOpening` | one state byte per opening | Single bytes, each atomic; a draft let go or a pending opening released is the same state at the next pass. |
+| `failPinCheck` | `pinState` 2 | One byte, after the JCRE's own decrement of the counter. Torn between them, the card is state 1 over no tries: `VERIFY_PIN` and, since D22, the allowance read that as blocked. |
+| `processSetPin` | the allowance and its count zeroed | On a card with no PIN, before the PIN's transaction: each copy atomic, and a card with no PIN has no allowance to lose. |
+| `processResetCard` | the bulk wipes and the new keys | Then who the card is, in one transaction, last (Foxy's design): torn before it, the card is still its owner's, empty, and the owner resets it again. The wipe takes the rollover bytes ([D20](#d20)) with it. |
+| `processLockCard`, `processSetTag`, `armAllowance` | one byte | Atomic. |
+| `writeHeader`, `logEntry` | several | Helpers: every caller holds a transaction around them (pinned in `CashuAppletTest`). |
+| `initCardKeypair`, `initPinKey` | the key pairs | Install time: no card exists until `install` returns. |
+
+**What a scan cannot see.** The review is of the source. jCardSim cannot tear a
+write, and no 2.0 card has been pulled away mid-command on purpose; the states
+a tear leaves are set by hand in the tests and shown harmless, as in D14.
+
+---
+
+## <a id="d24"></a>D24 — FLOOR_BITS is a quarter of the work of the newest header in the vectors
+
+**Decided (ENG-673):** `FLOOR_BITS`, the least work any block header must
+show before a card that has taken none believes it, is four times the target
+(a quarter of the work) of the newest mainnet header in
+`spec/vectors/headers.json`. For 2.0 that header is height 971,100 (bits
+`0x17021EF0`), and the floor is `0x17087BC0`: the same as Foxy's 1.15 value,
+because the network's difficulty had not moved by a retarget's worth between
+the two. `FloorBitsTest` works the floor out from the vectors and holds the
+applet to it.
+
+**The procedure, at each release** (v2.0.0 included): add the tip's header to
+`spec/vectors/headers.json` (taken from a block explorer and checked: its hash
+is the double SHA-256 of its 80 bytes), run `FloorBitsTest`, and set
+`FLOOR_BITS` to what it asks for. A floor from the release's own time means a
+card set up years later starts from its own era, and the ratchet (a quarter of
+the hardest header taken) carries it from there.
+
+**Why a quarter, and not the network's own target.** A header at the tip's
+difficulty must always pass, and the difficulty moves by up to four times a
+retarget; a quarter of the work leaves room for the network to fall and still
+costs a forger a quarter of a block's work (about 2^77 hashes) per day it buys.
+
+---
 
 Small changes: open a PR and reference the decision id (e.g. "revisits D5").
 

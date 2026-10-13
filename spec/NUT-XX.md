@@ -2,540 +2,227 @@
 
 `optional`
 
-`depends on: NUT-00, NUT-01, NUT-03, NUT-04, NUT-05, NUT-10, NUT-11`
+`depends on: NUT-00, NUT-01, NUT-02, NUT-03, NUT-07, NUT-09, NUT-10, NUT-11, NUT-12`
 
-> **Status: Draft** — Reference implementation at [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard). Open for community review.
-
----
-
-This NUT defines a protocol for storing and spending Cashu `Proof`s on physical NFC cards, enabling offline point-of-sale payments without a persistent internet connection at the time of payment.
-
-Two card profiles are defined to accommodate different chip capabilities and deployment contexts:
-
-- **Profile B** — Bearer (offline): on-card proof storage, hardware secp256k1 signing, internet-optional
-- **Profile A** — Reference (online): server-side balance, hardware AES authentication, BoltCard-compatible *(informal — community contributions welcome)*
-- **Profile B+** — Bearer with PIN-gated spending: Profile B variant with optional PIN enforcement on `SPEND_PROOF`
-
-This document fully specifies **Profile B** and briefly describes Profile B+ as a variant. Profile A is referenced informally.
+> **Status: Draft, protocol 2.0** — Reference implementation at
+> [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard), shared with
+> the Foxy wallet project ([getfoxy/card](https://github.com/getfoxy/card)). Not yet
+> submitted to cashubtc/nuts. The byte-level wire is [`APDU.md`](APDU.md); this
+> document says what the bytes mean to a wallet and a mint.
 
 ---
 
-## Motivation
+This NUT defines how Cashu `Proof`s are held and spent by a smart card over NFC,
+so that a card can pay a till that is offline at the moment of payment and the
+card's holder never types a seed or carries a phone.
 
-Cashu ecash tokens are bearer instruments that can be transferred off-chain and offline between parties as byte strings. NFC cards provide a hardware-backed, user-friendly form factor for Cashu: the card stores proofs in tamper-resistant memory and authorizes their spending via an on-chip secp256k1 key, never exposing the private key to the reader.
+A card holds pieces (proofs) locked to a secp256k1 key it made itself and never
+exports (NUT-11 P2PK). It pays by signing a swap for the pieces it is asked to
+spend, burning each one as it signs, with one signature for the whole payment
+(NUT-11 `SIG_ALL`), and makes its own change. It keeps the mint's DLEQ proof
+(NUT-12) beside each piece for whoever reads the card to check. An owner key,
+held by the holder's phone, administers the card; a daily limit, kept against a
+clock taken from Bitcoin block headers, bounds what a terminal that has been
+handed the PIN can take.
 
-This enables:
-
-- **Offline point-of-sale payments** in markets with intermittent connectivity
-- **Physical bearer instruments** with the usability of a debit card and the privacy of cash
-- **Hardware-enforced single-spend** — a proof marked as spent by the card cannot be unmarked, even by an attacker with the card in hand
+Protocol 2.0 replaces the draft's 0.x profiles (a reader-supplied message to
+sign, a `SIGN_ARBITRARY` command, no owner, no limits), whose weaknesses are
+listed in [`docs/FOR-LNFLASH.md`](../docs/FOR-LNFLASH.md) section 3.
 
 ---
 
 ## Definitions
 
-- **Card**: An ISO 14443-4 compliant NFC device running the Cashu card applet (AID: `D2 76 00 00 85 01 02`)
-- **Card pubkey** (`P_card`): A secp256k1 public key generated on-device at install time; the corresponding private key never leaves the device
-- **Card proof**: A Cashu `Proof` whose `secret` is a NUT-10 `Secret` of kind `P2PK` with `data = hex(P_card)`
-- **Reader**: Any NFC-capable application (POS terminal, mobile wallet) that communicates with the card via ISO 7816-4 APDUs
-- **Provisioner**: The entity responsible for loading proofs onto the card (typically a POS terminal or wallet connected to the mint)
+- **Card**: an ISO 14443-4 NFC device running the applet, selected by the AID
+  `F0 43 41 53 48 55 43 41 52 44` ("CASHUCARD" after the proprietary RID byte
+  `F0`), version `02 00`.
+- **Card key** (`P_card`): a secp256k1 key pair made on the card at install. The
+  private half never leaves it. `GET_PUBKEY` answers the public half, compressed.
+- **Card piece**: a Cashu `Proof` whose `secret` is the NUT-10 P2PK secret below,
+  with `data = hex(P_card)` and the `SIG_ALL` flag.
+- **Owner key** (`P_owner`): a NIST P-256 key whose private half lives on the
+  holder's phone. It signs the owner's commands; it can never spend.
+- **Reader**: a till or a wallet speaking ISO 7816-4 APDUs to the card.
 
 ---
 
-## Profile A — Reference (Online)
+## The card piece
 
-| Property | Value |
-|----------|-------|
-| Tag type | NDEF-capable NFC tag with AES-128 CMAC authentication |
-| Balance storage | Server-side (mint or backend) |
-| Authentication | Hardware AES-128 CMAC (e.g. SUN message authentication) |
-| Connectivity | Online required per payment |
-| Double-spend prevention | Server-side |
-| Reference | [cashubtc/Numo](https://github.com/cashubtc/Numo) |
+Every piece on a 2.0 card has this secret, as text, with no spaces, in this key
+order, lowercase hex, the date in decimal:
 
-Profile A is not formally specified here. The [cashubtc/Numo](https://github.com/cashubtc/Numo) project provides a working Profile A implementation for Android using NDEF tags with CMAC authentication.
+```
+["P2PK",{"nonce":"<64 hex>","data":"<66 hex P_card>","tags":[["sigflag","SIG_ALL"]]}]
+```
 
-> **Community contribution welcome**: A formal Profile A spec (AES CMAC authentication flow, server-side balance API, LNURL-withdraw compatibility) would be a valuable addition. If you are implementing Profile A and want to contribute a spec, please open a PR or discussion.
+and, for a piece with a date (a locktime and the card's refund key):
+
+```
+["P2PK",{"nonce":"<64 hex>","data":"<66 hex P_card>","tags":[["locktime","<decimal>"],["refund","<66 hex>"],["sigflag","SIG_ALL"]]}]
+```
+
+The card stores only what it cannot rebuild: the keyset id's first 8 bytes, the
+amount, the 32-byte nonce, `C` and the date (82 bytes a slot with its status:
+[`APDU.md`](APDU.md#proof-slot-layout)). It rebuilds the secret from the nonce, its
+own key and the date, so a reader cannot make it sign for any other text.
+[`vectors/secret.json`](vectors/secret.json) has slots, secrets, messages and the
+card's signatures.
+
+A wallet tops a card up with an ordinary NUT-11 locked swap to `P_card` with
+`sigflag SIG_ALL`, then writes each piece's fields to the card. A keyset id longer
+than 8 bytes (NUT-02 v1) is stored by its first 8; a reader expands it against the
+mint's keysets and refuses an ambiguous one.
 
 ---
 
-## Profile B — Bearer (Offline)
+## Paying: one signature for the payment
 
-### Card Requirements
-
-| Property | Value |
-|----------|-------|
-| Interface | ISO 14443-4 (NFC Type A/B), ISO 7816-4 APDU transport |
-| Cryptography | secp256k1 key-pair generation; BIP-340 Schnorr signing |
-| Persistent storage | ≥ 8 KB non-volatile (2,496 bytes proof storage + OS overhead) |
-| AID | `D2 76 00 00 85 01 02` |
-
-> **Note**: Any ISO 7816-4 compliant NFC device capable of secp256k1 key generation and Schnorr signing may implement Profile B. Example chips known to meet these requirements: NXP JCOP4 SmartMX3 (JavaCard 3.0.5+, CC EAL 5+). Note that the Profile B reference applet needs `ALG_EC_SVDP_DH_PLAIN_XY`, which is JavaCard 3.0.5+, so JavaCard 3.0.4 parts cannot run it.
-
-### Proof Format on Card
-
-Card proofs are Cashu `Proof`s locked with a NUT-11 P2PK spending condition to the card's public key. When loaded onto the card, they are stored in a compact binary format.
-
-**Binary proof slot (78 bytes):**
+The till names the pieces (`SPEND_ALL_BEGIN`), gives its swap outputs
+(`SPEND_ALL_OUTPUTS`), asks the card for its change (`SPEND_ALL_CHANGE`), and asks
+for the signature (`SPEND_ALL_SIGN`). The card signs, with BIP-340, the SHA-256 of
+the NUT-11 `SIG_ALL` message:
 
 ```
-Offset  Len  Field        Description
-------  ---  -----        -----------
-0       1    status       0x00=empty, 0x01=unspent, 0x02=spent
-1       8    keyset_id    Binary keyset ID (8 bytes = 16 hex chars of NUT-01 keyset ID)
-9       4    amount       Big-endian uint32, in keyset's base unit (sats or cents)
-13      32   nonce        The 32-byte random nonce from the P2PK Secret
-45      33   C            Compressed secp256k1 mint signature point
+msg = secret_0 ‖ C_0 ‖ … ‖ secret_n ‖ C_n ‖ amount_0 ‖ B_0 ‖ … ‖ amount_m ‖ B_m
 ```
 
-**Maximum slots**: 32 (configurable at install time, limited by available EEPROM)
+each secret as its text, each `C` and `B_` in hex, each amount in decimal, inputs
+in the order named and outputs in the order given (the card's own change after the
+till's). The card burns every piece named in the commit that releases the
+signature; a card lifted while it signs has burned nothing. The till swaps at the
+mint with every input carrying the one witness, and only then says paid.
 
-**Reconstructing the full Proof from card storage:**
+**The card's own change.** For `SPEND_ALL_CHANGE` the card makes an output locked
+to its own key (a fresh nonce, the payment's date and refund key, `SIG_ALL`),
+hashes it to the curve (NUT-00) and blinds it with a fresh `r`, and keeps the
+opening (amount, keyset, date, nonce, `r`) until the piece is back on the card.
+Whoever finishes the change (the till in the same or the next tap, or the owner's
+phone later from `GET_CHANGE`, NUT-09 restore) unblinds the mint's signature and
+loads the piece. Nothing a till names can take that change: it is locked to the
+card.
 
-Given the stored fields and the card's public key (`P_card` from `GET_PUBKEY`), a reader reconstructs the full `Proof` as follows:
-
-```python
-# Reconstruct Proof.secret (NUT-10 well-known secret of kind P2PK)
-secret = json.dumps([
-    "P2PK",
-    {
-        "nonce": nonce.hex(),
-        "data": P_card.compressed_hex(),
-        "tags": [["sigflag", "SIG_INPUTS"]]
-    }
-], separators=(",", ":"))
-
-# Reconstruct Proof
-proof = {
-    "id":     keyset_id.hex(),
-    "amount": amount,
-    "secret": secret,
-    "C":      C.compressed_hex()
-}
-```
-
-The `secret` JSON MUST be serialized **without spaces** and with keys in the order shown above to ensure a consistent serialization for signing.
-
-### Concrete Example
-
-Given:
-- Card pubkey (`P_card`): `02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2`
-- Nonce (`x`): `916c21b8c67da71e9d02f4e3adc6f30700c152e01a07ae30e3bcc6b55b0c9e5e`
-- Keyset ID: `0059534ce0bfa19a` (8 bytes binary: `00 59 53 4c e0 bf a1 9a`)
-- Amount: `8` sats
-- Mint signature (`C`): `024a43eddcf0e42dad32ca5c0e82e51d7a38e7a48b80e89d2e17cc94abb02c04c3`
-
-The reconstructed `Proof.secret` is the following string (key order and no spaces are mandatory):
-
-```
-["P2PK",{"nonce":"916c21b8c67da71e9d02f4e3adc6f30700c152e01a07ae30e3bcc6b55b0c9e5e","data":"02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2","tags":[["sigflag","SIG_INPUTS"]]}]
-```
-
-The message sent to `SPEND_PROOF` is:
-
-```
-msg = SHA256("["P2PK",{"nonce":"916c21b8c67da71e9d02f4e3adc6f30700c152e01a07ae30e3bcc6b55b0c9e5e","data":"02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2","tags":[["sigflag","SIG_INPUTS"]]}]")
-    = SHA256(UTF8(Proof.secret))
-```
-
-After calling `SPEND_PROOF`, the reader assembles the full proof for mint redemption:
-
-```json
-{
-  "id": "0059534ce0bfa19a",
-  "amount": 8,
-  "secret": "[\"P2PK\",{\"nonce\":\"916c21b8c67da71e9d02f4e3adc6f30700c152e01a07ae30e3bcc6b55b0c9e5e\",\"data\":\"02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2\",\"tags\":[[\"sigflag\",\"SIG_INPUTS\"]]}]",
-  "C": "024a43eddcf0e42dad32ca5c0e82e51d7a38e7a48b80e89d2e17cc94abb02c04c3",
-  "witness": "{\"signatures\":[\"<64-byte Schnorr signature from card hex-encoded>\"]}"
-}
-```
+**What a till must check before it signs anything off.** The secrets it rebuilds
+are format-4; the pieces' keyset is a keyset of the mint it will swap at; and,
+offline, each piece's DLEQ proof (below). A till that cannot reach the mint
+accepts the risk of a piece already spent elsewhere (offline double spend: this
+NUT does not prevent it).
 
 ---
 
-## Card Provisioning
+## The mint's proof on the card (NUT-12)
 
-Provisioning loads signed Cashu proofs onto the card. Proofs MUST be locked to the card's public key using NUT-11 P2PK spending conditions before loading.
-
-### Step 1 — Discover Card Pubkey
-
-```
-Reader  -->  Card: SELECT APPLICATION (AID: D2 76 00 00 85 01 02)
-Reader  -->  Card: GET_PUBKEY (INS: 0x10)
-Card    -->  Reader: P_card (33-byte compressed secp256k1 public key)
-```
-
-### Step 2 — Mint Locked Proofs
-
-The reader (or a connected backend) requests proofs from the mint that are locked to `P_card`:
-
-**Blind message construction (NUT-03):**
-
-For each desired denomination, generate a nonce `x` (32 random bytes) and construct the P2PK secret:
-
-```json
-["P2PK", {
-  "nonce": "<hex(x)>",
-  "data": "<hex(P_card)>",
-  "tags": [["sigflag", "SIG_INPUTS"]]
-}]
-```
-
-Serialize this JSON (no spaces) and use it as the secret for blind signature request per NUT-03/NUT-04.
-
-**Denomination selection**: Proofs SHOULD follow standard Cashu power-of-2 denominations to enable exact-amount payment selection. The provisioner splits the desired total into an optimal denomination set.
-
-### Step 3 — Write Proofs to Card
-
-For each proof received from the mint, write it to the card:
-
-```
-Reader  -->  Card: VERIFY_PIN (if PIN is set; required for LOAD_PROOF)
-Reader  -->  Card: CLEAR_SPENT (reclaim any spent slots)
-Reader  -->  Card: LOAD_PROOF [keyset_id(8) || amount(4) || nonce(32) || C(33)]
-Card    -->  Reader: slot_index (1 byte)
-```
-
-Repeat `LOAD_PROOF` for each proof. After all proofs are loaded, verify:
-
-```
-Reader  -->  Card: GET_BALANCE
-Card    -->  Reader: total unspent balance (uint32)
-```
+A wallet that loads a piece with its DLEQ proof (`e`, `s` and the blinding factor
+`r`: 96 bytes) gives it to the card with the piece (`LOAD_PROOF` P1 = 1). The card
+keeps it and hands it back for any unspent piece (`GET_DLEQ`), and never checks it.
+A reader rebuilds the secret, `Y = hash_to_curve(secret)`, `C' = C + r·K` and
+`B' = Y + r·G`, and checks NUT-12's equation with the mint's key `K` for the
+amount. A piece that passes was signed by the mint; a piece the card was given
+by a terminal with a made-up `C` does not. It does not show that a real piece is
+unspent.
 
 ---
 
-## Payment Flow
+## The owner
 
-### Offline Payment
-
-Payment requires no internet connection at the time of the transaction. The merchant stores the signed proofs locally and redeems them when connectivity is available.
+A card with an owner is its owner's, empty or not. The owner's commands carry an
+ECDSA signature (P-256, SHA-256, DER) by `P_owner` over
 
 ```
-Step 1: Tap
-
-  Customer taps card at merchant terminal.
-
-Step 2: Enumerate available proofs
-
-  Reader --> Card: GET_BALANCE
-  Reader <-- Card: balance (uint32)
-
-  if balance < payment_amount:
-      abort: "Insufficient balance"
-
-  Reader --> Card: GET_SLOT_STATUS
-  Reader <-- Card: 32-byte array (one status byte per slot)
-
-Step 3: Select proofs
-
-  Reader reads unspent proofs to find a subset summing to >= payment_amount.
-  Prefer exact match; otherwise select minimum overpayment.
-
-  For each candidate slot idx:
-      Reader --> Card: GET_PROOF (P1=idx)
-      Reader <-- Card: proof data (78 bytes)
-      Reconstruct full Proof from stored data + P_card (see above)
-
-Step 4: Spend proofs (ATOMIC PER PROOF)
-
-  For each selected proof at slot idx:
-      msg = SHA256(UTF8(proof.secret))   # 32-byte message to sign
-      Reader --> Card: SPEND_PROOF (P1=idx, Data=msg[32])
-      Card: marks slot as STATUS_SPENT (IRREVERSIBLE)
-      Card: signs msg with card private key (Schnorr)
-      Reader <-- Card: signature (64 bytes: R_x[32] || s[32])
-
-      Attach signature to proof:
-          proof.witness = {"signatures": [signature.hex()]}
-
-Step 5: Confirm to customer
-
-  Reader displays: "Payment accepted — X sats"
-  (No internet required at this point)
-
-Step 6: Settle (online, deferred)
-
-  When connectivity is available, merchant redeems proofs with mint:
-      POST /v1/melt (NUT-05) with the collected proofs
-  OR
-      POST /v1/swap (NUT-03) to exchange for fresh proofs
+label ‖ nonce (16, from GET_NONCE, one try) ‖ value
 ```
 
-### Signature Verification
+with a label of each command: `CashuCard/change-pin`, `CashuCard/set-limit`,
+`CashuCard/set-owner`, `CashuCard/set-card`, `CashuCard/load`, `CashuCard/lock`,
+`CashuCard/reset`, `CashuCard/tag`, `CashuCard/refresh`
+([`APDU.md`](APDU.md#the-owners-proof)). A phone derives a card's owner key from
+its wallet seed:
 
-The NUT-11 P2PK signature produced in Step 4 can be verified by the mint during redemption. Verification follows standard NUT-11 rules:
+```
+d = HMAC-SHA256(key = seed, message = "CashuCard/owner" ‖ 0x00 ‖ P_card (33)) mod n
+```
 
-1. Parse `Proof.secret` as a NUT-10 `Secret` of kind `P2PK`
-2. Extract the signing public key from `Secret.data` (`P_card`)
-3. Verify the Schnorr signature in `Proof.witness.signatures[0]` on `SHA256(UTF8(Proof.secret))` with `P_card`
+re-made with a counter byte appended while `d = 0`. Restoring the seed restores
+ownership of every card. [`vectors/owner.json`](vectors/owner.json) has proofs for
+every label.
 
-The mint enforces this condition when `SIG_INPUTS` is set, ensuring only the card can authorize spending.
-
-### Offline Proof Validity Check
-
-A merchant may optionally verify proof validity offline without contacting the mint, using the mint's published public keys (NUT-01):
-
-1. Retrieve the mint keyset for `Proof.id` (cached from a prior online session)
-2. Verify the mint signature: `C == k_amount * hash_to_curve(Proof.secret)` where `k_amount` is the mint's public key for the proof's amount
-3. Verify the P2PK signature (see above)
-
-This offline check provides strong assurance that the proof was legitimately issued by the mint and authorized by this specific card. It does not prevent double-spend from a cloned card.
+A card is set up in one tap, owner last: `SET_PIN` (or none), `SET_CARD` (the
+mint), then `SET_OWNER` carrying the tip block header as its anchor. An unowned
+empty card is open to the first phone that sets it up.
 
 ---
 
-## Denomination Handling and Change
+## The clock and the limits
 
-### Proof Selection
+A card's clock is the time in the newest Bitcoin block header it has been shown,
+believed for its proof of work and only moving forward. A header must meet its own
+target, a floor built into the applet (a quarter of the network's work at the
+newest header in [`vectors/headers.json`](vectors/headers.json)), and a quarter of
+the hardest header the card has taken. A forger must spend a quarter of a block's
+work for every day it buys.
 
-To pay exactly `amount` sats, the reader selects a minimal subset of unspent proofs whose sum equals `amount`. If no exact match is possible, the reader selects proofs summing to the smallest value greater than `amount`.
+The owner sets, all off on a new card:
 
-**Overpayment**: If selected proofs sum to more than `amount`, the excess is merchant income. Cards SHOULD be pre-loaded with power-of-2 denominations (1, 2, 4, 8, 16, ...) to minimize overpayment.
+- a **daily limit**: what may leave the card in one day's window (86,400 seconds of
+  the card's clock), counting the pieces less the card's own change;
+- a **limit on one payment**: past it a payment waits, by the card's own work;
+- a **no-PIN allowance**: what a card with a PIN signs for in the window without it.
 
-**Change to card**: Returning change to the card is NOT performed during the offline payment step. Change may optionally be credited to the card in a subsequent online provisioning session (i.e., the merchant's backend creates new proofs for the change amount and loads them onto the card during the next tap).
-
----
-
-## APDU Interface
-
-Card communication uses ISO 7816-4 APDUs. All commands use `CLA = B0`.
-
-### Required Commands
-
-| INS | Name | Description |
-|-----|------|-------------|
-| 0x10 | `GET_PUBKEY` | Returns 33-byte compressed card public key |
-| 0x11 | `GET_BALANCE` | Returns uint32 sum of unspent proof amounts |
-| 0x13 | `GET_PROOF` | Returns 78-byte proof slot data at given index |
-| 0x14 | `GET_SLOT_STATUS` | Returns 32-byte status array (one byte per slot) |
-| 0x20 | `SPEND_PROOF` | Marks proof spent and returns 64-byte Schnorr signature |
-| 0x30 | `LOAD_PROOF` | Writes a proof into the next empty slot |
-
-See [`APDU.md`](APDU.md) for complete command reference including optional commands.
-
-### SELECT Response
-
-Upon successful SELECT, the card returns a 2-byte version indicator:
-
-```
-[major_version (1 byte)] [minor_version (1 byte)]
-```
-
-### SPEND_PROOF — Message Construction
-
-The 32-byte message sent to `SPEND_PROOF` MUST be:
-
-```
-msg = SHA256(UTF8(Proof.secret))
-```
-
-where `Proof.secret` is the serialized P2PK secret string (no spaces, deterministic key order).
-
-### SPEND_PROOF — Signature Format
-
-The 64-byte response is a [BIP-340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) Schnorr signature:
-
-```
-[R_x (32 bytes)] [s (32 bytes)]
-```
-
-Signing algorithm (BIP-340 default signing):
-
-1. Let `d` = card private key scalar; `P` = `d * G`
-2. If `P.y` is odd, let `d' = n - d`, else `d' = d`
-3. Let `a` = 32 bytes of fresh randomness from the card's secure RNG
-4. Let `t = d' XOR tagged_hash("BIP0340/aux", a)`
-5. Let `k` = `tagged_hash("BIP0340/nonce", t || bytes(P.x) || msg) mod n`
-6. Let `R = k * G`; if `R.y` is odd, let `k = n - k`
-7. Let `e = tagged_hash("BIP0340/challenge", bytes(R.x) || bytes(P.x) || msg) mod n`
-8. Let `s = (k + e * d') mod n`
-9. Return `bytes(R.x) || bytes(s)`
-
-where `tagged_hash(tag, msg) = SHA256(SHA256(tag) || SHA256(tag) || msg)`.
-
-Steps 3–4 are BIP-340's auxiliary randomness, and they are **required**, not
-optional. A bearer card signs in a field the attacker controls; a nonce derived
-from `(d, msg)` alone means a fault injected between emitting `R` and folding in
-`e` yields two signatures over one `k`, from which `d = (s1 - s2)/(e1 - e2)`
-recovers the card key and every proof it holds. Signatures over the same message
-are therefore **not** reproducible, which is the intended behaviour.
-
-This is compatible with standard BIP-340 verification and NUT-11 P2PK signature verification.
+**Bounds on a walked clock (2.0).** Real headers are free, so each day's limit
+could be renewed by a terminal that keeps the card and brings a header a day. In
+2.0 the window rolls at most the owner's **rollover budget** times (default 7,
+1 to 30) between the owner's `REFRESH`es: an owner's proof over the tip header,
+sent by the holder's phone whenever it is online. The no-PIN allowance begins
+again at a roll only if a PIN or an owner's proof has armed it since it last did.
+A card whose owner was set with an anchor header never runs on an unset clock.
 
 ---
 
-## Profile B+ — Bearer with PIN-Gated Spending
+## Security considerations
 
-Profile B+ is a variant of Profile B in which `SPEND_PROOF` requires a valid PIN to have been presented in the current NFC session (via `VERIFY_PIN`) before the card will authorize a spend.
-
-This variant is suitable for higher-value cards where the issuer or user wants an additional factor beyond physical possession.
-
-**Changes from Profile B:**
-
-- `SPEND_PROOF` checks `pinVerifiedFlag` before signing; returns `6982 (SECURITY STATUS NOT SATISFIED)` if PIN not verified
-- Reader flow adds `VERIFY_PIN` step before Step 4 in the payment flow
-- Card MUST have a PIN set (`SET_PIN` called during provisioning)
-
-**Advertising Profile B+:**
-
-Cards running Profile B+ SHOULD set a capability flag in the `GET_INFO` response indicating PIN-gated spending is enforced. Readers MUST check this flag and prompt the user for their PIN before attempting `SPEND_PROOF`.
-
-**Leaving Profile B+:**
-
-A card MAY let its holder return it to Profile B. In this implementation `CLEAR_PIN (0x43)` does so (applet 0.5, [D15](../docs/DECISIONS.md#d15)): it requires the PIN to have been verified in the current session and presented again, and leaves the card with no PIN set, so `SPEND_PROOF` no longer checks `pinVerifiedFlag` and `SET_PIN` may be called again. A blocked PIN cannot be cleared. Because the profile can change between taps, readers MUST read the PIN state from `GET_INFO` on every tap rather than remembering it per card.
-
-**A blocked PIN:**
-
-A card MAY provide a PIN unblocking key. In this implementation `SET_PUK (0x44)` sets one at personalisation, once, and `UNBLOCK_PIN (0x45)` replaces the PIN — blocked or merely forgotten — on presentation of the PUK (applet 0.6, [D16](../docs/DECISIONS.md#d16)). The PUK has ten tries and is exhausted for good after them; the card never reveals it, so the personaliser records it off the card. `UNBLOCK_PIN` opens no session: the holder presents the new PIN with `VERIFY_PIN` as usual. Readers SHOULD read `GET_INFO` byte 8 to tell a blocked card that can be recovered (PUK set) from one that cannot (no PUK, or exhausted).
-
-**NUT scope:** Profile B+ is not formally specified in this NUT. Implementors are encouraged to propose a Profile B+ amendment or separate NUT once the base Profile B implementation is stable.
+- **The card signs only what it burns.** Every signature is either a payment's
+  (every piece named burned in the same commit) or `AUTH`'s (a tagged hash no
+  secret text can equal). There is no command that signs a reader's bytes.
+- **A terminal handed the PIN** takes at most the daily limit per window, the
+  rollover budget's windows between the owner's refreshes, and nothing of the
+  owner's: it cannot change the PIN, the limits, the record or the owner.
+- **A lost card is lost cash**, up to its limits for whoever learns its PIN, and up
+  to its no-PIN allowance (once per arming) for anyone.
+- **Offline double spend.** A till that accepts offline trusts that no copy of a
+  piece was spent first. The card cannot prevent a piece being spent twice by
+  someone who obtained its signature twice; it can only refuse to sign twice.
+- **Mint trust.** The mint is trusted for solvency (NUT-06 operators should
+  publish reserves).
+- **Side channels.** The two byte-array multiplies on the card's key and nonces
+  (`mul256x256`, `mulByDelta`) have no secret-dependent branch (DECISIONS D21).
+  The modular reductions on the same signing path still branch on values derived
+  from the key and the nonce (`reduce512toModN`, `addModN`, `reduceModN`, `sub32`,
+  `cmp32`); they are an open item (SECURITY-MODEL, open item 5), and no timing has
+  been measured on silicon. The chip's EC and RSA engines are the vendor's.
 
 ---
 
-## Security Model
+## Mint support
 
-### Threat: Physical card theft
-
-**Risk**: An attacker who steals the card can spend all proofs.
-
-**Mitigation**: This is equivalent risk to physical cash. Card balance should reflect the user's risk tolerance (analogous to wallet cash). Optional PIN (`VERIFY_PIN`) can be enabled for high-value cards but is NOT required for spending in the base profile (bearer semantics).
-
-### Threat: Card cloning / EEPROM extraction
-
-**Risk**: A sophisticated attacker with chip-level access and invasive probing equipment could extract proof data from EEPROM before spend.
-
-**Mitigation**:
-- Cards certified to CC EAL 5+ or higher provide hardware protection against invasive attacks
-- The card private key is generated on-device, stored in secure non-volatile memory, and never exported — cloning the EEPROM gives the attacker the proof secrets but NOT the card key. Proofs without a valid P2PK signature are rejected by the mint.
-- For high-value cards, implementors SHOULD use devices with formal tamper-resistance certification
-
-### Threat: Offline double-spend window
-
-**Risk**: Between the card being tapped and the merchant settling online, an attacker could attempt to spend the same proof at another terminal (if they have a cloned card or can intercept the settlement).
-
-**Mitigation**:
-- The card's STATUS_SPENT flag is set BEFORE the signature is returned in `SPEND_PROOF`. This is atomic and irreversible at the hardware level.
-- Mint enforces P2PK signature requirement, so a proof without the card signature is rejected
-- Merchants should set short settlement windows for high-value transactions
-
-### Threat: Malicious provisioner loading fake proofs
-
-**Risk**: A provisioner could attempt to load proofs that were not actually issued by the mint (fabricated C values).
-
-**Mitigation**: 
-- The card does not validate proofs at load time (it has no mint pubkey)
-- Proof validity is enforced by the mint at redemption time
-- Users should only provision from trusted sources (their own wallet or the Flash app)
-- PIN protection on `LOAD_PROOF` ensures only authorized provisioners can write to the card
-
-### Threat: Replay attack on SPEND_PROOF
-
-**Risk**: A reader captures a `SPEND_PROOF` signature and replays it.
-
-**Mitigation**: The signature is over `SHA256(Proof.secret)` which is unique per proof (includes the unique nonce). A replayed signature is for the same proof, which will be rejected by the mint as already seen (standard Cashu double-spend prevention).
+A mint needs NUT-10 and NUT-11 with `SIG_ALL` on swaps, and NUT-12 for the DLEQ
+proofs a card carries. Nutshell supports these; the reference implementation's
+end-to-end tests run against Nutshell 0.20.3.
 
 ---
 
-## Mint Support
+## AID assignment
 
-Mints supporting NUT-XX cards MUST:
-
-1. Support NUT-11 P2PK spending conditions (`SIG_INPUTS`)
-2. Accept P2PK-locked proofs during melt (NUT-05) and swap (NUT-03)
-3. Verify Schnorr signatures over `SHA256(UTF8(Proof.secret))`
-
-Mints SHOULD advertise NUT-XX support in their info endpoint (NUT-06):
-
-```json
-{
-  "nuts": {
-    "XX": {
-      "supported": true,
-      "profiles": ["A", "B"]
-    }
-  }
-}
-```
-
----
-
-## Wallet / POS Integration
-
-Wallets or POS applications implementing NUT-XX MUST:
-
-1. Cache the card's pubkey (`P_card`) after the first `GET_PUBKEY` call in a session
-2. Reconstruct `Proof.secret` from stored `nonce` and `P_card` before signing
-3. Compute `msg = SHA256(UTF8(Proof.secret))` before calling `SPEND_PROOF`
-4. Attach the returned signature as `proof.witness.signatures[0]` (hex-encoded)
-5. Store collected `(proof, witness)` pairs durably before confirming payment to user
-6. Settle with the mint within a reasonable time window
-
----
-
-## AID Assignment
-
-`D2 76 00 00 85 01 02`
-
-| Bytes | Meaning |
-|-------|---------|
-| `D2 76 00 00 85` | NFC Forum registered AID prefix for non-NFC Forum applications |
-| `01` | Cashu protocol identifier |
-| `02` | Profile B (Bearer) |
-
----
-
-## Open Questions
-
-The following design questions are open for community discussion:
-
-1. **Profile A formal spec**: Profile A (NTAG 424 / server-side balance) is informally referenced in this NUT. A full Profile A spec is deferred — community contributions welcome (see Profile A section above).
-
-2. **Denomination scheme**: The NUT currently recommends (SHOULD) power-of-2 denominations. Should this be stronger (MUST)? Or is denomination selection best left entirely to the provisioner?
-
-3. **Key derivation for recovery**: Should card keypairs be derivable from a BIP-39 seed for recovery? Currently, a lost or damaged card means lost funds — same as physical cash. Derivable keys would allow card replacement at the cost of requiring the user to manage a seed.
-
-4. **Multiple mints / keysets**: Should a single card support proofs from multiple mints simultaneously? The current design stores keyset IDs per proof, which technically allows it, but there is no discovery mechanism defined.
-
-5. **Proof encoding standard**: Should the compact binary slot format (78 bytes) be formalized as a CBOR or TLV encoding, or remain an opaque implementation detail of the APDU interface?
-
----
-
-## Appendix: Profile Comparison
-
-| Property | Profile A | Profile B |
-|----------|-----------|-----------|
-| Device type | NDEF tag with AES-128 CMAC | ISO 7816-4 smart card with secp256k1 |
-| Approx. cost | $0.50–1.00/card | $1.50–8.00/card |
-| Balance storage | Server-side | On-card EEPROM |
-| Internet at payment | Required | Optional (offline) |
-| EC keypair on card | No | Yes (secp256k1) |
-| Custom applet | No | Yes (open source) |
-| Double-spend prevention | Server | Hardware + Mint |
-| BoltCard compatible | Yes | No |
-| Privacy | Server knows balance | Card knows balance |
-| Recommended use | Urban / always-online | Rural / offline markets |
+`F0 43 41 53 48 55 43 41 52 44` is a proprietary AID (RID byte `F0`), naming the
+protocol and no wallet. The 0.x draft's `D2 76 00 00 85 01 02` sat under the NFC
+Forum's RID and is withdrawn. A card that does not answer the 2.0 AID is not a 2.0
+card, and a wallet treats it as one that needs an update.
 
 ---
 
 ## References
 
-- [NUT-00][00]: Notation and models
-- [NUT-01][01]: Mint public keys
-- [NUT-03][03]: Swap
-- [NUT-04][04]: Mint tokens
-- [NUT-05][05]: Melting tokens
-- [NUT-06][06]: Mint info
-- [NUT-10][10]: Spending conditions
-- [NUT-11][11]: Pay to Public Key (P2PK)
-- [cashubtc/Numo](https://github.com/cashubtc/Numo): Android Cashu NFC POS (Profile A reference)
-- [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard): Profile B reference implementation
-- [NXP JCOP4 SmartMX3 (JavaCard 3.0.5+)](https://www.nxp.com/products/security-and-authentication/secure-service-2go/jcop-4): Example Profile B chip (CC EAL 5+). `ALG_EC_SVDP_DH_PLAIN_XY` is 3.0.5+, so 3.0.4 parts cannot run this applet
-- [BIP-340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki): Schnorr signatures
-
-[00]: https://github.com/cashubtc/nuts/blob/main/00.md
-[01]: https://github.com/cashubtc/nuts/blob/main/01.md
-[03]: https://github.com/cashubtc/nuts/blob/main/03.md
-[04]: https://github.com/cashubtc/nuts/blob/main/04.md
-[05]: https://github.com/cashubtc/nuts/blob/main/05.md
-[06]: https://github.com/cashubtc/nuts/blob/main/06.md
-[10]: https://github.com/cashubtc/nuts/blob/main/10.md
-[11]: https://github.com/cashubtc/nuts/blob/main/11.md
+- [`APDU.md`](APDU.md): every command, byte for byte.
+- [`docs/FOXY-CARD-SPEC.md`](../docs/FOXY-CARD-SPEC.md) and
+  [`docs/FOXY-CARD-DAILY-LIMIT.md`](../docs/FOXY-CARD-DAILY-LIMIT.md): the design.
+- [`docs/DECISIONS.md`](../docs/DECISIONS.md) D18 to D24: what 2.0 changed and why.
+- [`docs/SECURITY-MODEL.md`](../docs/SECURITY-MODEL.md): threats and what is untested.
+- NUT-10, NUT-11 (P2PK, `SIG_ALL`), NUT-12 (DLEQ), NUT-09 (restore).

@@ -5,20 +5,34 @@ for **offline NFC bearer payments** — a physical card that holds Bitcoin-
 denominated ecash on its own chip and spends it by tapping, with no phone, no
 account, and no internet at the point of sale.
 
-Reference implementation of **NUT-XX: Cashu NFC Card Protocol**, Profile B
-(Bearer/Offline).
+This is the **shared Cashu card protocol, version 2.0**: one wire for Flash and
+for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
+of **NUT-XX: Cashu NFC Card Protocol** ([`spec/NUT-XX.md`](spec/NUT-XX.md)).
 
-> ### Status: hardware-proven, single-card R&D
+> ### Credit
 >
-> The applet has run on physical silicon end to end: selftest 10/10, and the
-> full money loop — fund → load → tap-to-spend on an iPhone → NUT-03
-> settlement at the mint → NUT-05 Lightning melt — executed on an NXP JCOP4
-> J3R180 against `forge.flashapp.me`. The merchant terminal
-> (`flash-pos`) carries the same protocol and has spent a real card over NFC.
-> See the [hardware test report](docs/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)
-> for evidence, and [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) before
-> trusting anything here with real money at scale — fleet provisioning, key
-> rotation and the payout sweep to merchant accounts are still ahead.
+> 2.0 is the Foxy wallet project's fork, [getfoxy/card](https://github.com/getfoxy/card)
+> at software 1.20, merged back here with its history ([D18](docs/DECISIONS.md#d18)).
+> Their review of our applet 0.4 ([`docs/FOR-LNFLASH.md`](docs/FOR-LNFLASH.md))
+> found that it signed a hash the reader chose and could sign anything without
+> burning a slot; their applet fixes both, and adds the owner key, the daily limit
+> on a clock of Bitcoin block headers, one `SIG_ALL` signature per payment with the
+> card's own change, and the mint's DLEQ proof kept with each piece. On top of it,
+> 2.0 has a neutral identity ([D19](docs/DECISIONS.md#d19)) and our fixes
+> ([D20](docs/DECISIONS.md#d20) to [D24](docs/DECISIONS.md#d24)).
+
+> ### Status: 2.0 proven in simulation; 1.20 has run on one card
+>
+> Foxy's 1.20 has run on one NXP JCOP4 J3R180 with the Foxy iPhone app: installed,
+> set up, loaded, paid from with change written back. Our 0.x applet ran the full
+> money loop on a J3R180 against `forge.flashapp.me` (the
+> [hardware test report](docs/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)). The 2.0
+> build has run under jCardSim, through the bridge, and in a real `SIG_ALL` swap at
+> a Nutshell 0.20.3 mint in CI; it has **not** yet been installed on silicon (its
+> load file is a size the J3R180 has not been tried at:
+> [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md)). Read
+> [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) before trusting anything here
+> with real money at scale.
 
 ## Start here
 
@@ -26,188 +40,146 @@ Reference implementation of **NUT-XX: Cashu NFC Card Protocol**, Profile B
 |---|---|
 | **Curious what this is** | [`docs/VISION.md`](docs/VISION.md) |
 | **A developer joining the project** | [`VISION`](docs/VISION.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`CONTRIBUTING`](CONTRIBUTING.md) |
+| **Implementing a reader or wallet** | [`spec/NUT-XX.md`](spec/NUT-XX.md) → [`spec/APDU.md`](spec/APDU.md) → [`spec/vectors/`](spec/vectors/) |
+| **Reading the design in full** | [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) |
 | **An AI agent working in this repo** | [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`GLOSSARY`](docs/GLOSSARY.md). The decisions file exists so settled calls are not re-litigated. |
 | **Auditing security** | [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) |
-| **New to Cashu or smartcards** | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) |
-| **Holding a card and a reader** | [`tools/cardctl/README.md`](tools/cardctl/README.md) |
-| **Manufacturing the card** | [`flash-card-assets`](https://github.com/lnflash/flash-card-assets) |
-
-## The system
-
-Five components; only the first three live in this repo.
-
-| Component | Where | Status |
-|---|---|---|
-| **Applet** — card firmware | `applet/` | Builds, CI green, unproven on hardware |
-| **cardctl** — PC/SC host driver | `tools/cardctl/` | Works; untested against a card |
-| **Spec** — NUT-XX + APDU | `spec/` | Draft, not yet submitted upstream |
-| **cashu-client** — mint protocol | [lnflash/cashu-client](https://github.com/lnflash/cashu-client) | Load + redeem implemented |
-| **Card artwork** | [lnflash/flash-card-assets](https://github.com/lnflash/flash-card-assets) | Draft v1 |
-| **Flash Forge** — the mint | [forge.flashapp.me](https://forge.flashapp.me) | **Live**, [reserves published](https://forge.flashapp.me/reserves) |
-| **Merchant terminal** | — | ❌ **does not exist** |
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the trust boundaries and
-the two end-to-end flows.
+| **Holding a card and a reader** | [`tools/cardctl/README.md`](tools/cardctl/README.md), then [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) |
+| **Testing an app without a card** | [Card simulator](#card-simulator) |
 
 ## What the card does
 
-- **Stores proofs** — 32 slots × 78 bytes in EEPROM
-- **Holds a secp256k1 key** generated on-card at install, never exported
-- **Signs** a 32-byte message with BIP-340 Schnorr, to unlock NUT-11 P2PK proofs
-- **Marks a slot spent** before releasing the signature, irreversibly
+- **Holds pieces** — up to 128 slots of 82 bytes: keyset, amount, the P2PK nonce,
+  `C`, and a date. Every piece is a format-4 secret locked to the card's key with
+  `SIG_ALL` (NUT-11); the card rebuilds the secret itself, so nothing a reader
+  sends is ever what it signs.
+- **Holds a secp256k1 key** generated on-card at install, never exported.
+- **Pays with one signature** — `SPEND_ALL_*`: the places, a till's outputs, the
+  card's own change (locked to its own key), then one BIP-340 signature over the
+  NUT-11 `SIG_ALL` message, with every place burned in the commit that releases it.
+- **Proves itself** — `AUTH` signs a tagged hash of the reader's and the card's
+  random bytes; it cannot be a spend.
+- **Has an owner** — a P-256 key on the holder's phone, whose ECDSA proofs (labels
+  `CashuCard/…`) change the PIN, the limits, the record and the owner, add funds
+  with no PIN, and refresh the card. A blocked PIN is unblocked by the owner.
+- **Bounds a terminal** — a daily limit, a limit on one payment and a no-PIN
+  allowance, counted against a clock that is the newest Bitcoin block header the
+  card has been shown, with a rollover budget between the owner's refreshes
+  ([D20](docs/DECISIONS.md#d20)).
+- **Keeps the mint's DLEQ proof** beside each piece, for a reader to check offline.
+- **Answers as an NFC tag** carrying one web address, which its owner can switch off.
 
-What it does **not** do: any BDHKE (blinding/unblinding), any mint
-communication, or any verification of what it is asked to sign. Those live on
-the host — see [D3](docs/DECISIONS.md#d3).
+What it does **not** do: any BDHKE beyond making its own change outputs, any mint
+communication, or any check of the DLEQ proofs it keeps. Those live on the host —
+see [D3](docs/DECISIONS.md#d3).
+
+**AID:** package `F0 43 41 53 48 55 43 41 52 44` ("CASHUCARD"), applet `…44 01`.
+`SELECT` answers `02 00`. A card on the 0.x AID (`D2 76 00 00 85 01 02`) or Foxy's
+1.x AID answers nothing to it: it needs an update.
 
 ## Supported hardware
 
 | Chip | Status | Notes |
 |---|---|---|
-| NXP JCOP4 (SmartMX3) | ✅ Target | JavaCard 3.0.5, CC EAL 5+, ~$5/card |
+| NXP JCOP4 (SmartMX3, J3R180) | ✅ Target | JavaCard 3.0.5, CC EAL 5+ |
 | Feitian / JCOP3 JavaCard 3.0.4 | ❌ | No `ALG_EC_SVDP_DH_PLAIN_XY` — 3.0.5+ only |
 | NXP NTAG 424 DNA | ❌ | No EC crypto; this is the BoltCard chip |
 
-**JavaCard 3.0.5 or later is a hard requirement.** The signer computes `k·G`
-with `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY`, which does not exist in the 3.0.4
-API — verified against the SDK jars. The card must also be **dual-interface**
-and supplied **unlocked** (known GlobalPlatform keys), or the applet can never
-be installed. See [D6](docs/DECISIONS.md#d6).
-
-## APDU command set
-
-Full reference: [`spec/APDU.md`](spec/APDU.md).
-
-| CLA | INS | Command | PIN | Description |
-|---|---|---|---|---|
-| `00` | `A4` | SELECT | — | ISO SELECT by AID |
-| `B0` | `01` | GET_INFO | — | Version, slot counts, capabilities, PIN state |
-| `B0` | `10` | GET_PUBKEY | — | 33-byte compressed public key |
-| `B0` | `11` | GET_BALANCE | — | Sum of unspent amounts (uint32) |
-| `B0` | `12` | GET_PROOF_COUNT | — | Count of non-empty slots |
-| `B0` | `13` | GET_PROOF | — | Full proof at a slot index |
-| `B0` | `14` | GET_SLOT_STATUS | — | One status byte per slot |
-| `B0` | `20` | SPEND_PROOF | ✔ (if set) | Mark spent + return 64-byte signature |
-| `B0` | `21` | SIGN_ARBITRARY | ✔ (if set) | Sign 32 bytes, consuming no proof |
-| `B0` | `30` | LOAD_PROOF | ✔ | Store a proof in the next free slot |
-| `B0` | `31` | CLEAR_SPENT | ✔ | Reclaim spent slots |
-| `B0` | `40`–`42` | VERIFY/SET/CHANGE_PIN | — / ✔ | PIN management |
-| `B0` | `43` | CLEAR_PIN | ✔ | Remove the PIN; the card is bearer again (applet 0.5) |
-| `B0` | `44` | SET_PUK | ✔ (if set) | Set the provisioning PUK, once (applet 0.6) |
-| `B0` | `45` | UNBLOCK_PIN | PUK | Replace a blocked or forgotten PIN with the PUK (applet 0.6) |
-| `B0` | `50` | LOCK_CARD | ✔ | Irreversibly disable writes |
-
-**Spending is PIN-gated once a PIN is set** (D13, v0.2.0): `SPEND_PROOF`,
-`SIGN_ARBITRARY`, `LOAD_PROOF`, `CLEAR_SPENT` and `LOCK_CARD` answer `6982`
-until `VERIFY_PIN` succeeds in the same session. A card ships with **no PIN**,
-and until one is set it has bearer semantics — a hostile reader in range can
-drain it — so setting a PIN is the holder's first job. Three wrong tries block
-the card, and any reader in range can send those three tries. Since applet
-0.6 a card personalised with a PUK (`SET_PUK`, set once and recorded off the
-card) recovers from that with `UNBLOCK_PIN`, which replaces the PIN
-([D16](docs/DECISIONS.md#d16)); a card with no PUK, or whose PUK has been
-guessed at ten times, strands its balance for good: nothing else can sign for
-its proofs (threat #14 in the [security model](docs/SECURITY-MODEL.md)). See
-[D13](docs/DECISIONS.md#d13); D12 records the earlier no-PIN design. A holder
-who has the PIN can take it off again with `CLEAR_PIN` (applet 0.5,
-[D15](docs/DECISIONS.md#d15)): the card is bearer again, and `SET_PIN` works
-once more. A blocked PIN cannot be cleared; only the PUK unblocks it.
-
-Every applet build before 0.3 stopped gating once the PIN was blocked (ENG-615,
-fixed in 0.3), and 0.1 builds from before D13 gate no spend at all. Builds
-before 0.4 may write a slot's status byte before its data, so a card pulled
-mid-write can show a phantom proof (ENG-620, fixed in 0.4,
-[D14](docs/DECISIONS.md#d14)); `main` tracked a 0.3 build that does. A card
-whose `SELECT` answers anything below `00 04` (`00 01`, `00 02` or `00 03`)
-needs the CAP reinstalled; sweep its balance first, because the reinstall
-regenerates the card key. A card answering `00 04` is sound but has no
-`CLEAR_PIN` (added in 0.5) and no PUK (added in 0.6); one answering `00 05`
-has no PUK. Reinstall either only if the holder wants what it lacks, and
-sweep first just the same.
-
-**AID:** package `D2 76 00 00 85 01 02`, applet `…02 01`.
+**JavaCard 3.0.5 or later is a hard requirement** ([D6](docs/DECISIONS.md#d6)).
+The card must also be supplied **unlocked** (known GlobalPlatform keys), and its
+manager keys rotated before it is handed to a person.
 
 ## Build
 
-Requires **JDK 11+** and a JavaCard SDK **3.0.5 or later**. The SDK is not
-downloaded for you:
+Requires **JDK 11+**, Apache Ant, Python 3 and a JavaCard SDK **3.0.5 or later**.
+The SDK is not downloaded for you:
 
 ```bash
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
-# → applet/target/cashu-javacard-0.1.0.cap
+# → applet/target/cashu-javacard-2.0.0.cap   (three applets: the opener, the card's, then the NFC tag)
 ```
 
-Override the kit with `-Djc.sdk=/path/to/jc305u4_kit`. Installing onto a card:
-[`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).
+The build strips the Descriptor component and checks the load file's size against
+what the J3R180 has installed (`tools/stripcap.py`, `tools/refcheck.py`;
+[`docs/FOXY-CARD-HARDWARE.md`](docs/FOXY-CARD-HARDWARE.md)). Installing onto a
+card: [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).
 
 ## Test
 
 ```bash
-mvn -f applet/pom.xml test        # applet — jCardSim, no hardware needed
-mvn -f tools/cardsim/pom.xml test # card simulator bridge, same jCardSim
-cd tools/cardctl && python3 test_bip340.py && python3 test_apdu.py
+mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
+mvn -f tools/cardsim/pom.xml package # card simulator bridge, its suite, and the jar
+node --test 'tools/**/*.test.cjs'    # client and Cashu arithmetic (bridge and mint cases skip)
+cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consistency test_card_file test_hwtest_65byte_pubkey; do python3 $t.py; done
 ```
 
-CI runs all three on every push. **A green suite is not evidence about silicon** —
-jCardSim runs on the JVM with a garbage collector and cannot reproduce EEPROM
-exhaustion or hardware crypto framing. See [D10](docs/DECISIONS.md#d10).
+CI runs all of it on every push, plus the bridge's client cases against the jar
+and a `SIG_ALL` swap at two Nutshell 0.20.3 mints (forge's shape, an 8-byte
+keyset id with no fee, and a fresh v2 keyset, 33 bytes with a fee), and checks the tracked CAP is built
+from this source. **A green suite is not evidence about silicon** — jCardSim runs
+on the JVM with a garbage collector and cannot reproduce EEPROM exhaustion, torn
+writes or hardware crypto framing. See [D10](docs/DECISIONS.md#d10).
 
 ## Card simulator
 
 `tools/cardsim/` serves the real applet, inside jCardSim, on
-`http://127.0.0.1:9876` so an app's fake NFC transport can run end-to-end
-tests on a simulator or emulator without a reader:
+`http://127.0.0.1:9876` so an app's fake NFC transport can run end-to-end tests
+on a simulator or emulator without a reader:
 
 ```bash
 tools/cardsim/cardsim.sh                               # from source, via Maven
 mvn -B -f tools/cardsim/pom.xml package && java -jar tools/cardsim/target/cardsim.jar
-curl -s -X POST localhost:9876/apdu -d '{"hex":"00A4040007D2760000850102"}'   # {"hex":"00069000","sw":"9000"}
+curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}'   # {"hex":"02009000","sw":"9000"}
 ```
 
-Endpoints: `POST /apdu` (raw bytes in, data‖SW out, never retried),
-`POST /reset` (a brand-new card), `POST /fixture` (proofs, spent slots, PIN,
-PUK, blocked PIN, an older applet version to emulate), `GET /state`.
-`tools/cardsim/client.cjs` is a zero-dependency Node client with the
-`cardctl` command set. Two things a loader has to know: SELECT starts a
-session, as a tap does; and the simulator's card key is the same after
-every `/reset`, so mint proofs per run. The header of
+Endpoints: `POST /apdu` (raw bytes in, data‖SW out, never retried), `POST /reset`
+(a brand-new card), `POST /fixture` (PIN, record, the deterministic test owner,
+anchor and headers, format-4 pieces with dates and DLEQ, spent slots, limits with
+the rollover budget, a blocked PIN), `GET /state`. `tools/cardsim/client.cjs` is a
+zero-dependency Node client with the 2.0 command set and the owner's proofs, and
+`tools/cardsim/cashu-crypto.cjs` the Cashu arithmetic a test needs. Two things a
+loader has to know: SELECT starts a session, as a tap does; and the simulator's
+card key is the same after every `/reset`, so mint pieces per run. The header of
 `tools/cardsim/src/main/java/me/flashapp/cashu/cardsim/CardSim.java` is the
-contract.
+contract that flash-pos and flash-mobile pin.
+
+Foxy's own simulator for its iOS build (`tools/cardsim/run.sh`, a line protocol on
+port 47431) is kept beside it.
 
 ## Project layout
 
 ```
-applet/src/main/java/   applet source (JavaCard 3.0.5+)
+applet/src/main/java/   applet source (JavaCard 3.0.5+): CashuApplet, SchnorrHW, Opener, Tag
 applet/src/test/java/   jCardSim test suite
-tools/cardctl/          PC/SC host driver + its own tests
-tools/cardsim/          jCardSim card over localhost HTTP for app e2e
-spec/                   NUT-XX.md (protocol), APDU.md (wire format),
-                        CARD-FILE.md (host↔mint interchange format)
-docs/                   vision, architecture, decisions, security, glossary
+tools/cardctl/          PC/SC host driver (2.0) + its own tests
+tools/cardsim/          jCardSim card over localhost HTTP for app e2e, its client and e2e
+tools/chip/             Foxy's bench scripts for a card on a reader
+spec/                   NUT-XX.md (protocol), APDU.md (wire format), vectors/,
+                        CARD-FILE.md (0.x host↔mint interchange format)
+docs/                   vision, architecture, decisions, security, glossary, Foxy's design
 ```
 
 ## Spec
 
 [`spec/NUT-XX.md`](spec/NUT-XX.md) is a draft, intended for submission to
-[cashubtc/nuts](https://github.com/cashubtc/nuts) once it has run on hardware.
-Profile A is an online, BoltCard-compatible mode; **Profile B** is what this
-repo implements.
+[cashubtc/nuts](https://github.com/cashubtc/nuts) once 2.0 has run on hardware.
 
 ## Related
 
+- [getfoxy/card](https://github.com/getfoxy/card) — Foxy's fork, the base of 2.0
 - [cashu-client](https://github.com/lnflash/cashu-client) — mint protocol, BDHKE, witnesses, DLEQ
 - [flash-card-assets](https://github.com/lnflash/flash-card-assets) — print-ready physical card design
 - [forge.flashapp.me](https://forge.flashapp.me) — the Flash Cashu mint ([reserves](https://forge.flashapp.me/reserves))
-- [Numo](https://github.com/cashubtc/Numo) — Android Cashu NFC PoS, a Profile A reference
 - [cashubtc/nuts](https://github.com/cashubtc/nuts) — the Cashu specifications
 
 ## Contributing
 
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and
 [`docs/DECISIONS.md`](docs/DECISIONS.md) first — most of what looks like a
-missing feature is a decision with reasoning behind it.
+missing feature is a decision with reasoning behind it. A change to the wire is a
+change to Foxy's too: agree it with them.
 
 ## License
 

@@ -16,6 +16,7 @@ build/
 *.p12
 
 # Build output
+applet/target/
 target/
 *.cap
 

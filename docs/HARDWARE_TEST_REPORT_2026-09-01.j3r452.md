@@ -1,3 +1,5 @@
+> This is upstream's own report of their applet on their hardware (lnflash/cashu-javacard), kept as received. It is not a report on the Foxy fork.
+
 # Cashu JavaCard Physical Hardware Test Report
 
 - **Test date:** 2026-09-01 (UTC+08:00)

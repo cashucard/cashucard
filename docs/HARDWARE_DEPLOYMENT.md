@@ -1,6 +1,7 @@
 # Hardware Deployment Guide
 
-ENG-182 — GlobalPlatform packaging and deployment for CashuApplet.
+GlobalPlatform packaging and deployment for the Cashu card applet, protocol 2.0
+([D18](DECISIONS.md#d18), [D19](DECISIONS.md#d19)).
 
 ---
 
@@ -12,6 +13,7 @@ ENG-182 — GlobalPlatform packaging and deployment for CashuApplet.
 | Apache Ant | 1.10+ | `brew install ant` |
 | GlobalPlatformPro (gp) | 20.01.23+ | See below |
 | JavaCard SDK | 3.0.5+ (`jc305u4_kit`) | See [Build the .cap file](#build-the-cap-file) |
+| Python 3 | 3.9+ | for `tools/stripcap.py` and `tools/refcheck.py`, which the build runs |
 | Physical card | NXP JCOP4 SmartMX3 (JavaCard 3.0.5+) | **Not** JavaCard 3.0.4 — see [Supported targets](#supported-targets) |
 | PC/SC reader | Any ISO 7816-4 reader | `brew install pcsc-lite` |
 
@@ -50,19 +52,36 @@ cd cashu-javacard/applet
 ant cap
 ant cap -Djc.sdk=/path/to/jc305u4_kit   # explicit form
 
-# Output: target/cashu-javacard-0.1.0.cap
-ls -lh target/cashu-javacard-0.1.0.cap
+# Output: target/cashu-javacard-2.0.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
+ls -lh target/cashu-javacard-2.0.0.cap
 ```
+
+The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
+keeps nothing of it) and checks the load file's size against what the J3R180 has
+been seen to install (`tools/refcheck.py`, from
+[FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.0 build is **20,060 bytes**
+(92 past a multiple of 256), a size not yet tried on the chip: refcheck says so and
+passes it. Install it on a test card first; if the chip refuses it, move it with
+`CashuApplet.sizeTheFile` to a size known to install and add the answer to
+refcheck's table.
+
+> **Three applets, installed in order.** The chip refuses the card's applet as the
+> first instantiated from its package (no answer, or `6F00`); it takes it once a
+> small applet has been instantiated before it. So the file lists `Opener` first,
+> and the install is three commands (below): the opener, the card's applet, and the
+> NFC tag, which is `Tag`, listed last and made under the NFC Forum's own name,
+> `D2760000850101`, given as the instance AID. Measurements and the rest of what
+> the chip has room for: [FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md).
+
+> **The mint's proofs are reserved after install.** The 12,288 bytes that hold
+> them are not made at install: the chip would refuse the card's applet if its
+> constructor asked for them. The first `SET_CARD` reserves them. A card that is
+> refused them is set up all the same and works as a card with no room for proofs.
 
 > **3.0.5 is a hard floor.** `SchnorrHW` performs the `k·G` scalar multiply with
 > `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY`, which was introduced in JavaCard 3.0.5
 > and does not exist in 3.0.4. A 3.0.4 kit cannot convert this applet, and a
 > 3.0.4 card cannot run it.
-
-There is no build-time mode switch. `SchnorrHW` is the only signer; the
-BigInteger simulation that used to sit behind a `HARDWARE` flag has been removed
-(it could never be converted to a `.cap` — the JavaCard runtime has no
-`java.math`).
 
 ---
 
@@ -80,99 +99,85 @@ gp --list
 
 ## Install
 
-The CAP tracked in this repo is **applet version 0.6**, sha256
-`e3a2e58b8a1e178272a442545bc512e82b7f4750ab76c494edbafe5fc865937b`. A CAP you
-build yourself hashes differently even from identical source, because the
-converter writes a creation timestamp into `META-INF/MANIFEST.MF`. Every other
-entry is byte-identical when built with JDK 17 and the kit CI pins
-(`jc305u4_kit` at `oracle_javacard_sdks` commit `6a75ec0d`), and CI checks
-exactly that on every push. So before installing your own build, compare every
-entry except `META-INF/MANIFEST.MF` against the tracked CAP:
+The CAP tracked in this repo is **applet version 2.0**, sha256
+`59f66673a0dda7993c2e2e432e5e3e3d8203cf09c7edb3a4f79e5016a90db787`
+(`applet/target/cashu-javacard-2.0.0.cap`). A CAP you build yourself hashes
+differently even from identical source, because the converter writes a creation
+timestamp into `META-INF/MANIFEST.MF`. Every other entry is byte-identical when
+built with JDK 17 and the kit CI pins (`jc305u4_kit` at `oracle_javacard_sdks`
+commit `6a75ec0d`), and CI checks exactly that on every push. So before
+installing your own build, compare every entry except `META-INF/MANIFEST.MF`
+against the tracked CAP:
 
 ```bash
-# From applet/, after `ant cap` has overwritten target/cashu-javacard-0.1.0.cap
-git show HEAD:applet/target/cashu-javacard-0.1.0.cap > /tmp/tracked.cap
+# From applet/, after `ant cap` has overwritten target/cashu-javacard-2.0.0.cap
+git show HEAD:applet/target/cashu-javacard-2.0.0.cap > /tmp/tracked.cap
 rm -rf /tmp/cap-tracked /tmp/cap-built
 unzip -q /tmp/tracked.cap -d /tmp/cap-tracked
-unzip -q target/cashu-javacard-0.1.0.cap -d /tmp/cap-built
+unzip -q target/cashu-javacard-2.0.0.cap -d /tmp/cap-built
 diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built && echo "same CAP as the tracked one"
 ```
 
 Any output from `diff` means the two CAPs differ; do not install. After
-installing, `SELECT` must answer `00 06` (below).
-
-**Install only a CAP that matches the tracked one** (sha256 `e3a2e58b…`, or the
-entry comparison above). The file name and the CAP's package version read 0.1
-on every build (`applet/build.xml` pins the package version), so neither can
-tell a fixed build from a vulnerable one; only the applet version `SELECT`
-answers after install can. Every 0.1 and 0.2 applet build carries ENG-615: its gate checks `pinState == 1`, so once the PIN is blocked,
-`LOAD_PROOF`, `CLEAR_SPENT` and `LOCK_CARD` stop asking for it, and so do
-`SPEND_PROOF` and `SIGN_ARBITRARY` on builds that gate them (0.1 builds from
-before D13 gate no spend at all). The last tracked 0.2 CAP was sha256
-`939cf24a…`. A card whose `SELECT` answers anything below `00 04` (`00 01`,
-`00 02` or `00 03`) needs reinstalling — sweep its balance first (see
-[Upgrade](#upgrade--re-personalise)).
-
-A card answering `00 03` has the ENG-615 fix but may still carry ENG-620: a
-card pulled mid-`LOAD_PROOF` can show a phantom proof ([D14](DECISIONS.md#d14)).
-`main` tracked a 0.3 CAP with the old slot write order, sha256 `958a8baa…`,
-from `f889934` (merged 2026-09-30) until the ENG-620 fix replaced it; no
-release carries it. Nothing on an installed card tells it apart from a 0.3
-build with the fix, which is why the fix moved the applet version to 0.4.
-Don't install `958a8baa…` or any other 0.3 CAP.
-
-A card answering `00 04` is sound: 0.4 fixed ENG-620, and nothing since is a
-fix. 0.5 added `CLEAR_PIN` ([D15](DECISIONS.md#d15)), which a 0.4 card answers
-with `6D00`; the last tracked 0.4 CAP was sha256 `d2947b9f…`. 0.6 added the
-PUK — `SET_PUK` and `UNBLOCK_PIN` ([D16](DECISIONS.md#d16)), which a 0.4 or
-0.5 card answers with `6D00`, and a ninth `GET_INFO` byte; the last tracked
-0.5 CAP was sha256 `7b02ad46…`. A card answering `00 05` is sound and lacks
-the PUK, so three wrong PINs still strand it (SECURITY-MODEL #14). Reinstall
-a 0.4 or 0.5 card only if its holder wants what it lacks, and like every
-version change that is a fresh install — delete, then install — with the
-balance swept first, because there is no in-place upgrade and the reinstall
-regenerates the card key (see [Upgrade](#upgrade--re-personalise)). There is
-no other way to give a card in the field a PUK. `cardctl selftest` passes a
-0.4 or 0.5 card and says which commands it lacks.
-
-**Personalising a 0.6 card:** `cardctl info` first and confirm `PIN : unset`
-and `PUK : unset` — a card that already reports a PUK and no PIN was armed by
-someone else before it reached you, and is not yours to issue: reinstall the
-CAP, the PUK cannot be replaced (`set-puk` refuses that state and says so;
-[SECURITY-MODEL #16](SECURITY-MODEL.md)). Then `cardctl set-puk --puk <8–12
-digits>`, then `cardctl set-pin <pin>`, and record the PUK off the card at
-once — the card never reveals it, and a 0.6 card whose PUK was recorded
-nowhere is a 0.5 card when its PIN is blocked. See the
-[Personalisation](../spec/APDU.md#personalisation) section of the APDU spec
-and [D16](DECISIONS.md#d16) for custody (ENG-618).
+installing, `SELECT` must answer `02 00` (below).
 
 ```bash
-# Install CashuApplet.cap onto the card
-gp --install target/cashu-javacard-0.1.0.cap
+# Load the file and instantiate the opener (gp installs one applet of a file at a time)...
+gp --install target/cashu-javacard-2.0.0.cap --applet F04341534855434152444D
+# ...then create the card's applet from the loaded package
+gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
+# ...then the NFC tag, under the NFC Forum's own name as its instance AID
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
 
 # Verify installation
 gp --list
-# Expected:
-#   APP: D276000085010201 (SELECTABLE)   ← our applet
+# Expected (among the rest):
+#   APP: F04341534855434152444D (SELECTABLE)   ← the opener
+#   APP: F043415348554341524401 (SELECTABLE)   ← the card's applet
+#   APP: D2760000850101 (SELECTABLE)           ← the tag
+
+# The tag, read as a phone reads it: its name, the capability container (15 bytes), the NDEF file (2, then 20 bytes)
+gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000214
+# Expected: 9000 / 9000 / 000F20003B00340406E104001600FF 9000 / 9000 / 0014 9000 / D101105504 + "getfoxy.io/card" 9000
 ```
+
+### Setting a card up
+
+A card straight from the install has no PIN, no record and no owner: it holds
+nothing and cannot be loaded, and any reader in range can set it up. Set it up
+before it leaves your hands, owner last, with the tip block header as the
+anchor ([D20](DECISIONS.md#d20)):
+
+```bash
+cd tools/cardctl
+python3 cardctl.py set-pin 1234
+python3 cardctl.py verify-pin 1234
+python3 cardctl.py set-card --mint https://forge.flashapp.me
+python3 cardctl.py set-owner --owner-key <32-byte hex> --anchor <the tip header, 80 bytes hex>
+python3 cardctl.py set-limit --owner-key <…> --day 50000 --payment 0 --allowance 0 --budget 7
+python3 cardctl.py selftest
+```
+
+Without `--owner-key` cardctl signs with its TEST key, which anyone with this
+repository holds: bench cards only. A card handed to a person is owned by the
+holder's phone (flash-mobile's "Set up this card").
 
 ---
 
 ## Test install / select / deselect lifecycle
 
 ```bash
-# SELECT the applet (sends SELECT APDU with our AID)
-gp --apdu 00A4040007D2760000850102
+# SELECT the applet by its package AID
+gp --apdu 00A404000AF0434153485543415244
 
-# Response: 0006 9000  (applet version 0.6 + SW_OK = applet responding)
-# Anything below 0004 (0001, 0002 or 0003) may carry ENG-615 or ENG-620: sweep the card, then reinstall.
-# 0004 is sound but has no CLEAR_PIN and no PUK; 0005 has no PUK. Reinstall only if wanted (sweep first).
+# Response: 0200 9000  (applet version 2.0 + SW_OK = applet responding)
+# A card that answers 6A82 has no 2.0 applet: it is a 0.x or Foxy 1.x card and needs an update.
 
 # GET_INFO (INS 0x01)
 gp --apdu B0010000
 
-# Response: 00 06 20 00 00 20 1F 00 00
-#   v0.6 | 32 slots | 0 unspent | 0 spent | 32 empty | caps=0x1F (bit 3 = CLEAR_PIN, bit 4 = PUK) | PIN unset | PUK unset
+# Response: 02 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+#   v2.0 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change grant
 # SW: 9000
 
 # GET_PUBKEY (INS 0x10)
@@ -181,34 +186,65 @@ gp --apdu B0100000
 # Response: 33-byte compressed secp256k1 public key + SW 9000
 ```
 
+`cardctl selftest` passes a card answering `02 00` and fails any other.
+
 ---
 
 ## Reinstall (delete + install)
 
 ```bash
-# Delete the applet (and its package)
-gp --delete D276000085010201   # applet AID
-gp --delete D276000085010200   # package AID (optional)
+# Delete the tag, the card's applet, the opener, then the package (that order)
+gp --delete D2760000850101           # the tag
+gp --delete F043415348554341524401   # the card's applet
+gp --delete F04341534855434152444D   # the opener
+gp --delete F0434153485543415244     # the package
 
-# Re-install
-gp --install target/cashu-javacard-0.1.0.cap
+# Re-install: the opener first, the tag last
+gp --install target/cashu-javacard-2.0.0.cap --applet F04341534855434152444D
+gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
 ```
+
+The chip refuses to delete an instance that something still refers to, which is why the
+instances go one by one and in this order, and why no static field of the package refers
+to an object an applet instance made (`Tag` holds no reference to the card's applet; it
+asks for a shareable interface at each selection and keeps nothing of it).
 
 ---
 
-## Upgrade / re-personalise
+## Upgrade from 0.x, and the field-card sweep
 
-The applet has no OTA upgrade path — delete and reinstall to upgrade. That
-includes 0.4 → 0.5 (`CLEAR_PIN`) and 0.5 → 0.6 (the PUK): there is no
-in-place upgrade, so a card that should answer `0x43`, `0x44` or `0x45` is
-deleted and installed from the 0.6 CAP, then personalised again with a PUK
-and a PIN.
-All proof data and the card keypair are wiped on delete, and the proofs are
-P2PK-locked to that keypair, so **sweep the balance before deleting**. The
-v0.2 reinstall on the J3R180 stranded 5 sat this way (see the
-[hardware test report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)).
+There is no in-place upgrade: 2.0 is a new AID and a new wire, and a reinstall
+makes a new card key. **Every piece on a card is P2PK-locked to its key, so a
+card is swept before it is deleted.** The v0.2 reinstall on the J3R180 stranded
+5 sat this way (see the [hardware test report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)).
 
-For production cards, use a secure messaging channel (SCP02/SCP03) with the card's default keys. Contact the card vendor for production key ceremonies.
+The 0.x applet is sunset ([D18](DECISIONS.md#d18)). Both apps drop it: a card
+on the 0.x AID (`D2 76 00 00 85 01 02`, `SELECT` answers `00 0X`) or on Foxy's
+1.x AID shows "This card needs an update", and neither app spends from it or
+loads it.
+
+**The one funded field card (operator-run, a release precondition for both
+apps):**
+
+1. With the **current** (0.x-speaking) app releases, before the 2.0 apps ship,
+   spend the card's whole balance to an account the operator controls (a
+   payment at the till, or the holder's withdraw), and check at the mint that
+   the swap settled.
+2. `python3 tools/cardctl/cardctl.py dump --mint <mint> --out field-card.json`
+   (it selects the 0.x applet) as a record of what was on it; every slot should
+   now be spent.
+3. Delete the 0.x applet (`gp --delete D276000085010201`, then
+   `gp --delete D2760000850102`), install 2.0 as above, and set the card up.
+4. Record the date, the card's old and new keys and the swept amount here.
+
+| Date | Card | Old key | New key | Swept | By |
+|---|---|---|---|---|---|
+| (pending) | J3R180 field card | | | | |
+
+For production cards, use a secure messaging channel (SCP02/SCP03) and rotate the
+card manager keys: a card left on its factory keys can have the applet deleted,
+and the money with it, by anyone with a reader.
 
 ---
 
@@ -221,18 +257,20 @@ For production cards, use a secure messaging channel (SCP02/SCP03) with the card
 | SHA-256 | `MessageDigest.ALG_SHA_256` |
 | k·G scalar multiply | `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY` |
 | BIP-340 aux randomness | `RandomData.ALG_SECURE_RANDOM` |
-| 256-bit mulModN | Schoolbook 256×256 + 2-level DELTA reduction |
-| 256-bit addModN | Carry-propagation + conditional subtract |
+| 256-bit mulModN | Schoolbook 256×256, no secret-dependent branch ([D21](DECISIONS.md#d21)), + 2-level DELTA reduction (which still branches: SECURITY-MODEL open item 5) |
+| 256-bit addModN | Carry-propagation + conditional subtract (a secret-dependent branch: open item 5) |
 
 DELTA = 2^256 mod n = `0x00...01 45512319 50B75FC4 402DA173 2FC9BEBF`
 
 The signing operation allocates **nothing** at runtime. JavaCard Classic puts
 `new` in persistent EEPROM/Flash and never collects it, so an allocation on the
 signing path would leak a few hundred bytes per tap until the card ran out of
-persistent memory and every `SPEND_PROOF` / `SIGN_ARBITRARY` threw. All scratch
-is allocated once at install time as `CLEAR_ON_DESELECT` transient arrays:
-`sc` (256 B) plus `work` (288 B), threaded through the arithmetic helpers as
-explicit `(work, workOff)` parameters.
+persistent memory and every payment threw. All scratch is allocated once at
+install time as `CLEAR_ON_DESELECT` transient arrays, threaded through the
+arithmetic helpers as explicit `(work, workOff)` parameters.
+
+D21 changes the multiply's timing: re-measure `cardctl --timing selftest` (AUTH)
+and a payment's `SPEND_ALL_SIGN` on the J3R180 before release.
 
 ### Install-time ECDH framing probe
 
@@ -240,14 +278,8 @@ explicit `(work, workOff)` parameters.
 the applet reads a 65-byte `04 ‖ X ‖ Y`, and some parts return the bare 64-byte
 `X ‖ Y` instead. `SchnorrHW.init()` therefore performs one throwaway `2·G` at
 install time and refuses to install if the framing is not what `sign()` indexes
-into.
-
-If `gp --install` fails with `6F00`, that probe is the first thing to suspect —
-and it failing there is the desired outcome. The alternative is discovering it
-at spend time, where `SPEND_PROOF` marks the slot SPENT *before* signing: an
-incompatible card would consume one proof per tap, return `6F00` each time, and
-leave the proofs unredeemable because they are P2PK-locked to a key whose card
-can no longer sign.
+into. If `gp --install` fails with `6F00`, that probe is the first thing to
+suspect, after the size of the load file (above).
 
 ---
 
@@ -255,7 +287,7 @@ can no longer sign.
 
 | Card | JC API | Notes |
 |------|--------|-------|
-| NXP JCOP4 SmartMX3 P71 | 3.0.5 | ✅ Primary target; secp256k1 custom curve supported |
+| NXP JCOP4 SmartMX3 P71 (J3R180) | 3.0.5 | ✅ Primary target; secp256k1 custom curve supported |
 | Feitian JavaCard 3.0.4 | 3.0.4 | ❌ No `ALG_EC_SVDP_DH_PLAIN_XY` (3.0.5+ only) — the CAP will not convert or load |
 | Generic JC 3.0.5+ | 3.0.5 | ⚠️  May work; verify custom EC-FP curve + `ALG_EC_SVDP_DH_PLAIN_XY` support |
 | JavaCard ≤ 3.0.4 | ≤ 3.0.4 | ❌ No ECDH plain-XY |
@@ -265,8 +297,17 @@ can no longer sign.
 
 ## AID reference
 
+Protocol 2.0 ([D19](DECISIONS.md#d19)):
+
 | Element | AID (hex) |
 |---------|-----------|
-| Package | `D2 76 00 00 85 01 02` |
-| Applet  | `D2 76 00 00 85 01 02 01` |
-| SELECT  | `00 A4 04 00 07 D2 76 00 00 85 01 02` |
+| Package | `F0 43 41 53 48 55 43 41 52 44` |
+| Opener (instantiated first, does nothing) | `F0 43 41 53 48 55 43 41 52 44 4D` |
+| Card's applet | `F0 43 41 53 48 55 43 41 52 44 01` |
+| Tag, class (listed last in the file) | `F0 43 41 53 48 55 43 41 52 44 54` |
+| Tag, instance (the NFC Forum's NDEF Tag Application; what a phone selects) | `D2 76 00 00 85 01 01` |
+| SELECT | `00 A4 04 00 0A F0 43 41 53 48 55 43 41 52 44` |
+
+Withdrawn, and answered `6A82` by a 2.0 card: the 0.x applet's
+`D2 76 00 00 85 01 02` (package) and `D2 76 00 00 85 01 02 01` (applet), and
+Foxy's 1.x `F0 46 4F 58 59 43 41 52 44`.

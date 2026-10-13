@@ -100,9 +100,11 @@ ant -f applet/build.xml cap
 ```
 
 CI runs the applet suite and the `tools/cardsim` bridge (its Java suite, then
-the shaded jar started and driven by the Node client) on JDK 11 and 17, the
-`cardctl` suite on Python 3.11 and 3.13, and the CAP conversion, on every push. The conversion is also
-compared with the CAP tracked at `applet/target/cashu-javacard-0.1.0.cap`: every
+the shaded jar started and driven by the Node client, and a `SIG_ALL` swap at two
+Nutshell 0.20.3 mints: an 8-byte keyset id with no fee, as forge runs, and a
+33-byte v2 id with a fee) on JDK 11 and 17, the `cardctl` suite on Python 3.11 and
+3.13, and the CAP conversion with its size check, on every push. The conversion is also
+compared with the CAP tracked at `applet/target/cashu-javacard-2.0.0.cap`: every
 entry but `META-INF/MANIFEST.MF` must match, and
 [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) must publish the
 tracked CAP's sha256. So a change to the applet source ships with the rebuilt
@@ -125,6 +127,11 @@ CAP (JDK 17, `jc305u4_kit`) and its new hash in that guide.
    source under `applet/src/main/java/me/flashapp/cashu`. Each file needs an
    entry in that test's `INSTALL_TIME_METHODS` listing its install-time methods;
    a new file with no entry fails the test rather than going unchecked.
+   There is one exception, since software 1.20: the 12,288 bytes that hold the
+   mint's proofs are reserved by the first `SET_CARD`, because the chip will not
+   install an applet whose constructor asks for that much more
+   ([D17](docs/DECISIONS.md#d17)). The test lets through that one guarded
+   statement (`ONCE_ONLY_ALLOCATIONS`) and nothing beside it.
 6. **Local checks must be at least as strict as the mint's.** The card burns a
    slot *before* the mint sees anything, so a check looser than the mint's
    passes locally and still costs the proof. See

@@ -53,20 +53,29 @@ class CardSimHttpTest {
     }
 
     @Test
-    @DisplayName("POST /apdu round-trips a SELECT")
+    @DisplayName("POST /apdu round-trips a SELECT by the CASHUCARD AID: 02 00")
     void apduRoundTrip() throws Exception {
-        HttpResponse<String> r = post("/apdu", "{\"hex\":\"00A4040007D2760000850102\"}");
+        HttpResponse<String> r = post("/apdu", "{\"hex\":\"00A404000AF0434153485543415244\"}");
         assertEquals(200, r.statusCode());
         assertEquals("application/json", r.headers().firstValue("Content-Type").orElse(""));
         JsonObject o = json(r);
-        assertEquals("00069000", o.get("hex").getAsString());
+        assertEquals("02009000", o.get("hex").getAsString());
         assertEquals("9000", o.get("sw").getAsString());
+    }
+
+    @Test
+    @DisplayName("the 0.x AID selects nothing over the bridge: a 200 carrying the refusal")
+    void oldAidIsNotFound() throws Exception {
+        HttpResponse<String> r = post("/apdu", "{\"hex\":\"00A4040007D2760000850102\"}");
+        assertEquals(200, r.statusCode());
+        String sw = json(r).get("sw").getAsString();
+        assertTrue(sw.equals("6A82") || sw.equals("6999") || sw.equals("6E00"), sw);   // see OldCardTest.oldAidsAreNotFound
     }
 
     @Test
     @DisplayName("a card refusal is still a 200: the transport worked")
     void refusalIs200() throws Exception {
-        HttpResponse<String> r = post("/apdu", "{\"hex\":\"B0 13 1F 00 4E\"}"); // GET_PROOF of an empty slot
+        HttpResponse<String> r = post("/apdu", "{\"hex\":\"B0 13 1F 00 52\"}"); // GET_PROOF of an empty slot
         assertEquals(200, r.statusCode());
         assertEquals("6A88", json(r).get("sw").getAsString());
         assertEquals("6A88", json(r).get("hex").getAsString());
@@ -84,7 +93,7 @@ class CardSimHttpTest {
         assertEquals(400, post("/apdu", "").statusCode());
         // jCardSim parses the C-APDU before the applet sees it: an Lc that
         // does not match the data is refused here, not answered 6700.
-        HttpResponse<String> badLc = post("/apdu", "{\"hex\":\"B04300000531323334\"}");
+        HttpResponse<String> badLc = post("/apdu", "{\"hex\":\"B04000000531323334\"}");
         assertEquals(400, badLc.statusCode());
         assertTrue(json(badLc).get("error").getAsString().contains("Lc"), json(badLc).toString());
         assertEquals(400, post("/fixture", "{\"bogus\":1}").statusCode());
@@ -109,9 +118,10 @@ class CardSimHttpTest {
     void stateAndReset() throws Exception {
         JsonObject s = json(get("/state"));
         assertEquals(0, s.get("generation").getAsLong());
-        assertEquals("0.6", s.get("appletVersion").getAsString());
+        assertEquals("2.0", s.get("version").getAsString());
         assertEquals(66, s.get("pubkey").getAsString().length());
-        assertEquals(32, s.getAsJsonArray("slots").size());
+        assertEquals(128, s.getAsJsonArray("slots").size());
+        assertEquals(7, s.get("rollBudget").getAsInt());
         assertTrue(s.get("deterministicKey").getAsBoolean());
 
         HttpResponse<String> r = post("/reset", "");
@@ -123,46 +133,57 @@ class CardSimHttpTest {
     @Test
     @DisplayName("POST /fixture applies and answers state; a refused step answers 409 {error, sw, state}")
     void fixture() throws Exception {
-        HttpResponse<String> ok = post("/fixture", "{\"pin\":\"1234\",\"puk\":\"12345678\",\"blockedPin\":true}");
+        HttpResponse<String> ok = post("/fixture", "{\"pin\":\"1234\",\"mint\":\"http://m\",\"owner\":true,\"blockedPin\":true}");
         assertEquals(200, ok.statusCode());
         assertEquals(2, json(ok).get("pinState").getAsInt());
-        assertEquals(1, json(ok).get("pukState").getAsInt());
+        assertTrue(json(ok).get("hasOwner").getAsBoolean());
         assertEquals(1, json(ok).get("generation").getAsLong());
 
         HttpResponse<String> refused = post("/fixture", "{\"pin\":\"5678\"}");
         assertEquals(409, refused.statusCode());
         JsonObject o = json(refused);
-        assertEquals("SET_PIN", o.get("error").getAsString());
-        assertEquals("6985", o.get("sw").getAsString());
+        assertEquals("VERIFY_PIN", o.get("error").getAsString());
+        assertEquals("6983", o.get("sw").getAsString());
         JsonObject state = o.getAsJsonObject("state");
         assertEquals(2, state.get("generation").getAsLong());
-        assertEquals("SET_PIN", state.getAsJsonObject("fixtureError").get("step").getAsString());
-        assertEquals("SET_PIN", json(get("/state")).getAsJsonObject("fixtureError").get("step").getAsString());
+        assertEquals("VERIFY_PIN", state.getAsJsonObject("fixtureError").get("step").getAsString());
+        assertEquals("VERIFY_PIN", json(get("/state")).getAsJsonObject("fixtureError").get("step").getAsString());
 
-        HttpResponse<String> after = post("/apdu", "{\"hex\":\"B021000020" + "00".repeat(32) + "40\"}");
-        assertEquals("6982", json(after).get("sw").getAsString(), "the fixture's card is still blocked");
+        HttpResponse<String> after = post("/apdu", "{\"hex\":\"B018000000\"}");
+        assertEquals("6982", json(after).get("sw").getAsString(), "the fixture's card is still blocked: no log without the PIN");
     }
 
     @Test
-    @DisplayName("puk under a mask kept from an earlier fixture answers 400, not a PUK on a 0.4 card")
-    void pukUnderKeptMaskIs400() throws Exception {
-        assertEquals(200, post("/fixture", "{\"appletVersion\":\"0.4\"}").statusCode());
-        HttpResponse<String> refused = post("/fixture", "{\"puk\":\"12345678\"}");
-        assertEquals(400, refused.statusCode());
-        assertTrue(json(refused).get("error").getAsString().contains("masked to 0.4"));
-        JsonObject s = json(get("/state"));
-        assertEquals("0.4", s.get("appletVersion").getAsString());
-        assertEquals(0, s.get("pukState").getAsInt());
+    @DisplayName("the 0.x fixture keys answer 400 by name, with the card untouched: puk and appletVersion")
+    void oldFixtureKeysAre400() throws Exception {
+        String before = get("/state").body();
+        HttpResponse<String> puk = post("/fixture", "{\"puk\":\"12345678\"}");
+        assertEquals(400, puk.statusCode());
+        assertTrue(json(puk).get("error").getAsString().contains("no PUK"), puk.body());
+        HttpResponse<String> version = post("/fixture", "{\"appletVersion\":\"0.4\"}");
+        assertEquals(400, version.statusCode());
+        assertTrue(json(version).get("error").getAsString().contains("version masks are gone"), version.body());
+        assertEquals(before, get("/state").body(), "card untouched");
     }
 
     @Test
-    @DisplayName("a version-masked fixture changes what /apdu answers")
-    void maskedFixture() throws Exception {
-        assertEquals(200, post("/fixture", "{\"appletVersion\":\"0.4\"}").statusCode());
-        assertEquals("00049000", json(post("/apdu", "{\"hex\":\"00A4040007D2760000850102\"}")).get("hex").getAsString());
-        assertEquals("6D00", json(post("/apdu", "{\"hex\":\"B0440000090831323334353637 38\"}")).get("sw").getAsString());
-        assertEquals(200, post("/reset", "").statusCode());
-        assertEquals("00069000", json(post("/apdu", "{\"hex\":\"00A4040007D2760000850102\"}")).get("hex").getAsString());
+    @DisplayName("every new fixture field applies over HTTP: owner, mint, headers, limits with the budget, a piece with its mint's proof")
+    void newFixtureFields() throws Exception {
+        String header = SimCardTest.HEADERS.get(5);
+        String proof = "{\"keysetId\":\"0059534ce0bfa19a\",\"amount\":8,\"nonce\":\"" + "ab".repeat(32)
+            + "\",\"C\":\"02" + "11".repeat(32) + "\",\"dleq\":{\"e\":\"" + "01".repeat(32) + "\",\"s\":\"" + "02".repeat(32)
+            + "\",\"r\":\"" + "03".repeat(32) + "\"}}";
+        HttpResponse<String> r = post("/fixture", "{\"pin\":\"1234\",\"mint\":\"http://127.0.0.1:3338\",\"owner\":true,\"anchor\":\""
+            + header + "\",\"proofs\":[" + proof + "],\"limits\":{\"day\":1000,\"allowance\":100,\"rollBudget\":5}}");
+        assertEquals(200, r.statusCode(), r.body());
+        JsonObject s = json(r);
+        assertEquals(SimCardTest.TIMES.get(5).longValue(), s.get("now").getAsLong());
+        assertEquals(1000, s.get("dailyLimit").getAsLong());
+        assertEquals(100, s.get("allowance").getAsLong());
+        assertEquals(5, s.get("rollBudget").getAsInt());
+        assertTrue(s.get("testOwner").getAsBoolean());
+        assertEquals("http://127.0.0.1:3338", s.get("mint").getAsString());
+        assertEquals("01".repeat(32), s.getAsJsonArray("slots").get(0).getAsJsonObject().getAsJsonObject("dleq").get("e").getAsString());
     }
 
     @Test
@@ -184,7 +205,7 @@ class CardSimHttpTest {
                             HttpResponse.BodyHandlers.ofString());
                         JsonObject o = json(r);
                         if (r.statusCode() == 200 && "9000".equals(o.get("sw").getAsString())
-                            && o.get("hex").getAsString().length() == 22) {
+                            && o.get("hex").getAsString().length() == 64) {
                             ok.incrementAndGet();
                         } else {
                             synchronized (failures) { failures.add(new AssertionError(r.statusCode() + " " + r.body())); }
@@ -212,15 +233,15 @@ class CardSimHttpTest {
     @Test
     @DisplayName("a card that cannot be built fails start() (main exits 1) and releases the port")
     void cardBuildFailureFailsStart() throws Exception {
-        // The failure VersionMask.real() raises on an applet the TABLE does
-        // not know. It used to surface as a 500 on the first request, after
-        // main had already printed "listening".
+        // The failure SimCard raises when the applet does not answer a 2.x
+        // version after install. It used to surface as a 500 on the first
+        // request, after main had already printed "listening".
         sim.stop();
         int port = sim.port();
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> CardSim.start(port, () -> {
-            throw new IllegalStateException("no VersionMask entry for applet 0.7: add one to VersionMask.TABLE");
+            throw new IllegalStateException("SELECT after install answered 01149000, not a 2.x applet");
         }));
-        assertTrue(e.getMessage().contains("VersionMask.TABLE"), e.getMessage());
+        assertTrue(e.getMessage().contains("not a 2.x applet"), e.getMessage());
 
         // The failed start stopped its server: the same port binds again and serves.
         sim = CardSim.start(port);
@@ -233,13 +254,13 @@ class CardSimHttpTest {
         JsonObject fresh = json(get("/state")).getAsJsonObject("counts");
         assertEquals(0, fresh.get("unspent").getAsInt());
         assertEquals(0, fresh.get("spent").getAsInt());
-        assertEquals(32, fresh.get("empty").getAsInt());
+        assertEquals(128, fresh.get("empty").getAsInt());
 
         String proof = "{\"keysetId\":\"0059534ce0bfa19a\",\"amount\":8,\"nonce\":\"" + "ab".repeat(32)
             + "\",\"C\":\"02" + "11".repeat(32) + "\"}";
-        JsonObject loaded = json(post("/fixture", "{\"proofs\":[" + proof + "]}")).getAsJsonObject("counts");
+        JsonObject loaded = json(post("/fixture", "{\"mint\":\"http://m\",\"owner\":true,\"proofs\":[" + proof + "]}")).getAsJsonObject("counts");
         assertEquals(1, loaded.get("unspent").getAsInt());
         assertEquals(0, loaded.get("spent").getAsInt());
-        assertEquals(31, loaded.get("empty").getAsInt());
+        assertEquals(127, loaded.get("empty").getAsInt());
     }
 }
