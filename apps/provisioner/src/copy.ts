@@ -1,6 +1,4 @@
 /** The words on the screen and in iOS's NFC sheet. */
-import {NfcError} from 'react-native-nfc-manager';
-
 import {
   CASHU_PLAN,
   mayLeaveGuardedApplet,
@@ -8,6 +6,7 @@ import {
   type RunResult,
 } from './cardkit';
 import {locksOut} from './readout';
+import {nfcErrorName} from './session';
 
 export type Action = 'hello' | 'cashu' | 'rotate';
 
@@ -127,17 +126,21 @@ export function describeResult(
 
 /**
  * One line for a session that never reached the card (cancelled, NFC off, not
- * supported). The NFC library's errors are known by their classes, never by
- * constructor.name: a Release bundle's minifier renames classes.
+ * supported, timed out). The NFC library's errors are known by their classes
+ * (nfcErrorName), never by constructor.name, which a Release bundle's minifier
+ * renames, nor by their message, which iOS's leave empty: 'No card session:
+ * Timeout.', not 'No card session: Error.'.
  */
 export function describeSessionError(error: unknown): string {
-  if (error instanceof NfcError.UserCancel) {
+  const name = nfcErrorName(error);
+  if (name === 'UserCancel') {
     return 'Cancelled.';
   }
-  if (error instanceof NfcError.RadioDisabled) {
+  if (name === 'RadioDisabled') {
     return 'NFC is off: turn it on in Settings.';
   }
   const message =
-    error instanceof Error && error.message ? error.message : String(error);
+    name ??
+    (error instanceof Error && error.message ? error.message : String(error));
   return `No card session: ${message || 'unknown error'}.`;
 }

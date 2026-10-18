@@ -202,6 +202,32 @@ test("names a session that never reached the card, by the NFC library's own erro
   );
 });
 
+test('names every other NFC error by its class, which is all an iOS error carries', () => {
+  // nfc-manager's iOS side throws each Core NFC code as one of these with no
+  // message (NfcError.js, buildNfcExceptionIOS): String() of it is "Error"
+  expect(String(new NfcError.Timeout())).toBe('Error');
+  expect(describeSessionError(new NfcError.Timeout())).toBe(
+    'No card session: Timeout.',
+  );
+  expect(describeSessionError(new NfcError.SecurityViolation())).toBe(
+    'No card session: SecurityViolation.',
+  );
+  expect(describeSessionError(new NfcError.UnsupportedFeature())).toBe(
+    'No card session: UnsupportedFeature.',
+  );
+  expect(describeSessionError(new NfcError.SystemBusy())).toBe(
+    'No card session: SystemBusy.',
+  );
+  // under a Release bundle's names as well
+  const Renamed = {o: class extends NfcError.Timeout {}}.o;
+  expect(Renamed.name).not.toBe('Timeout');
+  expect(describeSessionError(new Renamed())).toBe('No card session: Timeout.');
+  // the library's base, which is what Android throws, keeps its message
+  expect(
+    describeSessionError(new NfcError.NfcErrorBase('no nfc support')),
+  ).toBe('No card session: no nfc support.');
+});
+
 test('knows those classes under the names a Release bundle gives them, and not by a name alone', () => {
   // Metro's minifier renames classes: the phone throws the library's class
   // under another name

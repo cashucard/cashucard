@@ -49,6 +49,12 @@ each phase with its APDU count and slowest APDU, every APDU over Android's defau
 618 ms, Android's effective timeout after `setTimeout(15000)`, and the free memory
 (GET DATA `FF21`) before and after. Share sends it as text.
 
+A run that stops says why. For an NFC failure that is the NFC library's error
+class, such as `TagConnectionLost` or `SessionInvalidated`, since an iOS error
+carries nothing else; Android's errors keep their own text. A session that never
+reached the card is named on the screen the same way, for example
+`No card session: Timeout.`
+
 ## Build and run (the owner, gate H1)
 
 Bundle id and Android `applicationId`: `com.flash.provisioner`.
@@ -64,7 +70,8 @@ plutil -p <the built .app>/Info.plist | grep -A5 select-identifiers   # A0000001
 The iOS sheet can select only the AIDs listed in `Info.plist`
 (`com.apple.developer.nfc.readersession.iso7816.select-identifiers`): the card
 manager first, the card's applet, the tag and the hello applet. Never the package
-AID. A missing AID or entitlement looks like a card fault.
+AID. A missing AID looks like a card fault. A missing entitlement ends the session
+before any card, and the screen says `No card session: SecurityViolation.`
 
 ## Checks (CI runs them)
 
