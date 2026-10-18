@@ -25,3 +25,7 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# Node and CocoaPods (tools/cardkit, apps/provisioner)
+node_modules/
+Pods/
