@@ -86,12 +86,13 @@ def main(argv):
     with open(args.cap, 'rb') as f:
         cap_sha = sha256(f.read())
     if cap_sha != CAP_SHA256:
-        print('make-assets: %s has sha256 %s, not the tracked CAP\'s %s (docs/HARDWARE_DEPLOYMENT.md)' % (args.cap, cap_sha, CAP_SHA256))
+        print('make-assets: %s has sha256 %s, not CAP_SHA256 %s in tools/cardkit/make-assets.py'
+              ' (a new CAP moves it, with LOAD_FILE_SIZE and LOAD_FILE_SHA256)' % (args.cap, cap_sha, CAP_SHA256))
         return 1
     cashu = load_file(args.cap)
     if len(cashu) != LOAD_FILE_SIZE or sha256(cashu) != LOAD_FILE_SHA256:
-        print('make-assets: the card\'s load file is %d bytes, sha256 %s; expected %d, %s'
-              % (len(cashu), sha256(cashu), LOAD_FILE_SIZE, LOAD_FILE_SHA256))
+        print('make-assets: the card\'s load file is %d bytes, sha256 %s; LOAD_FILE_SIZE and LOAD_FILE_SHA256'
+              ' in tools/cardkit/make-assets.py say %d, %s' % (len(cashu), sha256(cashu), LOAD_FILE_SIZE, LOAD_FILE_SHA256))
         return 1
 
     if not os.path.exists(args.hello_cap):

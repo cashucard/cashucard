@@ -36,7 +36,7 @@ tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as 
 | Path | What is there |
 |---|---|
 | `applet/` | The card's firmware: JavaCard 3.0.5, the floor ([D6](docs/DECISIONS.md#d6)), package `me.flashapp.cashu`. One load file holds three applets, installed in this order: the opener (`Opener`, AID `F0 43 41 53 48 55 43 41 52 44 4D`, which does nothing and comes first because the J3R180 will not take the card's applet as the package's first instance), the card's applet (`CashuApplet`, with `SchnorrHW`; `F0 43 41 53 48 55 43 41 52 44 01`) and the NFC tag (`Tag`). The jCardSim suite is `applet/src/test/java/`. |
-| `applet/target/cashu-javacard-2.1.0.cap` | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, and unless the guide publishes the tracked file's sha256. |
+| `applet/target/cashu-javacard-2.1.0.cap` | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, unless the guide publishes the tracked file's sha256, and unless `tools/cardkit/make-assets.py`'s pins and `apps/provisioner/src/assets/cashu.ts` match it. |
 | `tools/cardctl/` | The reference host driver, Python over PC/SC: `cardctl.py`, the BIP-340 verifier `bip340.py`, the owner's P-256 `p256.py`, and six test files that need no reader, no card and no pyscard. Its venv is the one [`tools/cardctl/README.md`](tools/cardctl/README.md) documents: a Homebrew Python, `.venv` in `tools/cardctl/`, never the macOS system Python 3.9 (pyscard installs there and fails at import). |
 | `tools/cardsim/` | The real applet in jCardSim on `http://127.0.0.1:9876`, for the apps' end-to-end runs: the HTTP bridge, its Node client `client.cjs`, the Cashu arithmetic `cashu-crypto.cjs` and the mint e2e `e2e-swap.test.cjs`. flash-pos and flash-mobile pin it by `CASHU_JAVACARD_REF`, so its routes, fixtures and client are a contract with both apps ([`tools/cardsim/README.md`](tools/cardsim/README.md)). `run.sh` and `ctl.sh` are Foxy's line-protocol simulator on port 47431. |
 | `tools/chip/` | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below). |
@@ -229,6 +229,17 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   with its new sha256 in `docs/HARDWARE_DEPLOYMENT.md`, or the `cap` job fails.
   A local `ant` run rewrites the tracked file (the manifest records the build
   time), so with no applet change, restore it from git rather than commit it.
+  It also moves cardkit's pins: `CAP_SHA256`, `LOAD_FILE_SIZE` and
+  `LOAD_FILE_SHA256` in `tools/cardkit/make-assets.py` (then run it and commit
+  `apps/provisioner/src/assets/`), the size and block counts in
+  `tools/cardkit/gp/test/load.test.ts` and `provision.test.ts` and in the
+  provisioner's `__tests__/session.test.ts` and `cardkit-in-the-app.test.ts`,
+  and on a version move the CAP's path and name in `make-assets.py` and the
+  `02 01` in `gp/provision.ts`'s checks, `gp/test/fake-card.ts`, and the
+  provisioner's `src/copy.ts` and its test (`gp/test/provision.test.ts` holds
+  the first two to `CashuApplet.java`'s version). `H0_LOAD_FILE_SHA256` in
+  `gp/test/transcripts.test.ts` stays: it is the load file in the owner's
+  capture, and only a new capture moves it.
 - **On a card, delete the tag, then the card's applet, then the opener, and only
   then the package** (`D2760000850101`, `F043415348554341524401`,
   `F04341534855434152444D`, `F0434153485543415244`): the chip refuses to delete
@@ -249,7 +260,8 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   the tracked CAP's sha256 and the card's load file by size and sha256, and writes
   `apps/provisioner/src/assets/` (run it, never edit them); the app re-checks the
   hash before it sends a byte. The tracked CAP is never rebuilt for this: a local
-  `ant cap` run rewrites it, so restore it from git first. A new CAP moves the pins.
+  `ant cap` run rewrites it, so restore it from git first. A new CAP moves the
+  pins, every one of them listed under shipping the CAP, above.
 - **[D27](docs/DECISIONS.md#d27) covers SCP02 and the vendored DES** (`gp/des.ts`),
   not a package's or a native cipher; SCP02 is all the J3R180 offers. A failed
   login counts towards a lock that is for good, so nothing is retried.
@@ -265,8 +277,10 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   `forge.flashapp.me`. The mints in CI are local Nutshell containers with
   FakeWallet; use those.
 - **Secrets never pass through prompts or shell history:** PINs, PUKs,
-  GlobalPlatform keys, and owner keys other than cardctl's published TEST key.
-  A step that needs one is the operator's.
+  GlobalPlatform keys other than the factory set (`40` to `4F`) and ENG-738's
+  public spike set (`10` to `3F`, in `tools/cardkit/gp/scp02.ts`), and owner
+  keys other than cardctl's published TEST key. A step that needs one is the
+  operator's.
 - **Every behaviour change ships with a test that fails before the change.**
   Run it both ways, and say in the PR what you ran; do not claim testing you
   did not do.

@@ -78,3 +78,8 @@ run nothing else and report it.
 Then run the tests (`cd tools/cardkit && node --import tsx --test 'gp/test/**/*.test.ts'`):
 every H0 test should now run and pass. A failure names the first byte that
 differs between gp and cardkit; that is the answer the captures were for.
+
+`gp-install-opener.txt` is held to the load file its LOAD blocks carry, by
+sha256 (`H0_LOAD_FILE_SHA256` in `transcripts.test.ts`, the 2.1.0 CAP's), and
+not to the provisioner's asset, so a later CAP leaves it passing. A failure at
+that hash means step 6 installed another CAP, not that cardkit differs from gp.

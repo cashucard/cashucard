@@ -5,12 +5,13 @@
  * once it lands: the handshake must prove the keys, and every command gp sent
  * under the MAC must be the one this module sends.
  *
- * Until then the parser and the replay are held to a log written in gp's
- * format, and in gp's wire form, from a run against the fake card.
+ * Until then the parser, the replay and the check of a capture's load are
+ * held to logs written in gp's format, and in gp's wire form, from runs
+ * against the fake card.
  */
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
-import {randomBytes} from 'node:crypto';
+import {createHash, randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
@@ -24,7 +25,7 @@ import {
   TAG_CLASS_AID,
 } from '../aids';
 import {concat, fromHex, toHex} from '../bytes';
-import {helloPlan, provision} from '../provision';
+import {helloPlan, provision, type Plan} from '../provision';
 import {
   FACTORY_KEYS,
   SPIKE_KEYS,
@@ -39,7 +40,7 @@ import {
   splitLoad,
   type KeySet,
 } from '../scp02';
-import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
+import {HELLO_LOAD_FILE} from './assets';
 import {FakeCard} from './fake-card';
 import {
   formatGpExchange,
@@ -47,6 +48,7 @@ import {
   parseKeyInformation,
   replay,
   type Exchange,
+  type Replay,
 } from './transcript';
 
 const FIXTURES = join(__dirname, 'fixtures');
@@ -86,27 +88,76 @@ function only(
   return found[0];
 }
 
+/**
+ * A run against the fake card, logged as gp -d logs one: lines gp prints that
+ * are not APDUs, then every exchange, with the command as gp puts it on the
+ * wire.
+ */
+async function gpRun(plan: Plan): Promise<{card: FakeCard; text: string}> {
+  const card = new FakeCard();
+  const lines: string[] = [
+    'GlobalPlatformPro v25.10.20',
+    'Reader: ACS ACR122U PICC Interface',
+    '# a line gp prints that is not an APDU',
+  ];
+  // the log holds what gp would have put on the wire for each command
+  const tx = async (apdu: number[]) => {
+    const reply = await card.transceive(apdu);
+    lines.push(formatGpExchange(gpWire(apdu), reply));
+    return reply;
+  };
+  let t = 0;
+  const r = await provision(tx, plan, {
+    random: n => randomBytes(n),
+    now: () => (t += 1),
+  });
+  assert.equal(r.ok, true);
+  return {card, text: lines.join('\n')};
+}
+
+/**
+ * The load file step 6 of the fixtures README installs: the 2.1.0 CAP's, as
+ * make-assets.py builds it (its LOAD_FILE_SHA256 when these tests were
+ * written). The capture is held to the file it carries, never to the
+ * provisioner's asset of the day: a new CAP moves make-assets.py's pins and
+ * leaves this one, which only a new capture of step 6 moves.
+ */
+const H0_LOAD_FILE_SHA256 =
+  'fe7d8ac31be1284f8a9a6d031cdee9b4690f8d02e0a9ab1fa3bac645f6bc13ee';
+
+/**
+ * The load in a replayed gp --install: INSTALL [for load] is this module's,
+ * the LOAD blocks gp sent carry the load file `sha256` names, and that file,
+ * cut by splitLoad, is gp's blocks byte for byte (gp's block size is the
+ * card's).
+ */
+function assertGpLoad(r: Replay, packageAid: number[], sha256: string): void {
+  const forLoad = only(
+    r.commands,
+    x => x[1] === 0xe6 && x[2] === 0x02,
+    'INSTALL [for load]',
+  );
+  assert.equal(toHex(forLoad), toHex(installForLoad(packageAid)));
+  const loads = r.commands.filter(x => x[1] === 0xe8);
+  const theirs = loads.flatMap(x => x.slice(5, 5 + x[4]));
+  assert.equal(
+    createHash('sha256').update(Buffer.from(theirs)).digest('hex'),
+    sha256,
+    'the load file in the LOAD blocks gp sent',
+  );
+  const ours = splitLoad(theirs);
+  assert.equal(
+    loads.length,
+    ours.length,
+    "the block count (gp's block size is the card's)",
+  );
+  loads.forEach((x, i) => assert.equal(toHex(x), toHex(ours[i]), `LOAD ${i}`));
+}
+
 describe('the gp -d log reader', () => {
   it("reads back a log written in gp's format and wire form, and replays its secure channel", async () => {
-    const card = new FakeCard();
-    const lines: string[] = [
-      'GlobalPlatformPro v25.10.20',
-      'Reader: ACS ACR122U PICC Interface',
-      '# a line gp prints that is not an APDU',
-    ];
-    // the log holds what gp would have put on the wire for each command
-    const tx = async (apdu: number[]) => {
-      const reply = await card.transceive(apdu);
-      lines.push(formatGpExchange(gpWire(apdu), reply));
-      return reply;
-    };
-    let t = 0;
-    const r = await provision(tx, helloPlan(HELLO_LOAD_FILE), {
-      random: n => randomBytes(n),
-      now: () => (t += 1),
-    });
-    assert.equal(r.ok, true);
-    const log = parseGpLog(lines.join('\n'));
+    const {card, text} = await gpRun(helloPlan(HELLO_LOAD_FILE));
+    const log = parseGpLog(text);
     assert.equal(log.length, card.log.length);
     // so this module sent, byte for byte, what gp sends: Le 00 on every wrapped command
     log.forEach((e, i) =>
@@ -118,6 +169,31 @@ describe('the gp -d log reader', () => {
       [0xe4, 0xe4, 0xe6, 0xe8, 0xe8, 0xe6],
     );
     assert.throws(() => replay(log, SPIKE_KEYS), /do not prove|does not prove/);
+  });
+
+  it("holds a capture's LOAD blocks to the load file they carry and to splitLoad's cut, whatever file that is", async () => {
+    // a load file other than the card's: the check is given the hash it holds
+    // the capture to, and reads no asset
+    const {text} = await gpRun(helloPlan(HELLO_LOAD_FILE));
+    const r = replay(parseGpLog(text), FACTORY_KEYS);
+    assertGpLoad(r, HELLO_PACKAGE_AID, HELLO_LOAD_FILE.sha256);
+    assert.throws(
+      () => assertGpLoad(r, HELLO_PACKAGE_AID, H0_LOAD_FILE_SHA256),
+      /the load file in the LOAD blocks gp sent/,
+      'a capture of another load file fails at its hash',
+    );
+    // the same file in blocks of 128: its hash holds, the cut does not
+    const recut = await gpRun({...helloPlan(HELLO_LOAD_FILE), blockSize: 128});
+    assert.throws(
+      () =>
+        assertGpLoad(
+          replay(parseGpLog(recut.text), FACTORY_KEYS),
+          HELLO_PACKAGE_AID,
+          HELLO_LOAD_FILE.sha256,
+        ),
+      /block count/,
+      'blocks of another size fail at the count',
+    );
   });
 
   it('reads a key information template as gp -i does: key ID, set version, and each type and length', () => {
@@ -261,22 +337,7 @@ describe('gate H0: the spare card through gp v25.10.20', () => {
     {skip: opener.skip},
     () => {
       const r = replay(opener.log(), FACTORY_KEYS);
-      const forLoad = only(
-        r.commands,
-        x => x[1] === 0xe6 && x[2] === 0x02,
-        'INSTALL [for load]',
-      );
-      assert.equal(toHex(forLoad), toHex(installForLoad(CASHU_PACKAGE_AID)));
-      const loads = r.commands.filter(x => x[1] === 0xe8);
-      const ours = splitLoad(fromHex(CASHU_LOAD_FILE.hex));
-      assert.equal(
-        loads.length,
-        ours.length,
-        "the block count (gp's block size is the card's)",
-      );
-      loads.forEach((x, i) =>
-        assert.equal(toHex(x), toHex(ours[i]), `LOAD ${i}`),
-      );
+      assertGpLoad(r, CASHU_PACKAGE_AID, H0_LOAD_FILE_SHA256);
       const inst = only(
         r.commands,
         x => x[1] === 0xe6 && x[2] === 0x0c,

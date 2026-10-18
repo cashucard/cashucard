@@ -7,6 +7,8 @@
  */
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
 import {
@@ -28,7 +30,7 @@ import {
   type ProvisionOptions,
   type RunEvent,
 } from '../provision';
-import {SPIKE_KEYS, parseCommand, type Transceiver} from '../scp02';
+import {SPIKE_KEYS, parseCommand, selectAid, type Transceiver} from '../scp02';
 import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
 import {FakeCard, ISD, pullAt} from './fake-card';
 
@@ -38,6 +40,10 @@ const OPENER = toHex(OPENER_AID);
 const CARD = toHex(CARD_AID);
 const TAG = toHex(TAG_AID);
 const PKG = toHex(CASHU_PACKAGE_AID);
+const APPLET_JAVA = join(
+  __dirname,
+  '../../../../applet/src/main/java/me/flashapp/cashu/CashuApplet.java',
+);
 
 function options(extra: Partial<ProvisionOptions> = {}): ProvisionOptions {
   let t = 0;
@@ -111,6 +117,31 @@ describe('provision: the Cashu card', () => {
         r.freeAfter &&
         r.freeAfter.nonVolatile < r.freeBefore.nonVolatile,
     );
+  });
+
+  it("verifies the applet's version as CashuApplet.java has it, which the fake card answers", async () => {
+    // VERSION_MAJOR and VERSION_MINOR, read as tools/cardctl/test_spec_consistency.py reads them
+    const java = readFileSync(APPLET_JAVA, 'utf8');
+    const version = ['VERSION_MAJOR', 'VERSION_MINOR'].map(name => {
+      const m = new RegExp(
+        `static final byte ${name}\\s*=\\s*\\(byte\\)\\s*0x([0-9A-Fa-f]{2})`,
+      ).exec(java);
+      assert.ok(m, `${name} in CashuApplet.java`);
+      return parseInt(m[1], 16);
+    });
+    const select = CASHU.checks.find(
+      c => toHex(c.apdu) === toHex(selectAid(CARD_AID)),
+    );
+    assert.deepEqual(select?.data, version, "verify's whole-AID SELECT");
+    const card = new FakeCard();
+    assert.equal((await provision(card.transceive, CASHU, options())).ok, true);
+    assert.deepEqual(
+      await card.transceive(selectAid(CARD_AID)),
+      [...version, 0x90, 0x00],
+      "the fake card's SELECT",
+    );
+    const info = await card.transceive([0xb0, 0x01, 0x00, 0x00, 0x00]);
+    assert.deepEqual(info.slice(0, 2), version, "the fake card's GET_INFO");
   });
 
   it('records each APDU as phase, INS, Lc, SW, reply length and time, and never its bytes', async () => {
