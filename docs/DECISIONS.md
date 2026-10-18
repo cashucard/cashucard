@@ -4,7 +4,7 @@ Each entry records a call that was made, what was rejected, and why. If you are
 about to change one of these, read the entry first — most were made against a
 real alternative, and several were made *after* getting it wrong once.
 
-Anchors are stable (`#d1` … `#d26`); other docs link to them. D15 and D16
+Anchors are stable (`#d1` … `#d27`); other docs link to them. D15 and D16
 are superseded by the 2.0 merge ([D18](#d18)) and kept for the record.
 
 ---
@@ -1123,6 +1123,65 @@ it carries the byte, which the architect's decision 2 had wanted of every one.
 flash-mobile, Foxy's wallet, `cardctl --budget` and the bridge's fixtures send
 the byte every time; a wallet that does not sends the limits it means and
 leaves the budget to the owner.
+
+---
+
+## <a id="d27"></a>D27: The phone installs over SCP02, with a DES of its own
+
+**Decided (ENG-738):** the phone-side provisioner talks to the card manager over
+GlobalPlatform SCP02, now, with a table-driven DES vendored in `tools/cardkit/gp/des.ts`:
+plain TypeScript, no dependency, the same code on Hermes and in Node. It is held to
+FIPS 81's vectors and the NIST SP 800-67 example, to node:crypto on random keys and
+data, and, at gate H0, to the owner's `gp -d` captures of the spare
+(`tools/cardkit/gp/test/fixtures/README.md`).
+
+**Why SCP02.** It is all the J3R180 offers. The owner's `gp -i -v` of the spare (CPLC
+serial 09336320, 2026-10-17): `Supports SCP02 i=15 i=35 i=55 i=75`, card data
+`GP SCP02 (i=55)`, key set version 01 with three DES3 keys of 16 bytes (IDs 1 to 3),
+sequence counter 0009, and no SCP03 and no AES set.
+
+**How.** C-MAC only (EXTERNAL AUTHENTICATE P1 `01`), three keys, no R-MAC, the ICV
+encrypted from the second command on, and the card's pseudo-random challenge taken as
+it comes. The host cannot read i from INITIALIZE UPDATE, which reports the protocol
+alone, so nothing depends on it. The C-MAC covers the header as sent (CLA `|04`,
+Lc + 8): GlobalPlatformPro v25.10.20, the gp both J3R180 hardware reports ran, does
+that for every SCP02 i (its `SCP02Wrapper.setVariant` sets `macModifiedAPDU` and `icvEnc`
+whatever it is given), although a reading of the specification's bit b2 says the
+other header for i=15 and 55. The option is kept (`macOverModifiedApdu`), and the H0
+transcript test decides it on the card's own answers. The commands are gp's byte for
+byte: INSTALL [for load] to the ISD with no hash and an empty token, LOAD in blocks of
+247 with Le, INSTALL [for install and make selectable] with privileges `00` and
+parameters `C9 00`, DELETE `80 E4 00 00`, and PUT KEY in place (P1 and the new
+version both `01`, each key under S-DEK with its check value), as `gp --lock` does on
+a card whose set is version 01.
+
+**What binds it.** A failed login counts towards a lock that is for good
+([`FORK.md`](../FORK.md)). So the card cryptogram is checked on the phone before
+EXTERNAL AUTHENTICATE is sent, and wrong keys send nothing more; nothing is retried
+(a repeat also breaks the MAC chain); after wrong keys or a refused login the app does
+nothing until it is restarted; and a key rotation finds the card's set from one
+INITIALIZE UPDATE checked against both sets, so a PUT KEY whose reply was lost costs
+no failed login. DELETE names six AIDs (the card's three instances and package, the
+hello applet and its package) and never the ISD. A card applet is removed only with
+Replace on and `GET_INFO` empty: no unspent or spent piece, no owner, no PIN, no
+record. A card that holds anything is never swept. The load file's sha256 is checked
+before the first APDU.
+
+**Rejected.** des.js (last released in May 2023) and crypto-js (no longer
+maintained, by its own README): a cipher that guards the card manager, from a
+package nobody is looking after, when the cipher is a page of tables a test suite can
+hold to the published vectors. A native crypto module (iOS CommonCrypto, Android
+`javax.crypto` through a bridge): a native build on both platforms for one cipher,
+and code the fake card in `gp/test` cannot run. SCP03 now: the chip has no AES key
+set, and making one is a PUT KEY of a new key type on the spare, a risk with nothing
+in it for the spike. Revisit if a later chip ships a factory AES set.
+
+**Not decided here.** Production key custody, diversification and a journal of
+rotations (Phase 4); rotating a field card; a resumable load. The spike's pass bar is
+the owner's (iOS arm to done in 45 s or less in 5 of 5 installs, no Android TagLost
+in 5 of 5, every drill recoverable), and which fallback is funded if iOS misses waits
+for the result. The spare ends as it began: factory keys `40` to `4F`, the 2.1 applet
+installed.
 
 ---
 

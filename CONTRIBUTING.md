@@ -51,6 +51,7 @@ Then pick a layer:
 |---|---|---|
 | Applet (`applet/`) | JavaCard | No — jCardSim |
 | Host driver (`tools/cardctl/`) | Python | Only for `selftest` |
+| Phone-side install (`tools/cardkit/`, `apps/provisioner/`) | TypeScript, React Native | No for the suites; the spare card and two phones for the bench run |
 | Mint protocol ([cashu-client](https://github.com/lnflash/cashu-client)) | TypeScript | No |
 | **Merchant terminal** | — | **Nobody is building this. It is the biggest gap.** |
 
@@ -87,6 +88,8 @@ more here than in an ordinary repo:
 ```bash
 mvn -f applet/pom.xml test                    # applet
 mvn -f tools/cardsim/pom.xml test             # card simulator bridge (compiles the applet in)
+(cd tools/cardkit && yarn install --frozen-lockfile && node --import tsx --test 'gp/test/**/*.test.ts')
+(cd apps/provisioner && yarn install --frozen-lockfile && node_modules/.bin/jest)
 cd tools/cardctl && python3 test_bip340.py && python3 test_apdu.py
 node --test 'tools/**/*.test.cjs'             # Node tools; set CARDSIM_URL for the bridge's integration cases
 ```
