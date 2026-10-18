@@ -145,15 +145,18 @@ python3 tools/cardkit/make-assets.py --check --cap "$RUNNER_TEMP/tracked.cap"
 ```
 
 On a workstation, [`README.md`](README.md) has the build (the SDKs once, then
-`ant` with its default `jc.sdk`, `~/.javacard/sdks/jc305u4_kit`):
+`ant` with its default `jc.sdk`, `~/.javacard/sdks/jc305u4_kit`). The hello CAP
+and `make-assets.py --check`, with no `--cap`, follow it:
 
 ```bash
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
+ant -f applet/build.xml hello-cap
+python3 tools/cardkit/make-assets.py --check   # reads the tracked CAP as committed; after ant cap, git checkout applet/target/cashu-javacard-2.1.0.cap first
 ```
 
-and the tests, which CI runs in the jobs above:
+The README also has the tests, which CI runs in the jobs above:
 
 ```bash
 mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
@@ -270,7 +273,9 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
 - **Spec changes are made here, never in cashu-javacard.** Do not push to
   `lnflash/cashu-javacard`: the mirror's commit and push there are the
   operator's.
-- **Gates H0 (the `gp` captures of the spare card) and H1 (the native builds and
-  runs on the phones) are the owner's.** Never run `gp`, or anything else, against
-  a card or reader; never install the provisioner on a phone; iOS pods and signing
-  are the owner's too ([`apps/provisioner/README.md`](apps/provisioner/README.md)).
+- **ENG-738's hardware steps are all the owner's,** gates H0 to H3: the `gp`
+  captures of the spare card (H0), the native builds and runs on the phones
+  (H1), the bench runs and drills (H2), and the readouts, screenshots and OS
+  versions from the phones (H3). Its plan names no device for an agent. iOS pods
+  and signing are the owner's too
+  ([`apps/provisioner/README.md`](apps/provisioner/README.md)).
