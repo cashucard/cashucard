@@ -2,7 +2,8 @@
  * SCP02 as GlobalPlatformPro v25.10.20 runs it on the J3R180 (i=55): session
  * keys, the two cryptograms and the C-MAC chain, each checked against
  * node:crypto; the handshake against a scripted card; and the command builders
- * byte for byte.
+ * byte for byte as gp puts them on the wire, where GPSession.transmit sends
+ * every command it has wrapped with Le 00.
  */
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -29,15 +30,18 @@ import {
   cardCryptogram,
   deleteAid,
   deriveSessionKeys,
+  externalAuthenticateCommand,
   getFreeMemory,
   hostCryptogram,
   installAndSelectable,
   installForLoad,
   kcv,
   openSession,
+  parseCommand,
   parseFreeMemory,
   putKeys,
   selectAid,
+  splitLoad,
   transmit,
   type KeySet,
   type Transceiver,
@@ -134,7 +138,7 @@ describe('SCP02: keys and cryptograms', () => {
 });
 
 describe('SCP02: the handshake', () => {
-  it('sends INITIALIZE UPDATE 80 50 00 00 08 <challenge> 00, then EXTERNAL AUTHENTICATE 84 82 01 00 10 with the host cryptogram and its C-MAC', async () => {
+  it('sends INITIALIZE UPDATE 80 50 00 00 08 <challenge> 00, then EXTERNAL AUTHENTICATE 84 82 01 00 10 with the host cryptogram, its C-MAC and Le 00', async () => {
     const card = scriptedCard(FACTORY_KEYS);
     const host = rnd(8);
     const session = await openSession(card.tx, FACTORY_KEYS, () => host);
@@ -144,7 +148,11 @@ describe('SCP02: the handshake', () => {
     const hc = nodeFullMac(s.enc, concat(card.seq, card.cardChallenge, host));
     // GlobalPlatformPro MACs the modified header: CLA 84 and Lc + 8 (D27; the H0 transcript confirms it)
     const mac = nodeRetailMac(s.mac, concat(fromHex('8482010010'), hc));
-    assert.equal(toHex(card.sent[1]), '8482010010' + toHex(hc) + toHex(mac));
+    // and sends it, as every command it wraps, with Le 00, which the MAC does not cover
+    assert.equal(
+      toHex(card.sent[1]),
+      '8482010010' + toHex(hc) + toHex(mac) + '00',
+    );
     assert.ok(session instanceof Session);
   });
 
@@ -217,11 +225,12 @@ describe('SCP02: the C-MAC chain', () => {
     const sMac = rnd(16);
     const session = new Session({enc: rnd(16), mac: sMac, dek: rnd(16)});
     const commands = [
-      fromHex('8482010008' + toHex(rnd(8))), // EXTERNAL AUTHENTICATE: the zero ICV
-      fromHex('80E40000094F07D2760000850101'),
+      externalAuthenticateCommand(rnd(8)), // the zero ICV; Le 00 after the MAC
+      deleteAid(TAG_AID), // case 4, as gp sends it: Le 00 after the MAC
       fromHex('80CAFF2100'), // case 2: Le kept after the MAC
       fromHex('80F24000024F00' + '00'),
       fromHex('80E8000003010203' + '00'),
+      fromHex('80E40000094F07D2760000850101'), // case 3 stays case 3
     ];
     let icv = new Array(8).fill(0);
     let first = true;
@@ -330,7 +339,10 @@ describe('SCP02: replies', () => {
   });
 });
 
-describe('GP commands, byte for byte as GlobalPlatformPro v25.10.20 builds them', () => {
+// gp's GPSession.transmit rebuilds every command it has wrapped as
+// new CommandAPDU(cla, ins, p1, p2, data, 256), so each goes out with Le 00;
+// SELECT, INITIALIZE UPDATE and GET DATA go unwrapped, as they were built.
+describe('GP commands, byte for byte as GlobalPlatformPro v25.10.20 sends them', () => {
   it('SELECT by name, with Le', () => {
     assert.equal(toHex(selectAid(ISD_AID)), '00A4040008A00000015100000000');
     assert.equal(
@@ -352,11 +364,22 @@ describe('GP commands, byte for byte as GlobalPlatformPro v25.10.20 builds them'
     assert.equal(parseFreeMemory(fromHex('6A88')), null);
   });
 
-  it('DELETE 80 E4 00 00 with 4F and the AID, no Le', () => {
-    assert.equal(toHex(deleteAid(TAG_AID)), '80E40000094F07D2760000850101');
+  it('EXTERNAL AUTHENTICATE 84 82 01 00 08: C-MAC only, the host cryptogram, Le 00', () => {
+    assert.equal(
+      toHex(externalAuthenticateCommand(fromHex('0102030405060708'))),
+      '8482010008' + '0102030405060708' + '00',
+    );
+    assert.throws(
+      () => externalAuthenticateCommand(new Array(7).fill(0)),
+      RangeError,
+    );
+  });
+
+  it('DELETE 80 E4 00 00 with 4F and the AID, and Le 00', () => {
+    assert.equal(toHex(deleteAid(TAG_AID)), '80E40000094F07D276000085010100');
     assert.equal(
       toHex(deleteAid(CASHU_PACKAGE_AID)),
-      '80E400000C4F0AF0434153485543415244',
+      '80E400000C4F0AF043415348554341524400',
     );
   });
 
@@ -377,25 +400,25 @@ describe('GP commands, byte for byte as GlobalPlatformPro v25.10.20 builds them'
     assert.throws(() => deleteAid(fromHex('A0000001510000')), /whitelist/);
   });
 
-  it('INSTALL [for load] 80 E6 02 00: package, the ISD, no hash, no parameters, an empty token', () => {
+  it('INSTALL [for load] 80 E6 02 00: package, the ISD, no hash, no parameters, an empty token, Le 00', () => {
     assert.equal(
       toHex(installForLoad(CASHU_PACKAGE_AID)),
-      '80E60200170AF043415348554341524408A000000151000000000000',
+      '80E60200170AF043415348554341524408A00000015100000000000000',
     );
   });
 
-  it('INSTALL [for install and make selectable] 80 E6 0C 00: package, module, instance, privileges 00, C9 00, an empty token', () => {
+  it('INSTALL [for install and make selectable] 80 E6 0C 00: package, module, instance, privileges 00, C9 00, an empty token, Le 00', () => {
     assert.equal(
       toHex(installAndSelectable(CASHU_PACKAGE_AID, OPENER_AID, OPENER_AID)),
-      '80E60C00290AF04341534855434152440BF04341534855434152444D0BF04341534855434152444D010002C90000',
+      '80E60C00290AF04341534855434152440BF04341534855434152444D0BF04341534855434152444D010002C9000000',
     );
     assert.equal(
       toHex(installAndSelectable(CASHU_PACKAGE_AID, TAG_CLASS_AID, TAG_AID)),
-      '80E60C00250AF04341534855434152440BF04341534855434152445407D2760000850101010002C90000',
+      '80E60C00250AF04341534855434152440BF04341534855434152445407D2760000850101010002C9000000',
     );
   });
 
-  it('PUT KEY 80 D8 <KVN> 81: the new KVN, then each key 80 10 <3DES-ECB under S-DEK> 03 <KCV>', () => {
+  it('PUT KEY 80 D8 <KVN> 81: the new KVN, then each key 80 10 <3DES-ECB under S-DEK> 03 <KCV>, and Le 00', () => {
     const sDek = rnd(16);
     const apdu = putKeys(SPIKE_KEYS, sDek, {p1: 0x01, newKvn: 0x01});
     const expected = concat(
@@ -408,11 +431,35 @@ describe('GP commands, byte for byte as GlobalPlatformPro v25.10.20 builds them'
           nodeEcb(k, new Array(8).fill(0)).slice(0, 3),
         ),
       ),
+      [0x00],
     );
     assert.equal(toHex(apdu), toHex(expected));
     assert.equal(
       toHex(kcv(FACTORY_KEYS.enc)),
       toHex(nodeEcb(FACTORY_KEYS.enc, new Array(8).fill(0)).slice(0, 3)),
     );
+  });
+
+  it('ends every command that goes under the C-MAC in Le 00, as gp sends them all', () => {
+    const wrapped: [string, number[]][] = [
+      ['EXTERNAL AUTHENTICATE', externalAuthenticateCommand(rnd(8))],
+      ...[TAG_AID, CARD_AID, OPENER_AID, CASHU_PACKAGE_AID].map(
+        aid => ['DELETE ' + toHex(aid), deleteAid(aid)] as [string, number[]],
+      ),
+      ['INSTALL [for load]', installForLoad(CASHU_PACKAGE_AID)],
+      [
+        'INSTALL [for install and make selectable]',
+        installAndSelectable(CASHU_PACKAGE_AID, CARD_AID, CARD_AID),
+      ],
+      ['PUT KEY', putKeys(SPIKE_KEYS, rnd(16), {p1: 0x01, newKvn: 0x01})],
+      ...splitLoad(rnd(600)).map(
+        (b, i) => ['LOAD ' + i, b] as [string, number[]],
+      ),
+    ];
+    for (const [name, apdu] of wrapped) {
+      const c = parseCommand(apdu);
+      assert.ok(c.data.length > 0, `${name} carries data`);
+      assert.equal(c.le, 0x00, `${name} ends in Le 00`);
+    }
   });
 });

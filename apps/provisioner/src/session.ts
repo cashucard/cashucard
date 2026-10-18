@@ -1,9 +1,18 @@
 /**
  * One NFC session: an armed IsoDep request, its transceiver and its teardown
  * (after flash-pos src/services/cashuCardNfc.ts). One at a time; cancelled in
- * `finally`, when the app leaves the foreground, and by the Cancel button.
+ * `finally`, by the Cancel button, and when the screen unmounts.
+ *
+ * Nothing here watches AppState, as neither reference session does. Android
+ * delivers the tag through onNewIntent (nfc-manager's default foreground
+ * dispatch), which it brackets with onPause and onResume, so AppState goes
+ * 'background' and back to 'active' on every tap; iOS reports 'inactive'
+ * while its NFC sheet covers the app. A cancel on either would close the
+ * session the tap has just opened. When the app does leave the foreground,
+ * iOS invalidates its reader session itself and nfc-manager stops Android's
+ * dispatch in onHostPause.
  */
-import {AppState, Platform} from 'react-native';
+import {Platform} from 'react-native';
 import NfcManager, {NfcTech} from 'react-native-nfc-manager';
 
 import type {Transceiver} from './cardkit';
@@ -73,11 +82,6 @@ export async function withCard<T>(
     platform: Platform.OS,
     os: String(Platform.Version),
   };
-  const leaving = AppState.addEventListener('change', state => {
-    if (state !== 'active') {
-      cancelCard();
-    }
-  });
   try {
     await NfcManager.start();
     await NfcManager.requestTechnology(NfcTech.IsoDep, {alertMessage});
@@ -101,7 +105,6 @@ export async function withCard<T>(
     stamps.done = now();
     return {value, stamps, meta};
   } finally {
-    leaving.remove();
     await cancelCard();
     inFlight = false;
   }

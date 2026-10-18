@@ -1149,11 +1149,14 @@ that for every SCP02 i (its `SCP02Wrapper.setVariant` sets `macModifiedAPDU` and
 whatever it is given), although a reading of the specification's bit b2 says the
 other header for i=15 and 55. The option is kept (`macOverModifiedApdu`), and the H0
 transcript test decides it on the card's own answers. The commands are gp's byte for
-byte: INSTALL [for load] to the ISD with no hash and an empty token, LOAD in blocks of
-247 with Le, INSTALL [for install and make selectable] with privileges `00` and
-parameters `C9 00`, DELETE `80 E4 00 00`, and PUT KEY in place (P1 and the new
-version both `01`, each key under S-DEK with its check value), as `gp --lock` does on
-a card whose set is version 01.
+byte as gp puts them on the wire, and there every command under the C-MAC carries
+Le `00`, outside the MAC: gp's `GPSession.transmit` rebuilds each command it has
+wrapped with Le `00`, whatever it was built with. So EXTERNAL AUTHENTICATE, INSTALL
+[for load] to the ISD with no hash and an empty token, LOAD in blocks of 247,
+INSTALL [for install and make selectable] with privileges `00` and parameters
+`C9 00`, DELETE `80 E4 00 00`, and PUT KEY in place (P1 and the new version both
+`01`, each key under S-DEK with its check value, as `gp --lock` does on a card whose
+set is version 01) all end in `00`.
 
 **What binds it.** A failed login counts towards a lock that is for good
 ([`FORK.md`](../FORK.md)). So the card cryptogram is checked on the phone before

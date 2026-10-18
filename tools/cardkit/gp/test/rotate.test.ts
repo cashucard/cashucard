@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 
 import {toHex} from '../bytes';
 import {rotateKeys, type RotateOptions} from '../provision';
-import {FACTORY_KEYS, SPIKE_KEYS, type KeySet} from '../scp02';
+import {FACTORY_KEYS, SPIKE_KEYS, parseCommand, type KeySet} from '../scp02';
 import {FakeCard, pullAt} from './fake-card';
 
 function options(extra: Partial<RotateOptions> = {}): RotateOptions {
@@ -44,6 +44,14 @@ describe('rotateKeys', () => {
     assert.deepEqual(card.insLog(), ROTATE_ORDER);
     const putKey = card.log[3];
     assert.deepEqual(putKey.slice(0, 4), [0x84, 0xd8, 0x01, 0x81]);
+    // EXTERNAL AUTHENTICATE and PUT KEY as gp sends them: Le 00 after the MAC
+    for (const a of card.log.filter(x => (x[0] & 0x04) !== 0)) {
+      assert.equal(
+        parseCommand(a).le,
+        0x00,
+        `INS ${toHex([a[1]])} ends in Le 00`,
+      );
+    }
     card.reset();
     const back = await rotateKeys(
       card.transceive,

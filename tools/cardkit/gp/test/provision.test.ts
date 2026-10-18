@@ -1,8 +1,9 @@
 /**
  * The install against the fake card: the happy path in order, a pull at every
  * APDU (before the card acts and after) followed by a run that sweeps and
- * installs, both guesses at what a torn LOAD leaves, the opener rule, a mute
- * INSTALL, refusals, the guards, a tampered load file, and events that throw.
+ * installs, with Replace on and with it off, both guesses at what a torn LOAD
+ * leaves, the opener rule, a mute INSTALL, refusals, the guards, a tampered
+ * load file, and events that throw.
  */
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -21,12 +22,13 @@ import {
   PHASES,
   cashuPlan,
   helloPlan,
+  mayLeaveGuardedApplet,
   provision,
   type Plan,
   type ProvisionOptions,
   type RunEvent,
 } from '../provision';
-import {SPIKE_KEYS, type Transceiver} from '../scp02';
+import {SPIKE_KEYS, parseCommand, type Transceiver} from '../scp02';
 import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
 import {FakeCard, ISD, pullAt} from './fake-card';
 
@@ -90,6 +92,14 @@ describe('provision: the Cashu card', () => {
         .filter(a => [0x82, 0xe4, 0xe6, 0xe8].includes(a[1]))
         .every(a => a[0] === 0x84),
     );
+    // as gp sends them: Le 00 after the MAC on every one (GPSession.transmit)
+    for (const a of card.log.filter(x => (x[0] & 0x04) !== 0)) {
+      assert.equal(
+        parseCommand(a).le,
+        0x00,
+        `INS ${toHex([a[1]])} ends in Le 00`,
+      );
+    }
     assert.deepEqual(
       r.timings.map(t => t.phase),
       PHASES,
@@ -155,6 +165,82 @@ describe('provision: the Cashu card', () => {
         }
       }
     }
+  });
+
+  it('after a pull with Replace off, recovers with Replace off unless the card applet got on, and then stops guarded until Replace is on', async () => {
+    const total = INSTALL_ORDER.length;
+    let guarded = 0;
+    for (const partialLoad of ['discard', 'keep'] as const) {
+      for (const when of ['before', 'after'] as const) {
+        for (let n = 0; n < total; n++) {
+          const card = new FakeCard({partialLoad});
+          const pull = pullAt(card, n, when);
+          const first = await provision(pull.tx, CASHU, options());
+          const where = `${partialLoad}/${when}/APDU ${n} (${first.phase})`;
+          assert.equal(first.kind, 'pulled', where);
+          card.reset();
+          const installed = card.instances.has(CARD);
+          if (installed) {
+            // the screen says to turn on Replace after a pull in any phase this can follow
+            assert.ok(
+              mayLeaveGuardedApplet(CASHU, first.phase),
+              `${where}: the card applet is on the card`,
+            );
+          }
+          if (first.phase === 'installTag' || first.phase === 'verify') {
+            assert.ok(
+              installed,
+              `${where}: the card applet's INSTALL had answered`,
+            );
+          }
+          const before = card.log.length;
+          const again = await provision(card.transceive, CASHU, options());
+          if (!installed) {
+            assert.equal(
+              again.ok,
+              true,
+              `${where}: ${again.kind} ${again.reason}`,
+            );
+            assertInstalled(card);
+            continue;
+          }
+          guarded++;
+          assert.equal(again.kind, 'guarded', where);
+          assert.equal(again.phase, 'probe', where);
+          assert.match(again.reason ?? '', /turn on Replace/, where);
+          assert.deepEqual(
+            card.log.slice(before).map(a => a[1]),
+            [0xa4, 0x01],
+            `${where}: SELECT and GET_INFO, nothing more`,
+          );
+          card.reset();
+          const replaced = await provision(
+            card.transceive,
+            CASHU,
+            options({replace: true}),
+          );
+          assert.equal(
+            replaced.ok,
+            true,
+            `${where}: ${replaced.kind} ${replaced.reason}`,
+          );
+          assertInstalled(card);
+        }
+      }
+    }
+    assert.ok(guarded > 0, 'some pulls leave the card applet on the card');
+  });
+
+  it('names the phases a pull may leave the card applet in: from its INSTALL on, and none for the hello applet', () => {
+    assert.deepEqual(
+      PHASES.filter(p => mayLeaveGuardedApplet(CASHU, p)),
+      ['installCard', 'installTag', 'verify', 'done'],
+    );
+    assert.deepEqual(
+      PHASES.filter(p => mayLeaveGuardedApplet(HELLO, p)),
+      [],
+    );
+    assert.equal(mayLeaveGuardedApplet(CASHU, 'putKey'), false);
   });
 
   it('keeps a torn LOAD out of the way in both variants: the sweep deletes a kept partial package', async () => {

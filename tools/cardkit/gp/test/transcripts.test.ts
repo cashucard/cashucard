@@ -6,7 +6,7 @@
  * under the MAC must be the one this module sends.
  *
  * Until then the parser and the replay are held to a log written in gp's
- * format from a run against the fake card.
+ * format, and in gp's wire form, from a run against the fake card.
  */
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
@@ -17,11 +17,13 @@ import {describe, it} from 'node:test';
 import {
   CARD_AID,
   CASHU_PACKAGE_AID,
+  HELLO_AID,
+  HELLO_PACKAGE_AID,
   OPENER_AID,
   TAG_AID,
   TAG_CLASS_AID,
 } from '../aids';
-import {fromHex, toHex} from '../bytes';
+import {concat, fromHex, toHex} from '../bytes';
 import {helloPlan, provision} from '../provision';
 import {
   FACTORY_KEYS,
@@ -29,6 +31,7 @@ import {
   deleteAid,
   installAndSelectable,
   installForLoad,
+  parseCommand,
   parseFreeMemory,
   parseInitializeUpdate,
   parseReply,
@@ -41,6 +44,7 @@ import {FakeCard} from './fake-card';
 import {
   formatGpExchange,
   parseGpLog,
+  parseKeyInformation,
   replay,
   type Exchange,
 } from './transcript';
@@ -58,6 +62,20 @@ function capture(name: string): {skip: string | false; log: () => Exchange[]} {
   };
 }
 
+/**
+ * A command as gp v25.10.20 puts it on the wire. GPSession.transmit rebuilds
+ * every command it has wrapped as new CommandAPDU(cla, ins, p1, p2, data, 256),
+ * so each goes out with Le 00 whatever it was built with; what gp sends
+ * unwrapped (SELECT, INITIALIZE UPDATE, GET DATA) goes as it was built.
+ */
+function gpWire(apdu: number[]): number[] {
+  if ((apdu[0] & 0x04) === 0) {
+    return apdu;
+  }
+  const c = parseCommand(apdu);
+  return concat([c.cla, c.ins, c.p1, c.p2, c.data.length], c.data, [0x00]);
+}
+
 function only(
   commands: number[][],
   match: (c: number[]) => boolean,
@@ -69,16 +87,17 @@ function only(
 }
 
 describe('the gp -d log reader', () => {
-  it('reads back a log written in gp format, and replays its secure channel', async () => {
+  it("reads back a log written in gp's format and wire form, and replays its secure channel", async () => {
     const card = new FakeCard();
     const lines: string[] = [
       'GlobalPlatformPro v25.10.20',
       'Reader: ACS ACR122U PICC Interface',
       '# a line gp prints that is not an APDU',
     ];
+    // the log holds what gp would have put on the wire for each command
     const tx = async (apdu: number[]) => {
       const reply = await card.transceive(apdu);
-      lines.push(formatGpExchange(apdu, reply));
+      lines.push(formatGpExchange(gpWire(apdu), reply));
       return reply;
     };
     let t = 0;
@@ -89,7 +108,10 @@ describe('the gp -d log reader', () => {
     assert.equal(r.ok, true);
     const log = parseGpLog(lines.join('\n'));
     assert.equal(log.length, card.log.length);
-    log.forEach((e, i) => assert.deepEqual(e.command, card.log[i]));
+    // so this module sent, byte for byte, what gp sends: Le 00 on every wrapped command
+    log.forEach((e, i) =>
+      assert.equal(toHex(card.log[i]), toHex(e.command), `APDU ${i}`),
+    );
     const session = replay(log, FACTORY_KEYS);
     assert.deepEqual(
       session.commands.map(c => c[1]),
@@ -97,19 +119,70 @@ describe('the gp -d log reader', () => {
     );
     assert.throws(() => replay(log, SPIKE_KEYS), /do not prove|does not prove/);
   });
+
+  it('reads a key information template as gp -i does: key ID, set version, and each type and length', () => {
+    // key set 01 of three DES3 keys of 16 bytes, IDs 1 to 3, as the owner's gp -i -v shows it
+    const kit = fromHex('E012C00401018010C00402018010C00403018010');
+    assert.deepEqual(parseKeyInformation(kit), [
+      {id: 1, kvn: 1, components: [{type: 0x80, length: 16}]},
+      {id: 2, kvn: 1, components: [{type: 0x80, length: 16}]},
+      {id: 3, kvn: 1, components: [{type: 0x80, length: 16}]},
+    ]);
+    assert.throws(() => parseKeyInformation(fromHex('6F00')), /not a key/);
+    assert.throws(
+      () => parseKeyInformation(fromHex('E006C004010180')),
+      /runs past/,
+    );
+    assert.throws(
+      () => parseKeyInformation(fromHex('E00AC0080101FF8800100000')),
+      /extended/,
+    );
+  });
 });
 
 describe('gate H0: the spare card through gp v25.10.20', () => {
+  // gp -i logs in to nothing (GPTool.needsAuthentication does not list it):
+  // GPData.dump sends GET DATA only, the key information template among them
   const info = capture('gp-info.txt');
-  it('the card opens SCP02 on key set 01 (gp -i)', {skip: info.skip}, () => {
-    const iu = info.log().find(e => e.command[1] === 0x50 && e.reply);
-    assert.ok(iu, 'an INITIALIZE UPDATE');
-    const reply = parseInitializeUpdate(parseReply(iu!.reply!));
-    assert.equal(reply.scp, 0x02);
-    assert.equal(reply.kvn, 0x01);
-  });
+  it(
+    'the card holds key set 01: three DES3 keys of 16 bytes (gp -i, GET DATA 00E0)',
+    {skip: info.skip},
+    () => {
+      const e = info
+        .log()
+        .find(
+          x =>
+            x.command[1] === 0xca &&
+            x.command[2] === 0x00 &&
+            x.command[3] === 0xe0 &&
+            x.reply !== null &&
+            parseReply(x.reply).sw === 0x9000,
+        );
+      assert.ok(e, 'a GET DATA 00E0 the card answered with 9000');
+      assert.deepEqual(
+        parseKeyInformation(parseReply(e!.reply!).data),
+        [1, 2, 3].map(id => ({
+          id,
+          kvn: 0x01,
+          components: [{type: 0x80, length: 16}],
+        })),
+      );
+    },
+  );
 
   const list = capture('gp-list.txt');
+  it(
+    'the card opens SCP02 on key set 01 (the INITIALIZE UPDATE of gp --list)',
+    {skip: list.skip},
+    () => {
+      const iu = list.log().find(e => e.command[1] === 0x50 && e.reply);
+      assert.ok(iu, 'an INITIALIZE UPDATE');
+      const reply = parseInitializeUpdate(parseReply(iu!.reply!));
+      assert.equal(reply.scp, 0x02);
+      assert.equal(reply.kvn, 0x01);
+    },
+  );
+
   it(
     "the handshake and every MACed command of gp --list are this module's",
     {skip: list.skip},
@@ -152,6 +225,35 @@ describe('gate H0: the spare card through gp v25.10.20', () => {
       },
     );
   }
+
+  // what the sweep on a clean card leans on (provision.ts): a DELETE of an AID
+  // that is not there answers 6A88, and the login lives on for the next one
+  const absent = capture('gp-delete-absent.txt');
+  it(
+    'DELETE of an AID that is not there answers 6A88, and the secure channel outlives it (gp-delete-absent.txt)',
+    {skip: absent.skip},
+    () => {
+      const r = replay(absent.log(), FACTORY_KEYS);
+      const deletes = r.commands.flatMap((command, i) =>
+        command[1] === 0xe4 ? [{command, reply: r.replies[i]}] : [],
+      );
+      assert.deepEqual(
+        deletes.map(d => toHex(d.command)),
+        [toHex(deleteAid(HELLO_AID)), toHex(deleteAid(HELLO_PACKAGE_AID))],
+        "the hello instance, then its package, as this module's DELETE commands",
+      );
+      deletes.forEach((d, i) => {
+        assert.ok(d.reply, `a reply to DELETE ${i + 1}`);
+        assert.equal(
+          parseReply(d.reply!).sw,
+          0x6a88,
+          i === 0
+            ? 'an AID that is not there is 6A88'
+            : 'the second, MACed on from the first, is 6A88 too: the channel stayed open',
+        );
+      });
+    },
+  );
 
   const opener = capture('gp-install-opener.txt');
   it(

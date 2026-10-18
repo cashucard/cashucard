@@ -24,7 +24,9 @@ each measured. For the spare card only. The decision behind it is
 
 Every run starts from the card as it is: it checks for an installed applet, logs
 in, removes whatever a torn run left (newest instance first, then the package) and
-then loads. A card moved mid-run is fine; tap again.
+then loads. A card moved mid-run is fine; tap again. Once the card applet's INSTALL
+has gone out, the next run finds the applet and removes it only with Replace on,
+so after a pull from Installing card on, the screen says to turn Replace on first.
 
 ## What it will not do
 

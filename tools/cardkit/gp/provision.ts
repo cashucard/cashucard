@@ -432,6 +432,26 @@ const INSTALL_PHASES: readonly Phase[] = [
   'installTag',
 ];
 
+/**
+ * Whether a run of `plan` that stopped in `phase` may have left the applet its
+ * probe guards on the card: that applet's INSTALL had gone out, and only its
+ * reply may have been lost. The next run's probe then finds the applet, empty
+ * (a run gets that far only past no applet or an empty one), and stops
+ * `guarded` unless `replace` is on. Never true for a plan with no guard.
+ */
+export function mayLeaveGuardedApplet(plan: Plan, phase: string): boolean {
+  const guard = plan.guard;
+  if (!guard) {
+    return false;
+  }
+  const step = plan.installs.find(s => equal(s.instance, guard));
+  if (!step) {
+    return false;
+  }
+  const at = PHASES.indexOf(phase as Phase);
+  return at >= 0 && at >= PHASES.indexOf(step.phase);
+}
+
 /** A plan runs the probe only when it has a card applet to guard, and only the INSTALLs it lists. */
 function applies(plan: Plan, phase: Phase): boolean {
   if (phase === 'probe') {

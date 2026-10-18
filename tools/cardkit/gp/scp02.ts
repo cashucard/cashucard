@@ -9,8 +9,11 @@
  * the ICV encrypted from the second command on, and the card's pseudo-random
  * challenge taken as it comes. That is what GlobalPlatformPro v25.10.20 does
  * for every SCP02 i (its SCP02Wrapper sets icvEnc and macModifiedAPDU for
- * all), and gp is what has run on these cards. The H0 transcripts
- * (gp/test/fixtures) hold this file to gp's bytes.
+ * all), and gp is what has run on these cards. gp's GPSession.transmit also
+ * sends every wrapped command with Le 00 (it rebuilds each as a CommandAPDU
+ * with Ne 256), so every builder here for a command under the C-MAC ends in
+ * 00, outside the MAC. The H0 transcripts (gp/test/fixtures) hold this file
+ * to gp's bytes.
  *
  * No retries anywhere: a command sent twice breaks the MAC chain, and a
  * failed handshake counts towards the card manager's lock, which is for good
@@ -347,6 +350,19 @@ export class Session {
   }
 }
 
+/**
+ * EXTERNAL AUTHENTICATE before its C-MAC: P1 01 (C-MAC only), the host
+ * cryptogram, and Le 00, as gp sends it (GPSession.transmit).
+ */
+export function externalAuthenticateCommand(hostCryptogram: Bytes): number[] {
+  if (hostCryptogram.length !== 8) {
+    throw new RangeError(
+      'the host cryptogram is 8 bytes, not ' + hostCryptogram.length,
+    );
+  }
+  return concat([0x84, 0x82, 0x01, 0x00, 0x08], hostCryptogram, [0x00]);
+}
+
 /** EXTERNAL AUTHENTICATE at C-MAC level, for keys `sessionIfMatches` has already proved. */
 export async function externalAuthenticate(
   tx: Transceiver,
@@ -361,10 +377,7 @@ export async function externalAuthenticate(
     hs.reply.cardChallenge,
     hs.hostChallenge,
   );
-  const reply = await session.send(
-    tx,
-    concat([0x84, 0x82, 0x01, 0x00, 0x08], cryptogram),
-  );
+  const reply = await session.send(tx, externalAuthenticateCommand(cryptogram));
   if (reply.sw !== 0x9000) {
     throw new CardError(reply.sw, 0x82);
   }
@@ -447,9 +460,10 @@ export function parseFreeMemory(data: Bytes): FreeMemory | null {
 }
 
 /**
- * DELETE of one object (P2 00: not its dependents), as gp sends it. Throws for
- * the card manager and for any AID off the six-AID whitelist, before anything
- * is built: this module cannot be made to delete anything else.
+ * DELETE of one object (P2 00: not its dependents), with Le 00 as gp sends
+ * it. Throws for the card manager and for any AID off the six-AID whitelist,
+ * before anything is built: this module cannot be made to delete anything
+ * else.
  */
 export function deleteAid(aid: Bytes): number[] {
   if (equal(aid, ISD_AID)) {
@@ -463,10 +477,11 @@ export function deleteAid(aid: Bytes): number[] {
   return concat(
     [0x80, 0xe4, 0x00, 0x00, aid.length + 2, 0x4f, aid.length],
     aid,
+    [0x00],
   );
 }
 
-/** INSTALL [for load] into `domain` (the ISD): no load file hash, no parameters, an empty token. */
+/** INSTALL [for load] into `domain` (the ISD): no load file hash, no parameters, an empty token, Le 00. */
 export function installForLoad(
   packageAid: Bytes,
   domain: Bytes = ISD_AID,
@@ -478,7 +493,7 @@ export function installForLoad(
     domain,
     [0x00, 0x00, 0x00],
   );
-  return concat([0x80, 0xe6, 0x02, 0x00, data.length], data);
+  return concat([0x80, 0xe6, 0x02, 0x00, data.length], data, [0x00]);
 }
 
 /**
@@ -514,7 +529,7 @@ export function splitLoad(file: Bytes, blockSize = 247): number[][] {
   return out;
 }
 
-/** INSTALL [for install and make selectable]: privileges 00, parameters C9 00, an empty token. */
+/** INSTALL [for install and make selectable]: privileges 00, parameters C9 00, an empty token, Le 00. */
 export function installAndSelectable(
   packageAid: Bytes,
   moduleAid: Bytes,
@@ -536,7 +551,7 @@ export function installAndSelectable(
     parameters,
     [0x00],
   );
-  return concat([0x80, 0xe6, 0x0c, 0x00, data.length], data);
+  return concat([0x80, 0xe6, 0x0c, 0x00, data.length], data, [0x00]);
 }
 
 /** A DES3 key's check value: the first three bytes of its encryption of eight zeros. */
@@ -547,8 +562,8 @@ export function kcv(key16: Bytes): number[] {
 /**
  * PUT KEY of a whole set: P1 the key set it replaces (0 adds one), P2 81 (key
  * ID 1, more to follow), the new set's version, then ENC, MAC and DEK, each
- * 80 10 <the key under S-DEK, 3DES-ECB> 03 <its KCV>. As gp --lock sends it on
- * a card whose set is version 01: P1 01, new version 01, in place.
+ * 80 10 <the key under S-DEK, 3DES-ECB> 03 <its KCV>, and Le 00. As gp --lock
+ * sends it on a card whose set is version 01: P1 01, new version 01, in place.
  */
 export function putKeys(
   keys: KeySet,
@@ -562,5 +577,9 @@ export function putKeys(
     }
     data.push(0x80, 0x10, ...tdesEcb(sessionDek, key), 0x03, ...kcv(key));
   }
-  return concat([0x80, 0xd8, options.p1 & 0xff, 0x81, data.length], data);
+  return concat(
+    [0x80, 0xd8, options.p1 & 0xff, 0x81, data.length],
+    data,
+    [0x00],
+  );
 }

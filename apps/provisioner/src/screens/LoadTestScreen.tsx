@@ -100,7 +100,13 @@ export function LoadTestScreen(): React.JSX.Element {
           setStopped(true);
         }
         setStatus(
-          describeResult(action, last, progress.current, cancelled.current),
+          describeResult(
+            action,
+            last,
+            progress.current,
+            cancelled.current,
+            replace,
+          ),
         );
         setReadout(
           makeReadout({

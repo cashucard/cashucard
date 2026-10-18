@@ -1,5 +1,12 @@
 /** The words on the screen and in iOS's NFC sheet. */
-import type {RunEvent, RunResult} from './cardkit';
+import {NfcError} from 'react-native-nfc-manager';
+
+import {
+  CASHU_PLAN,
+  mayLeaveGuardedApplet,
+  type RunEvent,
+  type RunResult,
+} from './cardkit';
 import {locksOut} from './readout';
 
 export type Action = 'hello' | 'cashu' | 'rotate';
@@ -58,12 +65,16 @@ const INS_NAMES: Record<number, string> = {
 
 const STOPPED = ' The app is stopped: restart it before trying again.';
 
-/** One line for how a run ended. `progress` is the last label shown before it ended. */
+/**
+ * One line for how a run ended. `progress` is the last label shown before it
+ * ended; `replace` is whether Replace was on for the run.
+ */
 export function describeResult(
   action: Action,
   result: RunResult<string>,
   progress: string,
   cancelled = false,
+  replace = false,
 ): string {
   if (result.ok) {
     if (action === 'hello') {
@@ -76,15 +87,21 @@ export function describeResult(
   }
   const during = progress || 'the run';
   switch (result.kind) {
-    case 'pulled':
-      if (cancelled) {
-        return action === 'rotate'
-          ? `Cancelled during ${during}. Tap again; the app finds which keys the card is on first.`
-          : `Cancelled during ${during}. Tap again; the partial install is removed first.`;
+    case 'pulled': {
+      const how = cancelled ? 'Cancelled' : 'Card moved';
+      if (action === 'rotate') {
+        return `${how} during ${during}. Tap again; the app finds which keys the card is on first.`;
       }
-      return action === 'rotate'
-        ? `Card moved during ${during}. Tap again; the app finds which keys the card is on first.`
-        : `Card moved during ${during}. Tap again; the partial install is removed first.`;
+      // once the card applet's INSTALL has gone out, the next run finds it and
+      // removes it only with Replace on (it stops `guarded` otherwise)
+      const again =
+        action === 'cashu' &&
+        !replace &&
+        mayLeaveGuardedApplet(CASHU_PLAN, result.phase)
+          ? 'Turn on Replace (spare card only) and tap again'
+          : 'Tap again';
+      return `${how} during ${during}. ${again}; the partial install is removed first.`;
+    }
     case 'wrongKeys':
       return (
         'The card did not prove the keys. Nothing more was sent.' + STOPPED
@@ -108,16 +125,19 @@ export function describeResult(
   }
 }
 
-/** One line for a session that never reached the card (cancelled, NFC off, not supported). */
+/**
+ * One line for a session that never reached the card (cancelled, NFC off, not
+ * supported). The NFC library's errors are known by their classes, never by
+ * constructor.name: a Release bundle's minifier renames classes.
+ */
 export function describeSessionError(error: unknown): string {
-  const name = error instanceof Error ? error.constructor.name : '';
-  if (name === 'UserCancel') {
+  if (error instanceof NfcError.UserCancel) {
     return 'Cancelled.';
   }
-  if (name === 'RadioDisabled') {
+  if (error instanceof NfcError.RadioDisabled) {
     return 'NFC is off: turn it on in Settings.';
   }
   const message =
     error instanceof Error && error.message ? error.message : String(error);
-  return `No card session: ${message || name || 'unknown error'}.`;
+  return `No card session: ${message || 'unknown error'}.`;
 }
