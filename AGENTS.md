@@ -24,6 +24,9 @@ edits, so a spec change is always a PR here.
 tools/mirror-spec.sh <path-to-cashu-javacard-checkout>          # dry run: the diff; exit 0 identical, 1 differs
 tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as committed at HEAD, then git status there
 # Either exits 2, changing nothing, while that checkout's spec/ or this one's has uncommitted changes.
+# --apply also exits 2 unless HEAD is in origin/main (as last fetched) and its history has the spec/
+# that checkout has committed: run it from main after the merge and a pull, never from a ticket's
+# worktree. The dry run says when --apply would refuse.
 # Nothing outside spec/ is touched. The commit and the push in cashu-javacard are the operator's.
 ```
 
@@ -47,6 +50,8 @@ tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as 
 CI (`.github/workflows/ci.yml`) runs on every push to every branch and on every
 pull request. These are its commands, copied from it, under the job each belongs
 to; run the jobs your change touches before you push. Nothing here needs a card.
+Two blocks are marked CI-only: they need the runner (`sudo apt-get`, a `pip`
+outside any venv, `$RUNNER_TEMP`), and the workstation's way follows each.
 
 `test`, jCardSim tests (JDK 11 and 17):
 
@@ -55,11 +60,15 @@ mvn -B -f applet/pom.xml test
 ```
 
 `cardsim`, the cardsim bridge (JDK 11 and 17, Node 22). The jar's build compiles
-`applet/src/main/java` in as well, then the jar is started and driven:
+`applet/src/main/java` in as well, then the jar is started and driven. The `for`
+line is CI's wait for the bridge, up to 30 s for `/state` to answer: a SELECT
+sent before it does fails. It ends in `break` where CI's step has `exit 0`,
+which would end your shell.
 
 ```bash
 mvn -B -f tools/cardsim/pom.xml package
 java -jar tools/cardsim/target/cardsim.jar --port 9876 &
+for i in $(seq 1 60); do curl -sf localhost:9876/state >/dev/null && break; sleep 0.5; done
 curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}' \
   | grep -q '"hex":"02019000"'
 curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
@@ -77,8 +86,7 @@ mint on a pre-v2 keyset (forge's shape)" (port 3339) start in Docker: run those
 steps as ci.yml has them.
 
 `cardctl`, cardctl tests (Python 3.11 and 3.13). The six suites run in
-`tools/cardctl` (the step's working directory); the second step proves
-`requirements.txt` installs and pyscard imports:
+`tools/cardctl` (the step's working directory):
 
 ```bash
 python test_bip340.py
@@ -89,11 +97,21 @@ python test_card_file.py
 python test_hwtest_65byte_pubkey.py
 ```
 
+The second step proves `requirements.txt` installs and pyscard imports. It is
+CI-only, for the runner's Ubuntu and a `pip` with no venv:
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y swig libpcsclite-dev
 pip install -r tools/cardctl/requirements.txt
 python -c "import smartcard.scard; print('pyscard import OK')"
+```
+
+On a workstation the same proof runs in the venv of the layout's `tools/cardctl/`
+row, the one [`tools/cardctl/README.md`](tools/cardctl/README.md) makes:
+
+```bash
+cd tools/cardctl && .venv/bin/pip install -r requirements.txt && .venv/bin/python -c "import smartcard.scard"
 ```
 
 `e2e-tools`, e2e tool tests (Node 22). The bridge and mint cases skip without
@@ -113,7 +131,9 @@ sh tools/mirror-spec.test.sh
 `martinpaljak/oracle_javacard_sdks` at `6a75ec0d6913db236d354f154df7dbc9573d976d`
 checked out at `.javacard-sdks`. The tracked CAP is set aside, the source is
 converted (the build runs `tools/stripcap.py` and `tools/refcheck.py`), and the
-step "Tracked CAP matches the source and the deployment guide" compares the two:
+step "Tracked CAP matches the source and the deployment guide" compares the
+two. CI-only: `$RUNNER_TEMP` and `$GITHUB_WORKSPACE` are the runner's, and unset
+anywhere else.
 
 ```bash
 mv applet/target/cashu-javacard-2.1.0.cap "$RUNNER_TEMP/tracked.cap"

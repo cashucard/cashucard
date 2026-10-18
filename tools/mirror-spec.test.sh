@@ -2,8 +2,9 @@
 # Tests for tools/mirror-spec.sh. Each case builds two throwaway git checkouts:
 # a source laid out like this repo, with a copy of the script in its tools/,
 # and a target laid out like a cashu-javacard checkout, with files beside spec/
-# that must come through untouched. Needs git, diff and tar; no network. CI runs
-# it on every push and pull request:
+# that must come through untouched. The source's history is the target's spec/
+# (the last mirror), then a spec PR, merged: origin/main is at it. Needs git,
+# diff and tar; no network. CI runs it on every push and pull request:
 #
 #   sh tools/mirror-spec.test.sh
 #
@@ -11,13 +12,11 @@
 # script is missing or not executable.
 set -u
 
-here=$(cd "$(dirname "$0")" && pwd -P)
-script=$here/mirror-spec.sh
-
 # Git with none of the caller's configuration (identity, hooks, signing, global
 # ignores) and none of a hook's environment, so a check means the same on a
-# laptop and in CI.
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+# laptop and in CI; and no CDPATH, which would send the cd of a relative path
+# elsewhere or have it print into $here.
+unset CDPATH GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 GIT_CONFIG_GLOBAL=/dev/null
 GIT_CONFIG_NOSYSTEM=1
 GIT_AUTHOR_NAME=mirror-spec.test
@@ -25,6 +24,9 @@ GIT_AUTHOR_EMAIL=mirror-spec.test@example.invalid
 GIT_COMMITTER_NAME=$GIT_AUTHOR_NAME
 GIT_COMMITTER_EMAIL=$GIT_AUTHOR_EMAIL
 export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+
+here=$(cd "$(dirname "$0")" && pwd -P)
+script=$here/mirror-spec.sh
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/mirror-spec-test.XXXXXX") || exit 1
 trap 'rm -rf "$tmp"' EXIT
@@ -68,6 +70,12 @@ commit() {
 	git -C "$1" add -A && git -C "$1" commit -q -m "$2"
 }
 
+# merged <checkout>: its origin/main moves to its HEAD, as when the PR has
+# merged and been fetched.
+merged() {
+	git -C "$1" update-ref refs/remotes/origin/main HEAD
+}
+
 # Every file under $1 but .git, with its checksum: the same before and after
 # means nothing there changed.
 snapshot() {
@@ -79,8 +87,18 @@ outside() {
 	snapshot "$1" | grep -v ' \./spec/'
 }
 
+# last <checkout>: spec/ as the last mirror left it, which the target holds.
+last() {
+	put "$1/spec/APDU.md" "wire 2.0"
+	put "$1/spec/NUT-XX.md" "the protocol"
+	put "$1/spec/vectors/owner.json" '{"owner": 1}'
+	put "$1/spec/OLD.md" "only there"
+	put "$1/spec/old/GONE.md" "a directory only there"
+}
+
 # fresh: a new source ($src, its copy of the script $s) and target ($dst),
-# each committed.
+# each committed. The source's first commit has the spec/ the target holds;
+# its second, a spec PR merged into origin/main, is HEAD.
 k=0
 fresh() {
 	k=$((k + 1))
@@ -92,18 +110,16 @@ fresh() {
 	git -c init.defaultBranch=main init -q "$dst"
 	cp "$script" "$s" && chmod +x "$s"
 	put "$src/README.md" "the working repo"
+	last "$src"
+	commit "$src" "spec/ as the last mirror left it"
 	put "$src/spec/APDU.md" "wire 2.1"
-	put "$src/spec/NUT-XX.md" "the protocol"
-	put "$src/spec/vectors/owner.json" '{"owner": 1}'
 	put "$src/spec/vectors/transcript.json" '{"only": "here"}'
 	put "$src/spec/notes/NEW.md" "a directory only here"
-	commit "$src" source
+	rm -r "$src/spec/OLD.md" "$src/spec/old"
+	commit "$src" "a spec PR"
+	merged "$src"
 	put "$dst/README.md" "the protocol reference"
-	put "$dst/spec/APDU.md" "wire 2.0"
-	put "$dst/spec/NUT-XX.md" "the protocol"
-	put "$dst/spec/vectors/owner.json" '{"owner": 1}'
-	put "$dst/spec/OLD.md" "only there"
-	put "$dst/spec/old/GONE.md" "a directory only there"
+	last "$dst"
 	put "$dst/spec.md" "beside spec/, not in it"
 	put "$dst/specs/KEEP.md" "beside spec/, not in it"
 	put "$dst/tools/keep.sh" "outside spec/"
@@ -156,12 +172,24 @@ run "$dst" --apply
 [ "$rc" -eq 2 ] && [ -L "$dst/spec" ] && [ "$(cat "$tmp/elsewhere/APDU.md")" = "outside the target" ] && [ -z "$(git -C "$dst" status --porcelain)" ]
 verdict "a target whose spec/ is a committed symbolic link: exit 2, the link and what it names as they were"
 
+fresh
+git -C "$dst" rm -r -q spec
+put "$dst/spec" "a file named spec"
+commit "$dst" "spec is a file"
+run "$dst" --apply
+[ "$rc" -eq 2 ] && grep -q "spec is not a directory" "$tmp/err" && [ -f "$dst/spec" ] && [ "$(cat "$dst/spec")" = "a file named spec" ] && [ -z "$(git -C "$dst" status --porcelain)" ]
+verdict "a target whose spec is a committed regular file: exit 2, the file as it was"
+
 # --- dry run, apply, dry run --------------------------------------------------
 fresh
 before=$(snapshot "$dst")
 run "$dst"
 [ "$rc" -eq 1 ]
 verdict "dry run, spec/ differs: exit 1"
+grep -qF "at $(git -C "$src" rev-parse --short HEAD) (main)" "$tmp/err" &&
+	grep -q "^  Files a/spec/APDU.md and b/spec/APDU.md differ" "$tmp/err" && grep -q "^  Only in a/spec: OLD.md" "$tmp/err" &&
+	grep -q -e "--apply copies it" "$tmp/err"
+verdict "dry run: names the commit and its branch, lists what differs, and says --apply copies it"
 grep -q "^--- a/spec/APDU.md" "$tmp/out" && grep -q "^+++ b/spec/APDU.md" "$tmp/out" &&
 	grep -q "^-wire 2.0" "$tmp/out" && grep -q "^+wire 2.1" "$tmp/out"
 verdict "dry run: a unified diff, the target's file (a/) against this repo's (b/)"
@@ -198,6 +226,8 @@ commit "$dst" mirror
 run "$dst"
 [ "$rc" -eq 0 ] && [ ! -s "$tmp/out" ]
 verdict "dry run once the mirror is committed: exit 0, no diff"
+[ "$(git -C "$dst" rev-parse HEAD:spec)" = "$(git -C "$src" rev-parse HEAD:spec)" ]
+verdict "the committed mirror is the source's spec/, tree for tree"
 run "$dst" --apply
 [ "$rc" -eq 0 ] && [ -z "$(git -C "$dst" status --porcelain --untracked-files=all)" ]
 verdict "apply when identical: exit 0, nothing to commit"
@@ -216,6 +246,86 @@ verdict "a target with no spec/ yet: dry run exits 1"
 run "$dst" --apply
 [ "$rc" -eq 0 ] && diff -r "$src/spec" "$dst/spec" >/dev/null
 verdict "... and --apply makes it"
+
+# --- a file on one side only differs, an empty one too ------------------------
+fresh
+run "$dst" --apply
+commit "$dst" mirror
+mkdir -p "$src/spec/fixtures" && : >"$src/spec/fixtures/.gitkeep"
+commit "$src" "an empty file"
+merged "$src"
+run "$dst"
+[ "$rc" -eq 1 ] && grep -q "Only in b/spec: fixtures" "$tmp/err"
+verdict "an empty file only in the source: the dry run exits 1 and names it"
+run "$dst" --apply
+[ "$rc" -eq 0 ] && [ -f "$dst/spec/fixtures/.gitkeep" ] && [ ! -s "$dst/spec/fixtures/.gitkeep" ]
+verdict "... and --apply creates it"
+commit "$dst" "mirror of the empty file"
+[ "$(git -C "$dst" rev-parse HEAD:spec)" = "$(git -C "$src" rev-parse HEAD:spec)" ]
+verdict "... and the mirror, committed, is the source's spec/, tree for tree"
+git -C "$src" rm -q spec/fixtures/.gitkeep
+commit "$src" "the empty file goes"
+merged "$src"
+run "$dst"
+[ "$rc" -eq 1 ] && grep -q "Only in a/spec: fixtures" "$tmp/err"
+verdict "an empty file only in the target: the dry run exits 1 and names it"
+run "$dst" --apply
+[ "$rc" -eq 0 ] && [ ! -e "$dst/spec/fixtures" ]
+verdict "... and --apply removes it"
+
+# --- refusals: a HEAD that has not merged, a target ahead of HEAD -------------
+fresh
+git -C "$src" checkout -q -b pr-b
+put "$src/spec/NUT-XX.md" "a change not merged yet"
+commit "$src" "an open PR"
+before=$(snapshot "$dst")
+run "$dst"
+[ "$rc" -eq 1 ] && grep -q "^+a change not merged yet" "$tmp/out" &&
+	grep -q -e "--apply would refuse" "$tmp/err" && grep -q "is not in origin/main" "$tmp/err"
+verdict "HEAD not in origin/main (an open PR's branch): the dry run shows the diff and says --apply would refuse"
+run "$dst" --apply
+[ "$rc" -eq 2 ] && grep -q "is not in origin/main" "$tmp/err" && grep -qF "(pr-b)" "$tmp/err" && [ "$(snapshot "$dst")" = "$before" ]
+verdict "... and --apply exits 2, names the branch, and changes nothing"
+
+fresh
+git -C "$src" update-ref -d refs/remotes/origin/main
+before=$(snapshot "$dst")
+run "$dst" --apply
+[ "$rc" -eq 2 ] && grep -q "has no origin/main" "$tmp/err" && [ "$(snapshot "$dst")" = "$before" ]
+verdict "no origin/main to tell whether HEAD has merged: --apply exits 2, changing nothing"
+
+# The PR is mirrored; then --apply runs from a worktree of main from before
+# it, which is merged and behind the mirror.
+fresh
+run "$dst" --apply
+commit "$dst" "mirror of the PR"
+git -C "$src" worktree add -q --detach "$tmp/$k/stale" HEAD~1
+s=$tmp/$k/stale/tools/mirror-spec.sh
+before=$(snapshot "$dst")
+run "$dst"
+[ "$rc" -eq 1 ] && grep -q -e "--apply would refuse" "$tmp/err" && grep -q "is not one that spec/ here has been at" "$tmp/err"
+verdict "a worktree behind the commit the mirror was made from: the dry run says --apply would refuse"
+run "$dst" --apply
+[ "$rc" -eq 2 ] && grep -q "is not one that spec/ here has been at" "$tmp/err" && grep -qF "(detached HEAD)" "$tmp/err" &&
+	[ "$(snapshot "$dst")" = "$before" ]
+verdict "... and --apply exits 2, changing nothing"
+
+fresh
+put "$dst/spec/APDU.md" "an edit made in the mirror, and committed there"
+commit "$dst" "an edit in the mirror"
+before=$(snapshot "$dst")
+run "$dst" --apply
+[ "$rc" -eq 2 ] && grep -q "is not one that spec/ here has been at" "$tmp/err" && [ "$(snapshot "$dst")" = "$before" ]
+verdict "a spec/ committed in the target that this repo never had: --apply exits 2, changing nothing"
+
+fresh
+run "$dst" --apply
+commit "$dst" "mirror of the PR"
+git -C "$src" revert --no-edit HEAD >/dev/null
+merged "$src"
+run "$dst" --apply
+[ "$rc" -eq 0 ] && diff -r "$src/spec" "$dst/spec" >/dev/null && [ "$(cat "$dst/spec/APDU.md")" = "wire 2.0" ]
+verdict "a revert merged here is mirrored: forward is HEAD's history, whatever spec/ says"
 
 # --- refusals: uncommitted changes under spec/ --------------------------------
 for kind in modified staged untracked ignored; do
@@ -275,10 +385,30 @@ done
 fresh
 put "$src/.gitignore" "*.swp"
 commit "$src" ignore
+merged "$src"
 put "$src/spec/.APDU.md.swp" "an editor's file, ignored in the source"
 run "$dst" --apply
 [ "$rc" -eq 0 ] && [ ! -e "$dst/spec/.APDU.md.swp" ] && [ "$(cat "$dst/spec/APDU.md")" = "wire 2.1" ]
 verdict "the copy is spec/ as committed: a file the source ignores is not copied"
+
+# --- the call AGENTS.md gives, relative, under a CDPATH -----------------------
+# With . in CDPATH, cd prints the directory it finds, into $root; without it,
+# /bin/sh as bash does not look in the current directory at all.
+for cdpath in ".:$tmp" "$tmp"; do
+	case $cdpath in
+	.:*) with="with . first" ;;
+	*) with="without ." ;;
+	esac
+	fresh
+	(cd "$tmp/$k" && CDPATH=$cdpath cashu-card/tools/mirror-spec.sh cashu-javacard) >"$tmp/out" 2>"$tmp/err"
+	rc=$?
+	[ "$rc" -eq 1 ] && grep -q "^--- a/spec/APDU.md" "$tmp/out"
+	verdict "a relative call and target, CDPATH set $with: the dry run finds both checkouts, exit 1"
+	(cd "$tmp/$k" && CDPATH=$cdpath cashu-card/tools/mirror-spec.sh cashu-javacard --apply) >"$tmp/out" 2>"$tmp/err"
+	rc=$?
+	[ "$rc" -eq 0 ] && diff -r "$src/spec" "$dst/spec" >/dev/null
+	verdict "... and --apply copies"
+done
 
 echo "1..$n"
 if [ "$failed" -ne 0 ]; then
