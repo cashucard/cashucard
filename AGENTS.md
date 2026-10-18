@@ -145,15 +145,18 @@ python3 tools/cardkit/make-assets.py --check --cap "$RUNNER_TEMP/tracked.cap"
 ```
 
 On a workstation, [`README.md`](README.md) has the build (the SDKs once, then
-`ant` with its default `jc.sdk`, `~/.javacard/sdks/jc305u4_kit`). The hello CAP
-and `make-assets.py --check`, with no `--cap`, follow it:
+`ant` with its default `jc.sdk`, `~/.javacard/sdks/jc305u4_kit`). Set the tracked
+CAP aside first, as CI does: `ant cap` rewrites its manifest build time, so a
+`--check` against the rewritten file fails at the CAP pin. Run top to bottom:
 
 ```bash
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
+cp applet/target/cashu-javacard-2.1.0.cap "${TMPDIR:-/tmp}/tracked.cap"   # the committed CAP, before ant touches it
 ant -f applet/build.xml cap
 ant -f applet/build.xml hello-cap
-python3 tools/cardkit/make-assets.py --check   # reads the tracked CAP as committed; after ant cap, git checkout applet/target/cashu-javacard-2.1.0.cap first
+python3 tools/cardkit/make-assets.py --check --cap "${TMPDIR:-/tmp}/tracked.cap"
+git checkout -- applet/target/cashu-javacard-2.1.0.cap                     # restore the tracked CAP; never commit a local rebuild
 ```
 
 The README also has the tests, which CI runs in the jobs above:
@@ -162,6 +165,8 @@ The README also has the tests, which CI runs in the jobs above:
 mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
 mvn -f tools/cardsim/pom.xml package # card simulator bridge, its suite, and the jar
 node --test 'tools/**/*.test.cjs'    # client and Cashu arithmetic (bridge and mint cases skip)
+(cd tools/cardkit && yarn install --frozen-lockfile && node --import tsx --test 'gp/test/**/*.test.ts')  # SCP02 and the phone's install, against a fake card
+(cd apps/provisioner && yarn install --frozen-lockfile && node_modules/.bin/jest)                         # the provisioner app
 cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consistency test_card_file test_hwtest_65byte_pubkey; do python3 $t.py; done
 ```
 
