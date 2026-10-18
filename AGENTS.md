@@ -12,8 +12,9 @@ how the card behaves.
 
 `lnflash/cashu-card` is the working repository of the shared Cashu card
 (protocol 2.1, one wire for Flash and for Foxy's wallet): the JavaCard applet,
-its host tools and simulator, the protocol in `spec/`, and the TypeScript card
-library and the provisioning app still to come. It began as a copy of
+its host tools and simulator, the protocol in `spec/`, the TypeScript card
+library with the bench-spike app that installs the card from a phone, and the
+provisioning app still to come. It began as a copy of
 `lnflash/cashu-javacard` main with its whole history. `lnflash/cashu-javacard`
 stays the protocol reference, and from now on it is a read-only mirror of this
 repo's `spec/`: every PR that touches `spec/` here is mirrored there with
@@ -35,15 +36,15 @@ tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as 
 | Path | What is there |
 |---|---|
 | `applet/` | The card's firmware: JavaCard 3.0.5, the floor ([D6](docs/DECISIONS.md#d6)), package `me.flashapp.cashu`. One load file holds three applets, installed in this order: the opener (`Opener`, AID `F0 43 41 53 48 55 43 41 52 44 4D`, which does nothing and comes first because the J3R180 will not take the card's applet as the package's first instance), the card's applet (`CashuApplet`, with `SchnorrHW`; `F0 43 41 53 48 55 43 41 52 44 01`) and the NFC tag (`Tag`). The jCardSim suite is `applet/src/test/java/`. |
-| `applet/target/cashu-javacard-2.1.0.cap` | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, and unless the guide publishes the tracked file's sha256. |
+| `applet/target/cashu-javacard-2.1.0.cap` | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, unless the guide publishes the tracked file's sha256, and unless `tools/cardkit/make-assets.py`'s pins and `apps/provisioner/src/assets/cashu.ts` match it. |
 | `tools/cardctl/` | The reference host driver, Python over PC/SC: `cardctl.py`, the BIP-340 verifier `bip340.py`, the owner's P-256 `p256.py`, and six test files that need no reader, no card and no pyscard. Its venv is the one [`tools/cardctl/README.md`](tools/cardctl/README.md) documents: a Homebrew Python, `.venv` in `tools/cardctl/`, never the macOS system Python 3.9 (pyscard installs there and fails at import). |
 | `tools/cardsim/` | The real applet in jCardSim on `http://127.0.0.1:9876`, for the apps' end-to-end runs: the HTTP bridge, its Node client `client.cjs`, the Cashu arithmetic `cashu-crypto.cjs` and the mint e2e `e2e-swap.test.cjs`. flash-pos and flash-mobile pin it by `CASHU_JAVACARD_REF`, so its routes, fixtures and client are a contract with both apps ([`tools/cardsim/README.md`](tools/cardsim/README.md)). `run.sh` and `ctl.sh` are Foxy's line-protocol simulator on port 47431. |
 | `tools/chip/` | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below). |
 | `tools/` | Also: `stripcap.py` and `refcheck.py`, which the CAP build runs; `e2e-melt.cjs` and `e2e-redeem.cjs`, 0.x tools that drive a 0.x card and a mint, kept for the sweep of 0.x field cards; `mirror-spec.sh` and its test `mirror-spec.test.sh`. |
 | `spec/` | The protocol, mirrored to cashu-javacard: `NUT-XX.md` (what the bytes mean to a wallet and a mint), `APDU.md` (the wire, byte for byte), `CARD-FILE.md` (the 0.x interchange format) and `vectors/` (`headers.json`, `owner.json`, `secret.json`, `transcript.json`). |
-| `docs/` | `ARCHITECTURE.md`, `DECISIONS.md` (D1 to D26), `SECURITY-MODEL.md`, `HARDWARE_DEPLOYMENT.md` (build, install, reinstall, the AIDs), Foxy's design (`FOXY-CARD-*.md`), and one hardware report for each silicon milestone, named `HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md` (`HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md` is the newest). |
-| `tools/cardkit/` | To come (ENG-738): the card's commands as environment-agnostic TypeScript, with no NFC, HTTP or platform import; the transport is injected as `type Transceiver = (apdu: number[]) => Promise<number[]>`. |
-| `apps/provisioner/` | To come (ENG-739): the React Native app that provisions cards, on `tools/cardkit`. |
+| `docs/` | `ARCHITECTURE.md`, `DECISIONS.md` (D1 to D27), `SECURITY-MODEL.md`, `HARDWARE_DEPLOYMENT.md` (build, install, reinstall, the AIDs), Foxy's design (`FOXY-CARD-*.md`), and one hardware report for each silicon milestone, named `HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md` (`HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md` is the newest). |
+| `tools/cardkit/` | Installs the card's applet and rotates the card manager's keys over GlobalPlatform SCP02, as environment-agnostic TypeScript (ENG-738, [D27](docs/DECISIONS.md#d27)): a vendored DES, the session, the commands and the recovering install, with no NFC, HTTP or platform import. The transport is injected as `type Transceiver = (apdu: number[]) => Promise<number[]>`, so the phone and Node run the same code and `gp/test/` runs it against a fake card. Also here: `make-assets.py`, which writes the provisioner's load files from the CAPs, and `hello/`, the smoke test's one-applet package (not the card's: `ant -f applet/build.xml hello-cap` builds it, `HelloTest` runs it in jCardSim). |
+| `apps/provisioner/` | ENG-738's bench spike: a bare React Native app (yarn classic, bundle id `com.flash.provisioner`) with one load-test screen. It installs the 2.1 applet on the spare J3R180 over NFC through `tools/cardkit`, which Metro bundles from `tools/` (`src/cardkit.ts` is its one way in), and reads out the timings. Its [`README.md`](apps/provisioner/README.md) says what it does, what it will not do and the owner's build; `src/assets/` is generated. The app that provisions cards (ENG-739) is still to come. |
 
 ## Build, test and check
 
@@ -132,34 +133,69 @@ sh tools/mirror-spec.test.sh
 checked out at `.javacard-sdks`. The tracked CAP is set aside, the source is
 converted (the build runs `tools/stripcap.py` and `tools/refcheck.py`), and the
 step "Tracked CAP matches the source and the deployment guide" compares the
-two. CI-only: `$RUNNER_TEMP` and `$GITHUB_WORKSPACE` are the runner's, and unset
-anywhere else.
+two. The step "Hello CAP, and the provisioner's load files match the CAPs" builds
+the hello applet and runs `make-assets.py --check` on the set-aside CAP. CI-only:
+`$RUNNER_TEMP` and `$GITHUB_WORKSPACE` are the runner's, and unset anywhere else.
 
 ```bash
 mv applet/target/cashu-javacard-2.1.0.cap "$RUNNER_TEMP/tracked.cap"
 ant -f applet/build.xml cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+ant -f applet/build.xml hello-cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+python3 tools/cardkit/make-assets.py --check --cap "$RUNNER_TEMP/tracked.cap"
 ```
 
 On a workstation, [`README.md`](README.md) has the build (the SDKs once, then
-`ant` with its default `jc.sdk`, `~/.javacard/sdks/jc305u4_kit`):
+`ant` with its default `jc.sdk`, `~/.javacard/sdks/jc305u4_kit`). Set the tracked
+CAP aside first, as CI does: `ant cap` rewrites its manifest build time, so a
+`--check` against the rewritten file fails at the CAP pin. Run top to bottom:
 
 ```bash
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
+cp applet/target/cashu-javacard-2.1.0.cap "${TMPDIR:-/tmp}/tracked.cap"   # the committed CAP, before ant touches it
 ant -f applet/build.xml cap
+ant -f applet/build.xml hello-cap
+python3 tools/cardkit/make-assets.py --check --cap "${TMPDIR:-/tmp}/tracked.cap"
+git checkout -- applet/target/cashu-javacard-2.1.0.cap                     # restore the tracked CAP; never commit a local rebuild
 ```
 
-and the tests, which CI runs in the jobs above:
+The README also has the tests, which CI runs in the jobs above:
 
 ```bash
 mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
 mvn -f tools/cardsim/pom.xml package # card simulator bridge, its suite, and the jar
 node --test 'tools/**/*.test.cjs'    # client and Cashu arithmetic (bridge and mint cases skip)
+(cd tools/cardkit && yarn install --frozen-lockfile && node --import tsx --test 'gp/test/**/*.test.ts')  # SCP02 and the phone's install, against a fake card
+(cd apps/provisioner && yarn install --frozen-lockfile && node_modules/.bin/jest)                         # the provisioner app
 cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consistency test_card_file test_hwtest_65byte_pubkey; do python3 $t.py; done
 ```
 
 `tools/cardsim/cardsim.sh` runs the bridge from source, via Maven (README's
 "Card simulator").
+
+`cardkit`, the install against a fake card (Node 22, yarn classic), run in
+`tools/cardkit`; the library typechecks with no Node types (it runs on the phone):
+
+```bash
+yarn install --frozen-lockfile
+node_modules/.bin/tsc -p tsconfig.json --noEmit
+node_modules/.bin/tsc -p tsconfig.test.json --noEmit
+node --import tsx --test 'gp/test/**/*.test.ts'
+node_modules/.bin/prettier --check .
+```
+
+`provisioner`, the app (Node 22, yarn classic), run in `apps/provisioner`. The
+bundles prove Metro resolves `tools/cardkit` with no cardkit install;
+`$RUNNER_TEMP` is the runner's, so point it at a scratch directory first.
+
+```bash
+yarn install --frozen-lockfile
+node_modules/.bin/tsc --noEmit
+node_modules/.bin/eslint .
+node_modules/.bin/jest
+node_modules/.bin/react-native bundle --platform ios --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-ios.js"
+node_modules/.bin/react-native bundle --platform android --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-android.js"
+```
 
 ## Conventions that bite
 
@@ -188,7 +224,7 @@ cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consisten
   ([`CONTRIBUTING.md`](CONTRIBUTING.md), principle 5; the one exception is
   [D17](docs/DECISIONS.md#d17)'s).
 - **Every design change gets a D-entry in [`docs/DECISIONS.md`](docs/DECISIONS.md):**
-  what was decided, what was rejected and why. The next is D27; anchors are
+  what was decided, what was rejected and why. The next is D28; anchors are
   stable, and a superseded entry is marked and kept.
 - **Every silicon milestone gets a hardware report file,**
   `docs/HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md`: the card, the
@@ -198,6 +234,17 @@ cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consisten
   with its new sha256 in `docs/HARDWARE_DEPLOYMENT.md`, or the `cap` job fails.
   A local `ant` run rewrites the tracked file (the manifest records the build
   time), so with no applet change, restore it from git rather than commit it.
+  It also moves cardkit's pins: `CAP_SHA256`, `LOAD_FILE_SIZE` and
+  `LOAD_FILE_SHA256` in `tools/cardkit/make-assets.py` (then run it and commit
+  `apps/provisioner/src/assets/`), the size and block counts in
+  `tools/cardkit/gp/test/load.test.ts` and `provision.test.ts` and in the
+  provisioner's `__tests__/session.test.ts` and `cardkit-in-the-app.test.ts`,
+  and on a version move the CAP's path and name in `make-assets.py` and the
+  `02 01` in `gp/provision.ts`'s checks, `gp/test/fake-card.ts`, and the
+  provisioner's `src/copy.ts` and its test (`gp/test/provision.test.ts` holds
+  the first two to `CashuApplet.java`'s version). `H0_LOAD_FILE_SHA256` in
+  `gp/test/transcripts.test.ts` stays: it is the load file in the owner's
+  capture, and only a new capture moves it.
 - **On a card, delete the tag, then the card's applet, then the opener, and only
   then the package** (`D2760000850101`, `F043415348554341524401`,
   `F04341534855434152444D`, `F0434153485543415244`): the chip refuses to delete
@@ -210,6 +257,19 @@ cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consisten
   `tools/cardctl/p256.py`, the cardsim client and `OwnerKey.java` share and
   `SimCardTest` checks. They are not links to the old repository; renaming one
   is a build or key change of its own.
+- **The H0 tests skip until the owner's `gp -d` captures land.** A missing log in
+  `tools/cardkit/gp/test/fixtures/` skips its test with `pending H0 fixtures`, and
+  a present one makes it required. The skips are expected, and an agent never
+  writes a fixture ([`README.md`](tools/cardkit/gp/test/fixtures/README.md) there).
+- **The provisioner's load files are pinned.** `tools/cardkit/make-assets.py` pins
+  the tracked CAP's sha256 and the card's load file by size and sha256, and writes
+  `apps/provisioner/src/assets/` (run it, never edit them); the app re-checks the
+  hash before it sends a byte. The tracked CAP is never rebuilt for this: a local
+  `ant cap` run rewrites it, so restore it from git first. A new CAP moves the
+  pins, every one of them listed under shipping the CAP, above.
+- **[D27](docs/DECISIONS.md#d27) covers SCP02 and the vendored DES** (`gp/des.ts`),
+  not a package's or a native cipher; SCP02 is all the J3R180 offers. A failed
+  login counts towards a lock that is for good, so nothing is retried.
 
 ## Rules for agents
 
@@ -222,11 +282,19 @@ cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consisten
   `forge.flashapp.me`. The mints in CI are local Nutshell containers with
   FakeWallet; use those.
 - **Secrets never pass through prompts or shell history:** PINs, PUKs,
-  GlobalPlatform keys, and owner keys other than cardctl's published TEST key.
-  A step that needs one is the operator's.
+  GlobalPlatform keys other than the factory set (`40` to `4F`) and ENG-738's
+  public spike set (`10` to `3F`, in `tools/cardkit/gp/scp02.ts`), and owner
+  keys other than cardctl's published TEST key. A step that needs one is the
+  operator's.
 - **Every behaviour change ships with a test that fails before the change.**
   Run it both ways, and say in the PR what you ran; do not claim testing you
   did not do.
 - **Spec changes are made here, never in cashu-javacard.** Do not push to
   `lnflash/cashu-javacard`: the mirror's commit and push there are the
   operator's.
+- **ENG-738's hardware steps are all the owner's,** gates H0 to H3: the `gp`
+  captures of the spare card (H0), the native builds and runs on the phones
+  (H1), the bench runs and drills (H2), and the readouts, screenshots and OS
+  versions from the phones (H3). Its plan names no device for an agent. iOS pods
+  and signing are the owner's too
+  ([`apps/provisioner/README.md`](apps/provisioner/README.md)).

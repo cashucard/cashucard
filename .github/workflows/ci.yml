@@ -313,9 +313,90 @@ jobs:
           }
           echo "tracked CAP $sha matches this source in every entry but META-INF/MANIFEST.MF"
 
+      # The phone-side provisioner (ENG-738) carries two load files: the tracked
+      # CAP's, and the hello applet's for its smoke test. The hello CAP goes
+      # through the same pinned converter here, and both files must be exactly
+      # what tools/cardkit/make-assets.py makes of the two CAPs (the tracked one
+      # was set aside above, before the build wrote over its path).
+      - name: Hello CAP, and the provisioner's load files match the CAPs
+        run: |
+          ant -f applet/build.xml hello-cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+          python3 tools/cardkit/make-assets.py --check --cap "$RUNNER_TEMP/tracked.cap"
+
       - name: Upload CAP
         uses: actions/upload-artifact@v5
         with:
           name: cashu-javacard-cap
           path: applet/target/cashu-javacard-2.1.0.cap
           if-no-files-found: error
+
+  cardkit:
+    name: cardkit (SCP02 and the install, against a fake card)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/cardkit
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: yarn
+          cache-dependency-path: tools/cardkit/yarn.lock
+
+      - name: Install
+        run: yarn install --frozen-lockfile
+
+      # The library is typechecked with no Node types (it runs on the phone),
+      # the tests with them.
+      - name: Typecheck
+        run: |
+          node_modules/.bin/tsc -p tsconfig.json --noEmit
+          node_modules/.bin/tsc -p tsconfig.test.json --noEmit
+
+      # DES against FIPS 81 and node:crypto; SCP02 and the GP commands byte for
+      # byte; the install against a fake card (a pull at every APDU, both guesses
+      # at a torn LOAD, the opener rule, the guards); the key rotation. The H0
+      # tests replay the owner's gp captures, and skip, saying so, until they
+      # are in gp/test/fixtures.
+      - name: Tests
+        run: node --import tsx --test 'gp/test/**/*.test.ts'
+
+      - name: Format
+        run: node_modules/.bin/prettier --check .
+
+  provisioner:
+    name: provisioner app (typecheck, lint, tests, bundles)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/provisioner
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: yarn
+          cache-dependency-path: apps/provisioner/yarn.lock
+
+      - name: Install
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck
+        run: node_modules/.bin/tsc --noEmit
+
+      - name: Lint
+        run: node_modules/.bin/eslint .
+
+      - name: Tests
+        run: node_modules/.bin/jest
+
+      # The release bundles prove Metro resolves cardkit from tools/ and its
+      # dependency from here, with no cardkit install. Native builds and
+      # signing are the owner's (H1).
+      - name: Bundle for iOS and Android
+        run: |
+          node_modules/.bin/react-native bundle --platform ios --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-ios.js"
+          node_modules/.bin/react-native bundle --platform android --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-android.js"

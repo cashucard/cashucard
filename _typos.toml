@@ -2,7 +2,18 @@
 [default.extend-words]
 # "afe1081" is a commit hash, quoted in the 0.x hardware report and its script
 afe = "afe"
+# triple DES's encrypt-decrypt-encrypt order (OpenSSL's des-ede3), in tools/cardkit
+ede = "ede"
 
 [default.extend-identifiers]
 # a plural of the SELECT command, in the applet's tests
 SELECTs = "SELECTs"
+
+[files]
+# gp's APDU logs (H0 captures), the provisioner's load files and Xcode's object
+# IDs: hex, not words
+extend-exclude = [
+  "tools/cardkit/gp/test/fixtures/*.txt",
+  "apps/provisioner/src/assets/",
+  "*.pbxproj",
+]

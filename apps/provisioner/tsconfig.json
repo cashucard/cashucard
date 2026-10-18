@@ -1,0 +1,10 @@
+{
+  "extends": "@react-native/typescript-config/tsconfig.json",
+  "compilerOptions": {
+    // tools/cardkit is bundled from the repo; its one dependency resolves from
+    // this app's node_modules, as Metro's nodeModulesPaths has it
+    "paths": {
+      "@noble/hashes/*": ["./node_modules/@noble/hashes/*"]
+    }
+  }
+}

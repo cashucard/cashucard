@@ -118,6 +118,8 @@ card: [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).
 mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
 mvn -f tools/cardsim/pom.xml package # card simulator bridge, its suite, and the jar
 node --test 'tools/**/*.test.cjs'    # client and Cashu arithmetic (bridge and mint cases skip)
+(cd tools/cardkit && yarn install --frozen-lockfile && node --import tsx --test 'gp/test/**/*.test.ts')  # SCP02 and the phone's install, against a fake card
+(cd apps/provisioner && yarn install --frozen-lockfile && node_modules/.bin/jest)                         # the provisioner app
 cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consistency test_card_file test_hwtest_65byte_pubkey; do python3 $t.py; done
 ```
 
@@ -162,6 +164,8 @@ applet/src/test/java/   jCardSim test suite
 tools/cardctl/          PC/SC host driver (2.0) + its own tests
 tools/cardsim/          jCardSim card over localhost HTTP for app e2e, its client and e2e
 tools/chip/             Foxy's bench scripts for a card on a reader
+tools/cardkit/          GlobalPlatform for the phone: SCP02, the install, a fake card (D27)
+apps/provisioner/       bench spike: installs the card's applet from a phone over NFC (ENG-738)
 spec/                   NUT-XX.md (protocol), APDU.md (wire format), vectors/,
                         CARD-FILE.md (0.x host↔mint interchange format)
 docs/                   vision, architecture, decisions, security, glossary, Foxy's design
