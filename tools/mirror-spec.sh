@@ -17,11 +17,14 @@
 #
 # --apply copies a HEAD that has merged, and moves the mirror forward only: it
 # exits 2, with nothing changed, unless HEAD is in the history of origin/main
-# (as last fetched; there is no fetch here), and unless the spec/ the target
-# has committed is one that spec/ here has been at in HEAD's history. So an
-# unmerged branch cannot publish its spec/, and a worktree behind the commit
-# the mirror was made from cannot take the mirror back. The dry run says when
-# --apply would refuse, and why.
+# and its spec/ is origin/main's, and unless the spec/ the target has committed
+# is one that spec/ here has been at in HEAD's history. So an unmerged branch
+# cannot publish its spec/, and a worktree behind origin/main cannot take the
+# mirror back, a revert's mirror included: what --apply copies is origin/main's
+# spec/. That is origin/main as last fetched (there is no fetch here), so pull
+# first: a target mirrored since that fetch is refused, unless its spec/ is one
+# HEAD's history has as well, as after a revert. The dry run says when --apply
+# would refuse, and why.
 #
 # Both exit 2, with nothing changed, when the target has uncommitted changes
 # under spec/ (modified, staged, untracked or ignored files: they are printed),
@@ -131,6 +134,12 @@ else
 	1) refusal="HEAD, $at, is not in origin/main: it has not merged, or merged after origin/main was last fetched; mirror from main once the PR has merged, after a pull" ;;
 	*) die "git merge-base failed in $root" ;;
 	esac
+	# What is copied is origin/main's spec/. A worktree behind it would copy an
+	# older one, and the check below misses that when the mirror is a revert's:
+	# the spec/ the revert brought back is in that worktree's history too.
+	if [ "$(git -C "$root" rev-parse -q --verify HEAD:spec)" != "$(git -C "$root" rev-parse -q --verify refs/remotes/origin/main:spec)" ]; then
+		refusal="${refusal:+$refusal$nl}spec/ at HEAD, $at, is not origin/main's spec/: pull, or mirror from main"
+	fi
 fi
 # The mirror moves forward only: the spec/ the target has committed is one
 # that spec/ here has been at in HEAD's history, every commit that changed it

@@ -327,6 +327,38 @@ run "$dst" --apply
 [ "$rc" -eq 0 ] && diff -r "$src/spec" "$dst/spec" >/dev/null && [ "$(cat "$dst/spec/APDU.md")" = "wire 2.0" ]
 verdict "a revert merged here is mirrored: forward is HEAD's history, whatever spec/ says"
 
+# The PR is mirrored, then its revert; then --apply runs from a ticket's
+# worktree made at the PR's commit. It is merged, and its history has the
+# spec/ the revert brought back, so only origin/main's spec/ tells it is behind.
+fresh
+run "$dst" --apply
+commit "$dst" "mirror of the PR"
+git -C "$src" revert --no-edit HEAD >/dev/null
+merged "$src"
+run "$dst" --apply
+commit "$dst" "mirror of the revert"
+git -C "$src" worktree add -q -b eng-740 "$tmp/$k/ticket" HEAD~1
+s=$tmp/$k/ticket/tools/mirror-spec.sh
+before=$(snapshot "$dst")
+run "$dst"
+[ "$rc" -eq 1 ] && grep -q "^+wire 2.1" "$tmp/out" && grep -q -e "--apply would refuse" "$tmp/err" && grep -q "is not origin/main's spec/" "$tmp/err"
+verdict "a ticket's worktree at a PR whose revert is mirrored: the dry run shows the reverted change and says --apply would refuse"
+run "$dst" --apply
+[ "$rc" -eq 2 ] && grep -q "is not origin/main's spec/" "$tmp/err" && grep -qF "(eng-740)" "$tmp/err" && [ "$(snapshot "$dst")" = "$before" ]
+verdict "... and --apply exits 2, names the branch, and changes nothing"
+
+# main fetched, not pulled, behind origin/main by a PR outside spec/: its spec/
+# is origin/main's, the one --apply copies.
+fresh
+git -C "$src" checkout -q -b later
+put "$src/README.md" "a PR outside spec/"
+commit "$src" "a PR outside spec/"
+merged "$src"
+git -C "$src" checkout -q main
+run "$dst" --apply
+[ "$rc" -eq 0 ] && diff -r "$src/spec" "$dst/spec" >/dev/null
+verdict "main behind origin/main by a PR outside spec/: --apply copies, its spec/ being origin/main's"
+
 # --- refusals: uncommitted changes under spec/ --------------------------------
 for kind in modified staged untracked ignored; do
 	fresh

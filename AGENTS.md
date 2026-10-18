@@ -24,9 +24,9 @@ edits, so a spec change is always a PR here.
 tools/mirror-spec.sh <path-to-cashu-javacard-checkout>          # dry run: the diff; exit 0 identical, 1 differs
 tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as committed at HEAD, then git status there
 # Either exits 2, changing nothing, while that checkout's spec/ or this one's has uncommitted changes.
-# --apply also exits 2 unless HEAD is in origin/main (as last fetched) and its history has the spec/
-# that checkout has committed: run it from main after the merge and a pull, never from a ticket's
-# worktree. The dry run says when --apply would refuse.
+# --apply also exits 2 unless HEAD is in origin/main (as last fetched) and its spec/ is origin/main's,
+# and its history has the spec/ that checkout has committed: run it from main after the merge and a
+# pull, never from a ticket's worktree. The dry run says when --apply would refuse.
 # Nothing outside spec/ is touched. The commit and the push in cashu-javacard are the operator's.
 ```
 
