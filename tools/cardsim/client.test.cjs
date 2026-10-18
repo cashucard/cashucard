@@ -302,6 +302,12 @@ test("every request carries an AbortSignal and a wedged bridge fails the call at
     assert.ok(Date.now() - started < 2000, "failed at the deadline, not the 360-minute CI default")
     assert.ok(seen[0].signal instanceof AbortSignal)
     assert.equal(seen.length, 1, "a timed-out request is not retried")
+    // The abort fires when the deadline passes, but under load the server's
+    // handler may not have run yet (fetch returned does not mean the request
+    // was dispatched). Wait for delivery, bounded; seen.length is the no-retry
+    // guard, hits only proves the one request arrived.
+    const delivered = Date.now() + 2000
+    while (hits.length === 0 && Date.now() < delivered) await new Promise(r => setTimeout(r, 10))
     assert.deepEqual(hits, ["/fixture"], "the request reached the server exactly once")
   } finally {
     for (const s of sockets) s.destroy()
