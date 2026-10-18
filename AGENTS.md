@@ -1,0 +1,212 @@
+# AGENTS.md
+
+The guide to this repository for its operator and for AI agents: what it is,
+where things are, the commands CI runs, the conventions that cost a day when
+missed, and the rules an agent works under. The design is in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), the settled calls and their
+reasons in [`docs/DECISIONS.md`](docs/DECISIONS.md), and the words in
+[`docs/GLOSSARY.md`](docs/GLOSSARY.md). Read the first two before a change to
+how the card behaves.
+
+## What this repo is, and what cashu-javacard is now
+
+`lnflash/cashu-card` is the working repository of the shared Cashu card
+(protocol 2.1, one wire for Flash and for Foxy's wallet): the JavaCard applet,
+its host tools and simulator, the protocol in `spec/`, and the TypeScript card
+library and the provisioning app still to come. It began as a copy of
+`lnflash/cashu-javacard` main with its whole history. `lnflash/cashu-javacard`
+stays the protocol reference, and from now on it is a read-only mirror of this
+repo's `spec/`: every PR that touches `spec/` here is mirrored there with
+`tools/mirror-spec.sh` after it merges, and cashu-javacard takes no direct spec
+edits, so a spec change is always a PR here.
+
+```bash
+tools/mirror-spec.sh <path-to-cashu-javacard-checkout>          # dry run: the diff; exit 0 identical, 1 differs
+tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as committed at HEAD, then git status there
+# Either exits 2, changing nothing, while that checkout's spec/ or this one's has uncommitted changes.
+# Nothing outside spec/ is touched. The commit and the push in cashu-javacard are the operator's.
+```
+
+## Layout
+
+| Path | What is there |
+|---|---|
+| `applet/` | The card's firmware: JavaCard 3.0.5, the floor ([D6](docs/DECISIONS.md#d6)), package `me.flashapp.cashu`. One load file holds three applets, installed in this order: the opener (`Opener`, AID `F0 43 41 53 48 55 43 41 52 44 4D`, which does nothing and comes first because the J3R180 will not take the card's applet as the package's first instance), the card's applet (`CashuApplet`, with `SchnorrHW`; `F0 43 41 53 48 55 43 41 52 44 01`) and the NFC tag (`Tag`). The jCardSim suite is `applet/src/test/java/`. |
+| `applet/target/cashu-javacard-2.1.0.cap` | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, and unless the guide publishes the tracked file's sha256. |
+| `tools/cardctl/` | The reference host driver, Python over PC/SC: `cardctl.py`, the BIP-340 verifier `bip340.py`, the owner's P-256 `p256.py`, and six test files that need no reader, no card and no pyscard. Its venv is the one [`tools/cardctl/README.md`](tools/cardctl/README.md) documents: a Homebrew Python, `.venv` in `tools/cardctl/`, never the macOS system Python 3.9 (pyscard installs there and fails at import). |
+| `tools/cardsim/` | The real applet in jCardSim on `http://127.0.0.1:9876`, for the apps' end-to-end runs: the HTTP bridge, its Node client `client.cjs`, the Cashu arithmetic `cashu-crypto.cjs` and the mint e2e `e2e-swap.test.cjs`. flash-pos and flash-mobile pin it by `CASHU_JAVACARD_REF`, so its routes, fixtures and client are a contract with both apps ([`tools/cardsim/README.md`](tools/cardsim/README.md)). `run.sh` and `ctl.sh` are Foxy's line-protocol simulator on port 47431. |
+| `tools/chip/` | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below). |
+| `tools/` | Also: `stripcap.py` and `refcheck.py`, which the CAP build runs; `e2e-melt.cjs` and `e2e-redeem.cjs`, 0.x tools that drive a 0.x card and a mint, kept for the sweep of 0.x field cards; `mirror-spec.sh` and its test `mirror-spec.test.sh`. |
+| `spec/` | The protocol, mirrored to cashu-javacard: `NUT-XX.md` (what the bytes mean to a wallet and a mint), `APDU.md` (the wire, byte for byte), `CARD-FILE.md` (the 0.x interchange format) and `vectors/` (`headers.json`, `owner.json`, `secret.json`, `transcript.json`). |
+| `docs/` | `ARCHITECTURE.md`, `DECISIONS.md` (D1 to D26), `SECURITY-MODEL.md`, `HARDWARE_DEPLOYMENT.md` (build, install, reinstall, the AIDs), Foxy's design (`FOXY-CARD-*.md`), and one hardware report for each silicon milestone, named `HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md` (`HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md` is the newest). |
+| `tools/cardkit/` | To come (ENG-738): the card's commands as environment-agnostic TypeScript, with no NFC, HTTP or platform import; the transport is injected as `type Transceiver = (apdu: number[]) => Promise<number[]>`. |
+| `apps/provisioner/` | To come (ENG-739): the React Native app that provisions cards, on `tools/cardkit`. |
+
+## Build, test and check
+
+CI (`.github/workflows/ci.yml`) runs on every push to every branch and on every
+pull request. These are its commands, copied from it, under the job each belongs
+to; run the jobs your change touches before you push. Nothing here needs a card.
+
+`test`, jCardSim tests (JDK 11 and 17):
+
+```bash
+mvn -B -f applet/pom.xml test
+```
+
+`cardsim`, the cardsim bridge (JDK 11 and 17, Node 22). The jar's build compiles
+`applet/src/main/java` in as well, then the jar is started and driven:
+
+```bash
+mvn -B -f tools/cardsim/pom.xml package
+java -jar tools/cardsim/target/cardsim.jar --port 9876 &
+curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}' \
+  | grep -q '"hex":"02019000"'
+curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
+  | grep -q '"hex":"9000"'
+CARDSIM_URL=http://127.0.0.1:9876 node --test tools/cardsim/client.test.cjs
+CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3338 EXPECT_KEYSET_ID_BYTES=33 EXPECT_INPUT_FEE_PPK=100 \
+  node --test tools/cardsim/e2e-swap.test.cjs
+CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3339 EXPECT_KEYSET_ID_BYTES=8 EXPECT_INPUT_FEE_PPK=0 \
+  node --test tools/cardsim/e2e-swap.test.cjs
+```
+
+The two swaps need the Nutshell 0.20.3 mints (FakeWallet) that the steps "Start
+a Nutshell 0.20.3 mint" (port 3338, a v2 keyset) and "Start a Nutshell 0.20.3
+mint on a pre-v2 keyset (forge's shape)" (port 3339) start in Docker: run those
+steps as ci.yml has them.
+
+`cardctl`, cardctl tests (Python 3.11 and 3.13). The six suites run in
+`tools/cardctl` (the step's working directory); the second step proves
+`requirements.txt` installs and pyscard imports:
+
+```bash
+python test_bip340.py
+python test_p256.py
+python test_apdu.py
+python test_spec_consistency.py
+python test_card_file.py
+python test_hwtest_65byte_pubkey.py
+```
+
+```bash
+sudo apt-get update
+sudo apt-get install -y swig libpcsclite-dev
+pip install -r tools/cardctl/requirements.txt
+python -c "import smartcard.scard; print('pyscard import OK')"
+```
+
+`e2e-tools`, e2e tool tests (Node 22). The bridge and mint cases skip without
+`CARDSIM_URL` and `MINT_URL`:
+
+```bash
+node --test 'tools/**/*.test.cjs'
+```
+
+`tools`, the spec mirror script:
+
+```bash
+sh tools/mirror-spec.test.sh
+```
+
+`cap`, CAP conversion (JDK 17, Ant), with the JavaCard SDKs of
+`martinpaljak/oracle_javacard_sdks` at `6a75ec0d6913db236d354f154df7dbc9573d976d`
+checked out at `.javacard-sdks`. The tracked CAP is set aside, the source is
+converted (the build runs `tools/stripcap.py` and `tools/refcheck.py`), and the
+step "Tracked CAP matches the source and the deployment guide" compares the two:
+
+```bash
+mv applet/target/cashu-javacard-2.1.0.cap "$RUNNER_TEMP/tracked.cap"
+ant -f applet/build.xml cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+```
+
+On a workstation, [`README.md`](README.md) has the build (the SDKs once, then
+`ant` with its default `jc.sdk`, `~/.javacard/sdks/jc305u4_kit`):
+
+```bash
+git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
+
+ant -f applet/build.xml cap
+```
+
+and the tests, which CI runs in the jobs above:
+
+```bash
+mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
+mvn -f tools/cardsim/pom.xml package # card simulator bridge, its suite, and the jar
+node --test 'tools/**/*.test.cjs'    # client and Cashu arithmetic (bridge and mint cases skip)
+cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consistency test_card_file test_hwtest_65byte_pubkey; do python3 $t.py; done
+```
+
+`tools/cardsim/cardsim.sh` runs the bridge from source, via Maven (README's
+"Card simulator").
+
+## Conventions that bite
+
+- **SELECT answers the applet's version, and a wire change moves it.** The
+  card's applet answers `SELECT` with `02 01 90 00` (2.1), and `GET_INFO`
+  begins with the same two bytes. `CashuApplet.VERSION_MAJOR` and
+  `VERSION_MINOR` move with every wire-visible change of behaviour and every
+  fix a card in the field has to be told apart by (the comment above them;
+  [D26](docs/DECISIONS.md#d26) is 2.1's). `AidVersionTest` pins them, the CAP's
+  name carries the version, and a change to the wire is a change to Foxy's
+  wallet too: agree it with them first.
+- **Readers select the applet's whole AID, `F043415348554341524401`, never the
+  package AID `F0434153485543415244`** (ENG-681, [D25](docs/DECISIONS.md#d25)).
+  On the chip the package AID reaches the opener, which answers `90 00` with no
+  version and `6D 00` to every command after. jCardSim gave the package AID to
+  the card's applet, so every suite passed a SELECT the chip answers with the
+  opener; `tools/cardsim` now resolves a partial name as the chip does.
+- **jCardSim proves protocol logic, never silicon** ([D10](docs/DECISIONS.md#d10)).
+  It runs on the JVM with a garbage collector and cannot reproduce EEPROM
+  exhaustion, torn writes or hardware crypto framing. A green suite is not
+  evidence about a chip; a hardware report is.
+- **Nothing is allocated after install.** JavaCard Classic never frees `new`,
+  so an allocation on a command's path leaks EEPROM on every tap.
+  `SchnorrHWMathTest.noAllocationOutsideInstallTime` scans every applet source,
+  and a new source file needs its entry in that test's `INSTALL_TIME_METHODS`
+  ([`CONTRIBUTING.md`](CONTRIBUTING.md), principle 5; the one exception is
+  [D17](docs/DECISIONS.md#d17)'s).
+- **Every design change gets a D-entry in [`docs/DECISIONS.md`](docs/DECISIONS.md):**
+  what was decided, what was rejected and why. The next is D27; anchors are
+  stable, and a superseded entry is marked and kept.
+- **Every silicon milestone gets a hardware report file,**
+  `docs/HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md`: the card, the
+  environment, the CAP's sha256, what ran, and what was not covered.
+- **An applet change ships its CAP.** The rebuilt
+  `applet/target/cashu-javacard-2.1.0.cap` (JDK 17, `jc305u4_kit`) is committed
+  with its new sha256 in `docs/HARDWARE_DEPLOYMENT.md`, or the `cap` job fails.
+  A local `ant` run rewrites the tracked file (the manifest records the build
+  time), so with no applet change, restore it from git rather than commit it.
+- **On a card, delete the tag, then the card's applet, then the opener, and only
+  then the package** (`D2760000850101`, `F043415348554341524401`,
+  `F04341534855434152444D`, `F0434153485543415244`): the chip refuses to delete
+  an instance something still refers to. Reinstall the opener first and the tag
+  last. Sweep a card before deleting its applet: every piece on it is locked to
+  its key ([`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md)).
+- **Some names keep `cashu-javacard` on purpose:** the CAP's file name (from
+  `applet/build.xml`), the CI artifact `cashu-javacard-cap`, and the seed of the
+  TEST owner key, `cashu-javacard/cardctl test owner key`, which
+  `tools/cardctl/p256.py`, the cardsim client and `OwnerKey.java` share and
+  `SimCardTest` checks. They are not links to the old repository; renaming one
+  is a build or key change of its own.
+
+## Rules for agents
+
+- **Never touch cards, readers or phones** unless the ticket's approved plan
+  names the device and the actions, and then do exactly those actions. That
+  covers `gp`, `tools/chip/`, `tools/e2e-melt.cjs` and `tools/e2e-redeem.cjs`,
+  every `cardctl` command (its test files are fine) and an app build on a
+  device. jCardSim and `tools/cardsim` need no permission.
+- **Never read or write production systems.** That includes the mint at
+  `forge.flashapp.me`. The mints in CI are local Nutshell containers with
+  FakeWallet; use those.
+- **Secrets never pass through prompts or shell history:** PINs, PUKs,
+  GlobalPlatform keys, and owner keys other than cardctl's published TEST key.
+  A step that needs one is the operator's.
+- **Every behaviour change ships with a test that fails before the change.**
+  Run it both ways, and say in the PR what you ran; do not claim testing you
+  did not do.
+- **Spec changes are made here, never in cashu-javacard.** Do not push to
+  `lnflash/cashu-javacard`: the mirror's commit and push there are the
+  operator's.
