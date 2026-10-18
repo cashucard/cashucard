@@ -1,4 +1,4 @@
-# Contributing to cashu-javacard
+# Contributing to cashu-card
 
 An open-source implementation of [NUT-XX: Cashu NFC Card Protocol](spec/NUT-XX.md).
 Contributions are welcome — including from people who have never touched a
@@ -57,7 +57,7 @@ Then pick a layer:
 
 ### AI agent
 
-Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
+Read [`AGENTS.md`](AGENTS.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/DECISIONS.md`](docs/DECISIONS.md) and
 [`docs/GLOSSARY.md`](docs/GLOSSARY.md) before editing. Three rules that matter
 more here than in an ordinary repo:
@@ -148,6 +148,9 @@ CAP (JDK 17, `jc305u4_kit`) and its new hash in that guide.
    `SchnorrHW`) require two reviewers.
 4. Spec changes should be discussed in
    [cashubtc/nuts](https://github.com/cashubtc/nuts) before implementation.
+   They are made here: [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard),
+   the protocol reference, mirrors this repo's `spec/` after each merge and
+   takes no spec PRs of its own.
 5. **Do not claim testing you did not perform.** In a repo handling bearer
    funds, reviewers have to take those statements at face value.
 

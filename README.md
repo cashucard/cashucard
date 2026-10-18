@@ -1,4 +1,4 @@
-# cashu-javacard
+# cashu-card
 
 A JavaCard applet implementing the [Cashu](https://cashu.space) ecash protocol
 for **offline NFC bearer payments** — a physical card that holds Bitcoin-
@@ -8,6 +8,10 @@ account, and no internet at the point of sale.
 This is the **shared Cashu card protocol, version 2.1**: one wire for Flash and
 for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
 of **NUT-XX: Cashu NFC Card Protocol** ([`spec/NUT-XX.md`](spec/NUT-XX.md)).
+
+The card is developed here. [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard),
+where it began, stays the protocol reference: a read-only mirror of [`spec/`](spec/),
+copied there after each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 
 > ### Credit
 >
@@ -42,7 +46,7 @@ of **NUT-XX: Cashu NFC Card Protocol** ([`spec/NUT-XX.md`](spec/NUT-XX.md)).
 | **A developer joining the project** | [`VISION`](docs/VISION.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`CONTRIBUTING`](CONTRIBUTING.md) |
 | **Implementing a reader or wallet** | [`spec/NUT-XX.md`](spec/NUT-XX.md) → [`spec/APDU.md`](spec/APDU.md) → [`spec/vectors/`](spec/vectors/) |
 | **Reading the design in full** | [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) |
-| **An AI agent working in this repo** | [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`GLOSSARY`](docs/GLOSSARY.md). The decisions file exists so settled calls are not re-litigated. |
+| **An AI agent working in this repo** | [`AGENTS`](AGENTS.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`GLOSSARY`](docs/GLOSSARY.md). The decisions file exists so settled calls are not re-litigated. |
 | **Auditing security** | [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) |
 | **Holding a card and a reader** | [`tools/cardctl/README.md`](tools/cardctl/README.md), then [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) |
 | **Testing an app without a card** | [Card simulator](#card-simulator) |
