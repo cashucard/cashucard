@@ -229,6 +229,40 @@ compromised or truncated download.
         </javacard>
     </target>
 
+    <!-- ── The provisioner's hello applet (ENG-738) ────────────────────── -->
+    <!--
+      A package of one applet that answers INS 01 with HELLO, for the phone-side
+      provisioner's smoke test (tools/cardkit/hello/me/flashapp/hello/Hello.java).
+      Not part of the card: built here so it goes through the same pinned
+      converter, then stripped as the card's CAP is. tools/cardkit/make-assets.py
+      turns it into apps/provisioner/src/assets/hello.ts, and CI checks the two
+      agree. refcheck does not apply: the package has no opener, and needs none.
+
+        Package AID : F0 43 41 53 48 48 45 4C 4C 4F      (F0 "CASHHELLO")
+        Applet  AID : F0 43 41 53 48 48 45 4C 4C 4F 01
+    -->
+    <property name="hello.cap.file" value="${target.dir}/hello-1.0.cap"/>
+    <target name="hello-cap" depends="setup"
+            description="Build the provisioner's hello applet (JavaCard 3.0.5)">
+        <javacard>
+            <cap
+                jckit="${jc.sdk}"
+                targetsdk="${jc.sdk}"
+                sources="${basedir}/../tools/cardkit/hello"
+                package="me.flashapp.hello"
+                version="1.0"
+                aid="F0:43:41:53:48:48:45:4C:4C:4F"
+                output="${hello.cap.file}">
+                <applet class="me.flashapp.hello.Hello"
+                        aid="F0:43:41:53:48:48:45:4C:4C:4F:01"/>
+            </cap>
+        </javacard>
+        <exec executable="python3" dir="${basedir}/.." failonerror="true">
+            <arg value="tools/stripcap.py"/>
+            <arg value="applet/${hello.cap.file}"/>
+        </exec>
+    </target>
+
     <!-- ── Clean ──────────────────────────────────────────────────────── -->
     <target name="clean" description="Remove build artefacts">
         <delete dir="${target.dir}"/>
