@@ -84,6 +84,31 @@ export function PrimaryButton({
   );
 }
 
+/** The quiet action beside the loud one: bordered, never accent. */
+export function SecondaryButton({
+  title,
+  onPress,
+  disabled,
+  testID,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  const t = useTheme();
+  const s = styles(t);
+  return (
+    <Pressable
+      testID={testID}
+      disabled={disabled}
+      onPress={onPress}
+      style={[s.secondary, disabled && s.primaryDisabled]}>
+      <Text style={s.secondaryText}>{title}</Text>
+    </Pressable>
+  );
+}
+
 export function Row({
   label,
   value,
@@ -148,6 +173,14 @@ export const styles = (t: Theme) =>
     },
     primaryDanger: {backgroundColor: t.danger},
     primaryDisabled: {opacity: 0.35},
+    secondary: {
+      borderColor: t.line,
+      borderWidth: 1.5,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    secondaryText: {color: t.ink, fontFamily: FONT.medium, fontSize: 16},
     primaryText: {
       color: '#fff',
       fontFamily: FONT.semibold,

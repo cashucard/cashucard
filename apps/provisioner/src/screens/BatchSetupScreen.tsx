@@ -9,7 +9,7 @@ import {ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SETUP} from '../strings';
 import {DEMO_BATCH, useApp, type BatchConfig} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
-import {Dim, PrimaryButton, Row, Screen} from '../ui';
+import {Dim, PrimaryButton, Row, Screen, SecondaryButton} from '../ui';
 
 const DEMO_MINTS = ['https://mint.demo.invalid'];
 
@@ -130,7 +130,7 @@ export function BatchSetupScreen({
             testID="start-batch"
           />
           <Text style={s.buildLine}>{SETUP.buildLine('fe7d8ac3')}</Text>
-          <PrimaryButton title="Settings" onPress={onSettings} />
+          <SecondaryButton title="Settings" onPress={onSettings} />
         </View>
       </ScrollView>
     </Screen>

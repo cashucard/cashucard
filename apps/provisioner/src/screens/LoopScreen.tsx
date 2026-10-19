@@ -19,7 +19,7 @@ import {
 } from '../strings';
 import {useApp} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
-import {Dim, PrimaryButton, Screen} from '../ui';
+import {Dim, PrimaryButton, Screen, SecondaryButton} from '../ui';
 
 interface RunUi {
   phase: string;
@@ -261,7 +261,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
       {center}
 
       <View style={s.endBatch}>
-        <PrimaryButton title="END BATCH" onPress={onEndBatch} />
+        <SecondaryButton title="END BATCH" onPress={onEndBatch} />
       </View>
     </Screen>
   );
