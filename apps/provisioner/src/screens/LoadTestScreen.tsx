@@ -31,6 +31,7 @@ import {
   HOLD,
   describeResult,
   describeSessionError,
+  describeShareFailure,
   labelFor,
   type Action,
 } from '../copy';
@@ -186,7 +187,9 @@ export function LoadTestScreen(): React.JSX.Element {
             <Button
               title="Share readout"
               onPress={() => {
-                Share.share({message: text}).catch(() => undefined);
+                Share.share({message: text}).catch(e =>
+                  setStatus(describeShareFailure(e)),
+                );
               }}
             />
           </View>
