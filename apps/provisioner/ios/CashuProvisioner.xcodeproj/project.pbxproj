@@ -7,45 +7,35 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0ACCDB780D315F3945F30FE8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		0C80B921A6F3F58F76C31292 /* libPods-CashuProvisioner.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-CashuProvisioner.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		2B03249272794C34845418FA /* Figtree-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */; };
+		3B7A13A3A2614EE0BE4783C1 /* Figtree-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */; };
+		711D7D8CDDF841378B722B5F /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 78EFB2B3A4E94099AD221634 /* OFL.txt */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		3B7A13A3A2614EE0BE4783C1 /* Figtree-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */; };
-		2B03249272794C34845418FA /* Figtree-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */; };
 		C6F534521EBF4500990A681C /* Figtree-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */; };
 		C91F76E390FC4B46A75195E5 /* Figtree-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */; };
-		711D7D8CDDF841378B722B5F /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 78EFB2B3A4E94099AD221634 /* OFL.txt */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		00E356F41AD99517003FC87E /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
-			remoteInfo = CashuProvisioner;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
-		00E356F11AD99517003FC87E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* CashuProvisioner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CashuProvisioner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = CashuProvisioner/Images.xcassets; sourceTree = "<group>"; };
-		7A3C1E5B2D9F4A6081C2B3D4 /* CashuProvisioner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = CashuProvisioner.entitlements; path = CashuProvisioner/CashuProvisioner.entitlements; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = CashuProvisioner/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = CashuProvisioner/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-CashuProvisioner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CashuProvisioner.debug.xcconfig"; path = "Target Support Files/Pods-CashuProvisioner/Pods-CashuProvisioner.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-CashuProvisioner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CashuProvisioner.release.xcconfig"; path = "Target Support Files/Pods-CashuProvisioner/Pods-CashuProvisioner.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-CashuProvisioner.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CashuProvisioner.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Medium.ttf"; path = "../assets/fonts/Figtree-Medium.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = CashuProvisioner/AppDelegate.swift; sourceTree = "<group>"; };
+		78EFB2B3A4E94099AD221634 /* OFL.txt */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = OFL.txt; path = ../assets/fonts/OFL.txt; sourceTree = "<group>"; };
+		7A3C1E5B2D9F4A6081C2B3D4 /* CashuProvisioner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = CashuProvisioner.entitlements; path = CashuProvisioner/CashuProvisioner.entitlements; sourceTree = "<group>"; };
+		8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-SemiBold.ttf"; path = "../assets/fonts/Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = CashuProvisioner/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Regular.ttf"; path = "../assets/fonts/Figtree-Regular.ttf"; sourceTree = "<group>"; };
+		C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Bold.ttf"; path = "../assets/fonts/Figtree-Bold.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; name = "Figtree-Bold.ttf"; path = "../assets/fonts/Figtree-Bold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */ = {isa = PBXFileReference; name = "Figtree-Medium.ttf"; path = "../assets/fonts/Figtree-Medium.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; name = "Figtree-Regular.ttf"; path = "../assets/fonts/Figtree-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; name = "Figtree-SemiBold.ttf"; path = "../assets/fonts/Figtree-SemiBold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		78EFB2B3A4E94099AD221634 /* OFL.txt */ = {isa = PBXFileReference; name = "OFL.txt"; path = "../assets/fonts/OFL.txt"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,14 +50,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		00E356F01AD99517003FC87E /* Supporting Files */ = {
-			isa = PBXGroup;
-			children = (
-				00E356F11AD99517003FC87E /* Info.plist */,
-			);
-			name = "Supporting Files";
-			sourceTree = "<group>";
-		};
 		13B07FAE1A68108700A75B9A /* CashuProvisioner */ = {
 			isa = PBXGroup;
 			children = (
@@ -120,17 +102,8 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				3B4392A12AC88292D35C810B /* Pods-CashuProvisioner.debug.xcconfig */,
-				5709B34CF0A7D63546082F79 /* Pods-CashuProvisioner.release.xcconfig */,
-			);
-			path = Pods;
-			sourceTree = "<group>";
-		};
 		AE84AA7CF60D4D3B90E893C1 /* Resources */ = {
-			isa = "PBXGroup";
+			isa = PBXGroup;
 			children = (
 				C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */,
 				75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */,
@@ -139,8 +112,17 @@
 				78EFB2B3A4E94099AD221634 /* OFL.txt */,
 			);
 			name = Resources;
-			sourceTree = "<group>";
 			path = "";
+			sourceTree = "<group>";
+		};
+		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				3B4392A12AC88292D35C810B /* Pods-CashuProvisioner.debug.xcconfig */,
+				5709B34CF0A7D63546082F79 /* Pods-CashuProvisioner.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
@@ -198,13 +180,6 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		00E356EC1AD99517003FC87E /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		13B07F8E1A680F5B00A75B9A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -216,6 +191,7 @@
 				C6F534521EBF4500990A681C /* Figtree-Regular.ttf in Resources */,
 				C91F76E390FC4B46A75195E5 /* Figtree-SemiBold.ttf in Resources */,
 				711D7D8CDDF841378B722B5F /* OFL.txt in Resources */,
+				0ACCDB780D315F3945F30FE8 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -307,14 +283,6 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
-		00E356F51AD99517003FC87E /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 13B07F861A680F5B00A75B9A /* CashuProvisioner */;
-			targetProxy = 00E356F41AD99517003FC87E /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -337,7 +305,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.flash.provisioner";
+				PRODUCT_BUNDLE_IDENTIFIER = com.flash.provisioner;
 				PRODUCT_NAME = CashuProvisioner;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -365,7 +333,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.flash.provisioner";
+				PRODUCT_BUNDLE_IDENTIFIER = com.flash.provisioner;
 				PRODUCT_NAME = CashuProvisioner;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -441,7 +409,14 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -506,7 +481,13 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

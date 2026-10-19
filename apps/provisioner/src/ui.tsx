@@ -20,7 +20,7 @@ export function Screen({
   onBack,
   children,
 }: {
-  title: string;
+  title?: string;
   onBack?: () => void;
   children: React.ReactNode;
 }) {
@@ -34,14 +34,16 @@ export function Screen({
           <Text style={s.bannerText}>{DEMO_BANNER}</Text>
         </View>
       ) : null}
-      <View style={s.header}>
-        {onBack ? (
-          <Pressable onPress={onBack} hitSlop={12} testID="back">
-            <Text style={s.back}>‹ Back</Text>
-          </Pressable>
-        ) : null}
-        <Text style={s.title}>{title}</Text>
-      </View>
+      {title || onBack ? (
+        <View style={s.header}>
+          {onBack ? (
+            <Pressable onPress={onBack} hitSlop={12} testID="back">
+              <Text style={s.back}>‹ Back</Text>
+            </Pressable>
+          ) : null}
+          {title ? <Text style={s.title}>{title}</Text> : null}
+        </View>
+      ) : null}
       <View style={s.body}>{children}</View>
     </SafeAreaView>
   );

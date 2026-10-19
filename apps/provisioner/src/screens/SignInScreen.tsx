@@ -27,7 +27,7 @@ export function SignInScreen() {
   const t = useTheme();
   const s = local(t);
   return (
-    <Screen title={APP_NAME}>
+    <Screen>
       <View style={s.center}>
         <Text style={s.wordmark}>{APP_NAME}</Text>
         <View style={s.tagline}>
