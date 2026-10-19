@@ -176,7 +176,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
 
   const runningPhase =
     ui.phase === 'load' && ui.block
-      ? `Writing ${ui.block.index} of ${ui.block.of}`
+      ? `Writing ${Math.round((ui.block.index / ui.block.of) * 100)}%`
       : PHASES[ui.phase] ?? '';
 
   const fill = done ? 1 : ui.block ? ui.block.index / ui.block.of : 0;
