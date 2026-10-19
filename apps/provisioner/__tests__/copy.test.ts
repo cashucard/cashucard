@@ -6,6 +6,7 @@ import {
   HOLD,
   describeResult,
   describeSessionError,
+  describeShareFailure,
   labelFor,
 } from '../src/copy';
 import {randomBytes} from '../src/random';
@@ -243,5 +244,14 @@ test('knows those classes under the names a Release bundle gives them, and not b
   class UserCancel extends Error {}
   expect(describeSessionError(new UserCancel())).toBe(
     'No card session: Error.',
+  );
+});
+
+test('a failed Share says so on the status line and names the copy path', () => {
+  expect(describeShareFailure(new Error('no activity'))).toBe(
+    'Share failed: no activity. Long-press the readout to copy it.',
+  );
+  expect(describeShareFailure(new Error(''))).toBe(
+    'Share failed: unknown error. Long-press the readout to copy it.',
   );
 });

@@ -29,3 +29,6 @@ venv/
 # Node and CocoaPods (tools/cardkit, apps/provisioner)
 node_modules/
 Pods/
+
+# the device-build Metro bundle (built before install, never committed)
+apps/provisioner/android/app/src/main/assets/

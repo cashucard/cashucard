@@ -144,3 +144,10 @@ export function describeSessionError(error: unknown): string {
     (error instanceof Error && error.message ? error.message : String(error));
   return `No card session: ${message || 'unknown error'}.`;
 }
+
+/* A failed Share gets no card error and no name of its own: say it plainly on
+ * the status line, and point at the copy path the selectable readout allows. */
+export function describeShareFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  return `Share failed: ${message || 'unknown error'}. Long-press the readout to copy it.`;
+}
