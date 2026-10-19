@@ -131,6 +131,9 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
         at: Date.now(),
         pending: false,
       });
+      // success auto-rearms: the done state holds for a beat, then the
+      // next-card chooser is back (a real tap clears it the same way)
+      setTimeout(() => setDone(null), 2600);
     } else {
       const cont = (stopId === 'hasOld' || stopId === 'oldVersion') && !replace;
       setStop({id: stopId, cont});
