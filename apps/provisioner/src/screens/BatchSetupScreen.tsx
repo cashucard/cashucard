@@ -51,7 +51,7 @@ export function BatchSetupScreen({
   const [pinBatch, setPinBatch] = useState('');
   const [daily, setDaily] = useState('25.00');
   const [noPin, setNoPin] = useState('5.00');
-  const [count, setCount] = useState('12');
+  const [count, setCount] = useState(app.demo ? '250' : '12');
 
   const field = (
     v: string,
