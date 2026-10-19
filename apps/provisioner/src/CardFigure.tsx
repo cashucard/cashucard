@@ -11,7 +11,8 @@ import {Image, ImageSourcePropType, StyleSheet, View} from 'react-native';
 import {useTheme, type Theme} from './theme';
 
 const W = 220;
-const H = 138; // card ratio
+/** The art's own ratio after its print-margin trim (1048×663) — the ring hugs the card. */
+const H = 220 / 1.5807;
 
 /** FL1: the Flash bearer front (black, bolt roundel, gold chip). */
 const FL1_FRONT: ImageSourcePropType = require('../assets/cardart/fl1-front.png');

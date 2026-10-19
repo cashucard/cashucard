@@ -46,8 +46,37 @@ export const LIGHT: Theme = {
   line: 'rgba(11,11,11,0.12)',
 };
 
+/**
+ * The theme the app shows: the store's choice (system/dark/light) provided by
+ * ThemeProvider in store.tsx, falling back to the phone's own scheme when no
+ * provider is above (the bench screen in tests).
+ */
+import {createContext, useContext} from 'react';
+
+const ThemeCtx = createContext<Theme | null>(null);
+export const ThemeProvider = ThemeCtx.Provider;
+
 export function useTheme(): Theme {
-  return useColorScheme() === 'light' ? LIGHT : DARK;
+  const provided = useContext(ThemeCtx);
+  const system = useColorScheme();
+  if (provided) {
+    return provided;
+  }
+  return system === 'light' ? LIGHT : DARK;
+}
+
+/** The system scheme, resolved against the store's choice. */
+export function resolveTheme(
+  choice: 'system' | 'dark' | 'light',
+  system: 'light' | 'dark' | null | undefined,
+): Theme {
+  if (choice === 'dark') {
+    return DARK;
+  }
+  if (choice === 'light') {
+    return LIGHT;
+  }
+  return system === 'light' ? LIGHT : DARK;
 }
 
 /** Figtree is the brand face; tabular figures wherever a number moves. */

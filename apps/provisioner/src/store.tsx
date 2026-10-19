@@ -4,8 +4,10 @@
  * with the ops service (Phase 3); demo rows never leave the phone.
  */
 import React, {createContext, useContext, useMemo, useState} from 'react';
+import {useColorScheme} from 'react-native';
 
 import type {DemoStateId} from './strings';
+import {resolveTheme, ThemeProvider} from './theme';
 
 export interface BatchConfig {
   mint: string;
@@ -55,6 +57,7 @@ export function AppStore({children}: {children: React.ReactNode}) {
   const [batch, setBatch] = useState<
     (BatchConfig & {done: RecordRow[]}) | null
   >(null);
+  const system = useColorScheme();
 
   const value = useMemo<AppState>(
     () => ({
@@ -72,7 +75,11 @@ export function AppStore({children}: {children: React.ReactNode}) {
     }),
     [signedIn, demo, theme, batch],
   );
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <ThemeProvider value={resolveTheme(theme, system)}>
+      <Ctx.Provider value={value}>{children}</Ctx.Provider>
+    </ThemeProvider>
+  );
 }
 
 export function useApp(): AppState {

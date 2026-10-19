@@ -34,4 +34,20 @@ test('signs in, then shows batch setup; demo mode raises its banner', async () =
     tree!.root.findByProps({testID: 'demo-switch'}).props.onValueChange(true);
   });
   expect(text()).toContain('DEMO — no card, no record');
+
+  // the theme pill changes what the screens draw: dark then light
+  const bg = () =>
+    tree!.root.findByType(require('react-native').SafeAreaView).props.style;
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'theme-dark'}).props.onPress();
+  });
+  expect(bg().backgroundColor).toBe('#050505');
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'theme-light'}).props.onPress();
+  });
+  expect(bg().backgroundColor).toBe('#FAFAF8');
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'theme-system'}).props.onPress();
+  });
+  expect(['#050505', '#FAFAF8']).toContain(bg().backgroundColor);
 });
