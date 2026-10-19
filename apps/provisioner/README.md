@@ -71,6 +71,11 @@ The screens are set in bundled OFL Figtree (`assets/fonts/`, linked with
 `react-native-asset`; re-run it when fonts change). Type, color and spacing
 tokens live in `src/theme.ts`; copy in `src/strings.ts`.
 
+**iPhone builds are Release, not Debug** (`-configuration Release`): a Debug
+build on a physical iPhone looks for a Metro packager at launch (`ip.txt`),
+and on a Mac where another project's Metro holds :8081 the app can hang on a
+blank screen. Release never consults a packager.
+
 ## Build and run (the owner, gate H1)
 
 Bundle id and Android `applicationId`: `com.flash.provisioner`.
