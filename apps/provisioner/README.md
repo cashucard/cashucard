@@ -47,7 +47,9 @@ The tap wait, arm to done against iOS's 60-second session (the headroom), the
 critical path (login to the last INSTALL, apart from the sweep and the checks),
 each phase with its APDU count and slowest APDU, every APDU over Android's default
 618 ms, Android's effective timeout after `setTimeout(15000)`, and the free memory
-(GET DATA `FF21`) before and after. Share sends it as text.
+(GET DATA `FF21`) before and after. Share sends it as text; if Share itself
+fails, the status line says so, and the readout is selectable, so a long-press
+copies it by hand.
 
 A run that stops says why. For an NFC failure that is the NFC library's error
 class, such as `TagConnectionLost` or `SessionInvalidated`, since an iOS error

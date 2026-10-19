@@ -31,5 +31,15 @@ target 'CashuProvisioner' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Fix fmt consteval error with Xcode 26.4+ clang (fmt 11.0.2 fails in
+    # C++20; the H1 build proved it). The same stanza flash-mobile carries.
+    installer.pods_project.targets.each do |target|
+      if target.name == 'fmt'
+        target.build_configurations.each do |config|
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        end
+      end
+    end
   end
 end
