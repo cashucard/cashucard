@@ -6,7 +6,7 @@
  * runs against the fake card, in the real cadence.
  */
 import React, {useState} from 'react';
-import {StyleSheet, Text, Vibration, View} from 'react-native';
+import {ScrollView, StyleSheet, Text, Vibration, View} from 'react-native';
 
 import type {RunEvent} from '../cardkit';
 import {runDemo, stopFor} from '../demo/runDemo';
@@ -163,20 +163,32 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
     }
     if (app.demo) {
       return (
-        <View style={s.chooser}>
+        <ScrollView contentContainerStyle={s.chooser}>
           <Dim>Demo states — the fake card plays them, in real cadence.</Dim>
-          {DEMO_STATES.map(d => (
-            <PrimaryButton
-              key={d.id}
-              title={d.name}
-              testID={`demo-${d.id}`}
-              disabled={needsAck}
-              onPress={() => {
-                run(d.id, false);
-              }}
-            />
-          ))}
-        </View>
+          {DEMO_STATES.map(d =>
+            d.id === 'ok' ? (
+              <PrimaryButton
+                key={d.id}
+                title={d.name}
+                testID={`demo-${d.id}`}
+                disabled={needsAck}
+                onPress={() => {
+                  run(d.id, false);
+                }}
+              />
+            ) : (
+              <SecondaryButton
+                key={d.id}
+                title={d.name}
+                testID={`demo-${d.id}`}
+                disabled={needsAck}
+                onPress={() => {
+                  run(d.id, false);
+                }}
+              />
+            ),
+          )}
+        </ScrollView>
       );
     }
     return (
