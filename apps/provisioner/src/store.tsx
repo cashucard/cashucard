@@ -45,7 +45,7 @@ export const DEMO_BATCH: BatchConfig = {
   pinBatch: '',
   dailyUsd: 25,
   noPinUsd: 5,
-  count: 12,
+  count: 250,
 };
 
 export function AppStore({children}: {children: React.ReactNode}) {

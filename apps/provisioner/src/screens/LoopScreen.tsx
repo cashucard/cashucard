@@ -1,14 +1,15 @@
 /**
- * S3. The loop. One screen carries a batch: the counter, the card figure with
- * honest progress (phase + live block count), the commit button, and every
- * stop state with its three lines in order (what happened, what the card is
- * now, what to do). In demo mode the center is the state chooser — the same
- * runs against the fake card, in the real cadence.
+ * S3. The loop. One screen carries a batch: the counter, the card's own
+ * printed art filling as the load writes, the commit, and every stop as a
+ * panel with its three lines in order (what happened, what the card is now,
+ * what to do). In demo mode the center is the state menu; a done state keeps
+ * its result card — with the card's PIN — until NEXT CARD.
  */
 import React, {useState} from 'react';
-import {ScrollView, StyleSheet, Text, Vibration, View} from 'react-native';
+import {Pressable, ScrollView, StyleSheet, Text, Vibration, View} from 'react-native';
 
 import type {RunEvent} from '../cardkit';
+import {CardFigure} from '../CardFigure';
 import {runDemo, stopFor} from '../demo/runDemo';
 import {
   DEMO_STATES,
@@ -32,53 +33,78 @@ const local = (t: Theme) =>
       color: t.ink,
       fontFamily: FONT.tabular,
       fontVariant: ['tabular-nums'],
-      fontSize: 40,
+      fontSize: 44,
       textAlign: 'center',
     },
-    figureWrap: {alignItems: 'center', marginVertical: 12},
-    figure: {
-      width: 180,
-      height: 112,
-      borderRadius: 14,
-      borderWidth: 2,
-      overflow: 'hidden',
-      justifyContent: 'flex-end',
-      backgroundColor: t.card,
-    },
-    figureIdle: {borderColor: t.ink},
-    figureStop: {borderColor: t.dim},
-    figureDanger: {borderColor: t.danger},
-    fill: {backgroundColor: t.dim},
-    fillDone: {backgroundColor: t.accent},
+    figureWrap: {alignItems: 'center', marginVertical: 14},
     phase: {
       color: t.ink,
       fontFamily: FONT.medium,
-      fontSize: 17,
+      fontSize: 19,
       textAlign: 'center',
+      minHeight: 26,
     },
-    doneWrap: {alignItems: 'center', gap: 6},
-    doneLine: {color: t.accent, fontFamily: FONT.semibold, fontSize: 20},
-    pinLine: {
+    menu: {
+      backgroundColor: t.card,
+      borderRadius: 18,
+      overflow: 'hidden',
+    },
+    menuRow: {
+      paddingHorizontal: 18,
+      paddingVertical: 15,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    menuText: {flex: 1, gap: 2},
+    menuName: {color: t.ink, fontFamily: FONT.semibold, fontSize: 17},
+    menuSub: {color: t.dim, fontFamily: FONT.regular, fontSize: 13},
+    menuDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+      backgroundColor: t.accent,
+    },
+    menuDotHollow: {
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+      borderWidth: 1.5,
+      borderColor: t.dim,
+    },
+    menuChevron: {color: t.dim, fontFamily: FONT.regular, fontSize: 22},
+    menuDivider: {height: StyleSheet.hairlineWidth, backgroundColor: t.line},
+    result: {
+      backgroundColor: t.card,
+      borderRadius: 18,
+      padding: 20,
+      gap: 8,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    resultDanger: {borderColor: t.danger},
+    resultDone: {borderColor: t.accent},
+    resultTitle: {color: t.ink, fontFamily: FONT.semibold, fontSize: 24},
+    resultTitleDanger: {color: t.danger},
+    resultLine: {color: t.dim, fontFamily: FONT.regular, fontSize: 16},
+    resultNext: {color: t.ink, fontFamily: FONT.semibold, fontSize: 17},
+    resultPin: {
       color: t.ink,
       fontFamily: FONT.tabular,
       fontVariant: ['tabular-nums'],
-      fontSize: 18,
+      fontSize: 34,
+      letterSpacing: 6,
     },
-    stop: {gap: 6, padding: 14, borderRadius: 12},
-    stopDanger: {backgroundColor: t.danger},
-    stopPlain: {backgroundColor: t.card},
-    stopWhat: {fontFamily: FONT.semibold, fontSize: 17},
-    stopWhatDanger: {color: '#fff'},
-    stopWhatPlain: {color: t.ink},
-    stopCard: {fontFamily: FONT.regular},
-    stopCardDanger: {color: '#fff'},
-    stopCardPlain: {color: t.dim},
-    stopNext: {fontFamily: FONT.medium},
-    stopNextDanger: {color: '#fff'},
-    stopNextPlain: {color: t.ink},
-    chooser: {gap: 8},
+    resultId: {
+      color: t.dim,
+      fontFamily: FONT.tabular,
+      fontVariant: ['tabular-nums'],
+      fontSize: 15,
+    },
+    chooser: {gap: 14},
     realOff: {gap: 12},
     endBatch: {marginTop: 'auto'},
+    scroll: {gap: 12, paddingBottom: 24},
   });
 
 export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
@@ -91,7 +117,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
   const [stop, setStop] = useState<{id: DemoStateId; cont: boolean} | null>(
     null,
   );
-  /** Done only: the short id and, on per-card PIN policy, the PIN. */
+  /** Done only: the short id and, on per-card PIN policy, the PIN. Holds until NEXT CARD. */
   const [done, setDone] = useState<{id: string; pin?: string} | null>(null);
   /** After wrong-keys: the loop stays disarmed until the stop is answered. */
   const [needsAck, setNeedsAck] = useState(false);
@@ -131,9 +157,6 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
         at: Date.now(),
         pending: false,
       });
-      // success auto-rearms: the done state holds for a beat, then the
-      // next-card chooser is back (a real tap clears it the same way)
-      setTimeout(() => setDone(null), 2600);
     } else {
       const cont = (stopId === 'hasOld' || stopId === 'oldVersion') && !replace;
       setStop({id: stopId, cont});
@@ -156,9 +179,16 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
       ? `Writing ${ui.block.index} of ${ui.block.of}`
       : PHASES[ui.phase] ?? '';
 
-  const fill = ui.block ? ui.block.index / ui.block.of : done ? 1 : 0;
-
-  const danger = stop ? STOP[stop.id].danger === true : false;
+  const fill = done ? 1 : ui.block ? ui.block.index / ui.block.of : 0;
+  const figureState = done
+    ? 'done'
+    : stop
+      ? STOP[stop.id].danger
+        ? 'danger'
+        : 'stop'
+      : busy
+        ? 'running'
+        : 'idle';
 
   const center = (() => {
     if (busy || done || stop) {
@@ -166,32 +196,25 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
     }
     if (app.demo) {
       return (
-        <ScrollView contentContainerStyle={s.chooser}>
-          <Dim>Demo states — the fake card plays them, in real cadence.</Dim>
-          {DEMO_STATES.map(d =>
-            d.id === 'ok' ? (
-              <PrimaryButton
-                key={d.id}
-                title={d.name}
+        <View style={s.menu}>
+          {DEMO_STATES.map((d, i) => (
+            <React.Fragment key={d.id}>
+              {i > 0 ? <View style={s.menuDivider} /> : null}
+              <Pressable
                 testID={`demo-${d.id}`}
                 disabled={needsAck}
-                onPress={() => {
-                  run(d.id, false);
-                }}
-              />
-            ) : (
-              <SecondaryButton
-                key={d.id}
-                title={d.name}
-                testID={`demo-${d.id}`}
-                disabled={needsAck}
-                onPress={() => {
-                  run(d.id, false);
-                }}
-              />
-            ),
-          )}
-        </ScrollView>
+                onPress={() => run(d.id, false)}
+                style={s.menuRow}>
+                <View style={d.id === 'ok' ? s.menuDot : s.menuDotHollow} />
+                <View style={s.menuText}>
+                  <Text style={s.menuName}>{d.name}</Text>
+                  <Text style={s.menuSub}>{d.sub}</Text>
+                </View>
+                <Text style={s.menuChevron}>›</Text>
+              </Pressable>
+            </React.Fragment>
+          ))}
+        </View>
       );
     }
     return (
@@ -207,77 +230,76 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
 
   return (
     <Screen title={app.demo ? 'Demo batch' : 'Batch'}>
-      <Text testID="counter" style={s.counter}>
-        {LOOP.of(batch.done.filter(r => r.ok).length, batch.count)}
-      </Text>
-
-      {/* the card figure: an outline that fills as the load writes */}
-      <View style={s.figureWrap}>
-        <View
-          testID="card-figure"
-          style={[
-            s.figure,
-            stop ? (danger ? s.figureDanger : s.figureStop) : s.figureIdle,
-          ]}>
-          <View
-            style={[s.fill, done ? s.fillDone : null, {height: `${fill * 100}%`}]}
-          />
-        </View>
-      </View>
-
-      {busy ? (
-        <Text testID="phase-line" style={s.phase}>
-          {runningPhase}
+      <ScrollView contentContainerStyle={s.scroll}>
+        <Text testID="counter" style={s.counter}>
+          {LOOP.of(batch.done.filter(r => r.ok).length, batch.count)}
         </Text>
-      ) : null}
 
-      {done ? (
-        <View style={s.doneWrap}>
-          <Text testID="done-line" style={s.doneLine}>
-            {LOOP.done(done.id)}
-          </Text>
-          {done.pin ? (
-            <Text testID="pin-line" style={s.pinLine}>
-              {LOOP.demoPin(done.pin)}
+        <View style={s.figureWrap}>
+          <CardFigure fill={fill} state={figureState} />
+        </View>
+
+        <Text testID="phase-line" style={s.phase}>
+          {busy ? runningPhase : ' '}
+        </Text>
+
+        {done ? (
+          <View style={[s.result, s.resultDone]} testID="done">
+            <Text style={s.resultTitle}>{LOOP.doneTitle}</Text>
+            <Text style={s.resultId}>{LOOP.done(done.id)}</Text>
+            {done.pin ? (
+              <Text testID="pin-line" style={s.resultPin}>
+                {LOOP.pinShown(done.pin)}
+              </Text>
+            ) : null}
+            <PrimaryButton
+              title={LOOP.next}
+              testID="next-card"
+              onPress={() => {
+                setDone(null);
+              }}
+            />
+          </View>
+        ) : null}
+
+        {stop ? (
+          <View
+            testID="stop"
+            style={[
+              s.result,
+              STOP[stop.id].danger ? s.resultDanger : null,
+            ]}>
+            <Text
+              style={[
+                s.resultTitle,
+                STOP[stop.id].danger ? s.resultTitleDanger : null,
+              ]}>
+              {STOP[stop.id].what}
             </Text>
-          ) : null}
+            <Text style={s.resultLine}>{STOP[stop.id].card}</Text>
+            <Text style={s.resultNext}>{STOP[stop.id].next}</Text>
+            <PrimaryButton
+              title={STOP[stop.id].action ?? 'OK'}
+              danger={STOP[stop.id].danger}
+              testID="stop-action"
+              onPress={() => {
+                if (stop.cont) {
+                  run(stop.id, true);
+                } else {
+                  setStop(null);
+                  setNeedsAck(false);
+                }
+              }}
+            />
+          </View>
+        ) : null}
+
+        {center}
+
+        <View style={s.endBatch}>
+          <SecondaryButton title="END BATCH" onPress={onEndBatch} />
         </View>
-      ) : null}
-
-      {stop ? (
-        <View
-          testID="stop"
-          style={[s.stop, danger ? s.stopDanger : s.stopPlain]}>
-          <Text style={[s.stopWhat, danger ? s.stopWhatDanger : s.stopWhatPlain]}>
-            {STOP[stop.id].what}
-          </Text>
-          <Text style={[s.stopCard, danger ? s.stopCardDanger : s.stopCardPlain]}>
-            {STOP[stop.id].card}
-          </Text>
-          <Text style={[s.stopNext, danger ? s.stopNextDanger : s.stopNextPlain]}>
-            {STOP[stop.id].next}
-          </Text>
-          <PrimaryButton
-            title={STOP[stop.id].action ?? 'OK'}
-            danger={danger}
-            testID="stop-action"
-            onPress={() => {
-              if (stop.cont) {
-                run(stop.id, true);
-              } else {
-                setStop(null);
-                setNeedsAck(false);
-              }
-            }}
-          />
-        </View>
-      ) : null}
-
-      {center}
-
-      <View style={s.endBatch}>
-        <SecondaryButton title="END BATCH" onPress={onEndBatch} />
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

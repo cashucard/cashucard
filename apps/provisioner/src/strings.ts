@@ -42,23 +42,37 @@ export const PHASES: Record<string, string> = {
 export const LOOP = {
   idle: 'Tap a blank card.',
   program: 'PROGRAM CARD',
-  done: (shortId: string) => `Done · …${shortId}`,
-  demoPin: (pin: string) => `This card's PIN: ${pin}`,
+  doneTitle: 'Card programmed',
+  done: (shortId: string) => `Card …${shortId}`,
+  pinShown: (pin: string) => `PIN ${pin}`,
+  next: 'NEXT CARD',
   of: (done: number, count: number) => `${done} of ${count}`,
 };
 
-/** What the demo chooser shows; the strings each state carries live in STOP. */
-export const DEMO_STATES = [
-  {id: 'ok', name: 'A clean card, programmed'},
-  {id: 'pulled', name: 'Card lifted mid-write'},
-  {id: 'hasValue', name: 'A card that holds value'},
-  {id: 'hasOld', name: 'A card with an empty install'},
-  {id: 'oldVersion', name: 'A card with old software'},
-  {id: 'wrongKeys', name: 'The card manager refuses the keys'},
-  {id: 'noSession', name: 'The phone loses the session'},
-] as const;
+export type DemoStateId =
+  | 'ok'
+  | 'pulled'
+  | 'hasValue'
+  | 'hasOld'
+  | 'oldVersion'
+  | 'wrongKeys'
+  | 'noSession';
 
-export type DemoStateId = (typeof DEMO_STATES)[number]['id'];
+/** What the demo chooser shows; the strings each state carries live in STOP. */
+export const DEMO_STATES: ReadonlyArray<{
+  id: DemoStateId;
+  name: string;
+  sub: string;
+}> = [
+  {id: 'ok', name: 'A clean card, programmed', sub: 'The happy path — about ten seconds'},
+  {id: 'pulled', name: 'Card lifted mid-write', sub: 'A torn run recovers on the next tap'},
+  {id: 'hasValue', name: 'A card that holds value', sub: 'The stop that never programs'},
+  {id: 'hasOld', name: 'A card with an empty install', sub: 'Operator chooses to reuse it'},
+  {id: 'oldVersion', name: 'A card with old software', sub: 'The tap upgrades it'},
+  {id: 'wrongKeys', name: 'The card manager refuses the keys', sub: 'Short words: a lock is for good'},
+  {id: 'noSession', name: 'The phone loses the session', sub: 'Nothing reached the card'},
+];
+
 
 export const STOP: Record<
   string,
@@ -131,3 +145,12 @@ export const SETTINGS = {
 };
 
 export const DEMO_BANNER = 'DEMO — no card, no record';
+
+// The chooser and the stop copy stay in step: every stop state the chooser
+// names has its three lines (ok and noSession are not stops — they carry no
+// STOP block, by design).
+for (const d of DEMO_STATES) {
+  if (d.id !== 'ok' && d.id !== 'noSession' && !STOP[d.id]) {
+    throw new Error(`no STOP copy for ${d.id}`);
+  }
+}

@@ -13,6 +13,9 @@ import {Dim, PrimaryButton, Row, Screen, SecondaryButton} from '../ui';
 
 const DEMO_MINTS = ['https://mint.demo.invalid'];
 
+/** The design code this build's card art draws (docs/CARD-DESIGNS.md). */
+const CARD_DESIGN = 'FL1 — Flash, black, the bolt';
+
 const local = (t: Theme) =>
   StyleSheet.create({
     scroll: {gap: 12, paddingBottom: 32},
@@ -87,6 +90,10 @@ export function BatchSetupScreen({
   return (
     <Screen title={SETUP.title} onBack={undefined}>
       <ScrollView contentContainerStyle={s.scroll}>
+        {app.demo ? (
+          <Dim>{'Demo batch — placeholder values. Nothing leaves the phone.'}</Dim>
+        ) : null}
+        <Row label="Card design" value={CARD_DESIGN} testID="card-design" />
         <Dim>{SETUP.mint}</Dim>
         <View style={s.cluster}>
           {DEMO_MINTS.map(m => (
