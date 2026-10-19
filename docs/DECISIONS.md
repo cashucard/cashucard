@@ -1196,3 +1196,66 @@ Improvement Proposal**. That process exists precisely for "large-scale or
 cross-team changes", and this project does not yet have one of its own: the
 closest is FIP-04, which describes the design being replaced. *(The FIP
 repository is internal to Flash.)*
+
+## <a id="d28"></a>D28: 2.1 holds; the 1.21 gaps are kept, with triggers
+
+**Decided (ENG-737, 2026-10-19):** the card stays at 2.1. The six gaps Foxy's 1.21
+(`06a9ea7` + `6e0b619`, 2026-10-17) closed and 2.1 has not are **kept on purpose**
+and recorded here with the triggers that reopen them. No port is scheduled now.
+
+**The gaps kept** (from the 10-17 comparison of getfoxy/card 1.21 against this
+repo's 2.1; their line numbers are theirs):
+
+1. **PIN before money** — 1.21 refuses `LOAD_PROOF`, `CLEAR_SPENT`, `LOAD_CHANGE`,
+   the owner commands and the INS `22`–`26` family on a PIN-less card with
+   `6A97`, and every load wants the PIN verified in the tap; 2.1 lets a PIN-less
+   card take loads from any reader, and the next tap after any payment opens the
+   gate again (the hole `SECURITY-MODEL` #17 names).
+2. **Change bound to the mint's key, unblinded on the card** — 1.21's
+   `LOAD_CHANGE` (`53`) and 80-byte change record keep the blinding factor off
+   the wire; 2.1's `GET_CHANGE` hands every reader the `r`, so "anybody who saw
+   the mint's answer could finish the piece".
+3. **No reset or record change while change is owed** — `SET_CARD`/`RESET_CARD`
+   answer `6A8D` until the change is taken; 2.1 lets both move the refund key
+   and the mint from under change still to come.
+4. **The allowance counts whole pieces and refills on the PIN**, not the day —
+   a no-PIN reader cannot burn the allowance "for the price of a few sats".
+5. **The owner is claimed in a tap of its own** — a till handed the PIN cannot
+   make itself owner mid-payment.
+6. **The holder's numbers are PIN-protected until an owner exists** (the
+   `SET_LIMIT` field flip; small).
+
+**Why hold.** (a) The program's critical path is phone-side provisioning
+(cardkit, the ops service, the consumer install flows); a 1.21 port is a
+~18-file hand merge with an INS collision (`53` is `REFRESH` here and
+`LOAD_CHANGE` there), status-word overlaps (`6A97`/`6A98`) with Foxy's unbuilt
+keysets design, a `SET_LIMIT` field flip, and a chip-size trial (~21.4 KB) —
+weeks of applet work off the critical path. (b) Every 2.1 card so far is an
+operator's or a test card; none is in a holder's hand, so the window the gaps
+open has no public money in it. (c) 2.2 is tentatively the piece-numbering
+freeze (getfoxy/iOS#2) and must also carry the owner-settable tag URL: a full
+1.21 port inside the same revision would make the freeze three programs wide
+and its silicon re-verification once-only in name only. (d) The gaps' two
+security items are exactly what Foxy will want settled before keysets work —
+so they belong on the 2.2 scope agenda with the partner, not merged in
+unilaterally.
+
+**Triggers (any one reopens the decision, in this order of likelihood):**
+
+- Foxy answers on `INS 53` (whose `LOAD_CHANGE`/`REFRESH` reading wins) and on
+  the `6A97`/`6A98`/`SET_LIMIT` overlaps — at the 2.2 scope conversation.
+- 1.21 (or its rebased form) runs on a J3R180: its chip behaviour stops being
+  a draft.
+- A card design reaches holder hands while still 2.1: the PIN-less load gate
+  (gap 1) becomes a live question, not a recorded one.
+- The keysets design (`b334797`) starts building: its status words must not
+  collide with whatever 2.2 decides.
+
+**Rejected.** Porting 1.21 into 2.2 now (the why above; the merge is not a
+merge — both sides changed 18 files since `88840aa`). Porting only the
+no-new-INS rows (6, 8, 9): cheap, but it defers exactly the two security wins
+and leaves `r` on the wire, while still spending applet and review time
+off the critical path. Asking Foxy to rebase 1.21 onto 2.1 unilaterally: it
+puts a large ask on the partner in the same breath as the freeze talk; the
+scope conversation decides the direction first, and the work follows the
+decision.
