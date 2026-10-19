@@ -11,6 +11,11 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		3B7A13A3A2614EE0BE4783C1 /* Figtree-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */; };
+		2B03249272794C34845418FA /* Figtree-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */; };
+		C6F534521EBF4500990A681C /* Figtree-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */; };
+		C91F76E390FC4B46A75195E5 /* Figtree-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */; };
+		711D7D8CDDF841378B722B5F /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 78EFB2B3A4E94099AD221634 /* OFL.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,6 +41,11 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = CashuProvisioner/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = CashuProvisioner/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; name = "Figtree-Bold.ttf"; path = "../assets/fonts/Figtree-Bold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */ = {isa = PBXFileReference; name = "Figtree-Medium.ttf"; path = "../assets/fonts/Figtree-Medium.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; name = "Figtree-Regular.ttf"; path = "../assets/fonts/Figtree-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; name = "Figtree-SemiBold.ttf"; path = "../assets/fonts/Figtree-SemiBold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		78EFB2B3A4E94099AD221634 /* OFL.txt */ = {isa = PBXFileReference; name = "OFL.txt"; path = "../assets/fonts/OFL.txt"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +105,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				AE84AA7CF60D4D3B90E893C1 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -117,6 +128,19 @@
 			);
 			path = Pods;
 			sourceTree = "<group>";
+		};
+		AE84AA7CF60D4D3B90E893C1 /* Resources */ = {
+			isa = "PBXGroup";
+			children = (
+				C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */,
+				75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */,
+				A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */,
+				8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */,
+				78EFB2B3A4E94099AD221634 /* OFL.txt */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+			path = "";
 		};
 /* End PBXGroup section */
 
@@ -187,6 +211,11 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				3B7A13A3A2614EE0BE4783C1 /* Figtree-Bold.ttf in Resources */,
+				2B03249272794C34845418FA /* Figtree-Medium.ttf in Resources */,
+				C6F534521EBF4500990A681C /* Figtree-Regular.ttf in Resources */,
+				C91F76E390FC4B46A75195E5 /* Figtree-SemiBold.ttf in Resources */,
+				711D7D8CDDF841378B722B5F /* OFL.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
