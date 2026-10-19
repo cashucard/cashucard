@@ -25,9 +25,11 @@ a lock that is for good.
   a batch never leaves it. The operator's eyes are on the cards; the screen's
   job while running is one glanceable figure and a phase line, and its job at
   the ends is a word and a haptic.
-- **Progress is honest.** The phase name and, while loading, the block count
-  (`Writing 37 of 82`). Both come from the run's own events. No bar that
-  animates at its own pace, no spinner that lies.
+- **Progress is honest.** The phase name and, while the load writes, its
+  percent (`Writing 57%`) — computed from the run's own block events, the
+  user's unit, never an animation of its own pace. (The bench screen keeps
+  raw block counts; that surface is the debugger's.) No bar that animates at
+  its own pace, no spinner that lies.
 - **The button that commits says what it does** — `PROGRAM CARD`, `START
   BATCH` — and is grey until it can be pressed. A way back is at the top left;
   there is no CANCEL at the bottom except the in-tap Cancel on the loop screen
