@@ -224,7 +224,7 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   ([`CONTRIBUTING.md`](CONTRIBUTING.md), principle 5; the one exception is
   [D17](docs/DECISIONS.md#d17)'s).
 - **Every design change gets a D-entry in [`docs/DECISIONS.md`](docs/DECISIONS.md):**
-  what was decided, what was rejected and why. The next is D28; anchors are
+  what was decided, what was rejected and why. The next is D29; anchors are
   stable, and a superseded entry is marked and kept.
 - **Every silicon milestone gets a hardware report file,**
   `docs/HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md`: the card, the
