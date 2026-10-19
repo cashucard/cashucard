@@ -1,34 +1,53 @@
 /**
- * @format
+ * The designed app's root and its routes: sign-in first, then the batch
+ * setup, and demo mode's banner once the switch is on. The bench screen is
+ * reached from Settings only.
  */
-
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 
-test('renders the load-test screen, its three runs, Cancel and the Replace switch', async () => {
+test('signs in, then shows batch setup; demo mode raises its banner', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(() => {
     tree = ReactTestRenderer.create(<App />);
   });
-  const titles = tree!.root
-    .findAll(
-      n => typeof n.props.title === 'string' && typeof n.type !== 'string',
-    )
-    .map(n => n.props.title as string);
-  expect([...new Set(titles)]).toEqual([
-    'Smoke test (hello applet)',
-    'Install Cashu card',
-    'Rotate keys and back',
-    'Cancel',
-  ]);
-  const status = tree!.root.findByProps({testID: 'status'});
-  expect(status.props.children).toBe(
-    'Hold the card against the back of the phone. Keep still until it finishes.',
-  );
-  expect(
-    tree!.root.findAllByProps({
-      accessibilityLabel: 'Replace existing install (spare card only)',
-    }).length,
-  ).toBeGreaterThan(0);
+  const text = () =>
+    tree!.root
+      .findAll(n => typeof n.props.children === 'string')
+      .map(n => n.props.children as string)
+      .join('\n');
+  expect(text()).toContain('Cashu card provisioner');
+  expect(text()).toContain('SIGN IN');
+
+  await ReactTestRenderer.act(() => {
+    tree!.root
+      .findAllByProps({title: 'SIGN IN'})[0]
+      .props.onPress();
+  });
+  expect(text()).toContain('NEW BATCH');
+
+  await ReactTestRenderer.act(() => {
+    tree!.root.findAllByProps({title: 'Settings'})[0].props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'demo-switch'}).props.onValueChange(true);
+  });
+  expect(text()).toContain('DEMO — no card, no record');
+
+  // the theme pill changes what the screens draw: dark then light
+  const bg = () =>
+    tree!.root.findByType(require('react-native').SafeAreaView).props.style;
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'theme-dark'}).props.onPress();
+  });
+  expect(bg().backgroundColor).toBe('#050505');
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'theme-light'}).props.onPress();
+  });
+  expect(bg().backgroundColor).toBe('#FAFAF8');
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'theme-system'}).props.onPress();
+  });
+  expect(['#050505', '#FAFAF8']).toContain(bg().backgroundColor);
 });

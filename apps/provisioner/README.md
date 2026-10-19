@@ -57,6 +57,25 @@ carries nothing else; Android's errors keep their own text. A session that never
 reached the card is named on the screen the same way, for example
 `No card session: Timeout.`
 
+## The designed app and demo mode (ENG-739)
+
+The app now boots the designed flow of
+[`docs/PROVISIONER-APP.md`](../../docs/PROVISIONER-APP.md): sign-in, batch
+setup, the programming loop, batch summary, settings. Demo mode (Settings →
+Demo mode) runs every state of the loop against a fake card
+(`src/demo/fakeCard.ts`) built on cardkit's own SCP02 crypto, in the measured
+cadence — the design review lives on a phone, with no card and no service.
+The real-hardware path is this spike's screen, kept at Settings → Bench runs.
+
+The screens are set in bundled OFL Figtree (`assets/fonts/`, linked with
+`react-native-asset`; re-run it when fonts change). Type, color and spacing
+tokens live in `src/theme.ts`; copy in `src/strings.ts`.
+
+**iPhone builds are Release, not Debug** (`-configuration Release`): a Debug
+build on a physical iPhone looks for a Metro packager at launch (`ip.txt`),
+and on a Mac where another project's Metro holds :8081 the app can hang on a
+blank screen. Release never consults a packager.
+
 ## Build and run (the owner, gate H1)
 
 Bundle id and Android `applicationId`: `com.flash.provisioner`.
