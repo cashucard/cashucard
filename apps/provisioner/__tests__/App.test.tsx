@@ -14,7 +14,14 @@ import {DARK, ThemeProvider} from '../src/theme';
 test('opens on sign-in; a signed-in session reaches batch setup; demo mode raises its banner', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(() => {
-    tree = ReactTestRenderer.create(<App />);
+    tree = ReactTestRenderer.create(
+      <App
+        recovery={{
+          storage: {read: async () => null, replace: async () => undefined},
+          uuid: () => '00000000-0000-4000-8000-000000000001',
+        }}
+      />,
+    );
   });
   const text = () =>
     tree!.root
@@ -79,7 +86,14 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
 test('the sign-in screen demo door enters demo mode with no session (design review without a service)', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(() => {
-    tree = ReactTestRenderer.create(<App />);
+    tree = ReactTestRenderer.create(
+      <App
+        recovery={{
+          storage: {read: async () => null, replace: async () => undefined},
+          uuid: () => '00000000-0000-4000-8000-000000000001',
+        }}
+      />,
+    );
   });
   const text = () =>
     tree!.root

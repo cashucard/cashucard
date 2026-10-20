@@ -22,8 +22,9 @@ ENG-741 app work remain outstanding.
 
 The ENG-741 service increment adds scoped reservations, full installation identity
 and version 2 recovery exports. Restores pause provisioning until reconciliation
-and stale-client fencing; no unlock workflow is implemented. The app journal
-and real-card loop remain the next checkpoint. This increment passes 63 Node
+and stale-client fencing; no unlock workflow is implemented. The durable journal, batch coordinator and injected orchestration are implemented.
+Real screens now use them behind a disabled installation gate; device CPLC and
+termination evidence and personalization remain outstanding. This increment passes 63 Node
 tests, 11 Workers tests, both typechecks, formatting and a deployment dry run.
 
 ## Execution order and checkpoints
@@ -48,7 +49,7 @@ port as release-ready merely because its baseline suites pass.
 | 4 | Add controlled operator bootstrap and recovery | Empty local DO becomes usable; bootstrap cannot silently replace an existing operator; administrative recovery works without a live session | Implemented; local lifecycle checks passed |
 | 5 | Complete encrypted backup and restore | Scheduled path writes a versioned artifact; restoring it to an empty service recovers keys by card ID without the old DB or master; missing backup configuration is visible | Implemented locally; independent destination and alerts need operator configuration |
 | 6 | Finish deployment documentation and readiness review | Threat model and runbook match implementation; independent backup procedure and data-loss window are explicit; deployment gates reviewed | Documented; release review and operator configuration outstanding |
-| 7 | Execute ENG-741 app integration | Real batch/ordinal assignment and persisted outbox survive simulated interruption and restart without storing manager keys or PINs | Contract, identity reader, reservation API, durable journal and batch coordinator implemented; screen/NFC integration and disposition handling pending |
+| 7 | Execute ENG-741 app integration | Real batch/ordinal assignment and persisted outbox survive simulated interruption and restart without storing manager keys or PINs | Contract, identity reader, reservations, durable state, orchestration and gated real screens implemented; device validation and personalization outstanding |
 
 Checkpoint 1 provides the same routine commands as CI.
 Checkpoints 2–6 together satisfy the ENG-740 deployment gates; completing
@@ -129,24 +130,23 @@ The implementation contract is now
 durable stages and recovery decisions; hardware verification and personalization
 remain explicit gates.
 
-The review found that `LoopScreen.run` currently calls `runDemo` even outside
-demo mode; real batch creation, escrow fetch and NFC orchestration are still
-unimplemented. `shortIdOf()` is a two-byte display suffix, not a unique fleet
-identity. Keep the full applet public key as the post-install record identity
-in a future schema/API revision, with the suffix for display only. The current
-short-ID registry is not sufficient for a production fleet.
+The original review found that `LoopScreen.run` used demo behavior outside demo
+mode and the registry used a two-byte suffix. The implementation now routes real
+operator screens through the durable workflow and records full installation keys;
+the suffix is display-only. Demo and the legacy memory outbox are separate.
+Real installation stays disabled until the device evidence is reviewed.
 
 Before automatic recovery, define a stable pre-install chip identity or an
 equivalent explicit operator reconciliation contract. Applet public keys only
-exist after install and change on reinstall. No CPLC/serial reader currently
-exists, and neither NFC UID nor SCP02 diversification data has a demonstrated
-cross-platform stability/uniqueness contract here. If the card cannot be matched
+exist after install and change on reinstall. The CPLC reader is implemented and wired into the gated loop, but its phone
+stability evidence is outstanding. Neither NFC UID nor SCP02 diversification data
+is a substitute for that evidence. If the card cannot be matched
 to the saved attempt, stop before authentication rather than trying candidate
 keys. Hardware evidence for an identity contract needs a separately approved
 device plan; it is not supplied by the service tests.
 
-Wire the app to real service batch IDs and escrow ordinals before claiming the
-operator workflow is complete. Reserve and durably record the attempt's batch,
+The app now uses real service batch IDs and reserved ordinals; native validation
+remains necessary before claiming the operator workflow is complete. Reserve and durably record the attempt's batch,
 ordinal and recovery context before an irreversible card operation. Persist
 the frozen registry outbox across app termination and reauthentication, without
 persisting card-manager keys or PINs. Define recovery when rotation succeeds
@@ -168,6 +168,8 @@ Acceptance includes an interrupted run and an app restart with a pending record,
 followed by reconciliation without duplicate assignments or lost registry rows.
 Automated checks use fake cards; any phone or silicon drill needs the device and
 actions named in an approved hardware plan under AGENTS.md.
+The [proposed device validation checklist](PROVISIONER-DEVICE-VALIDATION.md) records
+the candidate devices, missing validation tooling and the evidence required.
 
 ## Consumer provisioning gate
 

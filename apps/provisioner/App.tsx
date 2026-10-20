@@ -20,6 +20,11 @@ import {LoopScreen} from './src/screens/LoopScreen';
 import {SettingsScreen} from './src/screens/SettingsScreen';
 import {SignInScreen} from './src/screens/SignInScreen';
 import {AppStore, useApp} from './src/store';
+import {
+  ProvisioningProvider,
+  type ProvisioningProviderOptions,
+} from './src/ProvisioningStore';
+import {ProvisioningScreen} from './src/screens/ProvisioningScreen';
 
 type Route = 'setup' | 'loop' | 'summary' | 'settings' | 'bench';
 
@@ -38,6 +43,10 @@ function Navigator(): React.JSX.Element {
     // loop and the summary never read the session), so a reviewer reaches it
     // from the sign-in screen without a service.
     return <SignInScreen />;
+  }
+
+  if (!app.demo && route !== 'settings' && route !== 'bench') {
+    return <ProvisioningScreen onSettings={() => setRoute('settings')} />;
   }
 
   switch (route) {
@@ -81,10 +90,14 @@ function Navigator(): React.JSX.Element {
   }
 }
 
-export default function App(): React.JSX.Element {
+export default function App({
+  recovery,
+}: {recovery?: ProvisioningProviderOptions} = {}): React.JSX.Element {
   return (
     <AppStore>
-      <Navigator />
+      <ProvisioningProvider options={recovery}>
+        <Navigator />
+      </ProvisioningProvider>
     </AppStore>
   );
 }

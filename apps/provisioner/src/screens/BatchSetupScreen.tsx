@@ -198,9 +198,17 @@ const local = (t: Theme) =>
 export function BatchSetupScreen({
   onStart,
   onSettings,
+  onCreate,
+  canStart = true,
+  installationOnly = false,
+  loadSha256,
 }: {
   onStart: () => void;
   onSettings: () => void;
+  onCreate?: (config: BatchConfig) => Promise<boolean>;
+  canStart?: boolean;
+  installationOnly?: boolean;
+  loadSha256?: string;
 }) {
   const app = useApp();
   const t = useTheme();
@@ -212,22 +220,47 @@ export function BatchSetupScreen({
   const [noPin, setNoPin] = useState('5.00');
   const [count, setCount] = useState(app.demo ? '250' : '12');
 
+  const [creating, setCreating] = useState(false);
+  const validNumbers =
+    Number.isSafeInteger(Number(count)) &&
+    Number(count) > 0 &&
+    Number(count) <= 100000 &&
+    daily.trim().length > 0 &&
+    noPin.trim().length > 0 &&
+    Number.isFinite(Number(daily)) &&
+    Number(daily) >= 0 &&
+    Number.isFinite(Number(noPin)) &&
+    Number(noPin) >= 0;
   const ready =
-    app.demo || (mint !== null && count.length > 0 && daily.length > 0);
+    canStart && !creating && (app.demo || (mint !== null && validNumbers));
 
-  const start = () => {
+  const start = async () => {
+    if (!ready) {
+      return;
+    }
     const config: BatchConfig = app.demo
       ? DEMO_BATCH
       : {
           mint: mint!,
           pinPolicy,
           pinBatch,
-          dailyUsd: Number(daily) || 0,
-          noPinUsd: Number(noPin) || 0,
-          count: Number(count) || 1,
+          dailyUsd: Number(daily),
+          noPinUsd: Number(noPin),
+          count: Number(count),
         };
-    app.startBatch(config);
-    onStart();
+    if (onCreate) {
+      setCreating(true);
+      try {
+        if (await onCreate({...config, pinBatch: ''})) {
+          onStart();
+        }
+      } finally {
+        setCreating(false);
+      }
+    } else {
+      app.startBatch(config);
+      onStart();
+    }
   };
 
   // Real mode reads the ops service's mint list; demo keeps its own.
@@ -370,7 +403,7 @@ export function BatchSetupScreen({
                 </View>
                 <Text style={s.policyLabel}>{SETUP.pinBatch}</Text>
               </Pressable>
-              {pinPolicy === 'batch' ? (
+              {pinPolicy === 'batch' && !installationOnly ? (
                 <TextInput
                   value={pinBatch}
                   onChangeText={v =>
@@ -444,13 +477,21 @@ export function BatchSetupScreen({
         </ScrollView>
 
         <View style={s.footer} testID="setup-footer">
+          {installationOnly ? (
+            <Text style={s.buildLine}>
+              Installation and key rotation only. Mint, owner, PIN and limits
+              are not applied yet.
+            </Text>
+          ) : null}
           <PrimaryButton
             title={SETUP.start}
             disabled={!ready}
             onPress={start}
             testID="start-batch"
           />
-          <Text style={s.buildLine}>{SETUP.buildLine('fe7d8ac3')}</Text>
+          <Text style={s.buildLine}>
+            {SETUP.buildLine(loadSha256?.slice(0, 8) ?? 'fe7d8ac3')}
+          </Text>
         </View>
       </View>
     </Screen>
