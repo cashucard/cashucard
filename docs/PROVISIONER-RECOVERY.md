@@ -5,8 +5,8 @@ cardkit and ops service after [D30](DECISIONS.md#d30). It does not enable consum
 issuance or change the 2.1 applet wire. [D31](DECISIONS.md#d31) records the
 decisions. The service reservation endpoints below are implemented; the durable
 attempt journal, durable batch coordinator, reservation transport and injected
-card orchestration now exist;
-the real screen/NFC loop is not wired yet. [D32](DECISIONS.md#d32) records
+card orchestration now exist. The real recovery screens and native session
+adapter are wired behind a disabled installation gate ([D36](DECISIONS.md#d36)). [D32](DECISIONS.md#d32) records
 the HTTP migration and restored-service admission gate.
 
 An interrupted run keeps the same reserved batch and ordinal. Resume identifies
@@ -349,5 +349,7 @@ phones, stability before/after the approved install/rotation sequence, and
 distinct identities on the approved card sample. Also verify journal behavior
 under app termination. Record results and limits in a hardware report; a small
 sample is not proof of global uniqueness. No hardware actions are authorized by
-this document. Until the evidence and personalization contract land, the real
-batch loop remains gated.
+this document. Until the device evidence lands, batch creation and physical programming remain
+disabled by `apps/provisioner/src/releaseGates.ts`. Frozen-record retries and
+explicit stop acknowledgement remain available without NFC. Installation receipts
+never certify holder readiness; that requires the separate personalization contract.

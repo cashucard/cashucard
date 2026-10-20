@@ -1,0 +1,294 @@
+/** Real receipts and recovery controls; demo results never enter this screen. */
+import React from 'react';
+import {ScrollView, Share, StyleSheet, Text, View} from 'react-native';
+import {CASHU_PLAN} from '../cardkit';
+import {useProvisioning} from '../ProvisioningStore';
+import {BatchSetupScreen} from './BatchSetupScreen';
+import {PHASES} from '../strings';
+import {FONT, useTheme} from '../theme';
+import {Dim, GearButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
+
+const GATE =
+  'Card installation is paused until device validation is complete. Personalization is not available in this build.';
+const STAGES: Record<string, string> = {
+  reserved: 'Card reserved. No installation has been confirmed.',
+  install_intent:
+    'An installation was interrupted. The same card must be checked before continuing.',
+  installed: 'Installation verified. Key rotation is not yet confirmed.',
+  rotation_intent:
+    'Key rotation was interrupted. The same card must be checked before continuing.',
+  rotated:
+    'Key rotation verified. The installation record has not been sent yet.',
+  record_pending:
+    'Installation and key rotation verified. The record is awaiting the service.',
+  recorded:
+    'The service confirmed the installation record. Batch progress is awaiting confirmation.',
+  quarantined:
+    'This attempt is stopped. Its evidence is retained for your operator.',
+};
+export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
+  const flow = useProvisioning();
+  const t = useTheme();
+  const [confirmQuarantine, setConfirmQuarantine] = React.useState(false);
+  React.useEffect(() => {
+    setConfirmQuarantine(false);
+  }, [flow.snapshot?.active?.attempt_id, flow.scopeMatches]);
+  const [shareNote, setShareNote] = React.useState(false);
+  const s = StyleSheet.create({
+    grow: {flex: 1},
+    scroll: {gap: 18, paddingBottom: 24},
+    title: {color: t.ink, fontFamily: FONT.semibold, fontSize: 24},
+    line: {color: t.ink, fontFamily: FONT.regular, fontSize: 16},
+    card: {backgroundColor: t.card, padding: 16, borderRadius: 16, gap: 10},
+  });
+  const shell = (content: React.ReactNode) => (
+    <Screen
+      title="Card installation"
+      headerRight={<GearButton testID="settings" onPress={onSettings} />}>
+      <ScrollView contentContainerStyle={s.scroll}>{content}</ScrollView>
+    </Screen>
+  );
+  if (flow.status === 'loading') {
+    return shell(
+      <Text style={s.line} testID="recovery-loading">
+        Checking saved work…
+      </Text>,
+    );
+  }
+  if (flow.status === 'blocked') {
+    return shell(
+      <>
+        <Text style={s.title}>Saved work is paused</Text>
+        <Dim>{flow.notice}</Dim>
+        <PrimaryButton
+          title="RELOAD SAVED WORK"
+          testID="recovery-reload"
+          disabled={flow.busy}
+          onPress={() => {
+            flow.reload();
+          }}
+        />
+      </>,
+    );
+  }
+  if (!flow.scopeMatches) {
+    return shell(
+      <>
+        <Text style={s.title} testID="recovery-scope">
+          Saved work belongs to another account or service
+        </Text>
+        <Dim>
+          Sign in with the original operator account and service to continue.
+          The saved batch has not been changed.
+        </Dim>
+        <SecondaryButton title="SETTINGS" onPress={onSettings} />
+      </>,
+    );
+  }
+  const snapshot = flow.snapshot!;
+  if (!snapshot.batch) {
+    return (
+      <View style={s.grow}>
+        {!flow.hardwareValidated ? (
+          <View style={s.card}>
+            <Dim>{GATE}</Dim>
+          </View>
+        ) : null}
+        {flow.notice ? (
+          <Text style={s.line} testID="recovery-notice">
+            {flow.notice}
+          </Text>
+        ) : null}
+        <BatchSetupScreen
+          onStart={() => undefined}
+          onSettings={onSettings}
+          onCreate={flow.create}
+          canStart={flow.hardwareValidated && !flow.busy}
+          installationOnly
+          loadSha256={CASHU_PLAN.loadFile.sha256}
+        />
+      </View>
+    );
+  }
+  const batch = snapshot.batch;
+  const journal = snapshot.active?.journal;
+  const stage = journal?.stage;
+  const recorded = snapshot.history.filter(j => j.stage === 'recorded');
+  const stopped = snapshot.history.length - recorded.length;
+  const complete =
+    !snapshot.active && batch.next_ordinal === batch.request.count;
+  const pendingRecord = stage === 'record_pending' || stage === 'recorded';
+  const canQuarantine =
+    !!stage && !['record_pending', 'recorded', 'quarantined'].includes(stage);
+  const share =
+    `Installation record — ${recorded.length} rotation records, ${stopped} stops\n` +
+    'No holder readiness is certified.\n' +
+    snapshot.history
+      .map(
+        j =>
+          `Card ${j.ordinal + 1}${
+            j.installation_id ? ` …${j.installation_id.slice(-4)}` : ''
+          }: ` +
+          (j.stage === 'recorded'
+            ? 'installation and rotation recorded'
+            : j.disposition_intent?.kind ?? 'stopped'),
+      )
+      .join('\n');
+  return shell(
+    <>
+      <Text style={s.title} testID="real-progress">
+        {batch.next_ordinal} of {batch.request.count} attempts acknowledged
+      </Text>
+      <Dim>
+        {recorded.length} rotation records · {stopped} stops
+      </Dim>
+      <Dim>
+        Installation and key rotation only. These cards are not ready for
+        holders.
+      </Dim>
+      {flow.notice ? (
+        <Text style={s.line} testID="recovery-notice">
+          {flow.notice}
+        </Text>
+      ) : null}
+      {flow.busy ? (
+        <Text style={s.line} testID="recovery-busy">
+          {PHASES[flow.phase] ?? 'Confirming saved work…'}
+        </Text>
+      ) : null}
+      {snapshot.active ? (
+        <View style={s.card} testID="real-attempt">
+          <Text style={s.line}>Card {snapshot.active.ordinal + 1}</Text>
+          <Text style={s.line}>
+            {stage
+              ? STAGES[stage]
+              : 'The reservation is awaiting confirmation from the service.'}
+          </Text>
+          {journal?.installation_id ? (
+            <Dim>Card …{journal.installation_id.slice(-4)}</Dim>
+          ) : null}
+          <SecondaryButton
+            title={pendingRecord ? 'RETRY RECORD' : 'CHECK SAVED WORK'}
+            testID="recovery-retry"
+            disabled={flow.busy}
+            onPress={() => {
+              flow.recover();
+            }}
+          />
+          {stage === 'quarantined' ? (
+            <PrimaryButton
+              title="ACKNOWLEDGE STOP AND CONTINUE"
+              testID="recovery-acknowledge"
+              disabled={flow.busy}
+              onPress={() => {
+                flow.acknowledge();
+              }}
+            />
+          ) : null}
+        </View>
+      ) : null}
+      {!complete && stage !== 'quarantined' && !pendingRecord ? (
+        <>
+          <PrimaryButton
+            title={
+              snapshot.active
+                ? 'CONTINUE WITH THE SAME CARD'
+                : 'INSTALL NEXT CARD'
+            }
+            testID="real-program"
+            disabled={
+              flow.busy ||
+              !flow.hardwareValidated ||
+              (!!snapshot.active && !journal)
+            }
+            onPress={() => {
+              flow.program();
+            }}
+          />
+          {!flow.hardwareValidated ? <Dim>{GATE}</Dim> : null}
+        </>
+      ) : null}
+      {canQuarantine ? (
+        <>
+          <SecondaryButton
+            title={
+              confirmQuarantine
+                ? 'CONFIRM STOPPING THIS ATTEMPT'
+                : 'STOP THIS ATTEMPT'
+            }
+            testID="recovery-quarantine"
+            disabled={flow.busy}
+            onPress={() => {
+              if (!confirmQuarantine) {
+                setConfirmQuarantine(true);
+                return;
+              }
+              setConfirmQuarantine(false);
+              flow.quarantine();
+            }}
+          />
+          {confirmQuarantine ? (
+            <Dim>
+              The attempt will remain stopped across restarts. A bound card
+              stays blocked until your operator resolves it.
+            </Dim>
+          ) : null}
+        </>
+      ) : null}
+      {snapshot.history.map(j => (
+        <View key={j.attempt_id} style={s.card}>
+          <Text style={s.line}>
+            Card {j.ordinal + 1}
+            {j.installation_id ? ` …${j.installation_id.slice(-4)}` : ''}
+          </Text>
+          <Dim>
+            {j.stage === 'recorded'
+              ? 'Installation and rotation recorded. Not ready for a holder.'
+              : 'Stopped and acknowledged. The attempt is retained.'}
+          </Dim>
+        </View>
+      ))}
+      {snapshot.history.length ? (
+        <SecondaryButton
+          title="SHARE INSTALLATION RECORD"
+          testID="real-share"
+          onPress={() => {
+            Share.share({message: share}).catch(() => setShareNote(true));
+          }}
+        />
+      ) : null}
+      {shareNote ? (
+        <Dim>
+          The installation record could not be shared. It remains on this phone.
+        </Dim>
+      ) : null}
+      {flow.cardActive ? (
+        <SecondaryButton
+          title="CANCEL TAP"
+          testID="real-cancel"
+          onPress={flow.cancel}
+        />
+      ) : null}
+      {complete ? (
+        <PrimaryButton
+          title="CLOSE ACKNOWLEDGED BATCH"
+          testID="real-close"
+          disabled={flow.busy}
+          onPress={() => {
+            flow.close();
+          }}
+        />
+      ) : null}
+      {!snapshot.active && !complete ? (
+        <SecondaryButton
+          title="CHECK SAVED WORK"
+          testID="recovery-retry"
+          disabled={flow.busy}
+          onPress={() => {
+            flow.recover();
+          }}
+        />
+      ) : null}
+    </>,
+  );
+}

@@ -1503,3 +1503,39 @@ card; guessing GP version; automatically advancing past an unacknowledged
 quarantine. Screen wiring, native termination drills, cross-phone CPLC evidence
 and personalization remain release gates. No hardware actions are authorized
 by this implementation decision.
+
+## <a id="d36"></a>D36: Scoped recovery screens with installation disabled until device validation
+
+**Decided (ENG-741 screens, 2026-10-20):** route real operator work through the
+single durable workflow, separate from demo batches and the legacy memory outbox.
+Load saved evidence before allowing batch creation. A failed native module/load
+or poisoned write pauses real work and offers reload, without resetting storage.
+Load the native storage/session adapters lazily so an older binary can still
+reach sign-in and demo. Keep one workflow writer and operation queue per storage
+adapter across React remounts.
+
+Bind visible recovery controls and replay to operator ID, environment and service
+origin. Sign-out and demo mode retain evidence. Foreign scopes hide card/batch
+metadata and cannot issue recovery requests. An actor change invalidates pending
+card work, cancels an armed session and guards subsequent APDUs; an in-flight
+command may already have reached the card, so its durable intent remains.
+Cancellation during key prefetch prevents a later NFC session from opening.
+
+Retry a frozen record after reauthentication, foregrounding or the retry timer,
+without fetching manager keys or opening NFC. Quarantine and disposition remain
+explicit actions; progress counts only acknowledged attempts. Summaries and
+sharing certify installation/rotation stages only, with no PIN display or
+holder-readiness claim. Replacement consent and partial-install repair have no
+screen implementation; an existing installation stops for operator review.
+
+The production installation release constant remains false. Batch creation and
+card programming both enforce it in their handlers, independently of disabled
+buttons. Record recovery and explicit disposition remain available. Enable only
+after the approved device CPLC/install/rotation and termination evidence is
+recorded; personalization requires its own contract before holder readiness.
+No hardware actions are authorized by this decision.
+
+**Rejected:** connecting the existing demo success loop to real NFC; a new batch
+when saved storage cannot be read; clearing evidence on sign-out; allowing a
+pending session to arm after switching actors; treating rotation receipts as
+personalized cards. Software tests do not establish native power-loss durability.

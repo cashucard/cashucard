@@ -1,0 +1,460 @@
+import React from 'react';
+import Renderer, {act} from 'react-test-renderer';
+import {ApiClient} from '../src/api';
+import {AppStore, useApp, type AppStateShape} from '../src/store';
+import {
+  ProvisioningProvider,
+  useProvisioning,
+  type ProvisioningProviderOptions,
+} from '../src/ProvisioningStore';
+import {ProvisioningScreen} from '../src/screens/ProvisioningScreen';
+import {
+  ProvisioningWorkflow,
+  type CardProvisioningService,
+  type RemoteBatch,
+  type ReservedAttempt,
+} from '../src/provisioningWorkflow';
+import type {JournalStorage} from '../src/journal';
+const uuid = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const config = {
+  count: 2,
+  mint: 'https://mint.test',
+  pinPolicy: 'perCard' as const,
+  pinBatch: 'never-persist',
+  dailyUsd: 25,
+  noPinUsd: 5,
+};
+function fixture() {
+  let bytes: string | null = null;
+  let id = 0;
+  const storage: JournalStorage = {
+    read: jest.fn(async () => bytes),
+    replace: jest.fn(async value => {
+      bytes = value;
+    }),
+  };
+  let batch: RemoteBatch;
+  let attempt: ReservedAttempt;
+  const service: CardProvisioningService = {
+    scope: {
+      service_origin: 'https://ops.test',
+      operator_id: 7,
+      key_env: 'issued',
+    },
+    batch: jest.fn(
+      async request =>
+        (batch ??= {
+          batch_id: 42,
+          batch_request_id: request.batch_request_id,
+          operator_id: 7,
+          device_id: request.device_id,
+          next_ordinal: 0,
+          config: {...request, key_env: 'issued', configuration_revision: 1},
+        }),
+    ),
+    reserve: jest.fn(async request => {
+      attempt ??= {
+        ...request,
+        operator_id: 7,
+        revision: 0,
+        state: 'active',
+        chip_id: null,
+        completion_receipt: null,
+      };
+      batch.next_ordinal = 1;
+      return {...attempt};
+    }),
+    attempt: jest.fn(async () => ({...attempt})),
+    keys: jest.fn(),
+    bind: jest.fn(),
+    record: jest.fn(),
+    disposition: jest.fn(),
+  };
+  return {
+    storage,
+    service,
+    uuid: () => uuid(++id),
+    bytes: () => bytes,
+    remote: () => attempt,
+  };
+}
+let app: AppStateShape;
+let flow: ReturnType<typeof useProvisioning>;
+function Probe() {
+  app = useApp();
+  flow = useProvisioning();
+  return <ProvisioningScreen onSettings={() => undefined} />;
+}
+let trees: Renderer.ReactTestRenderer[] = [];
+async function mount(options: ProvisioningProviderOptions) {
+  let tree!: Renderer.ReactTestRenderer;
+  await act(async () => {
+    tree = Renderer.create(
+      <AppStore clientOptions={{baseUrl: 'https://ops.test'}}>
+        <ProvisioningProvider options={options}>
+          <Probe />
+        </ProvisioningProvider>
+      </AppStore>,
+    );
+  });
+  trees.push(tree);
+  return tree;
+}
+async function signIn(operator_id = 7) {
+  const client = new ApiClient({baseUrl: 'https://ops.test'});
+  jest.spyOn(client, 'operatorSession').mockResolvedValue({
+    operator_id,
+    env: 'issued',
+    token: `token-${operator_id}`,
+  });
+  await act(async () => {
+    await app.signIn('lead', 'pw', {client});
+  });
+}
+const text = (tree: Renderer.ReactTestRenderer) =>
+  tree.root
+    .findAll(n => typeof n.props.children === 'string')
+    .map(n => n.props.children)
+    .join('\n');
+beforeEach(() => {
+  jest
+    .spyOn(ApiClient.prototype, 'mints')
+    .mockResolvedValue(['https://mint.test']);
+});
+afterEach(async () => {
+  await act(async () => {
+    trees.forEach(t => t.unmount());
+  });
+  trees = [];
+  jest.restoreAllMocks();
+});
+
+test('the release gate blocks direct create and program calls, without collecting a PIN', async () => {
+  const f = fixture();
+  const runCard = jest.fn();
+  const tree = await mount({...f, runCard, serviceFor: () => f.service});
+  await signIn();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(false);
+    expect(await flow.program()).toBe(false);
+  });
+  expect(f.service.batch).not.toHaveBeenCalled();
+  expect(f.service.reserve).not.toHaveBeenCalled();
+  expect(runCard).not.toHaveBeenCalled();
+  expect(text(tree)).toContain('device validation');
+  await act(async () => {
+    tree.root.findByProps({testID: 'pin-batch'}).props.onPress();
+  });
+  expect(tree.root.findAllByProps({testID: 'pin-batch-input'})).toHaveLength(0);
+});
+
+test('unreadable saved work blocks new requests; reload recovers without clearing evidence', async () => {
+  const f = fixture();
+  const read = jest
+    .spyOn(f.storage, 'read')
+    .mockRejectedValueOnce(new Error('disk'));
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  expect(text(tree)).toContain('Saved work is paused');
+  await act(async () => {
+    expect(await flow.create(config)).toBe(false);
+  });
+  expect(f.service.batch).not.toHaveBeenCalled();
+  expect(f.storage.replace).not.toHaveBeenCalled();
+  await act(async () => {
+    await flow.reload();
+  });
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(flow.status).toBe('ready');
+});
+
+test('restart retains the pending reservation; a different operator cannot replay or see its details', async () => {
+  const f = fixture();
+  let tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(true);
+  });
+  expect(f.bytes()).not.toContain(config.pinBatch);
+  const w = await ProvisioningWorkflow.open(f.storage, f.uuid);
+  await w.reserveNext(f.service);
+  await act(async () => {
+    tree.unmount();
+  });
+  trees = [];
+  // A fresh storage adapter models a new process and forces a disk read.
+  tree = await mount({
+    ...f,
+    storage: {...f.storage},
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+  });
+  await signIn(8);
+  expect(text(tree)).toContain('another account or service');
+  const reads = (f.service.attempt as jest.Mock).mock.calls.length;
+  await act(async () => {
+    expect(await flow.recover()).toBe(false);
+    expect(await flow.program()).toBe(false);
+  });
+  expect(f.service.attempt).toHaveBeenCalledTimes(reads);
+  expect(tree.root.findAllByProps({testID: 'real-attempt'})).toHaveLength(0);
+  await act(async () => {
+    app.signOut();
+  });
+  await signIn();
+  expect(flow.snapshot?.active?.attempt_id).toBe(
+    w.snapshot().active?.attempt_id,
+  );
+  expect(text(tree)).toContain('No installation has been confirmed');
+});
+
+test('cancellation during key prefetch prevents a later native session from arming', async () => {
+  const f = fixture();
+  let release!: () => void;
+  const prefetch = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const withCard = jest.fn();
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = jest.fn(
+    async (_w, _s, options) => {
+      await prefetch;
+      return options.withCard(async () => 'interrupted' as const);
+    },
+  );
+  const cancelCard = jest.fn(async () => {});
+  await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+    runCard,
+    withCard,
+    cancelCard,
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  let running!: Promise<boolean>;
+  await act(async () => {
+    running = flow.program();
+    await Promise.resolve();
+  });
+  expect(flow.cardActive).toBe(true);
+  await act(async () => {
+    flow.cancel();
+    release();
+    await running;
+  });
+  expect(cancelCard).toHaveBeenCalledTimes(1);
+  expect(withCard).not.toHaveBeenCalled();
+  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+});
+
+test('sign-out while keys are pending cannot arm NFC under the old session', async () => {
+  const f = fixture();
+  let release!: () => void;
+  const prefetch = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const withCard = jest.fn();
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w,
+    _s,
+    options,
+  ) => {
+    await prefetch;
+    return options.withCard(async () => 'interrupted');
+  };
+  await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+    runCard,
+    withCard,
+    cancelCard: async () => {},
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  let running!: Promise<boolean>;
+  await act(async () => {
+    running = flow.program();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    app.signOut();
+  });
+  await act(async () => {
+    release();
+    await running;
+  });
+  expect(withCard).not.toHaveBeenCalled();
+  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+});
+
+test('reauthentication retries the frozen record without keys or NFC, even while installation is gated', async () => {
+  const f = fixture();
+  const w = await ProvisioningWorkflow.open(f.storage, f.uuid);
+  const settings = {
+    count: 2,
+    mint_url: config.mint,
+    pin_policy: config.pinPolicy,
+    daily_usd: 25,
+    no_pin_usd: 5,
+    load_sha256: 'ab'.repeat(32),
+  };
+  await w.start(f.service, settings);
+  await w.reserveNext(f.service);
+  const chip = 'cplc-v1:4790d3213180072976207515';
+  const key =
+    '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+  Object.assign(f.remote(), {chip_id: chip, revision: 1});
+  await w.reconcile(f.service);
+  const active = w.snapshot().active!;
+  await w.withAttempt(f.service, async j => {
+    await j.installIntent({installation_id: null, replacement_consent: false});
+    await j.installed(key, {complete: true});
+    await j.rotationIntent();
+    await j.rotated(1);
+    await j.freezeRecord({
+      attempt_id: active.attempt_id,
+      batch_id: 42,
+      ordinal: 0,
+      load_sha256: settings.load_sha256,
+      operator_id: 7,
+      device_id: w.snapshot().device_id,
+      chip_id: chip,
+      installation_id: key,
+      display_id: key.slice(-4),
+      gp_key_version: 1,
+      key_env: 'issued',
+      configuration_revision: 1,
+      verified_stage: 'rotated',
+      verified_at: 123,
+    });
+  });
+  const frozen = w.snapshot().active!.journal!.frozen_record;
+  const receipt = {
+    attempt_id: active.attempt_id,
+    installation_id: key,
+    revision: 2,
+    recorded_at: 456,
+    verified_stage: 'rotated' as const,
+    ready_for_holder: false as const,
+  };
+  (f.service.record as jest.Mock).mockImplementation(async () => {
+    Object.assign(f.remote(), {
+      state: 'recorded',
+      revision: 2,
+      completion_receipt: receipt,
+    });
+    return receipt;
+  });
+  const runCard = jest.fn();
+  const tree = await mount({...f, runCard, serviceFor: () => f.service});
+  expect(f.service.record).not.toHaveBeenCalled();
+  await signIn();
+  expect(f.service.record).toHaveBeenCalledWith(
+    w.snapshot().device_id,
+    active.attempt_id,
+    1,
+    frozen,
+  );
+  expect(runCard).not.toHaveBeenCalled();
+  expect(f.service.keys).not.toHaveBeenCalled();
+  expect(flow.snapshot?.active).toBeNull();
+  expect(flow.snapshot?.history).toHaveLength(1);
+  expect(text(tree)).toContain('Not ready for a holder.');
+  expect(text(tree)).not.toContain('PIN:');
+});
+
+test('sign-out cancels an armed session and blocks its next command', async () => {
+  const f = fixture();
+  let release!: () => void;
+  const pause = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const tx = jest.fn(async () => [0x90, 0x00]);
+  const cancelCard = jest.fn(async () => {});
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w,
+    _s,
+    options,
+  ) =>
+    options.withCard(async guardedTx => {
+      await guardedTx([0x00]);
+      await pause;
+      await expect(guardedTx([0x01])).rejects.toThrow('Card session cancelled');
+      return 'interrupted';
+    });
+  await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+    runCard,
+    withCard: run => run(tx),
+    cancelCard,
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  let running!: Promise<boolean>;
+  await act(async () => {
+    running = flow.program();
+    await Promise.resolve();
+  });
+  expect(tx).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    app.signOut();
+  });
+  expect(cancelCard).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    release();
+    await running;
+  });
+  expect(tx).toHaveBeenCalledTimes(1);
+  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+});
+
+test('real batch setup rejects zero count and submits PIN-free settings once valid', async () => {
+  const f = fixture();
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  await act(async () => {
+    tree.root.findByProps({testID: 'mint-https://mint.test'}).props.onPress();
+    tree.root.findByProps({testID: 'batch-count'}).props.onChangeText('0');
+  });
+  expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(true);
+  await act(async () => {
+    await tree.root.findByProps({testID: 'start-batch'}).props.onPress();
+  });
+  expect(f.service.batch).not.toHaveBeenCalled();
+  await act(async () => {
+    tree.root.findByProps({testID: 'batch-count'}).props.onChangeText('2');
+  });
+  await act(async () => {
+    await tree.root.findByProps({testID: 'start-batch'}).props.onPress();
+  });
+  expect(f.service.batch).toHaveBeenCalledTimes(1);
+  expect((f.service.batch as jest.Mock).mock.calls[0][0]).toMatchObject({
+    count: 2,
+    mint_url: config.mint,
+  });
+  expect(f.bytes()).not.toContain('pinBatch');
+  expect(tree.root.findByProps({testID: 'real-progress'})).toBeTruthy();
+});

@@ -132,14 +132,26 @@ malformed snapshot is preserved and stops; it cannot silently generate another
 device/batch. Sign-in now retains the service's stable `operator_id`; the typed
 reservation adapter keeps the token in memory and scopes all requests to it.
 
-The coordinator is not wired to `AppStore`/`LoopScreen` or the legacy outbox.
-Injected bind/key/record orchestration and explicit disposition handling are
-described below. Screen/session wiring, card repair and personalization remain
-pending. The native dependency is pinned, but iOS pods,
-native builds and termination checks on both phones remain operator steps.
-Jest checks storage/restart semantics, not device power-loss durability. The
-real batch loop remains gated by the
-[recovery contract](../../docs/PROVISIONER-RECOVERY.md).
+`src/ProvisioningStore.tsx` now connects the coordinator to the real operator
+screens, separately from demo and the legacy outbox. Native storage/session
+adapters load lazily: a missing native module pauses real work without breaking
+sign-in or demo. Sign-out retains evidence, and another operator/environment or
+service cannot view attempt details or replay it. One operation queue survives
+React remounts. Actor changes cancel an armed session and block further commands;
+cancellation during key prefetch prevents NFC from opening later.
+
+`src/releaseGates.ts` keeps production installation disabled. Both batch creation
+and programming enforce the gate; software-only record recovery and explicit
+disposition remain usable. Reauthentication, foregrounding and a 30-second timer
+retry only frozen records, without keys or NFC. Summaries report acknowledged
+installation/rotation records and stops, never a PIN or holder readiness.
+Existing installations stop for operator review; there is no replacement-consent
+screen or partial-install repair yet.
+
+The native dependency is pinned, but iOS pods, native builds, both-phone CPLC
+checks and termination drills remain operator steps under an approved device
+plan. Jest checks storage/restart semantics, not device power-loss durability.
+See the [recovery contract](../../docs/PROVISIONER-RECOVERY.md).
 
 The TypeScript check includes app source and tests. Node types are available
 for the test-only cardkit fake; cardkit retains its separate Node-free library
@@ -168,7 +180,7 @@ intent before POST, recovers a lost acknowledgement from the service, and only
 then archives the attempt and advances the ordinal. The bound chip remains
 blocked on the service. Neither restart nor another batch clears the quarantine.
 
-These functions remain unconnected to the real screen and native `withCard`.
+The gated real screen uses these functions through native `withCard`.
 Tests use the existing software GP card and injected transports. Native builds,
 termination drills and both-phone CPLC checks remain operator work under an
 approved device plan; this change did not access any hardware.
