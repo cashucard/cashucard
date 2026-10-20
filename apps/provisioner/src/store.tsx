@@ -217,7 +217,12 @@ export function AppStore({
 
   const signOut = useCallback(() => {
     clientRef.current = null;
-    outboxRef.current = null;
+    // Keep an outbox that still holds rows (the 401 path keeps it for the
+    // same reason): its frozen bodies outlive the session and re-post on
+    // the next sign-in. A new outbox there would orphan them.
+    if (outboxRef.current && outboxRef.current.pendingRows.length === 0) {
+      outboxRef.current = null;
+    }
     setSession(null);
     setSignedIn(false);
   }, []);

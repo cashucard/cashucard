@@ -11,6 +11,9 @@ Run:  python3 -m pytest test_tip.py -q     (or: python3 test_tip.py)
 """
 
 import contextlib
+import email.message
+import urllib.error
+import urllib.request
 import io
 import json
 import sys
@@ -213,3 +216,59 @@ if __name__ == "__main__":
                 failures += 1
                 print(f"FAIL {name}: {exc}")
     sys.exit(1 if failures else 0)
+
+
+class FakeHTTPError(urllib.error.HTTPError):
+    """The real urllib.error.HTTPError, with an easy body."""
+
+    def __init__(self, code, body):
+        super().__init__(
+            "http://ops.test", code, f"HTTP Error {code}", hdrs=email.message.Message(), fp=None
+        )
+        self._body = json.dumps(body).encode("utf-8") if isinstance(body, dict) else body
+
+    def read(self):
+        return self._body
+
+
+def test_503_with_last_good_header_serves_it():
+    """The service's 503-with-last-good contract: the stale header in the body
+    is the answer (parse_header still validates it), not an error."""
+    saved = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen(
+        FakeHTTPError(503, {"reason": "upstream-unavailable", "header": HEADER_80.hex()})
+    )
+    try:
+        header = cardctl.fetch_tip("http://ops.test")
+    finally:
+        urllib.request.urlopen = saved
+    assert header == HEADER_80
+
+
+def test_503_without_a_header_stops_the_command():
+    saved = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen(
+        FakeHTTPError(503, {"reason": "upstream-unavailable"})
+    )
+    try:
+        try:
+            cardctl.fetch_tip("http://ops.test")
+            raise AssertionError("expected SystemExit")
+        except SystemExit:
+            pass
+    finally:
+        urllib.request.urlopen = saved
+
+
+def test_500_is_not_a_last_good_answer():
+    """Only 503 carries the last-good contract; other codes stop the command."""
+    saved = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen(FakeHTTPError(500, {"reason": "internal"}))
+    try:
+        try:
+            cardctl.fetch_tip("http://ops.test")
+            raise AssertionError("expected SystemExit")
+        except SystemExit:
+            pass
+    finally:
+        urllib.request.urlopen = saved

@@ -602,3 +602,86 @@ test('a real-mode stopped row carries no demo field; the summary prints no (demo
     tree!.unmount();
   });
 });
+
+test('a manual signOut with pending rows keeps the outbox; an empty one is dropped', async () => {
+  // The should-fix on PR #11: signOut nulled the outbox unconditionally, so
+  // signing out mid-batch destroyed pending rows' frozen bodies — they could
+  // never be re-posted and the registry row was lost. Manual sign-out keeps
+  // them, exactly like the 401 path; an outbox with nothing pending is
+  // dropped so a fresh sign-in starts clean.
+  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+  let state: ReturnType<typeof useApp> | undefined;
+  function Probe(): React.JSX.Element {
+    state = useApp();
+    return null as unknown as React.JSX.Element;
+  }
+  const posted: unknown[] = [];
+  let postSucceeds = false;
+  (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
+    operatorSession: async () => ({env: 'issued', token: 't'}),
+    postCard: async (_token: string, row: unknown) => {
+      if (!postSucceeds) {
+        throw new Error('503');
+      }
+      posted.push(row);
+    },
+  }));
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(
+      <AppStore clientOptions={{baseUrl: 'http://ops.test'}}>
+        <Probe />
+      </AppStore>,
+    );
+  });
+  await ReactTestRenderer.act(async () => {
+    await state!.signIn('bench-lead', 'pw');
+  });
+  await ReactTestRenderer.act(() => {
+    state!.startBatch({
+      mint: 'm',
+      pinPolicy: 'perCard',
+      pinBatch: '',
+      dailyUsd: 1,
+      noPinUsd: 1,
+      count: 1,
+    });
+  });
+
+  // The post fails: the row is pending in the outbox and on the batch view.
+  await ReactTestRenderer.act(async () => {
+    state!.postRegistryCard({
+      short_id: 'bb22',
+      batch_id: 1,
+      key_id: 2,
+      ordinal: 0,
+      installed_at: 1_700_000_003,
+      installer: 'op@bench-1',
+      load_sha256: 'fe7d8ac3',
+    });
+  });
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+  });
+  expect(state!.batch!.done[0].pending).toBe(true);
+
+  // Manual sign-out: the pending outbox survives; sign back in and the
+  // frozen body re-posts once the service answers.
+  await ReactTestRenderer.act(() => {
+    state!.signOut();
+  });
+  expect(state!.signedIn).toBe(false);
+
+  postSucceeds = true;
+  await ReactTestRenderer.act(async () => {
+    await state!.signIn('bench-lead', 'pw');
+  });
+  await ReactTestRenderer.act(async () => {
+    await state!.retryPending();
+  });
+  expect(posted).toHaveLength(1);
+  expect((posted[0] as {short_id: string}).short_id).toBe('bb22');
+  expect(state!.batch!.done[0].pending).toBe(false);
+  await ReactTestRenderer.act(() => {
+    tree!.unmount();
+  });
+});
