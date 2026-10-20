@@ -64,3 +64,29 @@ This establishes the expected SELECT version only, not CAP identity, current
 manager-key state, funds, ownership or replacement consent. The existing
 first-write plan names a different card and requires absence of the applet;
 this result does not authorize that plan on the replacement card.
+
+## Replacement card — complete public-state preflight
+
+After the operator instructed continuation of the stated public-state check,
+one execution of the bounded preflight at source `b066f45` selected the same
+named reader and required exact identity
+`cplc-v1:4790d3213041093363205547`. All six allowlisted reads completed;
+exit status 0. No authentication, signing, PIN or write command was attempted.
+
+| Field | Observed value |
+|---|---|
+| Installation | Present; SELECT version 2.1 |
+| Full installation public key | `0366bf811cadfcfc00e5f251017d1dc690a93a6a4a9d39ed114b96d33fb59d9941` |
+| Unspent / spent / empty slots | 0 / 0 / 128 |
+| PIN | none |
+| Owner / configuration record / locked | false / false / false |
+| NFC tag | present |
+
+These are applet-reported public indicators, not a balance proof against a
+mint or proof of manager keys. This card is outside the absent-applet drill's
+precondition. The next implementation gap is the real flow's explicit
+replacement confirmation bound to this inspected installation ID: cardkit and
+the tap contract support it, but ProvisioningStore currently stops with an
+operator-review message. Operator disposability/replacement consent and current
+manager-key provenance remain pending. No deletion, replacement or phone build
+was performed as part of this inspection.
