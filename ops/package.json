@@ -1,0 +1,27 @@
+{
+  "name": "@cashu-card/ops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The ops service (ENG-740, D29): per-card GP key issuance from a master via HKDF, escrowed at issuance, the registries, the BTC anchor tip, operator sessions.",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@noble/hashes": "1.8.0",
+    "better-sqlite3": "12.11.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "22.20.5",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "5.0.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
