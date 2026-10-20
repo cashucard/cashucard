@@ -107,13 +107,67 @@ test('the stub line "While the key service is pending…" is gone', () => {
   expect(all).not.toContain('While the key service is pending');
 });
 
-/** A store-driven probe of the settings card's env rule. */
-function SettingsProbe(): React.JSX.Element {
+test('S5: exactly one environment is ever lit, from the session env', async () => {
+  // The screen's rule: both lit flags derive from ONE value (session env, or
+  // factory when signed out), so "both lit" is unrepresentable. The cases
+  // drive the store's real sign-in seam and read what the probe renders.
+  const cases: Array<['factory' | 'issued' | null, string]> = [
+    ['issued', 'factory-dim issued-lit'],
+    ['factory', 'factory-lit issued-dim'],
+    [null, 'factory-lit issued-dim'], // sign-in failed: signed out, factory default
+  ];
+  for (const [env, expected] of cases) {
+    if (env) {
+      (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
+        operatorSession: async () => ({env, token: 't'}),
+      }));
+    } else {
+      (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
+        operatorSession: async () => {
+          throw new ApiServiceImplError();
+        },
+      }));
+    }
+    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+    await ReactTestRenderer.act(() => {
+      tree = ReactTestRenderer.create(
+        <AppStore
+          clientOptions={{baseUrl: 'http://ops.test'}}
+          key={String(env)}>
+          <SettingsProbeWithSignIn />
+        </AppStore>,
+      );
+    });
+    const rendered = tree!.root
+      .findAll(n => typeof n.props.children === 'string')
+      .map(n => n.props.children as string)
+      .join(' ');
+    expect(rendered).toContain(expected);
+    // and the rule's negation: never both lit in any rendered case
+    expect(rendered).not.toContain('factory-lit issued-lit');
+    await ReactTestRenderer.act(() => {
+      tree!.unmount();
+    });
+  }
+});
+
+/** Signs in (or fails) on mount, then renders the two lit flags' words. */
+function SettingsProbeWithSignIn(): React.JSX.Element {
   const app = useApp();
-  const factoryLit = (app.session?.env ?? 'factory') === 'factory';
-  const issuedLit = (app.session?.env ?? 'factory') === 'issued';
-  // S5: never both. The two flags are derived from one value; the test's
-  // assertion is on the invariant, and the screen renders from these.
+  const [done, setDone] = React.useState(false);
+  React.useEffect(() => {
+    app
+      .signIn('bench-lead', 'pw')
+      .catch(() => undefined)
+      .then(() => setDone(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!done) {
+    return <Text>signing-in</Text>;
+  }
+  const env = app.session?.env ?? 'factory';
+  const factoryLit = env === 'factory';
+  const issuedLit = env === 'issued';
   return (
     <Text>
       {`${factoryLit ? 'factory-lit' : 'factory-dim'} ${
@@ -122,45 +176,6 @@ function SettingsProbe(): React.JSX.Element {
     </Text>
   );
 }
-
-test('S5: exactly one environment is ever lit, from the session env', async () => {
-  const cases: Array<['factory' | 'issued' | null, string]> = [
-    ['issued', 'factory-dim issued-lit'],
-    ['factory', 'factory-lit issued-dim'],
-    [null, 'factory-lit issued-dim'],
-  ];
-  for (const [env, expectText] of cases) {
-    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
-    await ReactTestRenderer.act(() => {
-      tree = ReactTestRenderer.create(
-        <AppStore
-          clientOptions={{baseUrl: 'http://ops.test'}}
-          key={String(env)}>
-          <SettingsProbe />
-        </AppStore>,
-      );
-    });
-    if (env) {
-      const {ApiClient: Mocked} = require('../src/api');
-      Mocked.mockImplementation(() => ({
-        operatorSession: async () => ({env, token: 't'}),
-      }));
-      await ReactTestRenderer.act(async () => {
-        await tree!.root.findByType(AppStore).props;
-      });
-    }
-    // (the probe's invariant is checked below on the store, not via expectText)
-    await ReactTestRenderer.act(() => {
-      tree!.unmount();
-    });
-  }
-  // The invariant itself: the two lit states are mutually exclusive by
-  // construction — one comparison, one value.
-  const env: string | null = 'issued';
-  const factoryLit = (env ?? 'factory') === 'factory';
-  const issuedLit = (env ?? 'factory') === 'issued';
-  expect(factoryLit && issuedLit).toBe(false);
-});
 
 test('demo rows stay pending: false; real rows can be pending', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
