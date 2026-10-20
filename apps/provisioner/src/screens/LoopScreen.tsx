@@ -12,18 +12,19 @@
  * raised card, hairline dividers, the accent only where a thing is live.
  */
 import React, {useCallback, useEffect, useRef, useState, Fragment} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, Vibration, View} from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from 'react-native';
 
 import type {RunEvent} from '../cardkit';
 import {CardFigure} from '../CardFigure';
 import {runDemo, stopFor} from '../demo/runDemo';
-import {
-  DEMO_STATES,
-  LOOP,
-  PHASES,
-  STOP,
-  type DemoStateId,
-} from '../strings';
+import {DEMO_STATES, LOOP, PHASES, STOP, type DemoStateId} from '../strings';
 import {useApp} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
 import {Dim, PrimaryButton, Screen, SecondaryButton} from '../ui';
@@ -57,7 +58,12 @@ const local = (t: Theme) =>
       borderRadius: 2,
       backgroundColor: t.accent,
     },
-    figureWrap: {alignItems: 'center', marginVertical: 10, flex: 1, justifyContent: 'center'},
+    figureWrap: {
+      alignItems: 'center',
+      marginVertical: 10,
+      flex: 1,
+      justifyContent: 'center',
+    },
     phase: {
       color: t.ink,
       fontFamily: FONT.medium,
@@ -117,8 +123,18 @@ const local = (t: Theme) =>
     resultDone: {borderColor: t.accent},
     resultTitle: {color: t.ink, fontFamily: FONT.semibold, fontSize: 22},
     resultTitleDanger: {color: t.danger},
-    resultLine: {color: t.dim, fontFamily: FONT.regular, fontSize: 15, textAlign: 'center'},
-    resultNext: {color: t.ink, fontFamily: FONT.semibold, fontSize: 16, textAlign: 'center'},
+    resultLine: {
+      color: t.dim,
+      fontFamily: FONT.regular,
+      fontSize: 15,
+      textAlign: 'center',
+    },
+    resultNext: {
+      color: t.ink,
+      fontFamily: FONT.semibold,
+      fontSize: 16,
+      textAlign: 'center',
+    },
     resultPin: {
       color: t.ink,
       fontFamily: FONT.tabular,
@@ -211,13 +227,28 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
           ? String(Math.floor(1000 + Math.random() * 9000))
           : undefined;
       setDone({id, pin});
-      app.addRecord({
-        id,
-        ok: true,
-        demo: state,
-        at: Date.now(),
-        pending: false,
-      });
+      // ENG-740: a demo success records locally (pending stays false); a real
+      // success posts its registry row through the store's outbox — on
+      // failure the row is pending and the retry passes carry it.
+      if (app.demo) {
+        app.addDemoRecord({
+          id,
+          ok: true,
+          demo: state,
+          at: Date.now(),
+          pending: false,
+        });
+      } else {
+        app.postRegistryCard({
+          short_id: id,
+          batch_id: 0, // the batch's service id lands with the deep build (ENG-741)
+          key_id: 2,
+          ordinal: 0, // the escrow ordinal the phone drew; ENG-741 wires the real one
+          installed_at: Date.now(),
+          installer: 'op@bench',
+          load_sha256: 'fe7d8ac3',
+        });
+      }
       // ENG-754: auto-rearm after done - brief pause then auto-rearm
       autoRearm();
     } else {
@@ -226,13 +257,23 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
       if (stopId === 'wrongKeys') {
         setNeedsAck(true);
       }
-      app.addRecord({
-        id: state,
-        ok: false,
-        demo: state,
-        at: Date.now(),
-        pending: false,
-      });
+      if (app.demo) {
+        app.addDemoRecord({
+          id: state,
+          ok: false,
+          demo: state,
+          at: Date.now(),
+          pending: false,
+        });
+      } else {
+        app.addRecord({
+          id: state,
+          ok: false,
+          demo: state,
+          at: Date.now(),
+          pending: false,
+        });
+      }
     }
     setUi({phase: ''});
   }
@@ -253,12 +294,12 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
   const figureState = done
     ? 'done'
     : stop
-      ? STOP[stop.id].danger
-        ? 'danger'
-        : 'stop'
-      : busy
-        ? 'running'
-        : 'idle';
+    ? STOP[stop.id].danger
+      ? 'danger'
+      : 'stop'
+    : busy
+    ? 'running'
+    : 'idle';
 
   const doneCount = batch.done.filter(r => r.ok).length;
   const batchProgress = batch.count > 0 ? doneCount / batch.count : 0;
@@ -292,7 +333,11 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
     }
     return (
       <View style={s.realOff}>
-        <PrimaryButton title={LOOP.program} disabled onPress={() => undefined} />
+        <PrimaryButton
+          title={LOOP.program}
+          disabled
+          onPress={() => undefined}
+        />
         <Dim>
           {'Runs against real cards arrive with the key service (Phase 3).'}
         </Dim>
@@ -308,7 +353,12 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
             {LOOP.of(doneCount, batch.count)}
           </Text>
           <View style={s.progress} testID="batch-progress">
-            <View style={[s.progressFill, {width: `${Math.round(batchProgress * 100)}%`}]} />
+            <View
+              style={[
+                s.progressFill,
+                {width: `${Math.round(batchProgress * 100)}%`},
+              ]}
+            />
           </View>
         </View>
 
@@ -339,10 +389,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
         {stop ? (
           <View
             testID="stop"
-            style={[
-              s.result,
-              STOP[stop.id].danger ? s.resultDanger : null,
-            ]}>
+            style={[s.result, STOP[stop.id].danger ? s.resultDanger : null]}>
             <Text
               style={[
                 s.resultTitle,

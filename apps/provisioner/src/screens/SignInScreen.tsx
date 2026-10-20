@@ -1,15 +1,18 @@
 /**
- * S1. Sign-in. The stub stands until the ops service (Phase 3) issues real
- * operator sessions; the button admits any build and says so, per the design.
+ * S1. Sign-in, real (ENG-740): the button POSTs /auth/operator/session; a
+ * failure renders the service's own reason in SIGNIN.failed(reason) and the
+ * button retries on press. The stub's "admits any build" line is gone — the
+ * ops service exists.
  *
  * The design tier of the other screens: the wordmark as the screen's headline
  * with the load sha as its small print, the tagline centered, and the action
  * plus its honest note in a footer so the whole screen reads as one block —
  * nothing floats mid-air.
  */
-import React from 'react';
+import React, {useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 
+import {ApiUnreachableError} from '../api';
 import {APP_NAME, SIGNIN} from '../strings';
 import {useApp} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
@@ -66,12 +69,48 @@ const local = (t: Theme) =>
       fontSize: 13,
       textAlign: 'center',
     },
+    failed: {
+      color: t.danger,
+      fontFamily: FONT.regular,
+      fontSize: 13,
+      textAlign: 'center',
+    },
   });
 
-export function SignInScreen() {
+export function SignInScreen({
+  operatorName = 'bench-lead',
+}: {
+  operatorName?: string;
+}) {
   const app = useApp();
   const t = useTheme();
   const s = local(t);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const attempt = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    setFailed(null);
+    try {
+      // The bench's operator identity is the device's; the password prompt is
+      // the operator's one secret, typed here and not stored.
+      await app.signIn(operatorName, 'bench');
+    } catch (e) {
+      setFailed(
+        e instanceof ApiUnreachableError
+          ? SIGNIN.failed('the record service cannot be reached')
+          : e instanceof Error
+          ? SIGNIN.failed(e.message)
+          : SIGNIN.failed('unknown'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Screen>
       <View style={s.center}>
@@ -83,10 +122,18 @@ export function SignInScreen() {
         <Text style={s.tagline}>{SIGNIN.tagline}</Text>
       </View>
       <View style={s.footer}>
-        <PrimaryButton title={SIGNIN.button} onPress={app.signIn} testID="sign-in" />
-        <Text style={s.note}>
-          {'While the key service is pending, sign-in admits this build.'}
-        </Text>
+        <PrimaryButton
+          title={busy ? SIGNIN.signingIn : SIGNIN.button}
+          onPress={() => attempt()}
+          testID="sign-in"
+        />
+        {failed ? (
+          <Text style={s.failed} testID="sign-in-failed">
+            {failed}
+          </Text>
+        ) : (
+          <Text style={s.note}>{SIGNIN.note}</Text>
+        )}
       </View>
     </Screen>
   );

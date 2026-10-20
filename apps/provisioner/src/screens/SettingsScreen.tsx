@@ -9,7 +9,14 @@
  * that is not.
  */
 import React from 'react';
-import {Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 
 import {SETTINGS} from '../strings';
 import {useApp} from '../store';
@@ -123,6 +130,9 @@ export function SettingsScreen({
   const app = useApp();
   const t = useTheme();
   const s = local(t);
+  // S5: exactly one of the two environments is ever lit — the session's own.
+  const env = app.session?.env ?? 'factory';
+  const factoryActive = env === 'factory';
   return (
     <Screen title={SETTINGS.title} onBack={onBack}>
       <ScrollView contentContainerStyle={s.scroll}>
@@ -130,21 +140,23 @@ export function SettingsScreen({
           <Text style={s.header}>{SETTINGS.keyEnv}</Text>
           <View style={s.card}>
             <View style={s.row}>
-              <View style={s.dot} />
+              <View style={factoryActive ? s.dot : s.dotOff} />
               <View style={s.rowLabelCol}>
-                <Text style={s.rowLabel}>{SETTINGS.factory}</Text>
+                <Text style={[s.rowLabel, !factoryActive && {color: t.dim}]}>
+                  {SETTINGS.factory}
+                </Text>
               </View>
-              <Text style={s.rowValue}>active</Text>
+              <Text style={s.rowValue}>{factoryActive ? 'active' : '—'}</Text>
             </View>
             <View style={s.divider} />
             <View style={s.row}>
-              <View style={s.dotOff} />
+              <View style={!factoryActive ? s.dot : s.dotOff} />
               <View style={s.rowLabelCol}>
-                <Text style={[s.rowLabel, {color: t.dim}]}>
+                <Text style={[s.rowLabel, factoryActive && {color: t.dim}]}>
                   {SETTINGS.issued}
                 </Text>
               </View>
-              <Text style={s.rowValue}>—</Text>
+              <Text style={s.rowValue}>{!factoryActive ? 'active' : '—'}</Text>
             </View>
           </View>
         </View>
@@ -166,8 +178,8 @@ export function SettingsScreen({
                         {opt === 'system'
                           ? SETTINGS.themeSystem
                           : opt === 'dark'
-                            ? SETTINGS.themeDark
-                            : SETTINGS.themeLight}
+                          ? SETTINGS.themeDark
+                          : SETTINGS.themeLight}
                       </Text>
                     </Pressable>
                   );
@@ -216,6 +228,8 @@ export function SettingsScreen({
             <View style={s.identity}>
               <Text style={s.version}>{SETTINGS.version('0.1.0')}</Text>
               <Text style={s.loadSha}>{SETTINGS.loadSha('fe7d8ac3')}</Text>
+              <Text style={s.loadSha}>{app.serviceUrl}</Text>
+              <Text style={s.loadSha}>{SETTINGS.capPin('fe7d8ac3')}</Text>
             </View>
           </View>
         </View>
