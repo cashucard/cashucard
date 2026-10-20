@@ -39,6 +39,12 @@ reinstall. Reject malformed responses and zero/all-FF serials; missing CPLC or
 an identity mismatch prevents authentication and mutation in the automated loop.
 Do not substitute NFC UID or SCP02 diversification data.
 
+A subsequent [USB-reader check](HARDWARE_TEST_REPORT_2026-10-20.d321-cplc.md)
+read another card three times across PC/SC reconnections, consistently yielding
+`cplc-v1:4790d3213180072976207515`. That provides a second distinct observed
+composite and repeat-read evidence on the ACR122U. It does not cover physical
+reset, phones or reinstall; those gates remain open.
+
 CPLC is a guard against accidental card substitution. Authorization comes from
 the operator session and its permitted reservation. A card cryptogram proves
 possession of a candidate manager key set, not globally unique silicon identity;
