@@ -366,6 +366,44 @@ jobs:
       - name: Format
         run: node_modules/.bin/prettier --check .
 
+  # The ops service (ENG-740, D29): one SQLite DB, keys derived from the
+  # runtime-injected master. Same shape as cardkit, plus better-sqlite3 —
+  # a native module, so the install builds it and the cache key is this
+  # lockfile's.
+  ops:
+    name: ops service (key issuance, registries, anchor tip)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ops
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: yarn
+          cache-dependency-path: ops/yarn.lock
+
+      - name: Install
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck
+        run: |
+          node_modules/.bin/tsc -p tsconfig.json --noEmit
+          node_modules/.bin/tsc -p tsconfig.test.json --noEmit
+
+      # Derivation determinism; the one-transaction escrow (a forced failure
+      # between the batch row and a key row leaves nothing); the registry's
+      # retry contract; the sessions' expiry, revocation and scope; the tip's
+      # 80-byte validation, cache and last-good; no key material in any
+      # response the phone caches beyond one run.
+      - name: Tests
+        run: node --import tsx --test 'test/**/*.test.ts'
+
+      - name: Format
+        run: node_modules/.bin/prettier --check .
+
   provisioner:
     name: provisioner app (typecheck, lint, tests, bundles)
     runs-on: ubuntu-latest

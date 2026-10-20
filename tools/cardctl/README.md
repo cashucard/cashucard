@@ -125,6 +125,8 @@ reader is the more reliable way to install, leaving NFC for tap testing.
 | `change-pin NEW` | the owner sets a new PIN: no old PIN, any state; unblocks a blocked card |
 | `set-card --mint URL [--refund HEX] [--pin P]` | write the record (the owner's proof on an owned card) |
 | `set-owner [--anchor HEADER] [--old-owner-key HEX]` | give the card its owner (the public half of `--owner-key`), anchored at a block header |
+| `tip [--url URL]` | print the ops service's tip header, 80 bytes hex (ENG-740) — the value `--anchor` takes |
+| `set-owner-url [--url URL] [--old-owner-key HEX]` | `set-owner` with the anchor fetched from the ops service's tip feed |
 | `set-limit --day N [--payment N --allowance N [--budget R]]` | the owner's limits; `--budget` (1–30) is the rollover budget, and needs the two before it; without it the card leaves the budget as it is ([D26](../../docs/DECISIONS.md#d26)) |
 | `set-header --header HEX` | `SET_HEADER`: show the card a block header |
 | `refresh --header HEX` | `REFRESH`: the owner's proof over the tip header; the rollover budget is full again |
