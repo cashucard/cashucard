@@ -28,7 +28,10 @@ jest.mock('react-native-svg', () => {
   const React = require('react');
   const {View} = require('react-native');
   const make = (name: string) =>
-    React.forwardRef(function Mocked(props: Record<string, unknown>, ref: unknown) {
+    React.forwardRef(function Mocked(
+      props: Record<string, unknown>,
+      ref: unknown,
+    ) {
       return React.createElement(View, {...props, ref}, props.children);
     });
   return {
@@ -41,3 +44,9 @@ jest.mock('react-native-svg', () => {
     G: make('G'),
   };
 });
+
+// Keep the real contexts/components; the package's mock supplies test insets.
+jest.mock(
+  'react-native-safe-area-context',
+  () => require('react-native-safe-area-context/jest/mock').default,
+);

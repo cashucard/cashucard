@@ -196,3 +196,5 @@ for (const d of DEMO_STATES) {
     throw new Error(`no STOP copy for ${d.id}`);
   }
 }
+
+export const PHYSICAL_READ_BANNER = 'PHYSICAL CARD — read-only';

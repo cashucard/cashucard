@@ -196,3 +196,13 @@ labels its physical-card action. Cancel/back ends only its own session. It does
 not authenticate, modify cards, alter saved attempts or enable installation.
 Deterministic pause tooling remains outstanding. The checklist is not a hardware
 report or permission to operate devices.
+
+### Phone UI follow-up
+
+Shared screens use `react-native-safe-area-context` (pinned 5.10.1) for native
+insets, including Android edge-to-edge windows. This adds a native dependency:
+run pod install and rebuild the phones before loading this revision's bundle.
+The root provider supplies all shared screens; titles wrap in normal header
+layout. The identity diagnostic always shows “PHYSICAL CARD — read-only”, while
+ordinary demo screens retain their demo banner. Its content can scroll at larger
+text sizes. These changes do not arm NFC or enable installation.

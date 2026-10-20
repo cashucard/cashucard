@@ -1565,3 +1565,29 @@ unrelated session; treating public CPLC as ownership authentication, global
 uniqueness evidence or permission to enable installation. This decision ships
 software only; native builds and device actions remain the owner's under an
 approved device plan. Deterministic interruption tooling remains outstanding.
+
+## <a id="d39"></a>D39: Native safe areas and truthful physical diagnostic framing
+
+**Decided (ENG-741 phone UI follow-up, 2026-10-20):** use a single root
+`react-native-safe-area-context` provider and its native SafeAreaView for shared
+screens. React Native 0.77's built-in SafeAreaView is a plain View on Android;
+the Pixel's edge-to-edge window placed the demo banner under its status bar.
+Pin the new native dependency at 5.10.1, update the iOS lockfile and require a
+native rebuild before serving this bundle. Apply measured safe areas across
+platforms rather than device-specific offsets. Keep the title in normal flex
+layout so a long or enlarged heading wraps within its available width while
+Back and other controls retain their space. Set status-bar icon contrast from
+the active theme now that content no longer supplies a colored backdrop.
+
+The CPLC diagnostic declares itself a physical read-only screen. Its banner
+says “PHYSICAL CARD — read-only” even when reached through the demo door.
+Ordinary demo screens retain their existing demo banner. Diagnostic content is
+scrollable so safe-area padding and larger text do not hide its controls or
+identity result. This changes layout/copy only: no automatic NFC request,
+service call, authentication, journal transition or installation-gate change.
+
+**Rejected:** keeping “no card” on a screen that reads a real card; positioning
+an unconstrained title above Back; hardcoded Pixel/status-bar offsets. The
+2026-10-20 CPLC report remains evidence for its original source commit. UI-only
+checks of this revision do not count as additional card reads or recovery drills.
+D38 is reserved by the separate recovery-drill PR (#20).
