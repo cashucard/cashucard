@@ -21,3 +21,23 @@ jest.mock('react-native-nfc-manager', () => ({
   },
   NfcTech: {IsoDep: 'IsoDep'},
 }));
+
+// react-native-svg is native; in jest every element would be undefined, so
+// the mock renders a lone View (the tests never inspect the gear's insides).
+jest.mock('react-native-svg', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  const make = (name: string) =>
+    React.forwardRef(function Mocked(props: Record<string, unknown>, ref: unknown) {
+      return React.createElement(View, {...props, ref}, props.children);
+    });
+  return {
+    __esModule: true,
+    default: make('Svg'),
+    Svg: make('Svg'),
+    Path: make('Path'),
+    Circle: make('Circle'),
+    Rect: make('Rect'),
+    G: make('G'),
+  };
+});
