@@ -42,7 +42,7 @@ port as release-ready merely because its baseline suites pass.
 | 4 | Add controlled operator bootstrap and recovery | Empty local DO becomes usable; bootstrap cannot silently replace an existing operator; administrative recovery works without a live session | Implemented; local lifecycle checks passed |
 | 5 | Complete encrypted backup and restore | Scheduled path writes a versioned artifact; restoring it to an empty service recovers keys by card ID without the old DB or master; missing backup configuration is visible | Implemented locally; independent destination and alerts need operator configuration |
 | 6 | Finish deployment documentation and readiness review | Threat model and runbook match implementation; independent backup procedure and data-loss window are explicit; deployment gates reviewed | Documented; release review and operator configuration outstanding |
-| 7 | Execute ENG-741 app integration | Real batch/ordinal assignment and persisted outbox survive simulated interruption and restart without storing manager keys or PINs | Not implemented; identity contract needed below |
+| 7 | Execute ENG-741 app integration | Real batch/ordinal assignment and persisted outbox survive simulated interruption and restart without storing manager keys or PINs | Contract and cardkit identity primitive defined; journal and real loop not implemented |
 
 Checkpoint 1 provides the same routine commands as CI.
 Checkpoints 2–6 together satisfy the ENG-740 deployment gates; completing

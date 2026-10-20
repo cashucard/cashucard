@@ -57,6 +57,15 @@ metadata, not GET_PUBKEY response bytes; add an explicit read or a typed result.
 The load-file hash records the intended pinned artifact, not chip attestation
 of its installed code.
 
+Cardkit now exposes `parseCplc(data)` and `readChipIdentity(tx, expectedId?)`
+through its public entry point. The reader selects the full ISD AID and issues
+GET DATA once. It rejects non-success status, malformed CPLC, unusable serials
+or a saved-identity mismatch without authentication or retries. The library
+uses its existing SELECT builder, including Le `00`; the separate USB check used
+GlobalPlatformPro's raw SELECT without Le. Parser replay and fake transports
+validate this implementation; the new TypeScript reader has not been run on
+the physical card or either phone. Wiring it into the real loop remains pending.
+
 ## Service reservations and retry identity
 
 Each batch belongs to one operator and one device for this rollout. Enforce

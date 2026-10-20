@@ -86,7 +86,8 @@ cloning of these public values.
 - Identity before and after installation, deletion or manager-key rotation.
 - Cashu applet version, public key, value, owner, PIN state or installed CAP.
 - Key authentication, personalization, provisioning or interrupted-run recovery.
-- The new cardkit CPLC parser or app journal; neither is implemented yet.
+- The cardkit CPLC parser or app journal; neither was implemented at the time
+  of this check.
 
 The automated identity/recovery gate remains closed pending implementation and
 the separately approved phone/install verification in the contract. Existing
