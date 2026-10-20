@@ -81,17 +81,31 @@ def main():
     matches = [reader for reader in readers() if str(reader) == args.reader]
     if len(matches) != 1:
         raise PreflightError('expected exactly one matching named reader')
-    connection = matches[0].createConnection()
+    result = inspect_connection(matches[0].createConnection(), args.expect_chip, SCARD_LEAVE_CARD)
+    print(json.dumps(result, sort_keys=True))
+
+
+def inspect_connection(connection, expected_chip, leave_card):
+    """One connection; pyscard takes disposition on connect, not disconnect."""
+    connected = False
     try:
-        connection.connect()
+        try:
+            connection.connect(disposition=leave_card)
+            connected = True
+        except Exception:
+            raise PreflightError('reader connection failed; no retry performed') from None
 
         def transmit(apdu):
-            data, sw1, sw2 = connection.transmit(list(apdu))
+            try:
+                data, sw1, sw2 = connection.transmit(list(apdu))
+            except Exception:
+                raise PreflightError('read transport failed; no retry performed') from None
             return bytes(data), (sw1 << 8) | sw2
 
-        print(json.dumps(inspect_card(transmit, args.expect_chip), sort_keys=True))
+        return inspect_card(transmit, expected_chip)
     finally:
-        connection.disconnect(SCARD_LEAVE_CARD)
+        if connected:
+            connection.disconnect()
 
 
 if __name__ == '__main__':

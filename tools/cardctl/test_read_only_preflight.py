@@ -41,6 +41,28 @@ class PreflightTest(unittest.TestCase):
         self.assertFalse(result['authentication_attempted'])
         self.assertEqual(log, [p.SELECT_ISD, p.GET_CPLC, p.SELECT_CARD, p.GET_INFO, p.GET_PUBKEY, p.SELECT_TAG])
 
+    def test_native_connection_contract_and_failure_cleanup(self):
+        class Connection:
+            def __init__(self, fail=False):
+                self.fail = fail
+                self.events = []
+                self.replies = iter([(b'', 0x90, 0), (CPLC, 0x90, 0), (b'', 0x6A, 0x82)])
+            def connect(self, *, disposition):
+                self.events.append(('connect', disposition))
+                if self.fail:
+                    raise RuntimeError('private native detail')
+            def transmit(self, apdu):
+                return next(self.replies)
+            def disconnect(self):
+                self.events.append(('disconnect',))
+        good = Connection()
+        self.assertEqual(p.inspect_connection(good, CHIP, 0)['installation'], 'absent')
+        self.assertEqual(good.events, [('connect', 0), ('disconnect',)])
+        bad = Connection(fail=True)
+        with self.assertRaisesRegex(p.PreflightError, 'reader connection failed'):
+            p.inspect_connection(bad, CHIP, 0)
+        self.assertEqual(bad.events, [('connect', 0)])
+
     def test_unknown_version_stops_without_retry(self):
         send, log = self.transport([(b'', 0x9000), (CPLC, 0x9000), (bytes([2, 0]), 0x9000)])
         with self.assertRaises(p.PreflightError):
