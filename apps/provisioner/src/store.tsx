@@ -42,7 +42,7 @@ export interface AppState {
 const Ctx = createContext<AppState | null>(null);
 
 export const DEMO_BATCH: BatchConfig = {
-  mint: 'https://mint.demo.invalid',
+  mint: 'https://forge.flashapp.me',
   pinPolicy: 'perCard',
   pinBatch: '',
   dailyUsd: 25,
