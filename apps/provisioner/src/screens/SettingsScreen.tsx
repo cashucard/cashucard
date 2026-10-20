@@ -2,6 +2,11 @@
  * S5. Settings, grouped the way a 2026 settings screen is grouped: section
  * headers, one card per group, hairline dividers, a segmented theme pill,
  * the key environment as a locked row, and demo mode as its own switch card.
+ *
+ * The batch-setup revamp's rules hold here too: tabular figures for every
+ * number, the accent only where a thing is live (the factory key set's dot,
+ * the theme pill's active segment), and nothing that pretends to be a button
+ * that is not.
  */
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
@@ -33,14 +38,34 @@ const local = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+      minHeight: 52,
     },
     divider: {height: StyleSheet.hairlineWidth, backgroundColor: t.line},
     rowLabel: {flex: 1, color: t.ink, fontFamily: FONT.medium, fontSize: 16},
+    rowSub: {
+      color: t.dim,
+      fontFamily: FONT.regular,
+      fontSize: 12,
+      marginTop: 2,
+    },
     rowValue: {
       color: t.dim,
       fontFamily: FONT.tabular,
       fontVariant: ['tabular-nums'],
       fontSize: 15,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: t.accent,
+    },
+    dotOff: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      borderWidth: 1.5,
+      borderColor: t.dim,
     },
     pill: {
       flexDirection: 'row',
@@ -63,14 +88,29 @@ const local = (t: Theme) =>
       fontSize: 13,
       lineHeight: 19,
     },
-    lock: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: t.accent,
-    },
     chevron: {color: t.dim, fontFamily: FONT.regular, fontSize: 22},
+    // The identity block: wordmark-size version, the load sha as the small print
+    // under it, both centered — the same "which build am I holding" posture the
+    // batch screen's footer line keeps.
+    identity: {
+      alignItems: 'center',
+      paddingVertical: 20,
+      gap: 4,
+    },
+    version: {
+      color: t.ink,
+      fontFamily: FONT.semibold,
+      fontSize: 17,
+      fontVariant: ['tabular-nums'],
+    },
+    loadSha: {
+      color: t.dim,
+      fontFamily: FONT.regular,
+      fontSize: 12,
+      fontVariant: ['tabular-nums'],
+    },
     rowCenter: {justifyContent: 'center'},
+    rowLabelCol: {flex: 1},
   });
 
 export function SettingsScreen({
@@ -90,16 +130,20 @@ export function SettingsScreen({
           <Text style={s.header}>{SETTINGS.keyEnv}</Text>
           <View style={s.card}>
             <View style={s.row}>
-              <View style={s.lock} />
-              <Text style={s.rowLabel}>{SETTINGS.factory}</Text>
-              <Text style={s.rowValue}>●</Text>
+              <View style={s.dot} />
+              <View style={s.rowLabelCol}>
+                <Text style={s.rowLabel}>{SETTINGS.factory}</Text>
+              </View>
+              <Text style={s.rowValue}>active</Text>
             </View>
             <View style={s.divider} />
             <View style={s.row}>
-              <View style={[s.lock, {backgroundColor: t.dim}]} />
-              <Text style={[s.rowLabel, {color: t.dim}]}>
-                {SETTINGS.issued}
-              </Text>
+              <View style={s.dotOff} />
+              <View style={s.rowLabelCol}>
+                <Text style={[s.rowLabel, {color: t.dim}]}>
+                  {SETTINGS.issued}
+                </Text>
+              </View>
               <Text style={s.rowValue}>—</Text>
             </View>
           </View>
@@ -134,27 +178,7 @@ export function SettingsScreen({
         </View>
 
         <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.about}</Text>
-          <View style={s.card}>
-            <View style={s.row}>
-              <Text style={s.rowLabel}>{SETTINGS.version('0.1.0')}</Text>
-            </View>
-            <View style={s.divider} />
-            <View style={s.row}>
-              <Text style={s.rowLabel}>{SETTINGS.loadSha('fe7d8ac3')}</Text>
-            </View>
-            <View style={s.divider} />
-            <Pressable
-              testID="bench-entry"
-              onPress={onBench}
-              style={s.row}>
-              <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
-              <Text style={s.chevron}>›</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={s.section}>
+          <Text style={s.header}>{SETTINGS.demo}</Text>
           <View style={s.card}>
             <View style={s.row}>
               <Text style={s.rowLabel}>{SETTINGS.demo}</Text>
@@ -167,6 +191,31 @@ export function SettingsScreen({
             <View style={s.divider} />
             <View style={s.row}>
               <Text style={s.demoNote}>{SETTINGS.demoOn}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={s.section}>
+          <Text style={s.header}>{SETTINGS.bench}</Text>
+          <View style={s.card}>
+            <Pressable testID="bench-entry" onPress={onBench} style={s.row}>
+              <View style={s.rowLabelCol}>
+                <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
+                <Text style={s.rowSub}>
+                  {'Load test against the spare card. Bench only.'}
+                </Text>
+              </View>
+              <Text style={s.chevron}>›</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={s.section}>
+          <Text style={s.header}>{SETTINGS.about}</Text>
+          <View style={s.card}>
+            <View style={s.identity}>
+              <Text style={s.version}>{SETTINGS.version('0.1.0')}</Text>
+              <Text style={s.loadSha}>{SETTINGS.loadSha('fe7d8ac3')}</Text>
             </View>
           </View>
         </View>

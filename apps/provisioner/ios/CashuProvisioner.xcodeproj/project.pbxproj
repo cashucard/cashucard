@@ -17,6 +17,7 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		C6F534521EBF4500990A681C /* Figtree-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */; };
 		C91F76E390FC4B46A75195E5 /* Figtree-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */; };
+		F0B1A2C3D4E5F6A7B8C9D0E1 /* AppIcon.appiconset in Resources */ = {isa = PBXBuildFile; fileRef = F0B1A2C3D4E5F6A7B8C9D0E2 /* AppIcon.appiconset */; settings = {ATTRIBUTES = (); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,15 +28,17 @@
 		3B4392A12AC88292D35C810B /* Pods-CashuProvisioner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CashuProvisioner.debug.xcconfig"; path = "Target Support Files/Pods-CashuProvisioner/Pods-CashuProvisioner.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-CashuProvisioner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CashuProvisioner.release.xcconfig"; path = "Target Support Files/Pods-CashuProvisioner/Pods-CashuProvisioner.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-CashuProvisioner.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CashuProvisioner.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Medium.ttf"; path = "../assets/fonts/Figtree-Medium.ttf"; sourceTree = "<group>"; };
+		75D34E469CBA482B83C3EBF1 /* Figtree-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Medium.ttf"; path = "../assets/fonts/Figtree-Medium.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = CashuProvisioner/AppDelegate.swift; sourceTree = "<group>"; };
-		78EFB2B3A4E94099AD221634 /* OFL.txt */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = OFL.txt; path = ../assets/fonts/OFL.txt; sourceTree = "<group>"; };
+		78EFB2B3A4E94099AD221634 /* OFL.txt */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = OFL.txt; path = ../assets/fonts/OFL.txt; sourceTree = "<group>"; };
 		7A3C1E5B2D9F4A6081C2B3D4 /* CashuProvisioner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = CashuProvisioner.entitlements; path = CashuProvisioner/CashuProvisioner.entitlements; sourceTree = "<group>"; };
-		8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-SemiBold.ttf"; path = "../assets/fonts/Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
+		8096EB9AEA74448FA1B86FB4 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-SemiBold.ttf"; path = "../assets/fonts/Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = CashuProvisioner/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Regular.ttf"; path = "../assets/fonts/Figtree-Regular.ttf"; sourceTree = "<group>"; };
-		C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Bold.ttf"; path = "../assets/fonts/Figtree-Bold.ttf"; sourceTree = "<group>"; };
+		938A77B23DBEE4F2D0A4CC0C /* AppIcon.appiconset */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = AppIcon.appiconset; sourceTree = "<group>"; };
+		A459F94F36D543EBBE61C395 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Regular.ttf"; path = "../assets/fonts/Figtree-Regular.ttf"; sourceTree = "<group>"; };
+		C20B6DBF05AD41D499BD4287 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Bold.ttf"; path = "../assets/fonts/Figtree-Bold.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F0B1A2C3D4E5F6A7B8C9D0E2 /* AppIcon.appiconset */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = AppIcon.appiconset; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +62,8 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				938A77B23DBEE4F2D0A4CC0C /* AppIcon.appiconset */,
+				F0B1A2C3D4E5F6A7B8C9D0E2 /* AppIcon.appiconset */,
 			);
 			name = CashuProvisioner;
 			sourceTree = "<group>";
@@ -112,7 +117,6 @@
 				78EFB2B3A4E94099AD221634 /* OFL.txt */,
 			);
 			name = Resources;
-			path = "";
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -192,6 +196,7 @@
 				C91F76E390FC4B46A75195E5 /* Figtree-SemiBold.ttf in Resources */,
 				711D7D8CDDF841378B722B5F /* OFL.txt in Resources */,
 				0ACCDB780D315F3945F30FE8 /* PrivacyInfo.xcprivacy in Resources */,
+				F0B1A2C3D4E5F6A7B8C9D0E1 /* AppIcon.appiconset in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,6 +297,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CashuProvisioner/CashuProvisioner.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H7UAM79QQP;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = CashuProvisioner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -305,7 +311,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.flash.provisioner;
+				PRODUCT_BUNDLE_IDENTIFIER = com.islandbitcoin.provisioner;
 				PRODUCT_NAME = CashuProvisioner;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -321,6 +327,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CashuProvisioner/CashuProvisioner.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H7UAM79QQP;
 				INFOPLIST_FILE = CashuProvisioner/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -333,7 +340,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.flash.provisioner;
+				PRODUCT_BUNDLE_IDENTIFIER = com.islandbitcoin.provisioner;
 				PRODUCT_NAME = CashuProvisioner;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";

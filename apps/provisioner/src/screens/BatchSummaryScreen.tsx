@@ -1,27 +1,129 @@
 /**
  * S4. Batch summary and the record. The count, the stops, every row the
  * service would hold, and SHARE RECORD as text. Demo rows are marked DEMO.
+ *
+ * The design tier of the other screens: a stat header (three figures, the
+ * accent only on programmed), the record as one grouped card with per-row
+ * state dots and tabular ids, and the two actions pinned in a footer.
  */
 import React from 'react';
-import {ScrollView, Share, StyleSheet, Text} from 'react-native';
+import {ScrollView, Share, StyleSheet, Text, View} from 'react-native';
 
 import {SUMMARY} from '../strings';
 import {describeShareFailure} from '../copy';
 import {useApp} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
-import {Dim, PrimaryButton, Row, Screen} from '../ui';
+import {PrimaryButton, Screen, SecondaryButton} from '../ui';
 
 const local = (t: Theme) =>
   StyleSheet.create({
-    scroll: {gap: 8, paddingBottom: 24},
-    count: {
+    scroll: {gap: 20, paddingBottom: 24, flexGrow: 1},
+    grow: {flex: 1},
+    section: {gap: 8},
+    sectionHeader: {
+      color: t.dim,
+      fontFamily: FONT.semibold,
+      fontSize: 12,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+    },
+    card: {
+      backgroundColor: t.card,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    divider: {height: StyleSheet.hairlineWidth, backgroundColor: t.line},
+    stats: {flexDirection: 'row', gap: 10},
+    stat: {
+      flex: 1,
+      backgroundColor: t.card,
+      borderRadius: 16,
+      paddingVertical: 16,
+      alignItems: 'center',
+      gap: 2,
+    },
+    statFigure: {
       color: t.ink,
       fontFamily: FONT.tabular,
       fontVariant: ['tabular-nums'],
-      fontSize: 34,
+      fontSize: 32,
+    },
+    statFigureAccent: {color: t.accent},
+    statLabel: {
+      color: t.dim,
+      fontFamily: FONT.medium,
+      fontSize: 12,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+    },
+    recordRow: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      minHeight: 44,
+    },
+    stateDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: t.accent,
+    },
+    stateDotStopped: {backgroundColor: t.danger},
+    stateDotPending: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      borderWidth: 1.5,
+      borderColor: t.accent,
+    },
+    recordId: {
+      color: t.ink,
+      fontFamily: FONT.tabular,
+      fontVariant: ['tabular-nums'],
+      fontSize: 15,
+      flex: 1,
+    },
+    recordDemo: {
+      color: t.dim,
+      fontFamily: FONT.medium,
+      fontSize: 11,
+      letterSpacing: 0.8,
+    },
+    recordAt: {
+      color: t.dim,
+      fontFamily: FONT.tabular,
+      fontVariant: ['tabular-nums'],
+      fontSize: 13,
+    },
+    recordPending: {
+      color: t.dim,
+      fontFamily: FONT.medium,
+      fontSize: 12,
+    },
+    emptyRow: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    emptyText: {
+      color: t.dim,
+      fontFamily: FONT.regular,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    footer: {gap: 10, paddingBottom: 4, marginTop: 'auto'},
+    note: {
+      color: t.dim,
+      fontFamily: FONT.regular,
+      fontSize: 13,
       textAlign: 'center',
     },
   });
+
+function timeOf(at: number): string {
+  return new Date(at).toISOString().slice(11, 19);
+}
 
 export function BatchSummaryScreen({
   onBack,
@@ -51,42 +153,91 @@ export function BatchSummaryScreen({
 
   return (
     <Screen title={SUMMARY.title} onBack={onBack}>
-      <ScrollView contentContainerStyle={s.scroll}>
-        <Text style={s.count}>{`${done.length} of ${batch.count}`}</Text>
-        {stopped.map((r, i) => (
-          <Row
-            key={`stop-${i}`}
-            label={`Stopped: ${r.demo ?? r.id}`}
-            value={new Date(r.at).toISOString().slice(11, 19)}
+      <View style={s.grow}>
+        <ScrollView contentContainerStyle={s.scroll}>
+          <View style={s.stats}>
+            <View style={s.stat}>
+              <Text style={[s.statFigure, s.statFigureAccent]}>{done.length}</Text>
+              <Text style={s.statLabel}>Programmed</Text>
+            </View>
+            <View style={s.stat}>
+              <Text style={s.statFigure}>{stopped.length}</Text>
+              <Text style={s.statLabel}>Stopped</Text>
+            </View>
+            <View style={s.stat}>
+              <Text
+                style={[s.statFigure, pending.length === 0 ? undefined : s.statFigureAccent]}>
+                {pending.length}
+              </Text>
+              <Text style={s.statLabel}>Pending</Text>
+            </View>
+          </View>
+
+          <View style={s.section}>
+            <Text style={s.sectionHeader}>The record</Text>
+            <View style={s.card}>
+              {batch.done.length === 0 ? (
+                <View style={s.emptyRow}>
+                  <Text style={s.emptyText}>
+                    {'No cards this batch yet.'}
+                  </Text>
+                </View>
+              ) : (
+                batch.done.map((r, i) => {
+                  const dot = !r.ok
+                    ? s.stateDotStopped
+                    : r.pending
+                      ? s.stateDotPending
+                      : s.stateDot;
+                  return (
+                    <React.Fragment key={`${r.id}-${i}`}>
+                      {i > 0 ? <View style={s.divider} /> : null}
+                      <View style={s.recordRow}>
+                        <View style={dot} />
+                        <Text style={s.recordId}>{`…${r.id}`}</Text>
+                        {r.demo ? <Text style={s.recordDemo}>DEMO</Text> : null}
+                        {r.ok && !r.pending ? (
+                          <Text style={s.recordAt}>{timeOf(r.at)}</Text>
+                        ) : null}
+                        {!r.ok ? (
+                          <Text style={s.recordAt}>{timeOf(r.at)}</Text>
+                        ) : null}
+                        {r.pending ? (
+                          <Text style={s.recordPending}>{SUMMARY.pending}</Text>
+                        ) : null}
+                      </View>
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </View>
+            {pending.length > 0 ? (
+              <Text style={s.note}>{SUMMARY.pendingNote}</Text>
+            ) : null}
+          </View>
+        </ScrollView>
+
+        <View style={s.footer}>
+          <PrimaryButton
+            title={SUMMARY.share}
+            testID="share-record"
+            onPress={() => {
+              Share.share({message: text}).catch(e =>
+                setNote(describeShareFailure(e)),
+              );
+            }}
           />
-        ))}
-        {done.map((r, i) => (
-          <Row
-            key={`ok-${i}`}
-            label={`${SUMMARY.recorded(r.id)}${r.demo ? ' DEMO' : ''}`}
-            value={r.pending ? SUMMARY.pending : undefined}
+          {note ? <Text style={s.note}>{note}</Text> : null}
+          <SecondaryButton
+            title="CLOSE BATCH"
+            testID="close-batch"
+            onPress={() => {
+              app.endBatch();
+              onClose();
+            }}
           />
-        ))}
-        {pending.length > 0 ? <Dim>{SUMMARY.pendingNote}</Dim> : null}
-        <PrimaryButton
-          title={SUMMARY.share}
-          testID="share-record"
-          onPress={() => {
-            Share.share({message: text}).catch(e =>
-              setNote(describeShareFailure(e)),
-            );
-          }}
-        />
-        {note ? <Dim>{note}</Dim> : null}
-        <PrimaryButton
-          title="CLOSE BATCH"
-          testID="close-batch"
-          onPress={() => {
-            app.endBatch();
-            onClose();
-          }}
-        />
-      </ScrollView>
+        </View>
+      </View>
     </Screen>
   );
 }

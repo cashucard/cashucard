@@ -1,13 +1,14 @@
 /**
- * The designed app's root and its routes: sign-in first, then the batch
- * setup, and demo mode's banner once the switch is on. The bench screen is
- * reached from Settings only.
+ * The designed app's root and its routes: the app opens on batch setup (the
+ * sign-in gate is removed until the ops service lands), and demo mode's
+ * banner once the switch is on. The bench screen is reached from Settings
+ * only.
  */
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 
-test('signs in, then shows batch setup; demo mode raises its banner', async () => {
+test('opens on batch setup; demo mode raises its banner', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(() => {
     tree = ReactTestRenderer.create(<App />);
@@ -17,18 +18,10 @@ test('signs in, then shows batch setup; demo mode raises its banner', async () =
       .findAll(n => typeof n.props.children === 'string')
       .map(n => n.props.children as string)
       .join('\n');
-  expect(text()).toContain('Cashu card provisioner');
-  expect(text()).toContain('SIGN IN');
-
-  await ReactTestRenderer.act(() => {
-    tree!.root
-      .findAllByProps({title: 'SIGN IN'})[0]
-      .props.onPress();
-  });
   expect(text()).toContain('NEW BATCH');
 
   await ReactTestRenderer.act(() => {
-    tree!.root.findAllByProps({title: 'Settings'})[0].props.onPress();
+    tree!.root.findByProps({testID: 'settings'}).props.onPress();
   });
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'demo-switch'}).props.onValueChange(true);

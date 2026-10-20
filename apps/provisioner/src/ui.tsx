@@ -12,16 +12,19 @@ import {
 } from 'react-native';
 
 import {FONT, type Theme, useTheme} from './theme';
+import GearSvg from './assets/gear.svg';
 import {DEMO_BANNER} from './strings';
 import {useApp} from './store';
 
 export function Screen({
   title,
   onBack,
+  headerRight,
   children,
 }: {
   title?: string;
   onBack?: () => void;
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const t = useTheme();
@@ -34,14 +37,19 @@ export function Screen({
           <Text style={s.bannerText}>{DEMO_BANNER}</Text>
         </View>
       ) : null}
-      {title || onBack ? (
+      {title || onBack || headerRight ? (
         <View style={s.header}>
           {onBack ? (
             <Pressable onPress={onBack} hitSlop={12} testID="back">
               <Text style={s.back}>‹ Back</Text>
             </Pressable>
           ) : null}
-          {title ? <Text style={s.title}>{title}</Text> : null}
+          {title ? (
+            <View style={s.titleWrap} pointerEvents="box-none">
+              <Text style={s.title}>{title}</Text>
+            </View>
+          ) : null}
+          {headerRight ? <View style={s.headerRight}>{headerRight}</View> : null}
         </View>
       ) : null}
       <View style={s.body}>{children}</View>
@@ -109,21 +117,38 @@ export function SecondaryButton({
   );
 }
 
+export function GearButton({onPress, testID}: {onPress: () => void; testID?: string}) {
+  const t = useTheme();
+  const s = styles(t);
+  return (
+    <Pressable onPress={onPress} hitSlop={12} testID={testID} style={s.gear}>
+      <Gear size={22} color={t.dim} />
+    </Pressable>
+  );
+}
+
+/** The gearbox: flash-mobile's gear.svg artwork (icons-redesign), tinted. */
+function Gear({size, color}: {size: number; color: string}) {
+  return <GearSvg width={size} height={size} style={{color}} />;
+}
+
 export function Row({
   label,
   value,
   onPress,
   testID,
+  style,
 }: {
   label: string;
   value?: string;
   onPress?: () => void;
   testID?: string;
+  style?: object;
 }) {
   const t = useTheme();
   const s = styles(t);
   const inner = (
-    <View style={s.row}>
+    <View style={[s.row, style]}>
       <Text style={s.rowLabel}>{label}</Text>
       {value !== undefined ? <Text style={s.rowValue}>{value}</Text> : null}
     </View>
@@ -136,6 +161,9 @@ export function Row({
     inner
   );
 }
+
+/** Spread into styles that position absolutely. */
+const ABS = {position: 'absolute' as const};
 
 export const styles = (t: Theme) =>
   StyleSheet.create({
@@ -155,15 +183,25 @@ export const styles = (t: Theme) =>
       paddingHorizontal: 16,
       paddingTop: 8,
       paddingBottom: 12,
-      gap: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 48,
     },
-    back: {color: t.accent, fontFamily: FONT.medium, fontSize: 16},
     title: {
       color: t.ink,
       fontFamily: FONT.semibold,
       fontSize: 26,
       letterSpacing: 0.2,
+      textAlign: 'center',
     },
+    titleWrap: {
+      ...ABS,
+      left: 64,
+      right: 64,
+      alignItems: 'center',
+    },
+    back: {color: t.accent, fontFamily: FONT.medium, fontSize: 16},
     body: {flex: 1, paddingHorizontal: 16, gap: 12},
     primary: {
       backgroundColor: t.accent,
@@ -173,6 +211,7 @@ export const styles = (t: Theme) =>
     },
     primaryDanger: {backgroundColor: t.danger},
     primaryDisabled: {opacity: 0.35},
+    gear: {padding: 6},
     secondary: {
       borderColor: t.line,
       borderWidth: 1.5,

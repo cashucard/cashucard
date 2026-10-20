@@ -1,4 +1,4 @@
-package com.flash.provisioner
+package com.islandbitcoin.provisioner
 
 import android.app.Application
 import com.facebook.react.PackageList
