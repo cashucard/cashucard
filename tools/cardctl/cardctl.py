@@ -1410,6 +1410,46 @@ def cmd_set_header(args) -> int:
     return 0
 
 
+# ── the anchor tip feed (ENG-740) ─────────────────────────────────────────────
+# GET /anchor/tip on the ops service returns {"header": "<160 hex>"}: the same
+# 80-byte block header `set-owner --anchor` and `refresh --header` take. The
+# route is public (a block header is public data) and the request carries no
+# Authorization header — pinned on both sides (ops/test/sessions-clean.test.ts,
+# test_tip.py). The fetcher is a module-level function so the tests can inject
+# it and the no-network guarantee of this suite stays intact (test_tip.py).
+
+DEFAULT_OPS_URL = "http://127.0.0.1:8821"
+
+
+def fetch_tip(url: str) -> bytes:
+    """GET {url}/anchor/tip and return the 80-byte header. Test-injectable."""
+    import urllib.request
+
+    req = urllib.request.Request(url.rstrip("/") + "/anchor/tip")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        raise SystemExit(f"the tip feed at {url} did not answer: {exc}")
+    header = body.get("header")
+    if not isinstance(header, str):
+        raise SystemExit(f"the tip feed at {url} named no header")
+    return parse_header(header, "--anchor-url")
+
+
+def cmd_tip(args) -> int:
+    """Print the tip header's hex; validated to 80 bytes (parse_header)."""
+    header = fetch_tip(args.url)
+    print(header.hex())
+    return 0
+
+
+def cmd_set_owner_with_anchor_url(args) -> int:
+    """set-owner, with the anchor fetched from the tip feed (sugar over --anchor)."""
+    args.anchor = fetch_tip(args.url).hex()
+    return cmd_set_owner(args)
+
+
 def cmd_refresh(args) -> int:
     header = parse_header(args.header)
     owner = owner_key(args)
@@ -1650,6 +1690,12 @@ def build_parser() -> argparse.ArgumentParser:
     _owner_arg(s)
     s.set_defaults(func=cmd_set_owner)
 
+    s = sub.add_parser("set-owner-url", help="set-owner with the anchor fetched from the ops service's tip feed")
+    s.add_argument("--url", default=DEFAULT_OPS_URL, help=f"the ops service base URL (default {DEFAULT_OPS_URL})")
+    s.add_argument("--old-owner-key", help="the current owner's private key, on a card that has one")
+    _owner_arg(s)
+    s.set_defaults(func=cmd_set_owner_with_anchor_url)
+
     s = sub.add_parser("set-card", help="write the card record (the mint)")
     s.add_argument("--mint", required=True)
     s.add_argument("--refund", help="33-byte refund key hex (default: none)")
@@ -1668,6 +1714,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("set-header", help="SET_HEADER: show the card a block header (its clock moves forward)")
     s.add_argument("--header", required=True, help="80 bytes hex")
     s.set_defaults(func=cmd_set_header)
+
+    s = sub.add_parser("tip", help="print the ops service's tip header (80 bytes hex), for --anchor")
+    s.add_argument("--url", default=DEFAULT_OPS_URL, help=f"the ops service base URL (default {DEFAULT_OPS_URL})")
+    s.set_defaults(func=cmd_tip)
 
     s = sub.add_parser("refresh", help="REFRESH: the owner's proof over the tip header; the rollover budget is full again")
     s.add_argument("--header", required=True, help="the tip block header, 80 bytes hex")

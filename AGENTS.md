@@ -37,7 +37,7 @@ tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as 
 |---|---|
 | `applet/` | The card's firmware: JavaCard 3.0.5, the floor ([D6](docs/DECISIONS.md#d6)), package `me.flashapp.cashu`. One load file holds three applets, installed in this order: the opener (`Opener`, AID `F0 43 41 53 48 55 43 41 52 44 4D`, which does nothing and comes first because the J3R180 will not take the card's applet as the package's first instance), the card's applet (`CashuApplet`, with `SchnorrHW`; `F0 43 41 53 48 55 43 41 52 44 01`) and the NFC tag (`Tag`). The jCardSim suite is `applet/src/test/java/`. |
 | `applet/target/cashu-javacard-2.1.0.cap` | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, unless the guide publishes the tracked file's sha256, and unless `tools/cardkit/make-assets.py`'s pins and `apps/provisioner/src/assets/cashu.ts` match it. |
-| `tools/cardctl/` | The reference host driver, Python over PC/SC: `cardctl.py`, the BIP-340 verifier `bip340.py`, the owner's P-256 `p256.py`, and six test files that need no reader, no card and no pyscard. Its venv is the one [`tools/cardctl/README.md`](tools/cardctl/README.md) documents: a Homebrew Python, `.venv` in `tools/cardctl/`, never the macOS system Python 3.9 (pyscard installs there and fails at import). |
+| `tools/cardctl/` | The reference host driver, Python over PC/SC: `cardctl.py`, the BIP-340 verifier `bip340.py`, the owner's P-256 `p256.py`, and seven test files that need no reader, no card and no pyscard. Its venv is the one [`tools/cardctl/README.md`](tools/cardctl/README.md) documents: a Homebrew Python, `.venv` in `tools/cardctl/`, never the macOS system Python 3.9 (pyscard installs there and fails at import). |
 | `tools/cardsim/` | The real applet in jCardSim on `http://127.0.0.1:9876`, for the apps' end-to-end runs: the HTTP bridge, its Node client `client.cjs`, the Cashu arithmetic `cashu-crypto.cjs` and the mint e2e `e2e-swap.test.cjs`. flash-pos and flash-mobile pin it by `CASHU_JAVACARD_REF`, so its routes, fixtures and client are a contract with both apps ([`tools/cardsim/README.md`](tools/cardsim/README.md)). `run.sh` and `ctl.sh` are Foxy's line-protocol simulator on port 47431. |
 | `tools/chip/` | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below). |
 | `tools/` | Also: `stripcap.py` and `refcheck.py`, which the CAP build runs; `e2e-melt.cjs` and `e2e-redeem.cjs`, 0.x tools that drive a 0.x card and a mint, kept for the sweep of 0.x field cards; `mirror-spec.sh` and its test `mirror-spec.test.sh`. |
@@ -86,7 +86,7 @@ a Nutshell 0.20.3 mint" (port 3338, a v2 keyset) and "Start a Nutshell 0.20.3
 mint on a pre-v2 keyset (forge's shape)" (port 3339) start in Docker: run those
 steps as ci.yml has them.
 
-`cardctl`, cardctl tests (Python 3.11 and 3.13). The six suites run in
+`cardctl`, cardctl tests (Python 3.11 and 3.13). The seven suites run in
 `tools/cardctl` (the step's working directory):
 
 ```bash
@@ -96,6 +96,7 @@ python test_apdu.py
 python test_spec_consistency.py
 python test_card_file.py
 python test_hwtest_65byte_pubkey.py
+python test_tip.py
 ```
 
 The second step proves `requirements.txt` installs and pyscard imports. It is

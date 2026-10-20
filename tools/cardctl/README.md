@@ -125,6 +125,8 @@ reader is the more reliable way to install, leaving NFC for tap testing.
 | `change-pin NEW` | the owner sets a new PIN: no old PIN, any state; unblocks a blocked card |
 | `set-card --mint URL [--refund HEX] [--pin P]` | write the record (the owner's proof on an owned card) |
 | `set-owner [--anchor HEADER] [--old-owner-key HEX]` | give the card its owner (the public half of `--owner-key`), anchored at a block header |
+| `tip [--url URL]` | print the ops service's tip header, 80 bytes hex (ENG-740) — the value `--anchor` takes |
+| `set-owner-url [--url URL] [--old-owner-key HEX]` | `set-owner` with the anchor fetched from the ops service's tip feed |
 | `set-limit --day N [--payment N --allowance N [--budget R]]` | the owner's limits; `--budget` (1–30) is the rollover budget, and needs the two before it; without it the card leaves the budget as it is ([D26](../../docs/DECISIONS.md#d26)) |
 | `set-header --header HEX` | `SET_HEADER`: show the card a block header |
 | `refresh --header HEX` | `REFRESH`: the owner's proof over the tip header; the rollover budget is full again |
@@ -227,9 +229,10 @@ python3 test_apdu.py              # every command's bytes, against spec/APDU.md
 python3 test_spec_consistency.py  # cardctl vs spec/APDU.md, NUT-XX.md and the applet, parsed
 python3 test_card_file.py         # card file read/write, against spec/CARD-FILE.md
 python3 test_hwtest_65byte_pubkey.py  # host-side pubkey normalisation used by hwtest_65byte_pubkey.py
+python3 test_tip.py               # tip / set-owner-url: the ops service's tip feed, no socket (ENG-740)
 ```
 
-All six run without a reader or a card. The BIP-340 tests matter more than they
+All seven run without a reader or a card. The BIP-340 tests matter more than they
 look: `selftest`'s verdict is only as trustworthy as the verifier behind it, so
 that verifier is checked against the specification's own vectors, round-tripped
 against an independent reference signer, and mutation-tested to prove it can

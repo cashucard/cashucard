@@ -137,6 +137,8 @@ export function BatchSummaryScreen({
   const s = local(t);
   const batch = app.batch!;
   const [note, setNote] = React.useState<string | null>(null);
+  /** CLOSE BATCH's confirm when pending rows exist (a note, not a block). */
+  const [pendingConfirm, setPendingConfirm] = React.useState(false);
 
   const done = batch.done.filter(r => r.ok);
   const stopped = batch.done.filter(r => !r.ok);
@@ -146,8 +148,12 @@ export function BatchSummaryScreen({
     batch.done
       .map(
         r =>
-          `${r.ok ? 'ok' : 'stopped'} ${r.id}${r.demo ? ` (demo: ${r.demo})` : ''}` +
-          ` ${new Date(r.at).toISOString()}${r.pending ? ' record pending' : ''}`,
+          `${r.ok ? 'ok' : 'stopped'} ${r.id}${
+            r.demo ? ` (demo: ${r.demo})` : ''
+          }` +
+          ` ${new Date(r.at).toISOString()}${
+            r.pending ? ' record pending' : ''
+          }`,
       )
       .join('\n');
 
@@ -157,7 +163,9 @@ export function BatchSummaryScreen({
         <ScrollView contentContainerStyle={s.scroll}>
           <View style={s.stats}>
             <View style={s.stat}>
-              <Text style={[s.statFigure, s.statFigureAccent]}>{done.length}</Text>
+              <Text style={[s.statFigure, s.statFigureAccent]}>
+                {done.length}
+              </Text>
               <Text style={s.statLabel}>Programmed</Text>
             </View>
             <View style={s.stat}>
@@ -166,7 +174,10 @@ export function BatchSummaryScreen({
             </View>
             <View style={s.stat}>
               <Text
-                style={[s.statFigure, pending.length === 0 ? undefined : s.statFigureAccent]}>
+                style={[
+                  s.statFigure,
+                  pending.length === 0 ? undefined : s.statFigureAccent,
+                ]}>
                 {pending.length}
               </Text>
               <Text style={s.statLabel}>Pending</Text>
@@ -178,17 +189,15 @@ export function BatchSummaryScreen({
             <View style={s.card}>
               {batch.done.length === 0 ? (
                 <View style={s.emptyRow}>
-                  <Text style={s.emptyText}>
-                    {'No cards this batch yet.'}
-                  </Text>
+                  <Text style={s.emptyText}>{'No cards this batch yet.'}</Text>
                 </View>
               ) : (
                 batch.done.map((r, i) => {
                   const dot = !r.ok
                     ? s.stateDotStopped
                     : r.pending
-                      ? s.stateDotPending
-                      : s.stateDot;
+                    ? s.stateDotPending
+                    : s.stateDot;
                   return (
                     <React.Fragment key={`${r.id}-${i}`}>
                       {i > 0 ? <View style={s.divider} /> : null}
@@ -232,10 +241,22 @@ export function BatchSummaryScreen({
             title="CLOSE BATCH"
             testID="close-batch"
             onPress={() => {
+              // S4's retry contract: pending rows re-post; ending a batch
+              // with pending rows says so plainly first — a confirm, not a
+              // block. The second press closes.
+              if (pending.length > 0 && !pendingConfirm) {
+                setPendingConfirm(true);
+                return;
+              }
               app.endBatch();
               onClose();
             }}
           />
+          {pendingConfirm ? (
+            <Text style={s.note} testID="close-pending-note">
+              {SUMMARY.pendingNote}
+            </Text>
+          ) : null}
         </View>
       </View>
     </Screen>

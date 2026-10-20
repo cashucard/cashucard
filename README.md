@@ -47,7 +47,7 @@ copied there after each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 | **Implementing a reader or wallet** | [`spec/NUT-XX.md`](spec/NUT-XX.md) → [`spec/APDU.md`](spec/APDU.md) → [`spec/vectors/`](spec/vectors/) |
 | **Reading the design in full** | [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) |
 | **An AI agent working in this repo** | [`AGENTS`](AGENTS.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`GLOSSARY`](docs/GLOSSARY.md). The decisions file exists so settled calls are not re-litigated. |
-| **Auditing security** | [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) |
+| **Auditing security** | [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md); the ops service's is [`docs/OPS-THREAT-MODEL.md`](docs/OPS-THREAT-MODEL.md) |
 | **Holding a card and a reader** | [`tools/cardctl/README.md`](tools/cardctl/README.md), then [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) |
 | **Testing an app without a card** | [Card simulator](#card-simulator) |
 

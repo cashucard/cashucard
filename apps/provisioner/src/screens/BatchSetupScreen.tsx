@@ -8,7 +8,7 @@
  * Everything fits one screen on a phone; the only scrolling part is a mint
  * list that grows past four.
  */
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -18,13 +18,15 @@ import {
   View,
 } from 'react-native';
 
+import {ApiClient} from '../api';
 import {SETUP} from '../strings';
 import {DEMO_BATCH, useApp, type BatchConfig} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
 import {GearButton, Screen, PrimaryButton} from '../ui';
 
-// Default mints from the ops service (ENG-760: editable mint field with defaults)
-const DEFAULT_MINTS = [
+// Demo's mints (ENG-760: editable mint field with defaults). Real mode
+// fetches the service's list instead (ENG-740); these stay for demo only.
+const DEMO_MINTS = [
   'https://forge.flashapp.me',
   'https://mint.minibits.cash',
   'https://mint.macadamia.cash',
@@ -141,7 +143,12 @@ const local = (t: Theme) =>
       justifyContent: 'center',
     },
     radioOn: {borderColor: t.accent},
-    radioDot: {width: 10, height: 10, borderRadius: 5, backgroundColor: t.accent},
+    radioDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: t.accent,
+    },
     policyLabel: {color: t.ink, fontFamily: FONT.medium, fontSize: 15, flex: 1},
     pinInput: {
       backgroundColor: t.bg,
@@ -223,7 +230,34 @@ export function BatchSetupScreen({
     onStart();
   };
 
-  const customMint = mint !== null && !DEFAULT_MINTS.includes(mint);
+  // Real mode reads the ops service's mint list; demo keeps its own.
+  const [serviceMints, setServiceMints] = useState<string[] | null>(null);
+  const [mintsFailed, setMintsFailed] = useState(false);
+  useEffect(() => {
+    if (app.demo || !app.session) {
+      return;
+    }
+    let alive = true;
+    const client = new ApiClient({baseUrl: app.serviceUrl});
+    client
+      .mints(app.session.token)
+      .then(m => {
+        if (alive) {
+          setServiceMints(m);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setMintsFailed(true);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [app.demo, app.session, app.serviceUrl]);
+  const mints = app.demo || !serviceMints ? DEMO_MINTS : serviceMints;
+
+  const customMint = mint !== null && !mints.includes(mint);
 
   return (
     <Screen
@@ -236,13 +270,15 @@ export function BatchSetupScreen({
             <Text style={s.demoNote}>
               {'Demo batch — placeholder values. Nothing leaves the phone.'}
             </Text>
+          ) : mintsFailed ? (
+            <Text style={s.demoNote}>{SETUP.mintsFailed}</Text>
           ) : null}
 
           <View style={s.section}>
             <Text style={s.sectionHeader}>{SETUP.mint}</Text>
             <View style={s.card}>
               <View style={s.mintGrid}>
-                {DEFAULT_MINTS.map((m, i) => {
+                {mints.map((m, i) => {
                   const host = m.replace(/^https:\/\//, '');
                   const on = mint === m;
                   return (
@@ -255,7 +291,7 @@ export function BatchSetupScreen({
                         s.cellRow,
                         s.mintCellBorder,
                         i % 2 === 1 && s.cellRowEdgeR,
-                        i >= DEFAULT_MINTS.length - 2 && DEFAULT_MINTS.length % 2 === 0
+                        i >= mints.length - 2 && mints.length % 2 === 0
                           ? s.cellRowEdgeB
                           : null,
                         on ? s.cellSelected : null,
@@ -337,7 +373,9 @@ export function BatchSetupScreen({
               {pinPolicy === 'batch' ? (
                 <TextInput
                   value={pinBatch}
-                  onChangeText={v => setPinBatch(v.replace(/\D/g, '').slice(0, 8))}
+                  onChangeText={v =>
+                    setPinBatch(v.replace(/\D/g, '').slice(0, 8))
+                  }
                   placeholder="4–8 digits"
                   placeholderTextColor={t.dim}
                   keyboardType="numeric"

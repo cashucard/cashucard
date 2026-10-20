@@ -10,7 +10,14 @@ export const APP_NAME = 'Cashu card provisioner';
 export const SIGNIN = {
   tagline: 'Programs blank cards into Cashu cards. Operators only.',
   button: 'SIGN IN',
+  signingIn: 'SIGNING IN…',
   failed: (reason: string) => `Sign-in failed: ${reason}. Try again.`,
+  unreachable: 'the record service cannot be reached',
+  note: 'The key service issues this session; keys never live on this phone.',
+  namePlaceholder: 'Operator name',
+  passwordPlaceholder: 'Password',
+  demo: 'REVIEW IN DEMO MODE',
+  demoSub: 'No service, no card, no record — design review only.',
 };
 
 export const SETUP = {
@@ -23,6 +30,8 @@ export const SETUP = {
   noPin: 'No-PIN limit',
   count: 'Cards in the batch',
   start: 'START BATCH',
+  mintsFailed:
+    "The service's mint list did not arrive; the defaults are shown.",
   buildLine: (sha8: string) => `Builds the 2.1 card. Load file ${sha8}…`,
 };
 
@@ -47,6 +56,8 @@ export const LOOP = {
   pinShown: (pin: string) => `PIN ${pin}`,
   next: 'NEXT CARD',
   of: (done: number, count: number) => `${done} of ${count}`,
+  placeholderRecord:
+    'Record held on this phone: the batch is not registered yet (ENG-741).',
 };
 
 export type DemoStateId =
@@ -64,15 +75,42 @@ export const DEMO_STATES: ReadonlyArray<{
   name: string;
   sub: string;
 }> = [
-  {id: 'ok', name: 'A clean card, programmed', sub: 'The happy path — about ten seconds'},
-  {id: 'pulled', name: 'Card lifted mid-write', sub: 'A torn run recovers on the next tap'},
-  {id: 'hasValue', name: 'A card that holds value', sub: 'The stop that never programs'},
-  {id: 'hasOld', name: 'A card with an empty install', sub: 'Operator chooses to reuse it'},
-  {id: 'oldVersion', name: 'A card with old software', sub: 'The tap upgrades it'},
-  {id: 'wrongKeys', name: 'The card manager refuses the keys', sub: 'Short words: a lock is for good'},
-  {id: 'noSession', name: 'The phone loses the session', sub: 'Nothing reached the card'},
+  {
+    id: 'ok',
+    name: 'A clean card, programmed',
+    sub: 'The happy path — about ten seconds',
+  },
+  {
+    id: 'pulled',
+    name: 'Card lifted mid-write',
+    sub: 'A torn run recovers on the next tap',
+  },
+  {
+    id: 'hasValue',
+    name: 'A card that holds value',
+    sub: 'The stop that never programs',
+  },
+  {
+    id: 'hasOld',
+    name: 'A card with an empty install',
+    sub: 'Operator chooses to reuse it',
+  },
+  {
+    id: 'oldVersion',
+    name: 'A card with old software',
+    sub: 'The tap upgrades it',
+  },
+  {
+    id: 'wrongKeys',
+    name: 'The card manager refuses the keys',
+    sub: 'Short words: a lock is for good',
+  },
+  {
+    id: 'noSession',
+    name: 'The phone loses the session',
+    sub: 'Nothing reached the card',
+  },
 ];
-
 
 export const STOP: Record<
   string,
@@ -136,12 +174,16 @@ export const SETTINGS = {
   themeLight: 'Light',
   about: 'About',
   version: (v: string) => `Version ${v}`,
-  loadSha: (sha8: string) => `Load file ${sha8}…` ,
+  loadSha: (sha8: string) => `Load file ${sha8}…`,
+  capPin: (sha8: string) => `CAP pin ${sha8}…`,
   demo: 'Demo mode',
   demoOn:
     'Demo mode drives every state against a fake card. Nothing is written, nothing is signed.',
   demoBanner: 'DEMO — no card, no record',
   bench: 'Bench runs (load test)',
+  session: 'Session',
+  signOut: 'Sign out',
+  signOutSub: 'Ends this operator session; pending rows keep their place.',
 };
 
 export const DEMO_BANNER = 'DEMO — no card, no record';
