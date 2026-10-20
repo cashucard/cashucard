@@ -86,7 +86,7 @@ async function call(
   return {status: res.status, json};
 }
 
-test('every phone-cachable route carries no key material; only /keys/issue does', async () => {
+test('every phone-cacheable route carries no key material; only /keys/issue does', async () => {
   await withServer(async base => {
     const signin = await call(
       base,
