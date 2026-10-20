@@ -73,11 +73,21 @@ three matching reads per phone, without authentication or card writes.
    ([D37](DECISIONS.md#d37)). It is available through the demo door without a
    service session and clearly labels its physical-card action. Opening it does
    not arm NFC; tap READ PHYSICAL CARD IDENTITY for each deliberate read. Do not use a programming attempt as a read-only probe.
-3. Provide development-only pause controls at durable install intent, verified
-   installation, rotation intent, verified rotation and frozen-record boundaries
-   before attempting targeted termination drills. These controls are not
-   implemented yet. Timing a force-quit during a progress message does not prove
-   which durable boundary was exercised. Keep such controls out of production.
+3. The local validation build now has one-shot boundary pause controls
+   ([D38](DECISIONS.md#d38)). In an isolated validation worktree only, enable
+   `RECOVERY_DRILLS_ENABLED` as well as the separately approved installation
+   build gate in `apps/provisioner/src/releaseGates.ts`. Neither change belongs
+   in a production commit or distributed binary. The explicit build flag also
+   works in the owner-built iOS Release configuration; it does not depend on
+   Metro's development mode. After creating/resuming the intended batch, select
+   one boundary in the LOCAL VALIDATION BUILD panel before starting the run.
+   Only a boundary actually reached in that run provides pause evidence.
+   Record the displayed boundary and saved stage, then terminate while paused.
+   CONTINUE DRILL releases the waiter; STOP THIS RUN cancels it without clearing
+   evidence. Ordinary record retries can resume after stopping. The selected
+   pause is memory-only: reopening must use normal recovery, without rearming
+   that point. These controls do not pause inside an APDU or prove a torn LOAD
+   or lost PUT KEY reply; those checks remain separately planned hardware work.
 4. The owner confirms the devices/cards above and approves the bounded actions.
    For installation drills only, use an isolated local validation build with
    the installation gate enabled. Record that source delta and binary build;

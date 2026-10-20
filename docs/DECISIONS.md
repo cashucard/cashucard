@@ -1566,6 +1566,40 @@ uniqueness evidence or permission to enable installation. This decision ships
 software only; native builds and device actions remain the owner's under an
 approved device plan. Deterministic interruption tooling remains outstanding.
 
+## <a id="d38"></a>D38: One-shot validation pauses around durable recovery boundaries
+
+**Decided (ENG-741 recovery drills, 2026-10-20):** expose optional awaited
+checkpoints after saved install intent, verified installation before its result
+save, saved installation, saved rotation intent, verified rotation before its
+result save, saved rotation, and the frozen record after the NFC session closes
+but before POST. Hooks receive only a boundary name, without keys or transcripts.
+Verification-before-save pauses deliberately retain the prior intent as the
+durable stage. A checkpoint does not fabricate a successful result or repair
+state. Failed commits never reach the subsequent saved-state checkpoint.
+
+The production `RECOVERY_DRILLS_ENABLED` constant stays false independently of
+`CARD_INSTALLATION_VALIDATED`. Only an isolated owner-built validation binary
+may enable them under the approved plan; iOS validation may use a Release build,
+so this is an explicit source build gate rather than an implicit `__DEV__` gate.
+Neither gate has a remote or operator UI override. Existing injected test seams
+remain software-only. The pause panel is absent by default.
+
+A selected boundary pauses once, showing its name and the actual saved stage.
+Keep the workflow operation busy so background record retries and other workflow
+actions cannot pass it. Continue deliberately releases the waiter. Stop, actor
+change or unmount rejects it and retains evidence; command guards prevent later
+card commands. The frozen-record pause is outside NFC. Normal record recovery
+can resume after a stopped run, so terminate while paused to exercise process
+loss before POST. Pause selection/waiters are memory-only and never survive a
+process restart or enter the PIN-free recovery snapshot.
+
+**Rejected:** time-based force-quits as proof of a specific commit boundary;
+pauses enabled in distributed production builds; persisting drill configuration
+in recovery evidence; a pause that silently enables installation or skips
+verification. These hooks do not simulate mid-APDU failure, a lost PUT KEY reply,
+or a torn LOAD on silicon. Such drills still need separately bounded hardware
+actions/evidence. No native build or physical device action is authorized here.
+
 ## <a id="d39"></a>D39: Native safe areas and truthful physical diagnostic framing
 
 **Decided (ENG-741 phone UI follow-up, 2026-10-20):** use a single root
@@ -1590,4 +1624,4 @@ service call, authentication, journal transition or installation-gate change.
 an unconstrained title above Back; hardcoded Pixel/status-bar offsets. The
 2026-10-20 CPLC report remains evidence for its original source commit. UI-only
 checks of this revision do not count as additional card reads or recovery drills.
-D38 is reserved by the separate recovery-drill PR (#20).
+D38 records the separate recovery-drill decision.

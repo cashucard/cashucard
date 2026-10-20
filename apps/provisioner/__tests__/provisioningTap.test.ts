@@ -1,3 +1,4 @@
+import {RecoveryDrill} from '../src/recoveryDrills';
 import {runProvisioningTap, runReservedAttempt} from '../src/provisioningTap';
 import {
   ProvisioningWorkflow,
@@ -340,6 +341,14 @@ test('the reserved flow prefetches keys, binds before authentication, then recor
   };
   await w.start(service, settings);
   await w.reserveNext(service);
+  const record = jest.spyOn(service, 'record');
+  const checkpoint = jest.fn(async (boundary: string) => {
+    if (boundary === 'record-frozen-session-closed') {
+      expect(inNfc).toBe(false);
+      expect(w.snapshot().active!.journal!.stage).toBe('record_pending');
+      expect(record).not.toHaveBeenCalled();
+    }
+  });
   const withCard = jest.fn(
     async (
       run: (
@@ -359,9 +368,11 @@ test('the reserved flow prefetches keys, binds before authentication, then recor
     await runReservedAttempt(w, service, {
       ...options,
       withCard,
+      checkpoint,
       verifiedAt: () => 1700000000,
     }),
   ).toBe('recorded');
+  expect(checkpoint).toHaveBeenCalledWith('record-frozen-session-closed');
   expect(withCard).toHaveBeenCalledTimes(1);
   expect(w.snapshot().active).toBeNull();
   expect(w.snapshot().history[0]).toMatchObject({
@@ -374,3 +385,53 @@ test('the reserved flow prefetches keys, binds before authentication, then recor
     toHex(SPIKE_KEYS.enc).toLowerCase(),
   );
 });
+
+test.each([
+  ['install-intent-saved', 'install_intent', false, 0],
+  ['installation-verified-before-save', 'install_intent', true, 0],
+  ['installation-saved', 'installed', true, 0],
+  ['rotation-intent-saved', 'rotation_intent', true, 0],
+  ['rotation-verified-before-save', 'rotation_intent', true, 1],
+  ['rotation-saved', 'rotated', true, 1],
+] as const)(
+  'the %s drill pauses against saved %s evidence, with no later commands after stop',
+  async (boundary, stage, loaded, puts) => {
+    const f = fixture();
+    const journal = await f.open();
+    let hit!: () => void;
+    const paused = new Promise<void>(resolve => {
+      hit = resolve;
+    });
+    const drill = new RecoveryDrill(state => {
+      if (state.paused) {
+        hit();
+      }
+    });
+    drill.arm(boundary);
+    const pending = runProvisioningTap(f.tx, journal, SPIKE_KEYS, f.bind, {
+      ...options,
+      verifiedAt: () => 1700000000,
+      checkpoint: point => drill.checkpoint(point),
+    });
+    try {
+      expect(
+        await Promise.race([
+          paused.then(() => true),
+          pending.then(() => false),
+        ]),
+      ).toBe(true);
+      expect(journal.snapshot().stage).toBe(stage);
+      expect(JSON.parse((await f.storage.read())!).stage).toBe(stage);
+      expect(f.log.some(c => c[1] === 0xe8)).toBe(loaded);
+      expect(f.log.filter(c => c[1] === 0xd8)).toHaveLength(puts);
+      const commands = f.log.length;
+      drill.cancel();
+      expect(await pending).toBe('interrupted');
+      expect(f.log).toHaveLength(commands);
+      expect(journal.snapshot().stage).toBe(stage);
+    } finally {
+      drill.cancel();
+      await pending;
+    }
+  },
+);

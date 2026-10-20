@@ -1,6 +1,7 @@
 /** Real receipts and recovery controls; demo results never enter this screen. */
 import React from 'react';
 import {ScrollView, Share, StyleSheet, Text, View} from 'react-native';
+import {RECOVERY_BOUNDARIES} from '../recoveryDrills';
 import {CASHU_PLAN} from '../cardkit';
 import {useProvisioning} from '../ProvisioningStore';
 import {BatchSetupScreen} from './BatchSetupScreen';
@@ -136,6 +137,51 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
       .join('\n');
   return shell(
     <>
+      {flow.drill ? (
+        <View style={s.card} testID="recovery-drill-panel">
+          <Text style={s.line}>LOCAL VALIDATION BUILD — recovery drill</Text>
+          <Dim>
+            Pauses are held in memory only. Record the boundary and saved stage
+            before terminating the app. No holder readiness is certified.
+          </Dim>
+          {flow.drill.paused ? (
+            <>
+              <Text selectable style={s.line} testID="recovery-drill-paused">
+                {flow.drill.paused}
+              </Text>
+              <Dim>Saved stage: {stage ?? 'unconfirmed reservation'}</Dim>
+              <SecondaryButton
+                title="CONTINUE DRILL"
+                testID="recovery-drill-resume"
+                onPress={flow.drill.resume}
+              />
+              <SecondaryButton
+                title="STOP THIS RUN"
+                testID="recovery-drill-stop"
+                onPress={flow.drill.stop}
+              />
+            </>
+          ) : (
+            <>
+              <Dim>{flow.drill.target ?? 'No pause armed'}</Dim>
+              {RECOVERY_BOUNDARIES.map(boundary => (
+                <SecondaryButton
+                  key={boundary}
+                  title={boundary}
+                  testID={`drill-arm-${boundary}`}
+                  disabled={flow.busy || !flow.hardwareValidated}
+                  onPress={() => flow.drill!.arm(boundary)}
+                />
+              ))}
+              <SecondaryButton
+                title="DISARM PAUSE"
+                disabled={flow.busy}
+                onPress={() => flow.drill!.arm(null)}
+              />
+            </>
+          )}
+        </View>
+      ) : null}
       <Text style={s.title} testID="real-progress">
         {batch.next_ordinal} of {batch.request.count} attempts acknowledged
       </Text>

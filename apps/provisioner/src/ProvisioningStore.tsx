@@ -18,7 +18,15 @@ import {
 } from './provisioningWorkflow';
 import {runReservedAttempt, type AttemptRunOptions} from './provisioningTap';
 import {randomBytes, randomUuid} from './random';
-import {CARD_INSTALLATION_VALIDATED} from './releaseGates';
+import {
+  CARD_INSTALLATION_VALIDATED,
+  RECOVERY_DRILLS_ENABLED,
+} from './releaseGates';
+import {
+  RecoveryDrill,
+  type DrillState,
+  type RecoveryBoundary,
+} from './recoveryDrills';
 import {useApp, type AppSession, type BatchConfig} from './store';
 
 // One writer and operation queue per store, including across React remounts.
@@ -65,6 +73,7 @@ export interface ProvisioningProviderOptions {
   uuid?: () => string;
   /** Test seam; production uses the immutable release gate above. */
   hardwareValidated?: boolean;
+  recoveryDrillsEnabled?: boolean;
   serviceFor?: (session: AppSession, origin: string) => CardProvisioningService;
   runCard?: typeof runReservedAttempt;
   withCard?: AttemptRunOptions['withCard'];
@@ -79,6 +88,11 @@ interface RealProvisioning {
   phase: string;
   notice: string | null;
   hardwareValidated: boolean;
+  drill?: DrillState & {
+    arm(boundary: RecoveryBoundary | null): void;
+    resume(): void;
+    stop(): void;
+  };
   reload(): Promise<void>;
   create(config: BatchConfig): Promise<boolean>;
   recover(): Promise<boolean>;
@@ -143,12 +157,25 @@ export function ProvisioningProvider({
   const hardwareValidated =
     settings.hardwareValidated ?? CARD_INSTALLATION_VALIDATED;
   const mounted = useRef(true);
+  const [drillState, setDrillState] = useState<DrillState>({
+    target: null,
+    paused: null,
+  });
+  const drillsEnabled =
+    settings.recoveryDrillsEnabled ?? RECOVERY_DRILLS_ENABLED;
+  const drill = useRef<RecoveryDrill | null>(null);
+  drill.current ??= new RecoveryDrill(state => {
+    if (mounted.current) {
+      setDrillState(state);
+    }
+  });
   const busyRef = useRef(false);
   const cancelRequested = useRef(false);
   const armedCancel = useRef<(() => Promise<void>) | null>(null);
   const actorGeneration = useRef(0);
   const invalidateCard = useCallback(() => {
     cancelRequested.current = true;
+    drill.current?.cancel();
     const cancel = armedCancel.current;
     if (cancel) {
       cancel().catch(() => undefined); // Command guard still prevents further APDUs.
@@ -280,6 +307,7 @@ export function ProvisioningProvider({
         }
         return false;
       } finally {
+        drill.current?.cancel(); // An unvisited target must not carry into another run.
         busyRef.current = false;
         if (mounted.current) {
           setBusy(false);
@@ -346,6 +374,40 @@ export function ProvisioningProvider({
     phase,
     notice,
     hardwareValidated,
+    drill: drillsEnabled
+      ? {
+          ...drillState,
+          arm: boundary => {
+            if (
+              !busyRef.current &&
+              hardwareValidated &&
+              !latest.current.demo &&
+              latest.current.session &&
+              sameActor(
+                snapshot,
+                latest.current.session,
+                latest.current.serviceUrl,
+              )
+            ) {
+              drill.current!.arm(boundary);
+            }
+          },
+          resume: () => {
+            if (
+              latest.current.session &&
+              !latest.current.demo &&
+              sameActor(
+                snapshot,
+                latest.current.session,
+                latest.current.serviceUrl,
+              )
+            ) {
+              drill.current!.resume();
+            }
+          },
+          stop: invalidateCard,
+        }
+      : undefined,
     scopeMatches: sameActor(snapshot, app.session, app.serviceUrl),
     reload,
     recover,
@@ -414,6 +476,9 @@ export function ProvisioningProvider({
             ).value;
           } finally {
             armedCancel.current = null;
+            if (mounted.current) {
+              setCardActive(false);
+            }
           }
         };
         const outcome = await (settings.runCard ?? runReservedAttempt)(
@@ -421,6 +486,18 @@ export function ProvisioningProvider({
           service,
           {
             withCard,
+            checkpoint: drillsEnabled
+              ? async boundary => {
+                  if (!allowed()) {
+                    throw new TransportError('Card session cancelled');
+                  }
+                  setSnapshot(w.snapshot());
+                  await drill.current!.checkpoint(boundary);
+                  if (!allowed()) {
+                    throw new TransportError('Card session cancelled');
+                  }
+                }
+              : undefined,
             random: randomBytes,
             now: Date.now,
             verifiedAt: () => Math.floor(Date.now() / 1000),
@@ -471,6 +548,7 @@ export function ProvisioningProvider({
         return;
       }
       cancelRequested.current = true;
+      drill.current?.cancel();
       if (armedCancel.current) {
         invalidateCard();
       } else if (settings.cancelCard) {
