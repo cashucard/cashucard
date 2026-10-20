@@ -38,6 +38,8 @@ Do not use cardctl selftest/info: those commands perform a broader sequence.
 Use a bounded raw PC/SC transport, without GlobalPlatform tool auto-selection
 or implicit login. Inspect the host script's APDU allowlist before execution.
 The existing cardkit reader/inspector are the interpretation reference.
+The executable allowlist is `tools/cardctl/read_only_preflight.py`; its README
+records the exact command for this card and reader.
 
 Record only public identity and state in the hardware report. An absent applet
 is not proof of manager keys, free memory, package inventory or universal
