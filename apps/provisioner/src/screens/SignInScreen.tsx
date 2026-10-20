@@ -10,7 +10,7 @@
  * nothing floats mid-air.
  */
 import React, {useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, TextInput, View} from 'react-native';
 
 import {ApiUnreachableError} from '../api';
 import {APP_NAME, SIGNIN} from '../strings';
@@ -59,6 +59,22 @@ const local = (t: Theme) =>
       textAlign: 'center',
       maxWidth: 280,
     },
+    form: {
+      alignSelf: 'stretch',
+      gap: 10,
+      paddingHorizontal: 8,
+    },
+    input: {
+      color: t.ink,
+      fontFamily: FONT.regular,
+      fontSize: 16,
+      borderWidth: 1.5,
+      borderColor: t.line,
+      borderRadius: 12,
+      backgroundColor: t.card,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
     footer: {
       gap: 12,
       paddingBottom: 8,
@@ -77,31 +93,30 @@ const local = (t: Theme) =>
     },
   });
 
-export function SignInScreen({
-  operatorName = 'bench-lead',
-}: {
-  operatorName?: string;
-}) {
+export function SignInScreen() {
   const app = useApp();
   const t = useTheme();
   const s = local(t);
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const attempt = async () => {
-    if (busy) {
+    if (busy || name.trim() === '' || password === '') {
       return;
     }
     setBusy(true);
     setFailed(null);
     try {
-      // The bench's operator identity is the device's; the password prompt is
-      // the operator's one secret, typed here and not stored.
-      await app.signIn(operatorName, 'bench');
+      // The operator's name and password are typed here and held in memory
+      // only: the password is the operator's one secret, never stored by the
+      // app (the service keeps its scrypt hash).
+      await app.signIn(name.trim(), password);
     } catch (e) {
       setFailed(
         e instanceof ApiUnreachableError
-          ? SIGNIN.failed('the record service cannot be reached')
+          ? SIGNIN.failed(SIGNIN.unreachable)
           : e instanceof Error
           ? SIGNIN.failed(e.message)
           : SIGNIN.failed('unknown'),
@@ -120,11 +135,37 @@ export function SignInScreen({
         <Text style={s.wordmark}>{APP_NAME}</Text>
         <Text style={s.loadSha}>{SIGNIN_BUILD}</Text>
         <Text style={s.tagline}>{SIGNIN.tagline}</Text>
+        <View style={s.form}>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder={SIGNIN.namePlaceholder}
+            placeholderTextColor={t.dim}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+            style={s.input}
+            testID="sign-in-name"
+          />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder={SIGNIN.passwordPlaceholder}
+            placeholderTextColor={t.dim}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            editable={!busy}
+            style={s.input}
+            testID="sign-in-password"
+          />
+        </View>
       </View>
       <View style={s.footer}>
         <PrimaryButton
           title={busy ? SIGNIN.signingIn : SIGNIN.button}
           onPress={() => attempt()}
+          disabled={busy || name.trim() === '' || password === ''}
           testID="sign-in"
         />
         {failed ? (

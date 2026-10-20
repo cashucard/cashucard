@@ -14,6 +14,8 @@ export const SIGNIN = {
   failed: (reason: string) => `Sign-in failed: ${reason}. Try again.`,
   unreachable: 'the record service cannot be reached',
   note: 'The key service issues this session; keys never live on this phone.',
+  namePlaceholder: 'Operator name',
+  passwordPlaceholder: 'Password',
 };
 
 export const SETUP = {
@@ -52,6 +54,8 @@ export const LOOP = {
   pinShown: (pin: string) => `PIN ${pin}`,
   next: 'NEXT CARD',
   of: (done: number, count: number) => `${done} of ${count}`,
+  placeholderRecord:
+    'Record held on this phone: the batch is not registered yet (ENG-741).',
 };
 
 export type DemoStateId =
@@ -175,6 +179,9 @@ export const SETTINGS = {
     'Demo mode drives every state against a fake card. Nothing is written, nothing is signed.',
   demoBanner: 'DEMO — no card, no record',
   bench: 'Bench runs (load test)',
+  session: 'Session',
+  signOut: 'Sign out',
+  signOutSub: 'Ends this operator session; pending rows keep their place.',
 };
 
 export const DEMO_BANNER = 'DEMO — no card, no record';

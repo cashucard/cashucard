@@ -64,10 +64,29 @@ class ApiServiceImplError extends Error {
   }
 }
 
+/** Fills the sign-in form's name and password (S1's typed credentials). */
+async function fillCredentials(
+  tree: ReactTestRenderer.ReactTestRenderer,
+  name = 'bench-lead',
+  password = 'pw',
+): Promise<void> {
+  await ReactTestRenderer.act(async () => {
+    await tree.root
+      .findByProps({testID: 'sign-in-name'})
+      .props.onChangeText(name);
+    await tree.root
+      .findByProps({
+        testID: 'sign-in-password',
+      })
+      .props.onChangeText(password);
+  });
+}
+
 test('a failed sign-in renders SIGNIN.failed with the service reason, and retries on press', async () => {
   const tree = await mountSignIn('reject-reason');
   expect(text(tree)).not.toContain('SIGNIN.failed');
 
+  await fillCredentials(tree);
   await ReactTestRenderer.act(async () => {
     await tree.root.findByProps({testID: 'sign-in'}).props.onPress();
   });
@@ -88,12 +107,23 @@ test('a failed sign-in renders SIGNIN.failed with the service reason, and retrie
 
 test('an unreachable service renders the unreachable reason (S1: the service-side reason, not improvised)', async () => {
   const tree = await mountSignIn('reject-unreachable');
+  await fillCredentials(tree);
   await ReactTestRenderer.act(async () => {
     await tree.root.findByProps({testID: 'sign-in'}).props.onPress();
   });
   expect(text(tree)).toContain(
     SIGNIN.failed('the record service cannot be reached'),
   );
+  await ReactTestRenderer.act(() => {
+    tree.unmount();
+  });
+});
+
+test('the sign-in button is disabled until name and password are typed (no hardcoded operator)', async () => {
+  const tree = await mountSignIn('resolve');
+  expect(tree.root.findByProps({testID: 'sign-in'}).props.disabled).toBe(true);
+  await fillCredentials(tree);
+  expect(tree.root.findByProps({testID: 'sign-in'}).props.disabled).toBe(false);
   await ReactTestRenderer.act(() => {
     tree.unmount();
   });
@@ -271,3 +301,158 @@ function BatchSummaryScreenWithPending({
   }
   return <BatchSummaryScreen onBack={() => undefined} onClose={onClosed} />;
 }
+
+test('retryPending flips the batch view pending flags via a successful retry pass (field match, not identity)', async () => {
+  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+  let state: ReturnType<typeof useApp> | undefined;
+  function Probe(): React.JSX.Element {
+    state = useApp();
+    return null as unknown as React.JSX.Element;
+  }
+  // A failed first post leaves the row pending on the batch view and in the
+  // outbox: the outbox's client is built at sign-in, so the mock must fail
+  // at post time — a flag the scripted client reads, not a re-mock.
+  let postSucceeds = false;
+  (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
+    operatorSession: async () => ({env: 'issued', token: 't'}),
+    postCard: async () => {
+      if (!postSucceeds) {
+        throw new Error('503');
+      }
+    },
+  }));
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(
+      <AppStore clientOptions={{baseUrl: 'http://ops.test'}}>
+        <Probe />
+      </AppStore>,
+    );
+  });
+  await ReactTestRenderer.act(async () => {
+    await state!.signIn('bench-lead', 'pw');
+  });
+  await ReactTestRenderer.act(() => {
+    state!.startBatch({
+      mint: 'm',
+      pinPolicy: 'perCard',
+      pinBatch: '',
+      dailyUsd: 1,
+      noPinUsd: 1,
+      count: 2,
+    });
+  });
+  await ReactTestRenderer.act(async () => {
+    state!.postRegistryCard({
+      short_id: 'ab12',
+      batch_id: 1,
+      key_id: 2,
+      ordinal: 0,
+      installed_at: 1_700_000_000,
+      installer: 'op@bench-1',
+      load_sha256: 'fe7d8ac3',
+    });
+  });
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+  });
+  expect(state!.batch!.done[0].pending).toBe(true);
+
+  // The retry pass runs against a now-answering client: the batch view's
+  // pending flag flips. The outbox row and the batch-view row are different
+  // objects, so this passes only when the match is by fields.
+  postSucceeds = true;
+  await ReactTestRenderer.act(async () => {
+    await state!.retryPending();
+  });
+  expect(state!.batch!.done[0].pending).toBe(false);
+  await ReactTestRenderer.act(() => {
+    tree!.unmount();
+  });
+});
+
+test('a 401 on the retry pass signs the session out (an expired 12 h token cannot retry forever)', async () => {
+  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+  let state: ReturnType<typeof useApp> | undefined;
+  function Probe(): React.JSX.Element {
+    state = useApp();
+    return null as unknown as React.JSX.Element;
+  }
+  // The client is captured at sign-in; the flag starts true so the inline
+  // post lands (200), then flips for the retry pass (401 = expired token).
+  // The 401 must be the real ApiServiceError: the outbox and the store tell
+  // it apart from a transport failure by instanceof.
+  const {ApiServiceError} = jest.requireActual(
+    '../src/api',
+  ) as typeof import('../src/api');
+  let postSucceeds = true;
+  (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
+    operatorSession: async () => ({env: 'issued', token: 't'}),
+    postCard: async () => {
+      if (!postSucceeds) {
+        throw new ApiServiceError('no-session', 401);
+      }
+    },
+  }));
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(
+      <AppStore clientOptions={{baseUrl: 'http://ops.test'}}>
+        <Probe />
+      </AppStore>,
+    );
+  });
+  await ReactTestRenderer.act(async () => {
+    await state!.signIn('bench-lead', 'pw');
+  });
+  await ReactTestRenderer.act(() => {
+    state!.startBatch({
+      mint: 'm',
+      pinPolicy: 'perCard',
+      pinBatch: '',
+      dailyUsd: 1,
+      noPinUsd: 1,
+      count: 1,
+    });
+  });
+  await ReactTestRenderer.act(async () => {
+    state!.postRegistryCard({
+      short_id: 'cd34',
+      batch_id: 1,
+      key_id: 2,
+      ordinal: 0,
+      installed_at: 1_700_000_001,
+      installer: 'op@bench-1',
+      load_sha256: 'fe7d8ac3',
+    });
+  });
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+  });
+  expect(state!.batch!.done[0].pending).toBe(false);
+
+  postSucceeds = false;
+  // A second row goes out and 401s into the outbox; the retry pass hits it.
+  await ReactTestRenderer.act(async () => {
+    state!.postRegistryCard({
+      short_id: 'ef56',
+      batch_id: 1,
+      key_id: 2,
+      ordinal: 1,
+      installed_at: 1_700_000_002,
+      installer: 'op@bench-1',
+      load_sha256: 'fe7d8ac3',
+    });
+  });
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+  });
+  expect(state!.batch!.done[1].pending).toBe(true);
+
+  await ReactTestRenderer.act(async () => {
+    await state!.retryPending();
+  });
+  expect(state!.signedIn).toBe(false, 'the 401 signed the session out');
+  expect(state!.session).toBeNull();
+  await ReactTestRenderer.act(() => {
+    tree!.unmount();
+  });
+});

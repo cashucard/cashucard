@@ -4,6 +4,11 @@
  * plan's decision 4. Shape-validated only (80 bytes, like cardctl's
  * HEADER_LEN check at cardctl.py:479-480); proof-of-work is NOT verified and
  * the threat model's row 10 says so.
+ *
+ * The last-good header persists to the `anchor_tip` table (one row, id = 1)
+ * and is seeded from it at boot, so a restart does not silently lose the
+ * header the 503 fallback promises. The store is injectable; without one the
+ * feed behaves exactly as before, in memory only.
  */
 export const HEADER_LEN = 80;
 export const CACHE_SECONDS = 60;
@@ -19,6 +24,12 @@ export interface TipHeader {
 
 /** The fetch, injectable so tests (and cardctl's offline suite) never touch a network. */
 export type TipFetcher = (url: string) => Promise<Buffer>;
+
+/** The last-good header's store; the ops DB's anchor_tip table in production. */
+export interface TipStore {
+  read(): {header: Buffer; height: number; fetchedAt: number} | undefined;
+  write(tip: {header: Buffer; height: number; fetchedAt: number}): void;
+}
 
 export const httpTipFetcher: TipFetcher = async url => {
   const res = await fetch(url, {signal: AbortSignal.timeout(10_000)});
@@ -37,7 +48,25 @@ export class AnchorFeed {
   constructor(
     private readonly fetcher: TipFetcher = httpTipFetcher,
     private readonly now: () => number = () => Math.floor(Date.now() / 1000),
-  ) {}
+    private readonly store?: TipStore,
+  ) {
+    // Seed from the persisted last-good: a restart keeps the header the 503
+    // fallback answers with (finding: the table was dead schema before).
+    const saved = this.store?.read();
+    if (
+      saved &&
+      saved.header.length === HEADER_LEN &&
+      Number.isInteger(saved.height) &&
+      saved.height > 0
+    ) {
+      this.lastGood = {
+        header: Buffer.from(saved.header),
+        height: saved.height,
+        fetchedAt: saved.fetchedAt,
+      };
+      this.fetchedAt = saved.fetchedAt;
+    }
+  }
 
   /**
    * The tip header: from cache within CACHE_SECONDS, from upstream otherwise.
@@ -66,6 +95,12 @@ export class AnchorFeed {
       const tip: TipHeader = {header, fetchedAt: now, height};
       this.lastGood = tip;
       this.fetchedAt = now;
+      try {
+        this.store?.write({header: tip.header, height, fetchedAt: now});
+      } catch {
+        // A failed persistence write must not take the tip down; the
+        // in-memory last-good still serves, and the next fetch rewrites.
+      }
       return {ok: true, tip};
     } catch (e) {
       if (e instanceof UpstreamError || e instanceof Error) {

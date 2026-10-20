@@ -118,3 +118,87 @@ test('a garbage height is rejected like a failed upstream', async () => {
   const r = await f.tip();
   assert.ok(!r.ok);
 });
+
+// ── the last-good header persists (the 503 fallback survives a restart) ──────
+
+/** An in-memory TipStore, plus a reader for what a "restart" would see. */
+function memoryStore() {
+  let saved: {header: Buffer; height: number; fetchedAt: number} | undefined;
+  return {
+    read: () =>
+      saved ? {...saved, header: Buffer.from(saved.header)} : undefined,
+    write: (tip: {header: Buffer; height: number; fetchedAt: number}) => {
+      saved = {...tip, header: Buffer.from(tip.header)};
+    },
+    peek: () => saved,
+  };
+}
+
+test('a fetched tip is written to the store; a restarted feed seeds from it', async () => {
+  const store = memoryStore();
+  const f = new AnchorFeed(okFetcher, () => clock, store);
+  await f.tip();
+  assert.ok(store.peek(), 'the good tip was persisted');
+  assert.equal(store.peek()!.height, 900_000);
+
+  // The restart: a NEW feed over the same store, its fetcher dead.
+  const restarted = new AnchorFeed(
+    async () => {
+      throw new Error('upstream down after restart');
+    },
+    () => clock + CACHE_SECONDS + 1,
+    store,
+  );
+  const r = await restarted.tip();
+  assert.ok(!r.ok, 'upstream is down after the restart');
+  assert.ok(r.ok === false && r.stale !== null);
+  assert.ok(r.ok === false && r.stale!.header.equals(HEADER));
+  assert.equal(r.ok === false ? r.stale!.height : -1, 900_000);
+});
+
+test('a store row from before the height column (no height) does not seed', () => {
+  const store = {
+    read: () => ({
+      header: Buffer.from(HEADER),
+      height: 0,
+      fetchedAt: 1,
+    }),
+    write: () => undefined,
+  };
+  const f = new AnchorFeed(
+    async () => {
+      throw new Error('down');
+    },
+    () => clock,
+    store,
+  );
+  return f.tip().then(r => {
+    assert.ok(!r.ok);
+    assert.equal(r.ok === false ? r.stale : null, null, 'invalid seed ignored');
+  });
+});
+
+test('a failed store write does not take the tip down', async () => {
+  const f = new AnchorFeed(
+    async url => (url === TIP_URL ? heightOf(900_000) : HEADER),
+    () => clock,
+    {
+      read: () => undefined,
+      write: () => {
+        throw new Error('disk full');
+      },
+    },
+  );
+  const r = await f.tip();
+  assert.ok(r.ok, 'the tip still answers with the store broken');
+});
+
+async function okFetcher(url: string): Promise<Buffer> {
+  if (url === TIP_URL) {
+    return heightOf(900_000);
+  }
+  if (url === blockUrl(900_000)) {
+    return HEADER;
+  }
+  throw new Error('unexpected url ' + url);
+}

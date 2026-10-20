@@ -13,6 +13,8 @@ import {randomBytes} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import type {TipStore} from './anchor';
+
 /** The migrations, in order, forward-only. Never edit one; append the next. */
 export const MIGRATIONS: readonly string[] = [
   // 1. the v1 schema
@@ -75,6 +77,12 @@ export const MIGRATIONS: readonly string[] = [
     fetched_at INTEGER NOT NULL
   );
   `,
+  // 2. the anchor tip's height: the last-good row the feed seeds from at boot
+  // needs the block height alongside the header, or the seeded feed cannot
+  // answer the tip's {header, height, fetched_at} shape.
+  `
+  ALTER TABLE anchor_tip ADD COLUMN height INTEGER;
+  `,
 ];
 
 export interface DbOptions {
@@ -131,5 +139,43 @@ export class OpsDb {
 
   close(): void {
     this.db.close();
+  }
+
+  /**
+   * The anchor feed's last-good store, over the `anchor_tip` table (one row,
+   * id = 1). Write-on-fetch, read-at-boot: a restart keeps the header the
+   * 503 fallback answers with instead of silently forgetting it.
+   */
+  tipStore(): TipStore {
+    const read = this.db.prepare(
+      'SELECT header, height, fetched_at FROM anchor_tip WHERE id = 1',
+    );
+    const write = this.db.prepare(
+      `INSERT INTO anchor_tip (id, header, height, fetched_at) VALUES (1, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET header = excluded.header, height = excluded.height, fetched_at = excluded.fetched_at`,
+    );
+    return {
+      read: () => {
+        const r = read.get() as
+          | {header: Buffer; height: number | null; fetched_at: number}
+          | undefined;
+        if (!r || !Buffer.isBuffer(r.header)) {
+          return undefined;
+        }
+        // AnchorFeed revalidates length and positivity on read, so a row
+        // written before migration 2 (height NULL) seeds header-only.
+        if (r.height === null || !Number.isInteger(r.height) || r.height <= 0) {
+          return undefined;
+        }
+        return {
+          header: r.header,
+          height: r.height,
+          fetchedAt: r.fetched_at,
+        };
+      },
+      write: tip => {
+        write.run(tip.header, tip.height, tip.fetchedAt);
+      },
+    };
   }
 }

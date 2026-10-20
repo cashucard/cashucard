@@ -157,3 +157,54 @@ test('a 409 keeps the row pending and visible, never dropped', async () => {
   expect(r.stillPending).toBe(1);
   expect(bodies.length).toBe(1);
 });
+
+test('a 401 aborts the retry pass (the caller signs out; no row can succeed behind it)', async () => {
+  const {fetcher, bodies} = scriptedFetcher([
+    () => ({status: 401, json: {reason: 'no-session'}}),
+    () => ({status: 200, json: {stored: {}}}),
+  ]);
+  const client = new ApiClient({baseUrl: 'http://ops.test', fetcher});
+  const outbox = new RegistryOutbox(client);
+  outbox.add(row({short_id: 'aaaa'}));
+  outbox.add(row({short_id: 'bbbb'}));
+  await expect(outbox.retryAll('tok')).rejects.toMatchObject({
+    name: 'ApiServiceError',
+    status: 401,
+  });
+  expect(bodies.length).toBe(1, 'the pass stopped at the first 401');
+  expect(outbox.pendingRows.length).toBe(2, 'nothing flipped pending: false');
+});
+
+test('the documented timeout actually fires: a hung fetcher rejects in ApiUnreachableError', async () => {
+  let sawSignal: AbortSignal | null = null;
+  const hung = (_url: string, init?: RequestInit): Promise<Response> => {
+    sawSignal = (init?.signal as AbortSignal) ?? null;
+    return new Promise<Response>(() => undefined); // never resolves
+  };
+  const client = new ApiClient({
+    baseUrl: 'http://ops.test',
+    fetcher: hung,
+    timeoutMs: 20,
+  });
+  await expect(client.operatorSession('n', 'p')).rejects.toBeInstanceOf(
+    ApiUnreachableError,
+  );
+  expect(sawSignal).not.toBeNull();
+  expect(sawSignal!.aborted).toBe(true);
+});
+
+test('the timeout does not fire on a healthy response; the timer is cleared', async () => {
+  const {fetcher} = scriptedFetcher([
+    () => ({
+      status: 200,
+      json: {token: 't', kind: 'operator', env: 'factory', expires_at: 1},
+    }),
+  ]);
+  const client = new ApiClient({
+    baseUrl: 'http://ops.test',
+    fetcher,
+    timeoutMs: 20,
+  });
+  const s = await client.operatorSession('n', 'p');
+  expect(s.token).toBe('t');
+});

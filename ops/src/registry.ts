@@ -101,6 +101,13 @@ export function listCards(db: OpsDb, batchId: number): CardRow[] {
     .all(batchId) as CardRow[];
 }
 
+/** The stored row for a short id, or undefined; the 409 body's `stored`. */
+export function getCard(db: OpsDb, shortId: string): CardRow | undefined {
+  return db.db
+    .prepare('SELECT * FROM cards WHERE short_id = ?')
+    .get(shortId) as CardRow | undefined;
+}
+
 export class RegistryError extends Error {}
 
 export interface CapReleaseRow {

@@ -5,7 +5,7 @@
  */
 import http from 'node:http';
 
-import {AnchorFeed} from './anchor';
+import {AnchorFeed, httpTipFetcher} from './anchor';
 import {EnvMaster} from './master';
 import {OpsDb} from './db';
 import {HolderIssueState} from './issue';
@@ -30,7 +30,9 @@ export function serve(options: ServeOptions): http.Server {
   const db = new OpsDb({path: options.dbPath, master});
   const deps: RouterDeps = {
     db,
-    anchor: new AnchorFeed(),
+    // The last-good header persists to the anchor_tip table and seeds the
+    // feed at boot: a restart keeps the header the 503 fallback answers with.
+    anchor: new AnchorFeed(httpTipFetcher, undefined, db.tipStore()),
     holderState: new HolderIssueState(),
     mints: options.mints ?? DEFAULT_MINTS,
   };

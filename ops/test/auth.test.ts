@@ -1,22 +1,30 @@
 /**
  * Operator auth: scrypt verify, the 12 h token, expiry, revocation, and the
- * scope rules — holder scope cannot read batches or write cap-releases; the
- * holder issue path is one-shot per (batch, ordinal) and rate-limited.
+ * scope rules — holder scope cannot read batches, write cap-releases, or
+ * write registry rows; the holder issue path is one-shot per (batch,
+ * ordinal) and rate-limited. The stolen-token answer (OPS-THREAT-MODEL #2):
+ * revoke-by-principal from another operator's token, no stolen bearer needed.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
+import {once} from 'node:events';
 
 import {
   createHolderSession,
   createOperatorSession,
   hashPassword,
+  listSessionsForPrincipal,
   resolveSession,
   revokeSession,
+  revokeSessionsForPrincipal,
   SESSION_TTL_SECONDS,
   verifyPassword,
 } from '../src/auth';
 import {createBatch} from '../src/batches';
+import {AnchorFeed} from '../src/anchor';
 import {HolderIssueState, issueKeys} from '../src/issue';
+import {route, RouterDeps} from '../src/router';
 import {testDb} from './helpers';
 
 function seedOperator(db: ReturnType<typeof testDb>, env = 'issued'): number {
@@ -183,4 +191,150 @@ test('no-such-batch / no-such-ordinal answers, for both scopes', () => {
   const ord = issueKeys(db, batch.id, 5, {kind: 'operator'}, holders);
   assert.ok(!ord.ok && ord.reason === 'no-such-ordinal');
   db.close();
+});
+
+test('revoke-by-principal: another operator token revokes a stolen one, no stolen bearer needed', () => {
+  const db = testDb();
+  seedOperator(db);
+  const stolen = createOperatorSession(db, 'bench-lead', 'correct horse')!;
+  const keepers = createOperatorSession(db, 'bench-lead', 'correct horse')!;
+  assert.ok(resolveSession(db, stolen.token));
+  const n = revokeSessionsForPrincipal(db, stolen.session.principalId);
+  assert.equal(n, 2, 'every live session of the principal, the caller too');
+  assert.equal(resolveSession(db, stolen.token), null);
+  assert.equal(resolveSession(db, keepers.token), null);
+  // and the list agrees: nothing live for the principal any more
+  assert.equal(
+    listSessionsForPrincipal(db, stolen.session.principalId).length,
+    0,
+  );
+  // a re-sign-in works and is listed
+  const fresh = createOperatorSession(db, 'bench-lead', 'correct horse')!;
+  const live = listSessionsForPrincipal(db, fresh.session.principalId);
+  assert.equal(live.length, 1);
+  assert.equal(live[0]!.tokenHash, fresh.session.tokenHash);
+  db.close();
+});
+
+test('holder tokens cannot revoke or list sessions (the revoke routes are operator-only)', async () => {
+  const db = testDb();
+  db.db
+    .prepare(
+      "INSERT INTO operators (name, password_hash, key_env, created) VALUES ('bench-lead', ?, 'issued', 1)",
+    )
+    .run(hashPassword('x'));
+  const deps: RouterDeps = {
+    db,
+    anchor: new AnchorFeed(async () => {
+      throw new Error('no network in this suite');
+    }),
+    holderState: new HolderIssueState(),
+    mints: ['https://forge.flashapp.me'],
+  };
+  const server = http.createServer((req, res) => {
+    route(deps, req, res).catch(() => {
+      res.writeHead(500).end('{"reason":"internal"}');
+    });
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${(server.address() as {port: number}).port}`;
+  const call = async (
+    method: string,
+    path: string,
+    token?: string,
+    body?: unknown,
+  ): Promise<{status: number; json: Record<string, unknown>}> => {
+    const res = await fetch(base + path, {
+      method,
+      headers: {
+        ...(token ? {authorization: `Bearer ${token}`} : {}),
+        ...(body ? {'content-type': 'application/json'} : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return {
+      status: res.status,
+      json: (await res.json()) as Record<string, unknown>,
+    };
+  };
+  try {
+    const op = await call('POST', '/auth/operator/session', undefined, {
+      name: 'bench-lead',
+      password: 'x',
+    });
+    const opToken = op.json.token as string;
+    const holder = await call('POST', '/auth/holder/session', undefined, {
+      proof: {env: 'issued'},
+    });
+    const holderToken = holder.json.token as string;
+
+    // OPS-GOVERNANCE Q4: the operator posts registries; the holder's only
+    // path is one-shot issuance. A stolen holder token must not write
+    // registry rows (it could forge arbitrary ones otherwise).
+    const batch = await call('POST', '/registry/batches', opToken, {
+      count: 2,
+      mint_url: 'https://forge.flashapp.me',
+      pin_policy: 'perCard',
+      daily_usd: 25,
+      no_pin_usd: 5,
+      load_sha256: 'fe7d8ac3',
+    });
+    const batchId = (batch.json.batch as Record<string, unknown>).id as number;
+    const holderPost = await call('POST', '/registry/cards', holderToken, {
+      short_id: 'dead',
+      batch_id: batchId,
+      key_id: 2,
+      ordinal: 0,
+      installed_at: 1,
+      installer: 'thief',
+      load_sha256: 'fe7d8ac3',
+    });
+    assert.equal(holderPost.status, 403);
+    assert.equal(holderPost.json.reason, 'operator-only');
+    // the operator's own post on the same batch answers 200 (the gate is the
+    // scope, not the route)
+    const opPost = await call('POST', '/registry/cards', opToken, {
+      short_id: 'beef',
+      batch_id: batchId,
+      key_id: 2,
+      ordinal: 0,
+      installed_at: 1,
+      installer: 'op@bench-1',
+      load_sha256: 'fe7d8ac3',
+    });
+    assert.equal(opPost.status, 200);
+
+    // revoke + list are operator-only too
+    const holderRevoke = await call(
+      'POST',
+      '/auth/operator/revoke',
+      holderToken,
+      {principal_id: 1},
+    );
+    assert.equal(holderRevoke.status, 403);
+    const holderList = await call(
+      'GET',
+      '/auth/operator/sessions',
+      holderToken,
+    );
+    assert.equal(holderList.status, 403);
+
+    // an operator revokes principal 1 (the operator's own principal here) and
+    // the once-live token stops resolving; the response carries the count
+    const revoke = await call('POST', '/auth/operator/revoke', opToken, {
+      principal_id: 1,
+    });
+    assert.equal(revoke.status, 200);
+    assert.equal(typeof revoke.json.revoked, 'number');
+    const after = await call('GET', '/mints', opToken);
+    assert.equal(
+      after.status,
+      401,
+      "the operator's own token went with the revoke",
+    );
+  } finally {
+    server.close();
+    db.close();
+  }
 });

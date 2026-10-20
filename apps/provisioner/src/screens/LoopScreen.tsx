@@ -34,6 +34,15 @@ interface RunUi {
   block?: {index: number; of: number};
 }
 
+/**
+ * The real-mode registry row's placeholders until ENG-741 wires the real
+ * batch id and escrow ordinal. A `0` here cannot reach the service: with
+ * foreign_keys ON and no batch row 0, the POST is a 500 and the row is
+ * pending forever (the finding this guard exists for).
+ */
+const PLACEHOLDER_BATCH_ID = 0;
+const PLACEHOLDER_ORDINAL = 0;
+
 const local = (t: Theme) =>
   StyleSheet.create({
     scroll: {gap: 14, paddingBottom: 24, flexGrow: 1},
@@ -176,6 +185,8 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
   const [done, setDone] = useState<{id: string; pin?: string} | null>(null);
   /** After wrong-keys: the loop stays disarmed until the stop is answered. */
   const [needsAck, setNeedsAck] = useState(false);
+  /** Real mode before ENG-741: the done panel says the record is held. */
+  const [placeholderNote, setPlaceholderNote] = useState(false);
   /** Auto-rearm timer for done state. */
   const autoRearmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Track if we're in the middle of a run to show cancel button. */
@@ -212,6 +223,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
     setRunArmed(true);
     setStop(null);
     setDone(null);
+    setPlaceholderNote(false);
     clearAutoRearmTimer();
     setUi({phase: 'probe'});
     const demoRun = await runDemo(state, {replace, onEvent});
@@ -239,15 +251,31 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
           pending: false,
         });
       } else {
-        app.postRegistryCard({
-          short_id: id,
-          batch_id: 0, // the batch's service id lands with the deep build (ENG-741)
-          key_id: 2,
-          ordinal: 0, // the escrow ordinal the phone drew; ENG-741 wires the real one
-          installed_at: Date.now(),
-          installer: 'op@bench',
-          load_sha256: 'fe7d8ac3',
-        });
+        // ENG-741 wires the real batch id and escrow ordinal; until then the
+        // placeholder constants must not reach the service — with foreign
+        // keys on, a batch_id no batch row holds is a 500 and an eternally
+        // pending row. The run records locally and the done panel says the
+        // record is held, visibly, rather than posting a doomed row.
+        if (PLACEHOLDER_BATCH_ID === 0 || PLACEHOLDER_ORDINAL === 0) {
+          app.addRecord({
+            id,
+            ok: true,
+            at: Date.now(),
+            pending: false,
+          });
+          setPlaceholderNote(true);
+        } else {
+          setPlaceholderNote(false);
+          app.postRegistryCard({
+            short_id: id,
+            batch_id: PLACEHOLDER_BATCH_ID,
+            key_id: 2,
+            ordinal: PLACEHOLDER_ORDINAL,
+            installed_at: Date.now(),
+            installer: 'op@bench',
+            load_sha256: 'fe7d8ac3',
+          });
+        }
       }
       // ENG-754: auto-rearm after done - brief pause then auto-rearm
       autoRearm();
@@ -381,6 +409,11 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
                   {done.pin}
                 </Text>
               </View>
+            ) : null}
+            {placeholderNote && !app.demo ? (
+              <Text testID="placeholder-note" style={s.resultLine}>
+                {LOOP.placeholderRecord}
+              </Text>
             ) : null}
             {/* ENG-754: auto-rearm - no button needed, auto-rearms after pause */}
           </View>

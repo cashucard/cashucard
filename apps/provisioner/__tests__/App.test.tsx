@@ -27,6 +27,15 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   jest
     .spyOn(ApiClient.prototype, 'operatorSession')
     .mockResolvedValue({env: 'issued', token: 'test-token'});
+  // S1's typed credentials: the screen no longer carries a default operator.
+  await ReactTestRenderer.act(async () => {
+    await tree!.root
+      .findByProps({testID: 'sign-in-name'})
+      .props.onChangeText('bench-lead');
+    await tree!.root
+      .findByProps({testID: 'sign-in-password'})
+      .props.onChangeText('pw');
+  });
   await ReactTestRenderer.act(async () => {
     await tree!.root.findByProps({testID: 'sign-in'}).props.onPress();
   });

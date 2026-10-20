@@ -68,18 +68,49 @@ export class ApiClient {
     body?: unknown,
   ): Promise<Record<string, unknown>> {
     let res: Response;
+    // The documented timeout, actually applied: a hung ops socket must not
+    // stall sign-in, nor one retry pass per pending row, past TIMEOUT_MS.
+    // The abort races the fetcher — a fetcher that ignores the signal (or a
+    // platform fetch that honors it late) still resolves the call.
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.timeoutMs);
     try {
-      res = await this.fetcher(this.options.baseUrl + path, {
+      const pending = this.fetcher(this.options.baseUrl + path, {
         method,
         headers: {
           ...(token ? {Authorization: `Bearer ${token}`} : {}),
           ...(body !== undefined ? {'Content-Type': 'application/json'} : {}),
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: undefined, // the timeout is applied below via AbortSignal
+        signal: controller.signal,
       } as RequestInit);
+      res = await new Promise<Response>((resolve, reject) => {
+        const onAbort = () => reject(new Error('the request timed out'));
+        controller.signal.addEventListener('abort', onAbort, {once: true});
+        pending.then(
+          v => {
+            controller.signal.removeEventListener('abort', onAbort);
+            resolve(v);
+          },
+          e => {
+            controller.signal.removeEventListener('abort', onAbort);
+            reject(e);
+          },
+        );
+      });
     } catch (e) {
+      if (timedOut) {
+        throw new ApiUnreachableError(
+          new Error(`the request exceeded ${this.timeoutMs} ms`),
+        );
+      }
       throw new ApiUnreachableError(e);
+    } finally {
+      clearTimeout(timer);
     }
     let json: Record<string, unknown>;
     try {
@@ -152,7 +183,10 @@ export class RegistryOutbox {
 
   /**
    * One retry pass. Resolves when every row has been answered or exhausted
-   * its pass; answered rows flip to `pending: false` in place.
+   * its pass; answered rows flip to `pending: false` in place. A 401 (the
+   * 12 h token dead) aborts the pass with that error: no row can succeed
+   * behind it, and the caller — the store's retry pass — signs out on it
+   * instead of re-posting 401s forever.
    */
   async retryAll(
     token: string,
@@ -168,6 +202,9 @@ export class RegistryOutbox {
         entry.pending = false;
         posted++;
       } catch (e) {
+        if (e instanceof ApiServiceError && e.status === 401) {
+          throw e;
+        }
         if (e instanceof ApiServiceError && e.status === 409) {
           // A conflict cannot be resolved by the bench: keep it pending and
           // visible rather than dropping a programmed card's row.

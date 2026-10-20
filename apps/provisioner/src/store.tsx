@@ -19,6 +19,7 @@ import {AppState, useColorScheme, type AppStateStatus} from 'react-native';
 
 import {
   ApiClient,
+  ApiServiceError,
   ApiUnreachableError,
   RegistryOutbox,
   type ApiClientOptions,
@@ -113,37 +114,74 @@ export function AppStore({
 
   const clientRef = useRef<ApiClient | null>(null);
   const outboxRef = useRef<RegistryOutbox | null>(null);
+  /** signOut, callable from retryPending without a dependency cycle. */
+  const signOutRef = useRef<() => void>(() => undefined);
   const makeClient = useCallback(
     (): ApiClient =>
       new ApiClient(clientOptions ?? {baseUrl: DEFAULT_SERVICE_URL}),
     [clientOptions],
   );
 
-  const retryPending = useCallback(async (): Promise<void> => {
+  /**
+   * Reflects the outbox's answered rows onto the batch view: every view row
+   * still pending whose (id, at) matches an outbox row that is no longer
+   * pending flips to pending: false. The outbox stores {...row} copies and
+   * the batch view stores separate view rows, so the match is by the row's
+   * own fields, never object identity (the bug that kept flags pending
+   * forever) — and the flag only ever flips when the service answered.
+   */
+  const reflectAnswered = useCallback((): void => {
     const outbox = outboxRef.current;
-    const sess = session;
-    if (!outbox || !sess || outbox.pendingRows.length === 0) {
+    if (!outbox) {
       return;
     }
-    await outbox.retryAll(sess.token);
-    // Reflect answered rows in the batch view: pending flips where the outbox
-    // says it did.
-    const answered = new Set(
-      outbox.all.filter(e => !e.pending).map(e => e.row),
-    );
+    const answered = outbox.all
+      .filter(e => !e.pending)
+      .map(e => ({id: e.row.short_id, at: e.row.installed_at}));
     setBatch(b =>
       b
         ? {
             ...b,
             done: b.done.map(r =>
-              r.pending && answered.has(r as unknown as CardRegistryRow)
+              r.pending && answered.some(a => a.id === r.id && a.at === r.at)
                 ? {...r, pending: false}
                 : r,
             ),
           }
         : b,
     );
-  }, [session]);
+  }, []);
+
+  const retryPending = useCallback(async (): Promise<void> => {
+    const outbox = outboxRef.current;
+    const sess = session;
+    if (!outbox || !sess) {
+      return;
+    }
+    // No pendingRows short-circuit here: the reflection below is the point —
+    // rows the inline post path already answered must still flip the batch
+    // view's pending flags on this pass, even when nothing is pending now.
+    let expired = false;
+    try {
+      await outbox.retryAll(sess.token);
+    } catch (e) {
+      // retryAll resolves per-row; a throw here is a transport-level one.
+      // A 401 means the 12 h token is dead: treat it as expiry, sign out,
+      // and let the next sign-in rebuild the outbox (the pending rows stay
+      // on the batch view until then).
+      if (e instanceof ApiServiceError && e.status === 401) {
+        expired = true;
+      } else {
+        throw e;
+      }
+    }
+    reflectAnswered();
+    if (expired) {
+      // signOut is a stable closure over the setters; the ref carries it so
+      // retryPending (declared before it) can call it without a cycle.
+      signOutRef.current();
+    }
+  }, [session, reflectAnswered]);
 
   // The retry cadence: on an interval, and when the app returns to the
   // foreground (the plan's "re-post on interval and app-foreground").
@@ -165,6 +203,14 @@ export function AppStore({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, session]);
+
+  const signOut = useCallback(() => {
+    clientRef.current = null;
+    outboxRef.current = null;
+    setSession(null);
+    setSignedIn(false);
+  }, []);
+  signOutRef.current = signOut;
 
   const value = useMemo<AppStateShape>(
     () => ({
@@ -192,12 +238,7 @@ export function AppStore({
             : new Error('sign-in failed');
         }
       },
-      signOut: () => {
-        clientRef.current = null;
-        outboxRef.current = null;
-        setSession(null);
-        setSignedIn(false);
-      },
+      signOut,
       setDemo,
       setTheme,
       startBatch: config => setBatch({...config, done: []}),
@@ -208,42 +249,33 @@ export function AppStore({
           b ? {...b, done: [...b.done, {...row, pending: false}]} : b,
         ),
       postRegistryCard: row => {
+        // The batch view's row shape (RecordRow) differs from the wire row's
+        // (CardRegistryRow): id = short_id, at = installed_at. Spreading the
+        // wire row produced a view row with no id/at, which no retry pass
+        // could ever match — the flag stayed pending forever.
+        const view: RecordRow = {
+          id: row.short_id,
+          ok: true,
+          at: row.installed_at,
+          pending: true,
+        };
         const outbox = outboxRef.current;
         const sess = session;
         if (!outbox || !sess) {
           // No session: the row is pending by definition and the next
           // sign-in's retry pass carries it? No — without a session there is
           // no outbox; the row stays pending on the batch view only.
-          setBatch(b =>
-            b
-              ? {...b, done: [...b.done, {...row, pending: true} as RecordRow]}
-              : b,
-          );
+          setBatch(b => (b ? {...b, done: [...b.done, view]} : b));
           return;
         }
         outbox.add(row);
-        setBatch(b =>
-          b
-            ? {...b, done: [...b.done, {...row, pending: true} as RecordRow]}
-            : b,
-        );
+        setBatch(b => (b ? {...b, done: [...b.done, view]} : b));
         (async () => {
           try {
             await outbox.retryAll(sess.token);
-            setBatch(prev =>
-              prev
-                ? {
-                    ...prev,
-                    done: prev.done.map(r =>
-                      r.pending &&
-                      r.id === row.short_id &&
-                      r.at === row.installed_at
-                        ? {...r, pending: false}
-                        : r,
-                    ),
-                  }
-                : prev,
-            );
+            // Same reflection as the retry pass: only rows the outbox says
+            // were answered flip, so a 503 keeps the flag pending.
+            reflectAnswered();
           } catch {
             // the outbox holds it; the interval pass retries
           }
@@ -260,6 +292,8 @@ export function AppStore({
       clientOptions,
       makeClient,
       retryPending,
+      reflectAnswered,
+      signOut,
     ],
   );
   return (

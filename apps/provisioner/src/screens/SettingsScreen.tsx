@@ -223,6 +223,18 @@ export function SettingsScreen({
         </View>
 
         <View style={s.section}>
+          <Text style={s.header}>{SETTINGS.session}</Text>
+          <View style={s.card}>
+            <Pressable testID="sign-out" onPress={app.signOut} style={s.row}>
+              <View style={s.rowLabelCol}>
+                <Text style={s.rowLabel}>{SETTINGS.signOut}</Text>
+                <Text style={s.rowSub}>{SETTINGS.signOutSub}</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={s.section}>
           <Text style={s.header}>{SETTINGS.about}</Text>
           <View style={s.card}>
             <View style={s.identity}>

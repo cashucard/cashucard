@@ -20,6 +20,8 @@ export {
   createHolderSession,
   resolveSession,
   revokeSession,
+  revokeSessionsForPrincipal,
+  listSessionsForPrincipal,
   SESSION_TTL_SECONDS,
 } from './auth';
 export {
@@ -29,9 +31,10 @@ export {
   httpTipFetcher,
   UpstreamError,
 } from './anchor';
-export type {TipFetcher, TipHeader} from './anchor';
+export type {TipFetcher, TipHeader, TipStore} from './anchor';
 export {
   recordCard,
+  getCard,
   listCards,
   addCapRelease,
   listCapReleases,
@@ -44,4 +47,5 @@ export {route, HttpError} from './router';
 export type {RouterDeps} from './router';
 export {serve, DEFAULT_MINTS} from './server';
 export {EnvMaster} from './master';
+export {bootstrapOperator} from './bootstrap';
 export type {MasterSource} from './master';

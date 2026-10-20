@@ -182,3 +182,52 @@ export function revokeSession(db: OpsDb, token: string): boolean {
     .run(db.now(), hashToken(token));
   return info.changes > 0;
 }
+
+/**
+ * Revokes every live session of a principal — the stolen-phone answer the
+ * threat model's row 2 claims: an operator who still holds THEIR token
+ * revokes a principal's sessions without possessing the stolen one. The
+ * operator's own sessions included, by design: revoking yourself is
+ * sign-out with ceremony.
+ */
+export function revokeSessionsForPrincipal(
+  db: OpsDb,
+  principalId: number,
+): number {
+  const info = db.db
+    .prepare(
+      'UPDATE sessions SET revoked_at = ? WHERE principal_id = ? AND revoked_at IS NULL',
+    )
+    .run(db.now(), principalId);
+  return info.changes;
+}
+
+/** The live (unexpired, unrevoked) sessions of a principal, hashes only. */
+export function listSessionsForPrincipal(
+  db: OpsDb,
+  principalId: number,
+): Session[] {
+  const rows = db.db
+    .prepare(
+      `SELECT * FROM sessions
+       WHERE principal_id = ? AND revoked_at IS NULL AND expires_at > ?
+       ORDER BY created`,
+    )
+    .all(principalId, db.now()) as {
+    token_hash: string;
+    principal_id: number;
+    kind: SessionKind;
+    env: KeyEnv;
+    expires_at: number;
+    revoked_at: number | null;
+    created: number;
+  }[];
+  return rows.map(r => ({
+    tokenHash: r.token_hash,
+    principalId: r.principal_id,
+    kind: r.kind,
+    env: r.env,
+    expiresAt: r.expires_at,
+    revokedAt: r.revoked_at ?? null,
+  }));
+}

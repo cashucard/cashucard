@@ -5,10 +5,13 @@
  * The routes (D29):
  *   POST /auth/operator/session   password -> 12 h token
  *   POST /auth/holder/session     proof stub -> scope-holder token
+ *   POST /auth/operator/signout   revoke the bearer's own session
+ *   GET  /auth/operator/sessions  the operator's live sessions (operator only)
+ *   POST /auth/operator/revoke    revoke a principal's live sessions (operator only)
  *   POST /keys/issue              {batch_id, ordinal}; operator or one-shot holder
  *   GET  /mints                   active mint list
  *   GET  /anchor/tip              80-byte header, 60 s cache, 503 with last-good
- *   POST /registry/cards          idempotent upsert (identical -> 200, changed -> 409)
+ *   POST /registry/cards          operator-only, idempotent upsert (identical -> 200, changed -> 409)
  *   GET  /registry/cards?batch_id operator only
  *   POST /registry/cap-releases   operator only
  */
@@ -17,8 +20,10 @@ import {IncomingMessage, ServerResponse} from 'node:http';
 import {
   createHolderSession,
   createOperatorSession,
+  listSessionsForPrincipal,
   resolveSession,
   revokeSession,
+  revokeSessionsForPrincipal,
   Session,
 } from './auth';
 import {AnchorFeed} from './anchor';
@@ -27,6 +32,7 @@ import {OpsDb} from './db';
 import {HolderIssueState, issueKeys} from './issue';
 import {
   addCapRelease,
+  getCard,
   listCapReleases,
   recordCard,
   RegistryError,
@@ -201,6 +207,32 @@ export async function route(
       sendJson(res, 200, {revoked: true});
       return;
     }
+    // The stolen-phone answer (OPS-THREAT-MODEL #2): an operator revokes a
+    // principal's live sessions — theirs included — WITHOUT possessing the
+    // stolen token, and can list what is live first. Both operator-only: a
+    // holder token must not revoke or list operator sessions.
+    if (method === 'GET' && path === '/auth/operator/sessions') {
+      const session = requireOperator(deps, req);
+      sendJson(res, 200, {
+        sessions: listSessionsForPrincipal(deps.db, session.principalId).map(
+          s => ({
+            kind: s.kind,
+            env: s.env,
+            expires_at: s.expiresAt,
+            token_hash: s.tokenHash,
+          }),
+        ),
+      });
+      return;
+    }
+    if (method === 'POST' && path === '/auth/operator/revoke') {
+      requireOperator(deps, req);
+      const body = parseJson(await readBody(req));
+      const principalId = intField(body, 'principal_id');
+      const revoked = revokeSessionsForPrincipal(deps.db, principalId);
+      sendJson(res, 200, {revoked});
+      return;
+    }
 
     // ── keys ──────────────────────────────────────────────────────────────
     if (method === 'POST' && path === '/keys/issue') {
@@ -267,7 +299,10 @@ export async function route(
 
     // ── registry: cards ───────────────────────────────────────────────────
     if (method === 'POST' && path === '/registry/cards') {
-      requireSession(deps, req);
+      // Operator-only (OPS-GOVERNANCE Q4): the operator posts registries and
+      // the holder's only path is one-shot key issuance — a holder token
+      // must not write registry rows.
+      requireOperator(deps, req);
       const body = parseJson(await readBody(req));
       const row = {
         short_id: strField(body, 'short_id'),
@@ -281,7 +316,13 @@ export async function route(
       try {
         const result = recordCard(deps.db, row);
         if (result.kind === 'conflict') {
-          sendJson(res, 409, {reason: 'short-id-exists', stored: result});
+          // The existing row, so the caller can see WHAT differs; a bare
+          // {kind: 'conflict'} names no row at all.
+          const existing = getCard(deps.db, row.short_id);
+          sendJson(res, 409, {
+            reason: 'short-id-exists',
+            stored: existing,
+          });
           return;
         }
         sendJson(res, 200, {stored: result.row});
