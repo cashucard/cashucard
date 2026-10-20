@@ -1,7 +1,11 @@
 /**
- * The service entry: node:http on loopback, TLS at the reverse proxy (D29's
- * hosting decision). OPS_MASTER_KEY comes from the runtime-injected
- * environment — never a prompt, never shell history (AGENTS.md).
+ * The service entry — the Node/dev side (D29): node:http on loopback, TLS at
+ * the reverse proxy. The deployed shape is the Workers entry
+ * (`worker.ts` + the Durable Object in `do.ts`, the ENG-740 hosting
+ * amendment); this server and `bootstrap.ts` stay the ops-cli/dev path over
+ * the same modules and the same DB seam. OPS_MASTER_KEY comes from the
+ * runtime-injected environment — never a prompt, never shell history
+ * (AGENTS.md).
  */
 import http from 'node:http';
 
@@ -10,13 +14,10 @@ import {EnvMaster} from './master';
 import {OpsDb} from './db';
 import {HolderIssueState} from './issue';
 import {route, RouterDeps} from './router';
+import {openSqliteFile} from './sqlite-file';
+import {DEFAULT_MINTS} from './config';
 
-export const DEFAULT_MINTS = [
-  'https://forge.flashapp.me',
-  'https://mint.minibits.cash',
-  'https://mint.macadamia.cash',
-  'https://mint.cubabitcoin.org',
-];
+export {DEFAULT_MINTS} from './config';
 
 export interface ServeOptions {
   readonly port: number;
@@ -27,7 +28,7 @@ export interface ServeOptions {
 export function serve(options: ServeOptions): http.Server {
   const master = new EnvMaster();
   master.getMaster(); // fail fast at boot, not on the first batch
-  const db = new OpsDb({path: options.dbPath, master});
+  const db = new OpsDb({sql: openSqliteFile(options.dbPath), master});
   const deps: RouterDeps = {
     db,
     // The last-good header persists to the anchor_tip table and seeds the

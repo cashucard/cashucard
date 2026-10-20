@@ -9,11 +9,11 @@
  *
  * The routes (D29):
  *   POST /auth/operator/session   password -> 12 h token
- *   POST /auth/holder/session     proof stub -> scope-holder token
+ *   POST /auth/holder/session     disabled until consumer authorization exists
  *   POST /auth/operator/signout   revoke the bearer's own session
  *   GET  /auth/operator/sessions  the operator's live sessions (operator only)
  *   POST /auth/operator/revoke    revoke a principal's live sessions (operator only)
- *   POST /keys/issue              {batch_id, ordinal}; operator or one-shot holder
+ *   POST /keys/issue              {batch_id, ordinal}; operator only
  *   GET  /mints                   active mint list
  *   GET  /anchor/tip              PUBLIC: 80-byte header, 60 s cache, 503 with last-good
  *   POST /registry/cards          operator-only, idempotent upsert (identical -> 200, changed -> 409)
@@ -23,7 +23,7 @@
 import {IncomingMessage, ServerResponse} from 'node:http';
 
 import {
-  createHolderSession,
+  LoginRateLimitError,
   createOperatorSession,
   listSessionsForPrincipal,
   resolveSession,
@@ -34,6 +34,7 @@ import {
 import {AnchorFeed} from './anchor';
 import {BatchError, createBatch, listBatches} from './batches';
 import {OpsDb} from './db';
+import type {PasswordHasher} from './pwhash';
 import {HolderIssueState, issueKeys} from './issue';
 import {
   addCapRelease,
@@ -47,6 +48,7 @@ const BODY_LIMIT = 1 << 20; // 1 MiB; a registry row is a few hundred bytes
 
 export interface RouterDeps {
   readonly db: OpsDb;
+  readonly passwordHasher?: PasswordHasher;
   readonly anchor: AnchorFeed;
   readonly holderState: HolderIssueState;
   /** The mints the service serves (the registry the screens read). */
@@ -166,7 +168,12 @@ export async function route(
       const body = parseJson(await readBody(req));
       const name = strField(body, 'name');
       const password = strField(body, 'password');
-      const issued = createOperatorSession(deps.db, name, password);
+      const issued = await createOperatorSession(
+        deps.db,
+        name,
+        password,
+        deps.passwordHasher,
+      );
       if (!issued) {
         throw new HttpError(
           401,
@@ -183,22 +190,11 @@ export async function route(
       return;
     }
     if (method === 'POST' && path === '/auth/holder/session') {
-      const body = parseJson(await readBody(req));
-      const issued = createHolderSession(deps.db, body.proof);
-      if (!issued) {
-        throw new HttpError(
-          401,
-          'bad-proof',
-          'the holder proof is not well-formed',
-        );
-      }
-      sendJson(res, 200, {
-        token: issued.token,
-        kind: issued.session.kind,
-        env: issued.session.env,
-        expires_at: issued.session.expiresAt,
-      });
-      return;
+      throw new HttpError(
+        403,
+        'holder-disabled',
+        'consumer provisioning is disabled',
+      );
     }
     if (method === 'POST' && path === '/auth/operator/signout') {
       const token = bearer(req);
@@ -241,7 +237,7 @@ export async function route(
 
     // ── keys ──────────────────────────────────────────────────────────────
     if (method === 'POST' && path === '/keys/issue') {
-      const session = requireSession(deps, req);
+      requireOperator(deps, req);
       const body = parseJson(await readBody(req));
       const batchId = intField(body, 'batch_id');
       const ordinal = intField(body, 'ordinal');
@@ -249,9 +245,7 @@ export async function route(
         deps.db,
         batchId,
         ordinal,
-        session.kind === 'operator'
-          ? {kind: 'operator'}
-          : {kind: 'holder', tokenHash: session.tokenHash},
+        {kind: 'operator'},
         deps.holderState,
       );
       if (!result.ok) {
@@ -435,6 +429,10 @@ export async function route(
 
     sendJson(res, 404, {reason: 'no-such-route'});
   } catch (e) {
+    if (e instanceof LoginRateLimitError) {
+      sendJson(res, 429, {reason: 'login-rate-limited', message: e.message});
+      return;
+    }
     if (e instanceof HttpError) {
       sendJson(res, e.status, {reason: e.code, message: e.message});
       return;

@@ -1275,7 +1275,7 @@ issued-but-unescrowed state can exist. Key sets are never resident on a phone
 beyond the run that fetched them; the phone is the transport (D27), the service
 is the vault.
 
-**Hosting (PROPOSED pending Foxy sign-off):** a dedicated droplet, never
+**Original hosting proposal (superseded by [D30](#d30), partner sign-off pending):** a dedicated droplet, never
 co-located with the forge mint — the escrow DB is fleet-wide card-manager keys
 and keeps its own perimeter (its own backups, its own alerting). See
 [`OPS-GOVERNANCE.md`](OPS-GOVERNANCE.md); that document's sign-off gates
@@ -1310,3 +1310,33 @@ which the registry cross-checks in tests
 [`OPS-GOVERNANCE.md`](OPS-GOVERNANCE.md). Master key custody is a config seam
 (`ops/src/master.ts`), not a product choice — the KMS/HSM decision is open and
 deliberately cheap to change.
+
+## <a id="d30"></a>D30: Workers hosting and operator provisioning before consumer access
+
+**Decided (ENG-740 Workers port review, 2026-10-20):** target one Cloudflare
+Worker forwarding to one SQLite-backed Durable Object. Keep D29's derivation,
+atomic escrow and service custody. The Node SQLite adapter remains for local
+development and recovery tooling. Partner agreement remains pending; this
+amends the engineering plan, not Foxy's governance sign-off.
+
+Ship operator provisioning first. Disable the unauthenticated holder stub on
+the deployed service; consumer provisioning in flash-mobile and Foxy's wallet
+requires verified identity, authorization for the specific card or attempt,
+durable replay rules and interrupted-install recovery. Public identifiers and
+factory keys do not authorize retrieval of existing private manager keys.
+
+Deployment requires controlled operator bootstrap, corrected platform adapters
+and CI, and a tested complete encrypted recovery export with an independent
+copy. The app must preserve attempt identity and pending registry records
+across termination without persisting manager keys or PINs. The implementation
+order and acceptance checks are in
+[`OPS-WORKERS-PLAN.md`](OPS-WORKERS-PLAN.md).
+
+**Why:** the Durable Object preserves the single-writer transaction model
+without maintaining a VM. D1 or distributed services introduce another storage
+model without demonstrated workload pressure. Retain a VM as the alternative
+if custody requirements exclude Cloudflare. Deferring authorization because no
+consumer UI calls the stub was rejected: the endpoint itself grants access.
+Platform PITR alone was rejected as recovery because it shares the account's
+failure boundary. Tests stay focused on business invariants and runtime
+differences rather than duplicating every route across both backends.

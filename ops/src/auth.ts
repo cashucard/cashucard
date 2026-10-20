@@ -1,19 +1,16 @@
 /**
- * Operator and holder sessions. Operator auth v1 is a scrypt password
- * (node:crypto, no new native dep — the plan's decision 3); the bearer token
- * is 12 h, revocable server-side, and stored hashed (the DB never holds a
- * live token). Holder sessions are a stub — the real IdP is Phase 5b — and
- * their scope is narrow by design (OPS-GOVERNANCE Q4): one-shot issuance,
- * no batch reads, no cap releases.
+ * Operator and holder sessions. Operator auth v1 is a password whose hash
+ * goes through the pwhash seam (scrypt on Node, PBKDF2-SHA256 over WebCrypto
+ * on the Durable Object — the ENG-740 Workers amendment; the stored string's
+ * prefix picks the verifier, so hashes outlive backend changes); the bearer
+ * token is 12 h, revocable server-side, and stored hashed (the DB never holds
+ * a live token). Holder access is disabled until verified identity and
+ * card authorization exist (D30), including previously minted holder tokens.
  */
-import {
-  createHash,
-  randomBytes,
-  scryptSync,
-  timingSafeEqual,
-} from 'node:crypto';
+import {createHash, randomBytes} from 'node:crypto';
 
 import {OpsDb} from './db';
+import {NodePwHash, type PasswordHasher} from './pwhash';
 
 export const SESSION_TTL_SECONDS = 12 * 60 * 60; // 12 h
 export const PRINCIPAL_HOLDER = 0; // holder sessions have no operators row
@@ -30,34 +27,24 @@ export interface Session {
   readonly revokedAt: number | null;
 }
 
-/** scrypt with a per-password salt; the stored string carries its parameters. */
-export function hashPassword(password: string): string {
-  const salt = Buffer.from(randomBytes(16));
-  const N = 16384;
-  const r = 8;
-  const p = 1;
-  const hash = scryptSync(password, salt, 64, {N, r, p});
-  return `scrypt$${N}$${r}$${p}$${salt.toString('hex')}$${hash.toString('hex')}`;
+/**
+ * The process's hasher: scrypt on Node (the server, the ops CLI, the tests).
+ * The Durable Object constructs a SubtlePwHash and hands it to
+ * `createOperatorSession` — hash/verify dispatch on the stored prefix either
+ * way, so a row written by one backend verifies on the other.
+ */
+export const defaultPwHash: PasswordHasher = new NodePwHash();
+
+/** scrypt (or PBKDF2, via the seam) with a per-password salt; self-describing string. */
+export function hashPassword(password: string): Promise<string> {
+  return defaultPwHash.hash(password);
 }
 
-export function verifyPassword(password: string, stored: string): boolean {
-  const parts = stored.split('$');
-  if (parts.length !== 6 || parts[0] !== 'scrypt') {
-    return false;
-  }
-  const [, nStr, rStr, pStr, saltHex, hashHex] = parts;
-  const expected = Buffer.from(hashHex!, 'hex');
-  const actual = scryptSync(
-    password,
-    Buffer.from(saltHex!, 'hex'),
-    expected.length,
-    {
-      N: Number(nStr),
-      r: Number(rStr),
-      p: Number(pStr),
-    },
-  );
-  return timingSafeEqual(expected, actual);
+export async function verifyPassword(
+  password: string,
+  stored: string,
+): Promise<boolean> {
+  return defaultPwHash.verify(password, stored);
 }
 
 const hashToken = (token: string): string =>
@@ -69,42 +56,77 @@ export interface IssuedSession {
   readonly session: Session;
 }
 
-export function createOperatorSession(
+export async function createOperatorSession(
   db: OpsDb,
   name: string,
   password: string,
-): IssuedSession | null {
+  pwHash: PasswordHasher = defaultPwHash,
+): Promise<IssuedSession | null> {
+  reserveLoginAttempt(db);
   const operator = db.db
     .prepare('SELECT id, password_hash, key_env FROM operators WHERE name = ?')
     .get(name) as
     {id: number; password_hash: string; key_env: KeyEnv} | undefined;
-  if (!operator || !verifyPassword(password, operator.password_hash)) {
+  if (!operator || !(await pwHash.verify(password, operator.password_hash))) {
     return null;
   }
-  return issueSession(db, operator.id, 'operator', operator.key_env);
+  // Password verification yields to other requests. Credential recovery must
+  // invalidate a login already in flight, as well as previously issued tokens.
+  return db.db.transaction(() => {
+    const current = db.db
+      .prepare('SELECT password_hash, key_env FROM operators WHERE id = ?')
+      .get(operator.id) as {password_hash: string; key_env: KeyEnv} | undefined;
+    if (
+      !current ||
+      current.password_hash !== operator.password_hash ||
+      current.key_env !== operator.key_env
+    ) {
+      return null;
+    }
+    return issueSession(db, operator.id, 'operator', current.key_env);
+  });
 }
 
-/**
- * The holder-session stub (OPS-GOVERNANCE Q5): any well-formed proof gets a
- * scope-holder token, so the contract exists before the IdP does. The proof
- * format is what Phase 5b's IdP will validate; the stub checks shape only.
- */
+/** Consumer identity and card authorization are not implemented (D30). */
 export function createHolderSession(
-  db: OpsDb,
-  proof: unknown,
+  _db: OpsDb,
+  _proof: unknown,
 ): IssuedSession | null {
-  if (
-    typeof proof !== 'object' ||
-    proof === null ||
-    typeof (proof as {env?: unknown}).env !== 'string'
-  ) {
-    return null;
+  return null;
+}
+
+/** A service-wide work budget, durable across process or object restarts. */
+export const LOGIN_MAX_ATTEMPTS = 10;
+export const LOGIN_WINDOW_SECONDS = 60;
+
+export class LoginRateLimitError extends Error {
+  constructor() {
+    super('operator sign-in attempt budget exhausted; retry after the window');
   }
-  const env = (proof as {env: string}).env;
-  if (env !== 'factory' && env !== 'issued') {
-    return null;
-  }
-  return issueSession(db, PRINCIPAL_HOLDER, 'holder', env);
+}
+
+function reserveLoginAttempt(db: OpsDb): void {
+  // Reserve before the asynchronous verifier: concurrent requests cannot all
+  // observe an unused slot. One row bounds storage even for rotating names.
+  db.db.transaction(() => {
+    const now = db.now();
+    const row = db.db
+      .prepare(
+        'SELECT window_start, attempts FROM login_attempt_budget WHERE id = 1',
+      )
+      .get() as {window_start: number; attempts: number} | undefined;
+    const reset = !row || now - row.window_start >= LOGIN_WINDOW_SECONDS;
+    if (!reset && row.attempts >= LOGIN_MAX_ATTEMPTS) {
+      throw new LoginRateLimitError();
+    }
+    db.db
+      .prepare(
+        `INSERT INTO login_attempt_budget (id, window_start, attempts)
+      VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET
+      window_start = excluded.window_start, attempts = excluded.attempts`,
+      )
+      .run(reset ? now : row.window_start, reset ? 1 : row.attempts + 1);
+  });
 }
 
 function issueSession(
@@ -155,7 +177,7 @@ export function resolveSession(
         revoked_at: number | null;
       }
     | undefined;
-  if (!row) {
+  if (!row || row.kind !== 'operator') {
     return null;
   }
   // better-sqlite3 returns NULL columns as null; the column is revoked_at

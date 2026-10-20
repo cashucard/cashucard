@@ -22,7 +22,7 @@ async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
     .prepare(
       "INSERT INTO operators (name, password_hash, key_env, created) VALUES ('bench-lead', ?, 'issued', 1)",
     )
-    .run(hashPassword('x'));
+    .run(await hashPassword('x'));
   const deps: RouterDeps = {
     db,
     anchor: new AnchorFeed(async () => {
@@ -156,79 +156,6 @@ test('every phone-cacheable route carries no key material; only /keys/issue does
       assert.equal(typeof v, 'string', `keys/issue carries ${f}`);
       assert.match(v as string, /^[0-9a-f]{32}$/, `${f} is 16 bytes hex`);
     }
-  });
-});
-
-test('holder sign-in and holder issue responses follow the same rule', async () => {
-  await withServer(async base => {
-    const holder = await call(base, 'POST', '/auth/holder/session', undefined, {
-      proof: {env: 'issued'},
-    });
-    assert.equal(holder.status, 200);
-    assertNoKeyMaterial(holder.json, 'holder sign-in');
-    const token = holder.json.token as string;
-
-    // the holder signs in against a batch that exists (created by an operator)
-    const op = await call(base, 'POST', '/auth/operator/session', undefined, {
-      name: 'bench-lead',
-      password: 'x',
-    });
-    const opToken = op.json.token as string;
-    const batch = await call(base, 'POST', '/registry/batches', opToken, {
-      count: 1,
-      mint_url: 'https://forge.flashapp.me',
-      pin_policy: 'perCard',
-      daily_usd: 25,
-      no_pin_usd: 5,
-      load_sha256: 'fe7d8ac3',
-    });
-    const batchId = (batch.json.batch as Record<string, unknown>).id as number;
-
-    const issue = await call(base, 'POST', '/keys/issue', token, {
-      batch_id: batchId,
-      ordinal: 0,
-    });
-    assert.equal(issue.status, 200);
-    for (const f of KEY_FIELDS) {
-      assert.match(issue.json[f] as string, /^[0-9a-f]{32}$/);
-    }
-    // one-shot: a different holder token gets already-issued (no keys)
-    const holder2 = await call(
-      base,
-      'POST',
-      '/auth/holder/session',
-      undefined,
-      {
-        proof: {env: 'issued'},
-      },
-    );
-    const second = await call(
-      base,
-      'POST',
-      '/keys/issue',
-      holder2.json.token as string,
-      {
-        batch_id: batchId,
-        ordinal: 0,
-      },
-    );
-    assert.equal(second.status, 404);
-    assert.equal(second.json.reason, 'already-issued');
-    assertNoKeyMaterial(second.json, 'already-issued answer');
-
-    // holder cannot read batches or write cap releases
-    const batchRead = await call(
-      base,
-      'GET',
-      `/registry/cards?batch_id=${batchId}`,
-      token,
-    );
-    assert.equal(batchRead.status, 403);
-    const cap = await call(base, 'POST', '/registry/cap-releases', token, {
-      version: '2.1.0',
-      sha256: 'a'.repeat(64),
-    });
-    assert.equal(cap.status, 403);
   });
 });
 

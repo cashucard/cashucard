@@ -23,7 +23,14 @@ export {
   revokeSessionsForPrincipal,
   listSessionsForPrincipal,
   SESSION_TTL_SECONDS,
+  defaultPwHash,
 } from './auth';
+export {NodePwHash, SubtlePwHash} from './pwhash';
+export type {PasswordHasher, PwHashBackend} from './pwhash';
+export {openSqliteFile} from './sqlite-file';
+export {openSqlStorage, splitStatements} from './sql-do';
+export type {SqlStorageLike} from './sql-do';
+export type {SqlHandle, SqlStatement, SqlRunResult} from './sql';
 export {
   AnchorFeed,
   HEADER_LEN,

@@ -1,0 +1,213 @@
+/**
+ * The nightly escrow export (the Workers amendment's extract-and-leave
+ * story): readEscrow returns every row hex-encoded; exportEscrowSql arms the
+ * payload to the recipient; decryptEscrowExport round-trips it byte for byte
+ * with the age identity. The armor file without the identity is inert —
+ * asserted by attempting a decrypt with the wrong identity.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {createBatch} from '../src/batches';
+import {
+  decryptEscrowExport,
+  exportEscrowSql,
+  readEscrow,
+  type EscrowExport,
+} from '../src/export';
+import {generateIdentity, identityToRecipient} from 'age-encryption';
+import {TEST_MASTER, testDb} from './helpers';
+
+async function seeded(): Promise<ReturnType<typeof testDb>> {
+  const db = testDb();
+  db.db
+    .prepare(
+      "INSERT INTO operators (name, password_hash, key_env, created) VALUES ('op', 'x', 'issued', 1)",
+    )
+    .run();
+  createBatch(db, {
+    count: 4,
+    mintUrl: 'https://forge.flashapp.me',
+    pinPolicy: 'perCard',
+    dailyUsd: 25,
+    noPinUsd: 5,
+    loadSha256: 'fe7d8ac3',
+    operatorId: 1,
+  });
+  return db;
+}
+
+test('readEscrow returns every issued row, hex, in batch-ordinal order', async () => {
+  const db = await seeded();
+  const rows = readEscrow(db.db);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(
+    rows.map(r => `${r.batch_id}:${r.ordinal}`),
+    ['1:0', '1:1', '1:2', '1:3'],
+  );
+  for (const r of rows) {
+    assert.match(r.enc, /^[0-9a-f]{32}$/);
+    assert.match(r.mac, /^[0-9a-f]{32}$/);
+    assert.match(r.dek, /^[0-9a-f]{32}$/);
+  }
+  db.close();
+});
+
+test('the escrow export round-trips: decrypt(identity) returns the same rows', async () => {
+  const db = await seeded();
+  const identity = await generateIdentity();
+  const recipient = await identityToRecipient(identity);
+  const {armored} = await exportEscrowSql(db.db, recipient, 1_700_000_000);
+  assert.match(armored, /^-----BEGIN AGE ENCRYPTED FILE-----/);
+
+  const out = await decryptEscrowExport(armored, identity);
+  assert.equal(out.exported_at, 1_700_000_000);
+  const expected = readEscrow(db.db);
+  assert.deepEqual(out.keys, expected);
+  db.close();
+});
+
+test('the armored export is inert without the identity: a wrong one cannot read it', async () => {
+  const db = await seeded();
+  const recipient = await identityToRecipient(await generateIdentity());
+  const wrongIdentity = await generateIdentity();
+  const {armored} = await exportEscrowSql(db.db, recipient, 1_700_000_000);
+  await assert.rejects(() => decryptEscrowExport(armored, wrongIdentity));
+  db.close();
+});
+
+test('the exported rows re-derive the escrow: the master+salt rebuilds the same keys', async () => {
+  // The export's whole point: with the file AND the master (a secret the
+  // escrow deliberately is not), every card's set is rebuildable offline.
+  const db = await seeded();
+  const identity = await generateIdentity();
+  const {armored} = await exportEscrowSql(
+    db.db,
+    await identityToRecipient(identity),
+  );
+  const out: EscrowExport = await decryptEscrowExport(armored, identity);
+
+  const {deriveKeySet} = await import('../src/keys');
+  const batch = db.db
+    .prepare('SELECT ordinal_salt FROM key_batches WHERE id = 1')
+    .get() as {ordinal_salt: Buffer};
+  const ks = deriveKeySet(TEST_MASTER, batch.ordinal_salt, 2);
+  const row = out.keys.find(r => r.ordinal === 2)!;
+  assert.equal(row.enc, ks.enc.toString('hex'));
+  assert.equal(row.mac, ks.mac.toString('hex'));
+  assert.equal(row.dek, ks.dek.toString('hex'));
+  db.close();
+});
+
+test('recovery export restores card lookup without the derivation master or credentials', async () => {
+  const source = await seeded();
+  source.db
+    .prepare(
+      "UPDATE key_batches SET pin_policy = 'batch', pin_batch = '123456'",
+    )
+    .run();
+  source.db
+    .prepare(
+      "INSERT INTO cards VALUES ('abc123', 1, 1, 2, 1700000000, 'op', 'fe7d8ac3')",
+    )
+    .run();
+  source.db
+    .prepare("INSERT INTO cap_releases VALUES ('2.1', ?, 1)")
+    .run('ab'.repeat(32));
+  const identity = await generateIdentity();
+  const {armored} = await exportEscrowSql(
+    source.db,
+    await identityToRecipient(identity),
+  );
+  const payload = await decryptEscrowExport(armored, identity);
+  assert.equal((payload as unknown as {version: number}).version, 1);
+  assert.ok(!JSON.stringify(payload).includes('123456'));
+  assert.ok(!JSON.stringify(payload).includes('password_hash'));
+  const {restoreEscrowExport} = await import('../src/export');
+  const {OpsDb} = await import('../src/db');
+  const {openSqliteFile} = await import('../src/sqlite-file');
+  const restored = new OpsDb({sql: openSqliteFile(':memory:')});
+  restoreEscrowExport(restored.db, payload);
+  const row = restored.db
+    .prepare(
+      `SELECT k.enc, k.mac, k.dek FROM cards c JOIN issued_keys k ON c.batch_id = k.batch_id AND c.ordinal = k.ordinal WHERE c.short_id = ?`,
+    )
+    .get('abc123');
+  assert.deepEqual(
+    row,
+    source.db
+      .prepare(
+        'SELECT enc, mac, dek FROM issued_keys WHERE batch_id = 1 AND ordinal = 2',
+      )
+      .get(),
+  );
+  assert.deepEqual(
+    restored.db.prepare('SELECT * FROM cap_releases').all(),
+    source.db.prepare('SELECT * FROM cap_releases').all(),
+  );
+  assert.equal(
+    (
+      restored.db.prepare('SELECT pin_batch FROM key_batches').get() as {
+        pin_batch: null;
+      }
+    ).pin_batch,
+    null,
+  );
+  assert.throws(() => restoreEscrowExport(restored.db, payload), /empty/);
+});
+
+test('recovery rejects invalid relationships and rolls back a failed insertion', async () => {
+  const source = await seeded();
+  const identity = await generateIdentity();
+  const {armored} = await exportEscrowSql(
+    source.db,
+    await identityToRecipient(identity),
+  );
+  const payload = await decryptEscrowExport(armored, identity);
+  const {restoreEscrowExport} = await import('../src/export');
+  const {OpsDb} = await import('../src/db');
+  const {openSqliteFile} = await import('../src/sqlite-file');
+  const target = new OpsDb({sql: openSqliteFile(':memory:')});
+  for (const invalid of [
+    {...payload, version: 2},
+    {...payload, keys: payload.keys.slice(1)},
+    {...payload, keys: [...payload.keys, payload.keys[0]]},
+    {...payload, batches: payload.batches.map(b => ({...b, operator_id: 99}))},
+    {
+      ...payload,
+      operators: payload.operators.map(o => ({
+        ...o,
+        password_hash: 'excluded',
+      })),
+    },
+  ])
+    assert.throws(
+      () => restoreEscrowExport(target.db, invalid),
+      /invalid recovery/,
+    );
+  const failing = {
+    ...target.db,
+    prepare(sql: string) {
+      if (sql === 'INSERT INTO issued_keys VALUES (?, ?, ?, ?, ?, ?)')
+        throw new Error('forced insertion failure');
+      return target.db.prepare(sql);
+    },
+    exec: target.db.exec.bind(target.db),
+    transaction: target.db.transaction.bind(target.db),
+  };
+  assert.throws(
+    () => restoreEscrowExport(failing, payload),
+    /forced insertion/,
+  );
+  assert.deepEqual(target.db.prepare('SELECT * FROM operators').all(), []);
+  assert.deepEqual(target.db.prepare('SELECT * FROM key_batches').all(), []);
+  restoreEscrowExport(target.db, payload);
+  assert.equal(
+    (
+      target.db.prepare('SELECT COUNT(*) AS n FROM issued_keys').get() as {
+        n: number;
+      }
+    ).n,
+    4,
+  );
+});

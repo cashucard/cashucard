@@ -14,10 +14,15 @@ that are a partner's to share in, not the service's to make alone.
 
 ## Q1. Hosting and who can see the escrow
 
-**Proposed: lnflash alone, one shared root.** The service runs on a lnflash-
-operated droplet (dedicated — never co-located with the forge mint; the escrow
-DB is fleet-wide card-manager keys and keeps its own perimeter, separate
-backups, separate alerting). Foxy's card-manager keys live in the same escrow
+**Proposed: lnflash alone, one shared root.** The deployment target is a
+lnflash-operated Cloudflare Worker and one SQLite-backed Durable Object
+([D30](DECISIONS.md#d30)), isolated from the forge mint with its own backups
+and alerting. This replaces the dedicated-droplet proposal and remains pending
+Foxy sign-off. Cloudflare account administrators and a compromised service
+runtime are within the escrow's trust boundary; independent encrypted exports
+and a tested restore are deployment gates in
+[`OPS-WORKERS-PLAN.md`](OPS-WORKERS-PLAN.md).
+Foxy's card-manager keys live in the same escrow
 as Flash's, under the same master.
 
 What this asks Foxy to accept: lnflash's operators can, technically, read the
@@ -86,12 +91,12 @@ Flash's does, and nothing wider. The IdP behind the holder session is Q5.
 
 ## Q5. The holder session's identity provider
 
-**Proposed: deferred — the stub now, the real IdP with Phase 5b.** `/v1/auth/
-holder/session` accepts a proof shaped for whichever IdP the sign-off picks
-(Flash account, Foxy's own, or both); v1 ships the stub that issues a
-scope-`holder` token to any well-formed proof, because no consumer app calls
-it until 5b. This is the one question this document can safely leave open,
-and it says so rather than picking an IdP the partner has not discussed.
+**Proposed: deferred — holder access disabled until Phase 5b.** The IdP may
+be Flash account, Foxy's own, or both, subject to sign-off. The shape-only
+holder proof stub is development-only: deployed holder-session creation and
+holder key issuance stay disabled until verified identity and per-card
+authorization exist. The operator release does not depend on choosing the
+consumer IdP; Phase 5b does.
 
 ## Sign-off status
 

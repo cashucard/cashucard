@@ -1,0 +1,36 @@
+# The ops service on Workers (the ENG-740 hosting amendment, 2026-10-20):
+# one Worker forwarding to one SQLite-backed Durable Object, whose embedded
+# SQLite IS the escrow DB (D29's one DB; PITR is the platform's). OPS_MASTER_KEY
+# is a wrangler secret, set by the operator:
+#
+#   wrangler secret put OPS_MASTER_KEY        # >= 64 hex chars (32 bytes)
+#   wrangler secret put OPS_OPERATOR_SETUP    # JSON command; remove after setup
+#
+# OPS_OPERATOR_SETUP creates the first operator in the actual DO, or performs
+# explicit credential recovery. See ops/README.md; a local SQLite CLI cannot
+# populate a deployed DO.
+name = "cashu-card-ops"
+main = "src/worker.ts"
+compatibility_date = "2026-10-13"
+# node:crypto (token bytes, sha256), Buffer: available through the flag; the
+# shared modules import node:crypto and node:http types only.
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [{ name = "OPS_DO", class_name = "OpsStore" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OpsStore"]
+
+# The nightly escrow export (OPS-GOVERNANCE Q2): set OPS_BACKUPS (an R2
+# bucket binding) and OPS_BACKUP_RECIPIENT (an age recipient, age1...) to arm
+# it. Missing configuration fails the cron and reports unhealthy backup status.
+#
+#   wrangler r2 bucket create cashu-card-ops-backups
+#   [[r2_buckets]]
+#   binding = "OPS_BACKUPS"
+#   bucket_name = "cashu-card-ops-backups"
+#
+[triggers]
+crons = ["17 3 * * *"]

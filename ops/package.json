@@ -7,12 +7,16 @@
   "main": "src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "test": "node --import tsx --test 'test/*.test.ts'",
     "format:check": "prettier --check .",
-    "bootstrap-operator": "node --import tsx src/bootstrap.ts"
+    "bootstrap-operator": "node --import tsx src/bootstrap.ts",
+    "typecheck:workers": "tsc -p tsconfig.workers.json --noEmit",
+    "test:workers": "vitest run --config vitest.workers.config.mts",
+    "test:node": "node --import tsx --test 'test/*.test.ts'"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
+    "age-encryption": "0.2.4",
     "better-sqlite3": "12.11.1"
   },
   "devDependencies": {
@@ -20,7 +24,11 @@
     "@types/node": "22.20.5",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
-    "typescript": "5.0.4"
+    "typescript": "5.0.4",
+    "@cloudflare/workers-types": "5.20261014.1",
+    "@cloudflare/vitest-plugin": "1.4.0",
+    "vitest": "4.1.11",
+    "wrangler": "4.149.0"
   },
   "engines": {
     "node": ">=22"
