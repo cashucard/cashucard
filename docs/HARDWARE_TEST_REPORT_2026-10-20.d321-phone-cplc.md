@@ -87,3 +87,26 @@ release gate remains closed.
 No install/reinstall or rotation occurred; no post-install identity stability,
 termination persistence, interrupted-install recovery, distinct-card sample,
 fleet uniqueness or personalization was tested. Installation remains disabled.
+
+## UI-only follow-up, approximately 23:39–23:40 UTC
+
+Source `2d00ca9e81049231df939d0569b7e9668d69e7b6` fixes the observations above:
+measured native safe areas, a normally laid out wrapping title, theme-aware
+status-bar icons, a physical read-only banner and scrollable diagnostic content.
+`react-native-safe-area-context` 5.10.1 compiled in Android Debug and iOS Release
+against this app's React Native 0.77.1; the new native module requires rebuilding.
+
+Both approved phones were rebuilt, installed over the existing app and launched,
+without clearing data. Pixel now uses isolated Metro port 8084; the earlier
+8083 server was left untouched. The Pixel identity screen was reached through
+the demo door without pressing Read. ADB bounds showed Back ending at x=247 and
+the title beginning at x=358; the physical banner sits below the system status
+bar. The screenshot shows readable status icons and no header collision.
+
+![Pixel identity screen after layout fix, no read started](hardware/2026-10-20/pixel-identity-layout-fixed.png)
+
+Max's updated Release app was installed/launched; its revised layout was not
+independently captured or visually confirmed in this follow-up. No additional
+CPLC reads, authentication, service login, installation, rotation or recovery
+drill ran. The six identity observations and their original build hashes above
+remain evidence for source `1b54cf9`, not a claim of six retests on this revision.
