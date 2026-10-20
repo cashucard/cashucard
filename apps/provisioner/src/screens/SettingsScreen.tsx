@@ -123,9 +123,13 @@ const local = (t: Theme) =>
 export function SettingsScreen({
   onBack,
   onBench,
+  onIdentity,
+  hardwareBusy = false,
 }: {
   onBack: () => void;
   onBench: () => void;
+  onIdentity?: () => void;
+  hardwareBusy?: boolean;
 }) {
   const app = useApp();
   const t = useTheme();
@@ -210,6 +214,24 @@ export function SettingsScreen({
         <View style={s.section}>
           <Text style={s.header}>{SETTINGS.bench}</Text>
           <View style={s.card}>
+            {onIdentity ? (
+              <>
+                <Pressable
+                  testID="identity-entry"
+                  onPress={onIdentity}
+                  disabled={hardwareBusy}
+                  style={s.row}>
+                  <View style={s.rowLabelCol}>
+                    <Text style={s.rowLabel}>Read physical card identity</Text>
+                    <Text style={s.rowSub}>
+                      Read-only CPLC check. No installation or authentication.
+                    </Text>
+                  </View>
+                  <Text style={s.chevron}>›</Text>
+                </Pressable>
+                <View style={s.divider} />
+              </>
+            ) : null}
             <Pressable testID="bench-entry" onPress={onBench} style={s.row}>
               <View style={s.rowLabelCol}>
                 <Text style={s.rowLabel}>{SETTINGS.bench}</Text>

@@ -35,8 +35,10 @@ checklist, a screenshot, transcript, shell history or shared test artifact.
    a working Metro bundle does not prove that the module is installed.
 2. Provide a read-only phone identity probe that invokes `readChipIdentity`
    through the native NFC adapter, with no service reservation, key fetch,
-   authentication or mutation. The library exists; a standalone settings probe
-   is not implemented yet. Do not use a programming attempt as a read-only probe.
+   authentication or mutation. Settings → Read physical card identity now provides this probe
+   ([D37](DECISIONS.md#d37)). It is available through the demo door without a
+   service session and clearly labels its physical-card action. Opening it does
+   not arm NFC; tap READ PHYSICAL CARD IDENTITY for each deliberate read. Do not use a programming attempt as a read-only probe.
 3. Provide development-only pause controls at durable install intent, verified
    installation, rotation intent, verified rotation and frozen-record boundaries
    before attempting targeted termination drills. These controls are not

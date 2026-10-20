@@ -94,10 +94,32 @@ export function nfcErrorName(error: unknown): NfcErrorName | undefined {
   return undefined;
 }
 
-let inFlight = false;
+interface ActiveSession {
+  owner: object;
+  cancelled: boolean;
+}
+let inFlight: ActiveSession | null = null;
+
+/** Cancellation belongs to this caller, never a different screen's session. */
+export function createCardSession() {
+  const owner = {};
+  return {
+    run<T>(message: string, run: (tx: Transceiver) => Promise<T>) {
+      return runCardSession(owner, message, run, Date.now);
+    },
+    async cancel(): Promise<void> {
+      if (inFlight?.owner === owner) {
+        await cancelCard();
+      }
+    },
+  };
+}
 
 /** Ends any session; never throws (cancelling nothing rejects, and that is fine). */
 export async function cancelCard(): Promise<void> {
+  if (inFlight) {
+    inFlight.cancelled = true;
+  }
   try {
     await NfcManager.cancelTechnologyRequest();
   } catch {
@@ -126,10 +148,25 @@ export async function withCard<T>(
   run: (tx: Transceiver) => Promise<T>,
   now: () => number = Date.now,
 ): Promise<{value: T; stamps: Stamps; meta: SessionMeta}> {
+  return runCardSession({}, alertMessage, run, now);
+}
+
+async function runCardSession<T>(
+  owner: object,
+  alertMessage: string,
+  run: (tx: Transceiver) => Promise<T>,
+  now: () => number,
+): Promise<{value: T; stamps: Stamps; meta: SessionMeta}> {
   if (inFlight) {
     throw new Error('a run is already going');
   }
-  inFlight = true;
+  const active = {owner, cancelled: false};
+  inFlight = active;
+  const checkCancelled = () => {
+    if (active.cancelled) {
+      throw new Error('Card session cancelled');
+    }
+  };
   const stamps: Stamps = {arm: now()};
   const meta: SessionMeta = {
     platform: Platform.OS,
@@ -137,7 +174,9 @@ export async function withCard<T>(
   };
   try {
     await NfcManager.start();
+    checkCancelled();
     await NfcManager.requestTechnology(NfcTech.IsoDep, {alertMessage});
+    checkCancelled();
     stamps.connect = now();
     if (Platform.OS === 'android') {
       try {
@@ -157,6 +196,7 @@ export async function withCard<T>(
     // message, only its class, so it is rethrown under the library's name for
     // it; any other error (Android's carry their messages) is rethrown as is.
     const tx: Transceiver = async apdu => {
+      checkCancelled();
       try {
         return Array.from(await NfcManager.isoDepHandler.transceive(apdu));
       } catch (e) {
@@ -164,11 +204,12 @@ export async function withCard<T>(
         throw name ? new Error(name) : e;
       }
     };
+    checkCancelled();
     const value = await run(tx);
     stamps.done = now();
     return {value, stamps, meta};
   } finally {
     await cancelCard();
-    inFlight = false;
+    inFlight = null;
   }
 }

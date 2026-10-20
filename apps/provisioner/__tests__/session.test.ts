@@ -18,7 +18,7 @@ import {CASHU_PLAN, provision} from '../src/cardkit';
 import {describeSessionError} from '../src/copy';
 import {randomBytes} from '../src/random';
 import {formatReadout, makeReadout} from '../src/readout';
-import {nfcErrorName, withCard} from '../src/session';
+import {createCardSession, nfcErrorName, withCard} from '../src/session';
 import {FakeCard} from '../../../tools/cardkit/gp/test/fake-card';
 
 const nfc = jest.mocked(NfcManager);
@@ -186,3 +186,46 @@ test.each([
     expect(text).not.toContain('the card did not answer');
   },
 );
+
+test('a scoped session cancelled during native startup never requests a tag', async () => {
+  nfc.requestTechnology.mockResolvedValue(NfcTech.IsoDep);
+  let release!: () => void;
+  nfc.start.mockImplementationOnce(
+    () =>
+      new Promise<void>(resolve => {
+        release = resolve;
+      }),
+  );
+  const session = createCardSession();
+  const run = jest.fn();
+  const pending = session.run('read identity', run);
+  await session.cancel();
+  release();
+  await expect(pending).rejects.toThrow('Card session cancelled');
+  expect(nfc.requestTechnology).not.toHaveBeenCalled();
+  expect(run).not.toHaveBeenCalled();
+});
+
+test('cancelling an unrelated scoped session cannot close the active session', async () => {
+  const active = createCardSession();
+  const unrelated = createCardSession();
+  nfc.requestTechnology.mockResolvedValue(NfcTech.IsoDep);
+  const {value} = await active.run('read identity', async tx => {
+    await unrelated.cancel();
+    expect(nfc.cancelTechnologyRequest).not.toHaveBeenCalled();
+    return tx([0x00]);
+  });
+  expect(value).toEqual([0x90, 0x00]);
+});
+
+test('scoped cancellation blocks later commands even if native cancellation is delayed', async () => {
+  const session = createCardSession();
+  nfc.requestTechnology.mockResolvedValue(NfcTech.IsoDep);
+  nfc.cancelTechnologyRequest.mockImplementation(async () => undefined);
+  await session.run('read identity', async tx => {
+    await tx([0x00]);
+    await session.cancel();
+    await expect(tx([0x01])).rejects.toThrow('Card session cancelled');
+  });
+  expect(nfc.isoDepHandler.transceive).toHaveBeenCalledTimes(1);
+});

@@ -22,11 +22,13 @@ import {SignInScreen} from './src/screens/SignInScreen';
 import {AppStore, useApp} from './src/store';
 import {
   ProvisioningProvider,
+  useProvisioning,
   type ProvisioningProviderOptions,
 } from './src/ProvisioningStore';
+import {CardIdentityScreen} from './src/screens/CardIdentityScreen';
 import {ProvisioningScreen} from './src/screens/ProvisioningScreen';
 
-type Route = 'setup' | 'loop' | 'summary' | 'settings' | 'bench';
+type Route = 'setup' | 'loop' | 'summary' | 'settings' | 'bench' | 'identity';
 
 const benchStyles = {
   benchWrap: {flex: 1} as const,
@@ -35,6 +37,7 @@ const benchStyles = {
 
 function Navigator(): React.JSX.Element {
   const app = useApp();
+  const recovery = useProvisioning();
   const [route, setRoute] = useState<Route>('setup');
 
   if (!app.signedIn && !app.demo) {
@@ -45,7 +48,7 @@ function Navigator(): React.JSX.Element {
     return <SignInScreen />;
   }
 
-  if (!app.demo && route !== 'settings' && route !== 'bench') {
+  if (!app.demo && !['settings', 'bench', 'identity'].includes(route)) {
     return <ProvisioningScreen onSettings={() => setRoute('settings')} />;
   }
 
@@ -55,6 +58,19 @@ function Navigator(): React.JSX.Element {
         <SettingsScreen
           onBack={() => setRoute('setup')}
           onBench={() => setRoute('bench')}
+          onIdentity={() => {
+            if (!recovery.busy) {
+              setRoute('identity');
+            }
+          }}
+          hardwareBusy={recovery.busy}
+        />
+      );
+    case 'identity':
+      return (
+        <CardIdentityScreen
+          onBack={() => setRoute('settings')}
+          disabled={recovery.busy}
         />
       );
     case 'bench':
