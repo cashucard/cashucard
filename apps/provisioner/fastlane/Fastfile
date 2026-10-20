@@ -1,0 +1,49 @@
+default_platform :ios
+
+platform :ios do
+  desc "Build and upload to TestFlight (internal)"
+  lane :beta do
+    # Ensure certs/profiles
+    match(type: "appstore", readonly: false)
+    
+    # Bump build number
+    increment_build_number(xcodeproj: "CashuProvisioner.xcodeproj")
+    
+    # Build and archive
+    gym(
+      workspace: "CashuProvisioner.xcworkspace",
+      scheme: "CashuProvisioner",
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      export_options: {
+        method: "app-store-connect",
+        team_id: "H7UAM79QQP",
+        upload_bitcode: false,
+        upload_symbols: true,
+        compile_bitcode: false
+      }
+    )
+    
+    # Upload to TestFlight
+    pilot(
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+      groups: ["Internal Testers"],
+      changelog: "v#{lane_context[SharedValues::VERSION_NUMBER]} (#{lane_context[SharedValues::BUILD_NUMBER]}) — internal release"
+    )
+  end
+
+  desc "Build for internal testing only (no upload)"
+  lane :build_only do
+    match(type: "appstore", readonly: true)
+    increment_build_number(xcodeproj: "CashuProvisioner.xcodeproj")
+    gym(
+      workspace: "CashuProvisioner.xcworkspace",
+      scheme: "CashuProvisioner",
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store"
+    )
+  end
+end

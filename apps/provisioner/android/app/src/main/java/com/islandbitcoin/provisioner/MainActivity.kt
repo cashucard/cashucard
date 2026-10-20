@@ -1,4 +1,4 @@
-package com.flash.provisioner
+package com.islandbitcoin.provisioner
 
 import android.os.Bundle
 import android.view.WindowManager
