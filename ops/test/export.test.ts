@@ -409,3 +409,89 @@ test('v2 preserves provisioning retry identities, blocked chips and receipts; v1
   target.close();
   source.close();
 });
+
+test('a backward wall-clock correction does not prevent exporting and restoring a completed attempt', async () => {
+  const source = await seeded();
+  const {OpsDb} = await import('../src/db');
+  const {openSqliteFile} = await import('../src/sqlite-file');
+  const {restoreEscrowExport} = await import('../src/export');
+  const {
+    createProvisioningBatch,
+    reserveAttempt,
+    bindAttempt,
+    recordAttempt,
+    getAttempt,
+  } = await import('../src/provisioning');
+  let clock = 1_700_000_000;
+  const db = new OpsDb({
+    sql: source.db,
+    now: () => clock,
+    master: {getMaster: () => TEST_MASTER},
+  });
+  const scope = {
+    operator_id: 1,
+    device_id: '11111111-1111-4111-8111-111111111111',
+    key_env: 'issued' as const,
+  };
+  const batch = createProvisioningBatch(db, scope, {
+    batch_request_id: '22222222-2222-4222-8222-222222222222',
+    count: 1,
+    mint_url: 'https://mint.test',
+    pin_policy: 'perCard',
+    daily_usd: 25,
+    no_pin_usd: 5,
+    load_sha256: 'ab'.repeat(32),
+  });
+  const attempt = reserveAttempt(db, scope, {
+    attempt_id: '33333333-3333-4333-8333-333333333333',
+    batch_id: batch.batch_id,
+    ordinal: 0,
+  });
+  const chip = 'cplc-v1:4790d3213180072976207515';
+  const binding = bindAttempt(db, scope, attempt.attempt_id, {
+    revision: 0,
+    chip_id: chip,
+  });
+  clock -= 1;
+  const installation =
+    '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+  const receipt = recordAttempt(db, scope, attempt.attempt_id, {
+    revision: binding.revision,
+    record: {
+      attempt_id: attempt.attempt_id,
+      batch_id: batch.batch_id,
+      ordinal: 0,
+      chip_id: chip,
+      installation_id: installation,
+      display_id: installation.slice(-4),
+      load_sha256: batch.config.load_sha256,
+      gp_key_version: 1,
+      operator_id: scope.operator_id,
+      device_id: scope.device_id,
+      key_env: scope.key_env,
+      configuration_revision: 1,
+      verified_stage: 'rotated',
+      verified_at: clock,
+    },
+  });
+  assert.ok(receipt.recorded_at < attempt.created);
+  const identity = await generateIdentity();
+  const {armored} = await exportEscrowSql(
+    db.db,
+    await identityToRecipient(identity),
+    clock,
+  );
+  const payload = await decryptEscrowExport(armored, identity);
+  const target = new OpsDb({sql: openSqliteFile(':memory:')});
+  try {
+    restoreEscrowExport(target.db, payload);
+    assert.deepEqual(
+      getAttempt(target, scope, attempt.attempt_id).completion_receipt,
+      receipt,
+    );
+    assert.deepEqual(readEscrow(target.db), readEscrow(db.db));
+  } finally {
+    target.close();
+    source.close();
+  }
+});

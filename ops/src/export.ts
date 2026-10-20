@@ -488,8 +488,7 @@ export function validateEscrowExport(
       !attempt ||
       !batch ||
       attempt.state !== 'recorded' ||
-      row.display_id !== row.installation_id.slice(-4) ||
-      row.recorded_at < attempt.created
+      row.display_id !== row.installation_id.slice(-4)
     )
       fail();
     for (const field of [
@@ -508,6 +507,8 @@ export function validateEscrowExport(
       body.load_sha256 !== batches.get(batch.batch_id)!.load_sha256
     )
       fail();
+    // Wall-clock timestamps can move backward; revisions and identity establish
+    // ordering. Preserve observed times rather than rejecting a valid snapshot.
     const receipt = json(row.receipt_json);
     shape(receipt, {
       attempt_id: uuid,
