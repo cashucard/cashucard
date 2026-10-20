@@ -78,7 +78,7 @@ blank screen. Release never consults a packager.
 
 ## Build and run (the owner, gate H1)
 
-Bundle id and Android `applicationId`: `com.flash.provisioner`.
+Bundle id and Android `applicationId`: `com.islandbitcoin.provisioner`.
 
 ```sh
 yarn install --frozen-lockfile
@@ -181,9 +181,11 @@ then archives the attempt and advances the ordinal. The bound chip remains
 blocked on the service. Neither restart nor another batch clears the quarantine.
 
 The gated real screen uses these functions through native `withCard`.
-Tests use the existing software GP card and injected transports. Native builds,
-termination drills and both-phone CPLC checks remain operator work under an
-approved device plan; this change did not access any hardware.
+Software tests use the existing GP card and injected transports. Under explicit
+operator authorization, native rebuilds and three documented read-only CPLC reads
+on both the Pixel and Max passed on 2026-10-20; see the
+[hardware report](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md).
+Install/rotation, termination and personalization checks remain outstanding.
 
 The next native validation steps are in the
 [proposed owner-run checklist](../../docs/PROVISIONER-DEVICE-VALIDATION.md).

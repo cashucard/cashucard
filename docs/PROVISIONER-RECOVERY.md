@@ -67,9 +67,12 @@ GET DATA once. It rejects non-success status, malformed CPLC, unusable serials
 or a saved-identity mismatch without authentication or retries. The library
 uses its existing SELECT builder, including Le `00`; the separate USB check used
 GlobalPlatformPro's raw SELECT without Le. Parser replay and fake transports
-validate this implementation; the new TypeScript reader has not been run on
-the physical card or either phone. The gated real loop now uses this reader;
-phone evidence remains outstanding.
+validate this implementation. The TypeScript reader now also has
+[read-only phone evidence](HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md):
+three documented reads on the Pixel 8 Pro and Max (iPhone 13 Pro Max) match the
+same card's USB baseline. Identity stability through install/rotation, a distinct
+card sample and termination/recovery behavior remain unverified. The gated real
+loop uses this reader; installation stays disabled.
 
 ## Service reservations and retry identity
 
