@@ -99,8 +99,9 @@ secret store outside this Cloudflare account. Missing configuration fails the
 scheduled invocation instead of silently skipping it.
 
 Each successful export writes a uniquely named `escrow/<timestamp>-<uuid>.age`
-object. Version 1 contains manager keys, batch metadata, card mappings, CAP
-releases and operator identities. It excludes operator passwords, sessions,
+object. Version 2 contains manager keys, batch metadata, card mappings, CAP
+releases, operator identities and provisioning reservations, chip bindings,
+full installation records and retry receipts. It excludes operator passwords, sessions,
 PINs and the derivation master. Exports are encrypted recovery snapshots;
 they are not the signed, partner-filtered deliverable proposed in governance.
 
@@ -133,10 +134,18 @@ node --import tsx src/recover.ts /path/to/escrow-artifact.age
 
 The CLI authenticates and validates the artifact, refuses an occupied service,
 and restores atomically. Newly created files use operator-only permissions.
+Version 1 artifacts remain supported as legacy data without reconstructed
+reservations. Restoring either version sets `recovery_required=1`: provisioning
+mutations and key fetches are paused, with authenticated scoped attempt reads
+available for inspection. This prevents missing post-snapshot requests from
+silently being created again. No HTTP unlock or automatic client recovery is
+provided; reconciliation and fencing stale clients are a release gate before
+reopening. Do not clear the control flag as a substitute for reconciliation.
 The local SQLite database now contains plaintext manager keys; do not upload
 or share it as an encrypted backup. Restored operator credentials are disabled
 and sessions are absent. Use explicit local operator recovery before sign-in.
-Existing key lookup uses escrow rows without the original derivation master.
+Offline escrow inspection uses stored rows without the original derivation master;
+HTTP key retrieval remains paused after restore.
 The Node server and Worker currently require a configured master at startup;
 a fresh replacement master can create future batches without changing old keys.
 
@@ -148,7 +157,8 @@ and a replayed bootstrap correctly refuses a populated operator table.
 
 The release drill restores a downloaded artifact into an empty database,
 recovers operator access, and verifies ENC/MAC/DEK lookup for a registered test
-card through its stored batch and ordinal. It needs no physical card. Preserve
+card through its stored batch and ordinal using the local recovery drill, not
+the paused HTTP endpoint. It needs no physical card. Preserve
 the old service and artifacts until that drill succeeds.
 
 ## Deployment and rollback
@@ -172,3 +182,32 @@ The provisioner app's real loop and durable journal remain ENG-741. The current
 loop runs the demo engine even outside demo mode; deploying this service does
 not make that path a completed real-card workflow. The separate bench path and
 all physical-device work retain AGENTS.md's hardware rules.
+
+## Provisioning reservation API
+
+All provisioning routes require an operator session. Sign-in now returns
+`operator_id`; use that ID for journal scoping. `device_id`, `batch_request_id`
+and `attempt_id` are canonical lowercase UUIDs supplied by a durable client.
+They are operational identifiers, not credentials. See the full
+[identity and recovery contract](../docs/PROVISIONER-RECOVERY.md).
+
+| Method and path                                | Request and result                                                                                                                                                          |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /provisioning/batches`                   | `device_id`, `batch_request_id`, `count`, `mint_url`, `pin_policy`, `daily_usd`, `no_pin_usd`, `load_sha256`; returns `batch` with immutable configuration and next ordinal |
+| `POST /provisioning/attempts`                  | `device_id`, `attempt_id`, `batch_id`, `ordinal`; returns the owned reservation                                                                                             |
+| `GET /provisioning/attempts/:id?device_id=...` | Returns reservation state and any immutable receipts; no keys                                                                                                               |
+| `POST /provisioning/attempts/:id/bind`         | `device_id`, `revision`, `chip_id`; returns binding receipt                                                                                                                 |
+| `POST /keys/issue`                             | `device_id`, `attempt_id`; optional `batch_id`/`ordinal` must match; returns the same per-attempt hex keys while active                                                     |
+| `POST /provisioning/attempts/:id/record`       | `device_id`, `revision`, strict `record`; returns a terminal rotation receipt, never holder readiness                                                                       |
+| `POST /provisioning/attempts/:id/disposition`  | `device_id`, `revision`, `kind` (`quarantined`/`abandoned`), `reason`; consumes the ordinal and frees the device while preserving unresolved chip blocking                  |
+
+Idempotent retries are scoped and checked before revision conflicts. Changed
+request content is 409; missing or inaccessible reservations are 404. Restore
+pause is 409 `recovery-required`. Keys are returned only from the reservation-
+scoped key endpoint, and responses carry `Cache-Control: no-store`.
+
+Legacy batch creation and suffix-only card registration POSTs return 410.
+Legacy GETs are owner-filtered and omit PINs; they do not include the new full-
+installation history. Migrate clients to the new API before real provisioning.
+The app's current sign-in/mint reads remain available, but no real batch loop
+is claimed by this service change.

@@ -91,6 +91,49 @@ export const MIGRATIONS: readonly string[] = [
     attempts INTEGER NOT NULL CHECK (attempts > 0)
   );
   `,
+  // 4. Operator/device reservations and immutable installation history (D31).
+  `
+  CREATE TABLE provisioning_control (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    recovery_required INTEGER NOT NULL DEFAULT 0 CHECK (recovery_required IN (0, 1))
+  );
+  INSERT INTO provisioning_control (id, recovery_required) VALUES (1, 0);
+  CREATE TABLE provisioning_batches (
+    batch_id INTEGER PRIMARY KEY REFERENCES key_batches(id),
+    request_id TEXT NOT NULL UNIQUE,
+    operator_id INTEGER NOT NULL REFERENCES operators(id),
+    device_id TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    key_env TEXT NOT NULL CHECK (key_env IN ('factory', 'issued')),
+    next_ordinal INTEGER NOT NULL DEFAULT 0 CHECK (next_ordinal >= 0),
+    created INTEGER NOT NULL
+  );
+  CREATE TABLE provisioning_attempts (
+    attempt_id TEXT PRIMARY KEY,
+    batch_id INTEGER NOT NULL REFERENCES provisioning_batches(batch_id),
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    operator_id INTEGER NOT NULL REFERENCES operators(id),
+    device_id TEXT NOT NULL,
+    revision INTEGER NOT NULL CHECK (revision >= 0),
+    state TEXT NOT NULL CHECK (state IN ('active', 'recorded', 'quarantined', 'abandoned')),
+    chip_id TEXT,
+    created INTEGER NOT NULL,
+    bind_receipt TEXT,
+    disposition_json TEXT,
+    disposition_receipt TEXT,
+    UNIQUE (batch_id, ordinal)
+  );
+  CREATE UNIQUE INDEX provisioning_active_device ON provisioning_attempts(device_id) WHERE state = 'active';
+  CREATE UNIQUE INDEX provisioning_blocked_chip ON provisioning_attempts(chip_id) WHERE chip_id IS NOT NULL AND state IN ('active', 'quarantined', 'abandoned');
+  CREATE TABLE provisioning_records (
+    attempt_id TEXT PRIMARY KEY REFERENCES provisioning_attempts(attempt_id),
+    installation_id TEXT NOT NULL UNIQUE,
+    display_id TEXT NOT NULL,
+    body_json TEXT NOT NULL,
+    receipt_json TEXT NOT NULL,
+    recorded_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export interface DbOptions {

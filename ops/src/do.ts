@@ -125,7 +125,10 @@ export async function handleOpsRequest(
     const {status, body} = await routeRequest(deps, request);
     return new Response(JSON.stringify(body), {
       status,
-      headers: {'content-type': 'application/json'},
+      headers: {
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      },
     });
   } catch (e) {
     if (e instanceof HttpError) {
@@ -133,13 +136,19 @@ export async function handleOpsRequest(
         JSON.stringify({reason: e.code, message: e.message}),
         {
           status: e.status,
-          headers: {'content-type': 'application/json'},
+          headers: {
+            'content-type': 'application/json',
+            'cache-control': 'no-store',
+          },
         },
       );
     }
     return new Response(JSON.stringify({reason: 'internal'}), {
       status: 500,
-      headers: {'content-type': 'application/json'},
+      headers: {
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      },
     });
   }
 }

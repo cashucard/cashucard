@@ -17,12 +17,14 @@ let counter = 0;
 
 function nextRandom(): (n: number) => Buffer {
   const c = ++counter;
+  let invocation = 0;
   return n => {
     // deterministic but distinct per call
     const buf = Buffer.alloc(n);
     for (let i = 0; i < n; i++) {
-      buf[i] = (c * 7 + i * 13 + 1) & 0xff;
+      buf[i] = (c * 7 + invocation * 17 + i * 13 + 1) & 0xff;
     }
+    invocation++;
     return buf;
   };
 }

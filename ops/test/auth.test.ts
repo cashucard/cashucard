@@ -217,41 +217,10 @@ test('holder tokens cannot revoke or list sessions (the revoke routes are operat
         db.now(),
       );
 
-    // OPS-GOVERNANCE Q4: the operator posts registries; the holder's only
-    // path is one-shot issuance. A stolen holder token must not write
-    // registry rows (it could forge arbitrary ones otherwise).
-    const batch = await call('POST', '/registry/batches', opToken, {
-      count: 2,
-      mint_url: 'https://forge.flashapp.me',
-      pin_policy: 'perCard',
-      daily_usd: 25,
-      no_pin_usd: 5,
-      load_sha256: 'fe7d8ac3',
-    });
-    const batchId = (batch.json.batch as Record<string, unknown>).id as number;
-    const holderPost = await call('POST', '/registry/cards', holderToken, {
-      short_id: 'dead',
-      batch_id: batchId,
-      key_id: 2,
-      ordinal: 0,
-      installed_at: 1,
-      installer: 'thief',
-      load_sha256: 'fe7d8ac3',
-    });
+    // Holder tokens fail authentication even on retired write endpoints.
+    const holderPost = await call('POST', '/registry/cards', holderToken, {});
     assert.equal(holderPost.status, 401);
     assert.equal(holderPost.json.reason, 'no-session');
-    // the operator's own post on the same batch answers 200 (the gate is the
-    // scope, not the route)
-    const opPost = await call('POST', '/registry/cards', opToken, {
-      short_id: 'beef',
-      batch_id: batchId,
-      key_id: 2,
-      ordinal: 0,
-      installed_at: 1,
-      installer: 'op@bench-1',
-      load_sha256: 'fe7d8ac3',
-    });
-    assert.equal(opPost.status, 200);
 
     // revoke + list are operator-only too
     const holderRevoke = await call(

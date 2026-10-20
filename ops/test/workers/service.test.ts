@@ -41,27 +41,42 @@ describe('ops on Workers (the DO)', () => {
     const token = await operatorToken();
     expect(token).not.toBe('');
 
-    const res = await SELF.fetch('http://x/registry/batches', {
+    const deviceId = crypto.randomUUID();
+    const res = await SELF.fetch('http://x/provisioning/batches', {
       method: 'POST',
       headers: {authorization: `Bearer ${token}`},
       body: JSON.stringify({
+        device_id: deviceId,
+        batch_request_id: crypto.randomUUID(),
         count: 3,
         mint_url: 'https://forge.flashapp.me',
         pin_policy: 'perCard',
         daily_usd: 25,
         no_pin_usd: 5,
-        load_sha256: 'fe7d8ac3',
+        load_sha256: 'fe'.repeat(32),
       }),
     });
     expect(res.status).toBe(200);
     const batch = ((await json(res)).batch ?? {}) as Record<string, unknown>;
-    const batchId = batch.id as number;
+    const batchId = batch.batch_id as number;
 
-    // the escrow rows exist, one per ordinal — same write, same transaction
+    const attemptId = crypto.randomUUID();
+    const reservation = await SELF.fetch('http://x/provisioning/attempts', {
+      method: 'POST',
+      headers: {authorization: `Bearer ${token}`},
+      body: JSON.stringify({
+        device_id: deviceId,
+        attempt_id: attemptId,
+        batch_id: batchId,
+        ordinal: 0,
+      }),
+    });
+    expect(reservation.status).toBe(200);
+    // Read the reserved escrow set through the production issuance path.
     const issue = await SELF.fetch('http://x/keys/issue', {
       method: 'POST',
       headers: {authorization: `Bearer ${token}`},
-      body: JSON.stringify({batch_id: batchId, ordinal: 1}),
+      body: JSON.stringify({device_id: deviceId, attempt_id: attemptId}),
     });
     expect(issue.status).toBe(200);
     const keys = await json(issue);
@@ -73,31 +88,45 @@ describe('ops on Workers (the DO)', () => {
   it('a lost response re-issues byte-identical keys through the DO', async () => {
     await ensureOperator();
     const token = await operatorToken();
-    const batchRes = await SELF.fetch('http://x/registry/batches', {
+    const deviceId = crypto.randomUUID();
+    const batchRes = await SELF.fetch('http://x/provisioning/batches', {
       method: 'POST',
       headers: {authorization: `Bearer ${token}`},
       body: JSON.stringify({
+        device_id: deviceId,
+        batch_request_id: crypto.randomUUID(),
         count: 2,
         mint_url: 'https://forge.flashapp.me',
         pin_policy: 'perCard',
         daily_usd: 25,
         no_pin_usd: 5,
-        load_sha256: 'fe7d8ac3',
+        load_sha256: 'fe'.repeat(32),
       }),
     });
     const batchId = (
       ((await json(batchRes)).batch ?? {}) as Record<string, unknown>
-    ).id as number;
+    ).batch_id as number;
 
-    const ask = (ord: number) =>
+    const attemptId = crypto.randomUUID();
+    const reservation = await SELF.fetch('http://x/provisioning/attempts', {
+      method: 'POST',
+      headers: {authorization: `Bearer ${token}`},
+      body: JSON.stringify({
+        device_id: deviceId,
+        attempt_id: attemptId,
+        batch_id: batchId,
+        ordinal: 0,
+      }),
+    });
+    expect(reservation.status).toBe(200);
+    const ask = () =>
       SELF.fetch('http://x/keys/issue', {
         method: 'POST',
         headers: {authorization: `Bearer ${token}`},
-        body: JSON.stringify({batch_id: batchId, ordinal: ord}),
+        body: JSON.stringify({device_id: deviceId, attempt_id: attemptId}),
       }).then(json);
-
-    const a = (await ask(0)) as Record<string, string>;
-    const b = (await ask(0)) as Record<string, string>;
+    const a = (await ask()) as Record<string, string>;
+    const b = (await ask()) as Record<string, string>;
     expect(a.enc).toMatch(/^[0-9a-f]{32}$/);
     expect(b.enc).toMatch(/^[0-9a-f]{32}$/);
     expect(a.enc).toBe(b.enc);
