@@ -1539,3 +1539,29 @@ No hardware actions are authorized by this decision.
 when saved storage cannot be read; clearing evidence on sign-out; allowing a
 pending session to arm after switching actors; treating rotation receipts as
 personalized cards. Software tests do not establish native power-loss durability.
+
+## <a id="d37"></a>D37: Explicit read-only phone identity check with session-owned cancellation
+
+**Decided (ENG-741 validation tooling, 2026-10-20):** add Settings → Read physical
+card identity for the approved owner-run phone checks. Opening the screen does
+not arm NFC. Only its explicit read action selects the ISD and requests CPLC,
+through the existing strict reader. It does not authenticate, reserve an attempt,
+fetch keys, change provisioning state or enable the installation release gate.
+The action says it reads a physical card even when reached through demo mode.
+Display only the resulting public identity and platform/OS; a failed reread
+clears the earlier result, with no automatic retry or raw error/transcript.
+
+A diagnostic session has its own cancellation handle. Its cleanup cannot cancel
+another screen's session, including when acquisition was refused because NFC
+was busy. Cancellation latches before native startup completes and guards
+subsequent commands; it cannot retract a command already in flight. Keep the
+existing global single-session exclusion and legacy `withCard` API. Disable the
+diagnostic entry and handler while the real workflow is busy, and cancel the
+probe on unmount without displaying a late reply.
+
+**Rejected:** using a programming reservation as a read-only identity probe;
+automatically arming NFC on entry; allowing diagnostic cleanup to cancel an
+unrelated session; treating public CPLC as ownership authentication, global
+uniqueness evidence or permission to enable installation. This decision ships
+software only; native builds and device actions remain the owner's under an
+approved device plan. Deterministic interruption tooling remains outstanding.

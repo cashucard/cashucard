@@ -187,5 +187,10 @@ approved device plan; this change did not access any hardware.
 
 The next native validation steps are in the
 [proposed owner-run checklist](../../docs/PROVISIONER-DEVICE-VALIDATION.md).
-It identifies missing read-only phone and deterministic pause tooling; it is
-not a hardware report or permission to operate devices.
+Settings → Read physical card identity supplies the read-only phone probe:
+entering the screen does not arm NFC; the explicit read issues SELECT ISD and
+GET DATA CPLC only. It also works through the demo door without a service, but
+labels its physical-card action. Cancel/back ends only its own session. It does
+not authenticate, modify cards, alter saved attempts or enable installation.
+Deterministic pause tooling remains outstanding. The checklist is not a hardware
+report or permission to operate devices.
