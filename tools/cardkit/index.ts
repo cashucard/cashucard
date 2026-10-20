@@ -19,3 +19,5 @@ export {
 export * from './gp/scp02';
 export * from './gp/provision';
 export * from './gp/identity';
+
+export * from './gp/inspect';

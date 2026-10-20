@@ -300,3 +300,56 @@ test('sign-in cannot return a session with missing stable operator identity', as
     ),
   ).rejects.toThrow('malformed');
 });
+
+test('card orchestration routes preserve frozen records and scoped key/disposition requests', async () => {
+  const requests: {url: string; body: unknown}[] = [];
+  const client = new ApiClient({
+    baseUrl: 'https://ops.test',
+    fetcher: async (url, init) => {
+      requests.push({url, body: JSON.parse(String(init!.body))});
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({receipt: {}, enc: 'key'}),
+      } as Response;
+    },
+  });
+  const service = client.reservations({
+    operator_id: 7,
+    env: 'issued',
+    token: 'memory-only',
+  });
+  await service.bind('device', 'attempt', {revision: 0, chip_id: 'chip'});
+  await service.keys('device', 'attempt');
+  const frozen = '{"verified_at":123,"display_id":"abcd"}';
+  await service.record('device', 'attempt', 1, frozen);
+  await service.disposition('device', 'attempt', {
+    revision: 1,
+    kind: 'quarantined',
+    reason: 'authentication-failed',
+  });
+  expect(requests).toEqual([
+    {
+      url: 'https://ops.test/provisioning/attempts/attempt/bind',
+      body: {device_id: 'device', revision: 0, chip_id: 'chip'},
+    },
+    {
+      url: 'https://ops.test/keys/issue',
+      body: {device_id: 'device', attempt_id: 'attempt'},
+    },
+    {
+      url: 'https://ops.test/provisioning/attempts/attempt/record',
+      body: {device_id: 'device', revision: 1, record: JSON.parse(frozen)},
+    },
+    {
+      url: 'https://ops.test/provisioning/attempts/attempt/disposition',
+      body: {
+        device_id: 'device',
+        revision: 1,
+        kind: 'quarantined',
+        reason: 'authentication-failed',
+      },
+    },
+  ]);
+  expect(JSON.stringify(requests)).not.toContain('memory-only');
+});

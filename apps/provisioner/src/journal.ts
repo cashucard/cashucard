@@ -39,16 +39,35 @@ export interface CompletionRecord
   verified_stage: 'rotated';
   verified_at: number;
 }
+export interface DispositionIntent {
+  kind: 'quarantined' | 'abandoned';
+  reason: string;
+  revision: number;
+}
+export interface DispositionReceipt {
+  attempt_id: string;
+  kind: 'quarantined' | 'abandoned';
+  reason: string;
+  revision: number;
+  acknowledged_at: number;
+}
 export interface AttemptJournal extends JournalScope, AttemptIdentity {
   schema: 1;
   stage: Stage;
   chip_id?: string;
-  preinstall?: {installation_id: string | null; replacement_consent: boolean};
+  preinstall?: {
+    installation_id: string | null;
+    replacement_consent: boolean;
+    inspection: 'absent' | 'empty-2.1-with-tag';
+  };
   installation_id?: string;
   installation_verified?: true;
   frozen_record?: string;
   completion_receipt?: string;
   quarantine_reason?: string;
+  gp_key_version?: number;
+  disposition_intent?: DispositionIntent;
+  disposition_receipt?: string;
 }
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -72,6 +91,9 @@ const fields = new Set([
   'frozen_record',
   'completion_receipt',
   'quarantine_reason',
+  'gp_key_version',
+  'disposition_intent',
+  'disposition_receipt',
 ]);
 const reasons = [
   'identity-mismatch',
@@ -156,7 +178,11 @@ function validate(j: AttemptJournal): void {
       j.preinstall &&
         typeof j.preinstall === 'object' &&
         Object.keys(j.preinstall).sort().join(',') ===
-          'installation_id,replacement_consent' &&
+          'inspection,installation_id,replacement_consent' &&
+        j.preinstall.inspection ===
+          (j.preinstall.installation_id === null
+            ? 'absent'
+            : 'empty-2.1-with-tag') &&
         typeof j.preinstall.replacement_consent === 'boolean' &&
         (j.preinstall.installation_id === null ||
           (KEY.test(j.preinstall.installation_id) &&
@@ -194,6 +220,33 @@ function validate(j: AttemptJournal): void {
   if (j.completion_receipt !== undefined) {
     requireState(typeof j.completion_receipt === 'string');
     validateReceipt(JSON.parse(j.completion_receipt!), j);
+  }
+  if (
+    ['rotated', 'record_pending', 'recorded'].includes(j.stage) ||
+    j.gp_key_version !== undefined
+  ) {
+    requireState(
+      Number.isInteger(j.gp_key_version) &&
+        j.gp_key_version! >= 0 &&
+        j.gp_key_version! <= 255,
+    );
+  }
+  if (j.disposition_intent !== undefined) {
+    const d = j.disposition_intent;
+    requireState(
+      j.stage === 'quarantined' &&
+        d &&
+        typeof d === 'object' &&
+        Object.keys(d).sort().join(',') === 'kind,reason,revision' &&
+        ['quarantined', 'abandoned'].includes(d.kind) &&
+        d.reason === j.quarantine_reason &&
+        Number.isSafeInteger(d.revision) &&
+        d.revision >= 0,
+    );
+  }
+  if (j.disposition_receipt !== undefined) {
+    requireState(typeof j.disposition_receipt === 'string');
+    validateDisposition(JSON.parse(j.disposition_receipt), j);
   }
   if (j.stage === 'reserved') {
     requireState(
@@ -260,6 +313,7 @@ function validateRecord(r: CompletionRecord, j: AttemptJournal): void {
   requireState(
     r.display_id === j.installation_id?.slice(-4) &&
       Number.isInteger(r.gp_key_version) &&
+      r.gp_key_version === j.gp_key_version &&
       r.gp_key_version >= 0 &&
       r.gp_key_version <= 255 &&
       ['factory', 'issued'].includes(r.key_env) &&
@@ -291,6 +345,23 @@ function validateReceipt(r: CompletionReceipt, j: AttemptJournal): void {
       r.recorded_at >= 0 &&
       r.verified_stage === 'rotated' &&
       r.ready_for_holder === false,
+  );
+}
+
+function validateDisposition(r: DispositionReceipt, j: AttemptJournal): void {
+  requireState(
+    j.stage === 'quarantined' &&
+      j.disposition_intent &&
+      r &&
+      typeof r === 'object' &&
+      Object.keys(r).sort().join(',') ===
+        'acknowledged_at,attempt_id,kind,reason,revision' &&
+      r.attempt_id === j.attempt_id &&
+      r.kind === j.disposition_intent.kind &&
+      r.reason === j.disposition_intent.reason &&
+      r.revision === j.disposition_intent.revision + 1 &&
+      Number.isSafeInteger(r.acknowledged_at) &&
+      r.acknowledged_at >= 0,
   );
 }
 
@@ -370,8 +441,12 @@ export class ProvisioningJournal {
     });
   }
 
+  /** Caller must have inspected absence, or an empty 2.1 applet and its tag. */
   installIntent(
-    preinstall: NonNullable<AttemptJournal['preinstall']>,
+    preinstall: Pick<
+      NonNullable<AttemptJournal['preinstall']>,
+      'installation_id' | 'replacement_consent'
+    >,
   ): Promise<void> {
     const captured = {...preinstall};
     return this.change(j => {
@@ -380,7 +455,15 @@ export class ProvisioningJournal {
           j.chip_id &&
           (captured.installation_id === null || captured.replacement_consent),
       );
-      return {...j, stage: 'install_intent', preinstall: captured};
+      return {
+        ...j,
+        stage: 'install_intent',
+        preinstall: {
+          ...captured,
+          inspection:
+            captured.installation_id === null ? 'absent' : 'empty-2.1-with-tag',
+        },
+      };
     });
   }
 
@@ -411,10 +494,10 @@ export class ProvisioningJournal {
     });
   }
 
-  rotated(): Promise<void> {
+  rotated(gp_key_version: number): Promise<void> {
     return this.change(j => {
       requireState(j.stage === 'rotation_intent');
-      return {...j, stage: 'rotated'};
+      return {...j, stage: 'rotated', gp_key_version};
     });
   }
 
@@ -432,6 +515,41 @@ export class ProvisioningJournal {
     return this.change(j => {
       requireState(j.stage === 'record_pending');
       return {...j, stage: 'recorded', completion_receipt};
+    });
+  }
+
+  beginDisposition(
+    kind: DispositionIntent['kind'],
+    revision: number,
+  ): Promise<void> {
+    return this.change(j => {
+      requireState(j.stage === 'quarantined' && !j.disposition_receipt);
+      if (j.disposition_intent) {
+        requireState(j.disposition_intent.kind === kind);
+        return j;
+      }
+      return {
+        ...j,
+        disposition_intent: {kind, revision, reason: j.quarantine_reason!},
+      };
+    });
+  }
+
+  acknowledgeDisposition(receipt: DispositionReceipt): Promise<void> {
+    const disposition_receipt = JSON.stringify(receipt);
+    return this.change(j => {
+      validateDisposition(JSON.parse(disposition_receipt), j);
+      if (j.disposition_receipt) {
+        const old = JSON.parse(j.disposition_receipt) as DispositionReceipt;
+        requireState(
+          Object.entries(old).every(
+            ([k, v]) =>
+              (receipt as unknown as Record<string, unknown>)[k] === v,
+          ),
+        );
+        return j;
+      }
+      return {...j, disposition_receipt};
     });
   }
 

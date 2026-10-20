@@ -133,8 +133,9 @@ device/batch. Sign-in now retains the service's stable `operator_id`; the typed
 reservation adapter keeps the token in memory and scopes all requests to it.
 
 The coordinator is not wired to `AppStore`/`LoopScreen` or the legacy outbox.
-Real bind/key/record orchestration, explicit quarantine disposition handling and
-personalization remain pending. The native dependency is pinned, but iOS pods,
+Injected bind/key/record orchestration and explicit disposition handling are
+described below. Screen/session wiring, card repair and personalization remain
+pending. The native dependency is pinned, but iOS pods,
 native builds and termination checks on both phones remain operator steps.
 Jest checks storage/restart semantics, not device power-loss durability. The
 real batch loop remains gated by the
@@ -143,3 +144,31 @@ real batch loop remains gated by the
 The TypeScript check includes app source and tests. Node types are available
 for the test-only cardkit fake; cardkit retains its separate Node-free library
 check. The earlier declaration-only include did not typecheck the app.
+
+### Injected card orchestration
+
+`src/provisioningTap.ts` composes the journal, service and cardkit under an
+injected NFC session. `runReservedAttempt` reconciles first, fetches only that
+attempt's keys before arming NFC, binds the inspected CPLC before mutation,
+then installs/recovers, rotates/confirms and freezes the exact completion body.
+The record POST runs after the session closes. Pending record retries use no
+NFC or key lookup. It reports exact installation/rotation stages; it does not
+perform mint/owner/PIN personalization or report holder readiness.
+
+The read-only cardkit inspector returns the full installation key, empty-state
+and tag evidence. An interrupted complete new installation can be adopted;
+absent, partial or untouched old states quarantine without a recovery sweep.
+The saved intent names the verified pre-install inspection state separately
+from the new key. Older draft intents lacking that evidence stop for
+reconciliation. A durable rotation state confirms only the assigned set, without
+another PUT KEY. The confirmed GP key version enters the durable state and frozen record.
+
+`acknowledgeQuarantine` is an explicit operator action. It persists disposition
+intent before POST, recovers a lost acknowledgement from the service, and only
+then archives the attempt and advances the ordinal. The bound chip remains
+blocked on the service. Neither restart nor another batch clears the quarantine.
+
+These functions remain unconnected to the real screen and native `withCard`.
+Tests use the existing software GP card and injected transports. Native builds,
+termination drills and both-phone CPLC checks remain operator work under an
+approved device plan; this change did not access any hardware.

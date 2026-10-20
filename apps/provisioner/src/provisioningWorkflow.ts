@@ -7,6 +7,8 @@ import {
   assertJournalScope,
   type AttemptJournal,
   type CompletionReceipt,
+  type DispositionIntent,
+  type DispositionReceipt,
   type JournalScope,
   type JournalStorage,
 } from './journal';
@@ -33,6 +35,7 @@ export interface ReservedAttempt {
   state: 'active' | 'recorded' | 'quarantined' | 'abandoned';
   chip_id: string | null;
   completion_receipt: CompletionReceipt | null;
+  disposition_receipt?: DispositionReceipt | null;
 }
 export interface RemoteBatch {
   batch_id: number;
@@ -57,6 +60,46 @@ export interface ReservationService {
   }): Promise<ReservedAttempt>;
   attempt(device_id: string, attempt_id: string): Promise<ReservedAttempt>;
 }
+export interface IssuedAttemptKeys {
+  attempt_id: string;
+  batch_id: number;
+  ordinal: number;
+  chip_id: string | null;
+  enc: string;
+  mac: string;
+  dek: string;
+}
+export interface CardProvisioningService extends ReservationService {
+  bind(
+    device_id: string,
+    attempt_id: string,
+    input: {revision: number; chip_id: string},
+  ): Promise<{
+    attempt_id: string;
+    chip_id: string;
+    revision: number;
+    bound_at: number;
+  }>;
+  keys(device_id: string, attempt_id: string): Promise<IssuedAttemptKeys>;
+  record(
+    device_id: string,
+    attempt_id: string,
+    revision: number,
+    frozen: string,
+  ): Promise<CompletionReceipt>;
+  disposition(
+    device_id: string,
+    attempt_id: string,
+    intent: DispositionIntent,
+  ): Promise<DispositionReceipt>;
+}
+function terminal(j: AttemptJournal): boolean {
+  return (
+    j.stage === 'recorded' ||
+    (j.stage === 'quarantined' && !!j.disposition_receipt)
+  );
+}
+
 interface BatchState {
   scope: JournalScope;
   request: BatchRequest;
@@ -211,7 +254,7 @@ export class ProvisioningWorkflow {
     }
     check(s.history.length === b.next_ordinal);
     s.history.forEach((j, ordinal) =>
-      check(j.stage === 'recorded' && j.ordinal === ordinal),
+      check(terminal(j) && j.ordinal === ordinal),
     );
     check(new Set(s.history.map(j => j.attempt_id)).size === s.history.length);
     if (s.active) {
@@ -364,7 +407,9 @@ export class ProvisioningWorkflow {
         uint(remote.revision) &&
         (active.revision === null || remote.revision >= active.revision),
     );
-    check(remote.state === 'active' || remote.state === 'recorded');
+    check(
+      ['active', 'recorded', 'quarantined', 'abandoned'].includes(remote.state),
+    );
     let saved = active.journal;
     const journal = await ProvisioningJournal.open(
       {
@@ -390,7 +435,14 @@ export class ProvisioningWorkflow {
     } else {
       check(!journal.snapshot().chip_id);
     }
-    if (remote.state === 'recorded') {
+    if (remote.state === 'quarantined' || remote.state === 'abandoned') {
+      check(
+        journal.snapshot().stage === 'quarantined' &&
+          remote.disposition_receipt &&
+          remote.disposition_receipt.kind === remote.state,
+      );
+      await journal.acknowledgeDisposition(remote.disposition_receipt);
+    } else if (remote.state === 'recorded') {
       check(remote.completion_receipt);
       if (journal.snapshot().stage === 'record_pending') {
         await journal.acknowledge(remote.completion_receipt);
@@ -410,7 +462,8 @@ export class ProvisioningWorkflow {
     } else {
       check(
         remote.completion_receipt === null &&
-          journal.snapshot().stage !== 'recorded',
+          journal.snapshot().stage !== 'recorded' &&
+          !journal.snapshot().disposition_receipt,
       );
     }
     const next = this.snapshot();
@@ -432,18 +485,80 @@ export class ProvisioningWorkflow {
     return this.serial(async () => {
       const b = this.actor(service);
       check(this.state.active?.journal);
-      const journal = await ProvisioningJournal.open(
-        {
-          read: async () => JSON.stringify(this.state.active!.journal),
-          replace: async value => {
-            const next = this.snapshot();
-            next.active!.journal = JSON.parse(value) as AttemptJournal;
-            await this.commit(next);
-          },
-        },
-        b.scope,
-      );
+      const journal = await this.openActiveJournal(b.scope);
       return run(journal);
+    });
+  }
+
+  private openActiveJournal(scope: JournalScope): Promise<ProvisioningJournal> {
+    check(this.state.active?.journal);
+    return ProvisioningJournal.open(
+      {
+        read: async () => JSON.stringify(this.state.active!.journal),
+        replace: async value => {
+          const next = this.snapshot();
+          next.active!.journal = JSON.parse(value) as AttemptJournal;
+          await this.commit(next);
+        },
+      },
+      scope,
+    );
+  }
+
+  private async archiveActive(): Promise<void> {
+    const next = this.snapshot();
+    check(next.active?.journal && terminal(next.active.journal));
+    next.history.push(next.active.journal);
+    next.batch!.next_ordinal++;
+    next.active = null;
+    await this.commit(next);
+  }
+
+  /** Explicit operator acknowledgement; durable intent precedes its POST. */
+  acknowledgeQuarantine(
+    service: ReservationService & Pick<CardProvisioningService, 'disposition'>,
+    kind: DispositionIntent['kind'],
+  ): Promise<void> {
+    return this.serial(async () => {
+      await this.syncBatch(service);
+      await this.syncAttempt(service);
+      const b = this.actor(service);
+      const journal = await this.openActiveJournal(b.scope);
+      if (journal.snapshot().disposition_receipt) {
+        check(journal.snapshot().disposition_intent?.kind === kind);
+      } else {
+        await journal.beginDisposition(kind, this.state.active!.revision!);
+        const receipt = await service.disposition(
+          this.state.device_id,
+          this.state.active!.attempt_id,
+          journal.snapshot().disposition_intent!,
+        );
+        await journal.acknowledgeDisposition(receipt);
+      }
+      await this.archiveActive();
+    });
+  }
+
+  /** Replay only the frozen body; a lost completion reply never needs NFC. */
+  postRecord(
+    service: ReservationService & Pick<CardProvisioningService, 'record'>,
+  ): Promise<void> {
+    return this.serial(async () => {
+      await this.syncBatch(service);
+      await this.syncAttempt(service);
+      const b = this.actor(service);
+      const journal = await this.openActiveJournal(b.scope);
+      if (journal.snapshot().stage === 'record_pending') {
+        const receipt = await service.record(
+          this.state.device_id,
+          this.state.active!.attempt_id,
+          this.state.active!.revision!,
+          journal.snapshot().frozen_record!,
+        );
+        await journal.acknowledge(receipt);
+      }
+      check(journal.snapshot().stage === 'recorded');
+      await this.archiveActive();
     });
   }
 
@@ -463,12 +578,7 @@ export class ProvisioningWorkflow {
   advance(service: ReservationService): Promise<void> {
     return this.serial(async () => {
       await this.syncAttempt(service);
-      const next = this.snapshot();
-      check(next.active?.journal?.stage === 'recorded');
-      next.history.push(next.active.journal);
-      next.batch!.next_ordinal++;
-      next.active = null;
-      await this.commit(next);
+      await this.archiveActive();
     });
   }
 }

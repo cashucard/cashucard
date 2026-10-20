@@ -1,5 +1,5 @@
 import type {
-  ReservationService,
+  CardProvisioningService,
   RemoteBatch,
   ReservedAttempt,
 } from './provisioningWorkflow';
@@ -160,13 +160,49 @@ export class ApiClient {
   }
 
   /** Session-bound reservation transport; credentials remain in memory. */
-  reservations(session: OperatorSession): ReservationService {
+  reservations(session: OperatorSession): CardProvisioningService {
     return {
       scope: {
         service_origin: this.options.baseUrl,
         operator_id: session.operator_id,
         key_env: session.env,
       },
+      bind: async (device_id, attempt_id, input) =>
+        (
+          await this.call(
+            'POST',
+            `/provisioning/attempts/${encodeURIComponent(attempt_id)}/bind`,
+            session.token,
+            {device_id, ...input},
+          )
+        ).receipt as Awaited<ReturnType<CardProvisioningService['bind']>>,
+      keys: async (device_id, attempt_id) =>
+        (await this.call('POST', '/keys/issue', session.token, {
+          device_id,
+          attempt_id,
+        })) as unknown as Awaited<ReturnType<CardProvisioningService['keys']>>,
+      record: async (device_id, attempt_id, revision, frozen) =>
+        (
+          await this.call(
+            'POST',
+            `/provisioning/attempts/${encodeURIComponent(attempt_id)}/record`,
+            session.token,
+            {device_id, revision, record: JSON.parse(frozen)},
+          )
+        ).receipt as Awaited<ReturnType<CardProvisioningService['record']>>,
+      disposition: async (device_id, attempt_id, intent) =>
+        (
+          await this.call(
+            'POST',
+            `/provisioning/attempts/${encodeURIComponent(
+              attempt_id,
+            )}/disposition`,
+            session.token,
+            {device_id, ...intent},
+          )
+        ).receipt as Awaited<
+          ReturnType<CardProvisioningService['disposition']>
+        >,
       batch: async request =>
         (
           await this.call(

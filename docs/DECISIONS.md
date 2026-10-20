@@ -1462,3 +1462,44 @@ an old standalone attempt snapshot without its missing batch evidence. Such
 schema 1 evidence is retained and stops for reconciliation. The coordinator,
 transport and storage adapter are still not wired into the real screen/NFC
 loop; native termination checks and personalization remain release gates.
+
+## <a id="d35"></a>D35: Resume only verified installations and acknowledge quarantine explicitly
+
+**Decided (ENG-741 orchestration, 2026-10-20):** expose injected-session
+orchestration without enabling the real screen. Prefetch only the reserved
+manager set before arming NFC. Read/match CPLC, then acknowledge service binding
+before install intent and authentication. Persist the verified pre-install
+inspection state separately from the new installation key. Existing cards require consent naming
+the inspected full key, plus the empty-card guards. Never persist manager keys
+or APDU transcripts in the workflow snapshot.
+
+Read-only inspection checks the exact 2.1 applet version, 30-byte GET_INFO,
+compressed-key framing and tag selection. Service registry acceptance retains
+full curve-point validation. An interrupted install is adoptable only when its
+full key is new relative to the saved pre-install state and inspection is
+complete. An absent, incomplete or untouched old installation quarantines in
+this first orchestrator; a partial-install repair helper remains unimplemented.
+This deliberately chooses the contract's safe stop instead of an automatic
+DELETE/LOAD recovery sweep.
+
+After rotation intent, use the existing factory/assigned offline cryptogram
+matcher and never reinstall. A durable rotated state permits assigned-key
+confirmation only, without PUT KEY. Persist the GP key version actually
+observed during successful authentication and require the frozen record to
+match it. Earlier draft rotated snapshots without that evidence stop for
+reconciliation; never default them to version 01. Lost record acknowledgements
+are resolved by scoped inspection or an exact frozen-body retry without NFC.
+
+Quarantine remains latched across restart. An explicit operator disposition
+persists its kind/reason/revision before POST. Save the matching receipt before
+atomically archiving the attempt and consuming its ordinal. Retain the chip
+binding/history; the service keeps an unresolved chip blocked. D34's completed
+batch close may include acknowledged dispositions, without implying every card
+succeeded or is ready for a holder.
+
+**Rejected:** retrying authentication after refusal; reloading a card merely
+because an install result was lost; reapplying PUT KEY to a durably rotated
+card; guessing GP version; automatically advancing past an unacknowledged
+quarantine. Screen wiring, native termination drills, cross-phone CPLC evidence
+and personalization remain release gates. No hardware actions are authorized
+by this implementation decision.

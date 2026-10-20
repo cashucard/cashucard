@@ -103,7 +103,7 @@ test('failed or ambiguous commit sends no dependent action and latches this writ
   );
   expect(cardAction).not.toHaveBeenCalled();
   expect(() => journal.snapshot()).toThrow();
-  await expect(journal.rotated()).rejects.toThrow();
+  await expect(journal.rotated(1)).rejects.toThrow();
   const reopened = await ProvisioningJournal.open(storage, scope);
   expect(reopened.snapshot().stage).toBe('rotation_intent');
 });
@@ -111,7 +111,7 @@ test('failed or ambiguous commit sends no dependent action and latches this writ
 test('frozen record survives restart byte-identically and only a matching non-ready receipt advances it', async () => {
   const {journal, storage} = await installed();
   await journal.rotationIntent();
-  await journal.rotated();
+  await journal.rotated(1);
   const body = record();
   const pending = journal.freezeRecord(body);
   body.verified_at = 999;
@@ -154,7 +154,7 @@ test('storage read failure, foreign scope, invalid schema and secret-bearing rec
     ProvisioningJournal.open(storage, scope, {...attempt, ordinal: 1}),
   ).rejects.toThrow();
   await journal.rotationIntent();
-  await journal.rotated();
+  await journal.rotated(1);
   await expect(
     journal.freezeRecord({...record(), pin: '1234'} as CompletionRecord),
   ).rejects.toThrow();
@@ -178,13 +178,13 @@ test('storage read failure, foreign scope, invalid schema and secret-bearing rec
 
 test('serialized transitions preserve quarantine across restart without recording secret diagnostics', async () => {
   const {journal, storage} = await installed();
-  await Promise.all([journal.rotationIntent(), journal.rotated()]);
+  await Promise.all([journal.rotationIntent(), journal.rotated(1)]);
   await journal.quarantine('authentication-failed');
   const reopened = await ProvisioningJournal.open(storage, scope);
   expect(
     recoveryAction(reopened.snapshot(), {chip_id: chip, installation_id: key}),
   ).toBe('stop');
-  await expect(reopened.rotated()).rejects.toThrow();
+  await expect(reopened.rotated(1)).rejects.toThrow();
   await expect(reopened.quarantine('token=secret')).rejects.toThrow();
   expect((await storage.read())!).not.toMatch(/token|password|pin|enc|mac|dek/);
 });
