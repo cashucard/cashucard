@@ -144,6 +144,7 @@ test('the release gate blocks direct create and program calls, without collectin
   expect(f.service.batch).not.toHaveBeenCalled();
   expect(f.service.reserve).not.toHaveBeenCalled();
   expect(runCard).not.toHaveBeenCalled();
+  expect(flow.drill).toBeUndefined();
   expect(text(tree)).toContain('device validation');
   await act(async () => {
     tree.root.findByProps({testID: 'pin-batch'}).props.onPress();
@@ -513,4 +514,67 @@ test('real batch setup rejects zero count and submits PIN-free settings once val
   });
   expect(f.bytes()).not.toContain('pinBatch');
   expect(tree.root.findByProps({testID: 'real-progress'})).toBeTruthy();
+});
+
+test('validation pauses keep the operation busy; sign-out releases the waiter and retains the attempt', async () => {
+  const f = fixture();
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w,
+    _s,
+    options,
+  ) => {
+    await options.checkpoint!('install-intent-saved');
+    throw new Error('must not continue after sign-out');
+  };
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    recoveryDrillsEnabled: true,
+    serviceFor: () => f.service,
+    runCard,
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  await act(async () => {
+    flow.drill!.arm('install-intent-saved');
+  });
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = flow.program();
+  });
+  expect(flow.drill?.paused).toBe('install-intent-saved');
+  expect(
+    tree.root.findByProps({testID: 'recovery-drill-paused'}).props.children,
+  ).toBe('install-intent-saved');
+  expect(flow.busy).toBe(true);
+  expect(f.service.record).not.toHaveBeenCalled();
+  await act(async () => {
+    app.signOut();
+    await pending;
+  });
+  expect(flow.busy).toBe(false);
+  expect(flow.drill?.paused).toBeNull();
+  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+});
+
+test('enabling drill controls cannot bypass the independent installation gate', async () => {
+  const f = fixture();
+  const runCard = jest.fn();
+  await mount({
+    ...f,
+    recoveryDrillsEnabled: true,
+    runCard,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  await act(async () => {
+    flow.drill!.arm('install-intent-saved');
+    expect(await flow.create(config)).toBe(false);
+    expect(await flow.program()).toBe(false);
+  });
+  expect(flow.drill?.target).toBeNull();
+  expect(f.service.batch).not.toHaveBeenCalled();
+  expect(runCard).not.toHaveBeenCalled();
 });

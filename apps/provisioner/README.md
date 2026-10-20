@@ -192,5 +192,13 @@ entering the screen does not arm NFC; the explicit read issues SELECT ISD and
 GET DATA CPLC only. It also works through the demo door without a service, but
 labels its physical-card action. Cancel/back ends only its own session. It does
 not authenticate, modify cards, alter saved attempts or enable installation.
-Deterministic pause tooling remains outstanding. The checklist is not a hardware
-report or permission to operate devices.
+Local validation builds can additionally enable `RECOVERY_DRILLS_ENABLED` in
+`src/releaseGates.ts` to select a one-shot pause at a known durable boundary.
+The flag defaults false and does not bypass the installation gate. The real
+batch screen then shows the selected/reached boundary and actual saved stage;
+continue or stop deliberately, or terminate while paused for the approved drill.
+The frozen-record checkpoint is after NFC closes and before POST. Signing out
+or unmounting stops a paused run without discarding evidence. Pause configuration
+is never persisted and normal recovery runs after reopening. Mid-APDU failure,
+torn LOAD and lost PUT KEY replies are not simulated by these controls.
+The checklist is not a hardware report or permission to operate devices.
