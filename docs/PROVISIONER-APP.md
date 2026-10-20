@@ -11,6 +11,11 @@ operator is standing up at a bench or a desk with a pile of cards; the tap is in
 the other hand. Everything below is in service of that loop: fast, honest about
 what happened, impossible to misread from a glance.
 
+The current delivery gates are in
+[`OPS-WORKERS-PLAN.md`](OPS-WORKERS-PLAN.md): operator provisioning first,
+durable recovery of interrupted attempts and pending records, then consumer
+provisioning after identity and per-card authorization are enforced.
+
 The numbers the design lives with (from
 [`HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md`](HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md)):
 an install takes ~9 s on an iPhone and ~13 s on a Pixel from arm to done, of

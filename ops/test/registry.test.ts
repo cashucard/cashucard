@@ -132,3 +132,42 @@ test('a batch_id no batch row holds is a RegistryError, not a raw FK failure', (
   assert.equal(n.n, 0);
   db.close();
 });
+
+test('registry requires an escrowed ordinal within the batch before accepting a new card', () => {
+  const db = testDb();
+  seedBatch(db);
+  for (const ordinal of [-1, 10, 1.5]) {
+    assert.throws(() => recordCard(db, row({ordinal})), RegistryError);
+  }
+  db.db
+    .prepare('DELETE FROM issued_keys WHERE batch_id = 1 AND ordinal = 3')
+    .run();
+  assert.throws(() => recordCard(db, row()), RegistryError);
+  assert.equal(
+    (db.db.prepare('SELECT COUNT(*) AS n FROM cards').get() as {n: number}).n,
+    0,
+  );
+  assert.equal(recordCard(db, row({ordinal: 4})).kind, 'created');
+});
+
+test('new registry rows require safe nonnegative key versions and installation timestamps', () => {
+  const db = testDb();
+  seedBatch(db);
+  for (const value of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => recordCard(db, row({key_id: value})), RegistryError);
+    assert.throws(
+      () => recordCard(db, row({installed_at: value})),
+      RegistryError,
+    );
+  }
+  assert.equal(
+    (db.db.prepare('SELECT COUNT(*) AS n FROM cards').get() as {n: number}).n,
+    0,
+  );
+  assert.equal(
+    recordCard(db, row({key_id: 0, installed_at: 0})).kind,
+    'created',
+  );
+  // A changed POST for a recorded card keeps the established conflict response.
+  assert.equal(recordCard(db, row({key_id: -1})).kind, 'conflict');
+});

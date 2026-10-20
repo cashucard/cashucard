@@ -1,19 +1,19 @@
 /**
  * The one SQLite DB (D29) and its forward-only migrations, as ordered SQL
- * strings. One writer: the service process. The file lives at ops/data/ops.db
- * in dev; the deploy runbook points the path elsewhere and encrypts at rest.
+ * strings. One writer: on the Node side, the service process; on Workers, the
+ * Durable Object (single-threaded by the runtime). The storage backend is the
+ * DB seam (sql.ts): better-sqlite3 in dev (`sqlite-file.ts`), the DO's
+ * ctx.storage.sql deployed (`sql-do.ts`) — the tests run against either.
  *
  * Escrow and issuance are the same write by construction: createBatch derives
  * every key set and inserts batch + key rows in one transaction (a forced
  * failure between them leaves no row — ops/test/db.test.ts proves it, not
  * just states it).
  */
-import Database from 'better-sqlite3';
 import {randomBytes} from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 
 import type {TipStore} from './anchor';
+import type {SqlHandle} from './sql';
 
 /** The migrations, in order, forward-only. Never edit one; append the next. */
 export const MIGRATIONS: readonly string[] = [
@@ -83,11 +83,22 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE anchor_tip ADD COLUMN height INTEGER;
   `,
+  // 3. Persist the pre-hash login work budget across object eviction/restart.
+  `
+  CREATE TABLE login_attempt_budget (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    window_start INTEGER NOT NULL,
+    attempts INTEGER NOT NULL CHECK (attempts > 0)
+  );
+  `,
 ];
 
 export interface DbOptions {
-  /** The DB file path; ':memory:' for tests. */
-  readonly path: string;
+  /**
+   * The DB seam. On Node: `openSqliteFile(path)` — ':memory:' for tests.
+   * On Workers: `openSqlStorage(ctx.storage.sql)` inside the DO.
+   */
+  readonly sql: SqlHandle;
   /** Deterministic randomness for tests; node's randomBytes in production. */
   readonly randomBytes?: (n: number) => Buffer;
   /** Wall clock, seconds; injectable for tests. */
@@ -97,18 +108,13 @@ export interface DbOptions {
 }
 
 export class OpsDb {
-  readonly db: Database.Database;
+  readonly db: SqlHandle;
   readonly randomBytes: (n: number) => Buffer;
   readonly now: () => number;
   readonly master?: {getMaster(): Buffer};
 
   constructor(options: DbOptions) {
-    if (options.path !== ':memory:') {
-      fs.mkdirSync(path.dirname(options.path), {recursive: true});
-    }
-    this.db = new Database(options.path);
-    this.db.pragma('journal_mode = DELETE'); // one-writer discipline, like the session DBs
-    this.db.pragma('foreign_keys = ON');
+    this.db = options.sql;
     this.randomBytes =
       options.randomBytes ?? (n => Buffer.from(randomBytes(n)));
     this.now = options.now ?? (() => Math.floor(Date.now() / 1000));
@@ -128,17 +134,19 @@ export class OpsDb {
       this.db.prepare('INSERT INTO schema_version (version) VALUES (0)').run();
     }
     for (let v = current; v < MIGRATIONS.length; v++) {
-      const apply = this.db.transaction(() => {
+      // The seam's transaction runs fn atomically and immediately; the
+      // version bump is inside it, so a failed exec rolls both back.
+      this.db.transaction(() => {
         this.db.exec(MIGRATIONS[v]!);
         this.db.prepare('UPDATE schema_version SET version = ?').run(v + 1);
       });
-      apply();
       current = v + 1;
     }
   }
 
   close(): void {
-    this.db.close();
+    // Node owns its native handle; Durable Object storage belongs to the runtime.
+    this.db.close?.();
   }
 
   /**

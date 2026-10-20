@@ -2,8 +2,7 @@
  * Key issuance (the /keys/issue handler's rules): the set is already escrowed
  * at batch creation, so issuing is a read of issued_keys — plus the scope
  * rules the plan fixes. An operator may issue for any ordinal of any batch.
- * A holder may issue only one-shot per (batch, ordinal), rate-limited, and
- * never reads the batch list.
+ * Holder issuance is disabled until consumer card authorization exists (D30).
  */
 import {OpsDb} from './db';
 
@@ -21,7 +20,11 @@ export type IssueResult =
   | {
       ok: false;
       reason:
-        'no-such-batch' | 'no-such-ordinal' | 'already-issued' | 'rate-limited';
+        | 'no-such-batch'
+        | 'no-such-ordinal'
+        | 'already-issued'
+        | 'rate-limited'
+        | 'holder-disabled';
     };
 
 export type IssueScope =
@@ -81,8 +84,11 @@ export function issueKeys(
   batchId: number,
   ordinal: number,
   scope: IssueScope,
-  holderState: HolderIssueState,
+  _holderState: HolderIssueState,
 ): IssueResult {
+  if (scope.kind !== 'operator') {
+    return {ok: false, reason: 'holder-disabled'};
+  }
   const batch = db.db
     .prepare('SELECT id, count FROM key_batches WHERE id = ?')
     .get(batchId) as {id: number; count: number} | undefined;
@@ -92,17 +98,6 @@ export function issueKeys(
   if (!Number.isInteger(ordinal) || ordinal < 0 || ordinal >= batch.count) {
     return {ok: false, reason: 'no-such-ordinal'};
   }
-  if (scope.kind === 'holder') {
-    const claim = holderState.claim(
-      db.now(),
-      batchId,
-      ordinal,
-      scope.tokenHash,
-    );
-    if (claim !== 'claimed') {
-      return {ok: false, reason: claim};
-    }
-  }
   const keys = db.db
     .prepare('SELECT * FROM issued_keys WHERE batch_id = ? AND ordinal = ?')
     .get(batchId, ordinal) as IssuedKeysRow | undefined;
@@ -111,5 +106,16 @@ export function issueKeys(
     // the type is honest and the test can pin it.
     return {ok: false, reason: 'no-such-ordinal'};
   }
-  return {ok: true, keys};
+  // The DO's SqlStorage returns BLOBs as ArrayBuffer, not Buffer (the seam's
+  // one dtype difference); normalize so every caller's .toString('hex') and
+  // byte checks see the same shape on both backends.
+  return {
+    ok: true,
+    keys: {
+      ...keys,
+      enc: Buffer.from(keys.enc),
+      mac: Buffer.from(keys.mac),
+      dek: Buffer.from(keys.dek),
+    },
+  };
 }

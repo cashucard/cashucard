@@ -1,59 +1,67 @@
-/**
- * The operator bootstrap: a fresh deploy has an empty `operators` table, so
- * nothing can sign in until the first operator row exists (the finding this
- * closes — the password hash had to be hand-written into SQLite). One CLI:
- *
- *   node --import tsx src/bootstrap.ts <name> <key-env>
- *
- * The password is read from OPS_OPERATOR_PASSWORD (never a prompt, never
- * shell history — AGENTS.md's secrets rule; the env var is the operator's
- * step, the same way OPS_MASTER_KEY is). The first operator may pick the key
- * environment their sessions carry; later operators default to `issued`.
- */
-import {hashPassword} from './auth';
+/** Local SQLite bootstrap/recovery CLI; deployed Workers use OPS_OPERATOR_SETUP. */
+import {randomUUID} from 'node:crypto';
+import {defaultPwHash} from './auth';
 import {OpsDb} from './db';
+import {applyOperatorSetup} from './operator-setup';
+import {openSqliteFile} from './sqlite-file';
 
-export function bootstrapOperator(
+export async function bootstrapOperator(
   db: OpsDb,
   name: string,
   password: string,
   keyEnv: 'factory' | 'issued' = 'issued',
-): {id: number} {
-  if (!/^[A-Za-z0-9._@-]{1,64}$/.test(name)) {
-    throw new Error('the operator name is [A-Za-z0-9._@-], 1..64 chars');
-  }
-  if (password.length < 8) {
-    throw new Error('the password is at least 8 characters');
-  }
-  const info = db.db
-    .prepare(
-      `INSERT INTO operators (name, password_hash, key_env, created)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(name) DO UPDATE SET password_hash = excluded.password_hash, key_env = excluded.key_env`,
-    )
-    .run(name, hashPassword(password), keyEnv, db.now());
-  return {id: Number(info.lastInsertRowid)};
+): Promise<{id: number}> {
+  const result = await applyOperatorSetup(
+    db,
+    JSON.stringify({
+      action: 'bootstrap',
+      nonce: randomUUID(),
+      name,
+      password,
+      keyEnv,
+    }),
+    defaultPwHash,
+  );
+  return {id: result!.id};
 }
 
 if (require.main === module) {
-  const [name, keyEnvArg] = process.argv.slice(2);
+  const [action, name, keyEnvArg] = process.argv.slice(2);
   const password = process.env.OPS_OPERATOR_PASSWORD;
-  if (!name || !password) {
-    // eslint-disable-next-line no-console
+  if (
+    (action !== 'bootstrap' && action !== 'recover') ||
+    !name ||
+    !password ||
+    (keyEnvArg !== undefined &&
+      keyEnvArg !== 'factory' &&
+      keyEnvArg !== 'issued') ||
+    (action === 'recover' && keyEnvArg !== undefined)
+  ) {
     console.error(
-      'usage: OPS_OPERATOR_PASSWORD=<password> node --import tsx src/bootstrap.ts <name> [factory|issued]',
+      'usage: node --import tsx src/bootstrap.ts <bootstrap|recover> <name> [factory|issued]; supply OPS_OPERATOR_PASSWORD through a secret manager',
     );
     process.exit(2);
   }
-  const keyEnv =
-    keyEnvArg === 'factory' || keyEnvArg === 'issued' ? keyEnvArg : 'issued';
-  const dbPath = process.env.OPS_DB ?? 'data/ops.db';
-  const db = new OpsDb({path: dbPath});
-  try {
-    const {id} = bootstrapOperator(db, name, password, keyEnv);
-    // eslint-disable-next-line no-console
-    console.log(`operator ${name} ready (id ${id}, env ${keyEnv})`);
-  } finally {
-    db.close();
-  }
+  const db = new OpsDb({
+    sql: openSqliteFile(process.env.OPS_DB ?? 'data/ops.db'),
+  });
+  applyOperatorSetup(
+    db,
+    JSON.stringify({
+      action,
+      nonce: randomUUID(),
+      name,
+      password,
+      ...(action === 'bootstrap' ? {keyEnv: keyEnvArg ?? 'issued'} : {}),
+    }),
+    defaultPwHash,
+  )
+    .then(() => console.log('operator setup applied'))
+    .catch(() => {
+      console.error(
+        'operator setup failed; check action, name and setup requirements',
+      );
+      process.exitCode = 1;
+    })
+    .finally(() => db.close());
 }

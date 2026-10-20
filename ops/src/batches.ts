@@ -33,13 +33,25 @@ export interface BatchRow {
 }
 
 export function createBatch(db: OpsDb, input: BatchInput): BatchRow {
-  if (input.count < 1 || input.count > 100_000) {
-    throw new BatchError('count is 1..100000');
+  if (
+    !Number.isSafeInteger(input.count) ||
+    input.count < 1 ||
+    input.count > 100_000
+  ) {
+    throw new BatchError('count is an integer in 1..100000');
+  }
+  for (const [name, value] of [
+    ['dailyUsd', input.dailyUsd],
+    ['noPinUsd', input.noPinUsd],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new BatchError(`${name} is finite and nonnegative`);
+    }
   }
   const salt = newOrdinalSalt(db.randomBytes);
   const created = db.now();
-  const tx = db.db.transaction(() => {
-    const info = db.db
+  const batchId = db.db.transaction(() => {
+    db.db
       .prepare(
         `INSERT INTO key_batches
          (ordinal_salt, count, mint_url, pin_policy, pin_batch, daily_usd, no_pin_usd, load_sha256, operator_id, created)
@@ -57,7 +69,13 @@ export function createBatch(db: OpsDb, input: BatchInput): BatchRow {
         input.operatorId,
         created,
       );
-    const batchId = Number(info.lastInsertRowid);
+    // The salt is UNIQUE, so it names the fresh row on both backends —
+    // lastInsertRowid has no portable read on the DO's SqlStorage.
+    const batchId = (
+      db.db
+        .prepare('SELECT id FROM key_batches WHERE ordinal_salt = ?')
+        .get(salt) as {id: number}
+    ).id;
     const insert = db.db.prepare(
       `INSERT INTO issued_keys (batch_id, ordinal, enc, mac, dek, escrowed_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -69,8 +87,7 @@ export function createBatch(db: OpsDb, input: BatchInput): BatchRow {
       insert.run(batchId, ordinal, ks.enc, ks.mac, ks.dek, created);
     }
     return batchId;
-  });
-  const batchId = tx();
+  }); // the seam's transaction runs atomically and immediately
   return getBatch(db, batchId) as BatchRow;
 }
 
@@ -88,12 +105,21 @@ export function requireMaster(db: OpsDb): Buffer {
 }
 
 export function getBatch(db: OpsDb, id: number): BatchRow | undefined {
-  return db.db.prepare('SELECT * FROM key_batches WHERE id = ?').get(id) as
-    BatchRow | undefined;
+  const row = db.db
+    .prepare('SELECT * FROM key_batches WHERE id = ?')
+    .get(id) as BatchRow | undefined;
+  return row ? normalizeBatch(row) : undefined;
 }
 
 export function listBatches(db: OpsDb): BatchRow[] {
-  return db.db
-    .prepare('SELECT * FROM key_batches ORDER BY id DESC')
-    .all() as BatchRow[];
+  return (
+    db.db
+      .prepare('SELECT * FROM key_batches ORDER BY id DESC')
+      .all() as BatchRow[]
+  ).map(normalizeBatch);
+}
+
+/** The DO's SqlStorage returns BLOBs as ArrayBuffer; Buffer everywhere else. */
+function normalizeBatch(row: BatchRow): BatchRow {
+  return {...row, ordinal_salt: Buffer.from(row.ordinal_salt)};
 }

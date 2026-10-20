@@ -55,6 +55,14 @@ export function recordCard(db: OpsDb, input: CardInput): UpsertResult {
       ? {kind: 'stored', row: existing}
       : {kind: 'conflict'};
   }
+  for (const [name, value] of [
+    ['key_id', input.key_id],
+    ['installed_at', input.installed_at],
+  ] as const) {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new RegistryError(`${name} is a safe nonnegative integer`);
+    }
+  }
   // The batch must exist before we INSERT: with foreign keys ON a stray
   // batch_id reaches the INSERT's FK constraint, which the router rethrows
   // as a bare 500 — a client-side typo must not read as an internal error
@@ -62,10 +70,24 @@ export function recordCard(db: OpsDb, input: CardInput): UpsertResult {
   // the existing-row branch so a changed batch on a stored short_id stays a
   // 409 conflict, the retry contract's answer, not a 400.
   const batch = db.db
-    .prepare('SELECT id FROM key_batches WHERE id = ?')
-    .get(input.batch_id) as {id: number} | undefined;
+    .prepare('SELECT id, count FROM key_batches WHERE id = ?')
+    .get(input.batch_id) as {id: number; count: number} | undefined;
   if (!batch) {
     throw new RegistryError(`no such batch ${input.batch_id}`);
+  }
+  if (
+    !Number.isSafeInteger(input.ordinal) ||
+    input.ordinal < 0 ||
+    input.ordinal >= batch.count
+  ) {
+    throw new RegistryError('ordinal is outside the batch');
+  }
+  if (
+    !db.db
+      .prepare('SELECT 1 FROM issued_keys WHERE batch_id = ? AND ordinal = ?')
+      .get(input.batch_id, input.ordinal)
+  ) {
+    throw new RegistryError('ordinal has no escrowed keys');
   }
   const info = db.db
     .prepare(

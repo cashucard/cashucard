@@ -11,8 +11,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {AnchorFeed, CACHE_SECONDS, HEADER_LEN} from '../src/anchor';
-import {createBatch} from '../src/batches';
+import {BatchError, createBatch} from '../src/batches';
 import {MIGRATIONS, OpsDb} from '../src/db';
+import {openSqliteFile} from '../src/sqlite-file';
 import {TEST_MASTER, testDb} from './helpers';
 
 /** A temp-file path a test can open twice (a re-open of a real DB file). */
@@ -57,7 +58,7 @@ test('a second OpsDb on the same file does not re-apply or fail', () => {
   // schema) would show up here and nowhere in an :memory: test.
   const p = tempDbPath();
   const db = new OpsDb({
-    path: p,
+    sql: openSqliteFile(p),
     master: {getMaster: () => TEST_MASTER},
   });
   db.db
@@ -68,7 +69,7 @@ test('a second OpsDb on the same file does not re-apply or fail', () => {
   db.close();
 
   const again = new OpsDb({
-    path: p,
+    sql: openSqliteFile(p),
     master: {getMaster: () => TEST_MASTER},
   });
   const v = again.db.prepare('SELECT version FROM schema_version').get() as {
@@ -123,7 +124,7 @@ test('a forced failure between the batch row and a key row leaves NO row at all'
   // after the INSERT of the batch row — exactly the forced failure the
   // no-issued-but-unescrowed claim needs.
   const broken = new OpsDb({
-    path: ':memory:',
+    sql: openSqliteFile(':memory:'),
     now: () => 1_700_000_000,
     master: {getMaster: () => Buffer.alloc(4, 1)}, // too short: requireMaster throws
   });
@@ -158,7 +159,7 @@ test('a forced failure between the batch row and a key row leaves NO row at all'
   // master that fails from the second derive on.
   let calls = 0;
   const midFail = new OpsDb({
-    path: ':memory:',
+    sql: openSqliteFile(':memory:'),
     now: () => 1_700_000_000,
     master: {
       getMaster: () => {
@@ -202,7 +203,7 @@ test('migrations never rewrite history: opening twice leaves the same version', 
   // A forward-only contract holds only if a re-open does not re-apply or
   // reorder anything; the version row stands still across opens.
   const db = new OpsDb({
-    path: ':memory:',
+    sql: openSqliteFile(':memory:'),
     master: {getMaster: () => TEST_MASTER},
   });
   const v1 = (
@@ -212,7 +213,7 @@ test('migrations never rewrite history: opening twice leaves the same version', 
   ).version;
   db.close();
   const again = new OpsDb({
-    path: ':memory:',
+    sql: openSqliteFile(':memory:'),
     master: {getMaster: () => TEST_MASTER},
   });
   const v2 = (
@@ -230,7 +231,7 @@ test('migrations never rewrite history: opening twice leaves the same version', 
 test('a tip written through one OpsDb tipStore() seeds a fresh feed over the same DB', async () => {
   const p = tempDbPath();
   const db = new OpsDb({
-    path: p,
+    sql: openSqliteFile(p),
     now: () => 1_700_000_000,
     master: {getMaster: () => TEST_MASTER},
   });
@@ -276,7 +277,7 @@ test('a tip written through one OpsDb tipStore() seeds a fresh feed over the sam
 test('a NULL-height anchor_tip row (pre-migration-2) seeds nothing', async () => {
   const p = tempDbPath();
   const db = new OpsDb({
-    path: p,
+    sql: openSqliteFile(p),
     now: () => 1_700_000_000,
     master: {getMaster: () => TEST_MASTER},
   });
@@ -303,4 +304,41 @@ test('a NULL-height anchor_tip row (pre-migration-2) seeds nothing', async () =>
   );
   db.close();
   fs.rmSync(path.dirname(p), {recursive: true, force: true});
+});
+
+test('batch admission rejects invalid counts and limits before creating recovery metadata', () => {
+  const db = testDb();
+  db.db
+    .prepare(
+      "INSERT INTO operators (name, password_hash, key_env, created) VALUES ('op', 'test', 'issued', 1)",
+    )
+    .run();
+  const input = {
+    count: 1,
+    mintUrl: 'https://mint.test',
+    pinPolicy: 'perCard' as const,
+    dailyUsd: 0,
+    noPinUsd: 0,
+    loadSha256: 'test',
+    operatorId: 1,
+  };
+  for (const invalid of [
+    {count: 1.5},
+    {count: NaN},
+    {dailyUsd: -1},
+    {dailyUsd: Infinity},
+    {noPinUsd: -1},
+    {noPinUsd: NaN},
+  ]) {
+    assert.throws(() => createBatch(db, {...input, ...invalid}), BatchError);
+  }
+  assert.equal(
+    (
+      db.db.prepare('SELECT COUNT(*) AS n FROM key_batches').get() as {
+        n: number;
+      }
+    ).n,
+    0,
+  );
+  assert.equal(createBatch(db, input).count, 1);
 });
