@@ -4,7 +4,8 @@ ENG-741, 2026-10-20. This is the implementation contract for the operator app,
 cardkit and ops service after [D30](DECISIONS.md#d30). It does not enable consumer
 issuance or change the 2.1 applet wire. [D31](DECISIONS.md#d31) records the
 decisions. The service reservation endpoints below are implemented; the durable
-attempt journal, durable batch coordinator and reservation transport now exist;
+attempt journal, durable batch coordinator, reservation transport and injected
+card orchestration now exist;
 the real screen/NFC loop is not wired yet. [D32](DECISIONS.md#d32) records
 the HTTP migration and restored-service admission gate.
 
@@ -180,9 +181,14 @@ complete batch is still recognized by the service, retaining device identity.
 The schema 2 envelope uses the existing fixed storage key; a standalone schema 1
 attempt stops without replacement because its batch evidence is missing.
 
-These helpers remain unconnected to the current screen/legacy outbox. Explicit
-quarantine disposition acknowledgement and repair, real bind/key/record NFC
-orchestration, phone termination evidence and personalization remain pending.
+These helpers remain unconnected to the current screen/legacy outbox. The
+injected `provisioningTap.ts` orchestration binds before mutation, adopts only
+complete new installations, recovers rotation with the same assigned set and
+replays records without NFC. Quarantine disposition intent/receipt handling is
+implemented by `acknowledgeQuarantine`; unresolved chip repair, partial-install
+repair, phone termination evidence and personalization remain pending.
+[D35](DECISIONS.md#d35) records the conservative stop and observed-key-version
+rules. The real screen/NFC session adapter remains gated.
 
 ## Stages and recovery decisions
 
@@ -226,7 +232,8 @@ on the matched chip and same ordinal. If the applet exists but tag/package
 verification is incomplete, either finish only the missing non-destructive
 steps with a reviewed reconciliation helper or quarantine. Do not sweep a
 generated applet key merely to simplify recovery. This helper does not exist
-in current cardkit.
+in current cardkit. The first orchestrator conservatively quarantines all absent
+or incomplete resumed installs; automatic clean-and-load recovery is not wired.
 
 An intentional reinstall is a new attempt with a new ordinal and installation
 history, explicit consent and the normal empty-card guards. Retain the old
@@ -292,6 +299,12 @@ Replace the ambiguous placeholder `key_id: 2` with an explicit observed
 `gp_key_version` in the new record. It is the SCP02 key version, not the ordinal,
 escrow identity or applet version. Current captures use in-place KVN `01`;
 expose the actual handshake/result metadata rather than hardcoding it.
+
+Cardkit now exposes `inspectInstallation(tx)` for typed, read-only 2.1
+inspection and `confirmManagerKeys(tx, keys, options)` for assigned-only
+confirmation without PUT KEY. Successful rotation/confirmation returns the
+key version observed during authentication; the app persists that version
+before freezing the record. Parser/model tests do not establish chip behavior.
 
 `provision()` installs applets; it does not configure the mint, owner, PIN or
 limits. `rotated` therefore does not mean ready for the holder. Before enabling

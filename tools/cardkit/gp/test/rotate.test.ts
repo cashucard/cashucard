@@ -213,3 +213,50 @@ describe('rotateKeys', () => {
     assert.ok(!JSON.stringify(r).includes(toHex(SPIKE_KEYS.enc).slice(0, 8)));
   });
 });
+
+describe('observed manager key version', () => {
+  it('reports the reopened version rather than assuming in-place version 01', async () => {
+    const card = new FakeCard();
+    const result = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options({putKey: {newKvn: 0x22}}),
+    );
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(result.keyVersion, 0x22);
+    card.reset();
+    const resumed = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options(),
+    );
+    assert.equal(resumed.ok, true);
+    assert.equal(resumed.rotated, false);
+    assert.equal(resumed.keyVersion, 0x22);
+    assert.equal(card.failedAuths, 0);
+  });
+  it('confirmation authenticates only the assigned set and never sends PUT KEY', async () => {
+    const {confirmManagerKeys} = await import('../provision');
+    const card = new FakeCard();
+    const wrong = await confirmManagerKeys(
+      card.transceive,
+      SPIKE_KEYS,
+      options(),
+    );
+    assert.equal(wrong.kind, 'wrongKeys');
+    assert.deepEqual(card.insLog(), [0xa4, 0x50]);
+    assert.equal(card.failedAuths, 0);
+    card.reset();
+    const at = card.log.length;
+    const confirmed = await confirmManagerKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      options(),
+    );
+    assert.equal(confirmed.ok, true);
+    assert.equal(confirmed.keyVersion, 1);
+    assert.deepEqual(card.insLog().slice(at), [0xa4, 0x50, 0x82]);
+  });
+});

@@ -308,7 +308,12 @@ export class Session {
   readonly macOverModifiedApdu: boolean;
   private lastMac: number[] | null = null;
 
-  constructor(keys: SessionKeys, options: SessionOptions = {}) {
+  constructor(
+    keys: SessionKeys,
+    options: SessionOptions = {},
+    /** The version observed in the authenticated INITIALIZE UPDATE, if known. */
+    readonly keyVersion?: number,
+  ) {
     this.keys = {
       enc: bytes(keys.enc),
       mac: bytes(keys.mac),
@@ -370,7 +375,7 @@ export async function externalAuthenticate(
   hs: Handshake,
   options: SessionOptions = {},
 ): Promise<Session> {
-  const session = new Session(keys, options);
+  const session = new Session(keys, options, hs.reply.kvn);
   const cryptogram = hostCryptogram(
     keys.enc,
     hs.reply.seq,

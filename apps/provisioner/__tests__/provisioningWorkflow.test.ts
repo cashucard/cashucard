@@ -6,6 +6,7 @@ import {
   type BatchSettings,
 } from '../src/provisioningWorkflow';
 import {ApiServiceError} from '../src/api';
+import {runReservedAttempt} from '../src/provisioningTap';
 import type {
   CompletionRecord,
   CompletionReceipt,
@@ -212,7 +213,7 @@ test('terminal receipt and batch advancement commit together, including a lost a
     await j.installIntent({installation_id: null, replacement_consent: false});
     await j.installed(key, {complete: true});
     await j.rotationIntent();
-    await j.rotated();
+    await j.rotated(1);
     await j.freezeRecord(record);
   });
   const frozen = w.snapshot().active!.journal!.frozen_record;
@@ -260,7 +261,7 @@ test('terminal receipt and batch advancement commit together, including a lost a
     await j.installIntent({installation_id: key, replacement_consent: true});
     await j.installed(secondKey, {complete: true});
     await j.rotationIntent();
-    await j.rotated();
+    await j.rotated(1);
     await j.freezeRecord(secondRecord);
   });
   f.remote().state = 'recorded';
@@ -309,4 +310,160 @@ test('closing a batch cannot hide incomplete work', async () => {
   await w.reserveNext(f.service);
   await expect(w.closeBatch(f.service)).rejects.toThrow('reconciliation');
   expect(w.snapshot().active).not.toBeNull();
+});
+
+test('lost quarantine acknowledgement requires explicit operator acknowledgement before consuming the next ordinal', async () => {
+  const f = fixture();
+  let w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  await w.start(f.service, config);
+  await w.reserveNext(f.service);
+  f.remote().chip_id = chip;
+  f.remote().revision = 1;
+  await w.reconcile(f.service);
+  await w.withAttempt(f.service, j => j.quarantine('authentication-failed'));
+  const service = {
+    ...f.service,
+    disposition: jest.fn(
+      async (
+        _device: string,
+        id: string,
+        intent: import('../src/journal').DispositionIntent,
+      ) => {
+        const receipt = {
+          attempt_id: id,
+          kind: intent.kind,
+          reason: intent.reason,
+          revision: intent.revision + 1,
+          acknowledged_at: 123,
+        };
+        f.remote().state = intent.kind;
+        f.remote().revision = receipt.revision;
+        f.remote().disposition_receipt = receipt;
+        throw new Error('reply lost');
+      },
+    ),
+  };
+  await expect(w.acknowledgeQuarantine(service, 'quarantined')).rejects.toThrow(
+    'reply lost',
+  );
+  expect(w.snapshot().active!.journal!.disposition_intent).toEqual({
+    kind: 'quarantined',
+    reason: 'authentication-failed',
+    revision: 1,
+  });
+  w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  await w.reconcile(service);
+  expect(w.snapshot().history).toHaveLength(0);
+  expect(w.snapshot().active!.journal!.disposition_receipt).toBeDefined();
+  await expect(w.acknowledgeQuarantine(service, 'abandoned')).rejects.toThrow();
+  await w.acknowledgeQuarantine(service, 'quarantined');
+  expect(service.disposition).toHaveBeenCalledTimes(1);
+  expect(w.snapshot().active).toBeNull();
+  expect(w.snapshot().history[0]).toMatchObject({
+    stage: 'quarantined',
+    chip_id: chip,
+    quarantine_reason: 'authentication-failed',
+  });
+  expect(w.snapshot().batch!.next_ordinal).toBe(1);
+  await w.reserveNext(service);
+  expect(w.snapshot().active!.ordinal).toBe(1);
+});
+
+test('completion retry uses the frozen record without keys or NFC whether its first POST reached the service or not', async () => {
+  for (const committed of [false, true]) {
+    const f = fixture();
+    let w = await ProvisioningWorkflow.open(f.storage, f.newId);
+    await w.start(f.service, config);
+    await w.reserveNext(f.service);
+    f.remote().chip_id = chip;
+    f.remote().revision = 1;
+    await w.reconcile(f.service);
+    const id = w.snapshot().active!.attempt_id;
+    const body: CompletionRecord = {
+      attempt_id: id,
+      batch_id: 42,
+      ordinal: 0,
+      operator_id: 7,
+      device_id: w.snapshot().device_id,
+      chip_id: chip,
+      installation_id: key,
+      display_id: key.slice(-4),
+      gp_key_version: 1,
+      load_sha256: config.load_sha256,
+      key_env: 'issued',
+      configuration_revision: 1,
+      verified_stage: 'rotated',
+      verified_at: 123,
+    };
+    await w.withAttempt(f.service, async j => {
+      await j.installIntent({
+        installation_id: null,
+        replacement_consent: false,
+      });
+      await j.installed(key, {complete: true});
+      await j.rotationIntent();
+      await j.rotated(1);
+      await j.freezeRecord(body);
+    });
+    const frozen = w.snapshot().active!.journal!.frozen_record!;
+    let calls = 0;
+    const receipt: CompletionReceipt = {
+      attempt_id: id,
+      installation_id: key,
+      revision: 2,
+      recorded_at: 456,
+      verified_stage: 'rotated',
+      ready_for_holder: false,
+    };
+    const service = {
+      ...f.service,
+      bind: jest.fn(async () => {
+        throw new Error('no binding on record retry');
+      }),
+      keys: jest.fn(async () => {
+        throw new Error('no keys on record retry');
+      }),
+      disposition: jest.fn(async () => {
+        throw new Error('no disposition on record retry');
+      }),
+      record: jest.fn(
+        async (
+          _device: string,
+          _id: string,
+          _revision: number,
+          recordBody: string,
+        ) => {
+          expect(recordBody).toBe(frozen);
+          calls++;
+          if (committed || calls > 1) {
+            f.remote().state = 'recorded';
+            f.remote().revision = 2;
+            f.remote().completion_receipt = receipt;
+          }
+          if (calls === 1) {
+            throw new Error('reply lost');
+          }
+          return receipt;
+        },
+      ),
+    };
+    await expect(w.postRecord(service)).rejects.toThrow('reply lost');
+    w = await ProvisioningWorkflow.open(f.storage, f.newId);
+    const withCard = jest.fn(async () => {
+      throw new Error('no NFC on record retry');
+    });
+    expect(
+      await runReservedAttempt(w, service, {
+        withCard,
+        random: () => [],
+        now: () => 0,
+        verifiedAt: () => 999,
+      }),
+    ).toBe('recorded');
+    expect(service.keys).not.toHaveBeenCalled();
+    expect(withCard).not.toHaveBeenCalled();
+    expect(service.record).toHaveBeenCalledTimes(committed ? 1 : 2);
+    expect(w.snapshot().history[0].frozen_record).toBe(frozen);
+    expect(w.snapshot().batch!.next_ordinal).toBe(1);
+  }
 });

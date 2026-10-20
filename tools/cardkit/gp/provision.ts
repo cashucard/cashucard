@@ -247,6 +247,8 @@ interface Outcome {
 }
 
 export interface RotateResult extends RunResult<RotatePhase> {
+  /** Confirmed active key version from the successful authentication. */
+  keyVersion?: number;
   /** Which set the card proved. */
   active?: 'from' | 'to';
   /** False when the card was already on `to` (a PUT KEY whose reply was lost). */
@@ -658,7 +660,12 @@ export async function rotateKeys(
     if (toKeys) {
       await externalAuthenticate(run.timed, toKeys, hs, sessionOptions);
       run.enter('done');
-      return {...run.finish({ok: true}), active: 'to', rotated: false};
+      return {
+        ...run.finish({ok: true}),
+        active: 'to',
+        rotated: false,
+        keyVersion: hs.reply.kvn,
+      };
     }
     const session = await externalAuthenticate(
       run.timed,
@@ -675,9 +682,45 @@ export async function rotateKeys(
     expectOk(await session.send(run.timed, command), 0xd8);
     run.enter('reopen');
     expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
-    await openSession(run.timed, to, options.random, sessionOptions);
+    const reopened = await openSession(
+      run.timed,
+      to,
+      options.random,
+      sessionOptions,
+    );
     run.enter('done');
-    return {...run.finish({ok: true}), active: 'to', rotated: true};
+    return {
+      ...run.finish({ok: true}),
+      active: 'to',
+      rotated: true,
+      keyVersion: reopened.keyVersion,
+    };
+  } catch (e) {
+    return run.fail(e);
+  }
+}
+
+/** Confirm only this set, without PUT KEY or a fallback authentication. */
+export async function confirmManagerKeys(
+  tx: Transceiver,
+  keys: KeySet,
+  options: RunOptions,
+): Promise<RotateResult> {
+  const run = new Run<RotatePhase>(tx, options, 'selectIsd');
+  try {
+    run.enter('selectIsd');
+    expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+    run.enter('auth');
+    const session = await openSession(run.timed, keys, options.random, {
+      macOverModifiedApdu: options.macOverModifiedApdu,
+    });
+    run.enter('done');
+    return {
+      ...run.finish({ok: true}),
+      active: 'to',
+      rotated: false,
+      keyVersion: session.keyVersion,
+    };
   } catch (e) {
     return run.fail(e);
   }
