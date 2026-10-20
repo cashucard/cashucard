@@ -36,7 +36,7 @@ async function mountSignIn(
   (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
     operatorSession:
       impl === 'resolve'
-        ? async () => ({env: 'issued', token: 't'})
+        ? async () => ({operator_id: 1, env: 'issued', token: 't'})
         : impl === 'reject-unreachable'
         ? async () => {
             throw new ApiUnreachableError();
@@ -84,22 +84,22 @@ async function fillCredentials(
 
 test('a failed sign-in renders SIGNIN.failed with the service reason, and retries on press', async () => {
   const tree = await mountSignIn('reject-reason');
-  expect(text(tree)).not.toContain('SIGNIN.failed');
+  expect(text(tree!)).not.toContain('SIGNIN.failed');
 
   await fillCredentials(tree);
   await ReactTestRenderer.act(async () => {
     await tree.root.findByProps({testID: 'sign-in'}).props.onPress();
   });
-  expect(text(tree)).toContain(SIGNIN.failed('bad-credentials'));
+  expect(text(tree!)).toContain(SIGNIN.failed('bad-credentials'));
 
   // retry on press: this time it resolves
   (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-    operatorSession: async () => ({env: 'issued', token: 't'}),
+    operatorSession: async () => ({operator_id: 1, env: 'issued', token: 't'}),
   }));
   await ReactTestRenderer.act(async () => {
     await tree.root.findByProps({testID: 'sign-in'}).props.onPress();
   });
-  expect(text(tree)).not.toContain(SIGNIN.failed('bad-credentials'));
+  expect(text(tree!)).not.toContain(SIGNIN.failed('bad-credentials'));
   await ReactTestRenderer.act(() => {
     tree.unmount();
   });
@@ -111,7 +111,7 @@ test('an unreachable service renders the unreachable reason (S1: the service-sid
   await ReactTestRenderer.act(async () => {
     await tree.root.findByProps({testID: 'sign-in'}).props.onPress();
   });
-  expect(text(tree)).toContain(
+  expect(text(tree!)).toContain(
     SIGNIN.failed('the record service cannot be reached'),
   );
   await ReactTestRenderer.act(() => {
@@ -149,7 +149,7 @@ test('S5: exactly one environment is ever lit, from the session env', async () =
   for (const [env, expected] of cases) {
     if (env) {
       (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-        operatorSession: async () => ({env, token: 't'}),
+        operatorSession: async () => ({operator_id: 1, env, token: 't'}),
       }));
     } else {
       (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
@@ -263,7 +263,7 @@ test('CLOSE BATCH with pending rows shows the note first; the second press close
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'close-batch'}).props.onPress();
   });
-  expect(text(tree)).toContain(SUMMARY.pendingNote);
+  expect(text(tree!)).toContain(SUMMARY.pendingNote);
   expect(onClosed).not.toHaveBeenCalled();
 
   await ReactTestRenderer.act(() => {
@@ -314,7 +314,7 @@ test('retryPending flips the batch view pending flags via a successful retry pas
   // at post time — a flag the scripted client reads, not a re-mock.
   let postSucceeds = false;
   (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-    operatorSession: async () => ({env: 'issued', token: 't'}),
+    operatorSession: async () => ({operator_id: 1, env: 'issued', token: 't'}),
     postCard: async () => {
       if (!postSucceeds) {
         throw new Error('503');
@@ -386,7 +386,7 @@ test('a 401 on the retry pass signs the session out (an expired 12 h token canno
   ) as typeof import('../src/api');
   let postSucceeds = true;
   (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-    operatorSession: async () => ({env: 'issued', token: 't'}),
+    operatorSession: async () => ({operator_id: 1, env: 'issued', token: 't'}),
     postCard: async () => {
       if (!postSucceeds) {
         throw new ApiServiceError('no-session', 401);
@@ -450,7 +450,7 @@ test('a 401 on the retry pass signs the session out (an expired 12 h token canno
   await ReactTestRenderer.act(async () => {
     await state!.retryPending();
   });
-  expect(state!.signedIn).toBe(false, 'the 401 signed the session out');
+  expect(state!.signedIn).toBe(false);
   expect(state!.session).toBeNull();
   await ReactTestRenderer.act(() => {
     tree!.unmount();
@@ -474,7 +474,7 @@ test('a 401 expiry keeps the outbox: sign out, sign back in, retryPending re-pos
   const posted: unknown[] = [];
   let authMode: 'ok' | 'unauthorized' = 'ok';
   (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-    operatorSession: async () => ({env: 'issued', token: 't'}),
+    operatorSession: async () => ({operator_id: 1, env: 'issued', token: 't'}),
     postCard: async (_token: string, row: unknown) => {
       if (authMode === 'unauthorized') {
         throw new ApiServiceError('no-session', 401);
@@ -597,7 +597,7 @@ test('a real-mode stopped row carries no demo field; the summary prints no (demo
       </AppStore>,
     );
   });
-  expect(text(tree)).not.toContain('(demo:');
+  expect(text(tree!)).not.toContain('(demo:');
   await ReactTestRenderer.act(() => {
     tree!.unmount();
   });
@@ -618,7 +618,7 @@ test('a manual signOut with pending rows keeps the outbox; an empty one is dropp
   const posted: unknown[] = [];
   let postSucceeds = false;
   (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-    operatorSession: async () => ({env: 'issued', token: 't'}),
+    operatorSession: async () => ({operator_id: 1, env: 'issued', token: 't'}),
     postCard: async (_token: string, row: unknown) => {
       if (!postSucceeds) {
         throw new Error('503');

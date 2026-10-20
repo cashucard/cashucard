@@ -7,6 +7,9 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
+import GearSvg from '../src/assets/gear.svg';
+import {GearButton} from '../src/ui';
+import {DARK, ThemeProvider} from '../src/theme';
 
 test('opens on sign-in; a signed-in session reaches batch setup; demo mode raises its banner', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
@@ -26,7 +29,7 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   const {ApiClient} = require('../src/api');
   jest
     .spyOn(ApiClient.prototype, 'operatorSession')
-    .mockResolvedValue({env: 'issued', token: 'test-token'});
+    .mockResolvedValue({operator_id: 1, env: 'issued', token: 'test-token'});
   // S1's typed credentials: the screen no longer carries a default operator.
   await ReactTestRenderer.act(async () => {
     await tree!.root
@@ -104,4 +107,14 @@ test('the sign-in screen demo door enters demo mode with no session (design revi
   await ReactTestRenderer.act(() => {
     tree!.unmount();
   });
+});
+
+test('the settings gear receives its theme tint through the SVG color prop', () => {
+  const tree = ReactTestRenderer.create(
+    <ThemeProvider value={DARK}>
+      <GearButton onPress={() => undefined} />
+    </ThemeProvider>,
+  );
+  expect(tree.root.findByType(GearSvg).props.color).toBe(DARK.dim);
+  tree.unmount();
 });

@@ -1,3 +1,9 @@
+import type {
+  ReservationService,
+  RemoteBatch,
+  ReservedAttempt,
+} from './provisioningWorkflow';
+
 /**
  * The one HTTP surface to the ops service (ENG-740): fetch with a timeout and
  * typed errors, so tests mock this module and nothing else. The outbox holds
@@ -21,6 +27,7 @@ export interface CardRegistryRow {
 }
 
 export interface OperatorSession {
+  readonly operator_id: number;
   readonly env: 'factory' | 'issued';
   readonly token: string;
 }
@@ -34,6 +41,7 @@ export class ApiServiceError extends Error {
 }
 
 export class ApiUnreachableError extends Error {
+  readonly cause?: unknown;
   constructor(cause?: unknown) {
     super('the record service cannot be reached');
     this.name = 'ApiUnreachableError';
@@ -139,7 +147,55 @@ export class ApiClient {
     if (env !== 'factory' && env !== 'issued') {
       throw new ApiServiceError('the service named no known key environment');
     }
-    return {env, token: String(json.token)};
+    if (
+      !Number.isSafeInteger(json.operator_id) ||
+      (json.operator_id as number) <= 0 ||
+      typeof json.token !== 'string' ||
+      !json.token ||
+      json.kind !== 'operator'
+    ) {
+      throw new ApiServiceError('the operator session is malformed');
+    }
+    return {operator_id: json.operator_id as number, env, token: json.token};
+  }
+
+  /** Session-bound reservation transport; credentials remain in memory. */
+  reservations(session: OperatorSession): ReservationService {
+    return {
+      scope: {
+        service_origin: this.options.baseUrl,
+        operator_id: session.operator_id,
+        key_env: session.env,
+      },
+      batch: async request =>
+        (
+          await this.call(
+            'POST',
+            '/provisioning/batches',
+            session.token,
+            request,
+          )
+        ).batch as unknown as RemoteBatch,
+      reserve: async request =>
+        (
+          await this.call(
+            'POST',
+            '/provisioning/attempts',
+            session.token,
+            request,
+          )
+        ).attempt as unknown as ReservedAttempt,
+      attempt: async (device_id, attempt_id) =>
+        (
+          await this.call(
+            'GET',
+            `/provisioning/attempts/${encodeURIComponent(
+              attempt_id,
+            )}?device_id=${encodeURIComponent(device_id)}`,
+            session.token,
+          )
+        ).attempt as unknown as ReservedAttempt,
+    };
   }
 
   /** GET /mints — the real-mode mint list. */

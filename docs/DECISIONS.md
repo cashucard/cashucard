@@ -1405,3 +1405,60 @@ write routes as a bypass; marking an installed-only attempt terminal before it
 can retrieve its assigned rotation keys; restoring escrow without workflow
 identity; automatically reopening issuance after restoring an older snapshot.
 The app journal, personalization and device verification remain separate gates.
+
+## <a id="d33"></a>D33: One awaited nonsecret journal snapshot for phone recovery
+
+**Decided (ENG-741 journal foundation, 2026-10-20):** use one versioned JSON
+value in AsyncStorage, with a single coordinator owning its writer. Each
+transition awaits replacement of the whole value before its dependent action.
+The attempt journal and frozen completion body therefore cannot be committed
+independently. Pin AsyncStorage 2.2.0 for the existing React Native 0.77 app.
+Its installed Android implementation uses a SQLite transaction; iOS writes
+values and the manifest atomically. This source inspection does not prove
+power-loss durability on either phone; operator termination drills remain a
+release gate. Pods, native builds and device runs remain operator work.
+
+Any failed commit latches the writer until storage is reopened: a rejected
+promise may still have committed. Malformed/foreign-scope state cannot be
+silently replaced. No journal deletion, account-specific hidden copy or
+clear-on-sign-out is provided. Frozen records have an exact PIN-free schema;
+quarantine stores controlled reason codes rather than exception transcripts.
+
+**Rejected:** independent writes for stage and completion body; using progress
+callbacks as commit barriers; regenerating an attempt after storage failure;
+storing bearer tokens or manager keys to simplify restart. The first module
+implements one already-reserved attempt. Durable batch creation/progression,
+reservation reconciliation, terminal archival, app wiring and physical-card
+verification are still required before enabling the real loop.
+
+## <a id="d34"></a>D34: Persist batch creation and reservation before service calls
+
+**Decided (ENG-741 coordinator, 2026-10-20):** the phone's schema 2 snapshot
+holds its stable device UUID, scoped PIN-free batch request, pending reservation,
+active attempt journal and acknowledged history together under D33's storage
+key. The coordinator serializes service calls and journal transitions. Persist
+each creation UUID before its POST. After a lost response, repeat that exact
+request; once acknowledged, inspect the attempt instead of recreating it. A
+missing acknowledged attempt or changed scope stops for reconciliation.
+
+A server reservation consumes an ordinal but does not advance local batch
+progress. Save the matching terminal receipt, then archive the attempt and
+advance the batch in one replacement. Completion of installation/rotation is
+still not personalization. Quarantined/abandoned server states stop this first
+coordinator; explicit disposition acknowledgement remains to be implemented.
+
+**Amends D33's no-deletion rule:** an explicit completed-batch close may discard
+local acknowledged history only after all ordinals have terminal completion
+receipts, no active attempt remains, and the service recognizes the complete
+batch. Keep device identity and the service's installation history. Closing or
+switching an unfinished batch, automatic sign-out clearing and silent recovery
+from corrupt storage remain forbidden. A restored service's admission pause
+also prevents closing away the phone's newer evidence.
+
+**Rejected:** two local storage keys for batch progression and attempt state;
+creating a new UUID on timeout; treating the service's consumed ordinal as
+completed progress; trusting username as operator identity; silently upgrading
+an old standalone attempt snapshot without its missing batch evidence. Such
+schema 1 evidence is retained and stops for reconciliation. The coordinator,
+transport and storage adapter are still not wired into the real screen/NFC
+loop; native termination checks and personalization remain release gates.

@@ -4,7 +4,8 @@ ENG-741, 2026-10-20. This is the implementation contract for the operator app,
 cardkit and ops service after [D30](DECISIONS.md#d30). It does not enable consumer
 issuance or change the 2.1 applet wire. [D31](DECISIONS.md#d31) records the
 decisions. The service reservation endpoints below are implemented; the durable
-app journal and real NFC loop are not wired yet. [D32](DECISIONS.md#d32) records
+attempt journal, durable batch coordinator and reservation transport now exist;
+the real screen/NFC loop is not wired yet. [D32](DECISIONS.md#d32) records
 the HTTP migration and restored-service admission gate.
 
 An interrupted run keeps the same reserved batch and ordinal. Resume identifies
@@ -162,6 +163,26 @@ reporting, not a persistence boundary. Write intent outside `provision()` and
 `rotateKeys()`. The storage implementation must demonstrate app-termination
 recovery on each phone; local fake-store tests cannot establish power-loss
 durability on a device.
+
+`apps/provisioner/src/journal.ts` handles attempt transitions; the schema 2
+`provisioningWorkflow.ts` coordinator embeds that journal with the batch request,
+pending reservation, stable device UUID and acknowledged history in the same
+snapshot. See [D33](DECISIONS.md#d33) and [D34](DECISIONS.md#d34). It persists
+creation UUIDs before POST, replays lost responses with the same identity,
+retains server revisions and stops when an acknowledged attempt disappears.
+It scopes requests to the authenticated operator ID returned by sign-in.
+
+The coordinator's `withAttempt` serializes journal commits with batch operations;
+the future NFC caller must verify the card before reporting success and await
+intent before card commands. `advance` reconciles the receipt and commits
+history/progress together. `closeBatch` only releases local history after a
+complete batch is still recognized by the service, retaining device identity.
+The schema 2 envelope uses the existing fixed storage key; a standalone schema 1
+attempt stops without replacement because its batch evidence is missing.
+
+These helpers remain unconnected to the current screen/legacy outbox. Explicit
+quarantine disposition acknowledgement and repair, real bind/key/record NFC
+orchestration, phone termination evidence and personalization remain pending.
 
 ## Stages and recovery decisions
 
