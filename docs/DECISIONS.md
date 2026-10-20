@@ -1259,3 +1259,54 @@ off the critical path. Asking Foxy to rebase 1.21 onto 2.1 unilaterally: it
 puts a large ask on the partner in the same breath as the freeze talk; the
 scope conversation decides the direction first, and the work follows the
 decision.
+
+---
+
+## <a id="d29"></a>D29: The ops service — one service, one DB, keys derived from a master, escrowed at issuance, never resident on a phone
+
+**Decided (ENG-740, 2026-10-19):** the per-card card-manager keys are issued by
+one lnflash-operated service (`ops/`), backed by one SQLite DB, built in the
+cashu-card tree but extractable with its own lockfile from day one. Keys derive
+deterministically from a runtime-injected master (`OPS_MASTER_KEY`) by
+HKDF-SHA256 — salt is the batch's ordinal salt, info is `"gp-enc"|"gp-mac"|
+"gp-dek"` plus the card's ordinal — and the derive-and-escrow is one
+transaction, so a lost response re-issues byte-identical sets and no
+issued-but-unescrowed state can exist. Key sets are never resident on a phone
+beyond the run that fetched them; the phone is the transport (D27), the service
+is the vault.
+
+**Hosting (PROPOSED pending Foxy sign-off):** a dedicated droplet, never
+co-located with the forge mint — the escrow DB is fleet-wide card-manager keys
+and keeps its own perimeter (its own backups, its own alerting). See
+[`OPS-GOVERNANCE.md`](OPS-GOVERNANCE.md); that document's sign-off gates
+Phase 5b, not this build.
+
+**The retry contract:** the provisioner's registry re-POST is idempotent — an
+identical body re-posted returns the stored row, a changed body for an existing
+short id is a 409. This is the contract
+[`PROVISIONER-APP.md`](PROVISIONER-APP.md) S4 named and the outbox freezes the
+first body, so a partial field change between retries cannot become a 409 the
+bench cannot resolve.
+
+**Why one service, one DB.** The alternative — derive keys on the phone at
+rotation time — puts a fleet-wide master (or a per-card KMS round-trip) inside
+every consumer app on both platforms; the alternative — escrow on write,
+separately from issuance — leaves a window where a card exists whose keys are
+nowhere but the phone that just lost the tap. One deterministic derivation and
+one transactional write close both, at the cost the threat model states:
+whoever holds the escrow holds every card in it.
+
+**Why deterministic derivation rather than random keys.** Random per-card keys
+need their own durable storage *before* they reach the card — a lost response
+after PUT KEY but before the reply is the exact case that broke the 2026-10-18
+drills' model — and HKDF's 32-byte output is what the 16-byte key sets want
+anyway. The cost is that the ordinal space is load-bearing: a batch restarted
+or programmed out of order can write the wrong ordinal into a card's history,
+which the registry cross-checks in tests
+([`OPS-THREAT-MODEL.md`](OPS-THREAT-MODEL.md) #5's residual risks).
+
+**Cross-links:** the threat model is
+[`OPS-THREAT-MODEL.md`](OPS-THREAT-MODEL.md); the partner conversation is
+[`OPS-GOVERNANCE.md`](OPS-GOVERNANCE.md). Master key custody is a config seam
+(`ops/src/master.ts`), not a product choice — the KMS/HSM decision is open and
+deliberately cheap to change.
