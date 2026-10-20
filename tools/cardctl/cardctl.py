@@ -1422,14 +1422,31 @@ DEFAULT_OPS_URL = "http://127.0.0.1:8821"
 
 
 def fetch_tip(url: str) -> bytes:
-    """GET {url}/anchor/tip and return the 80-byte header. Test-injectable."""
+    """GET {url}/anchor/tip and return the 80-byte header. Test-injectable.
+
+    A 503 is the service's last-good answer, not a failure: its body carries
+    the stale header (and the reason), which parse_header still validates.
+    Only a connection error, a non-JSON body, or a header-less 503 stops the
+    command.
+    """
+    import urllib.error
     import urllib.request
 
     req = urllib.request.Request(url.rstrip("/") + "/anchor/tip")
+    body = None
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:
+    except urllib.error.HTTPError as exc:
+        # The 503-with-last-good contract (ops/src/router.ts): the body names
+        # the stale header. Other HTTP errors carry no usable header.
+        try:
+            body = json.loads(exc.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001 — a body we cannot read is no body
+            body = None
+        if exc.code != 503 or not isinstance(body, dict) or "header" not in body:
+            raise SystemExit(f"the tip feed at {url} answered HTTP {exc.code}")
+    except Exception as exc:  # noqa: BLE001 — surface the transport's words
         raise SystemExit(f"the tip feed at {url} did not answer: {exc}")
     header = body.get("header")
     if not isinstance(header, str):
