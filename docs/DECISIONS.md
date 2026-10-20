@@ -1340,3 +1340,38 @@ consumer UI calls the stub was rejected: the endpoint itself grants access.
 Platform PITR alone was rejected as recovery because it shares the account's
 failure boundary. Tests stay focused on business invariants and runtime
 differences rather than duplicating every route across both backends.
+
+## <a id="d31"></a>D31: Provisioning identity and recovery belong to a durable attempt
+
+**Decided (ENG-741 contract, 2026-10-20):** use a server-reserved attempt and a
+durable local journal to bind one operator/device, batch and ordinal to an
+installation. Preserve that identity across lost replies and app termination.
+Use composite J3R180 CPLC fields as the pre-install substitution guard, subject
+to hardware verification; public CPLC is not ownership authentication. Use the
+full applet public key for installation identity and keep the two-byte suffix
+for display only. Intentional reinstall creates a new attempt and history.
+
+Commit install/rotation intent before invoking cardkit, because progress
+callbacks are not awaited. Keep the inspected pre-install key and replacement
+consent separate from the new installation key, so a crash before DELETE cannot
+mislabel the untouched old applet as a completed replacement. After rotation
+intent, recovery never reinstalls:
+refetch the same assigned manager set, match chip and saved applet key, and use
+cardkit's offline cryptogram matching to recover PUT KEY uncertainty without
+trial logins. Authentication failures quarantine across restart. Completion is
+idempotent by attempt, with a frozen record committed before POST.
+Recognize identical retries before rejecting stale revisions. Acknowledged
+terminal quarantine consumes the ordinal and frees the device for another safe
+card while preserving the unresolved chip's block and installation history.
+
+**Rejected:** using a display suffix or changing applet key to identify blank
+silicon; treating NFC UID, CPLC or diversification data as authorization;
+allocating another ordinal after a timeout; automatically sweeping an installed
+applet on resume; persisting manager keys, PINs or tokens to simplify restart;
+equating installation/rotation with complete PIN/mint/owner personalization.
+
+The [contract](PROVISIONER-RECOVERY.md) defines proposed service routes, journal
+stages, migration and acceptance checks. It records existing code/capture
+evidence separately from the pending phone verification and personalization
+contract. This is an implementation decision, not a claim those features or
+hardware checks have shipped; the real batch loop remains gated on them.

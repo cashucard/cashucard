@@ -15,6 +15,9 @@ The current delivery gates are in
 [`OPS-WORKERS-PLAN.md`](OPS-WORKERS-PLAN.md): operator provisioning first,
 durable recovery of interrupted attempts and pending records, then consumer
 provisioning after identity and per-card authorization are enforced.
+The operator's durable attempt and interrupted-install behavior are defined in
+[`PROVISIONER-RECOVERY.md`](PROVISIONER-RECOVERY.md); this contract precedes
+enabling the real batch loop.
 
 The numbers the design lives with (from
 [`HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md`](HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md)):

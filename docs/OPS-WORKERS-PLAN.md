@@ -117,6 +117,12 @@ and access remain subject to [governance sign-off](OPS-GOVERNANCE.md).
 
 ## ENG 741 operator provisioning gates
 
+The implementation contract is now
+[`PROVISIONER-RECOVERY.md`](PROVISIONER-RECOVERY.md), recorded in
+[D31](DECISIONS.md#d31). It fixes the identities, proposed reservation API,
+durable stages and recovery decisions; hardware verification and personalization
+remain explicit gates.
+
 The review found that `LoopScreen.run` currently calls `runDemo` even outside
 demo mode; real batch creation, escrow fetch and NFC orchestration are still
 unimplemented. `shortIdOf()` is a two-byte display suffix, not a unique fleet
