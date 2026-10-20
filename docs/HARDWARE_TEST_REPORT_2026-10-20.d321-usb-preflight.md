@@ -45,3 +45,22 @@ Do not clear or replace it. Next diagnosis would require a separately approved
 read-only version inspection that records the SELECT response. Disposability,
 manager-key provenance, funds/owner state and installation public key remain
 unknown. No further physical attempt was made.
+
+## Replacement card — read-only identity and version
+
+The operator supplied another card and requested a check for the right version.
+On the same named ACS reader, one connection sent only SELECT ISD, GET CPLC
+and SELECT full card applet, using the plan's exact APDUs. CPLC framing and
+nonzero/non-FF serial were validated before applet selection. This was discovery
+of the newly supplied card, not a comparison against the previous card's ID.
+The connection used SCARD_LEAVE_CARD and disconnected normally; no retries.
+
+- Operational identity: `cplc-v1:4790d3213041093363205547`.
+- Applet SELECT data: `0201`; status: `9000` (protocol 2.1).
+- Serial: `09336320`, matching the earlier 2026-10-18 install-report spare.
+- No GET_INFO, GET_PUBKEY, tag inspection, authentication or writes were sent.
+
+This establishes the expected SELECT version only, not CAP identity, current
+manager-key state, funds, ownership or replacement consent. The existing
+first-write plan names a different card and requires absence of the applet;
+this result does not authorize that plan on the replacement card.
