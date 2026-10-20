@@ -1375,3 +1375,33 @@ stages, migration and acceptance checks. It records existing code/capture
 evidence separately from the pending phone verification and personalization
 contract. This is an implementation decision, not a claim those features or
 hardware checks have shipped; the real batch loop remains gated on them.
+
+## <a id="d32"></a>D32: Reservation scoped HTTP access and paused provisioning after restore
+
+**Decided (ENG-741 service implementation, 2026-10-20):** expose idempotent,
+PIN-free provisioning batches and operator/device-bound attempts. Reserve one
+active attempt per device, consume ordinals monotonically, bind chip identity,
+and retain immutable full-key installation and terminal disposition receipts.
+Recognize an authorized identical retry before testing its submitted revision.
+Terminal completion requires confirmed rotation and still says
+`ready_for_holder: false`; installation alone remains an active recovery stage.
+
+`/keys/issue` requires a known owned attempt and device; numeric batch/ordinal
+IDs alone never authorize lookup. Retire the old batch/card POST endpoints with
+410 so they cannot bypass reservation and identity checks. Keep legacy reads
+operator-scoped and PIN-free. Login supplies stable operator identity; bodies
+cannot override the session principal or key environment.
+
+Export version 2 carries provisioning request identities, bindings, revisions,
+consumed ordinals, blocked chips and receipts alongside escrow. Version 1 stays
+legacy. Every restore pauses provisioning mutations and key reads, permitting
+inspection only until reconciliation. An older snapshot cannot distinguish a
+genuinely new creation UUID from a retry whose first write was lost. No HTTP
+unlock exists; a reviewed recovery admission/client fencing procedure is still
+required before reopening the restored service.
+
+**Rejected:** accepting numeric lookup as a compatibility fallback; leaving old
+write routes as a bypass; marking an installed-only attempt terminal before it
+can retrieve its assigned rotation keys; restoring escrow without workflow
+identity; automatically reopening issuance after restoring an older snapshot.
+The app journal, personalization and device verification remain separate gates.

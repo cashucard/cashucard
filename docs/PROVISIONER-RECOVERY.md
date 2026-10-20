@@ -3,7 +3,9 @@
 ENG-741, 2026-10-20. This is the implementation contract for the operator app,
 cardkit and ops service after [D30](DECISIONS.md#d30). It does not enable consumer
 issuance or change the 2.1 applet wire. [D31](DECISIONS.md#d31) records the
-decisions. The endpoints and journal below are not implemented yet.
+decisions. The service reservation endpoints below are implemented; the durable
+app journal and real NFC loop are not wired yet. [D32](DECISIONS.md#d32) records
+the HTTP migration and restored-service admission gate.
 
 An interrupted run keeps the same reserved batch and ordinal. Resume identifies
 the presented chip, inspects the existing installation, and continues only the
@@ -74,12 +76,12 @@ replace operator authentication. Sharing batches or automatic device takeover
 is outside this first contract; operator reassignment needs an explicit,
 audited reconciliation procedure.
 
-Operator sign-in must return the stable `operator_id` alongside token and key
-environment; the current response does not. Never infer that identity from the
+Operator sign-in returns the stable `operator_id` alongside token and key
+environment. Never infer that identity from the
 typed username. Load pending journals before enabling batch creation, and stop
 if loading storage fails rather than generating another device identity.
 
-The following are proposed operator-only routes. Authenticate before returning
+The following are operator-only service routes. Authenticate before returning
 reservation state or keys; enforce ownership on every mutation and key fetch.
 
 | Route | Required behavior |
@@ -113,9 +115,25 @@ attempt, durably acknowledge that outcome before reserving the next ordinal.
 Recovering a lost local journal requires explicit operator reconciliation with
 server reservations; it must not silently start a fresh device or batch.
 
-The existing `/keys/issue` must be extended or wrapped to require the authorized
-reservation. Fetch the same escrow set for that batch/ordinal into memory before
+`POST /keys/issue` now requires `attempt_id` and `device_id`; optional numeric
+batch/ordinal references must match that authorized active reservation. There
+is no numeric-only fallback, even for legacy rows. Fetch the same escrow set for
+that batch/ordinal into memory before
 arming NFC; never enumerate other ordinals to find a matching key.
+
+Legacy `POST /registry/batches` and `POST /registry/cards` return 410. Their GET
+routes expose only the signed-in operator's legacy data, with no PIN values.
+New full-key installation records live separately and are reached through their
+attempt receipts; they are not synthesized into the suffix-only legacy list.
+An inaccessible operator/device binding returns 404. No route accepts a body
+operator identity as authority.
+
+The completion body is strict: `attempt_id`, `batch_id`, `ordinal`, `chip_id`,
+`installation_id`, `display_id`, `load_sha256`, `gp_key_version`, `operator_id`,
+`device_id`, `key_env`, `configuration_revision: 1`, `verified_stage: "rotated"`
+and `verified_at` (Unix seconds). Completion returns `ready_for_holder: false`:
+personalization is not implemented. An installed-only attempt remains active
+and can fetch its assigned set for rotation; it cannot be terminally recorded.
 
 ## Durable local journal
 
@@ -231,6 +249,15 @@ version and retain reservations, batch request identities, chip bindings, full
 installation history and completion receipts, excluding credentials and PINs.
 Restore must preserve idempotency so a retry cannot create another batch or
 installation after disaster recovery.
+
+Export version 2 preserves those provisioning tables and accepts version 1 as
+legacy recovery without inventing reservations. Every restore sets a durable
+`recovery_required` gate. Authenticated attempt inspection remains available;
+all provisioning mutations and key fetches stop with 409 until reconciliation.
+This also prevents an unknown POST from silently becoming a new request after
+its original request identity was lost from an older backup. No HTTP unlock is
+provided. Reopening admission requires a reviewed operator reconciliation and
+client fencing procedure; clearing the database flag alone is not that procedure.
 
 Snapshots must preserve request fingerprints, operator/device scope, attempts,
 revisions, terminal dispositions and receipts in the same consistent snapshot

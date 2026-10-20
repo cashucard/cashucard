@@ -97,11 +97,51 @@ test('disabled holder sign-in and legacy tokens cannot retrieve keys; operators 
     password: 'test',
   });
   assert.equal(operator.status, 200);
+  const operatorToken = (operator.body as {token: string}).token;
+  const deviceId = '00000000-0000-4000-8000-000000000001';
+  const attemptId = '00000000-0000-4000-8000-000000000003';
+  const reservedBatch = await call(
+    deps,
+    '/provisioning/batches',
+    {
+      device_id: deviceId,
+      batch_request_id: '00000000-0000-4000-8000-000000000002',
+      count: 1,
+      mint_url: 'https://mint.test',
+      pin_policy: 'perCard',
+      daily_usd: 1,
+      no_pin_usd: 0,
+      load_sha256: 'ab'.repeat(32),
+    },
+    operatorToken,
+  );
+  assert.equal(reservedBatch.status, 200);
+  const reservedBatchId = (reservedBatch.body as {batch: {batch_id: number}})
+    .batch.batch_id;
+  assert.equal(
+    (
+      await call(
+        deps,
+        '/provisioning/attempts',
+        {
+          device_id: deviceId,
+          attempt_id: attemptId,
+          batch_id: reservedBatchId,
+          ordinal: 0,
+        },
+        operatorToken,
+      )
+    ).status,
+    200,
+  );
   const issued = await call(
     deps,
     '/keys/issue',
-    {batch_id: batch.id, ordinal: 0},
-    (operator.body as {token: string}).token,
+    {
+      attempt_id: attemptId,
+      device_id: deviceId,
+    },
+    operatorToken,
   );
   assert.equal(issued.status, 200);
   assert.match((issued.body as {enc: string}).enc, /^[0-9a-f]{32}$/);

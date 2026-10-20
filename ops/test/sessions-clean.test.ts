@@ -104,35 +104,56 @@ test('every phone-cacheable route carries no key material; only /keys/issue does
     assertNoKeyMaterial(signin.json, 'sign-in');
     assert.equal(signin.json.env, 'issued');
 
-    const batch = await call(base, 'POST', '/registry/batches', token, {
+    const batch = await call(base, 'POST', '/provisioning/batches', token, {
+      device_id: '00000000-0000-4000-8000-000000000001',
+      batch_request_id: '00000000-0000-4000-8000-000000000002',
       count: 2,
       mint_url: 'https://forge.flashapp.me',
       pin_policy: 'perCard',
       daily_usd: 25,
       no_pin_usd: 5,
-      load_sha256: 'fe7d8ac3',
+      load_sha256: 'fe'.repeat(32),
     });
     assert.equal(batch.status, 200);
     assertNoKeyMaterial(batch.json, 'batch create');
-    const batchId = (batch.json.batch as Record<string, unknown>).id as number;
+    const batchId = (batch.json.batch as Record<string, unknown>)
+      .batch_id as number;
 
     const mints = await call(base, 'GET', '/mints', token);
     assert.equal(mints.status, 200);
     assertNoKeyMaterial(mints.json, 'mints');
 
-    const cards = await call(base, 'POST', '/registry/cards', token, {
-      short_id: '9c2f',
-      batch_id: batchId,
-      key_id: 2,
-      ordinal: 0,
-      installed_at: 1,
-      installer: 'op@bench-1',
-      load_sha256: 'fe7d8ac3',
-    });
-    assert.equal(cards.status, 200);
-    assertNoKeyMaterial(cards.json, 'registry post');
-    const stored = cards.json.stored as Record<string, unknown>;
-    assertNoKeyMaterial(stored, 'registry stored row');
+    const attemptId = '00000000-0000-4000-8000-000000000003';
+    const deviceId = '00000000-0000-4000-8000-000000000001';
+    const reservation = await call(
+      base,
+      'POST',
+      '/provisioning/attempts',
+      token,
+      {
+        device_id: deviceId,
+        attempt_id: attemptId,
+        batch_id: batchId,
+        ordinal: 0,
+      },
+    );
+    assert.equal(reservation.status, 200);
+    assertNoKeyMaterial(reservation.json, 'reservation');
+    assertNoKeyMaterial(
+      reservation.json.attempt as Record<string, unknown>,
+      'stored reservation',
+    );
+    const attemptRead = await call(
+      base,
+      'GET',
+      `/provisioning/attempts/${attemptId}?device_id=${deviceId}`,
+      token,
+    );
+    assert.equal(attemptRead.status, 200);
+    assertNoKeyMaterial(
+      attemptRead.json.attempt as Record<string, unknown>,
+      'reservation read',
+    );
 
     const cardsRead = await call(
       base,
@@ -147,8 +168,8 @@ test('every phone-cacheable route carries no key material; only /keys/issue does
 
     // The one route that DOES return keys: exactly one, the per-run fetch.
     const issue = await call(base, 'POST', '/keys/issue', token, {
-      batch_id: batchId,
-      ordinal: 0,
+      attempt_id: attemptId,
+      device_id: deviceId,
     });
     assert.equal(issue.status, 200);
     for (const f of KEY_FIELDS) {

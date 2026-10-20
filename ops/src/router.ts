@@ -13,10 +13,11 @@
  *   POST /auth/operator/signout   revoke the bearer's own session
  *   GET  /auth/operator/sessions  the operator's live sessions (operator only)
  *   POST /auth/operator/revoke    revoke a principal's live sessions (operator only)
- *   POST /keys/issue              {batch_id, ordinal}; operator only
+ *   POST /keys/issue              {device_id, attempt_id}; owned active reservation
  *   GET  /mints                   active mint list
  *   GET  /anchor/tip              PUBLIC: 80-byte header, 60 s cache, 503 with last-good
- *   POST /registry/cards          operator-only, idempotent upsert (identical -> 200, changed -> 409)
+ *   POST /provisioning/*          operator-only durable reservations and receipts
+ *   POST /registry/cards          retired: 410 reservation-required
  *   GET  /registry/cards?batch_id operator only
  *   POST /registry/cap-releases   operator only
  */
@@ -32,17 +33,13 @@ import {
   Session,
 } from './auth';
 import {AnchorFeed} from './anchor';
-import {BatchError, createBatch, listBatches} from './batches';
+import {listBatches} from './batches';
 import {OpsDb} from './db';
 import type {PasswordHasher} from './pwhash';
-import {HolderIssueState, issueKeys} from './issue';
-import {
-  addCapRelease,
-  getCard,
-  listCapReleases,
-  recordCard,
-  RegistryError,
-} from './registry';
+import {HolderIssueState} from './issue';
+import {ProvisioningError} from './provisioning';
+import {provisioningHttp, reservedKeys} from './provisioning-http';
+import {addCapRelease, listCapReleases, RegistryError} from './registry';
 
 const BODY_LIMIT = 1 << 20; // 1 MiB; a registry row is a few hundred bytes
 
@@ -131,6 +128,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
     'content-type': 'application/json',
+    'cache-control': 'no-store',
     'content-length': Buffer.byteLength(payload),
   });
   res.end(payload);
@@ -184,6 +182,7 @@ export async function route(
       sendJson(res, 200, {
         token: issued.token,
         kind: issued.session.kind,
+        operator_id: issued.session.principalId,
         env: issued.session.env,
         expires_at: issued.session.expiresAt,
       });
@@ -235,34 +234,28 @@ export async function route(
       return;
     }
 
-    // ── keys ──────────────────────────────────────────────────────────────
-    if (method === 'POST' && path === '/keys/issue') {
-      requireOperator(deps, req);
-      const body = parseJson(await readBody(req));
-      const batchId = intField(body, 'batch_id');
-      const ordinal = intField(body, 'ordinal');
-      const result = issueKeys(
+    // The new operator workflow is reservation-scoped before any key read.
+    if (path.startsWith('/provisioning/')) {
+      const session = requireOperator(deps, req);
+      const body = method === 'POST' ? parseJson(await readBody(req)) : {};
+      const result = provisioningHttp(
         deps.db,
-        batchId,
-        ordinal,
-        {kind: 'operator'},
-        deps.holderState,
+        session,
+        method,
+        path,
+        url,
+        body,
       );
-      if (!result.ok) {
-        const status = result.reason === 'rate-limited' ? 429 : 404;
-        sendJson(res, status, {reason: result.reason});
-        return;
-      }
-      // The one response a phone takes keys from; nothing else the phone can
-      // call returns key material (ops/test/sessions-clean.test.ts pins it).
-      sendJson(res, 200, {
-        batch_id: result.keys.batch_id,
-        ordinal: result.keys.ordinal,
-        enc: result.keys.enc.toString('hex'),
-        mac: result.keys.mac.toString('hex'),
-        dek: result.keys.dek.toString('hex'),
-        escrowed_at: result.keys.escrowed_at,
-      });
+      sendJson(res, result.status, result.body);
+      return;
+    }
+    if (method === 'POST' && path === '/keys/issue') {
+      const session = requireOperator(deps, req);
+      sendJson(
+        res,
+        200,
+        reservedKeys(deps.db, session, parseJson(await readBody(req))),
+      );
       return;
     }
 
@@ -301,53 +294,29 @@ export async function route(
 
     // ── registry: cards ───────────────────────────────────────────────────
     if (method === 'POST' && path === '/registry/cards') {
-      // Operator-only (OPS-GOVERNANCE Q4): the operator posts registries and
-      // the holder's only path is one-shot key issuance — a holder token
-      // must not write registry rows.
       requireOperator(deps, req);
-      const body = parseJson(await readBody(req));
-      const row = {
-        short_id: strField(body, 'short_id'),
-        batch_id: intField(body, 'batch_id'),
-        key_id: intField(body, 'key_id'),
-        ordinal: intField(body, 'ordinal'),
-        installed_at: intField(body, 'installed_at'),
-        installer: strField(body, 'installer'),
-        load_sha256: strField(body, 'load_sha256'),
-      };
-      try {
-        const result = recordCard(deps.db, row);
-        if (result.kind === 'conflict') {
-          // The existing row, so the caller can see WHAT differs; a bare
-          // {kind: 'conflict'} names no row at all.
-          const existing = getCard(deps.db, row.short_id);
-          sendJson(res, 409, {
-            reason: 'short-id-exists',
-            stored: existing,
-          });
-          return;
-        }
-        sendJson(res, 200, {stored: result.row});
-      } catch (e) {
-        if (e instanceof RegistryError) {
-          throw new HttpError(400, 'bad-row', e.message);
-        }
-        throw e;
-      }
-      return;
+      throw new HttpError(
+        410,
+        'reservation-required',
+        'use the provisioning attempt record endpoint',
+      );
     }
     if (method === 'GET' && path === '/registry/cards') {
-      requireOperator(deps, req);
-      const batchId = Number.parseInt(
-        url.searchParams.get('batch_id') ?? '',
-        10,
-      );
-      if (!Number.isInteger(batchId)) {
+      const session = requireOperator(deps, req);
+      const rawId = url.searchParams.get('batch_id');
+      const batchId = rawId ? Number(rawId) : NaN;
+      if (!Number.isSafeInteger(batchId) || batchId < 1) {
         throw new HttpError(
           400,
           'bad-field',
-          'batch_id is an integer query parameter',
+          'batch_id is a positive integer query parameter',
         );
+      }
+      const batch = deps.db.db
+        .prepare('SELECT operator_id FROM key_batches WHERE id = ?')
+        .get(batchId) as {operator_id: number} | undefined;
+      if (!batch || batch.operator_id !== session.principalId) {
+        throw new HttpError(404, 'not-found', 'no owned batch');
       }
       sendJson(res, 200, {cards: recordCardList(deps, batchId)});
       return;
@@ -380,55 +349,32 @@ export async function route(
 
     // ── batches (operator: the registry read the summary screens want) ────
     if (method === 'POST' && path === '/registry/batches') {
-      const session = requireOperator(deps, req);
-      const body = parseJson(await readBody(req));
-      try {
-        const batch = createBatch(deps.db, {
-          count: intField(body, 'count'),
-          mintUrl: strField(body, 'mint_url'),
-          pinPolicy:
-            body.pin_policy === 'batch'
-              ? 'batch'
-              : body.pin_policy === 'perCard'
-                ? 'perCard'
-                : (() => {
-                    throw new HttpError(
-                      400,
-                      'bad-field',
-                      'pin_policy is batch|perCard',
-                    );
-                  })(),
-          pinBatch:
-            typeof body.pin_batch === 'string' ? body.pin_batch : undefined,
-          dailyUsd: typeof body.daily_usd === 'number' ? body.daily_usd : 0,
-          noPinUsd: typeof body.no_pin_usd === 'number' ? body.no_pin_usd : 0,
-          loadSha256: strField(body, 'load_sha256'),
-          operatorId: session.principalId,
-        });
-        sendJson(res, 200, {
-          batch: {...batch, ordinal_salt: batch.ordinal_salt.toString('hex')},
-        });
-      } catch (e) {
-        if (e instanceof BatchError) {
-          throw new HttpError(400, 'bad-batch', e.message);
-        }
-        throw e;
-      }
-      return;
+      requireOperator(deps, req);
+      throw new HttpError(
+        410,
+        'reservation-required',
+        'use idempotent provisioning batch creation',
+      );
     }
     if (method === 'GET' && path === '/registry/batches') {
-      requireOperator(deps, req);
+      const session = requireOperator(deps, req);
       sendJson(res, 200, {
-        batches: listBatches(deps.db).map(b => ({
-          ...b,
-          ordinal_salt: b.ordinal_salt.toString('hex'),
-        })),
+        batches: listBatches(deps.db)
+          .filter(b => b.operator_id === session.principalId)
+          .map(b => {
+            const {pin_batch: _pin, ...visible} = b;
+            return {...visible, ordinal_salt: b.ordinal_salt.toString('hex')};
+          }),
       });
       return;
     }
 
     sendJson(res, 404, {reason: 'no-such-route'});
   } catch (e) {
+    if (e instanceof ProvisioningError) {
+      sendJson(res, e.status, {reason: e.code, message: e.message});
+      return;
+    }
     if (e instanceof LoginRateLimitError) {
       sendJson(res, 429, {reason: 'login-rate-limited', message: e.message});
       return;

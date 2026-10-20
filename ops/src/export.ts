@@ -8,6 +8,11 @@ import * as age from 'age-encryption';
 
 import type {SqlHandle} from './sql';
 import type {CardRow, CapReleaseRow} from './registry';
+import {
+  assertChipId,
+  assertInstallationId,
+  assertCompletionRecord,
+} from './provisioning';
 
 export interface EscrowRow {
   readonly batch_id: number;
@@ -37,8 +42,7 @@ export interface RecoveryBatch {
   operator_id: number;
   created: number;
 }
-export interface EscrowExport {
-  readonly version: 1;
+export interface EscrowExportBase {
   readonly exported_at: number;
   readonly operators: readonly RecoveryOperator[];
   readonly batches: readonly RecoveryBatch[];
@@ -46,6 +50,49 @@ export interface EscrowExport {
   readonly cards: readonly CardRow[];
   readonly cap_releases: readonly CapReleaseRow[];
 }
+
+export interface RecoveryProvisioningBatch {
+  batch_id: number;
+  request_id: string;
+  operator_id: number;
+  device_id: string;
+  config_json: string;
+  key_env: 'factory' | 'issued';
+  next_ordinal: number;
+  created: number;
+}
+export interface RecoveryProvisioningAttempt {
+  attempt_id: string;
+  batch_id: number;
+  ordinal: number;
+  operator_id: number;
+  device_id: string;
+  revision: number;
+  state: 'active' | 'recorded' | 'quarantined' | 'abandoned';
+  chip_id: string | null;
+  created: number;
+  bind_receipt: string | null;
+  disposition_json: string | null;
+  disposition_receipt: string | null;
+}
+export interface RecoveryProvisioningRecord {
+  attempt_id: string;
+  installation_id: string;
+  display_id: string;
+  body_json: string;
+  receipt_json: string;
+  recorded_at: number;
+}
+export type EscrowExport = EscrowExportBase &
+  (
+    | {readonly version: 1}
+    | {
+        readonly version: 2;
+        readonly provisioning_batches: readonly RecoveryProvisioningBatch[];
+        readonly provisioning_attempts: readonly RecoveryProvisioningAttempt[];
+        readonly provisioning_records: readonly RecoveryProvisioningRecord[];
+      }
+  );
 
 export interface ExportResult {
   /** The armored age file, R2-ready. */
@@ -92,7 +139,7 @@ export async function exportEscrowSql(
   const snapshot = db.transaction(
     () =>
       ({
-        version: 1 as const,
+        version: 2 as const,
         exported_at: now,
         operators: db
           .prepare(
@@ -111,6 +158,15 @@ export async function exportEscrowSql(
           ...row,
           ordinal_salt: Buffer.from(row.ordinal_salt).toString('hex'),
         })),
+        provisioning_batches: db
+          .prepare('SELECT * FROM provisioning_batches ORDER BY batch_id')
+          .all() as RecoveryProvisioningBatch[],
+        provisioning_attempts: db
+          .prepare('SELECT * FROM provisioning_attempts ORDER BY attempt_id')
+          .all() as RecoveryProvisioningAttempt[],
+        provisioning_records: db
+          .prepare('SELECT * FROM provisioning_records ORDER BY attempt_id')
+          .all() as RecoveryProvisioningRecord[],
         keys: readEscrow(db),
         cards: db
           .prepare('SELECT * FROM cards ORDER BY short_id')
@@ -148,9 +204,9 @@ export async function decryptEscrowExport(
 export function validateEscrowExport(
   value: unknown,
 ): asserts value is EscrowExport {
-  const fail = (): never => {
+  function fail(): never {
     throw new Error('invalid recovery export');
-  };
+  }
   const object = (v: unknown): Record<string, unknown> => {
     if (!v || typeof v !== 'object' || Array.isArray(v)) return fail();
     return v as Record<string, unknown>;
@@ -178,8 +234,9 @@ export function validateEscrowExport(
       x.forEach(row => shape(row, fields));
       return true;
     };
+  const version = object(value).version;
   shape(value, {
-    version: x => x === 1,
+    version: x => x === 1 || x === 2,
     exported_at: integer,
     operators: rows({
       id: positive,
@@ -217,6 +274,45 @@ export function validateEscrowExport(
       load_sha256: text,
     }),
     cap_releases: rows({version: text, sha256: hex(64), created: integer}),
+    ...(version === 2
+      ? {
+          provisioning_batches: rows({
+            batch_id: positive,
+            request_id: text,
+            operator_id: positive,
+            device_id: text,
+            config_json: text,
+            key_env: x => x === 'factory' || x === 'issued',
+            next_ordinal: integer,
+            created: integer,
+          }),
+          provisioning_attempts: rows({
+            attempt_id: text,
+            batch_id: positive,
+            ordinal: integer,
+            operator_id: positive,
+            device_id: text,
+            revision: integer,
+            state: x =>
+              ['active', 'recorded', 'quarantined', 'abandoned'].includes(
+                x as string,
+              ),
+            chip_id: x => x === null || text(x),
+            created: integer,
+            bind_receipt: x => x === null || text(x),
+            disposition_json: x => x === null || text(x),
+            disposition_receipt: x => x === null || text(x),
+          }),
+          provisioning_records: rows({
+            attempt_id: text,
+            installation_id: text,
+            display_id: x => typeof x === 'string' && /^[0-9a-f]{4}$/.test(x),
+            body_json: text,
+            receipt_json: text,
+            recorded_at: integer,
+          }),
+        }
+      : {}),
   });
   const out = value as EscrowExport;
   const unique = <T>(items: readonly T[], key: (x: T) => unknown) => {
@@ -245,12 +341,208 @@ export function validateEscrowExport(
     if (counts.get(batch.id) !== batch.count) fail();
   for (const card of out.cards)
     if (!keys.has(`${card.batch_id}:${card.ordinal}`)) fail();
+  if (out.version === 1) return; // Legacy suffix records confer no reservations.
+  const uuid = (x: unknown) =>
+    typeof x === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      x,
+    );
+  const json = (value: string): Record<string, unknown> => {
+    try {
+      return object(JSON.parse(value));
+    } catch {
+      return fail();
+    }
+  };
+  unique(out.provisioning_batches, x => x.batch_id);
+  unique(out.provisioning_batches, x => x.request_id);
+  const provisioningBatches = new Map(
+    out.provisioning_batches.map(x => [x.batch_id, x]),
+  );
+  for (const row of out.provisioning_batches) {
+    const batch = batches.get(row.batch_id);
+    const config = json(row.config_json);
+    shape(config, {
+      count: positive,
+      mint_url: text,
+      pin_policy: x => x === 'batch' || x === 'perCard',
+      daily_usd: money,
+      no_pin_usd: money,
+      load_sha256: hex(64),
+      key_env: x => x === 'factory' || x === 'issued',
+      configuration_revision: x => x === 1,
+    });
+    if (
+      !batch ||
+      !operators.has(row.operator_id) ||
+      row.operator_id !== batch.operator_id ||
+      !uuid(row.request_id) ||
+      !uuid(row.device_id) ||
+      row.next_ordinal > batch.count
+    )
+      fail();
+    for (const field of [
+      'count',
+      'mint_url',
+      'pin_policy',
+      'daily_usd',
+      'no_pin_usd',
+      'load_sha256',
+    ] as const)
+      if (config[field] !== batch[field]) fail();
+    if (config.key_env !== row.key_env) fail();
+  }
+  unique(out.provisioning_attempts, x => x.attempt_id);
+  unique(out.provisioning_attempts, x => `${x.batch_id}:${x.ordinal}`);
+  unique(
+    out.provisioning_attempts.filter(x => x.state === 'active'),
+    x => x.device_id,
+  );
+  unique(
+    out.provisioning_attempts.filter(
+      x => x.chip_id !== null && x.state !== 'recorded',
+    ),
+    x => x.chip_id,
+  );
+  const attempts = new Map(
+    out.provisioning_attempts.map(x => [x.attempt_id, x]),
+  );
+  const reservedCounts = new Map<number, number>();
+  for (const row of out.provisioning_attempts) {
+    const batch = provisioningBatches.get(row.batch_id);
+    if (
+      !batch ||
+      !uuid(row.attempt_id) ||
+      row.operator_id !== batch.operator_id ||
+      row.device_id !== batch.device_id ||
+      row.ordinal >= batch.next_ordinal ||
+      !keys.has(`${row.batch_id}:${row.ordinal}`)
+    )
+      fail();
+    reservedCounts.set(
+      row.batch_id,
+      (reservedCounts.get(row.batch_id) ?? 0) + 1,
+    );
+    if (row.chip_id !== null) {
+      try {
+        assertChipId(row.chip_id);
+      } catch {
+        fail();
+      }
+      if (row.bind_receipt === null) fail();
+      const receipt = json(row.bind_receipt!);
+      shape(receipt, {
+        attempt_id: uuid,
+        chip_id: text,
+        revision: positive,
+        bound_at: integer,
+      });
+      if (
+        receipt.attempt_id !== row.attempt_id ||
+        receipt.chip_id !== row.chip_id ||
+        (receipt.revision as number) > row.revision
+      )
+        fail();
+    } else if (row.bind_receipt !== null) fail();
+    if (row.state === 'quarantined' || row.state === 'abandoned') {
+      if (row.disposition_json === null || row.disposition_receipt === null)
+        fail();
+      const disposition = json(row.disposition_json!);
+      shape(disposition, {kind: x => x === row.state, reason: text});
+      const receipt = json(row.disposition_receipt!);
+      shape(receipt, {
+        attempt_id: uuid,
+        kind: x => x === row.state,
+        reason: text,
+        revision: positive,
+        acknowledged_at: integer,
+      });
+      if (
+        receipt.attempt_id !== row.attempt_id ||
+        receipt.reason !== disposition.reason ||
+        receipt.revision !== row.revision
+      )
+        fail();
+    } else if (
+      row.disposition_json !== null ||
+      row.disposition_receipt !== null
+    )
+      fail();
+    if (row.state === 'recorded' && row.chip_id === null) fail();
+  }
+  for (const row of out.provisioning_batches)
+    if ((reservedCounts.get(row.batch_id) ?? 0) !== row.next_ordinal) fail();
+  const recordedAttempts = unique(out.provisioning_records, x => x.attempt_id);
+  unique(out.provisioning_records, x => x.installation_id);
+  for (const row of out.provisioning_records) {
+    const attempt = attempts.get(row.attempt_id);
+    const batch = attempt && provisioningBatches.get(attempt.batch_id);
+    const body = json(row.body_json);
+    try {
+      assertInstallationId(row.installation_id);
+      assertCompletionRecord(body);
+    } catch {
+      fail();
+    }
+    if (
+      !attempt ||
+      !batch ||
+      attempt.state !== 'recorded' ||
+      row.display_id !== row.installation_id.slice(-4)
+    )
+      fail();
+    for (const field of [
+      'attempt_id',
+      'batch_id',
+      'ordinal',
+      'operator_id',
+      'device_id',
+      'chip_id',
+    ] as const)
+      if (body[field] !== attempt[field]) fail();
+    if (
+      body.installation_id !== row.installation_id ||
+      body.display_id !== row.display_id ||
+      body.key_env !== batch.key_env ||
+      body.load_sha256 !== batches.get(batch.batch_id)!.load_sha256
+    )
+      fail();
+    // Wall-clock timestamps can move backward; revisions and identity establish
+    // ordering. Preserve observed times rather than rejecting a valid snapshot.
+    const receipt = json(row.receipt_json);
+    shape(receipt, {
+      attempt_id: uuid,
+      installation_id: text,
+      revision: positive,
+      recorded_at: integer,
+      verified_stage: x => x === 'rotated',
+      ready_for_holder: x => x === false,
+    });
+    if (
+      receipt.attempt_id !== row.attempt_id ||
+      receipt.installation_id !== row.installation_id ||
+      receipt.revision !== attempt.revision ||
+      receipt.recorded_at !== row.recorded_at ||
+      receipt.verified_stage !== body.verified_stage
+    )
+      fail();
+  }
+  for (const row of out.provisioning_attempts)
+    if ((row.state === 'recorded') !== recordedAttempts.has(row.attempt_id))
+      fail();
 }
 
 /** Empty-service recovery only. Operators are disabled until controlled credential reset. */
 export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
   validateEscrowExport(payload);
   db.transaction(() => {
+    const control = db
+      .prepare(
+        'SELECT recovery_required FROM provisioning_control WHERE id = 1',
+      )
+      .get() as {recovery_required: number} | undefined;
+    if (!control || control.recovery_required !== 0)
+      throw new Error('recovery requires an empty service');
     for (const table of [
       'operators',
       'sessions',
@@ -259,6 +551,9 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
       'cards',
       'cap_releases',
       'anchor_tip',
+      'provisioning_batches',
+      'provisioning_attempts',
+      'provisioning_records',
     ]) {
       if (db.prepare(`SELECT 1 FROM ${table} LIMIT 1`).get())
         throw new Error('recovery requires an empty service');
@@ -301,11 +596,59 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
         r.installer,
         r.load_sha256,
       );
+    if (payload.version === 2) {
+      for (const r of payload.provisioning_batches)
+        db.prepare(
+          'INSERT INTO provisioning_batches (batch_id, request_id, operator_id, device_id, config_json, key_env, next_ordinal, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).run(
+          r.batch_id,
+          r.request_id,
+          r.operator_id,
+          r.device_id,
+          r.config_json,
+          r.key_env,
+          r.next_ordinal,
+          r.created,
+        );
+      for (const r of payload.provisioning_attempts)
+        db.prepare(
+          'INSERT INTO provisioning_attempts (attempt_id, batch_id, ordinal, operator_id, device_id, revision, state, chip_id, created, bind_receipt, disposition_json, disposition_receipt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        ).run(
+          r.attempt_id,
+          r.batch_id,
+          r.ordinal,
+          r.operator_id,
+          r.device_id,
+          r.revision,
+          r.state,
+          r.chip_id,
+          r.created,
+          r.bind_receipt,
+          r.disposition_json,
+          r.disposition_receipt,
+        );
+      for (const r of payload.provisioning_records)
+        db.prepare(
+          'INSERT INTO provisioning_records (attempt_id, installation_id, display_id, body_json, receipt_json, recorded_at) VALUES (?, ?, ?, ?, ?, ?)',
+        ).run(
+          r.attempt_id,
+          r.installation_id,
+          r.display_id,
+          r.body_json,
+          r.receipt_json,
+          r.recorded_at,
+        );
+    }
     for (const r of payload.cap_releases)
       db.prepare('INSERT INTO cap_releases VALUES (?, ?, ?)').run(
         r.version,
         r.sha256,
         r.created,
       );
+    // A backup may predate phone-side intents. Never recreate or issue against
+    // that uncertainty until the operator reconciles outstanding reservations.
+    db.prepare(
+      'UPDATE provisioning_control SET recovery_required = 1 WHERE id = 1',
+    ).run();
   });
 }
