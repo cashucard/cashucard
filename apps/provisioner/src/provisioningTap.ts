@@ -21,6 +21,7 @@ import {
   type Transceiver,
   type InstallationInspection,
 } from './cardkit';
+import type {RecoveryBoundary} from './recoveryDrills';
 import type {ProvisioningJournal} from './journal';
 import {
   ProvisioningWorkflow,
@@ -36,6 +37,8 @@ export interface TapOptions extends RunOptions {
   /** Consent for exactly this inspected old installation, never blanket replace. */
   replacementInstallationId?: string;
   verifiedAt: () => number;
+  /** Optional validation hook; receives only a public boundary name. */
+  checkpoint?: (boundary: RecoveryBoundary) => Promise<void>;
 }
 const complete = (
   observed: InstallationInspection,
@@ -100,6 +103,7 @@ export async function runProvisioningTap(
           observed.state === 'present' ? observed.installationId : null,
         replacement_consent: observed.state === 'present',
       });
+      await options.checkpoint?.('install-intent-saved');
       const installed = await provision(tx, CASHU_PLAN, {
         ...options,
         keys: FACTORY_KEYS,
@@ -121,7 +125,9 @@ export async function runProvisioningTap(
         await journal.quarantine('unsafe-partial-install');
         return 'quarantined';
       }
+      await options.checkpoint?.('installation-verified-before-save');
       await journal.installed(observed.installationId, {complete: true});
+      await options.checkpoint?.('installation-saved');
     }
     j = journal.snapshot();
     if (!complete(observed) || observed.installationId !== j.installation_id) {
@@ -130,6 +136,7 @@ export async function runProvisioningTap(
     }
     if (j.stage === 'installed') {
       await journal.rotationIntent();
+      await options.checkpoint?.('rotation-intent-saved');
     }
     j = journal.snapshot();
     if (j.stage === 'rotation_intent') {
@@ -141,7 +148,9 @@ export async function runProvisioningTap(
         await journal.quarantine('verification-failed');
         return 'quarantined';
       }
+      await options.checkpoint?.('rotation-verified-before-save');
       await journal.rotated(rotated.keyVersion!);
+      await options.checkpoint?.('rotation-saved');
     } else if (j.stage === 'rotated') {
       // A durable rotation claim permits confirmation only, never another PUT KEY.
       const confirmed = await confirmManagerKeys(tx, assigned, options);
@@ -268,6 +277,7 @@ export async function runReservedAttempt(
     );
   });
   if (result === 'record_pending') {
+    await options.checkpoint?.('record-frozen-session-closed');
     await workflow.postRecord(service);
     return 'recorded';
   }
