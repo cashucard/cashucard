@@ -27,6 +27,40 @@ The owner runs native builds, iOS pods/signing and phone actions, as required by
 [AGENTS.md](../AGENTS.md). No credential or nonpublic manager key belongs in this
 checklist, a screenshot, transcript, shell history or shared test artifact.
 
+## Authorized read-only phone run — 2026-10-20
+
+The operator explicitly instructed the agent to rebuild on the Pixel and Max
+and start read-only identity tests. This authorizes the necessary dependency,
+native build/signing, install/launch and read-only UI actions on these two
+identified phones for this run, overriding the default owner-only build/run
+assignment for this bounded task. It does not authorize installation or rotation
+APDUs, a bench run, PIN/owner operations, app-data clearing or production access.
+
+| Device | Observed identity | OS |
+|---|---|---|
+| Pixel 8 Pro | ADB `42201FDJG00048` | Android 17, API 37; patch 2026-10-05 |
+| Max, iPhone 13 Pro Max (`iPhone14,3`) | UDID `00008110-001E4CC014D8401E`; CoreDevice `810FE33E-9790-5BD9-AD8D-F985CBF85A23` | iOS 26.5.2, build 23F84 |
+
+Build merged #19, commit `1b54cf93459aeca39870b3030104071481589cff`,
+in the isolated phone-validation checkout. Keep the installation gate false.
+Use bundled Release on Max and Debug with isolated Metro port 8083 on the Pixel;
+existing Metro listeners on other ports are left alone. Preserve existing app
+data and the main checkout's uncommitted sign-in edit. The native application
+identifier is `com.islandbitcoin.provisioner` on both platforms (the older
+README identifier is stale).
+
+For each read, use the explicit Settings identity probe only, through the demo
+door so no service login is needed. The operator presents the same physical card
+from the USB baseline; expected public identity is
+`cplc-v1:4790d3213180072976207515`. Close the NFC session and remove the card
+between three deliberate reads per phone. The card APDU allowlist is SELECT ISD
+`00A4040008A00000015100000000`, then GET DATA CPLC `80CA9F7F00`.
+Record observed outcomes, never infer a pass from a successful build. If the
+card does not match the expected identity, stop and reconcile its identity.
+This run is now recorded in the
+[phone CPLC hardware report](HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md):
+three matching reads per phone, without authentication or card writes.
+
 ## Preparation checkpoints
 
 1. Review the exact merged app/cardkit/service commits and their CI results.

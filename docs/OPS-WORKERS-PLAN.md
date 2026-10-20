@@ -23,8 +23,11 @@ ENG-741 app work remain outstanding.
 The ENG-741 service increment adds scoped reservations, full installation identity
 and version 2 recovery exports. Restores pause provisioning until reconciliation
 and stale-client fencing; no unlock workflow is implemented. The durable journal, batch coordinator and injected orchestration are implemented.
-Real screens now use them behind a disabled installation gate; device CPLC and
-termination evidence and personalization remain outstanding. This increment passes 63 Node
+Real screens now use them behind a disabled installation gate. Read-only CPLC
+reads on Pixel and Max match the USB baseline on one card
+([report](HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md)); identity through
+install/rotation, distinct-card sampling, termination and personalization remain
+outstanding. This increment passes 63 Node
 tests, 11 Workers tests, both typechecks, formatting and a deployment dry run.
 
 ## Execution order and checkpoints
