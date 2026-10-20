@@ -2,7 +2,9 @@
  * S1. Sign-in, real (ENG-740): the button POSTs /auth/operator/session; a
  * failure renders the service's own reason in SIGNIN.failed(reason) and the
  * button retries on press. The stub's "admits any build" line is gone — the
- * ops service exists.
+ * ops service exists. Below the form sits demo's design-review door: demo
+ * mode with no session at all, so the screens run without a service
+ * (PROVISIONER-APP "Demo mode" — review on a phone before/without one).
  *
  * The design tier of the other screens: the wordmark as the screen's headline
  * with the load sha as its small print, the tagline centered, and the action
@@ -10,7 +12,7 @@
  * nothing floats mid-air.
  */
 import React, {useState} from 'react';
-import {StyleSheet, Text, TextInput, View} from 'react-native';
+import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 
 import {ApiUnreachableError} from '../api';
 import {APP_NAME, SIGNIN} from '../strings';
@@ -89,6 +91,12 @@ const local = (t: Theme) =>
       color: t.danger,
       fontFamily: FONT.regular,
       fontSize: 13,
+      textAlign: 'center',
+    },
+    demoLink: {
+      color: t.dim,
+      fontFamily: FONT.medium,
+      fontSize: 14,
       textAlign: 'center',
     },
   });
@@ -175,6 +183,17 @@ export function SignInScreen() {
         ) : (
           <Text style={s.note}>{SIGNIN.note}</Text>
         )}
+        {/* Demo's design-review door (PROVISIONER-APP "Demo mode"): the
+            screens run against the fake card with no session at all — the
+            store holds demo with session null, and the batch screen falls
+            back to its own mints. No service needed. */}
+        <Pressable
+          onPress={() => app.setDemo(true)}
+          disabled={busy}
+          testID="demo-entry">
+          <Text style={s.demoLink}>{SIGNIN.demo}</Text>
+          <Text style={s.note}>{SIGNIN.demoSub}</Text>
+        </Pressable>
       </View>
     </Screen>
   );

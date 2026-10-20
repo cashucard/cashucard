@@ -16,6 +16,8 @@ export const SIGNIN = {
   note: 'The key service issues this session; keys never live on this phone.',
   namePlaceholder: 'Operator name',
   passwordPlaceholder: 'Password',
+  demo: 'REVIEW IN DEMO MODE',
+  demoSub: 'No service, no card, no record — design review only.',
 };
 
 export const SETUP = {

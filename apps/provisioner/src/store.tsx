@@ -114,8 +114,6 @@ export function AppStore({
 
   const clientRef = useRef<ApiClient | null>(null);
   const outboxRef = useRef<RegistryOutbox | null>(null);
-  /** signOut, callable from retryPending without a dependency cycle. */
-  const signOutRef = useRef<() => void>(() => undefined);
   const makeClient = useCallback(
     (): ApiClient =>
       new ApiClient(clientOptions ?? {baseUrl: DEFAULT_SERVICE_URL}),
@@ -166,9 +164,10 @@ export function AppStore({
       await outbox.retryAll(sess.token);
     } catch (e) {
       // retryAll resolves per-row; a throw here is a transport-level one.
-      // A 401 means the 12 h token is dead: treat it as expiry, sign out,
-      // and let the next sign-in rebuild the outbox (the pending rows stay
-      // on the batch view until then).
+      // A 401 means the 12 h token is dead — the token, not the outbox: the
+      // frozen row bodies are still exactly what the service should receive.
+      // Expire the session but keep the outbox, so the next sign-in's retry
+      // pass re-posts the surviving rows instead of orphaning them.
       if (e instanceof ApiServiceError && e.status === 401) {
         expired = true;
       } else {
@@ -177,9 +176,9 @@ export function AppStore({
     }
     reflectAnswered();
     if (expired) {
-      // signOut is a stable closure over the setters; the ref carries it so
-      // retryPending (declared before it) can call it without a cycle.
-      signOutRef.current();
+      // expireSession is a stable closure over the setters; the ref carries
+      // it so retryPending (declared before it) can call it without a cycle.
+      expireSessionRef.current();
     }
   }, [session, reflectAnswered]);
 
@@ -204,13 +203,24 @@ export function AppStore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, session]);
 
+  /** Token died (the 401 path): clear the session, keep the outbox — its
+   * frozen bodies are still valid and the next sign-in's retry pass re-posts
+   * them. The outbox's client is the signed-in one; signIn reuses it rather
+   * than building a fresh one over pending rows. */
+  const expireSession = useCallback(() => {
+    clientRef.current = null;
+    setSession(null);
+    setSignedIn(false);
+  }, []);
+  const expireSessionRef = useRef<() => void>(() => undefined);
+  expireSessionRef.current = expireSession;
+
   const signOut = useCallback(() => {
     clientRef.current = null;
     outboxRef.current = null;
     setSession(null);
     setSignedIn(false);
   }, []);
-  signOutRef.current = signOut;
 
   const value = useMemo<AppStateShape>(
     () => ({
@@ -225,7 +235,12 @@ export function AppStore({
         try {
           const s = await client.operatorSession(name, password);
           clientRef.current = client;
-          outboxRef.current = new RegistryOutbox(client);
+          // Reuse an outbox that is still holding rows (a 401 expiry keeps
+          // it alive for exactly this); a fresh outbox here would orphan
+          // them — pending forever, never re-posted, never flipped.
+          if (!outboxRef.current) {
+            outboxRef.current = new RegistryOutbox(client);
+          }
           setSession({env: s.env, token: s.token});
           setSignedIn(true);
         } catch (e) {
@@ -262,9 +277,11 @@ export function AppStore({
         const outbox = outboxRef.current;
         const sess = session;
         if (!outbox || !sess) {
-          // No session: the row is pending by definition and the next
-          // sign-in's retry pass carries it? No — without a session there is
-          // no outbox; the row stays pending on the batch view only.
+          // Signed out with no outbox (the manual sign-out path nulls it):
+          // there is nowhere to freeze the body, so the row stays pending on
+          // the batch view only. A 401 expiry is different — it keeps the
+          // outbox alive, so rows added after it DO re-post on the next
+          // sign-in's retry pass (expireSession, above).
           setBatch(b => (b ? {...b, done: [...b.done, view]} : b));
           return;
         }

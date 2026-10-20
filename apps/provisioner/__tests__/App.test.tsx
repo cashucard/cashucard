@@ -72,3 +72,36 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   });
   jest.restoreAllMocks();
 });
+
+test('the sign-in screen demo door enters demo mode with no session (design review without a service)', async () => {
+  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(<App />);
+  });
+  const text = () =>
+    tree!.root
+      .findAll(n => typeof n.props.children === 'string')
+      .map(n => n.props.children as string)
+      .join('\n');
+  expect(text()).toContain('SIGN IN');
+
+  // No ApiClient mock here: pressing the demo door must not sign in at all —
+  // demo runs with session null, no service reached.
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'demo-entry'}).props.onPress();
+  });
+  // Past the gate, into the batch screen, with the demo marks up.
+  expect(text()).toContain('NEW BATCH');
+  expect(text()).toContain('DEMO — no card, no record');
+  expect(text()).toContain('Demo batch — placeholder values');
+
+  // Demo rows are reachable: the loop's demo chooser is present.
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'start-batch'}).props.onPress();
+  });
+  expect(tree!.root.findByProps({testID: 'demo-ok'})).toBeTruthy();
+
+  await ReactTestRenderer.act(() => {
+    tree!.unmount();
+  });
+});

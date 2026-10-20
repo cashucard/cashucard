@@ -6,7 +6,9 @@
  *
  * The sign-in gate is back (ENG-740): the ops service issues real operator
  * sessions, and a signed-in session's env is what the batch runs on. Demo
- * mode stays reachable from Settings for design review without a service.
+ * mode stays reachable for design review without a service — from the
+ * sign-in screen's demo door (no session at all; the store holds demo with
+ * session null) and from Settings once signed in.
  */
 import React, {useState} from 'react';
 import {Text, View} from 'react-native';
@@ -30,7 +32,11 @@ function Navigator(): React.JSX.Element {
   const app = useApp();
   const [route, setRoute] = useState<Route>('setup');
 
-  if (!app.signedIn) {
+  if (!app.signedIn && !app.demo) {
+    // Demo is its own door past the gate: demo mode runs every screen with
+    // no session at all (the batch screen falls back to its own mints; the
+    // loop and the summary never read the session), so a reviewer reaches it
+    // from the sign-in screen without a service.
     return <SignInScreen />;
   }
 

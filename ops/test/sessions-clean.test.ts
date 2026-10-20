@@ -243,3 +243,30 @@ test('an anchor tip 503 (no upstream in this suite) carries no key material', as
     assertNoKeyMaterial(tip.json, 'anchor 503');
   });
 });
+
+// ── GET /anchor/tip is public: cardctl's fetch_tip must reach it ────────────
+//
+// fetch_tip (tools/cardctl/cardctl.py) sends NO Authorization header — it is
+// a bench tool with no session — so the route must answer exactly that
+// request. This test drives the real router over a real socket with the
+// request fetch_tip constructs (same path, no header), not a parsed-body
+// stub, so an auth regression here is a red test rather than a dead feature.
+
+test('the exact request cardctl.fetch_tip constructs (no Authorization header) answers the tip', async () => {
+  await withServer(async base => {
+    // The one urlopen call fetch_tip makes: GET {base}/anchor/tip, no
+    // headers, 15 s timeout. Reconstructed verbatim from cardctl.py:1426-1428
+    // (a bare urllib Request carries no Authorization header; that fetch_tip
+    // adds none is pinned on the Python side, test_tip.py's header test).
+    const url = base.replace(/\/$/, '') + '/anchor/tip';
+    const res = await fetch(url, {method: 'GET'}); // no Authorization
+    assert.equal(
+      res.status,
+      503,
+      'the unauthenticated tip request reaches the route (503: no upstream here)',
+    );
+    const json = (await res.json()) as Record<string, unknown>;
+    assert.equal(json.reason, 'upstream-unavailable');
+    assertNoKeyMaterial(json, 'unauthenticated tip');
+  });
+});

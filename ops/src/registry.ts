@@ -55,6 +55,18 @@ export function recordCard(db: OpsDb, input: CardInput): UpsertResult {
       ? {kind: 'stored', row: existing}
       : {kind: 'conflict'};
   }
+  // The batch must exist before we INSERT: with foreign keys ON a stray
+  // batch_id reaches the INSERT's FK constraint, which the router rethrows
+  // as a bare 500 — a client-side typo must not read as an internal error
+  // (and, in the provisioner's outbox, a 5xx retries forever). Checked after
+  // the existing-row branch so a changed batch on a stored short_id stays a
+  // 409 conflict, the retry contract's answer, not a 400.
+  const batch = db.db
+    .prepare('SELECT id FROM key_batches WHERE id = ?')
+    .get(input.batch_id) as {id: number} | undefined;
+  if (!batch) {
+    throw new RegistryError(`no such batch ${input.batch_id}`);
+  }
   const info = db.db
     .prepare(
       `INSERT OR IGNORE INTO cards

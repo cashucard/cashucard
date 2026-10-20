@@ -229,9 +229,10 @@ python3 test_apdu.py              # every command's bytes, against spec/APDU.md
 python3 test_spec_consistency.py  # cardctl vs spec/APDU.md, NUT-XX.md and the applet, parsed
 python3 test_card_file.py         # card file read/write, against spec/CARD-FILE.md
 python3 test_hwtest_65byte_pubkey.py  # host-side pubkey normalisation used by hwtest_65byte_pubkey.py
+python3 test_tip.py               # tip / set-owner-url: the ops service's tip feed, no socket (ENG-740)
 ```
 
-All six run without a reader or a card. The BIP-340 tests matter more than they
+All seven run without a reader or a card. The BIP-340 tests matter more than they
 look: `selftest`'s verdict is only as trustworthy as the verifier behind it, so
 that verifier is checked against the specification's own vectors, round-tripped
 against an independent reference signer, and mutation-tested to prove it can

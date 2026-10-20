@@ -1,6 +1,11 @@
 /**
  * The one HTTP surface: a node:http router, no framework. Bearer-token auth
- * on every route; TLS lives at the reverse proxy, the service binds localhost.
+ * on every route but one: GET /anchor/tip is public, because its answer is
+ * public data — an 80-byte block header straight off mempool.space — and
+ * cardctl's fetch_tip (a bench tool with no session) is its caller. The
+ * sessions-clean claim (no key material in a cached response) is unaffected:
+ * the tip never carries keys. TLS lives at the reverse proxy, the service
+ * binds localhost.
  *
  * The routes (D29):
  *   POST /auth/operator/session   password -> 12 h token
@@ -10,7 +15,7 @@
  *   POST /auth/operator/revoke    revoke a principal's live sessions (operator only)
  *   POST /keys/issue              {batch_id, ordinal}; operator or one-shot holder
  *   GET  /mints                   active mint list
- *   GET  /anchor/tip              80-byte header, 60 s cache, 503 with last-good
+ *   GET  /anchor/tip              PUBLIC: 80-byte header, 60 s cache, 503 with last-good
  *   POST /registry/cards          operator-only, idempotent upsert (identical -> 200, changed -> 409)
  *   GET  /registry/cards?batch_id operator only
  *   POST /registry/cap-releases   operator only
@@ -276,7 +281,10 @@ export async function route(
 
     // ── anchor tip ────────────────────────────────────────────────────────
     if (method === 'GET' && path === '/anchor/tip') {
-      requireSession(deps, req);
+      // Deliberately public: the body is an 80-byte public block header (plus
+      // its height and fetch time) and the client is cardctl's fetch_tip, a
+      // bench tool that holds no session. Nothing here is per-card or
+      // per-operator data, so the sessions-clean claim still holds.
       const tip = await deps.anchor.tip();
       if (tip.ok) {
         sendJson(res, 200, {

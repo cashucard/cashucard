@@ -6,10 +6,22 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
+import {AnchorFeed, CACHE_SECONDS, HEADER_LEN} from '../src/anchor';
 import {createBatch} from '../src/batches';
 import {MIGRATIONS, OpsDb} from '../src/db';
 import {TEST_MASTER, testDb} from './helpers';
+
+/** A temp-file path a test can open twice (a re-open of a real DB file). */
+function tempDbPath(): string {
+  return path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ops-db-test-')),
+    'ops.db',
+  );
+}
 
 test('migrations apply forward-only to a fresh DB', () => {
   const db = testDb();
@@ -40,24 +52,35 @@ test('migrations apply forward-only to a fresh DB', () => {
 });
 
 test('a second OpsDb on the same file does not re-apply or fail', () => {
-  const db = testDb();
+  // A real file, opened twice: the first OpsDb writes a row and closes, the
+  // second re-opens the SAME path. A re-apply (or a crash on the existing
+  // schema) would show up here and nowhere in an :memory: test.
+  const p = tempDbPath();
+  const db = new OpsDb({
+    path: p,
+    master: {getMaster: () => TEST_MASTER},
+  });
   db.db
     .prepare(
       "INSERT INTO operators (name, password_hash, key_env, created) VALUES ('op', 'x', 'issued', 1)",
     )
     .run();
+  db.close();
+
   const again = new OpsDb({
-    path: ':memory:',
+    path: p,
     master: {getMaster: () => TEST_MASTER},
-    // share the underlying database by reopening the same handle's file is
-    // not possible in-memory; this just proves a fresh open is at head.
   });
   const v = again.db.prepare('SELECT version FROM schema_version').get() as {
     version: number;
   };
-  assert.equal(v.version, MIGRATIONS.length);
+  assert.equal(v.version, MIGRATIONS.length, 'the version stands at head');
+  const ops = again.db
+    .prepare('SELECT name FROM operators WHERE name = ?')
+    .get('op') as {name: string} | undefined;
+  assert.ok(ops, 'the previously written operator row survived the re-open');
   again.close();
-  db.close();
+  fs.rmSync(path.dirname(p), {recursive: true, force: true});
 });
 
 test('createBatch escrows every ordinal in one write', () => {
@@ -199,4 +222,85 @@ test('migrations never rewrite history: opening twice leaves the same version', 
   ).version;
   assert.equal(v1, v2);
   again.close();
+});
+
+// ── the anchor_tip table behaves (the threat model's "survives a restart"
+//    row, over the real store — not the hand-rolled memory one) ──────────────
+
+test('a tip written through one OpsDb tipStore() seeds a fresh feed over the same DB', async () => {
+  const p = tempDbPath();
+  const db = new OpsDb({
+    path: p,
+    now: () => 1_700_000_000,
+    master: {getMaster: () => TEST_MASTER},
+  });
+  const HEADER = Buffer.alloc(HEADER_LEN, 0xab);
+  const TIP_URL = 'https://mempool.space/api/blocks/tip/height';
+
+  // A live fetch writes the last-good header through the REAL store.
+  const live = new AnchorFeed(
+    async url => (url === TIP_URL ? Buffer.from('900000', 'ascii') : HEADER),
+    () => 1_700_000_000,
+    db.tipStore(),
+  );
+  const first = await live.tip();
+  assert.ok(first.ok, 'the live fetch answered');
+
+  // The restart: a NEW feed over the SAME DB file's tipStore(), its fetcher
+  // dead, its clock past the cache window. The stale header must come back.
+  const restarted = new AnchorFeed(
+    async () => {
+      throw new Error('upstream down after restart');
+    },
+    () => 1_700_000_000 + CACHE_SECONDS + 1,
+    db.tipStore(),
+  );
+  const r = await restarted.tip();
+  assert.ok(!r.ok, 'upstream is down after the restart');
+  assert.ok(r.ok === false && r.stale !== null, 'the last-good was seeded');
+  assert.ok(r.ok === false && r.stale!.header.equals(HEADER));
+  assert.equal(r.ok === false ? r.stale!.height : -1, 900_000);
+  assert.equal(r.ok === false ? r.stale!.fetchedAt : -1, 1_700_000_000);
+
+  // And the row itself is what the store read back: one row, id 1.
+  const row = db.db
+    .prepare('SELECT header, height, fetched_at FROM anchor_tip WHERE id = 1')
+    .get() as {header: Buffer; height: number; fetched_at: number};
+  assert.ok(row.header.equals(HEADER));
+  assert.equal(row.height, 900_000);
+
+  db.close();
+  fs.rmSync(path.dirname(p), {recursive: true, force: true});
+});
+
+test('a NULL-height anchor_tip row (pre-migration-2) seeds nothing', async () => {
+  const p = tempDbPath();
+  const db = new OpsDb({
+    path: p,
+    now: () => 1_700_000_000,
+    master: {getMaster: () => TEST_MASTER},
+  });
+  // The shape a row written before migration 2 has: header present, height NULL.
+  db.db
+    .prepare(
+      'INSERT INTO anchor_tip (id, header, height, fetched_at) VALUES (1, ?, NULL, ?)',
+    )
+    .run(Buffer.alloc(HEADER_LEN, 0xab), 1_699_999_000);
+
+  const feed = new AnchorFeed(
+    async () => {
+      throw new Error('upstream down');
+    },
+    () => 1_700_000_000,
+    db.tipStore(),
+  );
+  const r = await feed.tip();
+  assert.ok(!r.ok);
+  assert.equal(
+    r.ok === false ? r.stale : null,
+    null,
+    'a NULL-height row seeds nothing (no height, no {header, height, fetched_at} shape)',
+  );
+  db.close();
+  fs.rmSync(path.dirname(p), {recursive: true, force: true});
 });

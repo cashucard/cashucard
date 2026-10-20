@@ -63,7 +63,7 @@ is recorded as configuration, not as a measured property.
 | Registry re-POST is idempotent; a changed body is a 409 | `ops/test/registry.test.ts` |
 | Holder scope cannot read batches or write cap-releases; tokens expire and revoke | `ops/test/auth.test.ts` |
 | A stolen operator token is revoked by principal, not waited out | `ops/test/auth.test.ts` (revoke-by-principal without the stolen bearer; holder tokens cannot revoke or list) |
-| The last-good anchor header survives a restart | `ops/test/anchor.test.ts` (persist-on-fetch, seed-at-boot over a real DB) |
+| The last-good anchor header survives a restart | `ops/test/db.test.ts` (write through one OpsDb's `tipStore()`, seed a fresh AnchorFeed from the same store over the same DB file, dead fetcher past the cache window answers the stale header) and `ops/test/anchor.test.ts` (persist-on-fetch, seed-at-boot over an injected store) |
 | Tip: 80-byte validation, 60 s cache, 503 carries the last-good header | `ops/test/anchor.test.ts` |
 | No per-card key in any response a phone caches beyond one run | `ops/test/sessions-clean.test.ts` |
 | The provisioner's outbox re-posts the frozen first body | `apps/provisioner/src/api.test.ts` (a partial field change between retries cannot become a 409) |

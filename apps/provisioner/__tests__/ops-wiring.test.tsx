@@ -456,3 +456,149 @@ test('a 401 on the retry pass signs the session out (an expired 12 h token canno
     tree!.unmount();
   });
 });
+
+test('a 401 expiry keeps the outbox: sign out, sign back in, retryPending re-posts the surviving rows', async () => {
+  // The orphan scenario the 401 fix exists for: token expires mid-batch with
+  // pending rows -> 401 -> sign out -> sign in. The outbox's frozen bodies
+  // are still valid — only the token died — so the fresh session's retry
+  // pass must re-post them; a fresh outbox here would orphan them forever.
+  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+  let state: ReturnType<typeof useApp> | undefined;
+  function Probe(): React.JSX.Element {
+    state = useApp();
+    return null as unknown as React.JSX.Element;
+  }
+  const {ApiServiceError} = jest.requireActual(
+    '../src/api',
+  ) as typeof import('../src/api');
+  const posted: unknown[] = [];
+  let authMode: 'ok' | 'unauthorized' = 'ok';
+  (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
+    operatorSession: async () => ({env: 'issued', token: 't'}),
+    postCard: async (_token: string, row: unknown) => {
+      if (authMode === 'unauthorized') {
+        throw new ApiServiceError('no-session', 401);
+      }
+      posted.push(row);
+    },
+  }));
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(
+      <AppStore clientOptions={{baseUrl: 'http://ops.test'}}>
+        <Probe />
+      </AppStore>,
+    );
+  });
+  await ReactTestRenderer.act(async () => {
+    await state!.signIn('bench-lead', 'pw');
+  });
+  await ReactTestRenderer.act(() => {
+    state!.startBatch({
+      mint: 'm',
+      pinPolicy: 'perCard',
+      pinBatch: '',
+      dailyUsd: 1,
+      noPinUsd: 1,
+      count: 1,
+    });
+  });
+
+  // The token dies before the row can post: it lands pending in the outbox.
+  authMode = 'unauthorized';
+  await ReactTestRenderer.act(async () => {
+    state!.postRegistryCard({
+      short_id: 'aa11',
+      batch_id: 1,
+      key_id: 2,
+      ordinal: 0,
+      installed_at: 1_700_000_000,
+      installer: 'op@bench-1',
+      load_sha256: 'fe7d8ac3',
+    });
+  });
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+  });
+  expect(state!.batch!.done[0].pending).toBe(true);
+
+  // The retry pass hits the 401 and expires the session — the outbox survives.
+  await ReactTestRenderer.act(async () => {
+    await state!.retryPending();
+  });
+  expect(state!.signedIn).toBe(false);
+  expect(posted).toEqual([]);
+
+  // Sign back in: the surviving row re-posts under the new token.
+  authMode = 'ok';
+  await ReactTestRenderer.act(async () => {
+    await state!.signIn('bench-lead', 'pw');
+  });
+  await ReactTestRenderer.act(async () => {
+    await state!.retryPending();
+  });
+  expect(posted).toHaveLength(1);
+  // the frozen body, re-posted byte-identical
+  expect((posted[0] as {short_id: string}).short_id).toBe('aa11');
+  expect(state!.batch!.done[0].pending).toBe(false);
+  await ReactTestRenderer.act(() => {
+    tree!.unmount();
+  });
+});
+
+test('a real-mode stopped row carries no demo field; the summary prints no (demo: …) label for it', async () => {
+  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+  let state: ReturnType<typeof useApp> | undefined;
+  function Probe(): React.JSX.Element {
+    state = useApp();
+    return null as unknown as React.JSX.Element;
+  }
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(
+      <AppStore clientOptions={{baseUrl: 'http://ops.test'}}>
+        <Probe />
+      </AppStore>,
+    );
+  });
+  await ReactTestRenderer.act(() => {
+    state!.startBatch({
+      mint: 'm',
+      pinPolicy: 'perCard',
+      pinBatch: '',
+      dailyUsd: 1,
+      noPinUsd: 1,
+      count: 2,
+    });
+  });
+  // The row shape the loop's real-mode stop branch builds (no demo field).
+  await ReactTestRenderer.act(() => {
+    state!.addRecord({
+      id: 'wrong-keys-card',
+      ok: false,
+      at: 1_700_000_000,
+      pending: false,
+    });
+  });
+  expect(state!.batch!.done[0].demo).toBeUndefined();
+
+  // And the summary screen prints the row without a demo label.
+  function SummaryProbe(): React.JSX.Element {
+    const app = useApp();
+    if (!app.batch) {
+      return <Text>loading</Text>;
+    }
+    return (
+      <BatchSummaryScreen onBack={() => undefined} onClose={() => undefined} />
+    );
+  }
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(
+      <AppStore clientOptions={{baseUrl: 'http://ops.test'}}>
+        <SummaryProbe />
+      </AppStore>,
+    );
+  });
+  expect(text(tree)).not.toContain('(demo:');
+  await ReactTestRenderer.act(() => {
+    tree!.unmount();
+  });
+});

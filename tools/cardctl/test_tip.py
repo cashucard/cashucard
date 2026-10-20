@@ -149,6 +149,31 @@ def test_fetch_tip_survives_a_dead_service_with_a_clear_error():
         urllib.request.urlopen = real_urlopen
 
 
+def test_fetch_tip_sends_no_authorization_header():
+    """GET /anchor/tip is public on the ops service; the request fetch_tip
+    builds must carry no Authorization header, or the real service answers
+    401 and tip / set-owner-url can never succeed (the seam this pins:
+    ops/test/sessions-clean.test.ts drives the real router with the same
+    headerless request)."""
+    import urllib.request
+
+    seen = {}
+
+    def capture(req, timeout=None):
+        seen["headers"] = dict(req.header_items())
+        seen["has_auth"] = req.headers.get("Authorization") is not None
+        return fake_urlopen(None, {"header": HEADER_80.hex()})(req, timeout)
+
+    real_urlopen = urllib.request.urlopen
+    urllib.request.urlopen = capture
+    try:
+        assert cardctl.fetch_tip("http://ops.test") == HEADER_80
+    finally:
+        urllib.request.urlopen = real_urlopen
+    assert not seen["has_auth"], "fetch_tip must send no Authorization header"
+    assert not any(k.lower() == "authorization" for k in seen["headers"])
+
+
 def test_set_owner_url_fetches_then_anchors():
     """set-owner-url: sugar that fills --anchor from the feed, then runs set-owner."""
     calls = []

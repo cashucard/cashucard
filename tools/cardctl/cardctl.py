@@ -1413,8 +1413,10 @@ def cmd_set_header(args) -> int:
 # ── the anchor tip feed (ENG-740) ─────────────────────────────────────────────
 # GET /anchor/tip on the ops service returns {"header": "<160 hex>"}: the same
 # 80-byte block header `set-owner --anchor` and `refresh --header` take. The
-# fetcher is a module-level function so the tests can inject it and the
-# no-network guarantee of this suite stays intact (test_tip.py).
+# route is public (a block header is public data) and the request carries no
+# Authorization header — pinned on both sides (ops/test/sessions-clean.test.ts,
+# test_tip.py). The fetcher is a module-level function so the tests can inject
+# it and the no-network guarantee of this suite stays intact (test_tip.py).
 
 DEFAULT_OPS_URL = "http://127.0.0.1:8821"
 

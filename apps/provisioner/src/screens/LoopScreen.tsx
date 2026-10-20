@@ -294,10 +294,12 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
           pending: false,
         });
       } else {
+        // A real stop is a real stop: no `demo` field, or the summary's
+        // `(demo: wrongKeys)` mislabels the operator's batch record (only
+        // genuine demo rows carry it).
         app.addRecord({
           id: state,
           ok: false,
-          demo: state,
           at: Date.now(),
           pending: false,
         });

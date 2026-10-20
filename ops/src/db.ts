@@ -162,8 +162,11 @@ export class OpsDb {
         if (!r || !Buffer.isBuffer(r.header)) {
           return undefined;
         }
-        // AnchorFeed revalidates length and positivity on read, so a row
-        // written before migration 2 (height NULL) seeds header-only.
+        // A row written before migration 2 has height NULL — and no height
+        // means the seeded feed cannot answer the {header, height,
+        // fetched_at} shape, so it seeds NOTHING (the next good fetch
+        // repopulates the row). The Buffer check covers a legacy row whose
+        // header column ever stopped being a BLOB.
         if (r.height === null || !Number.isInteger(r.height) || r.height <= 0) {
           return undefined;
         }

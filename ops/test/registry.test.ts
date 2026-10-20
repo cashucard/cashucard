@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {createBatch} from '../src/batches';
-import {recordCard, type CardInput} from '../src/registry';
+import {RegistryError, recordCard, type CardInput} from '../src/registry';
 import {testDb} from './helpers';
 
 function seedBatch(db: ReturnType<typeof testDb>): void {
@@ -112,5 +112,23 @@ test('bad rows are RegistryErrors, not silent writes', () => {
   seedBatch(db);
   assert.throws(() => recordCard(db, row({short_id: 'NOT HEX!'})));
   assert.throws(() => recordCard(db, row({installer: ''})));
+  db.close();
+});
+
+test('a batch_id no batch row holds is a RegistryError, not a raw FK failure', () => {
+  const db = testDb();
+  seedBatch(db); // batch 1 exists
+  try {
+    recordCard(db, row({short_id: 'aa11', batch_id: 99}));
+    assert.fail('a nonexistent batch must throw');
+  } catch (e) {
+    assert.ok(e instanceof RegistryError, `RegistryError, got ${e}`);
+    assert.match((e as Error).message, /no such batch 99/);
+  }
+  // and nothing was written
+  const n = db.db
+    .prepare('SELECT COUNT(*) AS n FROM cards WHERE short_id = ?')
+    .get('aa11') as {n: number};
+  assert.equal(n.n, 0);
   db.close();
 });
