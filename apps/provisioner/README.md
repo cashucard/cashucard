@@ -107,3 +107,27 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
 `src/assets/cashu.ts` and `hello.ts` are written by
 `python3 tools/cardkit/make-assets.py` (from the tracked CAP, and from
 `ant -f applet/build.xml hello-cap`); CI checks them with `--check`. Do not edit them.
+
+### ENG-741 journal foundation
+
+`src/journal.ts` implements the versioned journal for one already-reserved
+attempt. It serializes awaited transitions, retains pre-install identity and
+replacement consent, freezes the exact completion body, checks receipt identity,
+and preserves quarantine across reopening. A failed write latches the instance;
+reopen and reconcile instead of proceeding from its old in-memory state.
+`recoveryAction` supplies inspection decisions; it never performs card commands
+or grants permission to reinstall a partial card.
+
+`src/journalStorage.ts` stores that snapshot as one AsyncStorage value under a
+fixed key. It has no sign-out clearing or fallback store. A future coordinator
+must own the single writer, match service/operator/device/key environment,
+verify the card before reporting installation/rotation, and await intent before
+calling cardkit. This module is not yet connected to `AppStore` or `LoopScreen`.
+Batch request persistence, reservation reconciliation, terminal archival and
+batch advancement remain separate work; the existing demo/outbox is unchanged.
+
+The native dependency is pinned, but iOS pods and native builds have not been
+run. Those and process-termination checks on both phones are operator steps;
+Jest tests exercise serialized storage and restart semantics, not device
+power-loss durability. The real batch loop remains gated by the
+[recovery contract](../../docs/PROVISIONER-RECOVERY.md).

@@ -1405,3 +1405,28 @@ write routes as a bypass; marking an installed-only attempt terminal before it
 can retrieve its assigned rotation keys; restoring escrow without workflow
 identity; automatically reopening issuance after restoring an older snapshot.
 The app journal, personalization and device verification remain separate gates.
+
+## <a id="d33"></a>D33: One awaited nonsecret journal snapshot for phone recovery
+
+**Decided (ENG-741 journal foundation, 2026-10-20):** use one versioned JSON
+value in AsyncStorage, with a single coordinator owning its writer. Each
+transition awaits replacement of the whole value before its dependent action.
+The attempt journal and frozen completion body therefore cannot be committed
+independently. Pin AsyncStorage 2.2.0 for the existing React Native 0.77 app.
+Its installed Android implementation uses a SQLite transaction; iOS writes
+values and the manifest atomically. This source inspection does not prove
+power-loss durability on either phone; operator termination drills remain a
+release gate. Pods, native builds and device runs remain operator work.
+
+Any failed commit latches the writer until storage is reopened: a rejected
+promise may still have committed. Malformed/foreign-scope state cannot be
+silently replaced. No journal deletion, account-specific hidden copy or
+clear-on-sign-out is provided. Frozen records have an exact PIN-free schema;
+quarantine stores controlled reason codes rather than exception transcripts.
+
+**Rejected:** independent writes for stage and completion body; using progress
+callbacks as commit barriers; regenerating an attempt after storage failure;
+storing bearer tokens or manager keys to simplify restart. The first module
+implements one already-reserved attempt. Durable batch creation/progression,
+reservation reconciliation, terminal archival, app wiring and physical-card
+verification are still required before enabling the real loop.

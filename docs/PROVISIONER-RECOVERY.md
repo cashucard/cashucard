@@ -4,7 +4,8 @@ ENG-741, 2026-10-20. This is the implementation contract for the operator app,
 cardkit and ops service after [D30](DECISIONS.md#d30). It does not enable consumer
 issuance or change the 2.1 applet wire. [D31](DECISIONS.md#d31) records the
 decisions. The service reservation endpoints below are implemented; the durable
-app journal and real NFC loop are not wired yet. [D32](DECISIONS.md#d32) records
+attempt journal foundation now exists; batch persistence, reconciliation and
+the real NFC loop are not wired yet. [D32](DECISIONS.md#d32) records
 the HTTP migration and restored-service admission gate.
 
 An interrupted run keeps the same reserved batch and ordinal. Resume identifies
@@ -162,6 +163,16 @@ reporting, not a persistence boundary. Write intent outside `provision()` and
 `rotateKeys()`. The storage implementation must demonstrate app-termination
 recovery on each phone; local fake-store tests cannot establish power-loss
 durability on a device.
+
+The first implementation, `apps/provisioner/src/journal.ts`, handles one
+already-reserved attempt with an injected storage boundary and a pinned
+AsyncStorage adapter. See [D33](DECISIONS.md#d33). It validates local scope,
+latches ambiguous storage failures, keeps pre-install identity separate, and
+freezes records and receipts. It deliberately has no delete/reset API. The
+coordinator must still persist batch requests/configuration and reservation
+revisions, reconcile service responses, archive terminal attempts and advance
+batch progress atomically before the real loop can use it. It is not wired to
+the current screen or its legacy in-memory outbox.
 
 ## Stages and recovery decisions
 
