@@ -24,3 +24,24 @@ revision and passes after the fix (five preflight tests total).
 Phase A remains incomplete. No manager-key provenance, disposable status,
 installation state or write readiness is inferred. A new physical attempt needs
 operator approval; no automatic retry is included.
+
+## Second attempt — identity matched, unexpected applet version
+
+The operator explicitly approved one new attempt after the cleanup fix.
+Source `f1c22c3` ran the same command once with the same environment and reader.
+It exited 1 with `{"error": "unexpected applet version"}`.
+
+The implementation reaches this error only after successful ISD selection,
+strict CPLC validation and exact match to
+`cplc-v1:4790d3213180072976207515`, followed by a successful full card-app AID
+selection whose response data differs from `02 01`. The response bytes are
+not included in this version's error output, so the installed version cannot
+be identified from this evidence. No GET_INFO, GET_PUBKEY or tag selection
+followed; no authentication, signing, PIN, key or write command was attempted.
+The successful connection used SCARD_LEAVE_CARD and normal disconnect.
+
+This card is not eligible for the proposed absent-applet first-write drill.
+Do not clear or replace it. Next diagnosis would require a separately approved
+read-only version inspection that records the SELECT response. Disposability,
+manager-key provenance, funds/owner state and installation public key remain
+unknown. No further physical attempt was made.
