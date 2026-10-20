@@ -5,7 +5,7 @@
  * what to do). In demo mode the center is the state menu; a done state keeps
  * its result card — with the card's PIN — until NEXT CARD.
  */
-import React, {useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState, Fragment} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, Vibration, View} from 'react-native';
 
 import type {RunEvent} from '../cardkit';
@@ -117,25 +117,47 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
   const [stop, setStop] = useState<{id: DemoStateId; cont: boolean} | null>(
     null,
   );
-  /** Done only: the short id and, on per-card PIN policy, the PIN. Holds until NEXT CARD. */
+  /** Done only: the short id and, on per-card PIN policy, the PIN. Holds until auto-rearm. */
   const [done, setDone] = useState<{id: string; pin?: string} | null>(null);
   /** After wrong-keys: the loop stays disarmed until the stop is answered. */
   const [needsAck, setNeedsAck] = useState(false);
+  /** Auto-rearm timer for done state. */
+  const autoRearmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Track if we're in the middle of a run to show cancel button. */
+  const [runArmed, setRunArmed] = useState(false);
 
   const batch = app.batch!;
 
-  const onEvent = (e: RunEvent) => {
+  const onEvent = useCallback((e: RunEvent) => {
     if (e.type === 'block') {
       setUi(u => ({...u, block: {index: e.index, of: e.of}}));
     } else if (e.type === 'phase') {
       setUi({phase: e.phase});
     }
-  };
+  }, []);
+
+  const clearAutoRearmTimer = useCallback(() => {
+    if (autoRearmTimer.current) {
+      clearTimeout(autoRearmTimer.current);
+      autoRearmTimer.current = null;
+    }
+  }, []);
+
+  const autoRearm = useCallback(() => {
+    clearAutoRearmTimer();
+    // Auto-rearm after a brief pause to show the done state
+    autoRearmTimer.current = setTimeout(() => {
+      setDone(null);
+      autoRearmTimer.current = null;
+    }, 2600);
+  }, [clearAutoRearmTimer]);
 
   async function run(state: DemoStateId, replace: boolean) {
     setBusy(true);
+    setRunArmed(true);
     setStop(null);
     setDone(null);
+    clearAutoRearmTimer();
     setUi({phase: 'probe'});
     const demoRun = await runDemo(state, {replace, onEvent});
     const stopId = stopFor(demoRun);
@@ -157,6 +179,8 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
         at: Date.now(),
         pending: false,
       });
+      // ENG-754: auto-rearm after done - brief pause then auto-rearm
+      autoRearm();
     } else {
       const cont = (stopId === 'hasOld' || stopId === 'oldVersion') && !replace;
       setStop({id: stopId, cont});
@@ -173,6 +197,13 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
     }
     setUi({phase: ''});
   }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearAutoRearmTimer();
+    };
+  }, [clearAutoRearmTimer]);
 
   const runningPhase =
     ui.phase === 'load' && ui.block
@@ -198,7 +229,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
       return (
         <View style={s.menu}>
           {DEMO_STATES.map((d, i) => (
-            <React.Fragment key={d.id}>
+            <Fragment key={d.id}>
               {i > 0 ? <View style={s.menuDivider} /> : null}
               <Pressable
                 testID={`demo-${d.id}`}
@@ -212,7 +243,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
                 </View>
                 <Text style={s.menuChevron}>›</Text>
               </Pressable>
-            </React.Fragment>
+            </Fragment>
           ))}
         </View>
       );
@@ -252,13 +283,7 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
                 {LOOP.pinShown(done.pin)}
               </Text>
             ) : null}
-            <PrimaryButton
-              title={LOOP.next}
-              testID="next-card"
-              onPress={() => {
-                setDone(null);
-              }}
-            />
+            {/* ENG-754: auto-rearm - no button needed, auto-rearms after pause */}
           </View>
         ) : null}
 
@@ -278,23 +303,48 @@ export function LoopScreen({onEndBatch}: {onEndBatch: () => void}) {
             </Text>
             <Text style={s.resultLine}>{STOP[stop.id].card}</Text>
             <Text style={s.resultNext}>{STOP[stop.id].next}</Text>
-            <PrimaryButton
-              title={STOP[stop.id].action ?? 'OK'}
-              danger={STOP[stop.id].danger}
-              testID="stop-action"
-              onPress={() => {
-                if (stop.cont) {
-                  run(stop.id, true);
-                } else {
+            {STOP[stop.id].action ? (
+              <PrimaryButton
+                title={STOP[stop.id].action!}
+                danger={STOP[stop.id].danger}
+                testID="stop-action"
+                onPress={() => {
+                  if (stop.cont) {
+                    run(stop.id, true);
+                  } else {
+                    setStop(null);
+                    setNeedsAck(false);
+                  }
+                }}
+              />
+            ) : (
+              <PrimaryButton
+                title="OK"
+                testID="stop-ok"
+                onPress={() => {
                   setStop(null);
                   setNeedsAck(false);
-                }
-              }}
-            />
+                }}
+              />
+            )}
           </View>
         ) : null}
 
         {center}
+
+        {/* ENG-756: in-tap Cancel while run is armed */}
+        {runArmed && (
+          <SecondaryButton
+            title="CANCEL"
+            testID="cancel-run"
+            onPress={() => {
+              setBusy(false);
+              setRunArmed(false);
+              clearAutoRearmTimer();
+              setUi({phase: ''});
+            }}
+          />
+        )}
 
         <View style={s.endBatch}>
           <SecondaryButton title="END BATCH" onPress={onEndBatch} />
