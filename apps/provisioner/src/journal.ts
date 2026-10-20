@@ -103,10 +103,7 @@ function sameScope(a: JournalScope, b: JournalScope): boolean {
     a.key_env === b.key_env
   );
 }
-function validate(j: AttemptJournal): void {
-  requireState(j && typeof j === 'object' && !Array.isArray(j));
-  requireState(Object.keys(j).every(k => fields.has(k)));
-  requireState(j.schema === 1 && stages.includes(j.stage));
+export function assertJournalScope(j: JournalScope): void {
   // RN 0.77's URL.origin/protocol getters throw; accept a constrained ASCII
   // origin without depending on the browser URL implementation used by Jest.
   const origin =
@@ -121,6 +118,18 @@ function validate(j: AttemptJournal): void {
         !(origin[1] === 'http' && port === 80) &&
         !(origin[1] === 'https' && port === 443)),
   );
+  requireState(
+    Number.isSafeInteger(j.operator_id) &&
+      j.operator_id > 0 &&
+      ['factory', 'issued'].includes(j.key_env) &&
+      UUID.test(j.device_id),
+  );
+}
+function validate(j: AttemptJournal): void {
+  requireState(j && typeof j === 'object' && !Array.isArray(j));
+  requireState(Object.keys(j).every(k => fields.has(k)));
+  requireState(j.schema === 1 && stages.includes(j.stage));
+  assertJournalScope(j);
   requireState(
     Number.isSafeInteger(j.operator_id) &&
       j.operator_id > 0 &&

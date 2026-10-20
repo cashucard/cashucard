@@ -108,26 +108,38 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
 `python3 tools/cardkit/make-assets.py` (from the tracked CAP, and from
 `ant -f applet/build.xml hello-cap`); CI checks them with `--check`. Do not edit them.
 
-### ENG-741 journal foundation
+### ENG-741 durable provisioning state
 
-`src/journal.ts` implements the versioned journal for one already-reserved
-attempt. It serializes awaited transitions, retains pre-install identity and
-replacement consent, freezes the exact completion body, checks receipt identity,
-and preserves quarantine across reopening. A failed write latches the instance;
-reopen and reconcile instead of proceeding from its old in-memory state.
-`recoveryAction` supplies inspection decisions; it never performs card commands
-or grants permission to reinstall a partial card.
+`src/provisioningWorkflow.ts` is the single coordinator over a schema 2 snapshot:
+stable device UUID, scoped PIN-free batch request, pending reservation, embedded
+attempt journal and acknowledged history. Persist the creation UUID before its
+POST; lost responses replay the same request after reopening. Once acknowledged,
+an attempt is inspected; a missing server attempt stops for reconciliation.
 
-`src/journalStorage.ts` stores that snapshot as one AsyncStorage value under a
-fixed key. It has no sign-out clearing or fallback store. A future coordinator
-must own the single writer, match service/operator/device/key environment,
-verify the card before reporting installation/rotation, and await intent before
-calling cardkit. This module is not yet connected to `AppStore` or `LoopScreen`.
-Batch request persistence, reservation reconciliation, terminal archival and
-batch advancement remain separate work; the existing demo/outbox is unchanged.
+`src/journal.ts` validates attempt stages, pre-install identity/replacement
+consent, frozen completion records and terminal receipt identity. The
+coordinator's `withAttempt` serializes these commits with batch operations. Its
+caller must verify the card before reporting installation/rotation, and await
+intent before calling cardkit. Failed writes latch the writer until reopening.
+`advance` reconciles the server receipt and atomically saves history and batch
+progress. An explicit `closeBatch` only releases local history after the entire
+batch is acknowledged and recognized by the service; device identity survives.
+Quarantined/abandoned server states stop for explicit disposition handling.
 
-The native dependency is pinned, but iOS pods and native builds have not been
-run. Those and process-termination checks on both phones are operator steps;
-Jest tests exercise serialized storage and restart semantics, not device
-power-loss durability. The real batch loop remains gated by the
+`src/journalStorage.ts` replaces one AsyncStorage value under a fixed key. There
+is no fallback store or clearing on sign-out. A schema 1 standalone attempt or
+malformed snapshot is preserved and stops; it cannot silently generate another
+device/batch. Sign-in now retains the service's stable `operator_id`; the typed
+reservation adapter keeps the token in memory and scopes all requests to it.
+
+The coordinator is not wired to `AppStore`/`LoopScreen` or the legacy outbox.
+Real bind/key/record orchestration, explicit quarantine disposition handling and
+personalization remain pending. The native dependency is pinned, but iOS pods,
+native builds and termination checks on both phones remain operator steps.
+Jest checks storage/restart semantics, not device power-loss durability. The
+real batch loop remains gated by the
 [recovery contract](../../docs/PROVISIONER-RECOVERY.md).
+
+The TypeScript check includes app source and tests. Node types are available
+for the test-only cardkit fake; cardkit retains its separate Node-free library
+check. The earlier declaration-only include did not typecheck the app.

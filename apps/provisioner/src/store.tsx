@@ -48,6 +48,7 @@ export interface RecordRow {
 export type KeyEnv = 'factory' | 'issued';
 
 export interface AppSession {
+  readonly operator_id: number;
   readonly env: KeyEnv;
   /** The bearer token, in memory only (no Keychain in v1). */
   readonly token: string;
@@ -246,7 +247,7 @@ export function AppStore({
           if (!outboxRef.current) {
             outboxRef.current = new RegistryOutbox(client);
           }
-          setSession({env: s.env, token: s.token});
+          setSession({operator_id: s.operator_id, env: s.env, token: s.token});
           setSignedIn(true);
         } catch (e) {
           // The screen renders SIGNIN.failed(reason): the service's reason,

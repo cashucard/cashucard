@@ -1430,3 +1430,35 @@ storing bearer tokens or manager keys to simplify restart. The first module
 implements one already-reserved attempt. Durable batch creation/progression,
 reservation reconciliation, terminal archival, app wiring and physical-card
 verification are still required before enabling the real loop.
+
+## <a id="d34"></a>D34: Persist batch creation and reservation before service calls
+
+**Decided (ENG-741 coordinator, 2026-10-20):** the phone's schema 2 snapshot
+holds its stable device UUID, scoped PIN-free batch request, pending reservation,
+active attempt journal and acknowledged history together under D33's storage
+key. The coordinator serializes service calls and journal transitions. Persist
+each creation UUID before its POST. After a lost response, repeat that exact
+request; once acknowledged, inspect the attempt instead of recreating it. A
+missing acknowledged attempt or changed scope stops for reconciliation.
+
+A server reservation consumes an ordinal but does not advance local batch
+progress. Save the matching terminal receipt, then archive the attempt and
+advance the batch in one replacement. Completion of installation/rotation is
+still not personalization. Quarantined/abandoned server states stop this first
+coordinator; explicit disposition acknowledgement remains to be implemented.
+
+**Amends D33's no-deletion rule:** an explicit completed-batch close may discard
+local acknowledged history only after all ordinals have terminal completion
+receipts, no active attempt remains, and the service recognizes the complete
+batch. Keep device identity and the service's installation history. Closing or
+switching an unfinished batch, automatic sign-out clearing and silent recovery
+from corrupt storage remain forbidden. A restored service's admission pause
+also prevents closing away the phone's newer evidence.
+
+**Rejected:** two local storage keys for batch progression and attempt state;
+creating a new UUID on timeout; treating the service's consumed ordinal as
+completed progress; trusting username as operator identity; silently upgrading
+an old standalone attempt snapshot without its missing batch evidence. Such
+schema 1 evidence is retained and stops for reconciliation. The coordinator,
+transport and storage adapter are still not wired into the real screen/NFC
+loop; native termination checks and personalization remain release gates.

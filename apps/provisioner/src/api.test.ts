@@ -57,7 +57,13 @@ test('operatorSession returns the service env and token', async () => {
   const {fetcher} = scriptedFetcher([
     () => ({
       status: 200,
-      json: {token: 't0k3n', kind: 'operator', env: 'issued', expires_at: 1},
+      json: {
+        operator_id: 1,
+        token: 't0k3n',
+        kind: 'operator',
+        env: 'issued',
+        expires_at: 1,
+      },
     }),
   ]);
   const client = new ApiClient({baseUrl: 'http://ops.test', fetcher});
@@ -140,7 +146,7 @@ test('outbox rows flip to pending: false and stay there; answered rows are not r
   await outbox.retryAll('tok');
   expect(calls).toBe(2);
   await outbox.retryAll('tok');
-  expect(calls).toBe(2, 'answered rows are never re-posted');
+  expect(calls).toBe(2);
   expect(outbox.pendingRows.length).toBe(0);
 });
 
@@ -171,8 +177,8 @@ test('a 401 aborts the retry pass (the caller signs out; no row can succeed behi
     name: 'ApiServiceError',
     status: 401,
   });
-  expect(bodies.length).toBe(1, 'the pass stopped at the first 401');
-  expect(outbox.pendingRows.length).toBe(2, 'nothing flipped pending: false');
+  expect(bodies.length).toBe(1);
+  expect(outbox.pendingRows.length).toBe(2);
 });
 
 test('the documented timeout actually fires: a hung fetcher rejects in ApiUnreachableError', async () => {
@@ -197,7 +203,13 @@ test('the timeout does not fire on a healthy response; the timer is cleared', as
   const {fetcher} = scriptedFetcher([
     () => ({
       status: 200,
-      json: {token: 't', kind: 'operator', env: 'factory', expires_at: 1},
+      json: {
+        operator_id: 1,
+        token: 't',
+        kind: 'operator',
+        env: 'factory',
+        expires_at: 1,
+      },
     }),
   ]);
   const client = new ApiClient({
@@ -207,4 +219,84 @@ test('the timeout does not fire on a healthy response; the timer is cleared', as
   });
   const s = await client.operatorSession('n', 'p');
   expect(s.token).toBe('t');
+});
+
+test('operator identity scopes the reservation transport and no numeric-only issuance is substituted', async () => {
+  const bodies: unknown[] = [];
+  const paths: string[] = [];
+  const headers: unknown[] = [];
+  const fetcher = async (
+    url: string,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    paths.push(url);
+    headers.push(init?.headers);
+    bodies.push(init?.body ? JSON.parse(String(init.body)) : null);
+    return {
+      ok: true,
+      status: 200,
+      json: async () =>
+        paths.length === 1
+          ? {
+              operator_id: 17,
+              kind: 'operator',
+              env: 'issued',
+              token: 'memory-only',
+            }
+          : {batch: {batch_id: 3}, attempt: {attempt_id: 'attempt'}},
+    } as Response;
+  };
+  const client = new ApiClient({baseUrl: 'https://ops.test', fetcher});
+  const session = await client.operatorSession('lead', 'password');
+  const service = client.reservations(session);
+  expect(service.scope).toEqual({
+    operator_id: 17,
+    key_env: 'issued',
+    service_origin: 'https://ops.test',
+  });
+  const request = {
+    device_id: 'device',
+    batch_request_id: 'request',
+    count: 1,
+    mint_url: 'https://mint.test',
+    pin_policy: 'perCard' as const,
+    daily_usd: 25,
+    no_pin_usd: 5,
+    load_sha256: 'ab'.repeat(32),
+  };
+  await service.batch(request);
+  await service.reserve({
+    device_id: 'device',
+    attempt_id: 'attempt',
+    batch_id: 3,
+    ordinal: 0,
+  });
+  await service.attempt('device', 'attempt');
+  expect(paths.slice(1)).toEqual([
+    'https://ops.test/provisioning/batches',
+    'https://ops.test/provisioning/attempts',
+    'https://ops.test/provisioning/attempts/attempt?device_id=device',
+  ]);
+  expect(bodies[1]).toEqual(request);
+  expect(bodies.slice(1)).not.toContainEqual(
+    expect.objectContaining({token: expect.anything()}),
+  );
+  expect(headers[3]).toEqual(
+    expect.objectContaining({Authorization: 'Bearer memory-only'}),
+  );
+});
+
+test('sign-in cannot return a session with missing stable operator identity', async () => {
+  const {fetcher} = scriptedFetcher([
+    () => ({
+      status: 200,
+      json: {kind: 'operator', env: 'issued', token: 'token'},
+    }),
+  ]);
+  await expect(
+    new ApiClient({baseUrl: 'https://ops.test', fetcher}).operatorSession(
+      'lead',
+      'password',
+    ),
+  ).rejects.toThrow('malformed');
 });

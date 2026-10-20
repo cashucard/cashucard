@@ -3,13 +3,7 @@
  * only (src/theme.ts); nothing here draws its own color.
  */
 import React from 'react';
-import {
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import {Pressable, SafeAreaView, StyleSheet, Text, View} from 'react-native';
 
 import {FONT, type Theme, useTheme} from './theme';
 import GearSvg from './assets/gear.svg';
@@ -49,7 +43,7 @@ export function Screen({
               <Text style={s.title}>{title}</Text>
             </View>
           ) : null}
-          {headerRight ? <View style={s.headerRight}>{headerRight}</View> : null}
+          {headerRight ? <View>{headerRight}</View> : null}
         </View>
       ) : null}
       <View style={s.body}>{children}</View>
@@ -59,7 +53,9 @@ export function Screen({
 
 export function Dim({children}: {children: React.ReactNode}) {
   const t = useTheme();
-  return <Text style={{color: t.dim, fontFamily: FONT.regular}}>{children}</Text>;
+  return (
+    <Text style={{color: t.dim, fontFamily: FONT.regular}}>{children}</Text>
+  );
 }
 
 export function PrimaryButton({
@@ -117,7 +113,13 @@ export function SecondaryButton({
   );
 }
 
-export function GearButton({onPress, testID}: {onPress: () => void; testID?: string}) {
+export function GearButton({
+  onPress,
+  testID,
+}: {
+  onPress: () => void;
+  testID?: string;
+}) {
   const t = useTheme();
   const s = styles(t);
   return (
@@ -129,7 +131,7 @@ export function GearButton({onPress, testID}: {onPress: () => void; testID?: str
 
 /** The gearbox: flash-mobile's gear.svg artwork (icons-redesign), tinted. */
 function Gear({size, color}: {size: number; color: string}) {
-  return <GearSvg width={size} height={size} style={{color}} />;
+  return <GearSvg width={size} height={size} color={color} />;
 }
 
 export function Row({

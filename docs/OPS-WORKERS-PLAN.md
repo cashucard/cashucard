@@ -23,7 +23,7 @@ ENG-741 app work remain outstanding.
 The ENG-741 service increment adds scoped reservations, full installation identity
 and version 2 recovery exports. Restores pause provisioning until reconciliation
 and stale-client fencing; no unlock workflow is implemented. The app journal
-and real-card loop remain the next checkpoint. This increment passes 62 Node
+and real-card loop remain the next checkpoint. This increment passes 63 Node
 tests, 11 Workers tests, both typechecks, formatting and a deployment dry run.
 
 ## Execution order and checkpoints
@@ -48,7 +48,7 @@ port as release-ready merely because its baseline suites pass.
 | 4 | Add controlled operator bootstrap and recovery | Empty local DO becomes usable; bootstrap cannot silently replace an existing operator; administrative recovery works without a live session | Implemented; local lifecycle checks passed |
 | 5 | Complete encrypted backup and restore | Scheduled path writes a versioned artifact; restoring it to an empty service recovers keys by card ID without the old DB or master; missing backup configuration is visible | Implemented locally; independent destination and alerts need operator configuration |
 | 6 | Finish deployment documentation and readiness review | Threat model and runbook match implementation; independent backup procedure and data-loss window are explicit; deployment gates reviewed | Documented; release review and operator configuration outstanding |
-| 7 | Execute ENG-741 app integration | Real batch/ordinal assignment and persisted outbox survive simulated interruption and restart without storing manager keys or PINs | Contract, cardkit identity reader and reservation API implemented; journal and real loop not implemented |
+| 7 | Execute ENG-741 app integration | Real batch/ordinal assignment and persisted outbox survive simulated interruption and restart without storing manager keys or PINs | Contract, identity reader, reservation API, durable journal and batch coordinator implemented; screen/NFC integration and disposition handling pending |
 
 Checkpoint 1 provides the same routine commands as CI.
 Checkpoints 2–6 together satisfy the ENG-740 deployment gates; completing
