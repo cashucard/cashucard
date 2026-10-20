@@ -15,6 +15,8 @@ import {
   type ReservedAttempt,
 } from '../src/provisioningWorkflow';
 import type {JournalStorage} from '../src/journal';
+import {SPIKE_KEYS, fromHex, toHex} from '../src/cardkit';
+import {FakeCard} from '../../../tools/cardkit/gp/test/fake-card';
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const config = {
@@ -302,80 +304,132 @@ test('sign-out while keys are pending cannot arm NFC under the old session', asy
   expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
 });
 
-test('reauthentication retries the frozen record without keys or NFC, even while installation is gated', async () => {
-  const f = fixture();
-  const w = await ProvisioningWorkflow.open(f.storage, f.uuid);
-  const settings = {
-    count: 2,
-    mint_url: config.mint,
-    pin_policy: config.pinPolicy,
-    daily_usd: 25,
-    no_pin_usd: 5,
-    load_sha256: 'ab'.repeat(32),
-  };
-  await w.start(f.service, settings);
-  await w.reserveNext(f.service);
-  const chip = 'cplc-v1:4790d3213180072976207515';
-  const key =
-    '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
-  Object.assign(f.remote(), {chip_id: chip, revision: 1});
-  await w.reconcile(f.service);
-  const active = w.snapshot().active!;
-  await w.withAttempt(f.service, async j => {
-    await j.installIntent({installation_id: null, replacement_consent: false});
-    await j.installed(key, {complete: true});
-    await j.rotationIntent();
-    await j.rotated(1);
-    await j.freezeRecord({
-      attempt_id: active.attempt_id,
+test('the real screen installs and rotates, then a restart retries its frozen record without another card session', async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: require('node:crypto').webcrypto,
+  });
+  try {
+    const f = fixture();
+    const card = new FakeCard();
+    const chip = 'cplc-v1:4790d3213180072976207515';
+    const key =
+      '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+    const cplc = fromHex(
+      '9F7F2A4790D32147000000000031800729762075150000000000000000048C2337323937360000000000000000',
+    );
+    let bound = false;
+    (f.service.keys as jest.Mock).mockImplementation(async () => ({
+      attempt_id: f.remote().attempt_id,
       batch_id: 42,
       ordinal: 0,
-      load_sha256: settings.load_sha256,
-      operator_id: 7,
-      device_id: w.snapshot().device_id,
-      chip_id: chip,
+      chip_id: null,
+      enc: toHex(SPIKE_KEYS.enc).toLowerCase(),
+      mac: toHex(SPIKE_KEYS.mac).toLowerCase(),
+      dek: toHex(SPIKE_KEYS.dek).toLowerCase(),
+    }));
+    (f.service.bind as jest.Mock).mockImplementation(
+      async (_device, attempt_id, input) => {
+        expect(input).toEqual({revision: 0, chip_id: chip});
+        bound = true;
+        Object.assign(f.remote(), {chip_id: chip, revision: 1});
+        return {attempt_id, chip_id: chip, revision: 1, bound_at: 123};
+      },
+    );
+    const withCard = jest.fn(async run =>
+      run(async (command: number[]) => {
+        if (command[1] === 0xca && command[2] === 0x9f) {
+          return [...cplc, 0x90, 0];
+        }
+        if ([0x50, 0x82, 0xe4, 0xe6, 0xe8, 0xd8].includes(command[1])) {
+          expect(bound).toBe(true);
+        }
+        const reply = await card.transceive(command);
+        if (command[1] === 0x10 && reply.at(-2) === 0x90) {
+          return [...fromHex(key), 0x90, 0];
+        }
+        return reply;
+      }),
+    );
+    (f.service.record as jest.Mock).mockRejectedValueOnce(
+      new Error('network unavailable'),
+    );
+    const tree = await mount({
+      ...f,
+      hardwareValidated: true,
+      serviceFor: () => f.service,
+      withCard,
+    });
+    await signIn();
+    await act(async () => {
+      await flow.create(config);
+    });
+    await act(async () => {
+      await tree.root.findByProps({testID: 'real-program'}).props.onPress();
+    });
+    expect(withCard).toHaveBeenCalledTimes(1);
+    expect(card.failedAuths).toBe(0);
+    expect(card.log.filter(c => c[1] === 0xd8)).toHaveLength(1);
+    expect(flow.snapshot?.active?.journal?.stage).toBe('record_pending');
+    const active = flow.snapshot!.active!;
+    const frozen = active.journal!.frozen_record;
+    expect(frozen).toBe((f.service.record as jest.Mock).mock.calls[0][3]);
+    expect(JSON.parse(frozen!)).toMatchObject({
       installation_id: key,
-      display_id: key.slice(-4),
       gp_key_version: 1,
-      key_env: 'issued',
-      configuration_revision: 1,
       verified_stage: 'rotated',
-      verified_at: 123,
     });
-  });
-  const frozen = w.snapshot().active!.journal!.frozen_record;
-  const receipt = {
-    attempt_id: active.attempt_id,
-    installation_id: key,
-    revision: 2,
-    recorded_at: 456,
-    verified_stage: 'rotated' as const,
-    ready_for_holder: false as const,
-  };
-  (f.service.record as jest.Mock).mockImplementation(async () => {
-    Object.assign(f.remote(), {
-      state: 'recorded',
+    expect(f.bytes()).not.toContain(config.pinBatch);
+    expect(f.bytes()).not.toContain(toHex(SPIKE_KEYS.enc).toLowerCase());
+    const receipt = {
+      attempt_id: active.attempt_id,
+      installation_id: key,
       revision: 2,
-      completion_receipt: receipt,
+      recorded_at: 456,
+      verified_stage: 'rotated' as const,
+      ready_for_holder: false as const,
+    };
+    (f.service.record as jest.Mock).mockImplementation(async () => {
+      Object.assign(f.remote(), {
+        state: 'recorded',
+        revision: 2,
+        completion_receipt: receipt,
+      });
+      return receipt;
     });
-    return receipt;
-  });
-  const runCard = jest.fn();
-  const tree = await mount({...f, runCard, serviceFor: () => f.service});
-  expect(f.service.record).not.toHaveBeenCalled();
-  await signIn();
-  expect(f.service.record).toHaveBeenCalledWith(
-    w.snapshot().device_id,
-    active.attempt_id,
-    1,
-    frozen,
-  );
-  expect(runCard).not.toHaveBeenCalled();
-  expect(f.service.keys).not.toHaveBeenCalled();
-  expect(flow.snapshot?.active).toBeNull();
-  expect(flow.snapshot?.history).toHaveLength(1);
-  expect(text(tree)).toContain('Not ready for a holder.');
-  expect(text(tree)).not.toContain('PIN:');
+    await act(async () => {
+      tree.unmount();
+    });
+    trees = [];
+    // New storage adapter models process loss. The production gate remains false;
+    // only software record recovery may run after signing back in.
+    const runCard = jest.fn();
+    const recovered = await mount({
+      ...f,
+      storage: {...f.storage},
+      runCard,
+      serviceFor: () => f.service,
+    });
+    await signIn();
+    expect(f.service.record).toHaveBeenCalledTimes(2);
+    expect((f.service.record as jest.Mock).mock.calls[1]).toEqual(
+      (f.service.record as jest.Mock).mock.calls[0],
+    );
+    expect(runCard).not.toHaveBeenCalled();
+    expect(f.service.keys).toHaveBeenCalledTimes(1);
+    expect(withCard).toHaveBeenCalledTimes(1);
+    expect(flow.snapshot?.active).toBeNull();
+    expect(flow.snapshot?.history).toHaveLength(1);
+    expect(text(recovered)).toContain('Not ready for a holder.');
+    expect(text(recovered)).not.toContain('PIN:');
+  } finally {
+    if (original) {
+      Object.defineProperty(globalThis, 'crypto', original);
+    } else {
+      Reflect.deleteProperty(globalThis, 'crypto');
+    }
+  }
 });
 
 test('sign-out cancels an armed session and blocks its next command', async () => {
@@ -439,7 +493,9 @@ test('real batch setup rejects zero count and submits PIN-free settings once val
     tree.root.findByProps({testID: 'mint-https://mint.test'}).props.onPress();
     tree.root.findByProps({testID: 'batch-count'}).props.onChangeText('0');
   });
-  expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(true);
+  expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(
+    true,
+  );
   await act(async () => {
     await tree.root.findByProps({testID: 'start-batch'}).props.onPress();
   });

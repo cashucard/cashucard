@@ -68,7 +68,8 @@ or a saved-identity mismatch without authentication or retries. The library
 uses its existing SELECT builder, including Le `00`; the separate USB check used
 GlobalPlatformPro's raw SELECT without Le. Parser replay and fake transports
 validate this implementation; the new TypeScript reader has not been run on
-the physical card or either phone. Wiring it into the real loop remains pending.
+the physical card or either phone. The gated real loop now uses this reader;
+phone evidence remains outstanding.
 
 ## Service reservations and retry identity
 
@@ -181,8 +182,8 @@ complete batch is still recognized by the service, retaining device identity.
 The schema 2 envelope uses the existing fixed storage key; a standalone schema 1
 attempt stops without replacement because its batch evidence is missing.
 
-These helpers remain unconnected to the current screen/legacy outbox. The
-injected `provisioningTap.ts` orchestration binds before mutation, adopts only
+The real recovery screens use these helpers separately from the legacy outbox.
+The injected `provisioningTap.ts` orchestration binds before mutation, adopts only
 complete new installations, recovers rotation with the same assigned set and
 replays records without NFC. Quarantine disposition intent/receipt handling is
 implemented by `acknowledgeQuarantine`; unresolved chip repair, partial-install
@@ -353,3 +354,7 @@ this document. Until the device evidence lands, batch creation and physical prog
 disabled by `apps/provisioner/src/releaseGates.ts`. Frozen-record retries and
 explicit stop acknowledgement remain available without NFC. Installation receipts
 never certify holder readiness; that requires the separate personalization contract.
+
+The proposed [owner-run device validation checklist](PROVISIONER-DEVICE-VALIDATION.md)
+names the candidate devices, preparation gaps, bounded checks and required
+evidence. It does not authorize hardware actions or mark any check as passed.

@@ -184,3 +184,8 @@ The gated real screen uses these functions through native `withCard`.
 Tests use the existing software GP card and injected transports. Native builds,
 termination drills and both-phone CPLC checks remain operator work under an
 approved device plan; this change did not access any hardware.
+
+The next native validation steps are in the
+[proposed owner-run checklist](../../docs/PROVISIONER-DEVICE-VALIDATION.md).
+It identifies missing read-only phone and deterministic pause tooling; it is
+not a hardware report or permission to operate devices.
