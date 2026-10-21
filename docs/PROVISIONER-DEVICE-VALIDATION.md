@@ -145,6 +145,7 @@ These observations update coverage; they do not broaden any device/card approval
 | Area | Evidence | Still outstanding |
 |---|---|---|
 | Original card identity across phones | Three matching CPLC reads per phone, original card ending 7515 | Distinct-card sampling is not a global uniqueness proof |
+| Identity after provisioning | Spare ending 5547: pre-write USB ID, bound Pixel ID and one operator-confirmed post-write Max read match | Repeated post-write reads and full iPhone write/recovery |
 | Pixel native storage | One-card batch survived restart; three write-drill stages recovered | Controlled unavailable-storage hardware case |
 | Pixel empty-app replacement | Approved spare ending 5547, one attempt, new installation and assigned GP version 1, one receipt | Fresh absent-applet card; full iPhone write run |
 | Completed install/result loss | `install_intent` after kill, complete new applet adopted | Actual mid-LOAD interruption/partial installation |
@@ -157,8 +158,9 @@ Detailed evidence:
 [Pixel three-boundary report](HARDWARE_TEST_REPORT_2026-10-20.d321-pixel-recovery.md),
 [batch persistence](HARDWARE_TEST_REPORT_2026-10-20.pixel-batch-persistence.md),
 [local encrypted recovery](RECOVERY_TEST_REPORT_2026-10-20.pixel-escrow.md).
-Max's post-install CPLC check on the provisioned spare is being coordinated
-separately; no full iPhone write or new card mutation is authorized here.
+Max's separately approved post-install CPLC check passed by explicit operator
+confirmation; see [the post-check report](HARDWARE_TEST_REPORT_2026-10-20.d321-max-postcheck.md).
+No full iPhone write or new card mutation is authorized here.
 The provisioned spare is now on assigned keys, so it must not be treated as a
 factory-key blank for another first-install run. Further write drills need
 separately identified cards, provenance, service/batch scope and approval.

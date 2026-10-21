@@ -188,6 +188,8 @@ on both the Pixel and Max passed on 2026-10-20; see the
 A separately approved Pixel replacement run passed three saved-boundary
 restarts (install result, rotation result, frozen record); see the
 [Pixel recovery report](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-pixel-recovery.md).
+The spare's post-write CPLC also matched on Max in an
+[operator-confirmed read-only post-check](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-max-postcheck.md).
 The completed run's escrow also passed a
 [local encrypted-export/CLI restore check](../../docs/RECOVERY_TEST_REPORT_2026-10-20.pixel-escrow.md).
 iPhone write/recovery, partial LOAD, actual lost replies and the other
