@@ -81,3 +81,30 @@ by this flow. No raw GP transcript or direct pre-kill new-key capture was made.
 The operator was asked to lift the card and reauthenticate. Adoption of the
 new installation, key rotation, remaining process losses and final record are
 still pending; this is not a completed recovery pass.
+
+## Second planned boundary: rotation verified before journal save
+
+After operator reauthentication, the same interrupted-install attempt was
+visible. USB mappings remained intact. Armed and verified
+`rotation-verified-before-save`, then selected Continue with the same card.
+The operator held the same spare steadily against the Pixel.
+
+The UI reached exactly `rotation-verified-before-save`, saved stage
+`rotation_intent`. A private AsyncStorage copy confirmed:
+
+- Same attempt `ac3575ad-6be4-4595-b213-97f89afabda6` and chip ending 5547.
+- Stage `rotation_intent`; saved GP key version still null.
+- New full installation key:
+  `036ba3354ef98337603ad52f429e5a67214fd064e6f1c04cd784d1b11c3aa19490`.
+
+The new key differs from the preinstall key, and the install-intent recovery
+path adopted a complete installation before advancing to rotation. That code
+path contains no DELETE/LOAD; no raw transport capture was taken to count
+commands independently. The rotation checkpoint follows successful assigned
+key rotation and confirmation, before saving `rotated`. Forced app stop at
+this pause without Continue/Stop, then relaunched and requested operator
+reauthentication. The card is now on the escrowed assigned keys; do not try
+factory keys or reset it.
+
+Assigned-state recovery after this process loss and record freezing/posting
+remain pending. No second card, ordinal or batch was created.
