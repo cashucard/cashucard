@@ -134,6 +134,26 @@ export const MIGRATIONS: readonly string[] = [
     recorded_at INTEGER NOT NULL
   );
   `,
+  // 5. Recovery companion credentials are independent of operator sessions.
+  `
+  CREATE TABLE recovery_connections (
+    id TEXT PRIMARY KEY,
+    issuer_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    approved_by INTEGER NOT NULL REFERENCES operators(id),
+    created INTEGER NOT NULL,
+    revoked INTEGER
+  );
+  CREATE TABLE recovery_pairings (
+    code_hash TEXT PRIMARY KEY,
+    issuer_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    approved_by INTEGER NOT NULL REFERENCES operators(id),
+    expires INTEGER NOT NULL,
+    connection_id TEXT REFERENCES recovery_connections(id)
+  );
+  `,
 ];
 
 export interface DbOptions {

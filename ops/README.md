@@ -237,3 +237,27 @@ Nextcloud on Start9 for independent encrypted copies, and a 24-hour maximum
 loss window. The [recovery implementation plan](../docs/OPS-RECOVERY-PLAN.md)
 records those choices, proposed cadence and outstanding access/restore gates.
 It does not authorize server access, transfer keys or change the staging cron.
+
+## Atoll Recovery enrollment
+
+Set public deployment configuration `OPS_RECOVERY_ISSUER_ID` to a stable UUID
+unique to this issuer/environment, and `OPS_RECOVERY_ADMINS` to a JSON array of
+existing operator names explicitly allowed to enroll backup readers. Empty or
+missing configuration does not grant that permission. The existing R2 binding
+and public age recipient must also be configured. No R2 API credential is needed
+by the companion when paired.
+
+Open `/ops/recovery/setup` over HTTPS and sign in as a designated recovery admin.
+Create a named pairing code and enter it privately into Atoll Recovery's Connect
+Issuer action with this service's origin. Codes expire after ten minutes. The
+same device can recover a lost claim response while the code is valid; a different
+device cannot reuse it. Use the same page to list and revoke connections, then
+sign out. Never send codes or credentials in chat, URLs or ordinary logs.
+
+The backup-only API is `GET /recovery/exports` (bounded cursor pagination) and
+`GET /recovery/exports/NAME` (existing encrypted snapshots only). Its independent
+credential does not authenticate to card APIs. It cannot trigger exports or
+retrieve plaintext recovery material. Existing snapshots in Nextcloud survive
+issuer outages; new downloads wait for issuer recovery. Direct R2 access remains
+an advanced recovery fallback. Re-enroll after a service restoration: exports do
+not restore companion sessions or grants.
