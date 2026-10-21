@@ -1683,3 +1683,24 @@ The independent installation and recovery-drill release gates remain unchanged.
 **Rejected:** timed kills, inferring a persisted stage from the checkpoint name,
 and updating a stale NFC sheet after the card session closes. This is validation
 observability, not evidence that an iPhone write drill has passed.
+
+
+## <a id="d43"></a>D43: Keep public interruption context visible until the next card run
+
+**Decided (ENG-741, 2026-10-20):** after an interrupted card operation,
+show the last known phase label and actual saved journal stage, explain that
+card changes may be incomplete, and ask the operator before retrying. Keep
+this message through service reconciliation; clear it on the next card run or
+actor invalidation. Store it only in memory. The durable journal remains the
+recovery authority and quarantined attempts remain stopped.
+
+Only mapped phase names enter the diagnostic; missing or unknown phases are
+reported as “Not reported.” No raw error, APDU, response, key material or guessed
+failure cause is displayed. Add labels for LOAD and key-rotation phases that
+previously had no display label. Phase context is the last emitted phase, not
+proof of a completed command, and this revision does not retrospectively
+explain Max's initial interruption.
+
+**Rejected:** clearing the interruption during background reconciliation,
+logging raw secure-channel traffic, treating an interrupted install as blank,
+and resetting the quarantined attempt to enable another installation.
