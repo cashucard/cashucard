@@ -155,3 +155,30 @@ The software confirmation flow is implemented separately from PR #23. It is
 not yet native/hardware validated, and both committed release gates remain
 false. Neither this addendum nor the operator's disposability confirmation
 authorizes starting phase B before its prerequisites and execution approval.
+
+## Local service preparation checkpoint
+
+Prepared from source `2a68a3f` on this Mac, separately from any phone/card
+action. A Node service listens only on `127.0.0.1:8822`; its mint list is only
+`http://127.0.0.1:3338`. Host-side issued-operator sign-in, authenticated mint
+list retrieval and sign-out passed. No mint was contacted, and no batch, card
+reservation, card key retrieval or card mutation was requested.
+
+Private run directory:
+`/Users/dread/Library/Application Support/cashu-card/eng-741-2026-10-20`.
+It has mode 0700; `ops.db`, `private-runtime.json` and `operator-login.txt`
+have mode 0600. The runtime file retains the generated derivation master and
+operator credential; the separate login file contains only the local operator
+login, never the derivation master. Do not paste either file into chat or logs.
+The local launcher preserves these files across restarts. The database is the
+local escrow store; no independently encrypted export or restore drill has
+been performed. Retention here is local test preparation, not production DR.
+
+The Pixel USB mapping, phone-side sign-in, one-card batch/reservation
+persistence, validation binary and native replacement review remain pending.
+Proposed preparation-only phone scope: Pixel ADB `42201FDJG00048`, inspect its
+reverse-port mappings, add `tcp:8821` to host `tcp:8822` only if not occupied by
+another mapping, and open the existing provisioner for operator-entered local
+login. Keep both release flags false. Stop before NFC, batch creation or card
+installation. This phone scope requires operator approval under AGENTS.md;
+it is separate from subsequent card-write approval.
