@@ -1822,3 +1822,22 @@ service state. Foreign-actor/blocked screens do not expose the action.
 **Rejected:** copying native app storage for routine operator support, exporting
 raw runtime objects, and sending details automatically. This diagnostic is not
 a recovery backup, receipt proof or authority to reset/unblock an attempt.
+
+
+## <a id="d51"></a>D51: Deploy the first remote rehearsal into isolated staging
+
+**Decided (ENG-740, 2026-10-21):** prepare a distinct
+`cashu-card-ops-staging` Worker, its own SQLite DO namespace and staging-only
+R2 backup bucket through an explicit staging configuration. Reuse shared
+operator provisioning and backup logic; the staging entry allowlists those
+routes and blocks holder, legacy and anchor routes. Expose only an edge-status
+root that does not imply backend readiness. Use independently generated test
+master/operator/recovery material; never import Pixel/Max databases or real
+card keys. A local-only mint reference is metadata, not a reachable mint.
+
+**Rejected:** treating a successful port/dry run as deployment, deploying the
+production-named configuration to discover a URL, or reusing live validation
+secrets. Account selection, resource creation, secret injection and public
+nonproduction smoke tests require a concrete approved deployment scope first.
+The default production configuration is unchanged. Hardware, holder readiness
+and independent production backup custody are separate release gates.

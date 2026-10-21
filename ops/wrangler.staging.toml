@@ -1,0 +1,25 @@
+# Separate Worker/DO namespace and R2 bucket. No production bindings or secrets.
+name = "cashu-card-ops-staging"
+main = "src/staging-entry.workers.ts"
+compatibility_date = "2026-10-13"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+routes = []
+
+[vars]
+# Batch-reference metadata only; staging never calls a production mint.
+OPS_MINTS = '["http://127.0.0.1:3338"]'
+
+[durable_objects]
+bindings = [{ name = "OPS_DO", class_name = "OpsStore" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OpsStore"]
+
+[[r2_buckets]]
+binding = "OPS_BACKUPS"
+bucket_name = "cashu-card-ops-staging-backups"
+
+[triggers]
+crons = ["17 3 * * *"]

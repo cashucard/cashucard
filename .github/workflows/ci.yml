@@ -407,6 +407,9 @@ jobs:
       - name: Bundle Worker locally
         run: node node_modules/wrangler/bin/wrangler.js deploy --dry-run --outdir "$RUNNER_TEMP/ops-worker"
 
+      - name: Bundle isolated staging Worker locally
+        run: node node_modules/wrangler/bin/wrangler.js deploy --config wrangler.staging.toml --dry-run --outdir "$RUNNER_TEMP/ops-staging-worker"
+
       - name: Format
         run: yarn format:check
 
