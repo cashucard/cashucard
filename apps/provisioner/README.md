@@ -252,3 +252,29 @@ addresses; LAN validation must use HTTPS. TLS trust still needs a separately
 approved device setup. Do not modify the app endpoint during an active batch:
 its saved origin is part of the recovery scope. Keep the original build/origin
 available to reconcile saved work rather than clearing storage.
+
+### Android upload signing
+
+Release builds require these private environment inputs from the release
+operator's protected environment or secret manager:
+
+- `CASHU_ANDROID_UPLOAD_KEYSTORE`: absolute path to the existing upload keystore.
+- `CASHU_ANDROID_UPLOAD_STORE_PASSWORD`: its store password.
+- `CASHU_ANDROID_UPLOAD_KEY_ALIAS`: the registered upload alias.
+- `CASHU_ANDROID_UPLOAD_KEY_PASSWORD`: its key password.
+
+Do not type values into command arguments/history or commit a keystore/password.
+There is no default release identity. `preReleaseBuild` and
+`validateSigningRelease` depend on the signing preflight, which rejects missing
+inputs, unreadable files and the published debug key even when renamed. The
+Android plugin then checks the actual key format/alias/password. Debug builds
+continue using the development key. An explicitly invoked preflight is:
+
+```sh
+node scripts/check-android-signing.cjs
+```
+
+Do not generate a replacement upload key until Play Console signing/enrollment
+state and certificate continuity have been reviewed. This setup does not grant
+store access or authorize a signed upload. See the
+[store release plan](../../docs/PROVISIONER-STORE-RELEASE.md).

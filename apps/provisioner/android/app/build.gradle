@@ -93,10 +93,13 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('release.keystore')
-            storePassword 'android'
-            keyAlias 'releasekey'
-            keyPassword 'android'
+            // Private environment inputs; never use command-line password flags.
+            // Preserve the existing upload key: do not generate a replacement.
+            def uploadKeystore = System.getenv('CASHU_ANDROID_UPLOAD_KEYSTORE')
+            if (uploadKeystore) storeFile file(uploadKeystore)
+            storePassword System.getenv('CASHU_ANDROID_UPLOAD_STORE_PASSWORD')
+            keyAlias System.getenv('CASHU_ANDROID_UPLOAD_KEY_ALIAS')
+            keyPassword System.getenv('CASHU_ANDROID_UPLOAD_KEY_PASSWORD')
         }
     }
     buildTypes {
@@ -119,5 +122,17 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+
+// Enforce private signing for CLI and Android Studio release builds.
+def validateCashuUploadSigning = tasks.register("validateCashuUploadSigning", Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine "node", "scripts/check-android-signing.cjs"
+}
+tasks.configureEach {
+    if (name == "preReleaseBuild" || name == "validateSigningRelease") {
+        dependsOn(validateCashuUploadSigning)
     }
 }
