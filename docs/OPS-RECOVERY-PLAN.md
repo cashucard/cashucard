@@ -1,10 +1,11 @@
 # Recovery custody and independent backup implementation plan
 
 2026-10-21. Current operator selections: an organization password manager
-(Vaultwarden on Zion) with designated recovery operators, Nextcloud on the operator's Start9 server,
+(Vaultwarden on Zion) with designated recovery operators, Nextcloud on the
+operator's Start9 server,
 and a maximum acceptable 24-hour loss window. This replaces the initial
 HashiCorp Vault choice: the HCP account had no cluster, and the operator chose
-the simpler custody option (D55). The operator confirmed Vaultwarden and Nextcloud are both on Zion.
+the simpler custody option (D55). Vaultwarden and Nextcloud are both on Zion.
 Hostnames, accounts, paths and credentials belong in a private operator
 inventory, not this repository. These selections do not authorize production
 deployment, host access or secret transfer.
@@ -35,7 +36,9 @@ with the designated operators; do not create an unattended plaintext export.
 Vaultwarden and Nextcloud share a server failure domain. Before relying on
 this arrangement, retain a protected offline copy of the age identity, its
 public recipient/key identifier and concise recovery instructions outside Zion.
-The medium/location and custodian remain to be selected. Test that standalone
+The operator selected a designated recovery operator to hold that offline
+copy outside Zion; the specific custodian, protected medium and location are
+recorded privately. No transfer has yet been performed. Test that standalone
 copy without Vaultwarden, Nextcloud or the normal laptop. Do not depend on
 cached vault sessions as the only escape, or store the only emergency copy in
 Nextcloud. Separately document Zion/Vaultwarden backup and account/MFA recovery;
