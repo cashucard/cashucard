@@ -223,7 +223,6 @@ The staging entry blocks holder, legacy registry and anchor routes before
 backend access. Do not use the default production-named config to discover a
 URL or import phone-validation databases into staging.
 
-
 The approved staging rehearsal now has successful remote operator and synthetic
 provisioning checks; see the [dated evidence](../docs/OPS_STAGING_REPORT_2026-10-21.md).
 Deployed native PBKDF2 has a 100k cap, so D52 preserves the 600k work factor
