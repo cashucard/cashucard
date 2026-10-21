@@ -130,19 +130,20 @@ def run_once(transfer, state_path, now=None):
                 if source.stat().st_size != size:
                     raise ValueError('source size mismatch')
                 sha = digest(source)
+                destination_name = name.replace(':', '-')
                 receipt = {'name': name, 'source_time': created,
-                           'size': size, 'sha256': sha}
+                           'size': size, 'sha256': sha, 'destination_name': destination_name}
                 previous = state['verified'].get(name)
                 if previous and previous != receipt:
                     raise ValueError('previously verified source changed')
-                transfer.put(source, name)
-                transfer.get('dest', name, readback)
+                transfer.put(source, destination_name)
+                transfer.get('dest', destination_name, readback)
                 if readback.stat().st_size != size or digest(readback) != sha:
                     raise ValueError('read-back verification failed')
                 manifest = root / 'manifest.json'
                 manifest.write_text(json.dumps(receipt, sort_keys=True) + '\n')
-                transfer.put(manifest, name + '.json')
-                transfer.get('dest', name + '.json', readback)
+                transfer.put(manifest, destination_name + '.json')
+                transfer.get('dest', destination_name + '.json', readback)
                 if readback.read_bytes() != manifest.read_bytes():
                     raise ValueError('manifest read-back failed')
                 state['verified'][name] = receipt

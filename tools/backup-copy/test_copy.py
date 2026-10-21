@@ -14,6 +14,7 @@ spec = importlib.util.spec_from_file_location('backup_copy', Path(__file__).with
 copy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(copy)
 NAME = '2026-10-21T03:17:00.000Z-00000000-0000-4000-8000-000000000001.age'
+DEST_NAME = NAME.replace(':', '-')
 DATA = b'encrypted fixture, not a real escrow export'
 NOW = copy.source_time(NAME) + 3600
 
@@ -58,10 +59,10 @@ class CopyChecks(unittest.TestCase):
         first = json.loads(self.state.read_text())
         self.assertEqual(first['latest']['source_time'], copy.source_time(NAME))
         self.assertEqual(self.transfer.dest['older.age'], b'keep me')
-        self.assertEqual(self.transfer.dest[NAME], DATA)
-        manifest = self.transfer.dest[NAME + '.json']
+        self.assertEqual(self.transfer.dest[DEST_NAME], DATA)
+        manifest = self.transfer.dest[DEST_NAME + '.json']
         self.assertTrue(self.run_copy(NOW + 60))
-        self.assertEqual(manifest, self.transfer.dest[NAME + '.json'])
+        self.assertEqual(manifest, self.transfer.dest[DEST_NAME + '.json'])
         self.assertTrue(self.run_copy(NOW + 18 * 3600))
         self.assertEqual(copy.health(self.state, NOW + 18 * 3600)['status'], 'warning')
         self.assertTrue(self.run_copy(NOW + 24 * 3600))
@@ -89,7 +90,7 @@ class CopyChecks(unittest.TestCase):
         self.transfer.corrupt = False
         self.transfer.source.clear()
         self.assertFalse(self.run_copy(NOW + 120))
-        self.assertEqual(self.transfer.dest[NAME], DATA)
+        self.assertEqual(self.transfer.dest[DEST_NAME], DATA)
 
     def test_rejects_paths_and_future_sources(self):
         for name in ('../' + NAME, 'subdir/' + NAME, 'not-an-export.age'):
@@ -139,10 +140,10 @@ class WebDavRoundTrip(unittest.TestCase):
                 # A fresh manifest mtime must not break immutable idempotence.
                 time.sleep(1.1)
                 self.assertTrue(copy.run_once(transfer, state, NOW + 2))
-                self.assertEqual((destination / 'backups' / NAME).read_bytes(), DATA)
+                self.assertEqual((destination / 'backups' / DEST_NAME).read_bytes(), DATA)
                 self.assertEqual((destination / 'older.age').read_bytes(), b'keep me')
                 # Preserve size and mtime: read-back must still fetch real bytes.
-                stored = destination / 'backups' / NAME
+                stored = destination / 'backups' / DEST_NAME
                 before = stored.stat()
                 stored.write_bytes(b'x' * len(DATA))
                 os.utime(stored, (before.st_atime, before.st_mtime))

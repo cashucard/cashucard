@@ -9,6 +9,9 @@ Requires Python 3.9+ on Linux/macOS and rclone 1.75.2 (the locally validated
 version). Source names must match the Worker's timestamp/UUID `.age` naming
 contract under its `escrow/` prefix. Source timestamps are trusted service
 metadata; this is not an independent attestation against a compromised exporter.
+Destination filenames replace timestamp colons with hyphens for portable
+[Nextcloud filenames](https://docs.nextcloud.com/server/stable/admin_manual/configuration_files/windows_compatible_filenames.html);
+the manifest retains the exact source name and destination name.
 Only such files are copied; no deletion or pruning command exists.
 
 Configure rclone privately using its documented
