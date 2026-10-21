@@ -675,3 +675,34 @@ test('native pause messages report saved state only inside an active card sessio
   expect(cardMessage).toHaveBeenCalledTimes(1);
   await act(async () => { flow.drill!.resume(); await pending; });
 });
+
+
+test.each([
+  ['load', 'Writing the applet'],
+  [undefined, 'Not reported'],
+  ['untrusted-detail', 'Not reported'],
+])('interruption retains a public last phase (%s) through service reconciliation', async (phase, label) => {
+  const f = fixture();
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w, _s, options,
+  ) => {
+    if (phase) { options.onEvent?.({type: 'phase', phase}); }
+    return 'interrupted';
+  };
+  const tree = await mount({
+    ...f, hardwareValidated: true, serviceFor: () => f.service, runCard,
+  });
+  await signIn();
+  await act(async () => { await flow.create(config); });
+  await act(async () => { await flow.program(); });
+  expect(text(tree)).toContain(`Card connection interrupted. Last phase: ${label}.`);
+  expect(text(tree)).toContain('Saved stage: reserved.');
+  expect(text(tree)).toContain('Ask your operator before retrying.');
+  expect(text(tree)).not.toContain('untrusted-detail');
+  await act(async () => { await flow.recover(); });
+  expect(text(tree)).toContain(`Card connection interrupted. Last phase: ${label}.`);
+  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+  expect(f.service.record).not.toHaveBeenCalled();
+  await act(async () => { app.signOut(); });
+  expect(flow.notice).toBeNull();
+});

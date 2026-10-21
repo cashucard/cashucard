@@ -18,6 +18,7 @@ import {
 } from './provisioningWorkflow';
 import {runReservedAttempt, type AttemptRunOptions} from './provisioningTap';
 import {randomBytes, randomUuid} from './random';
+import {PHASES} from './strings';
 import {
   CARD_INSTALLATION_VALIDATED,
   RECOVERY_DRILLS_ENABLED,
@@ -162,6 +163,7 @@ export function ProvisioningProvider({
   const [cardActive, setCardActive] = useState(false);
   const [phase, setPhase] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const [interruption, setInterruption] = useState<string | null>(null);
   const [replacement, setReplacement] = useState<ReplacementReview | null>(
     null,
   );
@@ -193,6 +195,7 @@ export function ProvisioningProvider({
   const actorGeneration = useRef(0);
   const invalidateCard = useCallback(() => {
     cancelRequested.current = true;
+    setInterruption(null);
     setReplacement(null);
     drill.current?.cancel();
     const cancel = armedCancel.current;
@@ -393,6 +396,8 @@ export function ProvisioningProvider({
     }
     return operate(async (w, service) => {
       cancelRequested.current = false;
+      setInterruption(null);
+      let lastPhase: string | undefined;
       const actor = latest.current;
       const generation = actorGeneration.current;
       const active = w.snapshot().active;
@@ -486,11 +491,22 @@ export function ProvisioningProvider({
           verifiedAt: () => Math.floor(Date.now() / 1000),
           onEvent: event => {
             if (mounted.current && event.type === 'phase') {
+              lastPhase = Object.prototype.hasOwnProperty.call(PHASES, event.phase)
+                ? PHASES[event.phase]
+                : undefined;
               setPhase(event.phase);
             }
           },
         },
       );
+      if (allowed() && outcome === 'interrupted') {
+        const stage = w.snapshot().active?.journal?.stage ?? 'unconfirmed';
+        setInterruption(
+          `Card connection interrupted. Last phase: ${lastPhase ?? 'Not reported'}. ` +
+            `Saved stage: ${stage}. Card changes may be incomplete. ` +
+            'Keep this card. Ask your operator before retrying.',
+        );
+      }
       if (
         allowed() &&
         outcome === 'replacement-consent-required' &&
@@ -520,7 +536,7 @@ export function ProvisioningProvider({
     busy,
     cardActive,
     phase,
-    notice,
+    notice: notice ?? interruption,
     hardwareValidated,
     drill: drillsEnabled
       ? {
