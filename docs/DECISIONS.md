@@ -1789,3 +1789,20 @@ are metadata only for installation-only batches (D47).
 **Rejected:** silently showing public demo mints while real discovery is
 pending or failed, and leaving a previous actor/service selection presented as
 current. Discovery never contacts any mint; it reads the configured ops list.
+
+
+## <a id="d49"></a>D49: Service origin is explicit public build configuration
+
+**Decided (ENG-741, 2026-10-21):** the app reads its default service origin
+from one public JSON build file. A Node-only tool validates and atomically
+writes it; no credentials, network calls or runtime endpoint switch are involved.
+Production preflight requires a canonical HTTPS DNS origin without userinfo,
+path, query or fragment, and an exported literal-false recovery-drill flag.
+Explicit local configuration permits the existing loopback HTTP development
+origin or HTTPS local validation. The committed default remains local.
+
+**Rejected:** shipping an implicit phone-loopback production endpoint, relaxing
+TLS globally, accepting credentials in a URL, and automatically migrating saved
+attempts when the service changes. Existing origin/actor journal checks remain
+authoritative. This preflight is packaging validation, not deployment permission,
+hardware certification or holder readiness; it does not enable installation.
