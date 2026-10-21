@@ -250,3 +250,20 @@ secp256k1, and then runs the same sign/verify and nonce-freshness rounds as
 ```bash
 python3 hwtest_65byte_pubkey.py -r 1   # reader index, as for cardctl
 ```
+
+## Bounded read-only provisioning preflight
+
+`read_only_preflight.py` checks an exact CPLC identity before inspecting the
+2.1 applet's public state. It never authenticates or retries. It stops on an
+absent applet, unknown version, malformed response or identity mismatch.
+Physical execution requires approval for the named reader/card and the APDU
+sequence in [the first-write drill plan](../../docs/PROVISIONER-FIRST-WRITE-DRILL.md).
+This is separate from `cardctl info` and `selftest`, which send more commands.
+
+After that approval, run in this directory with the documented Homebrew venv:
+
+```bash
+.venv/bin/python read_only_preflight.py --reader 'ACS ACR122U PICC Interface' --expect-chip cplc-v1:4790d3213180072976207515
+```
+
+Reader-free regression checks: `python3 test_read_only_preflight.py`.

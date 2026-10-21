@@ -1625,3 +1625,22 @@ an unconstrained title above Back; hardcoded Pixel/status-bar offsets. The
 2026-10-20 CPLC report remains evidence for its original source commit. UI-only
 checks of this revision do not count as additional card reads or recovery drills.
 D38 records the separate recovery-drill decision.
+
+## <a id="d40"></a>D40: Identity-bound read-only preflight before the first write drill
+
+**Decided (ENG-741, 2026-10-20):** inspect the named card through an explicit
+six-command allowlist before proposing installation. Match strict CPLC identity
+before selecting the applet; accept only the known 2.1 framing and report public
+installation state. Select exactly one named reader, connect once, leave the card
+powered state unchanged on disconnect, and never authenticate or retry. Keep
+the transport injectable so CI checks command order and stop conditions without
+PC/SC. The CLI validates the expected identity before native reader access.
+
+The first-write plan is conditional on this inspection and independent operator
+confirmation of disposability and manager-key provenance. Earlier hardware
+reports for another serial cannot establish those properties. A present applet
+stops this drill because the current UI has no replacement-consent flow.
+
+**Rejected:** broad selftest/info commands for this bounded check, trying keys
+to discover their provenance, and interpreting an absent applet as a blank card.
+The tool and plan do not themselves authorize physical execution.
