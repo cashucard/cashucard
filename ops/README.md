@@ -211,3 +211,13 @@ Legacy GETs are owner-filtered and omit PINs; they do not include the new full-
 installation history. Migrate clients to the new API before real provisioning.
 The app's current sign-in/mint reads remain available, but no real batch loop
 is claimed by this service change.
+
+## First remote staging rehearsal
+
+The port/dry-run checks above do not deploy a service. A separately reviewed
+[staging deployment plan](../docs/OPS-STAGING-DEPLOYMENT.md) uses
+`wrangler.staging.toml`, its own Worker/DO/R2 names and fresh test material.
+It obtains a workers.dev hostname only after an approved remote deployment.
+The staging entry blocks holder, legacy registry and anchor routes before
+backend access. Do not use the default production-named config to discover a
+URL or import phone-validation databases into staging.
