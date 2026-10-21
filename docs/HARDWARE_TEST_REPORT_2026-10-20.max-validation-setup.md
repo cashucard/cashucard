@@ -51,8 +51,21 @@ remain pending. The profile should be removed after this validation session.
 Node 22.23.3; `pod install --deployment` completed with 72 pods and no tracked
 lockfile delta. Prepared the isolated Node path in `.xcode.env.local`.
 Started signed Release build for the exact Max UDID, team H7UAM79QQP, with
-a dedicated DerivedData directory under private run state. Build is in
-progress; no native install/launch or phone batch persistence is claimed yet.
+a dedicated DerivedData directory under private run state. Build succeeded;
+`codesign --verify --deep --strict` passed. Compiled artifacts contain the
+expected HTTPS origin and local-network purpose text. SHA-256 values:
 
-No NFC, card authentication, installation, rotation or personalization is
+- Signed executable: `d569666d6cb6bba4d3540b4f8b571080ab731302662066957ef21ec3b26d15eb`.
+- Bundled JS: `9878e99cc36a2822dbc739744e8e77ae23e975dc00d31c589d55b93daa2f9285`.
+
+Installed successfully on the exact Max UDID without uninstall or clearing
+data. Did not launch over the operator's certificate Settings/Safari workflow.
+A read-only devicectl copy of only the app's AsyncStorage directory confirms
+preserved schema-2 state: device `afb0fc20-c68d-4159-8e7d-7eff4b8bf67b`,
+batch null, active null, history empty. No foreign saved work needs clearing.
+
+Phone certificate trust/Safari reachability, validation-app launch/sign-in,
+one-card batch creation and restart persistence remain pending.
+
+No NFC, card authentication, applet installation, rotation or personalization is
 authorized or performed by this setup.
