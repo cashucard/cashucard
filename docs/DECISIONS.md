@@ -1740,3 +1740,24 @@ Comparison covers only record fields, never holder/payment readiness.
 checking only the record-set flag, embedding a wallet private key in cardkit,
 and treating public record read-back as owner/PIN/limit attestation. The codec
 is groundwork for holder-wallet integration, not an enabled provisioning path.
+
+
+## <a id="d46"></a>D46: Inject holder signing after identity and durable intent
+
+**Decided (ENG-741, 2026-10-21):** a portable owner-command boundary accepts
+only SET_CARD, full SET_LIMIT and ALLOW_LOAD for an empty unlocked already-owned
+2.1 card. Validate/snapshot values, match full CPLC and installation key, await
+nonsecret intent commit, request a fresh nonce and delegate the exact
+`label || nonce || value` to the holder-wallet signer. Context includes a wallet
+key reference and frozen configuration identity. Reject malformed DER proofs;
+the card checks their cryptographic validity. Guard each asynchronous boundary
+against actor/session cancellation and reject overlapping calls on the same
+transport. No retries, manager authentication, PIN operations or readiness claims.
+
+**Rejected:** handing private owner material to the issuer, accepting arbitrary
+signing purposes, signing before durable intent, reusing a nonce after refusal,
+and treating an owner-command acknowledgement as verified personalization.
+The wallet adapter must authorize its key/context/operation; the caller owns
+exclusive NFC access and must read back and persist observations. The helper
+selects the applet before its nonce, clearing earlier grants; callers must not
+assume a preceding PIN or load grant survives that identity check.
