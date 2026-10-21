@@ -233,7 +233,42 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
           ) : null}
         </View>
       ) : null}
-      {!complete && stage !== 'quarantined' && !pendingRecord ? (
+      {flow.replacement ? (
+        <View style={s.card} testID="replacement-review">
+          <Text style={s.title}>Replace this installation?</Text>
+          <Dim>
+            This erases the existing applet and creates a new card identity.
+            Continue only for an approved test card with known factory manager
+            keys.
+          </Dim>
+          <Text selectable style={s.line}>
+            {flow.replacement.chipId}
+          </Text>
+          <Text selectable style={s.line}>
+            {flow.replacement.installationId}
+          </Text>
+          <Dim>
+            Tap the same card again after confirming. Its identity and empty
+            state will be checked again before replacement.
+          </Dim>
+          <PrimaryButton
+            title="REPLACE THIS INSTALLATION"
+            testID="replacement-confirm"
+            disabled={flow.busy || !flow.hardwareValidated}
+            onPress={() => flow.confirmReplacement()}
+          />
+          <SecondaryButton
+            title="KEEP EXISTING INSTALLATION"
+            testID="replacement-dismiss"
+            disabled={flow.busy}
+            onPress={flow.dismissReplacement}
+          />
+        </View>
+      ) : null}
+      {!complete &&
+      stage !== 'quarantined' &&
+      !pendingRecord &&
+      !flow.replacement ? (
         <>
           <PrimaryButton
             title={
