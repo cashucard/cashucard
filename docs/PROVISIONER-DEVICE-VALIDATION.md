@@ -19,8 +19,11 @@ code. No personalization or holder readiness is covered.
 The earlier USB report establishes only its documented read-only result. It
 does not establish phone behavior or authorize installing on Card A. An existing
 installation is not a blank test card. If the app reports an existing installation,
-stop; replacement-consent UI and partial-install repair are not implemented.
-Never erase it or attempt authentication with guessed keys. A different blank
+stop unless a separately approved plan permits replacement. The real flow now
+requires an installation-specific review and a second identity/empty-state
+inspection before replacement ([D41](DECISIONS.md#d41)); partial-install repair
+is still not implemented. Never erase a card outside its approved scope or
+attempt authentication with guessed keys. A different blank
 card needs its own recorded identity and approval.
 
 The owner runs native builds, iOS pods/signing and phone actions, as required by
@@ -134,3 +137,30 @@ boundaries leave the installation gate closed. Software tests remain evidence
 about software only. A passed installation gate still does not authorize holder
 handoff: mint/owner/PIN/limit personalization and its interrupted-write recovery
 need a separate contract and acceptance evidence.
+
+## Evidence checkpoint after the first Pixel write drill
+
+These observations update coverage; they do not broaden any device/card approval.
+
+| Area | Evidence | Still outstanding |
+|---|---|---|
+| Original card identity across phones | Three matching CPLC reads per phone, original card ending 7515 | Distinct-card sampling is not a global uniqueness proof |
+| Identity after provisioning | Spare ending 5547: pre-write USB ID, bound Pixel ID and one operator-confirmed post-write Max read match | Repeated post-write reads and full iPhone write/recovery |
+| Pixel native storage | One-card batch survived restart; three write-drill stages recovered | Controlled unavailable-storage hardware case |
+| Pixel empty-app replacement | Approved spare ending 5547, one attempt, new installation and assigned GP version 1, one receipt | Fresh absent-applet card; full iPhone write run |
+| Completed install/result loss | `install_intent` after kill, complete new applet adopted | Actual mid-LOAD interruption/partial installation |
+| Rotation/result loss | `rotation_intent` after verified rotation, assigned state recovered | Actual lost PUT KEY response; restart from durable `rotated` |
+| Frozen record/process loss | `record_pending` before POST, restart with card removed, unchanged record and one receipt | POST committed but HTTP reply lost |
+| Escrow recovery | Real completed-run age export restored by existing CLI without original master; control remains paused | Independent custody/off-machine copy; production delivery/restore drill |
+| Card substitution and actor changes | Software coverage only | Separately approved hardware wrong-card, cancel/sign-out and quarantine observations |
+
+Detailed evidence:
+[Pixel three-boundary report](HARDWARE_TEST_REPORT_2026-10-20.d321-pixel-recovery.md),
+[batch persistence](HARDWARE_TEST_REPORT_2026-10-20.pixel-batch-persistence.md),
+[local encrypted recovery](RECOVERY_TEST_REPORT_2026-10-20.pixel-escrow.md).
+Max's separately approved post-install CPLC check passed by explicit operator
+confirmation; see [the post-check report](HARDWARE_TEST_REPORT_2026-10-20.d321-max-postcheck.md).
+No full iPhone write or new card mutation is authorized here.
+The provisioned spare is now on assigned keys, so it must not be treated as a
+factory-key blank for another first-install run. Further write drills need
+separately identified cards, provenance, service/batch scope and approval.
