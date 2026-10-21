@@ -16,8 +16,9 @@ All three were merged after their final checks passed.
   The isolated validation checkout moved to this commit, preserving only its
   local two-gate enablement. App/cardkit/ops trees exactly match the installed
   build's original source `a8cee93998dfff4f6254c65217ee78ec0e03d91d`; no
-  native reinstall was needed. Build and bundle hashes are in the Pixel batch
-  persistence report. Committed gates remain false.
+  native reinstall was needed. Build and bundle hashes are in the
+  [Pixel batch persistence report](HARDWARE_TEST_REPORT_2026-10-20.pixel-batch-persistence.md).
+  Committed gates remain false.
 - CAP SHA-256:
   `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`.
 - Load-file SHA-256:
@@ -32,23 +33,22 @@ Batch 1, count 1; device `4794470b-dfef-447e-bbd8-7ebadcd9f41d`;
 operator 1, issued environment. Armed `installation-verified-before-save`,
 then tapped Install next card once. Service created the sole attempt:
 `ac3575ad-6be4-4595-b213-97f89afabda6`, ordinal 0, revision 0,
-active, chip not yet bound. The Pixel is waiting for the operator's inspection
-tap. No card result, binding, authentication or mutation is claimed yet.
+active, chip not yet bound. At this initial checkpoint the Pixel was waiting
+for the inspection tap; no card result or mutation had been observed.
 
-The read-only review is expected to end this invocation and clear its unvisited
-pause. Before confirming replacement, rearm the installation pause and verify
-the review's full chip/old installation identities. Do not infer mutation
-approval from a mismatching or incomplete inspection.
+The execution plan required the read-only review to end this invocation and
+clear its unvisited pause, followed by rearming and identity verification
+before replacement confirmation.
 
 ## USB interruption before inspection evidence
 
 While waiting for the operator to present the card, the Pixel disappeared
 from ADB. No further device command succeeded. A host-side read of the sole
-reservation still found revision 0, chip null, active. No service binding
-or completed card inspection is established. The operator was asked to
-reconnect USB and keep the card away while the same attempt is reconciled.
-Do not count this interruption as any of the planned post-write boundaries;
-no replacement was confirmed and no write result is claimed.
+reservation still found revision 0, chip null, active. At that point no service
+binding or completed inspection was established. The operator was asked to
+reconnect USB and keep the card away during reconciliation. This interruption
+is not counted as a planned post-write boundary; replacement had not yet
+been confirmed.
 
 ## Inspection completed and first planned boundary reached
 
@@ -75,12 +75,11 @@ confirmed the exact pause `installation-verified-before-save` and saved stage
 `install_intent`. Forced app stop without Continue/Stop, then relaunched.
 This is the first planned process-loss boundary. The checkpoint is reached
 only after successful installation and complete inspection, before saving
-`installed` or initiating key rotation. Manager keys have not yet been rotated
-by this flow. No raw GP transcript or direct pre-kill new-key capture was made.
+`installed` or initiating key rotation. Manager keys had not yet been rotated
+at this boundary. No raw GP transcript or direct pre-kill new-key capture was made.
 
-The operator was asked to lift the card and reauthenticate. Adoption of the
-new installation, key rotation, remaining process losses and final record are
-still pending; this is not a completed recovery pass.
+The operator lifted the card and reauthenticated for the adoption and rotation
+step described below.
 
 ## Second planned boundary: rotation verified before journal save
 
@@ -93,7 +92,7 @@ The UI reached exactly `rotation-verified-before-save`, saved stage
 `rotation_intent`. A private AsyncStorage copy confirmed:
 
 - Same attempt `ac3575ad-6be4-4595-b213-97f89afabda6` and chip ending 5547.
-- Stage `rotation_intent`; saved GP key version still null.
+- Stage `rotation_intent`; GP key version not yet saved.
 - New full installation key:
   `036ba3354ef98337603ad52f429e5a67214fd064e6f1c04cd784d1b11c3aa19490`.
 
@@ -106,8 +105,8 @@ this pause without Continue/Stop, then relaunched and requested operator
 reauthentication. The card is now on the escrowed assigned keys; do not try
 factory keys or reset it.
 
-Assigned-state recovery after this process loss and record freezing/posting
-remain pending. No second card, ordinal or batch was created.
+Assigned-state recovery followed in the next step. No second card, ordinal
+or batch was created.
 
 ## Third planned boundary: frozen record after NFC closure
 
@@ -134,9 +133,8 @@ authentications or PUT KEY commands; successful recovery and the same
 installation key are directly observed.
 
 Forced app stop at the frozen/session-closed boundary, without Continue/Stop,
-then relaunched. Requested operator sign-in with the card removed for final
-record-only recovery. Successful POST/receipt and batch acknowledgement are
-still pending.
+then relaunched. The operator removed the card and signed in for the final
+record-only recovery described below.
 
 ## Final record-only recovery and result
 
