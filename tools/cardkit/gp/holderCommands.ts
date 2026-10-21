@@ -169,6 +169,7 @@ export async function executeHolderCommand(
       info[16] !== 1
     )
       throw new Error('holder setup requires an empty unlocked owned card');
+    check();
     await options.saveIntent(intent);
     check();
     const nonce = (await send([0xb0, 0x44, 0, 0, 0x10])).data;
@@ -182,6 +183,7 @@ export async function executeHolderCommand(
         ...op.value,
       ]),
     });
+    check();
     const proof = signature(await options.sign(request));
     check();
     const data = [proof.length, ...proof, ...op.value];

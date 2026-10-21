@@ -274,3 +274,26 @@ test('a pending wallet approval excludes a concurrent command on the same transp
   await pending;
   assert.equal(f.log.length, 7);
 });
+
+test('cancellation after the nonce reply prevents even invoking the wallet signer', async () => {
+  const f = fixture();
+  let allowed = true;
+  let signs = 0;
+  f.options.canContinue = () => {
+    if (f.log.length === 6)
+      queueMicrotask(() => {
+        allowed = false;
+      });
+    return allowed;
+  };
+  f.options.sign = async () => {
+    signs++;
+    return proof;
+  };
+  await assert.rejects(
+    () => executeHolderCommand(f.tx, context, {kind: 'allow-load'}, f.options),
+    TransportError,
+  );
+  assert.equal(signs, 0);
+  assert.equal(f.log.length, 6);
+});
