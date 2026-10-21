@@ -1,4 +1,6 @@
 import React from 'react';
+import {Share} from 'react-native';
+import {recoveryDetails} from '../src/recoveryExport';
 import Renderer, {act} from 'react-test-renderer';
 import {ApiClient} from '../src/api';
 import {AppStore, useApp, type AppStateShape} from '../src/store';
@@ -208,6 +210,7 @@ test('restart retains the pending reservation; a different operator cannot repla
   });
   expect(f.service.attempt).toHaveBeenCalledTimes(reads);
   expect(tree.root.findAllByProps({testID: 'real-attempt'})).toHaveLength(0);
+  expect(tree.root.findAllByProps({testID: 'recovery-export'})).toHaveLength(0);
   await act(async () => {
     app.signOut();
   });
@@ -731,4 +734,46 @@ test('real mint discovery never substitutes demo endpoints and can retry a faile
   expect(tree.root.findByProps({testID: 'mint-https://mint.test'})).toBeTruthy();
   expect(text(tree)).not.toContain('The mint list could not be loaded.');
   expect(f.service.batch).not.toHaveBeenCalled();
+});
+
+
+test('an explicit recovery export contains public full identities without secrets or state changes', async () => {
+  const f = fixture();
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (w, service) => {
+    await w.withAttempt(service, async j => {
+      await j.bind('cplc-v1:4790d3213041093361205547');
+      await j.quarantine('unsafe-partial-install');
+    });
+    return 'quarantined';
+  };
+  const share = jest.spyOn(Share, 'share').mockResolvedValue({action: Share.sharedAction});
+  const tree = await mount({...f, hardwareValidated: true, serviceFor: () => f.service, runCard});
+  await signIn();
+  await act(async () => {await flow.create(config); await flow.program();});
+  expect(share).not.toHaveBeenCalled();
+  const before = f.bytes();
+  await act(async () => {tree.root.findByProps({testID: 'recovery-export'}).props.onPress();});
+  const report = JSON.parse((share.mock.calls[0][0] as {message: string}).message);
+  expect(report.schema).toBe(1);
+  expect(report.active).toMatchObject({
+    attempt_id: flow.snapshot!.active!.attempt_id,
+    journal: {stage: 'quarantined', chip_id: 'cplc-v1:4790d3213041093361205547', quarantine_reason: 'unsafe-partial-install'},
+  });
+  expect(JSON.stringify(report)).not.toContain(config.pinBatch);
+  expect(JSON.stringify(report)).not.toContain('token-7');
+  expect(report.batch).not.toHaveProperty('request');
+  const future = JSON.parse(JSON.stringify(flow.snapshot));
+  future.future_secret = 'not-exported-canary';
+  future.active.journal.frozen_record = 'not-exported-canary';
+  future.active.journal.completion_receipt = 'not-exported-canary';
+  future.batch.request.mint_url = 'https://not-exported-canary@mint.test';
+  future.batch.scope.service_origin = 'https://not-exported-canary@ops.test';
+  future.history = Array(25).fill(future.active.journal);
+  const bounded = recoveryDetails(future);
+  expect(bounded.recent_history).toHaveLength(20);
+  expect(bounded.history_count).toBe(25);
+  expect(bounded.service_origin).toBeNull();
+  expect(JSON.stringify(bounded)).not.toContain('not-exported-canary');
+  expect(f.bytes()).toBe(before);
+  expect(f.service.record).not.toHaveBeenCalled();
 });

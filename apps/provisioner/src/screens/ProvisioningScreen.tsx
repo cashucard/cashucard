@@ -6,6 +6,7 @@ import {CASHU_PLAN} from '../cardkit';
 import {useProvisioning} from '../ProvisioningStore';
 import {BatchSetupScreen} from './BatchSetupScreen';
 import {PHASES} from '../strings';
+import {recoveryDetails} from '../recoveryExport';
 import {FONT, useTheme} from '../theme';
 import {Dim, GearButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
 
@@ -35,6 +36,7 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
     setConfirmQuarantine(false);
   }, [flow.snapshot?.active?.attempt_id, flow.scopeMatches]);
   const [shareNote, setShareNote] = React.useState(false);
+  const [exportFailed, setExportFailed] = React.useState(false);
   const s = StyleSheet.create({
     grow: {flex: 1},
     scroll: {gap: 18, paddingBottom: 24},
@@ -343,6 +345,18 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
           The installation record could not be shared. It remains on this phone.
         </Dim>
       ) : null}
+      <SecondaryButton
+        title="EXPORT RECOVERY DETAILS"
+        testID="recovery-export"
+        disabled={flow.busy}
+        onPress={() => {
+          setExportFailed(false);
+          Share.share({message: JSON.stringify(recoveryDetails(snapshot), null, 2)})
+            .catch(() => setExportFailed(true));
+        }}
+      />
+      <Dim>Shares public card and attempt identifiers. No keys, PINs or credentials.</Dim>
+      {exportFailed ? <Dim>Recovery details could not be shared. Saved work is unchanged.</Dim> : null}
       {flow.cardActive ? (
         <SecondaryButton
           title="CANCEL TAP"

@@ -1806,3 +1806,19 @@ TLS globally, accepting credentials in a URL, and automatically migrating saved
 attempts when the service changes. Existing origin/actor journal checks remain
 authoritative. This preflight is packaging validation, not deployment permission,
 hardware certification or holder readiness; it does not enable installation.
+
+
+## <a id="d50"></a>D50: Export public recovery identifiers through an explicit action
+
+**Decided (ENG-741, 2026-10-21):** expose a versioned support-details share
+from a ready, same-actor batch screen. Allowlist public batch/device/attempt and
+full card identities, stages, artifact/key-version metadata and receipt-presence
+booleans. Never serialize the complete workflow, raw receipts, frozen bodies,
+PIN policy/mint configuration, keys or session. Bound recent history to 20
+entries and include its total count; original evidence remains on the device.
+Sharing is user initiated, disabled during operations and changes no journal or
+service state. Foreign-actor/blocked screens do not expose the action.
+
+**Rejected:** copying native app storage for routine operator support, exporting
+raw runtime objects, and sending details automatically. This diagnostic is not
+a recovery backup, receipt proof or authority to reset/unblock an attempt.
