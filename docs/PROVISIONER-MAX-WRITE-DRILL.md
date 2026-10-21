@@ -36,21 +36,24 @@ for occupied ports and document substitutions without stopping other services.
 If local-network reachability cannot be established, revise the plan before
 choosing a different transport or publicly reachable endpoint.
 
-## Card prerequisite — missing
+## Pinned candidate card
 
-Identify a disposable test card with known factory-manager-key provenance.
-The provisioned spare `cplc-v1:4790d3213041093363205547` is on assigned keys;
-it is not a factory-key card. The original card ending 7515 returned an
-unexpected applet version and has unconfirmed key provenance. Do not trial
-keys, clear either card, or reset the completed Pixel attempt to create a
-fresh candidate.
+The operator supplied another factory card and approved the stated read-only
+USB inspection by placing it on the named ACS reader. The
+[candidate report](HARDWARE_TEST_REPORT_2026-10-20.d321-max-candidate.md) records
+one connection, CPLC validation and full Cashu applet selection returning 6A82.
 
-After the operator identifies a candidate, propose a bounded read-only USB
-identity/version/state inspection on the named ACR122U, obtain its approval
-and record the outcome. Pin its exact CPLC and any old full installation ID
-before requesting write approval. Prefer a genuinely absent-applet card to
-cover the fresh-install path. A present empty supported applet requires an
-explicit replacement variant; any other state stops this plan.
+- Max candidate: `cplc-v1:4790d3213041093361205547`, serial **09336120**.
+- Factory manager-key provenance: operator-reported; no authentication tried.
+- Cashu applet: absent; no old installation ID to replace. This does not assert
+  free memory, absence of other packages or a universal blank-card inventory.
+- Excluded completed Pixel spare: `cplc-v1:4790d3213041093363205547`,
+  serial **09336320**, now on assigned keys.
+
+Both candidate and provisioned spare end in 5547, so use the full CPLC and
+serial for every physical handoff and write approval. Do not trial keys, clear
+the other cards or reset the Pixel attempt. Further preflight is not automatic;
+stop if state/provenance changes before the approved write run.
 
 ## Setup phase — approval required before phone/network actions
 
@@ -118,3 +121,44 @@ NFC platform while adding the fresh-card path if a suitable card is available.
 It does not inject actual mid-LOAD tears, lost PUT KEY or HTTP replies, wrong
 card/actor changes or unavailable storage; those checklist rows retain separate
 scopes. No release gate or holder readiness follows automatically from this run.
+
+## Host preparation checkpoint (no phone or network-listener changes)
+
+Prepared a separate protected directory
+`/Users/dread/Library/Application Support/cashu-card/eng-741-max-2026-10-20`.
+The Max-only database/master and issued operator `max-drill` are generated
+and retained privately; operator password verification passed offline. No
+batch, reservation or manager-key set has been issued in this database.
+The Pixel service and all its recovery material remain separate.
+
+Prepared a temporary validation CA and server certificate for `mlod.local`
+and IP `192.168.1.9`; offline certificate-chain verification passed.
+The public CA file is `tls/Cashu-Max-Validation.cer` in that private directory.
+Public CA DER SHA-256:
+`731bb5e9d67e55f19e59746508b99ddeb9dd5c574384d147d676bb61784a9a67`.
+No certificate has been installed or trusted on a phone or in a Mac trust store.
+The leaf lasts three days and CA seven days; recheck validity before execution.
+
+Prepared `serve-max.cjs` in the private directory. It refuses startup without
+an explicit setup-approved flag and the expected active LAN address. When
+approved it starts loopback service 8824 and the separate LAN TLS proxy 8843.
+The proxy permits only operator sign-in/out, mints and the required reservation
+API routes; it blocks `/anchor/tip`, holder and legacy registry routes so this
+run cannot trigger the service's external anchor fetch through the proxy.
+Route-policy checks passed offline. Neither listener has been started.
+
+Prepared isolated checkout `/Users/dread/Repos/cashu-card-max-drill`, source
+`3b4caa080e11e71c339bc993e811897389ab267a`. Its only current tracked local
+changes are the HTTPS origin and local-network purpose string; both gates
+remain false. Preparation diff SHA-256:
+`80fd53c7666616bbafbbbd07d68db1ea93aabbb69ee1dceb64a7d66e0ae9c881`.
+No pods, native signing/build, install or phone trust changes have run.
+After setup approval, enable the two gates only in this isolated build and
+record the final diff/build hashes.
+
+The requested next setup scope is the dedicated service/TLS listener, operator
+installation/trust of this exact public CA on Max, isolated native validation
+build/install/launch, local sign-in, one count-1 Max-owned batch and restart
+persistence. Stop before NFC/reservation/card authentication or writes.
+The fresh-card three-boundary write phase remains a separate approval after
+setup evidence and private escrow retention are reviewed.
