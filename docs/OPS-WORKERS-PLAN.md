@@ -142,7 +142,11 @@ Real installation stays disabled until the device evidence is reviewed.
 Before automatic recovery, define a stable pre-install chip identity or an
 equivalent explicit operator reconciliation contract. Applet public keys only
 exist after install and change on reinstall. The CPLC reader is implemented and wired into the gated loop, but its phone
-stability evidence is outstanding. Neither NFC UID nor SCP02 diversification data
+stability has scoped hardware evidence: three original-card reads per phone,
+then the replacement spare's USB/Pixel identity and an operator-confirmed Max
+post-write match. See the [validation coverage checkpoint](PROVISIONER-DEVICE-VALIDATION.md#evidence-checkpoint-after-the-first-pixel-write-drill).
+This does not prove fleet-wide uniqueness or complete the device/recovery gate.
+Neither NFC UID nor SCP02 diversification data
 is a substitute for that evidence. If the card cannot be matched
 to the saved attempt, stop before authentication rather than trying candidate
 keys. Hardware evidence for an identity contract needs a separately approved
