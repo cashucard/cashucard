@@ -1948,7 +1948,9 @@ this narrow toolchain change does not certify long-term framework maintenance.
 **Decided (ENG-741, 2026-10-21):** show the operator-supplied Flash privacy
 policy and terms links on sign-in and in Settings, opening the system browser
 only on a deliberate press. Failed opens show a generic actionable message.
-The terms URL is labelled Terms; a support destination remains unconfirmed.
+The terms URL is labelled Terms. The operator subsequently confirmed
+`support@getflash.io`; expose it through a Support mail link, with a readable
+address when the device cannot open a mail app.
 The linked policy still needs review against the provisioner's actual data flows
 before store declarations and production submission.
 
