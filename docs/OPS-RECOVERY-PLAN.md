@@ -63,9 +63,10 @@ Do not assume an app password itself confines access to one directory: isolate
 the account's accessible data. Obtain the actual WebDAV endpoint from Nextcloud;
 the Start9 dashboard address is not evidence of that endpoint.
 
-Prefer an independently operated pull job with bucket-scoped R2 read/list
-credentials and Nextcloud write credentials. It copies only encrypted artifacts
-and a nonsecret verification manifest. Do not put Nextcloud credentials in the
+Use an independently operated pull job with a paired backup-only issuer reader
+and dedicated Nextcloud write credentials (D61). Pairing removes manual R2
+credential entry; direct bucket-scoped R2 read/list remains an advanced fallback.
+It copies only encrypted artifacts and a nonsecret verification manifest. Do not put Nextcloud credentials in the
 Worker or decrypt artifacts during routine copies. The operator confirmed
 Start9 is the only always-on server and reports
 StartOS **0.4.0.3**. Target a separate packaged StartOS backup service using the
@@ -77,7 +78,10 @@ Pin SDK/image versions and validate package compatibility with 0.4.0.3 before
 any installation. Documentation support is not a built/validated package.
 The [local copy runner](../tools/backup-copy/README.md) implements additive
 read-back verification and source-time health with a loopback WebDAV check.
-Runner packaging, network access and service installation remain pending.
+Atoll Recovery beta.3 is installed on Zion, and live issuer pairing and dedicated
+Nextcloud browser authorization succeeded. The runner starts and retains setup
+through restart. Staging currently has no encrypted exports, so successful
+transfer, read-back and authenticated restoration remain unverified.
 
 Use an established transfer client such as rclone for
 [R2](https://developers.cloudflare.com/r2/examples/rclone/) and
@@ -118,9 +122,15 @@ Measure freshness using the source snapshot time of the newest independently
 verified copy, not its download/upload time. Alert on export/copy failure and
 when that source age reaches 18 hours. At 24 hours, treat recovery health as
 failed and require issuance to stop until fresh independent evidence exists.
-Select alert delivery/acknowledgement and implement/test the issuance gate before
-claiming this is enforced. A 12-hour cadence provides retry margin; it cannot
-guarantee the objective through an unbounded outage. Nightly exports plus a
+The operator selected an existing Start9 marketplace notification package on
+Zion. NTFY 2.32.0:0 is installed with HTTPS and a dedicated read-only subscriber;
+Atoll beta.4 obtained its private write-only publisher through the package
+action. Its first failure alert appeared in the authenticated read-only web
+subscription. Server acceptance and web receipt are verified; phone/desktop push
+and human acknowledgement remain separate checks.
+An independent monitor is still required for loss of Zion. Implement/test the
+issuance gate before claiming the 24-hour limit is enforced. A 12-hour cadence
+provides retry margin; it cannot guarantee the objective through an unbounded outage. Nightly exports plus a
 later copy can exceed 24 hours even in routine scheduling, so cadence alone
 must not be described as satisfying the accepted maximum.
 
@@ -152,7 +162,8 @@ must not be described as satisfying the accepted maximum.
    installation or establishes holder readiness.
 
 Current evidence is the [staging report](OPS_STAGING_REPORT_2026-10-21.md).
-Password-manager custody, independent scheduled copy, actual nightly success, remote-artifact
-restore, retention, alerts and reopening procedure are pending—not certified by
-this document. No server connection, credential transfer or cron change occurred
-while recording these choices.
+Password-manager custody, the offline recovery copy, independent scheduled
+artifact copy, actual nightly success, remote-artifact restore, retention, alert
+receipt and the reopening procedure remain pending. Setup evidence does not
+certify them. The staging cron remains unchanged; no production deployment or
+recovery identity transfer is part of this onboarding validation.
