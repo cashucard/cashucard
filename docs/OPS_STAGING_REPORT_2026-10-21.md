@@ -149,3 +149,36 @@ The registered signer published the universal artifact to the Atoll registry at
 `https://start9.bobodread.com`; a subsequent live index read confirmed beta.3
 and package source `624221d88a2c3ae815283296bcfff390884172f9`. Actual artifact/restore
 validation remains outstanding; this prerelease is not a production-readiness claim.
+
+## Atoll Recovery beta.4 NTFY connection and first received alert
+
+Zion completed the UI sideload upgrade to `0.1.0-beta.4:0`. Package source
+`7fc69b5ed78ddd38fdcc6616adaa71f298902842` was reviewed and merged through
+package PR #3 after ARM, x86 and initialization/action CI passed. The upstream
+sender merged through cashu-card #56. All three public release downloads
+matched the locally signed build hashes; the packaged ARM and x86 sender code
+was checked against reviewed source. Universal SHA-256:
+`30dc790314a5e8a5b220976ca74173bca18f2ceab6a11ce3a47861edf9d3cb51`.
+Two beta.4 registry imports failed with a registry-to-GitHub connection reset;
+no beta.4 marketplace installation is claimed.
+
+NTFY `2.32.0:0` was installed from Start9's primary marketplace on Zion,
+initialized and given a verified HTTPS address. A dedicated non-admin subscriber
+has read-only access to the recovery-health topic. Live checks returned HTTP 403
+for anonymous reading, 200 for subscriber reading, and 403 for subscriber writing.
+Generated credentials remain in protected operator storage, not this report.
+
+Atoll's Connect NTFY action succeeded without token entry, obtaining its own
+write-only publisher through the dependency action. Starting Atoll launched both
+the copy runner and notification watcher, and all setup tasks cleared. The first
+real notification appeared in the authenticated read-only web subscription:
+independent-copy health failed. Recovery Status separately returned copy Failed,
+source age Unknown, delivery Healthy and last acceptance
+`2026-10-21T23:37:10.768Z`.
+
+This proves automatic publisher setup, server acceptance and web receipt. It
+does not prove phone/desktop push, human acknowledgement, whole-Zion outage
+monitoring, successful artifact copy, authenticated restoration or issuance
+fencing. No production ops deployment or card, reader or phone operation was
+performed. The staging export schedule remains unchanged and no synthetic export
+was inserted.
