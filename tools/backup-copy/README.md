@@ -90,3 +90,36 @@ no R2 bucket, Nextcloud instance, server, card or phone. CI pins the rclone arch
 checksum and runs that compatibility check. Generic local WebDAV evidence does
 not prove a specific Nextcloud configuration, R2 credentials, StartOS compatibility
 or production recovery readiness.
+
+## Atoll Recovery notifications
+
+`alerts.py` watches the copy state independently. Configure it with a private
+0600 JSON file containing `webhook_url` (HTTPS) and `generation` (a new opaque
+identifier whenever notification routing is reconfigured). It needs no recovery
+identity or issued keys. The StartOS package supplies its private configuration.
+
+```sh
+python3 tools/backup-copy/alerts.py --config /data/private/alerts.json --copy-state /data/state/copy.json --state /data/state/alerts.json
+python3 tools/backup-copy/alerts.py --health --config /data/private/alerts.json --copy-state /data/state/copy.json --state /data/state/alerts.json
+```
+
+A receiver must accept a JSON POST with `event`, `status`, `source_age_seconds`
+and `text`, returning HTTP 2xx only when accepted. This is a generic webhook
+contract, not a claim of native integration with every notification provider.
+No credentials, snapshot identities or remote paths enter the payload. The URL
+can contain a secret route token and remains private. TLS verification stays on;
+redirects are rejected and each request has a bounded timeout.
+
+The watcher checks each minute, sends initial confirmation and health changes,
+reminds hourly during failure/warning and daily while healthy. A failed delivery
+does not advance confirmation and is retried after five minutes. Delivery health
+fails when the watcher stops checking for three minutes, the latest send failed,
+or accepted evidence is over 25 hours old. Reconfiguring its generation makes
+previous route evidence inapplicable. These rules concern receiver acceptance,
+not proof a human saw the message. Host shutdown disables both local processes;
+use an independently hosted monitor for whole-host failure. Notifications do not
+automatically stop issuance, decrypt snapshots, or establish recovery readiness.
+
+Run `python3 tools/backup-copy/test_alerts.py` for four focused checks: transition
+and reminder deduplication, failed-delivery acknowledgement/backoff, destination
+generation changes, and a real loopback HTTP receiver including redirect rejection.

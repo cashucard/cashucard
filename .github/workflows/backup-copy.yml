@@ -34,3 +34,4 @@ jobs:
         run: |
           rclone version
           python3 tools/backup-copy/test_copy.py
+          python3 tools/backup-copy/test_alerts.py
