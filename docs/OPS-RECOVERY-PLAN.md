@@ -40,9 +40,15 @@ the Start9 dashboard address is not evidence of that endpoint.
 Prefer an independently operated pull job with bucket-scoped R2 read/list
 credentials and Nextcloud write credentials. It copies only encrypted artifacts
 and a nonsecret verification manifest. Do not put Nextcloud credentials in the
-Worker or decrypt artifacts during routine copies. Runner placement remains to
-be confirmed against supported Start9 deployment options; Nextcloud being
-installed does not prove that an arbitrary scheduled job can run on that host.
+Worker or decrypt artifacts during routine copies. The operator confirmed Start9 is the only always-on server and reports
+StartOS **0.4.0.3**. Target a separate packaged StartOS backup service using the
+[0.4 daemon/volume/health-check model](https://docs.start9.com/packaging/0.4.0.x/main.html).
+The service owns its scheduled loop, protected transfer configuration and
+verification state. Expose freshness through a health check; it must not require
+SSH host cron, edits inside Nextcloud's container or the private age identity.
+Pin SDK/image versions and validate package compatibility with 0.4.0.3 before
+any installation. Documentation support is not a built/validated package.
+Runner packaging, network access and service installation remain pending.
 
 Use an established transfer client such as rclone for
 [R2](https://developers.cloudflare.com/r2/examples/rclone/) and
@@ -94,7 +100,7 @@ must not be described as satisfying the accepted maximum.
 1. Finish Vault custody and designate recovery operators. Keep all material in
    private operator-controlled channels; no keys or tokens enter chat/history.
 2. Confirm Nextcloud WebDAV endpoint, dedicated account, independent recovery
-   access and supported always-on runner. Confirm retention and alert recipient.
+   access and the dedicated StartOS 0.4.0.3 runner package. Confirm retention and alert recipient.
 3. Implement the thin local copy/verification orchestration with an injected
    transfer runner; exercise transfer compatibility against local fixtures. Tight regressions: interrupted copy never advances freshness,
    wrong read-back fails, old source with a new copy time stays stale, existing
