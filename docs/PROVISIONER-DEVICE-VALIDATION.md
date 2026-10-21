@@ -164,3 +164,8 @@ No full iPhone write or new card mutation is authorized here.
 The provisioned spare is now on assigned keys, so it must not be treated as a
 factory-key blank for another first-install run. Further write drills need
 separately identified cards, provenance, service/batch scope and approval.
+
+The next iPhone write run is scoped in the
+[proposed Max plan](PROVISIONER-MAX-WRITE-DRILL.md). It still needs a suitable
+card, a verified HTTPS service path and explicit setup/write approvals; none
+of those actions are authorized by this coverage summary.
