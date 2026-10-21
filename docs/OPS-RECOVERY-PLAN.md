@@ -1,32 +1,41 @@
 # Recovery custody and independent backup implementation plan
 
-2026-10-21. Operator selections: existing organization HashiCorp Vault (setup
-unfinished), Nextcloud on the operator's Start9 server, and a maximum acceptable
-24-hour loss window. Hostnames, accounts, paths and credentials belong in a
-private operator inventory, not this repository. These selections do not
-authorize production deployment, host access or secret transfer.
+2026-10-21. Current operator selections: an organization password manager
+with designated recovery operators, Nextcloud on the operator's Start9 server,
+and a maximum acceptable 24-hour loss window. This replaces the initial
+HashiCorp Vault choice: the HCP account had no cluster, and the operator chose
+the simpler custody option (D55). The password-manager product is pending.
+Hostnames, accounts, paths and credentials belong in a private operator
+inventory, not this repository. These selections do not authorize production
+deployment, host access or secret transfer.
 
 ## Custody
 
-Designated recovery operators retrieve the private age identity from the
-organization Vault using individual accounts and reviewed access policies.
+Store the private age identity in a restricted shared vault/collection in the
+organization password manager. Designated recovery operators use individual
+accounts with MFA and explicit access to that item. Record its public recipient
+and a nonsecret key identifier alongside it so an operator can match the correct
+identity to an encrypted artifact. Never put the identity in a shared document,
+chat, source control, ordinary log or automatically generated diagnostic.
+
 The service has only the public age recipient. The automatic backup-copy job
 has no private age identity, production manager keys or decryption authority.
-Do not confuse this identity with Vault's own unseal/recovery material or a
-holder wallet's owner key.
+This identity decrypts service recovery backups; it is separate from a holder
+wallet's owner key and the service's derivation master. Product-specific access,
+recovery and audit features must be verified before claiming they are available.
 
-Before relying on Vault, finish authentication/policies, audit access, backup
-and unseal/recovery arrangements, and test access from a recovery machine with
-the normal laptop and Cloudflare unavailable. Record the designated operator
-roles and emergency-access procedure privately. Recovering Vault must not
-require the same lost Cloudflare account or the only copy of this identity.
-Existing local staging key material is rehearsal material, not production
-custody. No key migration or production key creation is performed by this plan.
+Before relying on custody, designate recovery operators and verify retrieval
+from a separate recovery machine with the normal laptop and Cloudflare
+unavailable. Complete account recovery/MFA backup arrangements and the
+organization emergency-access procedure privately. Recovering the password
+manager must not depend on the only lost device, this Cloudflare account, or
+the sole copy of the age identity. Review protected offline emergency access
+with the designated operators; do not create an unattended plaintext export.
 
-HashiCorp references:
-[production hardening](https://developer.hashicorp.com/vault/docs/concepts/production-hardening),
-[seal/unseal](https://developer.hashicorp.com/vault/docs/concepts/seal),
-[storage and backup patterns](https://developer.hashicorp.com/vault/docs/internals/recommended-patterns).
+No HCP cluster, subscription or Vault deployment is required by this plan.
+Existing local staging key material remains rehearsal material, not production
+custody. No identity upload, migration, new production key or password-manager
+account change occurred while recording this decision.
 
 ## Independent encrypted copy
 
@@ -40,7 +49,8 @@ the Start9 dashboard address is not evidence of that endpoint.
 Prefer an independently operated pull job with bucket-scoped R2 read/list
 credentials and Nextcloud write credentials. It copies only encrypted artifacts
 and a nonsecret verification manifest. Do not put Nextcloud credentials in the
-Worker or decrypt artifacts during routine copies. The operator confirmed Start9 is the only always-on server and reports
+Worker or decrypt artifacts during routine copies. The operator confirmed
+Start9 is the only always-on server and reports
 StartOS **0.4.0.3**. Target a separate packaged StartOS backup service using the
 [0.4 daemon/volume/health-check model](https://docs.start9.com/packaging/0.4.0.x/main.html).
 The service owns its scheduled loop, protected transfer configuration and
@@ -97,7 +107,8 @@ must not be described as satisfying the accepted maximum.
 
 ## Bounded execution sequence and acceptance
 
-1. Finish Vault custody and designate recovery operators. Keep all material in
+1. Select the organization password manager, configure restricted shared
+   custody and designate recovery operators. Keep all material in
    private operator-controlled channels; no keys or tokens enter chat/history.
 2. Confirm Nextcloud WebDAV endpoint, dedicated account, independent recovery
    access and the dedicated StartOS 0.4.0.3 runner package. Confirm retention and alert recipient.
@@ -110,8 +121,9 @@ must not be described as satisfying the accepted maximum.
    install/modify Start9 services as discovery. An application password or R2
    credential is supplied privately by the operator, never as a prompt value.
 5. Observe an actual scheduled staging backup, independently copy it and prove
-   recovery from the Nextcloud artifact on a separate machine. Vault supplies
-   decryption authority only for the approved restore drill. No cards/mints.
+   recovery from the Nextcloud artifact on a separate machine. A designated
+   operator retrieves the identity from the password manager only for the
+   approved restore drill. No cards/mints.
 6. Restore into an empty protected Node database; verify escrow mapping and
    disabled old credentials/sessions. Preserve the recovery-required fence.
    Define/review reconciliation and stale-client fencing before reopening any
@@ -121,7 +133,7 @@ must not be described as satisfying the accepted maximum.
    installation or establishes holder readiness.
 
 Current evidence is the [staging report](OPS_STAGING_REPORT_2026-10-21.md).
-Vault custody, independent scheduled copy, actual nightly success, remote-artifact
+Password-manager custody, independent scheduled copy, actual nightly success, remote-artifact
 restore, retention, alerts and reopening procedure are pending—not certified by
 this document. No server connection, credential transfer or cron change occurred
 while recording these choices.
