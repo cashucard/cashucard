@@ -178,10 +178,11 @@ and escrow rows, so reconcile cards issued after the selected restore point
 before reopening issuance. Never delete a Durable Object namespace or rename
 its singleton object as a rollback technique.
 
-The provisioner app's real loop and durable journal remain ENG-741. The current
-loop runs the demo engine even outside demo mode; deploying this service does
-not make that path a completed real-card workflow. The separate bench path and
-all physical-device work retain AGENTS.md's hardware rules.
+The provisioner now has a separate real installation loop and durable journal
+(ENG-741); installation completion remains awaiting holder setup. Committed
+physical installation and recovery-drill gates stay disabled. Service deployment
+alone does not enable a card-writing path; all device work retains AGENTS.md's
+hardware rules.
 
 ## Provisioning reservation API
 
@@ -221,3 +222,13 @@ It obtains a workers.dev hostname only after an approved remote deployment.
 The staging entry blocks holder, legacy registry and anchor routes before
 backend access. Do not use the default production-named config to discover a
 URL or import phone-validation databases into staging.
+
+
+The approved staging rehearsal now has successful remote operator and synthetic
+provisioning checks; see the [dated evidence](../docs/OPS_STAGING_REPORT_2026-10-21.md).
+Deployed native PBKDF2 has a 100k cap, so D52 preserves the 600k work factor
+through the pinned fallback. Sign-in is correspondingly expensive: the app
+allows 30 seconds only for that call (D53); other requests remain bounded at
+10 seconds. These functional timings do not establish production capacity.
+The first scheduled backup, independent copy and remote-artifact restore drill
+remain separate evidence. No production deployment is authorized by staging.
