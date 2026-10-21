@@ -30,6 +30,16 @@ install/rotation, distinct-card sampling, termination and personalization remain
 outstanding. This increment passes 63 Node
 tests, 11 Workers tests, both typechecks, formatting and a deployment dry run.
 
+## Production-readiness continuation
+
+The [production-readiness execution plan](PROVISIONER-PRODUCTION-READINESS.md)
+tracks remaining personalization, service completion, operator experience and
+operational preparation. The unavailable spare for a full Max drill does not
+block those implementation milestones. Hardware evidence gates enabling the
+specific write capability; it does not gate engineering progress. PRs #30–#31
+retain the stopped Max evidence and add interruption context. The next software
+milestone is the personalization and holder-readiness contract.
+
 ## Execution order and checkpoints
 
 Implement in `/Users/dread/Repos/cashu-card-eng-740` on
