@@ -50,6 +50,8 @@ export class ApiUnreachableError extends Error {
 }
 
 const TIMEOUT_MS = 10_000;
+// Deployed 600k PBKDF2 verification takes 8–12s; retain a bounded login.
+const SIGN_IN_TIMEOUT_MS = 30_000;
 
 /** The transport, injectable so the tests never open a socket. */
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
@@ -63,10 +65,12 @@ export interface ApiClientOptions {
 export class ApiClient {
   private readonly fetcher: Fetcher;
   private readonly timeoutMs: number;
+  private readonly signInTimeoutMs: number;
 
   constructor(readonly options: ApiClientOptions) {
     this.fetcher = options.fetcher ?? ((u, i) => fetch(u, i));
     this.timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
+    this.signInTimeoutMs = options.timeoutMs ?? SIGN_IN_TIMEOUT_MS;
   }
 
   private async call(
@@ -74,10 +78,11 @@ export class ApiClient {
     path: string,
     token: string | null,
     body?: unknown,
+    timeoutMs = this.timeoutMs,
   ): Promise<Record<string, unknown>> {
     let res: Response;
     // The documented timeout, actually applied: a hung ops socket must not
-    // stall sign-in, nor one retry pass per pending row, past TIMEOUT_MS.
+    // stall past its budget. Only sign-in gets the longer password budget.
     // The abort races the fetcher — a fetcher that ignores the signal (or a
     // platform fetch that honors it late) still resolves the call.
     const controller = new AbortController();
@@ -85,7 +90,7 @@ export class ApiClient {
     const timer = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, this.timeoutMs);
+    }, timeoutMs);
     try {
       const pending = this.fetcher(this.options.baseUrl + path, {
         method,
@@ -113,7 +118,7 @@ export class ApiClient {
     } catch (e) {
       if (timedOut) {
         throw new ApiUnreachableError(
-          new Error(`the request exceeded ${this.timeoutMs} ms`),
+          new Error(`the request exceeded ${timeoutMs} ms`),
         );
       }
       throw new ApiUnreachableError(e);
@@ -139,10 +144,13 @@ export class ApiClient {
     name: string,
     password: string,
   ): Promise<OperatorSession> {
-    const json = await this.call('POST', '/auth/operator/session', null, {
-      name,
-      password,
-    });
+    const json = await this.call(
+      'POST',
+      '/auth/operator/session',
+      null,
+      {name, password},
+      this.signInTimeoutMs,
+    );
     const env = json.env;
     if (env !== 'factory' && env !== 'issued') {
       throw new ApiServiceError('the service named no known key environment');

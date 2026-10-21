@@ -62,3 +62,50 @@ accepted the same work factor. Setup remains incomplete, its one-shot secret
 is retained until successful bootstrap verification, and no remote backup has
 been demonstrated. D52 records the compatibility fix; this report does not
 claim that its subsequent deployment or remote checks have passed.
+
+## Follow-up: corrected deployment and authenticated smoke passed
+
+Merged #42 source `fde6ed56bb1eca750ca7434f0ae12e4a57f617f5` deployed
+successfully to the same staging Worker with nightly cron unchanged. Deployment
+version: `9af2644c-de8f-45f6-8fec-f2d3bd05f430` (before removing the setup
+secret, which creates a subsequent configuration version). The reviewed
+staging bundle SHA-256 is
+`638e8870acd3121e7c60a5e34cc16e8e76019551cba99536555b881cfe3ff042`.
+
+Bootstrap/sign-in succeeded over verified HTTPS. Removed the one-shot setup
+secret after verification. Authenticated smoke checks passed for the exact
+local-only mint list, synthetic count-1 batch and identical request replay,
+reservation and reconciliation, key issuance and byte-identical replay,
+same-token foreign-device denial on reconciliation/key issuance, blocked
+anchor/registry/holder routes, sign-out and rejected signed-out bearer. No
+physical card identity was supplied or bound; no card installation or external
+mint call occurred. All temporary smoke operator sessions were revoked.
+
+Authenticated backup status was HTTP 503 with `configured: true`, `stale: true`
+and `last_success: null`. This is expected before the first scheduled success;
+no cron invocation, export endpoint, R2 artifact read or restore was forced.
+Remote nightly success and independent recovery custody remain unproven.
+
+Warm sign-in measurements were 8.4–11.5 seconds; the first bootstrap plus login
+took 24.8 seconds. The app's original 10-second deadline was insufficient.
+The D53 candidate's actual `ApiClient` signed in remotely in 10.9 seconds,
+read the expected mint metadata, revoked the smoke operator's sessions and
+verified bearer rejection. Public evidence contains no password, token,
+manager-key material, raw receipt or card identity. These few timings establish
+functional compatibility, not a production load/abuse-resistance claim.
+
+An isolated staging app checkout passed public HTTPS-origin/release-gate
+preflight and generated iOS/Android release JavaScript bundles. It retains both
+physical installation and recovery drills disabled. No native build, phone
+install or distributed release is part of this evidence; the committed app's
+local development origin is unchanged. Candidate source is #42 plus D53's
+client deadline change and the staging-only public origin override.
+
+Candidate artifact SHA-256:
+
+- Public origin configuration:
+  `868b3b7dc9ab24f9135d4f2cb7ec8681c9ffab52dd61b7875689c1db44460669`
+- iOS JavaScript:
+  `f1d9bde1b09b8473ca6a5b595d0e33fe573ede9215757603f98281430d8dc626`
+- Android JavaScript:
+  `1ff7e8e514b29fe2e2056b418ed3ba28bf884bf332c6e1ed8d4b09b2753b4f4c`

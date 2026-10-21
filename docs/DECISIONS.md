@@ -1857,3 +1857,16 @@ a chained KDF, or silently falling back on every crypto failure. The fallback
 costs JavaScript CPU; a successful remote smoke test is required before calling
 the deployment usable. It does not establish production capacity or abuse
 resistance.
+
+## <a id="d53"></a>D53: Bound sign-in separately from provisioning requests
+
+**Decided (ENG-741, 2026-10-21):** allow 30 seconds for operator sign-in,
+retaining a 10-second deadline for all other app API calls. An explicitly
+injected timeout still overrides both for tests/local clients. Keep abort
+racing and timer cleanup; never retry authentication automatically. Remote
+staging's unchanged 600k PBKDF2 verification took 8–12 seconds and exceeded
+the original universal deadline. A fake-clock regression pins both budgets.
+
+**Rejected:** reducing password strength, extending every reservation/record
+request deadline, or removing the sign-in bound. This latency accommodation
+is not evidence of production authentication capacity or availability.
