@@ -1,0 +1,79 @@
+name: Provisioner Android native release
+on:
+  pull_request:
+    paths:
+      - 'apps/provisioner/android/**'
+      - 'apps/provisioner/package.json'
+      - 'apps/provisioner/yarn.lock'
+      - 'apps/provisioner/scripts/check-android-bundle.py'
+      - 'apps/provisioner/scripts/test_android_bundle.py'
+      - '.github/workflows/provisioner-android.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-release:
+    name: Android release bundle (test signing)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/provisioner
+    env:
+      # Public test inputs; this generated signer is never registered or uploaded.
+      CASHU_ANDROID_UPLOAD_STORE_PASSWORD: cashu-ci-test-only
+      CASHU_ANDROID_UPLOAD_KEY_ALIAS: cashu-ci-test-only
+      CASHU_ANDROID_UPLOAD_KEY_PASSWORD: cashu-ci-test-only
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: yarn
+          cache-dependency-path: apps/provisioner/yarn.lock
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            apps/provisioner/android/**/*.gradle*
+            apps/provisioner/android/gradle/wrapper/gradle-wrapper.properties
+            apps/provisioner/yarn.lock
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
+      - name: Install dependencies and Android tools
+        run: |
+          yarn install --frozen-lockfile
+          sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+      - name: Prepare test-only signer and public build configuration
+        run: |
+          umask 077
+          export CASHU_ANDROID_UPLOAD_KEYSTORE="$RUNNER_TEMP/LOCAL-TEST-ONLY.p12"
+          echo "CASHU_ANDROID_UPLOAD_KEYSTORE=$CASHU_ANDROID_UPLOAD_KEYSTORE" >> "$GITHUB_ENV"
+          echo "BUNDLETOOL_JAR=$RUNNER_TEMP/bundletool.jar" >> "$GITHUB_ENV"
+          keytool -genkeypair -keystore "$CASHU_ANDROID_UPLOAD_KEYSTORE" -storetype PKCS12 \
+            -alias "$CASHU_ANDROID_UPLOAD_KEY_ALIAS" \
+            -storepass:env CASHU_ANDROID_UPLOAD_STORE_PASSWORD \
+            -keypass:env CASHU_ANDROID_UPLOAD_KEY_PASSWORD \
+            -keyalg RSA -keysize 3072 -validity 30 -noprompt \
+            -dname 'CN=Cashu CI Test, O=NOT FOR DISTRIBUTION'
+          node scripts/configure-service.cjs --origin https://cashu-card-ops-staging.old-cell-30e7.workers.dev
+          node scripts/configure-service.cjs --check --production
+      - name: Build complete release AAB (no upload)
+        working-directory: apps/provisioner/android
+        run: ./gradlew :app:bundleRelease --console=plain --max-workers=2
+      - name: Verify artifact SDK, release mode and 16KB native alignment
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
+            --output "$BUNDLETOOL_JAR"
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $BUNDLETOOL_JAR" | sha256sum --check
+          python3 scripts/test_android_bundle.py
+          python3 scripts/check-android-bundle.py \
+            android/app/build/outputs/bundle/release/app-release.aab \
+            --readelf "$ANDROID_HOME/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
