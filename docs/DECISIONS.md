@@ -1938,3 +1938,21 @@ before store declarations and production submission.
 **Rejected:** requiring an operator session to reach the privacy policy, calling
 a terms page Support, inventing a contact URL, or treating a working hyperlink
 as approval of policy coverage or store disclosures.
+
+## <a id="d59"></a>D59: Verify additive independent copies through rclone
+
+**Decided (ENG-740, 2026-10-21):** use a thin Python runner around rclone for
+scoped encrypted R2-to-Nextcloud copies. Preserve prior snapshots, immutable
+conflicts and interruption evidence. Download and SHA-256-check destination
+bytes and their stable manifest before certifying an artifact. Recheck the
+newest snapshot each cycle; measure freshness by its source timestamp, never
+copy time. Report 18-hour warning, 24-hour failure, failed-cycle and stopped-runner
+health. Keep transfer credentials in protected configuration; no recovery private
+identity enters the runner. Validate actual transfer mechanics on loopback WebDAV.
+
+**Rejected:** custom S3/WebDAV implementations, destructive sync/pruning,
+ETag-only verification, using copy time as freshness, or interpreting local health
+as an enforced issuance gate or delivered alert. StartOS packaging/compatibility,
+Zion authorization, actual Nextcloud/R2 validation, custody and remote-artifact
+restore remain separate required gates. Source time is trusted exporter metadata;
+a hash receipt alone does not authenticate age ciphertext or its recipient.

@@ -1,0 +1,36 @@
+name: Independent backup copy
+on:
+  pull_request:
+    paths:
+      - 'tools/backup-copy/**'
+      - '.github/workflows/backup-copy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/backup-copy/**'
+      - '.github/workflows/backup-copy.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-copy:
+    name: Backup copy (local WebDAV)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install pinned transfer client
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/rclone/rclone/releases/download/v1.75.2/rclone-v1.75.2-linux-amd64.zip \
+            --output "$RUNNER_TEMP/rclone.zip"
+          echo "349ac8fba6ff65d6247043f1750cdcb518ec5d500ef91463a10d37c0ccdf3702  $RUNNER_TEMP/rclone.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/rclone.zip" -d "$RUNNER_TEMP/transfer-client"
+          echo "$RUNNER_TEMP/transfer-client/rclone-v1.75.2-linux-amd64" >> "$GITHUB_PATH"
+      - name: Copy integrity, freshness and actual local WebDAV round trip
+        run: |
+          rclone version
+          python3 tools/backup-copy/test_copy.py
