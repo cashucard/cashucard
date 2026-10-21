@@ -223,3 +223,32 @@ The root provider supplies all shared screens; titles wrap in normal header
 layout. The identity diagnostic always shows “PHYSICAL CARD — read-only”, while
 ordinary demo screens retain their demo banner. Its content can scroll at larger
 text sizes. These changes do not arm NFC or enable installation.
+
+
+### Service origin for a release candidate
+
+The default comes from `src/serviceOrigin.json` and remains the local
+`http://127.0.0.1:8821` development service. To prepare an isolated release
+checkout with an operator-supplied public HTTPS origin (example only):
+
+```sh
+yarn configure:service --origin https://ops.example.com
+yarn check:release
+```
+
+The configuration is public and contains no password/token. The tool rejects
+credentials, non-origin URLs, HTTP and local/IP production targets without
+contacting any host. It writes atomically and never echoes a rejected input.
+`check:release` also parses the release-gate source and requires recovery drills
+to be a literal disabled constant. It does not enable physical installation,
+validate the deployment certificate or replace release review. Rebuild the app
+and retain the chosen origin/configuration and artifact hashes. Do not ship the
+example origin. Supply the actual reviewed service origin before distribution.
+
+For an explicitly local validation checkout, use `--local` with configure;
+`node scripts/configure-service.cjs --check --local` checks that format without
+requiring production gates. Local HTTP is restricted to loopback/emulator
+addresses; LAN validation must use HTTPS. TLS trust still needs a separately
+approved device setup. Do not modify the app endpoint during an active batch:
+its saved origin is part of the recovery scope. Keep the original build/origin
+available to reconcile saved work rather than clearing storage.

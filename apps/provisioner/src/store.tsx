@@ -26,6 +26,7 @@ import {
   type CardRegistryRow,
 } from './api';
 import type {DemoStateId} from './strings';
+import serviceConfig from './serviceOrigin.json';
 import {resolveTheme, ThemeProvider} from './theme';
 
 export interface BatchConfig {
@@ -55,7 +56,7 @@ export interface AppSession {
 }
 
 /** The default service base URL; the About screen shows it. */
-export const DEFAULT_SERVICE_URL = 'http://127.0.0.1:8821';
+export const DEFAULT_SERVICE_URL = serviceConfig.serviceOrigin;
 
 export interface AppStateShape {
   signedIn: boolean;
