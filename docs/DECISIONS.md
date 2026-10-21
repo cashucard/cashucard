@@ -1841,3 +1841,19 @@ secrets. Account selection, resource creation, secret injection and public
 nonproduction smoke tests require a concrete approved deployment scope first.
 The default production configuration is unchanged. Hardware, holder readiness
 and independent production backup custody are separate release gates.
+
+## <a id="d52"></a>D52: Preserve password work factor under the deployed PBKDF2 cap
+
+**Decided (ENG-740, 2026-10-21):** retain PBKDF2-SHA256 at 600,000
+iterations and the existing stored format. Prefer native WebCrypto; on its
+specific 100,000-iteration `NotSupportedError`, use the already pinned
+`@noble/hashes` asynchronous PBKDF2 implementation. Other crypto errors still
+fail closed. Compare the fallback against Node's native PBKDF2 and exercise
+it inside workerd. Record remote bootstrap/sign-in and timing separately:
+local runtime acceptance did not prove deployed runtime compatibility.
+
+**Rejected:** reducing password protection to fit the native limit, inventing
+a chained KDF, or silently falling back on every crypto failure. The fallback
+costs JavaScript CPU; a successful remote smoke test is required before calling
+the deployment usable. It does not establish production capacity or abuse
+resistance.

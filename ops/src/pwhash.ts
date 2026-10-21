@@ -8,14 +8,16 @@
  *    server and the ops CLI use it.
  *  - `subtle` — PBKDF2-SHA256 over WebCrypto (`crypto.subtle.deriveBits`),
  *    600k iterations, OWASP's 2023 floor for PBKDF2-SHA256 and the path the
- *    Durable Object takes (no node:crypto on the Workers runtime without
- *    nodejs_compat; PBKDF2 is in the runtime's own WebCrypto).
+ *    Durable Object takes. Native WebCrypto is preferred; the deployed
+ *    iteration-cap error uses the pinned noble implementation (D52).
  *
  * The stored format: `scrypt$N$r$p$salt$hash` or `pbkdf2$iter$salt$hash`,
  * hex salt and hash. Verify dispatches on the prefix; hash always writes the
  * backend the process is running on. Timing-safe compare on both paths.
  */
 import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
+import {pbkdf2Async} from '@noble/hashes/pbkdf2';
+import {sha256} from '@noble/hashes/sha256';
 
 /** Which backend this process hashes with; verification is format-driven. */
 export type PwHashBackend = 'node' | 'subtle';
@@ -48,7 +50,7 @@ export class NodePwHash implements PasswordHasher {
   }
 }
 
-/** The Workers backend: PBKDF2-SHA256 over the runtime's WebCrypto. */
+/** The Workers backend: PBKDF2-SHA256, retaining the 600k work factor. */
 export class SubtlePwHash implements PasswordHasher {
   async hash(password: string): Promise<string> {
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -76,17 +78,33 @@ async function derivePbkdf2(
     false,
     ['deriveBits'],
   );
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      hash: 'SHA-256',
-      salt: salt as BufferSource,
-      iterations,
-    },
-    key,
-    KEY_LEN * 8,
-  );
-  return new Uint8Array(bits);
+  try {
+    const bits = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        hash: 'SHA-256',
+        salt: salt as BufferSource,
+        iterations,
+      },
+      key,
+      KEY_LEN * 8,
+    );
+    return new Uint8Array(bits);
+  } catch (error) {
+    // Deployed workerd may cap native PBKDF2 at 100k even when local
+    // workerd accepts 600k. Preserve the exact KDF, work factor and format.
+    if (
+      !(error instanceof Error) ||
+      error.name !== 'NotSupportedError' ||
+      !error.message.includes('iteration counts above 100000 are not supported')
+    ) {
+      throw error;
+    }
+    return pbkdf2Async(sha256, password, salt, {
+      c: iterations,
+      dkLen: KEY_LEN,
+    });
+  }
 }
 
 async function verifyPbkdf2(
