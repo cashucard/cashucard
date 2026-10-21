@@ -78,6 +78,7 @@ export interface ProvisioningProviderOptions {
   runCard?: typeof runReservedAttempt;
   withCard?: AttemptRunOptions['withCard'];
   cancelCard?: () => Promise<void>;
+  cardMessage?: (message: string) => void;
 }
 interface ReplacementReview {
   attemptId: string;
@@ -175,10 +176,15 @@ export function ProvisioningProvider({
   });
   const drillsEnabled =
     settings.recoveryDrillsEnabled ?? RECOVERY_DRILLS_ENABLED;
+  const armedMessage = useRef<((value: string) => void) | null>(null);
+  const pauseStage = useRef('unconfirmed');
   const drill = useRef<RecoveryDrill | null>(null);
   drill.current ??= new RecoveryDrill(state => {
     if (mounted.current) {
       setDrillState(state);
+      if (state.paused) {
+        armedMessage.current?.(`Paused: ${state.paused}\nSaved: ${pauseStage.current}`);
+      }
     }
   });
   const busyRef = useRef(false);
@@ -433,6 +439,7 @@ export function ProvisioningProvider({
         armedCancel.current =
           settings.cancelCard ??
           (native ? () => native.cancelCard() : async () => undefined);
+        armedMessage.current = settings.cardMessage ?? native?.setCardMessage ?? null;
         try {
           if (settings.withCard) {
             return await settings.withCard(guardedRun);
@@ -445,6 +452,7 @@ export function ProvisioningProvider({
           ).value;
         } finally {
           armedCancel.current = null;
+          armedMessage.current = null;
           if (mounted.current) {
             setCardActive(false);
           }
@@ -464,7 +472,9 @@ export function ProvisioningProvider({
                 if (!allowed()) {
                   throw new TransportError('Card session cancelled');
                 }
-                setSnapshot(w.snapshot());
+                const saved = w.snapshot();
+                setSnapshot(saved);
+                pauseStage.current = saved.active?.journal?.stage ?? 'unconfirmed';
                 await drill.current!.checkpoint(boundary);
                 if (!allowed()) {
                   throw new TransportError('Card session cancelled');

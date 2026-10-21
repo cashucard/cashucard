@@ -1667,3 +1667,19 @@ authorize a recovery sweep or bypass the hardware release gate.
 remembering consent across restarts, and treating an operator chat confirmation
 as a substitute for checking the physical card again. Manager-key provenance
 remains a hardware-plan prerequisite, not something inferred from public state.
+
+
+## <a id="d42"></a>D42: Show reached recovery pauses in the active iOS NFC sheet
+
+**Decided (ENG-741, 2026-10-20):** validation builds display the reached
+armed recovery boundary and current saved journal stage using the existing
+native card-message adapter. The iOS NFC sheet covers the React pause panel;
+operators need visible evidence of the boundary before terminating the app.
+Read the stage from the workflow snapshot at the checkpoint, not from the
+boundary name. Limit the message callback to the lifetime of the card session
+and clear it in its finally block. Closed-session checkpoints use the app panel.
+The independent installation and recovery-drill release gates remain unchanged.
+
+**Rejected:** timed kills, inferring a persisted stage from the checkpoint name,
+and updating a stale NFC sheet after the card session closes. This is validation
+observability, not evidence that an iPhone write drill has passed.

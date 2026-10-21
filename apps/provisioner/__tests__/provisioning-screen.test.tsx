@@ -636,3 +636,42 @@ test('replacement requires a closed-session review and one-shot installation-spe
   });
   expect(flow.replacement).toBeNull();
 });
+
+
+test('native pause messages report saved state only inside an active card session', async () => {
+  const f = fixture();
+  const cardMessage = jest.fn();
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w, _s, options,
+  ) => {
+    await options.withCard(async () => {
+      await options.checkpoint!('install-intent-saved');
+      return 'interrupted';
+    });
+    await options.checkpoint!('record-frozen-session-closed');
+    return 'interrupted';
+  };
+  const options: ProvisioningProviderOptions & {cardMessage: typeof cardMessage} = {
+    ...f, hardwareValidated: true, recoveryDrillsEnabled: true,
+    serviceFor: () => f.service, runCard, cardMessage,
+    withCard: run => run(async () => [0x90, 0]),
+  };
+  await mount(options);
+  await signIn();
+  await act(async () => { await flow.create(config); });
+  await act(async () => { flow.drill!.arm('install-intent-saved'); });
+  let pending!: Promise<boolean>;
+  await act(async () => { pending = flow.program(); });
+  expect(flow.drill?.paused).toBe('install-intent-saved');
+  expect(cardMessage).toHaveBeenCalledWith('Paused: install-intent-saved\nSaved: reserved');
+  await act(async () => {
+    flow.drill!.resume();
+    await pending;
+  });
+  expect(cardMessage).toHaveBeenCalledTimes(1);
+  await act(async () => { flow.drill!.arm('record-frozen-session-closed'); });
+  await act(async () => { pending = flow.program(); });
+  expect(flow.drill?.paused).toBe('record-frozen-session-closed');
+  expect(cardMessage).toHaveBeenCalledTimes(1);
+  await act(async () => { flow.drill!.resume(); await pending; });
+});
