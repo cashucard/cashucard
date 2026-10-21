@@ -253,3 +253,12 @@ post-check; the requested Pixel write approval does not move its batch or
 authorize Max writes. Card replacement consent and provenance were confirmed
 by the operator, but this complete drill still awaits explicit execution
 approval. The successful setup did not touch a card.
+
+### Pause arming for the replacement review
+
+The first read-only tap returns for replacement review and ends that program
+invocation. Its unvisited drill target is intentionally cleared at operation
+end. Therefore **after the review appears and before pressing Replace**, arm
+`installation-verified-before-save` again and verify the panel shows that exact
+target. Only then confirm replacement and retap the same card. Do not assume
+a target armed before the read-only inspection survives to the write tap.
