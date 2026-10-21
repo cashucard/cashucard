@@ -143,3 +143,17 @@ signed-in administrator. Accidentally authorized admin credentials are revoked.
 
 Run `python3 tools/backup-copy/test_issuer.py` for focused source-scope,
 pagination/identity, pairing/authorization and admin-rejection checks.
+
+### NTFY delivery
+
+A private alert config can select `provider: "ntfy"`, with `webhook_url` set to
+the server's HTTPS origin, `topic` set to one literal topic, and `token` holding
+a dedicated write-only publisher token. Never use an admin token or put a token
+in the URL. Atoll's StartOS connection action obtains its own publisher through
+the existing NTFY package rather than requesting copied credentials.
+
+The sender maps recovery health to a titled NTFY message, uses Bearer auth,
+rejects redirects and validates a bounded message receipt for the same topic.
+Five focused alert tests include real loopback authorization/payload inspection,
+wrong-topic receipt rejection and redirects. Receipt acceptance still does not
+prove browser/mobile delivery, human acknowledgement or whole-host monitoring.
