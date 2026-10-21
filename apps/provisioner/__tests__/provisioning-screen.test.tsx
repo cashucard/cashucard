@@ -714,3 +714,21 @@ test.each([
   await act(async () => { app.signOut(); });
   expect(flow.notice).toBeNull();
 });
+
+
+test('real mint discovery never substitutes demo endpoints and can retry a failed list', async () => {
+  jest.spyOn(ApiClient.prototype, 'mints')
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValue(['https://mint.test']);
+  const f = fixture();
+  const tree = await mount({...f, hardwareValidated: true, serviceFor: () => f.service});
+  expect(tree.root.findAllByProps({testID: 'mint-https://forge.flashapp.me'})).toHaveLength(0);
+  await signIn();
+  expect(tree.root.findAllByProps({testID: 'mint-https://forge.flashapp.me'})).toHaveLength(0);
+  expect(text(tree)).toContain('The mint list could not be loaded.');
+  expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(true);
+  await act(async () => {tree.root.findByProps({testID: 'retry-mints'}).props.onPress();});
+  expect(tree.root.findByProps({testID: 'mint-https://mint.test'})).toBeTruthy();
+  expect(text(tree)).not.toContain('The mint list could not be loaded.');
+  expect(f.service.batch).not.toHaveBeenCalled();
+});
