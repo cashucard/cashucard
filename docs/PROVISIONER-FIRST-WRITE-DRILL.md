@@ -182,3 +182,37 @@ another mapping, and open the existing provisioner for operator-entered local
 login. Keep both release flags false. Stop before NFC, batch creation or card
 installation. This phone scope requires operator approval under AGENTS.md;
 it is separate from subsequent card-write approval.
+
+## Pixel sign-in checkpoint and proposed validation setup
+
+The operator approved connecting the Pixel provisioner. Its reverse-port list
+was empty; added and verified Pixel `tcp:8821` -> Mac `tcp:8822`. Opened the
+existing app, disabled demo mode, and reached sign-in. The operator entered
+the private local credential and confirmed sign-in succeeded, then confirmed
+the Card installation screen displays the installation-paused gate. This
+phone observation is operator-reported; no password was captured. No native
+rebuild/reinstall, NFC, batch/reservation or card write occurred. A host-side
+DB check before sign-in found one operator and zero batches, issued-key rows
+or provisioning attempts.
+
+The next proposed scope is **validation setup only**, on Pixel ADB
+`42201FDJG00048`. After explicit approval:
+
+1. Prepare an isolated local validation source/binary from the reviewed PR #24
+   code, with both release flags true only in that isolated local build. Record
+   source and artifact hashes; keep committed release flags false.
+2. Build/install/launch that validation app on the Pixel without clearing app
+   data. Preserve its app identity, journal and local service database/master.
+3. Reestablish only the documented service/Metro USB mappings as needed. Let
+   the operator sign into the same local issued account privately.
+4. Create one batch with count 1 and the local test-mint URL, installation only.
+   Verify that batch survives an app restart. Do not tap Install/Continue,
+   reserve another ordinal, arm NFC, authenticate or touch the card.
+5. Stop with batch/source/build evidence for review. Request the separate
+   bounded replacement/install/rotation/restart drill approval only then.
+
+This resolves the setup ordering: a real batch cannot be created through the
+committed app while its installation gate is false. Batch persistence is checked
+in a separately approved validation setup, before requesting any card mutation.
+No NFC reservation is needed to validate batch persistence; the drill itself
+will reserve its sole attempt when programming is explicitly approved.
