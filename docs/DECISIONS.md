@@ -1723,3 +1723,20 @@ provisioner. The existing wire permits first-reader ownership of an unowned
 card; a host token does not secure unattended delivery. Preserve physical
 custody until holder setup or review an additional protection design.
 This does not enable consumer manager-key issuance or change the card wire.
+
+
+## <a id="d45"></a>D45: Portable public configuration values, with bounded read-back
+
+**Decided (ENG-741, 2026-10-20):** cardkit encodes the existing SET_CARD and
+13-byte SET_LIMIT values and strictly parses GET_CARD. This layer has no
+owner signing, PIN, manager authentication or write executor. It supports sat
+unit and printable ASCII mint text, validates wire bounds/design/refund-key
+framing, and leaves endpoint policy and curve validation to their own layers.
+GET_CARD read-back sends one command in an already identified applet session;
+no implicit SELECT clears transient grants, and refusal is never retried.
+Comparison covers only record fields, never holder/payment readiness.
+
+**Rejected:** inventing a new wire format, silently coercing or rounding limits,
+checking only the record-set flag, embedding a wallet private key in cardkit,
+and treating public record read-back as owner/PIN/limit attestation. The codec
+is groundwork for holder-wallet integration, not an enabled provisioning path.
