@@ -216,3 +216,40 @@ committed app while its installation gate is false. Batch persistence is checked
 in a separately approved validation setup, before requesting any card mutation.
 No NFC reservation is needed to validate batch persistence; the drill itself
 will reserve its sole attempt when programming is explicitly approved.
+
+## Ready-for-approval execution scope after validation setup
+
+The separately approved setup passed: isolated validation build installed on
+Pixel `42201FDJG00048`, operator sign-in, count-1 batch creation and exact
+workflow persistence across forced app stop/relaunch/reauthentication. See
+`HARDWARE_TEST_REPORT_2026-10-20.pixel-batch-persistence.md` for artifact and
+local gate-delta hashes. Source is
+`a8cee93998dfff4f6254c65217ee78ec0e03d91d`; the sole local source delta enables
+the two validation flags. Review source remains gated off.
+
+Use existing batch **1**, operator **1**, issued environment, device
+`4794470b-dfef-447e-bbd8-7ebadcd9f41d`, request
+`849592a9-a1fb-40e1-8fe0-24eea8747b30`. Active attempt is null, ordinal is 0;
+reserve only its first/sole attempt when the drill begins. Retained private
+service state and a consistent pre-write snapshot/master are present; local
+snapshot integrity and metadata checks passed. This is not independent DR.
+
+Requested write scope is the replacement variant above on card
+`cplc-v1:4790d3213041093363205547`, old installation
+`0366bf811cadfcfc00e5f251017d1dc690a93a6a4a9d39ed114b96d33fb59d9941`,
+using Pixel only. After approval, arm `installation-verified-before-save`,
+inspect the card, close NFC, review/confirm this exact old installation and
+retap. Permit the guarded known-AID cleanup/install using the provenance-known
+factory set, then the three specified process-loss boundaries and recovery
+with the same attempt. Permit one assigned-set PUT KEY plus its successful
+confirmation and the planned recovery authentication; never trial another key
+set or retry after an authentication failure. Preserve escrow and installed
+assigned keys at the end; no factory reset, mint/owner/PIN personalization,
+proof operations or production access. A version/state/identity/storage/auth
+error stops the drill. No new ordinal, recovery sweep or second installation.
+
+Max's optional final CPLC-only comparison stays a separately coordinated
+post-check; the requested Pixel write approval does not move its batch or
+authorize Max writes. Card replacement consent and provenance were confirmed
+by the operator, but this complete drill still awaits explicit execution
+approval. The successful setup did not touch a card.

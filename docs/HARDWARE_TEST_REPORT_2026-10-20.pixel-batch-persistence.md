@@ -1,4 +1,4 @@
-# Pixel validation setup — in progress, no card operations
+# Pixel validation setup — batch restart persistence passed
 
 ENG-741, 2026-10-20. The operator explicitly approved a local validation
 build/install and one-card batch persistence check, stopping before NFC.
@@ -42,8 +42,46 @@ mode-0600 database/runtime/login files. No production system is involved.
 The tracked CAP is not installed in this setup; its repository SHA-256 is
 `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`.
 
-## Results pending
+## Batch creation and process restart
 
-Validation-app sign-in, one-card batch creation and restart persistence are
-not yet established. No NFC, attempt reservation, card authentication, LOAD,
-DELETE, key rotation or proof/PIN/owner operation has been performed.
+The operator signed into the validation app. Before creation, selecting the
+local mint removed the custom-URL row and shifted the count field. An initial
+automation sequence used the stale count coordinates, then Back exited the
+app rather than dismissing a keyboard. No batch was created by that sequence;
+the operator signed in again. The next sequence inspected updated bounds
+after each action, verified count 1 and enabled Start, and created one batch.
+
+Observed UI: `0 of 1 attempts acknowledged`, local validation recovery panel,
+`No pause armed`. Install/Continue was never tapped.
+
+Public saved identifiers:
+
+- Batch: 1; operator: 1; key environment: issued.
+- Device: `4794470b-dfef-447e-bbd8-7ebadcd9f41d`.
+- Batch request: `849592a9-a1fb-40e1-8fe0-24eea8747b30`.
+- Count 1; mint `http://127.0.0.1:3338`; `pin_policy: perCard`.
+- Load SHA-256:
+  `fe7d8ac31be1284f8a9a6d031cdee9b4690f8d02e0a9ab1fa3bac645f6bc13ee`.
+- Active attempt: null; history: empty; next ordinal: 0.
+
+The service database contains one batch, one issued-key escrow row and zero
+provisioning attempts. A consistent `VACUUM INTO` snapshot and matching private
+runtime were retained in the private run directory as `before-card-write.db`
+and `before-card-write-runtime.json`, both mode 0600. Snapshot integrity is
+`ok`; metadata confirms one count-1 batch, one escrow row, zero attempts. No
+key values were printed or requested through the key API. This is local
+retention only, not an encrypted independent export/restore proof.
+
+Forced app stop, then copied its AsyncStorage database to the private run
+directory. The saved schema-2 workflow contains the exact identifiers above
+and no active attempt. Serialized workflow SHA-256:
+`2c7156f33a578f07b0757100b876aa8fc932dc683fc8405f9ec0c5ed54f4210a`.
+Relaunched MainActivity; the operator signed in again. The post-restart UI
+showed the validation panel, `No pause armed` and `0 of 1 attempts acknowledged`.
+A second private copy of AsyncStorage yielded a parsed workflow exactly equal
+to the pre-restart value, with the same serialized SHA-256. Batch 1, device ID
+and batch request ID survived; active attempt remains null. This establishes
+process-restart batch persistence on the Pixel, not card-install recovery.
+
+No NFC, attempt reservation, card authentication, LOAD, DELETE, key rotation
+or proof/PIN/owner operation has been performed.
