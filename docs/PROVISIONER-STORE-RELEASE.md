@@ -12,14 +12,14 @@ not the completed production deliverable.
 | --- | --- |
 | Identity | Preserve `com.islandbitcoin.provisioner` and current signing continuity until store enrollment is reviewed. Do not rename IDs or replace keys to bypass a validation setup. |
 | Android signing | D56 removes fixed Release passwords/keystore defaults and requires private upload signing inputs through the actual Gradle Release prerequisites. No key or signed artifact was generated for this change. |
-| Android native compatibility | Manifest target is API 36; compile SDK is still 35 with RN 0.77.1's toolchain. Review/align compile SDK, AGP and Gradle; build the complete AAB and validate native library page alignment/compatibility. A target integer and JS bundle are insufficient evidence. |
+| Android native compatibility | D57 aligns compile/target API 36 with AGP 8.10.1 and Gradle 8.11.1. The local full native AAB and 24 bundled 64-bit libraries pass SDK/release/16KB format checks (dated build report). Native CI and device/runtime evidence remain separate. Review the maintained RN/dependency baseline before distribution. |
 | Apple toolchain | Local Xcode is 26.6; project deployment target is iOS 15.1. A signed archive/export and native NFC/entitlement review remain pending. iOS pods/signing and device installs retain repository approval rules. |
 | Runtime endpoint | Only isolated staging has remote functional evidence. Committed default remains local; production configuration/deployment is pending. A store candidate must select its reviewed production origin explicitly. |
 | App capability | Installation and recovery-drill gates remain false. Enable only a reviewed platform capability after its exact evidence; never enable recovery drills for distribution. Preserve quarantined chips/journals. |
 | Privacy/support | The operator supplied the Flash privacy and terms URLs; both are accessible before sign-in and in Settings (D58). Support contact remains unconfirmed. Review the [data inventory](PROVISIONER-DATA-INVENTORY.md), policy coverage, app/SDK manifests and store declarations before submission. |
 | Reviewer access | Prepare scoped reviewer access, instructions and hardware evidence without giving app-store reviewers production manager keys or access to operational batches. Public demo UI does not by itself fulfill review access. |
 | Operational recovery | Implement the independent copy service and custody/restore gates in the recovery plan. Production freshness enforcement, alert delivery and restore/reconciliation remain unfinished. |
-| Distribution | Developer accounts/listings, upload signing continuity, store metadata, age/content/financial declarations and review notes remain to be confirmed. No upload or submission is authorized merely by this plan. |
+| Distribution | The operator confirmed app records already exist in both stores. Upload signing continuity, store metadata, age/content/financial declarations and review notes remain to be confirmed. No upload or submission is authorized merely by this plan. |
 
 ## Requirements verified from official sources
 
@@ -72,3 +72,5 @@ The [production-readiness plan](PROVISIONER-PRODUCTION-READINESS.md),
 [staging evidence](OPS_STAGING_REPORT_2026-10-21.md) remain the detailed sources.
 No phone/card operation, production access, store connection or upload occurred
 in this audit. No stage in this document constitutes store approval.
+
+Native evidence: [Android build report](PROVISIONER_ANDROID_BUILD_REPORT_2026-10-21.md).

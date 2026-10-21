@@ -1926,6 +1926,23 @@ falling back to debug signing, or an optional check that direct Gradle/Studio
 Release builds could skip. Store enrollment/certificate continuity and protected
 upload-key custody require explicit release review before any distribution.
 
+## <a id="d57"></a>D57: Verify Android API 36 and native alignment on built bundles
+
+**Decided (ENG-741, 2026-10-21):** compile and target API 36 using AGP 8.10.1,
+Gradle 8.11.1 (checksum pinned) and the existing JDK 17/NDK 27 toolchain. Keep
+application identity, dependency versions, four configured ABIs and physical
+release gates unchanged. Verify actual AAB manifest/config and every included
+64-bit ELF library using bundletool and llvm-readelf, not source constants.
+Run a path-filtered native CI build for Android toolchain/native dependency
+changes with an ephemeral test signer and no store upload or retained AAB.
+
+**Rejected:** changing only the manifest target, suppressing unsupported-SDK
+warnings, treating JS bundles as native compatibility evidence, or using
+production signing keys in PR checks. Format/alignment validation is not a
+16KB-device runtime test, hardware evidence or a distribution-ready artifact.
+A maintained React Native/dependency baseline remains part of release review;
+this narrow toolchain change does not certify long-term framework maintenance.
+
 ## <a id="d58"></a>D58: Make supplied legal links available before sign-in
 
 **Decided (ENG-741, 2026-10-21):** show the operator-supplied Flash privacy

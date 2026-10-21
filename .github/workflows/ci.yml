@@ -440,6 +440,9 @@ jobs:
       - name: Tests
         run: node_modules/.bin/jest
 
+      - name: Android artifact checker regressions
+        run: python3 scripts/test_android_bundle.py
+
       # The release bundles prove Metro resolves cardkit from tools/ and its
       # dependency from here, with no cardkit install. Native builds and
       # signing are the owner's (H1).
