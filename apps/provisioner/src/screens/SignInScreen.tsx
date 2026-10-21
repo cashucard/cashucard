@@ -17,6 +17,7 @@ import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {ApiUnreachableError} from '../api';
 import {APP_NAME, SIGNIN} from '../strings';
 import {useApp} from '../store';
+import {LegalLinks} from '../LegalLinks';
 import {FONT, useTheme, type Theme} from '../theme';
 import {PrimaryButton, Screen} from '../ui';
 
@@ -170,6 +171,7 @@ export function SignInScreen() {
         </View>
       </View>
       <View style={s.footer}>
+        <LegalLinks />
         <PrimaryButton
           title={busy ? SIGNIN.signingIn : SIGNIN.button}
           onPress={() => attempt()}

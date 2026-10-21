@@ -1925,3 +1925,16 @@ created and no existing signing identity is changed by this implementation.
 falling back to debug signing, or an optional check that direct Gradle/Studio
 Release builds could skip. Store enrollment/certificate continuity and protected
 upload-key custody require explicit release review before any distribution.
+
+## <a id="d58"></a>D58: Make supplied legal links available before sign-in
+
+**Decided (ENG-741, 2026-10-21):** show the operator-supplied Flash privacy
+policy and terms links on sign-in and in Settings, opening the system browser
+only on a deliberate press. Failed opens show a generic actionable message.
+The terms URL is labelled Terms; a support destination remains unconfirmed.
+The linked policy still needs review against the provisioner's actual data flows
+before store declarations and production submission.
+
+**Rejected:** requiring an operator session to reach the privacy policy, calling
+a terms page Support, inventing a contact URL, or treating a working hyperlink
+as approval of policy coverage or store disclosures.

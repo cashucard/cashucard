@@ -29,6 +29,29 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
       .map(n => n.props.children as string)
       .join('\n');
   expect(text()).toContain('SIGN IN');
+  expect(text()).toContain('Privacy Policy');
+  expect(text()).toContain('Terms');
+  const {Linking} = require('react-native');
+  const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  await ReactTestRenderer.act(async () => {
+    await tree!.root.findByProps({testID: 'legal-privacy'}).props.onPress();
+    await tree!.root.findByProps({testID: 'legal-terms'}).props.onPress();
+  });
+  expect(openURL.mock.calls).toEqual([
+    ['https://getflash.io/legal/privacy.html'],
+    ['https://getflash.io/legal/terms.html'],
+  ]);
+
+  const {Alert} = require('react-native');
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  openURL.mockRejectedValueOnce(new Error('private native details'));
+  await ReactTestRenderer.act(async () => {
+    await tree!.root.findByProps({testID: 'legal-privacy'}).props.onPress();
+  });
+  expect(alert).toHaveBeenCalledWith(
+    'Unable to open link',
+    'Please try again later.',
+  );
 
   // Sign in through the mocked api module (jest.mock at the bottom of the file
   // would race this hoisting; the store accepts a client via signIn's options,
@@ -54,6 +77,8 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'settings'}).props.onPress();
   });
+  expect(tree!.root.findByProps({testID: 'legal-privacy'})).toBeDefined();
+  expect(tree!.root.findByProps({testID: 'legal-terms'})).toBeDefined();
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'demo-switch'}).props.onValueChange(true);
   });
