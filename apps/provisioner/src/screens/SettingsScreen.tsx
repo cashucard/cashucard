@@ -20,6 +20,7 @@ import {
 
 import {SETTINGS} from '../strings';
 import {useApp} from '../store';
+import {LegalLinks} from '../LegalLinks';
 import {FONT, useTheme, type Theme} from '../theme';
 import {Screen} from '../ui';
 
@@ -267,6 +268,7 @@ export function SettingsScreen({
             </View>
           </View>
         </View>
+        <LegalLinks />
       </ScrollView>
     </Screen>
   );
