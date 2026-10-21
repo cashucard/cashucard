@@ -23,3 +23,5 @@ export * from './gp/identity';
 export * from './gp/inspect';
 
 export * from './gp/configuration';
+
+export * from './gp/holderCommands';

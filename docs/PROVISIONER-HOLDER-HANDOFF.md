@@ -120,3 +120,31 @@ must not reuse the disabled shape-only holder-session path.
 5. Review a holder integration with the wallet owners. Keep production deployment
    and physical enablement separately reviewed; unavailable Max hardware does
    not prevent these software slices.
+
+
+## Implemented signing boundary and remaining PIN work
+
+`tools/cardkit/gp/holderCommands.ts` implements the injected public owner-command
+boundary in D46. It matches full identity, requires durable intent before nonce
+and signing, supplies immutable public context/message, and sends at most one
+owner write. The wallet adapter remains responsible for key custody and explicit
+operation approval. Synthetic transport tests and existing public P-256 vectors
+exercise the boundary; no real wallet or physical card integration is claimed.
+
+The initial SET_OWNER, PIN setup/change, anchor acquisition and completion
+orchestration are not exposed through this helper. PIN recovery must implement
+these separate outcomes before any of those paths can certify readiness:
+
+| Observed state after interruption | Permitted continuation |
+| --- | --- |
+| Current PIN known only in the same live wallet session | No automatic VERIFY retry after an uncertain verify reply. Establish authoritative state and explicit holder action; wrong/blocked status stops. |
+| PIN lost from memory, card still unowned and empty | Stop with unknown PIN. Offer a separately approved reset only after exact identity, owned-state and empty-state checks; never try guessed old values. |
+| PIN lost, expected owner authority can be proved | Explicit holder-authorized CHANGE_PIN with a new known value is the recovery candidate; fresh intent/nonce and read-back are required. Do not require guessing the old PIN. |
+| Owner unknown or signer unavailable | Stop and retain evidence; neither ops-service nor a temporary issuer key may take ownership to bypass it. |
+| Identity, funds, lock or record differs from saved context | Stop before mutation and retain the original setup record. |
+
+These are recovery requirements, not implemented reset commands or hardware
+authorization. A reply lost after a write remains an uncertain write; the next
+layer must reconcile before another operation. No ordinary journal stores the
+PIN or a reusable PIN-derived hash. A background service retry cannot authorize
+a new PIN attempt or replace holder acknowledgement.
