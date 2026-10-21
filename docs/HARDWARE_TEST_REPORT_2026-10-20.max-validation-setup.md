@@ -112,6 +112,7 @@ Updated artifact SHA-256 values:
 - Executable: `a0afd26684b43ad6e471178e75402915ccebf1596c2e269edab640034909588e`.
 - Bundled JS: `1b00bab75d9c5dab0b4c36d393ede235a022a4b946cd12a71c9d5a58b1760699`.
 
-The message has not yet been observed during a physical NFC session. The earlier
-batch-restart observation applies to the first setup build; reconfirm the
-restored batch in this updated build before beginning separately approved writes.
+The message has not yet been observed during a physical NFC session. After the operator signed in to the updated build, another scoped native
+AsyncStorage copy matched the previous restored workflow exactly: same batch,
+no active attempt and empty history. The dedicated service still had zero
+provisioning attempts. No card operations were needed for this check.
