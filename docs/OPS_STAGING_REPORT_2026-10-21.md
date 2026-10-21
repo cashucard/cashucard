@@ -179,5 +179,6 @@ source age Unknown, delivery Healthy and last acceptance
 This proves automatic publisher setup, server acceptance and web receipt. It
 does not prove phone/desktop push, human acknowledgement, whole-Zion outage
 monitoring, successful artifact copy, authenticated restoration or issuance
-fencing. No production service, card, reader or phone was used. The staging
-export schedule remains unchanged and no synthetic export was inserted.
+fencing. No production ops deployment or card, reader or phone operation was
+performed. The staging export schedule remains unchanged and no synthetic export
+was inserted.
