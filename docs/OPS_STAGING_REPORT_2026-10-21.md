@@ -1,4 +1,4 @@
-# Isolated staging deployment — partial, cron decision pending
+# Isolated staging deployment — initial stop and follow-up
 
 2026-10-21. Operator explicitly approved the
 [bounded staging deployment](OPS-STAGING-DEPLOYMENT.md). Source pinned to
@@ -40,3 +40,25 @@ The local backup identity remains private and is not independent offsite custody
 Local preparation passed 65 Node tests, 12 Workers tests, both typechecks,
 formatting and the staging bundle dry run; PR #40's 24 CI checks passed before
 merge. These do not substitute for the pending remote smoke/backup evidence.
+
+
+## Follow-up: cron freed; deployed password runtime incompatibility
+
+The operator authorized removing the unused `meridian-emily` cron. Only its
+schedule was removed (verified empty); its Worker was not deleted. Other
+Workers were unchanged. Its owning source configuration must also remove the
+schedule before a future deployment can restore it.
+
+Redeploying the same pinned staging source succeeded with cron `17 3 * * *`
+and Worker version `3acfebc3-bc70-4fdb-8f49-4e718c2ea66d`. Fresh staging
+master, backup recipient and one-shot setup secrets were injected through
+private stdin. No secret values were emitted to ordinary output.
+
+The first sign-in failed with HTTP 500 / Cloudflare 1101 before any session or
+synthetic batch was created. A staging-only diagnostic trace identified
+`NotSupportedError`: deployed WebCrypto rejects PBKDF2 iteration counts above
+100,000; the configured password work factor is 600,000. Local workerd had
+accepted the same work factor. Setup remains incomplete, its one-shot secret
+is retained until successful bootstrap verification, and no remote backup has
+been demonstrated. D52 records the compatibility fix; this report does not
+claim that its subsequent deployment or remote checks have passed.
