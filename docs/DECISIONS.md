@@ -1910,3 +1910,18 @@ or treating selection of a password manager as proof of successful custody.
 Retain D54 as history; its initial assumption of an existing organization Vault
 was corrected before deployment. Independent copy/restore evidence and
 reconciliation/fencing remain required.
+
+## <a id="d56"></a>D56: Inject Android upload signing and reject debug-key releases
+
+**Decided (ENG-741, 2026-10-21):** Android Release builds receive the existing
+upload keystore path, alias and passwords only through private environment
+inputs. A Gradle prerequisite validates completeness, a readable absolute path
+and rejection of the published debug keystore (including renamed copies).
+AGP remains responsible for actual keystore/password/alias validation and signing.
+Debug builds retain their published development key. No new upload key is
+created and no existing signing identity is changed by this implementation.
+
+**Rejected:** committed release passwords, a default local release key, silently
+falling back to debug signing, or an optional check that direct Gradle/Studio
+Release builds could skip. Store enrollment/certificate continuity and protected
+upload-key custody require explicit release review before any distribution.
