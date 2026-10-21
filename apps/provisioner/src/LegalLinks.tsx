@@ -9,6 +9,7 @@ const links = [
     url: 'https://getflash.io/legal/privacy.html',
   },
   {id: 'terms', label: 'Terms', url: 'https://getflash.io/legal/terms.html'},
+  {id: 'support', label: 'Support', url: 'mailto:support@getflash.io'},
 ] as const;
 
 export function LegalLinks() {
@@ -25,7 +26,12 @@ export function LegalLinks() {
             try {
               await Linking.openURL(link.url);
             } catch {
-              Alert.alert('Unable to open link', 'Please try again later.');
+              Alert.alert(
+                'Unable to open link',
+                link.id === 'support'
+                  ? 'Email support@getflash.io from your preferred email app.'
+                  : 'Please try again later.',
+              );
             }
           }}>
           <Text style={[styles.label, {color: theme.dim}]}>{link.label}</Text>

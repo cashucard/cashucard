@@ -31,15 +31,18 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   expect(text()).toContain('SIGN IN');
   expect(text()).toContain('Privacy Policy');
   expect(text()).toContain('Terms');
+  expect(text()).toContain('Support');
   const {Linking} = require('react-native');
   const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   await ReactTestRenderer.act(async () => {
     await tree!.root.findByProps({testID: 'legal-privacy'}).props.onPress();
     await tree!.root.findByProps({testID: 'legal-terms'}).props.onPress();
+    await tree!.root.findByProps({testID: 'legal-support'}).props.onPress();
   });
   expect(openURL.mock.calls).toEqual([
     ['https://getflash.io/legal/privacy.html'],
     ['https://getflash.io/legal/terms.html'],
+    ['mailto:support@getflash.io'],
   ]);
 
   const {Alert} = require('react-native');
@@ -51,6 +54,15 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   expect(alert).toHaveBeenCalledWith(
     'Unable to open link',
     'Please try again later.',
+  );
+
+  openURL.mockRejectedValueOnce(new Error('no mail app'));
+  await ReactTestRenderer.act(async () => {
+    await tree!.root.findByProps({testID: 'legal-support'}).props.onPress();
+  });
+  expect(alert).toHaveBeenLastCalledWith(
+    'Unable to open link',
+    'Email support@getflash.io from your preferred email app.',
   );
 
   // Sign in through the mocked api module (jest.mock at the bottom of the file
@@ -79,6 +91,7 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   });
   expect(tree!.root.findByProps({testID: 'legal-privacy'})).toBeDefined();
   expect(tree!.root.findByProps({testID: 'legal-terms'})).toBeDefined();
+  expect(tree!.root.findByProps({testID: 'legal-support'})).toBeDefined();
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'demo-switch'}).props.onValueChange(true);
   });

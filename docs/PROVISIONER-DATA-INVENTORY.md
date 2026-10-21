@@ -7,8 +7,8 @@ before submission.
 
 The operator supplied [Privacy Policy](https://getflash.io/legal/privacy.html)
 and [Terms](https://getflash.io/legal/terms.html). The app exposes both before
-sign-in and in Settings. A dedicated public support destination is still
-unconfirmed. Confirm that the policy covers this application and these flows;
+sign-in and in Settings. The operator confirmed public support at `support@getflash.io`; the app
+provides a Support mail link with a readable address if no mail app opens. Confirm that the policy covers this application and these flows;
 the existing consumer-wallet wording alone is not evidence of coverage.
 
 | Data | Purpose and handling | Release review still needed |
