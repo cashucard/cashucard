@@ -111,8 +111,10 @@ must not reuse the disabled shape-only holder-session path.
 2. Remove misleading issuer PIN/limit promises from the real setup UX; retain
    historical batch fields for recovery compatibility until explicitly migrated.
    Demo design changes are separate from evidence for real behavior.
-3. Implement and test public card-configuration codecs/read-back against current
-   protocol vectors. Share portable code through cardkit, not issuer key custody.
+3. Public card-configuration value codecs and bounded GET_CARD read-back are
+   implemented in `tools/cardkit/gp/configuration.ts` (D45), with synthetic wire
+   tests. No signing, secret handling, mutations or readiness assertion are
+   included. Wallet orchestration and read-back of protected limits remain next.
 4. Define the injected holder-signer and unknown-PIN recovery behavior, then
    implement wallet setup orchestration with narrow fake-transport regressions.
 5. Review a holder integration with the wallet owners. Keep production deployment

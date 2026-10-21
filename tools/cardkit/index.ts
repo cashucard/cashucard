@@ -21,3 +21,5 @@ export * from './gp/provision';
 export * from './gp/identity';
 
 export * from './gp/inspect';
+
+export * from './gp/configuration';
