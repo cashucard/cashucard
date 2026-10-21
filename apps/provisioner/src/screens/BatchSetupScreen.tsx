@@ -22,7 +22,7 @@ import {ApiClient} from '../api';
 import {SETUP} from '../strings';
 import {DEMO_BATCH, useApp, type BatchConfig} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
-import {GearButton, Screen, PrimaryButton} from '../ui';
+import {GearButton, Screen, PrimaryButton, SecondaryButton} from '../ui';
 
 // Demo's mints (ENG-760: editable mint field with defaults). Real mode
 // fetches the service's list instead (ENG-740); these stay for demo only.
@@ -268,7 +268,11 @@ export function BatchSetupScreen({
   // Real mode reads the ops service's mint list; demo keeps its own.
   const [serviceMints, setServiceMints] = useState<string[] | null>(null);
   const [mintsFailed, setMintsFailed] = useState(false);
+  const [mintRequest, setMintRequest] = useState(0);
   useEffect(() => {
+    setServiceMints(null);
+    setMintsFailed(false);
+    setMint(null);
     if (app.demo || !app.session) {
       return;
     }
@@ -289,8 +293,8 @@ export function BatchSetupScreen({
     return () => {
       alive = false;
     };
-  }, [app.demo, app.session, app.serviceUrl]);
-  const mints = app.demo || !serviceMints ? DEMO_MINTS : serviceMints;
+  }, [app.demo, app.session, app.serviceUrl, mintRequest]);
+  const mints = app.demo ? DEMO_MINTS : (serviceMints ?? []);
 
   const customMint = mint !== null && !mints.includes(mint);
 
@@ -306,7 +310,20 @@ export function BatchSetupScreen({
               {'Demo batch — placeholder values. Nothing leaves the phone.'}
             </Text>
           ) : mintsFailed ? (
-            <Text style={s.demoNote}>{SETUP.mintsFailed}</Text>
+            <View>
+              <Text style={s.demoNote}>{SETUP.mintsFailed}</Text>
+              <SecondaryButton
+                title="RETRY MINT LIST"
+                testID="retry-mints"
+                onPress={() => setMintRequest(value => value + 1)}
+              />
+            </View>
+          ) : serviceMints === null ? (
+            <Text style={s.demoNote}>Loading the mint list…</Text>
+          ) : serviceMints.length === 0 ? (
+            <Text style={s.demoNote}>
+              The service has no mint references. Enter a batch reference below.
+            </Text>
           ) : null}
 
           <View style={s.section}>

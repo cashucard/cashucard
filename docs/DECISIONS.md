@@ -1776,3 +1776,16 @@ configuration is never rewritten by this UI change; demo design is separate.
 **Rejected:** collecting a batch PIN the issuer cannot apply, exposing controls
 that imply limits have been set, and migrating existing recovery fingerprints
 just to simplify the form. This does not enable holder setup or physical writes.
+
+
+## <a id="d48"></a>D48: Real mint discovery never substitutes demo endpoints
+
+**Decided (ENG-741, 2026-10-21):** real batch setup shows only the current
+service response or an explicit loading/empty/failure state. Offer a retry;
+clear list and selection when the request scope changes. Demo endpoints remain
+exclusive to demo mode. Explicit custom mint references remain available and
+are metadata only for installation-only batches (D47).
+
+**Rejected:** silently showing public demo mints while real discovery is
+pending or failed, and leaving a previous actor/service selection presented as
+current. Discovery never contacts any mint; it reads the configured ops list.

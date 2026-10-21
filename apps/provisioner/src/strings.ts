@@ -31,7 +31,7 @@ export const SETUP = {
   count: 'Cards in the batch',
   start: 'START BATCH',
   mintsFailed:
-    "The service's mint list did not arrive; the defaults are shown.",
+    'The mint list could not be loaded. Retry or enter a batch reference.',
   buildLine: (sha8: string) => `Builds the 2.1 card. Load file ${sha8}…`,
 };
 
