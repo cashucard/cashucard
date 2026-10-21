@@ -185,7 +185,14 @@ Software tests use the existing GP card and injected transports. Under explicit
 operator authorization, native rebuilds and three documented read-only CPLC reads
 on both the Pixel and Max passed on 2026-10-20; see the
 [hardware report](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md).
-Install/rotation, termination and personalization checks remain outstanding.
+A separately approved Pixel replacement run passed three saved-boundary
+restarts (install result, rotation result, frozen record); see the
+[Pixel recovery report](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-pixel-recovery.md).
+The completed run's escrow also passed a
+[local encrypted-export/CLI restore check](../../docs/RECOVERY_TEST_REPORT_2026-10-20.pixel-escrow.md).
+iPhone write/recovery, partial LOAD, actual lost replies and the other
+checklist cases remain outstanding. Personalization is unvalidated, and both
+committed release gates remain false.
 
 The next native validation steps are in the
 [proposed owner-run checklist](../../docs/PROVISIONER-DEVICE-VALIDATION.md).

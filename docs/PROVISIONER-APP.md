@@ -23,9 +23,12 @@ The numbers the design lives with (from
 [`HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md`](HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md)):
 an install takes ~9 s on an iPhone and ~13 s on a Pixel from arm to done, of
 which the 82 LOAD blocks are ~6–7 s in the middle; the rest is fast. The card
-must stay still the whole time. A torn run is normal life (a pile card shifts)
-and always recovers on the next tap. A failed card-manager login counts towards
-a lock that is for good.
+must stay still the whole time. After field loss, the same card must be
+inspected against its saved attempt. A complete new installation can be
+adopted; an absent, partial or unchanged old installation stops for operator
+reconciliation rather than an automatic repair sweep. See
+[the recovery contract](PROVISIONER-RECOVERY.md). A failed card-manager login
+counts towards a lock that is for good.
 
 ## Rules the screens keep to
 
