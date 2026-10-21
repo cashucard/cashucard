@@ -94,3 +94,24 @@ follow-up and a separately approved write scope remain outstanding.
 
 No NFC, card authentication, applet installation, rotation or personalization is
 authorized or performed by this setup.
+
+
+## Updated validation build: native pause visibility
+
+PR #29, source commit `ef63e88`, adds reached-boundary and saved-stage text to
+the active NFC sheet. All 117 app tests, TypeScript, ESLint (two existing
+configuration warnings) and Android release bundling passed. The focused
+regression failed before the change and passed after it. The isolated Max
+checkout includes this change alongside its three setup overrides; total diff
+SHA-256 `26056e99b086052edf619fef3472dd54279777e1d89ab5bf5fc2d2984a12fe7e`.
+
+Signed iOS Release rebuild succeeded, signature verification passed, and the
+updated app installed successfully on the same Max UDID without uninstall.
+Updated artifact SHA-256 values:
+
+- Executable: `a0afd26684b43ad6e471178e75402915ccebf1596c2e269edab640034909588e`.
+- Bundled JS: `1b00bab75d9c5dab0b4c36d393ede235a022a4b946cd12a71c9d5a58b1760699`.
+
+The message has not yet been observed during a physical NFC session. The earlier
+batch-restart observation applies to the first setup build; reconfirm the
+restored batch in this updated build before beginning separately approved writes.
