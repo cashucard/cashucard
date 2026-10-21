@@ -75,6 +75,8 @@ verification state. Expose freshness through a health check; it must not require
 SSH host cron, edits inside Nextcloud's container or the private age identity.
 Pin SDK/image versions and validate package compatibility with 0.4.0.3 before
 any installation. Documentation support is not a built/validated package.
+The [local copy runner](../tools/backup-copy/README.md) implements additive
+read-back verification and source-time health with a loopback WebDAV check.
 Runner packaging, network access and service installation remain pending.
 
 Use an established transfer client such as rclone for
