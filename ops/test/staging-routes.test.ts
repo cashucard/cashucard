@@ -10,6 +10,16 @@ test('staging permits only operator provisioning and backup-status methods', () 
     ['GET', '/auth/operator/sessions'],
     ['POST', '/auth/operator/revoke'],
     ['GET', '/ops/backup-status'],
+    ['GET', '/ops/recovery/setup'],
+    ['GET', '/ops/recovery/connections'],
+    ['POST', '/ops/recovery/pairings'],
+    ['POST', '/recovery/claim'],
+    ['GET', '/recovery/exports'],
+    [
+      'GET',
+      '/recovery/exports/2026-10-21T00%3A00%3A00.000Z-11111111-2222-4333-8444-555555555555.age',
+    ],
+    ['DELETE', `/ops/recovery/connections/${attempt}`],
     ['POST', '/keys/issue'],
     ['POST', '/provisioning/batches'],
     ['POST', '/provisioning/attempts'],
@@ -37,6 +47,9 @@ test('staging blocks anchor, holder, legacy, unknown paths and wrong methods', (
     ['POST', `/provisioning/attempts/${attempt}`],
     ['GET', '/provisioning/attempts/not-a-uuid'],
     ['GET', '/unknown'],
+    ['POST', '/recovery/exports'],
+    ['DELETE', '/ops/recovery/connections'],
+    ['GET', '/recovery/exports/other/path'],
     ['GET', `/provisioning/attempts/${attempt}/record`],
   ])
     assert.equal(

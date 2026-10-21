@@ -186,7 +186,13 @@ def main():
         return 0 if report['status'] == 'healthy' else 1
     try:
         private_file(args.config)
-        transfer = Rclone(json.loads(args.config.read_text()))
+        config = json.loads(args.config.read_text())
+        transfer = Rclone(config)
+        if config.get('source_kind') == 'issuer':
+            from issuer_source import IssuerTransfer
+            transfer = IssuerTransfer(config, transfer)
+        elif config.get('source_kind', 'r2') != 'r2':
+            raise ValueError('unknown source kind')
         args.state.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         parent = args.state.parent.lstat()
         if not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o077:

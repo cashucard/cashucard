@@ -1999,3 +1999,39 @@ recovery identities beside ciphertext, silent notification failures, using old
 route receipts to certify a new route, or labelling an untested StartOS lifecycle
 as a production release. StartOS installation/uninstall and backup/restore,
 actual Nextcloud/R2 access, custody and authenticated restoration remain gates.
+
+## <a id="d61"></a>D61: Pair backup-only companions and authorize Nextcloud in the browser
+
+**Decided (ENG-740, 2026-10-21):** replace mandatory R2 credential entry in
+Atoll Recovery with issuer pairing. Deployment administrators explicitly list
+which existing operator principals may approve recovery readers. Provisioning
+permission alone grants no enrollment authority. Approval yields a ten-minute,
+random single-use code. The companion persists its own random secret before
+claiming; retries with the same code and secret recover the same connection,
+while other claimants and revoked connections fail. Store only hashes of codes
+and credentials and retain the approving operator id. Bound pending enrollments,
+connections, request bodies, listing pages and artifact sizes.
+
+The companion credential can only list/download existing encrypted `escrow/`
+exports through HTTPS. It cannot issue, export on demand, change custody, read
+plaintext keys, or act as an operator session. Revocation is independent of
+operator sessions. Responses are private/no-store and no redirects are followed.
+Existing R2 configuration remains available as an advanced/offline-source option;
+verified destination/source changes still require reviewed migration.
+
+Use Nextcloud Login Flow v2 for browser approval and automatic private delivery of
+an app password. Verify the authorized principal is non-admin before saving it;
+revoke accidentally authorized admin tokens. Persist a successful poll privately
+before changing configuration so a lost local action result can be resumed.
+Discovery and browser authorization do not create a restricted account: until the
+Nextcloud package exposes a reviewed provisioning action, dedicated account
+creation remains a one-time administrative step. Never mount Nextcloud's data or
+retain its administrator credential as a shortcut.
+
+**Rejected:** handing the copier a Cloudflare account token, granting all card
+operators enrollment rights, public backup URLs, automatic source retargeting,
+recovery identities in the companion, and treating browser approval or local
+copy status as authenticated recovery or an issuance fence. An issuer API outage
+can delay new downloads; existing independent Nextcloud copies remain usable,
+and the advanced direct-R2 path remains a reviewed fallback. Hosting issuer and
+backup storage on one StartOS server would still require an off-server copy.

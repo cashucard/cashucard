@@ -24,8 +24,9 @@ import {DEFAULT_MINTS} from './config';
 import {SubtlePwHash} from './pwhash';
 import {applyOperatorSetup} from './operator-setup';
 import {resolveSession} from './auth';
+import {recoveryHttp, type RecoveryBindings} from './recovery-http.workers';
 
-export interface Env {
+export interface Env extends RecoveryBindings {
   OPS_MASTER_KEY: string;
   /** One-shot bootstrap/recovery command injected as a runtime secret. */
   OPS_OPERATOR_SETUP?: string;
@@ -62,6 +63,8 @@ export class OpsStore extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    const recovery = await recoveryHttp(this.deps.db, request, this.env);
+    if (recovery) return recovery;
     if (
       new URL(request.url).pathname === '/ops/backup-status' &&
       request.method === 'GET'

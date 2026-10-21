@@ -18,6 +18,8 @@ export default defineConfig({
         // use; never a real secret in the tree.
         bindings: {
           OPS_MASTER_KEY: '5a'.repeat(32),
+          OPS_RECOVERY_ADMINS: JSON.stringify(['lead-setup']),
+          OPS_RECOVERY_ISSUER_ID: '11111111-2222-4333-8444-555555555555',
           OPS_BACKUP_RECIPIENT:
             'age1kzny9tq55ygrunlrtqv4pmflnquer4xtktkx494wxwz6kermvcuql9acra',
           OPS_OPERATOR_SETUP: JSON.stringify({

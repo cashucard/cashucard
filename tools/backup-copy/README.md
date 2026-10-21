@@ -123,3 +123,23 @@ automatically stop issuance, decrypt snapshots, or establish recovery readiness.
 Run `python3 tools/backup-copy/test_alerts.py` for four focused checks: transition
 and reminder deduplication, failed-delivery acknowledgement/backoff, destination
 generation changes, and a real loopback HTTP receiver including redirect rejection.
+
+## Paired issuer source and browser-authorized Nextcloud
+
+In paired mode the private copy configuration uses `source_kind: "issuer"`,
+`source: "issuer:UUID"`, `issuer_id`, `issuer_origin` (HTTPS origin only), and
+`issuer_secret` (the companion's privately generated credential). The destination
+continues to use the dedicated Nextcloud rclone remote and the same immutable
+copy/read-back contract. Issuer downloads follow no redirects and enforce bounded
+pagination, identity and artifact size. Failed source access preserves receipts.
+
+`connect.py` is a private stdin/stdout helper for StartOS actions: `pair-issuer`,
+`nextcloud-start` and `nextcloud-finish`. Its successful output can contain an app
+password and must never become ordinary logs or action results. Completed browser
+authorization is journaled with `--result-file` before configuration is changed;
+keep that record private and remove it only after the credentials are committed.
+The browser flow must authorize a dedicated non-admin account, not the currently
+signed-in administrator. Accidentally authorized admin credentials are revoked.
+
+Run `python3 tools/backup-copy/test_issuer.py` for focused source-scope,
+pagination/identity, pairing/authorization and admin-rejection checks.
