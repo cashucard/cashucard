@@ -44,6 +44,13 @@ Worker or decrypt artifacts during routine copies. Runner placement remains to
 be confirmed against supported Start9 deployment options; Nextcloud being
 installed does not prove that an arbitrary scheduled job can run on that host.
 
+Use an established transfer client such as rclone for
+[R2](https://developers.cloudflare.com/r2/examples/rclone/) and
+[Nextcloud WebDAV](https://rclone.org/webdav/), keeping credentials in protected
+configuration. Use additive copies and explicit read-back verification; never
+use destructive sync. Implement only the small snapshot selection, verification
+and freshness layer needed here, rather than custom S3 signing or WebDAV auth.
+
 Download a complete R2 artifact to a private temporary file; compute its SHA-256;
 upload under a unique snapshot name; download the independent copy and compare
 bytes/hash before recording success. A transport ETag or successful upload alone
@@ -88,8 +95,8 @@ must not be described as satisfying the accepted maximum.
    private operator-controlled channels; no keys or tokens enter chat/history.
 2. Confirm Nextcloud WebDAV endpoint, dedicated account, independent recovery
    access and supported always-on runner. Confirm retention and alert recipient.
-3. Implement the local copy/verification tool against fake object/WebDAV
-   endpoints. Tight regressions: interrupted copy never advances freshness,
+3. Implement the thin local copy/verification orchestration with an injected
+   transfer runner; exercise transfer compatibility against local fixtures. Tight regressions: interrupted copy never advances freshness,
    wrong read-back fails, old source with a new copy time stays stale, existing
    snapshots survive retries/deletions. No external host is needed for tests.
 4. Obtain a bounded remote plan for that runner/account/directory and stage a
