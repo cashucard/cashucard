@@ -73,6 +73,39 @@ class DeliveryChecks(unittest.TestCase):
         self.check(1001, config=changed)
         self.assertEqual(len(self.sent), 2)
 
+    def test_ntfy_scoped_auth_payload_and_acceptance(self):
+        received = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                received.append((self.headers.get('Authorization'), body))
+                code = 302 if self.path == '/redirect' else 200
+                self.send_response(code)
+                self.send_header('Location', '/')
+                self.end_headers()
+                self.wfile.write(json.dumps({'event': 'message', 'id': 'fixture',
+                                            'topic': body['topic'] if self.path != '/wrong' else 'other'}).encode())
+            def log_message(self, *_):
+                pass
+        server = HTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever); thread.start()
+        try:
+            base = 'http://127.0.0.1:' + str(server.server_port)
+            payload = {'status': 'failed', 'text': 'Atoll Recovery: independent-copy health is failed.'}
+            with self.assertRaises(ValueError):
+                alerts.post_ntfy(base, payload, 'tk_fixture', 'atoll-recovery')
+            self.assertTrue(alerts.post_ntfy(base, payload, 'tk_fixture', 'atoll-recovery', allow_loopback=True))
+            self.assertEqual(received[0][0], 'Bearer tk_fixture')
+            self.assertEqual(received[0][1], {'topic': 'atoll-recovery', 'title': 'Atoll Recovery',
+                                             'message': payload['text'], 'priority': 4})
+            self.assertFalse(alerts.post_ntfy(base + '/wrong', payload, 'tk_fixture', 'atoll-recovery', allow_loopback=True))
+            self.assertFalse(alerts.post_ntfy(base + '/redirect', payload, 'tk_fixture', 'atoll-recovery', allow_loopback=True))
+            self.assertEqual(len(received), 3)
+            with self.assertRaises(ValueError):
+                alerts.post_ntfy(base, payload, 'tk_fixture', 'alerts_*', allow_loopback=True)
+        finally:
+            server.shutdown(); thread.join(); server.server_close()
+
     def test_actual_webhook_acceptance_failure_and_redirect_rejection(self):
         received = []
         class Handler(BaseHTTPRequestHandler):

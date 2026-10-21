@@ -2035,3 +2035,19 @@ copy status as authenticated recovery or an issuance fence. An issuer API outage
 can delay new downloads; existing independent Nextcloud copies remain usable,
 and the advanced direct-R2 path remains a reviewed fallback. Hosting issuer and
 backup storage on one StartOS server would still require an off-server copy.
+
+## <a id="d62"></a>D62: Use scoped NTFY publishers for local recovery notifications
+
+**Decided (ENG-740, 2026-10-21):** use the existing Start9 NTFY package for
+Zion notifications. Atoll may call its dependent Provision Publisher action
+only for its own package id and one fixed recovery-health topic. Persist the
+write-only token privately; publish over verified HTTPS with Bearer authorization.
+Validate NTFY's bounded receipt matches the topic before recording acceptance.
+Keep generic JSON webhooks available, with independent generation-based receipts.
+Publisher permissions do not include reading topics or administering users.
+
+**Rejected:** an unauthenticated topic, an administrator token in Atoll, secrets
+in query parameters, or a bespoke notification service. Local NTFY acceptance
+is not evidence that a person received a push. Zion shutdown also stops NTFY;
+whole-host failure requires an independent monitor. Browser/mobile subscription
+and an actual received-alert check remain operator acceptance steps.

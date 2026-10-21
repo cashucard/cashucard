@@ -5,6 +5,7 @@ import importlib.util
 import json
 import math
 import os
+import re
 import stat
 from pathlib import Path
 import time
@@ -37,6 +38,33 @@ def post_webhook(url, payload, *, allow_loopback=False):
         return False
 
 
+def post_ntfy(url, payload, token, topic, *, allow_loopback=False):
+    """Publish through a dedicated write-only ntfy token; validate its receipt."""
+    parts = urllib.parse.urlsplit(url)
+    local_test = allow_loopback and parts.scheme == 'http' and parts.hostname in ('127.0.0.1', '::1')
+    if ((parts.scheme != 'https' and not local_test) or not parts.hostname or
+            parts.username or parts.password or parts.fragment or parts.query or
+            (not local_test and parts.path not in ('', '/')) or
+            not re.fullmatch(r'tk_[A-Za-z0-9_-]{1,256}', token) or
+            not re.fullmatch(r'[-_A-Za-z0-9]{1,64}', topic)):
+        raise ValueError('invalid private ntfy configuration')
+    body = {'topic': topic, 'title': 'Atoll Recovery', 'message': payload['text'],
+            'priority': 3 if payload['status'] == 'healthy' else 4}
+    request = urllib.request.Request(url, data=json.dumps(body).encode(),
+                                    headers={'Content-Type': 'application/json',
+                                             'Authorization': 'Bearer ' + token}, method='POST')
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=10) as response:
+            data = response.read(16385)
+            if not 200 <= response.status < 300 or len(data) > 16384:
+                return False
+            receipt = json.loads(data)
+            return (receipt.get('event') == 'message' and receipt.get('topic') == topic and
+                    isinstance(receipt.get('id'), str) and bool(receipt['id']))
+    except Exception:
+        return False
+
+
 def load_delivery(path, generation):
     if path.exists():
         copy_runtime.private_file(path)
@@ -50,8 +78,15 @@ def load_delivery(path, generation):
             'delivery_ok': False}
 
 
-def run_check(config, check_copy, path, now=None, send=post_webhook):
+def run_check(config, check_copy, path, now=None, send=None):
     now = time.time() if now is None else now
+    if send is None:
+        if config.get('provider', 'webhook') == 'ntfy':
+            send = lambda url, payload: post_ntfy(url, payload, config['token'], config['topic'])
+        elif config.get('provider', 'webhook') == 'webhook':
+            send = post_webhook
+        else:
+            raise ValueError('unsupported notification provider')
     generation = config['generation']
     if not isinstance(generation, str) or not generation:
         raise ValueError('missing delivery generation')
