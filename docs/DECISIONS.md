@@ -1975,3 +1975,27 @@ as an enforced issuance gate or delivered alert. StartOS packaging/compatibility
 Zion authorization, actual Nextcloud/R2 validation, custody and remote-artifact
 restore remain separate required gates. Source time is trusted exporter metadata;
 a hash receipt alone does not authenticate age ciphertext or its recipient.
+
+## <a id="d60"></a>D60: Ship Atoll Recovery separately from issuance authority
+
+**Decided (ENG-740, 2026-10-21):** name the StartOS operational companion
+Atoll Recovery, with Cashu encrypted exports as its first workload. Publish a
+marked test release to the operator's Atoll registry before installation from
+that marketplace. Keep the ops-service as a separate future package. Recovery
+holds scoped transfer credentials and optional HTTPS notification routing,
+never an age private identity, holder key/PIN or service master.
+
+Monitor copy health independently of the copy process. Send sanitized webhook
+notifications on state transitions, bounded reminders and recovery; record only
+receiver acceptance after HTTP success. Deduplicate routine checks, back off
+failed deliveries and invalidate old confirmation when a destination changes.
+Expose delivery evidence and backup health separately. A same-host watcher
+cannot report loss of its whole host; an external monitor and actual operator
+acknowledgement remain operational requirements. A successful webhook response
+is not proof that a human read an alert or that issuance has been fenced.
+
+**Rejected:** widening a backup helper into issuer administration, retaining
+recovery identities beside ciphertext, silent notification failures, using old
+route receipts to certify a new route, or labelling an untested StartOS lifecycle
+as a production release. StartOS installation/uninstall and backup/restore,
+actual Nextcloud/R2 access, custody and authenticated restoration remain gates.
