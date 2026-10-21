@@ -3,22 +3,26 @@
  * only (src/theme.ts); nothing here draws its own color.
  */
 import React from 'react';
-import {Pressable, SafeAreaView, StyleSheet, Text, View} from 'react-native';
+import {Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
+
+import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {FONT, type Theme, useTheme} from './theme';
 import GearSvg from './assets/gear.svg';
-import {DEMO_BANNER} from './strings';
+import {DEMO_BANNER, PHYSICAL_READ_BANNER} from './strings';
 import {useApp} from './store';
 
 export function Screen({
   title,
   onBack,
   headerRight,
+  physicalReadOnly = false,
   children,
 }: {
   title?: string;
   onBack?: () => void;
   headerRight?: React.ReactNode;
+  physicalReadOnly?: boolean;
   children: React.ReactNode;
 }) {
   const t = useTheme();
@@ -26,9 +30,14 @@ export function Screen({
   const s = styles(t);
   return (
     <SafeAreaView style={s.screen}>
-      {app.demo ? (
-        <View style={s.banner}>
-          <Text style={s.bannerText}>{DEMO_BANNER}</Text>
+      <StatusBar barStyle={t.dark ? 'light-content' : 'dark-content'} />
+      {physicalReadOnly || app.demo ? (
+        <View style={[s.banner, physicalReadOnly && s.physicalBanner]}>
+          <Text
+            testID="screen-mode-banner"
+            style={[s.bannerText, physicalReadOnly && s.physicalBannerText]}>
+            {physicalReadOnly ? PHYSICAL_READ_BANNER : DEMO_BANNER}
+          </Text>
         </View>
       ) : null}
       {title || onBack || headerRight ? (
@@ -164,9 +173,6 @@ export function Row({
   );
 }
 
-/** Spread into styles that position absolutely. */
-const ABS = {position: 'absolute' as const};
-
 export const styles = (t: Theme) =>
   StyleSheet.create({
     screen: {flex: 1, backgroundColor: t.bg},
@@ -175,6 +181,8 @@ export const styles = (t: Theme) =>
       paddingVertical: 4,
       alignItems: 'center',
     },
+    physicalBanner: {backgroundColor: t.card},
+    physicalBannerText: {color: t.ink},
     bannerText: {
       color: '#fff',
       fontFamily: FONT.semibold,
@@ -188,6 +196,7 @@ export const styles = (t: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      gap: 12,
       minHeight: 48,
     },
     title: {
@@ -198,9 +207,8 @@ export const styles = (t: Theme) =>
       textAlign: 'center',
     },
     titleWrap: {
-      ...ABS,
-      left: 64,
-      right: 64,
+      flex: 1,
+      minWidth: 0,
       alignItems: 'center',
     },
     back: {color: t.accent, fontFamily: FONT.medium, fontSize: 16},

@@ -1,6 +1,6 @@
 /** Explicit read-only hardware check, separate from provisioning and demo. */
 import React, {useEffect, useRef, useState} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {ScrollView, StyleSheet, Text} from 'react-native';
 import {readChipIdentity} from '../cardkit';
 import {createCardSession, type SessionMeta} from '../session';
 import {FONT, useTheme} from '../theme';
@@ -67,8 +67,8 @@ export function CardIdentityScreen({
     text: {fontFamily: FONT.regular, fontSize: 16, color: t.ink},
   });
   return (
-    <Screen title="Card identity check" onBack={onBack}>
-      <View style={s.content}>
+    <Screen title="Card identity check" onBack={onBack} physicalReadOnly>
+      <ScrollView contentContainerStyle={s.content}>
         <Dim>
           This reads a physical card, including in demo mode. It reads public
           CPLC identity only: no authentication, installation or service
@@ -112,7 +112,7 @@ export function CardIdentityScreen({
             </Dim>
           </>
         ) : null}
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

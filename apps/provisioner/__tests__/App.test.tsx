@@ -61,15 +61,23 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
 
   // the theme pill changes what the screens draw: dark then light
   const bg = () =>
-    tree!.root.findByType(require('react-native').SafeAreaView).props.style;
+    tree!.root.findByType(
+      require('react-native-safe-area-context').SafeAreaView,
+    ).props.style;
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'theme-dark'}).props.onPress();
   });
   expect(bg().backgroundColor).toBe('#050505');
+  expect(
+    tree!.root.findByType(require('react-native').StatusBar).props.barStyle,
+  ).toBe('light-content');
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'theme-light'}).props.onPress();
   });
   expect(bg().backgroundColor).toBe('#FAFAF8');
+  expect(
+    tree!.root.findByType(require('react-native').StatusBar).props.barStyle,
+  ).toBe('dark-content');
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'theme-system'}).props.onPress();
   });

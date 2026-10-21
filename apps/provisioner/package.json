@@ -17,6 +17,7 @@
     "react-native": "0.77.1",
     "react-native-get-random-values": "1.11.0",
     "react-native-nfc-manager": "3.17.2",
+    "react-native-safe-area-context": "5.10.1",
     "react-native-svg": "15.15.5"
   },
   "devDependencies": {

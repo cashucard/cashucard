@@ -12,6 +12,10 @@
  */
 import React, {useState} from 'react';
 import {Text, View} from 'react-native';
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context';
 
 import {BatchSetupScreen} from './src/screens/BatchSetupScreen';
 import {BatchSummaryScreen} from './src/screens/BatchSummaryScreen';
@@ -110,10 +114,12 @@ export default function App({
   recovery,
 }: {recovery?: ProvisioningProviderOptions} = {}): React.JSX.Element {
   return (
-    <AppStore>
-      <ProvisioningProvider options={recovery}>
-        <Navigator />
-      </ProvisioningProvider>
-    </AppStore>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <AppStore>
+        <ProvisioningProvider options={recovery}>
+          <Navigator />
+        </ProvisioningProvider>
+      </AppStore>
+    </SafeAreaProvider>
   );
 }
