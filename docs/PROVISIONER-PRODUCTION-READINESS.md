@@ -36,6 +36,29 @@ now define the boundary. The next slices are honest operator handoff UX and
 portable card configuration/read-back, followed by wallet-owned setup orchestration. Supervised repair of the stopped card is a separate future
 capability, not a dependency of personalization or service completion.
 
+## Execution status after the isolated staging rehearsal (2026-10-21)
+
+- Issuer UX now reports installed/recorded cards as awaiting holder setup,
+  removes issuer PIN/limit promises and exports bounded public recovery evidence.
+- Public card configuration codecs/read-back and the injected owner-command
+  signer are implemented and tested. Initial owner/PIN setup, uncertain-PIN
+  recovery and complete holder-wallet orchestration remain separate unfinished
+  integration work; issuer receipts continue to assert no holder readiness.
+- A dedicated staging Worker/DO/R2 deployment now passes authenticated synthetic
+  reservation/replay, device scope and key issuance checks. The actual app API
+  client works with its bounded sign-in deadline. See the
+  [staging report](OPS_STAGING_REPORT_2026-10-21.md) for exact evidence/limits.
+- An isolated app candidate has the staging HTTPS origin, disabled physical/
+  recovery gates, release preflight and both JavaScript bundles. It is not an
+  installed native release or a production artifact.
+- Remaining operational release gates: actual scheduled backup success,
+  independent recovery-key/artifact custody and alerts, accepted data-loss
+  window, restore from that remote artifact, and reviewed reconciliation/fencing
+  before reopening a recovered service. Do not equate backup configuration or
+  the local restore suite with completion of those gates.
+- Production deployment and physical enablement remain unapproved. The missing
+  full Max drill still does not block software preparation or the staging work.
+
 ## Contract constraints already established
 
 - The current wire defines PIN setup/verification, card configuration, owner

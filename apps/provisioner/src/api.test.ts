@@ -353,3 +353,31 @@ test('card orchestration routes preserve frozen records and scoped key/dispositi
   ]);
   expect(JSON.stringify(requests)).not.toContain('memory-only');
 });
+
+test('sign-in has a bounded 30s budget while ordinary requests retain 10s', async () => {
+  jest.useFakeTimers();
+  const signals: AbortSignal[] = [];
+  const client = new ApiClient({
+    baseUrl: 'https://ops.test',
+    fetcher: (_url, init) => {
+      signals.push(init!.signal as AbortSignal);
+      return new Promise<Response>(() => undefined);
+    },
+  });
+  try {
+    const login = client
+      .operatorSession('lead', 'public test password')
+      .catch(error => error);
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(signals[0]!.aborted).toBe(false);
+    await jest.advanceTimersByTimeAsync(20_000);
+    expect(await login).toBeInstanceOf(ApiUnreachableError);
+    expect(signals[0]!.aborted).toBe(true);
+    const mint = client.mints('public-test-token').catch(error => error);
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(await mint).toBeInstanceOf(ApiUnreachableError);
+    expect(signals[1]!.aborted).toBe(true);
+  } finally {
+    jest.useRealTimers();
+  }
+});
