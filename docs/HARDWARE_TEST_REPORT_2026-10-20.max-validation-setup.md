@@ -1,4 +1,4 @@
-# Max validation setup — in progress, no card operations
+# Max validation setup — persistence passed, no card operations
 
 ENG-741, 2026-10-20. The operator explicitly approved the setup scope in
 PR #27: dedicated HTTPS service, temporary public-CA trust on Max, isolated
@@ -43,8 +43,12 @@ Public CA DER SHA-256:
 Finder selected only the public `Cashu-Max-Validation.cer` for operator
 AirDrop to Max. The operator was instructed to install the profile named
 Cashu Max Validation 2026-10-20, enable its certificate trust and open the
-HTTPS readiness page in Safari. Phone trust and reachability confirmation
-remain pending. The profile should be removed after this validation session.
+HTTPS readiness page in Safari. The operator initially reported an untrusted
+certificate after profile installation, then enabled full trust through
+Settings → General → About → Certificate Trust Settings and confirmed the
+page worked. This is operator-confirmed phone reachability, not an independent
+screenshot/TLS capture. The profile should be removed after this validation
+session.
 
 ## Native build checkpoint
 
@@ -64,8 +68,29 @@ A read-only devicectl copy of only the app's AsyncStorage directory confirms
 preserved schema-2 state: device `afb0fc20-c68d-4159-8e7d-7eff4b8bf67b`,
 batch null, active null, history empty. No foreign saved work needs clearing.
 
-Phone certificate trust/Safari reachability, validation-app launch/sign-in,
-one-card batch creation and restart persistence remain pending.
+After operator-confirmed Safari success, launched the installed validation
+app on Max and opened the separate Max login file in TextEdit on the Mac for
+private operator entry. Requested Local Network permission approval if
+prompted. The operator confirmed native-app sign-in succeeded. A host metadata check
+found one live operator session, zero batches and zero attempts at that
+checkpoint. The operator was then instructed to select the sole local test
+mint, set count 1, create the batch and stop before Install. Batch creation
+and restart persistence passed. Dedicated Max batch 1 has count 1, request
+`ee1a6138-112c-4aea-b6a9-9bed91d231d6`, next ordinal 0, no active attempt
+and empty history. The service holds one issued keyset and zero attempts.
+
+Copied only the native AsyncStorage directory before and after the planned
+terminate/relaunch and operator sign-in. The parsed saved workflow was exactly
+equal, including device, origin, batch and configuration; the operator also
+confirmed “0 of 1 attempts acknowledged” returned. Serialized workflow SHA-256:
+`92cee83a5a1189adf903be0e933bdb94aad81795c14ad614ae00de5d59f21bf2`.
+A consistent SQLite backup (`before-max-write.db`) and matching private runtime
+were retained in the protected run directory. This proves setup persistence,
+not recovery from an interrupted card write.
+
+Before any write drill, the iOS NFC sheet needs to show the reached validation
+pause and saved journal stage: it covers the React pause panel. That software
+follow-up and a separately approved write scope remain outstanding.
 
 No NFC, card authentication, applet installation, rotation or personalization is
 authorized or performed by this setup.
