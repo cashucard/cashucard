@@ -65,3 +65,19 @@ All 15 reader-free provisioning-tap tests passed during diagnosis, including
 fresh install, saved-boundary recovery and safe stopping. This does not explain
 the physical failure. No native command trace was captured. The stopped journal
 remains unchanged and no automatic card repair is planned.
+
+
+## Operator clarification
+
+The operator subsequently confirmed pressing Continue with the same card after
+an interruption. This explains the quarantine as a recovery-path stop: the first
+run saved install intent and was interrupted; the later run could not adopt a
+complete installation. The later USB absence result is consistent with that
+stop. The initial interruption's phase/cause remains unknown; this is not proof
+of a successful initial load or of a hardware-specific defect.
+
+The production flow currently discards the detailed interrupted result and
+clears the last live phase when the operation ends. Before another physical
+write, prepare bounded diagnostic visibility that retains public phase/outcome
+information, without APDU payloads or manager keys. Keep this stopped attempt
+and private backups intact; do not reset its journal to make it retryable.
