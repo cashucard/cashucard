@@ -109,3 +109,41 @@ Candidate artifact SHA-256:
   `f1d9bde1b09b8473ca6a5b595d0e33fe573ede9215757603f98281430d8dc626`
 - Android JavaScript:
   `1ff7e8e514b29fe2e2056b418ed3ba28bf884bf332c6e1ed8d4b09b2753b4f4c`
+
+## Atoll Recovery beta.3 issuer pairing and browser authorization
+
+Reviewed main source `36036d316433bb24e531e3961444456a0077e137` deployed to
+`cashu-card-ops-staging`, version `71b6f22e-02a5-4025-9720-61c459a00fcf`.
+The nightly `17 3 * * *` cron remains unchanged. Recovery enrollment is limited
+to the explicitly configured staging recovery administrator, independently of
+provisioning access. No production deployment was made.
+
+Zion (StartOS 0.4.0.3) completed the upgrade from Atoll Recovery beta.2 to
+`0.1.0-beta.3:0`. The package's Connect Issuer action accepted a short-lived
+code from the staging approval page and reported success without R2 credential
+entry. The staging administrator session was signed out afterward.
+
+Connect Nextcloud prefilled `https://cloud.bobodread.com` from the saved
+configuration. The first approval used an administrator session despite a
+separate browser window. Finish Nextcloud Connection rejected it and cleared
+the pending flow. The helper's reviewed rejection path revokes the returned
+app password; independent revocation verification was not performed. After
+explicit browser logout and verified sign-in as `atoll-recovery`, a fresh
+approval and Finish Nextcloud Connection succeeded. No app password was pasted
+into the new form. The existing dedicated destination was preserved.
+
+The copy runner started after configuration. Recovery Status returned Failed,
+source age Unknown, alerts Disabled and no accepted notification. A separate
+authenticated read-only listing confirmed zero objects in the staging escrow
+prefix. This is not evidence of a successful transfer or destination read-back.
+No export was forced, no synthetic artifact was inserted, and no restore or
+StartOS backup/restore round trip was performed. The existing restricted R2
+reader remains available as a fallback until paired transfer is verified.
+
+Published universal, x86_64 and aarch64 beta.3 artifacts were downloaded and
+matched the local registered-key signed build hashes. Package source:
+`624221d88a2c3ae815283296bcfff390884172f9`, merged through package PR #2.
+Universal SHA-256:
+`fdeb3e302ed23171baa6a6da755ffb4744f57ab78e0c8ccbba6bbfe8b86bba90`.
+Registry indexing and actual artifact/restore validation remain outstanding;
+the GitHub prerelease is not a production-readiness claim.
