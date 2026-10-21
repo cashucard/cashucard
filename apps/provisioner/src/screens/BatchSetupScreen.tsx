@@ -225,12 +225,13 @@ export function BatchSetupScreen({
     Number.isSafeInteger(Number(count)) &&
     Number(count) > 0 &&
     Number(count) <= 100000 &&
-    daily.trim().length > 0 &&
-    noPin.trim().length > 0 &&
-    Number.isFinite(Number(daily)) &&
-    Number(daily) >= 0 &&
-    Number.isFinite(Number(noPin)) &&
-    Number(noPin) >= 0;
+    (installationOnly ||
+      (daily.trim().length > 0 &&
+        noPin.trim().length > 0 &&
+        Number.isFinite(Number(daily)) &&
+        Number(daily) >= 0 &&
+        Number.isFinite(Number(noPin)) &&
+        Number(noPin) >= 0));
   const ready =
     canStart && !creating && (app.demo || (mint !== null && validNumbers));
 
@@ -242,10 +243,11 @@ export function BatchSetupScreen({
       ? DEMO_BATCH
       : {
           mint: mint!,
-          pinPolicy,
-          pinBatch,
-          dailyUsd: Number(daily),
-          noPinUsd: Number(noPin),
+          // Legacy API fields are inert metadata in installation-only batches.
+          pinPolicy: installationOnly ? 'perCard' : pinPolicy,
+          pinBatch: installationOnly ? '' : pinBatch,
+          dailyUsd: installationOnly ? 0 : Number(daily),
+          noPinUsd: installationOnly ? 0 : Number(noPin),
           count: Number(count),
         };
     if (onCreate) {
@@ -308,7 +310,9 @@ export function BatchSetupScreen({
           ) : null}
 
           <View style={s.section}>
-            <Text style={s.sectionHeader}>{SETUP.mint}</Text>
+            <Text style={s.sectionHeader}>
+              {installationOnly ? 'Batch mint reference' : SETUP.mint}
+            </Text>
             <View style={s.card}>
               <View style={s.mintGrid}>
                 {mints.map((m, i) => {
@@ -381,72 +385,82 @@ export function BatchSetupScreen({
             </View>
           </View>
 
-          <View style={s.section}>
-            <Text style={s.sectionHeader}>PIN</Text>
-            <View style={s.card}>
-              <Pressable
-                style={s.policyRow}
-                onPress={() => setPinPolicy('perCard')}
-                testID="pin-perCard">
-                <View style={[s.radio, pinPolicy === 'perCard' && s.radioOn]}>
-                  {pinPolicy === 'perCard' ? <View style={s.radioDot} /> : null}
-                </View>
-                <Text style={s.policyLabel}>{SETUP.pinPerCard}</Text>
-              </Pressable>
-              <View style={s.divider} />
-              <Pressable
-                style={s.policyRow}
-                onPress={() => setPinPolicy('batch')}
-                testID="pin-batch">
-                <View style={[s.radio, pinPolicy === 'batch' && s.radioOn]}>
-                  {pinPolicy === 'batch' ? <View style={s.radioDot} /> : null}
-                </View>
-                <Text style={s.policyLabel}>{SETUP.pinBatch}</Text>
-              </Pressable>
-              {pinPolicy === 'batch' && !installationOnly ? (
-                <TextInput
-                  value={pinBatch}
-                  onChangeText={v =>
-                    setPinBatch(v.replace(/\D/g, '').slice(0, 8))
-                  }
-                  placeholder="4–8 digits"
-                  placeholderTextColor={t.dim}
-                  keyboardType="numeric"
-                  secureTextEntry
-                  style={s.pinInput}
-                  testID="pin-batch-input"
-                />
-              ) : null}
+          {!installationOnly ? (
+            <View style={s.section}>
+              <Text style={s.sectionHeader}>PIN</Text>
+              <View style={s.card}>
+                <Pressable
+                  style={s.policyRow}
+                  onPress={() => setPinPolicy('perCard')}
+                  testID="pin-perCard">
+                  <View style={[s.radio, pinPolicy === 'perCard' && s.radioOn]}>
+                    {pinPolicy === 'perCard' ? (
+                      <View style={s.radioDot} />
+                    ) : null}
+                  </View>
+                  <Text style={s.policyLabel}>{SETUP.pinPerCard}</Text>
+                </Pressable>
+                <View style={s.divider} />
+                <Pressable
+                  style={s.policyRow}
+                  onPress={() => setPinPolicy('batch')}
+                  testID="pin-batch">
+                  <View style={[s.radio, pinPolicy === 'batch' && s.radioOn]}>
+                    {pinPolicy === 'batch' ? <View style={s.radioDot} /> : null}
+                  </View>
+                  <Text style={s.policyLabel}>{SETUP.pinBatch}</Text>
+                </Pressable>
+                {pinPolicy === 'batch' && !installationOnly ? (
+                  <TextInput
+                    value={pinBatch}
+                    onChangeText={v =>
+                      setPinBatch(v.replace(/\D/g, '').slice(0, 8))
+                    }
+                    placeholder="4–8 digits"
+                    placeholderTextColor={t.dim}
+                    keyboardType="numeric"
+                    secureTextEntry
+                    style={s.pinInput}
+                    testID="pin-batch-input"
+                  />
+                ) : null}
+              </View>
             </View>
-          </View>
+          ) : null}
 
           <View style={s.section}>
-            <Text style={s.sectionHeader}>{SETUP.limits}</Text>
+            <Text style={s.sectionHeader}>
+              {installationOnly ? 'Cards' : SETUP.limits}
+            </Text>
             <View style={s.card}>
-              <View style={s.fieldRow}>
-                <Text style={s.fieldLabel}>{SETUP.daily}</Text>
-                <TextInput
-                  value={daily}
-                  onChangeText={setDaily}
-                  keyboardType="numeric"
-                  editable={!app.demo}
-                  style={s.fieldInput}
-                  testID="daily-limit"
-                />
-              </View>
-              <View style={s.divider} />
-              <View style={s.fieldRow}>
-                <Text style={s.fieldLabel}>{SETUP.noPin}</Text>
-                <TextInput
-                  value={noPin}
-                  onChangeText={setNoPin}
-                  keyboardType="numeric"
-                  editable={!app.demo}
-                  style={s.fieldInput}
-                  testID="no-pin-limit"
-                />
-              </View>
-              <View style={s.divider} />
+              {!installationOnly ? (
+                <>
+                  <View style={s.fieldRow}>
+                    <Text style={s.fieldLabel}>{SETUP.daily}</Text>
+                    <TextInput
+                      value={daily}
+                      onChangeText={setDaily}
+                      keyboardType="numeric"
+                      editable={!app.demo}
+                      style={s.fieldInput}
+                      testID="daily-limit"
+                    />
+                  </View>
+                  <View style={s.divider} />
+                  <View style={s.fieldRow}>
+                    <Text style={s.fieldLabel}>{SETUP.noPin}</Text>
+                    <TextInput
+                      value={noPin}
+                      onChangeText={setNoPin}
+                      keyboardType="numeric"
+                      editable={!app.demo}
+                      style={s.fieldInput}
+                      testID="no-pin-limit"
+                    />
+                  </View>
+                  <View style={s.divider} />
+                </>
+              ) : null}
               <View style={s.fieldRow}>
                 <Text style={s.fieldLabel}>{SETUP.count}</Text>
                 <TextInput
@@ -461,26 +475,29 @@ export function BatchSetupScreen({
             </View>
           </View>
 
-          <View style={s.section}>
-            <View style={s.card}>
-              <View style={s.designRow}>
-                <View style={s.designChip}>
-                  <Text style={s.designChipBolt}>⚡</Text>
-                </View>
-                <View style={s.grow}>
-                  <Text style={s.mintName}>Card design</Text>
-                  <Text style={s.cardSub}>{CARD_DESIGN}</Text>
+          {!installationOnly ? (
+            <View style={s.section}>
+              <View style={s.card}>
+                <View style={s.designRow}>
+                  <View style={s.designChip}>
+                    <Text style={s.designChipBolt}>⚡</Text>
+                  </View>
+                  <View style={s.grow}>
+                    <Text style={s.mintName}>Card design</Text>
+                    <Text style={s.cardSub}>{CARD_DESIGN}</Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          ) : null}
         </ScrollView>
 
         <View style={s.footer} testID="setup-footer">
           {installationOnly ? (
             <Text style={s.buildLine}>
-              Installation and key rotation only. Mint, owner, PIN and limits
-              are not applied yet.
+              Installation and key rotation only. The holder wallet sets the
+              PIN, mint and limits. The batch mint reference is not written to
+              the card.
             </Text>
           ) : null}
           <PrimaryButton

@@ -1761,3 +1761,18 @@ The wallet adapter must authorize its key/context/operation; the caller owns
 exclusive NFC access and must read back and persist observations. The helper
 selects the applet before its nonce, clearing earlier grants; callers must not
 assume a preceding PIN or load grant survives that identity check.
+
+
+## <a id="d47"></a>D47: Operator installation setup exposes only settings it applies
+
+**Decided (ENG-741, 2026-10-21):** hide PIN policy, dollar-limit inputs and
+unapplied card-design promises from real installation-only setup. Label the
+required mint as a batch reference, not card personalization. Keep historical
+batch/journal/API fields compatible; newly created installation-only batches
+send perCard policy and zero dollar limits as inert metadata, without a PIN.
+Holder-wallet setup owns the actual settings under D44. Saved batch
+configuration is never rewritten by this UI change; demo design is separate.
+
+**Rejected:** collecting a batch PIN the issuer cannot apply, exposing controls
+that imply limits have been set, and migrating existing recovery fingerprints
+just to simplify the form. This does not enable holder setup or physical writes.

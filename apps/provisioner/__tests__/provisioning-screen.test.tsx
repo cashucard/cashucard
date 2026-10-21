@@ -146,9 +146,7 @@ test('the release gate blocks direct create and program calls, without collectin
   expect(runCard).not.toHaveBeenCalled();
   expect(flow.drill).toBeUndefined();
   expect(text(tree)).toContain('device validation');
-  await act(async () => {
-    tree.root.findByProps({testID: 'pin-batch'}).props.onPress();
-  });
+  expect(tree.root.findAllByProps({testID: 'pin-batch'})).toHaveLength(0);
   expect(tree.root.findAllByProps({testID: 'pin-batch-input'})).toHaveLength(0);
 });
 
@@ -482,7 +480,7 @@ test('sign-out cancels an armed session and blocks its next command', async () =
   expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
 });
 
-test('real batch setup rejects zero count and submits PIN-free settings once valid', async () => {
+test('real installation setup exposes no holder controls and submits inert legacy settings', async () => {
   const f = fixture();
   const tree = await mount({
     ...f,
@@ -490,6 +488,13 @@ test('real batch setup rejects zero count and submits PIN-free settings once val
     serviceFor: () => f.service,
   });
   await signIn();
+  for (const testID of [
+    'pin-perCard', 'pin-batch', 'pin-batch-input', 'daily-limit', 'no-pin-limit',
+  ]) {
+    expect(tree.root.findAllByProps({testID})).toHaveLength(0);
+  }
+  expect(text(tree)).toContain('The holder wallet sets the PIN, mint and limits.');
+  expect(text(tree)).not.toContain('FL1 — Flash, black, the bolt');
   await act(async () => {
     tree.root.findByProps({testID: 'mint-https://mint.test'}).props.onPress();
     tree.root.findByProps({testID: 'batch-count'}).props.onChangeText('0');
@@ -511,6 +516,9 @@ test('real batch setup rejects zero count and submits PIN-free settings once val
   expect((f.service.batch as jest.Mock).mock.calls[0][0]).toMatchObject({
     count: 2,
     mint_url: config.mint,
+    pin_policy: 'perCard',
+    daily_usd: 0,
+    no_pin_usd: 0,
   });
   expect(f.bytes()).not.toContain('pinBatch');
   expect(tree.root.findByProps({testID: 'real-progress'})).toBeTruthy();
