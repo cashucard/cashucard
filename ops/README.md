@@ -231,3 +231,9 @@ allows 30 seconds only for that call (D53); other requests remain bounded at
 10 seconds. These functional timings do not establish production capacity.
 The first scheduled backup, independent copy and remote-artifact restore drill
 remain separate evidence. No production deployment is authorized by staging.
+
+The operator selected organization HashiCorp Vault custody (setup unfinished),
+Nextcloud on Start9 for independent encrypted copies, and a 24-hour maximum
+loss window. The [recovery implementation plan](../docs/OPS-RECOVERY-PLAN.md)
+records those choices, proposed cadence and outstanding access/restore gates.
+It does not authorize server access, transfer keys or change the staging cron.

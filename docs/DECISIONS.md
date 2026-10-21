@@ -1870,3 +1870,20 @@ the original universal deadline. A fake-clock regression pins both budgets.
 **Rejected:** reducing password strength, extending every reservation/record
 request deadline, or removing the sign-in bound. This latency accommodation
 is not evidence of production authentication capacity or availability.
+
+## <a id="d54"></a>D54: Organization Vault custody and independent Nextcloud backups
+
+**Decided (ENG-740, 2026-10-21):** the operator selected the existing organization
+HashiCorp Vault, designated recovery operators, Nextcloud on Start9 for an
+independent encrypted copy, and a maximum 24-hour loss window. Vault setup is
+unfinished. The copy process does not receive the private age identity.
+Record provider/access/runner readiness separately from the selection. The
+[recovery plan](OPS-RECOVERY-PLAN.md) proposes 12-hour production exports with
+prompt verified copying and freshness enforcement; it changes no live schedule.
+
+**Rejected:** treating a local staging identity as production custody, treating
+Nextcloud as offline/immutable, giving the Worker independent-copy credentials,
+counting a fresh upload of an old snapshot as a fresh recovery point, or claiming
+that nightly export plus delayed copying guarantees a 24-hour maximum. Vault's
+own recovery, independent access, retention, alerts and restore/reconciliation
+remain release gates, not assumptions supplied by the selected product names.
