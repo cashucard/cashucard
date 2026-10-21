@@ -73,7 +73,7 @@ class Checks(unittest.TestCase):
                 if accepted:
                     self.assertEqual(connect.connect('nextcloud-finish', config)['username'], 'dedicated')
                 else:
-                    with self.assertRaises(ValueError): connect.connect('nextcloud-finish', config)
+                    self.assertEqual(connect.connect('nextcloud-finish', config), {'wrong_account': True})
                     self.assertEqual(http.requests[-1].method, 'DELETE')
 
     def test_completed_authorization_is_replayed_from_a_private_journal(self):

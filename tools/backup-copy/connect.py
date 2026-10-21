@@ -93,7 +93,7 @@ def connect(operation, config):
             revoke = urllib.request.Request(origin + '/ocs/v2.php/core/apppassword', headers=headers, method='DELETE')
             with opener().open(revoke, timeout=30):
                 pass
-            raise ValueError('authorize a dedicated non-admin account')
+            return {'wrong_account': True}
         return {'username': result['loginName'], 'app_password': result['appPassword'],
                 'webdav_url': origin + '/remote.php/dav/files/' + urllib.parse.quote(result['loginName'], safe='') + '/'}
     raise ValueError('unknown operation')
@@ -122,7 +122,7 @@ def main():
             result = saved['result']
         else:
             result = connect(args.operation, config)
-            if args.result_file and not result.get('pending'):
+            if args.result_file and not result.get('pending') and not result.get('wrong_account'):
                 parent = args.result_file.parent
                 if not parent.is_dir() or parent.stat().st_mode & 0o077:
                     raise ValueError('authorization directory must be private')
