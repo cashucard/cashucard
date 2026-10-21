@@ -163,7 +163,7 @@ must not be described as satisfying the accepted maximum.
 
 Current evidence is the [staging report](OPS_STAGING_REPORT_2026-10-21.md).
 Password-manager custody, the offline recovery copy, independent scheduled
-artifact copy, actual nightly success, remote-artifact restore, retention, alert
-receipt and the reopening procedure remain pending. Setup evidence does not
+artifact copy, actual nightly success, remote-artifact restore, retention, push
+delivery, human acknowledgement and the reopening procedure remain pending. Setup evidence does not
 certify them. The staging cron remains unchanged; no production deployment or
 recovery identity transfer is part of this onboarding validation.
