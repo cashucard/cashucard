@@ -422,7 +422,7 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     expect(withCard).toHaveBeenCalledTimes(1);
     expect(flow.snapshot?.active).toBeNull();
     expect(flow.snapshot?.history).toHaveLength(1);
-    expect(text(recovered)).toContain('Not ready for a holder.');
+    expect(text(recovered)).toContain('Holder wallet setup required before use.');
     expect(text(recovered)).not.toContain('PIN:');
   } finally {
     if (original) {
