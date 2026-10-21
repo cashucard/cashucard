@@ -24,15 +24,16 @@ the critical path for the following software milestones.
 
 | Order | Deliverable | Acceptance |
 | --- | --- | --- |
-| 1 | Personalization contract | Define owner/refund-key custody, mint/unit configuration, PIN handling, anchored satoshi limits and recovery for every irreversible write. Separate installation receipt from holder-ready receipt. Resolve authority and secret delivery before implementing signatures. |
+| 1 | Personalization contract | Holder wallet controls the owner key (D44). Follow the holder-handoff contract for mint/unit configuration, PIN handling, anchored satoshi limits and recovery. Issuer installation completion remains separate from holder payment readiness. |
 | 2 | Personalization engine and durable orchestration | Inject transport, signing and approved configuration; preserve identity and scope. Lost replies/restarts cannot invent a PIN, retry an uncertain PIN, duplicate personalization or claim readiness from rotation alone. No new card wire behavior without protocol agreement. |
 | 3 | Service completion contract | Record immutable configuration identity and verified completion, enforce operator/device/attempt scope, support idempotent completion and recovery exports. A client boolean cannot certify holder readiness. Extend both Node and Workers through the shared domain logic. |
 | 4 | Complete operator experience | Accurate progress/native-sheet phases, explicit secret handoff, stop/reconcile/export flows, pending-record recovery and usable batch summary. Remove contradictory demo-era production copy. Never display an install-only card as ready. |
 | 5 | Operational release preparation | Review production origin/build configuration, bootstrap, backup destination/alerts and accepted data-loss window, restore/reconciliation procedure, access control and rollback. Prepare deployable artifacts/runbook without accessing production. |
 | 6 | Release review by capability/platform | Review software/integration evidence separately from hardware coverage. Enable only capabilities with reviewed evidence; leave unproven physical write paths disabled. Keep consumer provisioning and recovery-drill controls disabled in distributed builds. |
 
-The immediate engineering milestone is order 1, followed by narrow engine and
-service slices. Supervised repair of the stopped card is a separate future
+The owner authority decision and [holder-handoff contract](PROVISIONER-HOLDER-HANDOFF.md)
+now define the boundary. The next slices are honest operator handoff UX and
+portable card configuration/read-back, followed by wallet-owned setup orchestration. Supervised repair of the stopped card is a separate future
 capability, not a dependency of personalization or service completion.
 
 ## Contract constraints already established

@@ -324,7 +324,7 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
           </Text>
           <Dim>
             {j.stage === 'recorded'
-              ? 'Installation and rotation recorded. Not ready for a holder.'
+              ? 'Installation and rotation recorded. Holder wallet setup required before use.'
               : 'Stopped and acknowledged. The attempt is retained.'}
           </Dim>
         </View>

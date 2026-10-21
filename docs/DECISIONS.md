@@ -1704,3 +1704,22 @@ explain Max's initial interruption.
 **Rejected:** clearing the interruption during background reconciliation,
 logging raw secure-channel traffic, treating an interrupted install as blank,
 and resetting the quarantined attempt to enable another installation.
+
+
+## <a id="d44"></a>D44: The holder wallet controls the owner key
+
+**Decided (ENG-741, 2026-10-20, explicit operator selection):** the holder
+wallet controls and recovers the private P-256 owner key. Ops-service continues
+to escrow manager keys; those are a different authority. The operator app
+completes installation/rotation recording, while the holder wallet performs
+personalization in the holder's hands. Existing receipts keep
+`ready_for_holder: false`. Define wallet handoff and unknown-PIN recovery in
+[the handoff contract](PROVISIONER-HOLDER-HANDOFF.md) before claiming payment
+readiness. The real app must describe this boundary honestly.
+
+**Rejected:** issuer custody by default, a temporary issuer owner, deriving
+owner keys from the manager-key master, and collecting a wallet seed in the
+provisioner. The existing wire permits first-reader ownership of an unowned
+card; a host token does not secure unattended delivery. Preserve physical
+custody until holder setup or review an additional protection design.
+This does not enable consumer manager-key issuance or change the card wire.

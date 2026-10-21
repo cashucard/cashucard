@@ -141,6 +141,12 @@ and `verified_at` (Unix seconds). Completion returns `ready_for_holder: false`:
 personalization is not implemented. An installed-only attempt remains active
 and can fetch its assigned set for rotation; it cannot be terminally recorded.
 
+Holder-controlled ownership is now selected in
+[D44](DECISIONS.md#d44). The [handoff contract](PROVISIONER-HOLDER-HANDOFF.md)
+separates the operator installation receipt from wallet-owned personalization.
+Ops-service manager-key escrow is not an owner-signing service. Existing
+completion bodies and false readiness receipts remain compatible.
+
 ## Durable local journal
 
 Use one transactional local store for the active attempt, batch progression and
