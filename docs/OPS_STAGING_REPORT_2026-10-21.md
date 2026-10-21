@@ -145,5 +145,7 @@ matched the local registered-key signed build hashes. Package source:
 `624221d88a2c3ae815283296bcfff390884172f9`, merged through package PR #2.
 Universal SHA-256:
 `fdeb3e302ed23171baa6a6da755ffb4744f57ab78e0c8ccbba6bbfe8b86bba90`.
-Registry indexing and actual artifact/restore validation remain outstanding;
-the GitHub prerelease is not a production-readiness claim.
+The registered signer published the universal artifact to the Atoll registry at
+`https://start9.bobodread.com`; a subsequent live index read confirmed beta.3
+and package source `624221d88a2c3ae815283296bcfff390884172f9`. Actual artifact/restore
+validation remains outstanding; this prerelease is not a production-readiness claim.
