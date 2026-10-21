@@ -232,7 +232,7 @@ allows 30 seconds only for that call (D53); other requests remain bounded at
 The first scheduled backup, independent copy and remote-artifact restore drill
 remain separate evidence. No production deployment is authorized by staging.
 
-The operator selected organization password-manager custody (product pending),
+The operator selected organization Vaultwarden custody, with a separately held offline recovery copy,
 Nextcloud on Start9 for independent encrypted copies, and a 24-hour maximum
 loss window. The [recovery implementation plan](../docs/OPS-RECOVERY-PLAN.md)
 records those choices, proposed cadence and outstanding access/restore gates.

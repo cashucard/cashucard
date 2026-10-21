@@ -1,10 +1,10 @@
 # Recovery custody and independent backup implementation plan
 
 2026-10-21. Current operator selections: an organization password manager
-with designated recovery operators, Nextcloud on the operator's Start9 server,
+(Vaultwarden on Zion) with designated recovery operators, Nextcloud on the operator's Start9 server,
 and a maximum acceptable 24-hour loss window. This replaces the initial
 HashiCorp Vault choice: the HCP account had no cluster, and the operator chose
-the simpler custody option (D55). The password-manager product is pending.
+the simpler custody option (D55). The operator confirmed Vaultwarden and Nextcloud are both on Zion.
 Hostnames, accounts, paths and credentials belong in a private operator
 inventory, not this repository. These selections do not authorize production
 deployment, host access or secret transfer.
@@ -31,6 +31,20 @@ organization emergency-access procedure privately. Recovering the password
 manager must not depend on the only lost device, this Cloudflare account, or
 the sole copy of the age identity. Review protected offline emergency access
 with the designated operators; do not create an unattended plaintext export.
+
+Vaultwarden and Nextcloud share a server failure domain. Before relying on
+this arrangement, retain a protected offline copy of the age identity, its
+public recipient/key identifier and concise recovery instructions outside Zion.
+The medium/location and custodian remain to be selected. Test that standalone
+copy without Vaultwarden, Nextcloud or the normal laptop. Do not depend on
+cached vault sessions as the only escape, or store the only emergency copy in
+Nextcloud. Separately document Zion/Vaultwarden backup and account/MFA recovery;
+a recovery password stored only in that same unavailable vault is circular.
+
+Use a restricted Vaultwarden organization collection for the online identity,
+with named individual members and verified access permissions. See
+[Vaultwarden's documented organization/collection support](https://github.com/dani-garcia/vaultwarden).
+No credential or identity is generated or transferred by this document.
 
 No HCP cluster, subscription or Vault deployment is required by this plan.
 Existing local staging key material remains rehearsal material, not production
@@ -107,8 +121,8 @@ must not be described as satisfying the accepted maximum.
 
 ## Bounded execution sequence and acceptance
 
-1. Select the organization password manager, configure restricted shared
-   custody and designate recovery operators. Keep all material in
+1. Configure restricted Vaultwarden shared custody, designate recovery
+   operators, and prepare/test the separately held offline recovery copy. Keep all material in
    private operator-controlled channels; no keys or tokens enter chat/history.
 2. Confirm Nextcloud WebDAV endpoint, dedicated account, independent recovery
    access and the dedicated StartOS 0.4.0.3 runner package. Confirm retention and alert recipient.

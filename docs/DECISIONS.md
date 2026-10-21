@@ -1896,8 +1896,10 @@ remain release gates, not assumptions supplied by the selected product names.
 **Decided (ENG-740, 2026-10-21):** after clarifying that the HCP account has no
 Vault cluster, the operator selected an organization password manager instead.
 Use restricted shared custody, designated individual recovery operators, MFA
-and a tested emergency-access procedure. Confirm the actual product and its
-access/recovery features before configuring it. The private age identity stays
+and a tested emergency-access procedure. The operator confirmed Vaultwarden on Zion, alongside Nextcloud. Require a
+protected, separately held offline identity/instructions copy and test recovery
+without that server. Confirm collection permissions and account-recovery
+features before configuring it. The private age identity stays
 out of the copy job and Cloudflare; Nextcloud/StartOS and the accepted 24-hour
 maximum remain as in D54. No key is transferred by this decision.
 
