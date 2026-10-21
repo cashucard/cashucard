@@ -1873,6 +1873,8 @@ is not evidence of production authentication capacity or availability.
 
 ## <a id="d54"></a>D54: Organization Vault custody and independent Nextcloud backups
 
+**Custody choice superseded by D55; Nextcloud and the loss-window choice remain.**
+
 **Decided (ENG-740, 2026-10-21):** the operator selected the existing organization
 HashiCorp Vault, designated recovery operators, Nextcloud on Start9 for an
 independent encrypted copy, and a maximum 24-hour loss window. Vault setup is
@@ -1887,3 +1889,24 @@ counting a fresh upload of an old snapshot as a fresh recovery point, or claimin
 that nightly export plus delayed copying guarantees a 24-hour maximum. Vault's
 own recovery, independent access, retention, alerts and restore/reconciliation
 remain release gates, not assumptions supplied by the selected product names.
+
+
+## <a id="d55"></a>D55: Use an organization password manager for recovery custody
+
+**Decided (ENG-740, 2026-10-21):** after clarifying that the HCP account has no
+Vault cluster, the operator selected an organization password manager instead.
+Use restricted shared custody, designated individual recovery operators, MFA
+and a tested emergency-access procedure. The operator confirmed Vaultwarden
+on Zion, alongside Nextcloud, and selected a designated recovery operator to
+keep a protected offline identity/instructions copy outside that server. Test
+recovery without Zion before relying on this arrangement. Confirm collection permissions and account-recovery
+features before configuring it. The private age identity stays
+out of the copy job and Cloudflare; Nextcloud/StartOS and the accepted 24-hour
+maximum remain as in D54. No key is transferred by this decision.
+
+**Rejected:** creating and operating a dedicated Vault cluster solely to hold
+this recovery identity, using one person's device as the only recovery path,
+or treating selection of a password manager as proof of successful custody.
+Retain D54 as history; its initial assumption of an existing organization Vault
+was corrected before deployment. Independent copy/restore evidence and
+reconciliation/fencing remain required.
