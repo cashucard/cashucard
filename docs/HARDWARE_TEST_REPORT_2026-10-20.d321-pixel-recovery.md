@@ -1,4 +1,4 @@
-# Pixel replacement and interrupted-install recovery — in progress
+# Pixel replacement and interrupted-install recovery — three boundaries passed
 
 ENG-741, 2026-10-20. The operator explicitly approved the bounded Pixel
 write/recovery drill and requested merging #22, #23 and #24 first.
@@ -137,3 +137,64 @@ Forced app stop at the frozen/session-closed boundary, without Continue/Stop,
 then relaunched. Requested operator sign-in with the card removed for final
 record-only recovery. Successful POST/receipt and batch acknowledgement are
 still pending.
+
+## Final record-only recovery and result
+
+With the card removed, the operator signed in after the third planned process
+loss. No further card-control tap was issued. The UI restored
+`1 of 1 attempts acknowledged`, `1 rotation records · 0 stops`, and
+`Installation and rotation recorded. Not ready for a holder.` A screenshot
+is retained at
+[the final Pixel screen](hardware/2026-10-20/pixel-recovery-recorded.png).
+
+A final private AsyncStorage copy confirms active null, batch 1 next ordinal
+1, and exactly one recorded history entry for the original attempt. Its
+frozen_record string is byte-identical to the pre-kill saved string. The local
+service contains exactly one attempt and one installation record. Parsed
+service body equals the frozen record; service receipt equals the phone's
+stored receipt. This verifies persisted contents, not a captured HTTP wire
+transcript. The receipt is:
+
+- Attempt `ac3575ad-6be4-4595-b213-97f89afabda6`, revision 2.
+- Installation
+  `036ba3354ef98337603ad52f429e5a67214fd064e6f1c04cd784d1b11c3aa19490`.
+- verified_stage rotated, recorded_at 1792547393.
+- **ready_for_holder false**.
+
+The application resumed the record-only path without another operator NFC
+tap. That source path posts the frozen record before the key-fetch/NFC path;
+no independent HTTP endpoint counter or RF trace was captured.
+A consistent completed service snapshot and matching private runtime were
+retained as `completed-pixel-drill.db` and
+`completed-pixel-drill-runtime.json` in the protected local run directory.
+These contain sensitive recovery material and are not repository artifacts.
+No close-batch action was taken; the acknowledged batch remains visible.
+
+| Planned process loss | Observed pause | Durable stage at kill | Later outcome |
+|---|---|---|---|
+| Installation completed before journal completion | installation-verified-before-save | install_intent | Complete new installation adopted; advanced to rotation |
+| Rotation verified before journal completion | rotation-verified-before-save | rotation_intent | Assigned-key state recovered; same installation retained |
+| Record frozen after NFC closure, before POST | record-frozen-session-closed | record_pending | Same frozen record posted; one matching receipt; ordinal acknowledged |
+
+All three planned boundaries passed on this Pixel/card/local-service run.
+The card ends with the 2.1 applet installed and assigned manager keys, not
+factory keys. No factory reset, extra installation/ordinal, mint access, owner,
+PIN, holder personalization or proof operation was requested. Keys are retained
+in the local escrow/database/master state; they are not printed here.
+
+## Limits and remaining work
+
+This is one composite successful run, not a full release validation. The
+initial USB interruption occurred before the first recorded binding and is
+not counted as a planned post-write boundary. No actual mid-LOAD tear, lost
+PUT KEY reply, wrong-card substitution, failed authentication or permanent
+lock scenario was injected. No raw APDU transcript was captured, so precise
+command counts/no-replay claims rely on the tested source paths plus observed
+state, not an independent transport trace.
+
+Max's optional post-install CPLC comparison and full iPhone write/recovery
+drills were not run. No Worker deployment or production service/mint was
+accessed. Local retained snapshots are not independently encrypted/offsite
+escrow or a demonstrated disaster restore. No distributed release gate is
+enabled by this report; both committed flags remain false. The isolated Pixel
+validation build and its Metro source retain the two approved local gates.
