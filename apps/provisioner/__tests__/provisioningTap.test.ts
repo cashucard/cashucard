@@ -211,7 +211,22 @@ test('an existing card requires key-specific replacement consent and a funded ca
   const f = fixture();
   expect((await provision(f.tx, CASHU_PLAN, options)).ok).toBe(true);
   const at = f.log.length;
-  expect(await f.tap(await f.open())).toBe('replacement-consent-required');
+  const review = jest.fn();
+  expect(
+    await runProvisioningTap(f.tx, await f.open(), SPIKE_KEYS, f.bind, {
+      ...options,
+      verifiedAt: () => 1,
+      onReplacementRequired: review,
+    }),
+  ).toBe('replacement-consent-required');
+  expect(review).toHaveBeenCalledWith({chipId: chip, installationId: key});
+  expect(
+    await runProvisioningTap(f.tx, await f.open(), SPIKE_KEYS, f.bind, {
+      ...options,
+      verifiedAt: () => 1,
+      replacementInstallationId: '03' + key.slice(2),
+    }),
+  ).toBe('replacement-consent-required');
   expect(destructive(f.log.slice(at))).toEqual([]);
   expect((await f.open()).snapshot().stage).toBe('reserved');
   f.card.setCardState({unspent: 1});

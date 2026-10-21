@@ -36,6 +36,11 @@ export type TapOutcome =
 export interface TapOptions extends RunOptions {
   /** Consent for exactly this inspected old installation, never blanket replace. */
   replacementInstallationId?: string;
+  /** Public inspection only; caller must wait for session closure before review. */
+  onReplacementRequired?: (inspection: {
+    chipId: string;
+    installationId: string;
+  }) => void;
   verifiedAt: () => number;
   /** Optional validation hook; receives only a public boundary name. */
   checkpoint?: (boundary: RecoveryBoundary) => Promise<void>;
@@ -95,6 +100,10 @@ export async function runProvisioningTap(
           return 'quarantined';
         }
         if (options.replacementInstallationId !== observed.installationId) {
+          options.onReplacementRequired?.({
+            chipId: chip.id,
+            installationId: observed.installationId,
+          });
           return 'replacement-consent-required';
         }
       }

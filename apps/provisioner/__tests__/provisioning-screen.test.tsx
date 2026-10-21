@@ -578,3 +578,61 @@ test('enabling drill controls cannot bypass the independent installation gate', 
   expect(f.service.batch).not.toHaveBeenCalled();
   expect(runCard).not.toHaveBeenCalled();
 });
+
+test('replacement requires a closed-session review and one-shot installation-specific consent', async () => {
+  const f = fixture();
+  const chipId = 'cplc-v1:4790d3213041093363205547';
+  const installationId =
+    '0366bf811cadfcfc00e5f251017d1dc690a93a6a4a9d39ed114b96d33fb59d9941';
+  const consents: Array<string | undefined> = [];
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    w,
+    service,
+    options,
+  ) => {
+    consents.push(options.replacementInstallationId);
+    await w.withAttempt(service, async j => {
+      if (!j.snapshot().chip_id) {
+        await j.bind(chipId);
+      }
+    });
+    return options.withCard(async () => {
+      options.onReplacementRequired?.({chipId, installationId});
+      expect(flow.replacement).toBeNull();
+      return 'replacement-consent-required';
+    });
+  };
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+    runCard,
+    withCard: run => run(async () => [0x90, 0]),
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  await act(async () => {
+    await flow.program();
+  });
+  expect(consents).toEqual([undefined]);
+  expect(flow.replacement).toMatchObject({chipId, installationId});
+  expect(text(tree)).toContain(installationId);
+  expect(tree.root.findAllByProps({testID: 'real-program'})).toHaveLength(0);
+  await act(async () => {
+    await tree.root
+      .findByProps({testID: 'replacement-confirm'})
+      .props.onPress();
+  });
+  expect(consents).toEqual([undefined, installationId]);
+  // A subsequent ordinary tap never reuses the previous confirmation.
+  await act(async () => {
+    await flow.program();
+  });
+  expect(consents).toEqual([undefined, installationId, undefined]);
+  await act(async () => {
+    app.signOut();
+  });
+  expect(flow.replacement).toBeNull();
+});

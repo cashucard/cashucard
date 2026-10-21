@@ -127,3 +127,31 @@ public chip/full installation IDs, private-state retention location (never its
 contents), batch/attempt IDs, reached boundaries and actual saved stages, each
 relaunch outcome, final receipt and omitted scenarios in a new hardware report.
 Keep the original read-only report unchanged as evidence for its original run.
+
+## Candidate update after USB preflight (proposed replacement variant)
+
+The original card returned an unexpected applet version. A second card returned
+2.1 and passed all public-state reads: chip
+`cplc-v1:4790d3213041093363205547`, installation
+`0366bf811cadfcfc00e5f251017d1dc690a93a6a4a9d39ed114b96d33fb59d9941`.
+It reports zero proofs, 128 empty slots, no PIN/owner/configuration record,
+unlocked, tag present. See the USB preflight hardware report. The operator
+confirmed it is a test card, replacement is permitted, and its manager keys
+have not changed since the earlier report's return to factory keys. This
+confirms provenance without trying any keys.
+
+For a later approved replacement variant, this exact chip and old installation
+replace phase B's original card and absent-applet precondition. All other
+service, source, retained-key, device and recovery prerequisites still apply.
+Before the first mutation, the Pixel must inspect the card, close NFC and show
+the new replacement review. The operator explicitly confirms that full old
+installation identity and retaps the same card. Recheck chip, old installation
+key and complete empty state before the existing guarded cleanup/install.
+The three subsequent pause/restart boundaries are unchanged; do not replace
+the newly installed applet on recovery. Max's eventual CPLC post-check would
+compare against this replacement card's identity.
+
+The software confirmation flow is implemented separately from PR #23. It is
+not yet native/hardware validated, and both committed release gates remain
+false. Neither this addendum nor the operator's disposability confirmation
+authorizes starting phase B before its prerequisites and execution approval.

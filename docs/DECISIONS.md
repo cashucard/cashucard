@@ -1644,3 +1644,26 @@ stops this drill because the current UI has no replacement-consent flow.
 **Rejected:** broad selftest/info commands for this bounded check, trying keys
 to discover their provenance, and interpreting an absent applet as a blank card.
 The tool and plan do not themselves authorize physical execution.
+
+## <a id="d41"></a>D41: Replacement review belongs to one inspected installation
+
+**Decided (ENG-741, 2026-10-20):** the real flow may offer replacement only
+after its read-only inspection finds a complete, empty installation and the
+NFC session has closed. Show the full public chip and installation identities,
+explain the identity change, and require an explicit replacement action. Keep
+the review in memory, scoped to the reserved attempt, bound chip and current
+actor generation. Consume it for one program invocation. Sign-out, service or
+demo changes, other workflow operations, ordinary programming and process loss
+clear the review; dismissal keeps the existing installation and reservation.
+
+On confirmation, request a new tap. Existing chip binding, exact installation
+key comparison and complete/empty-state inspection must pass again before
+install intent, factory authentication or mutation. Consent is durably recorded
+with the preinstall identity only through the existing install-intent journal.
+Interrupted installation keeps its existing recovery rules; the UI cannot
+authorize a recovery sweep or bypass the hardware release gate.
+
+**Rejected:** a batch-wide Replace switch, confirmation while NFC remains open,
+remembering consent across restarts, and treating an operator chat confirmation
+as a substitute for checking the physical card again. Manager-key provenance
+remains a hardware-plan prerequisite, not something inferred from public state.

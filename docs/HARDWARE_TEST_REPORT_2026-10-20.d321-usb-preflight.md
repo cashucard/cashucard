@@ -90,3 +90,11 @@ the tap contract support it, but ProvisioningStore currently stops with an
 operator-review message. Operator disposability/replacement consent and current
 manager-key provenance remain pending. No deletion, replacement or phone build
 was performed as part of this inspection.
+
+## Operator provenance confirmation
+
+After the complete public-state check, the operator confirmed this spare is a
+test card, replacement is okay, and its keys have not changed since the earlier
+report. That report records return to factory manager keys for serial 09336320.
+This establishes operator-reported provenance for a future bounded replacement
+plan; no authentication was used to test the assertion and no writes followed.
