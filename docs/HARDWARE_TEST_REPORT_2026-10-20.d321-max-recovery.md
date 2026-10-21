@@ -42,3 +42,26 @@ the observed screen message and whether Install was tapped once. The actual
 physical installation state and command history are not established by this
 journal. No successful installation, rotation or recovery result is claimed.
 Further card inspection or repair needs a separately scoped plan.
+
+
+## Approved read-only USB follow-up
+
+Operator approved continuing with the proposed read-only inspection, then
+confirmed card 09336120 was on the ACS ACR122U PICC Interface. Ran the existing
+bounded preflight once from this checkout using its Homebrew-backed cardctl
+venv and the full expected CPLC. One PC/SC connection selected ISD, read CPLC,
+and selected the full Cashu applet AID; result was `installation: absent`,
+`authentication_attempted: false`. No later state/key/tag read was sent because
+the applet was absent. No authentication, mutation or retry occurred. An initial
+host invocation used a nonexistent venv path and exited before Python or any
+reader access; the corrected invocation made the single connection above.
+
+This is evidence of no selectable Cashu applet, not a package inventory or a
+proof that no earlier installation command ran. It cannot establish key state.
+The quarantine guard deliberately rejects an absent/partial applet after a
+saved install intent; it does not authorize another install or sweep.
+
+All 15 reader-free provisioning-tap tests passed during diagnosis, including
+fresh install, saved-boundary recovery and safe stopping. This does not explain
+the physical failure. No native command trace was captured. The stopped journal
+remains unchanged and no automatic card repair is planned.
