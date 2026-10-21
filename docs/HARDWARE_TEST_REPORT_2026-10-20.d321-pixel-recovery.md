@@ -108,3 +108,32 @@ factory keys or reset it.
 
 Assigned-state recovery after this process loss and record freezing/posting
 remain pending. No second card, ordinal or batch was created.
+
+## Third planned boundary: frozen record after NFC closure
+
+After operator reauthentication, armed and verified
+`record-frozen-session-closed`, then continued the same saved rotation-intent
+attempt. The operator presented the same spare with USB connected. The UI
+reached exactly `record-frozen-session-closed`, saved stage `record_pending`.
+The NFC Cancel control was absent. This checkpoint is outside the withCard
+call, after its session cleanup; no direct RF trace was captured.
+
+Private AsyncStorage evidence confirms the same chip, attempt and new full
+installation key, installation_verified true, observed GP key version **1**,
+and a serialized frozen record with verified_stage rotated. The frozen record
+retains batch 1, ordinal 0, operator 1, issued environment, the same device
+and load hash, configuration revision 1, verified_at 1792547316.
+The server still had one active revision-1 attempt and **zero installation
+records** at this pause.
+
+This exercises recovery when rotation succeeded on card but its durable
+completion was lost. The code selects candidate session keys by cryptogram
+matching before EXTERNAL AUTHENTICATE, avoiding a failed trial login and a
+second PUT KEY. No raw APDU capture was taken to independently count
+authentications or PUT KEY commands; successful recovery and the same
+installation key are directly observed.
+
+Forced app stop at the frozen/session-closed boundary, without Continue/Stop,
+then relaunched. Requested operator sign-in with the card removed for final
+record-only recovery. Successful POST/receipt and batch acknowledgement are
+still pending.
