@@ -13,7 +13,7 @@ not the completed production deliverable.
 | Identity | Preserve `com.islandbitcoin.provisioner` and current signing continuity until store enrollment is reviewed. Do not rename IDs or replace keys to bypass a validation setup. |
 | Android signing | D56 removes fixed Release passwords/keystore defaults and requires private upload signing inputs through the actual Gradle Release prerequisites. No key or signed artifact was generated for this change. |
 | Android native compatibility | D57 aligns compile/target API 36 with AGP 8.10.1 and Gradle 8.11.1. The local full native AAB and 24 bundled 64-bit libraries pass SDK/release/16KB format checks (dated build report). Native CI and device/runtime evidence remain separate. Review the maintained RN/dependency baseline before distribution. |
-| Apple toolchain | Local Xcode is 26.6; project deployment target is iOS 15.1. A signed archive/export and native NFC/entitlement review remain pending. iOS pods/signing and device installs retain repository approval rules. |
+| Apple toolchain | Local Xcode is 26.6; project deployment target is iOS 15.1. Resource paths and standalone AppIcon catalog compilation pass the dated iOS resource report. A signed archive/export and native NFC/entitlement review remain pending. iOS pods/signing and device installs retain repository approval rules. |
 | Runtime endpoint | Only isolated staging has remote functional evidence. Native Release builds enforce HTTPS-origin and disabled recovery-drill checks. Committed default remains local, so Release fails until explicitly configured. Production configuration/deployment and review of the selected origin remain pending. |
 | App capability | Installation and recovery-drill gates remain false. Enable only a reviewed platform capability after its exact evidence; never enable recovery drills for distribution. Preserve quarantined chips/journals. |
 | Privacy/support | The operator supplied the Flash privacy and terms URLs; both are accessible before sign-in and in Settings (D58). Public support is `support@getflash.io`, exposed through a Support mail link. Review the [data inventory](PROVISIONER-DATA-INVENTORY.md), policy coverage, app/SDK manifests and store declarations before submission. |
@@ -74,3 +74,5 @@ No phone/card operation, production access, store connection or upload occurred
 in this audit. No stage in this document constitutes store approval.
 
 Native evidence: [Android build report](PROVISIONER_ANDROID_BUILD_REPORT_2026-10-21.md).
+
+Resource preparation: [iOS resource report](PROVISIONER_IOS_RESOURCE_REPORT_2026-10-21.md).
