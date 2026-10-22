@@ -1,0 +1,30 @@
+# Reviewed production configuration; deploy this file explicitly.
+# The private recovery identity belongs only in restricted custody, never here.
+# Inject a new production OPS_MASTER_KEY and one-shot OPS_OPERATOR_SETUP privately.
+name = "cashu-card-ops"
+main = "src/worker.ts"
+compatibility_date = "2026-10-13"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+routes = []
+
+[vars]
+OPS_RECOVERY_ADMINS = '["production-lead"]'
+OPS_RECOVERY_ISSUER_ID = '6d933aa4-b88b-402a-97fe-f0929a481b1e'
+OPS_BACKUP_RECIPIENT = 'age1xu35750fx9nccdhgn9z3a0cpprz4xzenk8a7nnmzsck5gv646v8s3a04yk'
+# Issuance starts closed and stays closed until a fresh independent copy exists.
+OPS_INDEPENDENT_BACKUP_ISSUER = '6d933aa4-b88b-402a-97fe-f0929a481b1e'
+
+[durable_objects]
+bindings = [{ name = "OPS_DO", class_name = "OpsStore" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OpsStore"]
+
+[[r2_buckets]]
+binding = "OPS_BACKUPS"
+bucket_name = "cashu-card-ops-backups"
+
+[triggers]
+crons = ["17 3,15 * * *"]

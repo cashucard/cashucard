@@ -103,11 +103,19 @@ signed candidate or store upload has been created in this preparation pass.
   The original file's digest is unchanged. The copy and its local credentials
   have mode `0600` in a directory with mode `0700`, outside all checkouts.
   Android signing preflight passes with those private environment inputs.
-  Restricted-vault/offline backup of this new working copy remains outstanding;
-  local preparation alone is not completed signing custody or a signed build.
+  Its offline backup subsequently passed second-Mac unlock/certificate
+  verification; see the custody report below. This is not a signed build.
+
+The [production custody report](OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md)
+records the separate production age identity, verified restricted Vaultwarden
+retrieval and encrypted-drive copy, and the Android upload-key backup check.
+The drive is unmounted and locked. `ops/wrangler.production.toml` now defines
+the explicit production recipient, issuer, isolated bucket, 12-hour export cron
+and independent-copy policy. It remains undeployed; private bootstrap/master
+injection and actual production export/copy/restore acceptance are pending.
 
 The separate-Mac staging restore is complete. Remaining operational acceptance
-includes production custody/copy verification, monitoring independent of Zion,
+includes production export/copy/restore verification, monitoring independent of Zion,
 and reviewed restore reconciliation before reopening issuance. Signed artifacts
 must demonstrate their actual HTTPS origin, native transport policy, platform
 entitlements and included dependencies before final store declarations.
