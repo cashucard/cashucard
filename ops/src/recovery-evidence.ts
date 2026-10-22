@@ -68,3 +68,33 @@ export function saveCopyReceipt(
     return true;
   });
 }
+
+export class BackupFreshnessError extends Error {
+  constructor() {
+    super('independent-backup-stale');
+  }
+}
+
+/** Unix seconds; copy/receipt time never extends the source snapshot lifetime. */
+export function independentBackupHealth(db: OpsDb) {
+  const issuer = db.independentBackupIssuer;
+  if (!issuer) return {required: false, stale: true, exported_at: null};
+  const row = db.db
+    .prepare(
+      `SELECT MAX(r.exported_at) AS exported_at
+    FROM recovery_copy_receipts r JOIN recovery_connections c ON c.id = r.connection_id
+    WHERE r.issuer_id = ? AND c.issuer_id = ? AND c.can_attest = 1
+      AND c.revoked IS NULL AND r.exported_at > 0 AND r.exported_at <= ?`,
+    )
+    .get(issuer, issuer, db.now()) as {exported_at: number | null};
+  const time = row.exported_at;
+  return {
+    required: true,
+    stale: time === null || db.now() - time >= 86400,
+    exported_at: time,
+  };
+}
+export function assertIndependentBackup(db: OpsDb): void {
+  const health = independentBackupHealth(db);
+  if (health.required && health.stale) throw new BackupFreshnessError();
+}
