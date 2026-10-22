@@ -10,7 +10,7 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
         '/ops/recovery/connections',
         '/recovery/exports',
       ].includes(path) ||
-      /^\/recovery\/exports\/[0-9A-FTZ.:%a-f-]+\.age$/.test(path) ||
+      /^\/recovery\/(exports|metadata)\/[0-9A-FTZ.:%a-f-]+\.age$/.test(path) ||
       /^\/provisioning\/attempts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
         path,
       )
@@ -24,10 +24,14 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
         '/auth/operator/revoke',
         '/ops/recovery/pairings',
         '/recovery/claim',
+        '/recovery/copy-receipts',
         '/keys/issue',
         '/provisioning/batches',
         '/provisioning/attempts',
       ].includes(path) ||
+      /^\/ops\/recovery\/connections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/attestation$/.test(
+        path,
+      ) ||
       /^\/provisioning\/attempts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(bind|record|disposition)$/i.test(
         path,
       )

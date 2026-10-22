@@ -165,3 +165,85 @@ it('ordinary provisioning access cannot enroll; backup credentials read only mat
     ).status,
   ).toBe(413);
 });
+
+it('copy receipts require explicit authority and exact source metadata; revocation removes eligibility', async () => {
+  const {stub, call} = await fixture('copy-attestation');
+  const {code} = (await (
+    await call('/ops/recovery/pairings', 'POST', {name: 'copier'})
+  ).json()) as {code: string};
+  const secret = 'q'.repeat(43);
+  const {connection_id} = (await (
+    await call('/recovery/claim', 'POST', {code, secret}, '')
+  ).json()) as {connection_id: string};
+  const bearer = 'recovery-v1.' + secret;
+  const now = Math.floor(Date.now() / 1000);
+  const name =
+    '2026-10-21T00:00:00.000Z-11111111-2222-4333-8444-555555555555.age';
+  const receipt = {
+    name,
+    exported_at: now - 100,
+    sha256: 'a'.repeat(64),
+    bytes: 3,
+  };
+  await env.OPS_BACKUPS!.put('escrow/' + name, 'abc', {
+    customMetadata: {
+      version: '1',
+      exported_at: String(receipt.exported_at),
+      ciphertext_sha256: receipt.sha256,
+      ciphertext_bytes: '3',
+    },
+  });
+  const attest = (input = receipt) =>
+    call('/recovery/copy-receipts', 'POST', input, bearer);
+  expect((await attest()).status).toBe(403);
+  const grant = '/ops/recovery/connections/' + connection_id + '/attestation';
+  expect((await call(grant, 'POST', {enabled: true}, bearer)).status).toBe(401);
+  expect((await call(grant, 'POST', {enabled: true})).status).toBe(200);
+  expect((await attest({...receipt, sha256: 'b'.repeat(64)})).status).toBe(409);
+  expect((await attest()).status).toBe(200);
+  expect((await attest()).status).toBe(200);
+  const olderName = name.replace('00:00:00', '00:00:01');
+  const older = {...receipt, name: olderName, exported_at: now - 200};
+  await env.OPS_BACKUPS!.put('escrow/' + olderName, 'abc', {
+    customMetadata: {
+      version: '1',
+      exported_at: String(older.exported_at),
+      ciphertext_sha256: older.sha256,
+      ciphertext_bytes: '3',
+    },
+  });
+  expect((await attest(older)).status).toBe(200);
+  expect(
+    (
+      await call(
+        '/recovery/metadata/' + encodeURIComponent(name),
+        'GET',
+        undefined,
+        bearer,
+      )
+    ).status,
+  ).toBe(200);
+  await env.OPS_BACKUPS!.put('escrow/' + olderName, 'abc', {
+    customMetadata: {
+      version: '1',
+      exported_at: String(now + 3600),
+      ciphertext_sha256: older.sha256,
+      ciphertext_bytes: '3',
+    },
+  });
+  expect((await attest({...older, exported_at: now + 3600})).status).toBe(409);
+  await runInDurableObject(stub, (_instance, ctx) => {
+    const db = new OpsDb({sql: openSqlStorage(ctx.storage)});
+    expect(
+      db.db.prepare('SELECT exported_at FROM recovery_copy_receipts').all(),
+    ).toEqual([{exported_at: receipt.exported_at}]);
+  });
+  expect((await call(grant, 'POST', {enabled: false})).status).toBe(200);
+  expect((await attest()).status).toBe(403);
+  await runInDurableObject(stub, (_instance, ctx) => {
+    const db = new OpsDb({sql: openSqlStorage(ctx.storage)});
+    expect(
+      db.db.prepare('SELECT 1 FROM recovery_copy_receipts').get(),
+    ).toBeUndefined();
+  });
+});

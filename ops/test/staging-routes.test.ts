@@ -14,6 +14,12 @@ test('staging permits only operator provisioning and backup-status methods', () 
     ['GET', '/ops/recovery/connections'],
     ['POST', '/ops/recovery/pairings'],
     ['POST', '/recovery/claim'],
+    ['POST', '/recovery/copy-receipts'],
+    ['POST', `/ops/recovery/connections/${attempt}/attestation`],
+    [
+      'GET',
+      '/recovery/metadata/2026-10-21T00%3A00%3A00.000Z-11111111-2222-4333-8444-555555555555.age',
+    ],
     ['GET', '/recovery/exports'],
     [
       'GET',

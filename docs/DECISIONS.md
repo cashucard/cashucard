@@ -2115,3 +2115,25 @@ enforce an issuance fence; those remain the next implementation slices.
 **Rejected:** inferring snapshot time from the filename, R2 upload time or the
 copier's clock; using the plaintext byte metric as ciphertext length; and
 silently reclassifying legacy downloads as verified independent copies.
+
+## <a id="d67"></a>D67: Grant copy-attestation authority separately from backup reads
+
+**Decided (ENG-740, 2026-10-21):** append a default-disabled capability to
+recovery connections. Only a deployment-allowlisted recovery administrator can
+grant or remove it. Old and newly paired readers remain read-only until that
+separate grant. Removing/regranting authority discards its prior copy evidence.
+Readers may retrieve source metadata; an authorized copier may attest only the
+exact object, source snapshot timestamp, digest and byte length validated against
+R2. Missing/legacy metadata and future snapshots fail closed. Persist only the
+newest source snapshot per connection, rechecking authority transactionally after
+the asynchronous storage read. Credential revocation makes its receipts ineligible.
+
+The receipt is a trusted copier's assertion that destination read-back succeeded,
+not proof of Nextcloud possession. No destination credentials or private recovery
+key enter the issuer. This extends D61 only for deliberately granted connections;
+ordinary backup readers still cannot mutate issuance or trigger exports. Issuance
+enforcement and Atoll receipt delivery remain separate implementation slices.
+
+**Rejected:** automatically upgrading paired readers, treating caller timestamps
+as source evidence, keeping receipt health across capability removal/regrant, and
+letting an older retried copy replace a newer snapshot.
