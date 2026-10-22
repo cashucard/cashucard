@@ -31,6 +31,7 @@ import {
 } from './src/ProvisioningStore';
 import {CardIdentityScreen} from './src/screens/CardIdentityScreen';
 import {ProvisioningScreen} from './src/screens/ProvisioningScreen';
+import {BENCH_RUNS_ENABLED} from './src/releaseGates';
 
 type Route = 'setup' | 'loop' | 'summary' | 'settings' | 'bench' | 'identity';
 
@@ -56,12 +57,19 @@ function Navigator(): React.JSX.Element {
     return <ProvisioningScreen onSettings={() => setRoute('settings')} />;
   }
 
-  switch (route) {
+  // A stale/direct route cannot mount laboratory write controls in this build.
+  const visibleRoute =
+    route === 'bench' && !BENCH_RUNS_ENABLED ? 'settings' : route;
+  switch (visibleRoute) {
     case 'settings':
       return (
         <SettingsScreen
           onBack={() => setRoute('setup')}
-          onBench={() => setRoute('bench')}
+          onBench={() => {
+            if (BENCH_RUNS_ENABLED && !recovery.busy) {
+              setRoute('bench');
+            }
+          }}
           onIdentity={() => {
             if (!recovery.busy) {
               setRoute('identity');
@@ -79,7 +87,7 @@ function Navigator(): React.JSX.Element {
       );
     case 'bench':
       return (
-        // the ENG-738 spike screen, unchanged, at Settings → Bench runs
+        // Approved laboratory builds only; the handler also enforces the gate.
         <View style={benchStyles.benchWrap}>
           <Text
             onPress={() => setRoute('settings')}

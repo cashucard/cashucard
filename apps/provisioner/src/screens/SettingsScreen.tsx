@@ -21,6 +21,7 @@ import {
 import {SETTINGS} from '../strings';
 import {useApp} from '../store';
 import {LegalLinks} from '../LegalLinks';
+import {BENCH_RUNS_ENABLED} from '../releaseGates';
 import {FONT, useTheme, type Theme} from '../theme';
 import {Screen} from '../ui';
 
@@ -233,15 +234,21 @@ export function SettingsScreen({
                 <View style={s.divider} />
               </>
             ) : null}
-            <Pressable testID="bench-entry" onPress={onBench} style={s.row}>
-              <View style={s.rowLabelCol}>
-                <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
-                <Text style={s.rowSub}>
-                  {'Load test against the spare card. Bench only.'}
-                </Text>
-              </View>
-              <Text style={s.chevron}>›</Text>
-            </Pressable>
+            {BENCH_RUNS_ENABLED ? (
+              <Pressable
+                testID="bench-entry"
+                onPress={onBench}
+                disabled={hardwareBusy}
+                style={s.row}>
+                <View style={s.rowLabelCol}>
+                  <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
+                  <Text style={s.rowSub}>
+                    {'Load test against the spare card. Bench only.'}
+                  </Text>
+                </View>
+                <Text style={s.chevron}>›</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 

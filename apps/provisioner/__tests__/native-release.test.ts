@@ -46,14 +46,19 @@ test('the actual Xcode bundle phase checks Release configuration before invoking
       '#!/bin/bash\nprintf "bundler-invoked\\n"\n',
       {mode: 0o755},
     );
-    const run = (configuration: string, origin: string, drills: boolean) => {
+    const run = (
+      configuration: string,
+      origin: string,
+      drills: boolean,
+      bench = false,
+    ) => {
       writeFileSync(
         join(dir, 'src/serviceOrigin.json'),
         JSON.stringify({serviceOrigin: origin}),
       );
       writeFileSync(
         join(dir, 'src/releaseGates.ts'),
-        `export const RECOVERY_DRILLS_ENABLED = ${drills};`,
+        `export const RECOVERY_DRILLS_ENABLED = ${drills}; export const BENCH_RUNS_ENABLED = ${bench};`,
       );
       return spawnSync('/bin/sh', ['-c', command], {
         encoding: 'utf8',
@@ -74,6 +79,9 @@ test('the actual Xcode bundle phase checks Release configuration before invoking
       expect(result.status).not.toBe(0);
       expect(result.stdout).not.toContain('bundler-invoked');
     }
+    const bench = run('Release', 'https://ops.example.com', false, true);
+    expect(bench.status).not.toBe(0);
+    expect(bench.stdout).not.toContain('bundler-invoked');
     for (const configuration of ['Release', 'StoreRelease']) {
       const result = run(configuration, 'https://ops.example.com', false);
       expect(result.status).toBe(0);

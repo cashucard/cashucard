@@ -1,9 +1,19 @@
 # Cashu card provisioner (ENG-738)
 
-A bench spike: can a Pixel 8 Pro and an iPhone install the card's 2.1 applet on a
-J3R180 over NFC, with no USB reader? One screen, three runs, and a readout of what
-each measured. For the spare card only. The decision behind it is
-[D27](../../docs/DECISIONS.md#d27); the GlobalPlatform code is
+The issuer app installs and records supported Cashu cards through authenticated
+reservations, retaining interrupted-attempt evidence. Installation completion
+means awaiting holder setup. Its production capability remains gated pending
+reviewed platform evidence.
+
+The original ENG-738 spare-card bench is retained for approved laboratory Debug
+builds only. `BENCH_RUNS_ENABLED` defaults to false: Settings hides it, navigation
+rejects entry and its handlers cannot open NFC. Native Release builds require
+that flag and recovery drills to remain disabled. Do not enable bench writes to
+bypass the production coordinator or its stopped-card evidence.
+
+The historical bench operations below are described for that controlled Debug
+workflow. The decision behind the GlobalPlatform implementation is
+[D27](../../docs/DECISIONS.md#d27); the shared library is
 [`tools/cardkit`](../../tools/cardkit), bundled from the repository.
 
 ## What it does
@@ -240,7 +250,7 @@ The configuration is public and contains no password/token. The tool rejects
 credentials, non-origin URLs, HTTP and local/IP production targets without
 contacting any host. It writes atomically and never echoes a rejected input.
 `check:release` also parses the release-gate source and requires recovery drills
-to be a literal disabled constant. It does not enable physical installation,
+and bench runs to be literal disabled constants. It does not enable physical installation,
 validate the deployment certificate or replace release review. Rebuild the app
 and retain the chosen origin/configuration and artifact hashes. Do not ship the
 example origin. Supply the actual reviewed service origin before distribution.
