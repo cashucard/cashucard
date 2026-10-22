@@ -2051,3 +2051,19 @@ in query parameters, or a bespoke notification service. Local NTFY acceptance
 is not evidence that a person received a push. Zion shutdown also stops NTFY;
 whole-host failure requires an independent monitor. Browser/mobile subscription
 and an actual received-alert check remain operator acceptance steps.
+
+## <a id="d63"></a>D63: Enforce public build configuration in native Release paths
+
+**Decided (ENG-741, 2026-10-21):** run the existing public HTTPS-origin and
+literal-disabled recovery-drill validator from native build prerequisites,
+not only an optional preparation command. Android Release pre-build, signing
+validation and JS bundling depend on the check. Xcode's bundle phase loads
+React Native's Node environment and checks every configuration except Debug
+before invoking the bundler, including custom archive configurations. Debug
+keeps local validation support. The validator reads the same source files Metro
+bundles; it never contacts the service or handles signing credentials.
+
+**Rejected:** optional preflight, a Release bypass for local diagnostics,
+changing the committed localhost default to an unapproved production origin,
+and treating a syntactically valid public endpoint as reviewed deployment or
+hardware evidence. This adds no phone operation, signing change or store upload.

@@ -245,6 +245,13 @@ validate the deployment certificate or replace release review. Rebuild the app
 and retain the chosen origin/configuration and artifact hashes. Do not ship the
 example origin. Supply the actual reviewed service origin before distribution.
 
+Native Release builds enforce this check automatically: Gradle runs it before
+Release JS bundling, pre-build and signing validation; Xcode's bundle phase runs
+it for every configuration other than `Debug`. A local endpoint or enabled
+recovery drills stop the build. Debug retains local validation support. There
+is no Release bypass; use Debug for local diagnostics. This validates build
+configuration only, not production deployment or physical capability evidence.
+
 For an explicitly local validation checkout, use `--local` with configure;
 `node scripts/configure-service.cjs --check --local` checks that format without
 requiring production gates. Local HTTP is restricted to loopback/emulator
