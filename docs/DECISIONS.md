@@ -2107,6 +2107,8 @@ session opens. No card operation was performed while implementing this guard.
 from the exporter and store it with the armored ciphertext SHA-256, UTF-8 byte
 length and metadata version in the same conditional R2 creation. An existing
 object is never overwritten; failure does not advance export-success status.
+The metadata also binds the stable issuer UUID; evidence for another issuer or
+without that binding is ineligible even if the object is accessible in the bucket.
 The snapshot timestamp uses Unix seconds and precedes encryption. Existing
 exports without metadata remain downloadable but cannot serve as validated
 freshness evidence. This metadata alone does not attest independent storage or

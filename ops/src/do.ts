@@ -142,6 +142,7 @@ export class OpsStore extends DurableObject<Env> {
         // time and the object filename are not the database snapshot time.
         customMetadata: {
           version: '1',
+          issuer_id: this.env.OPS_RECOVERY_ISSUER_ID ?? '',
           exported_at: String(exported_at),
           ciphertext_sha256: createHash('sha256').update(armored).digest('hex'),
           ciphertext_bytes: String(new TextEncoder().encode(armored).length),

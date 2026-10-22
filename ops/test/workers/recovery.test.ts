@@ -188,6 +188,7 @@ it('copy receipts require explicit authority and exact source metadata; revocati
   await env.OPS_BACKUPS!.put('escrow/' + name, 'abc', {
     customMetadata: {
       version: '1',
+      issuer_id: env.OPS_RECOVERY_ISSUER_ID!,
       exported_at: String(receipt.exported_at),
       ciphertext_sha256: receipt.sha256,
       ciphertext_bytes: '3',
@@ -207,12 +208,24 @@ it('copy receipts require explicit authority and exact source metadata; revocati
   await env.OPS_BACKUPS!.put('escrow/' + olderName, 'abc', {
     customMetadata: {
       version: '1',
+      issuer_id: env.OPS_RECOVERY_ISSUER_ID!,
       exported_at: String(older.exported_at),
       ciphertext_sha256: older.sha256,
       ciphertext_bytes: '3',
     },
   });
   expect((await attest(older)).status).toBe(200);
+  await env.OPS_BACKUPS!.put('escrow/' + olderName, 'abc', {
+    customMetadata: {
+      version: '1',
+      issuer_id: '99999999-2222-4333-8444-555555555555',
+      exported_at: String(older.exported_at),
+      ciphertext_sha256: older.sha256,
+      ciphertext_bytes: '3',
+    },
+  });
+  expect((await attest(older)).status).toBe(409);
+
   expect(
     (
       await call(
@@ -226,6 +239,7 @@ it('copy receipts require explicit authority and exact source metadata; revocati
   await env.OPS_BACKUPS!.put('escrow/' + olderName, 'abc', {
     customMetadata: {
       version: '1',
+      issuer_id: env.OPS_RECOVERY_ISSUER_ID!,
       exported_at: String(now + 3600),
       ciphertext_sha256: older.sha256,
       ciphertext_bytes: '3',
