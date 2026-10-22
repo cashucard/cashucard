@@ -78,9 +78,11 @@ export class BackupFreshnessError extends Error {
 }
 
 /** Unix seconds; copy/receipt time never extends the source snapshot lifetime. */
-export function independentBackupHealth(db: OpsDb) {
-  const issuer = db.independentBackupIssuer;
+export function independentBackupHealth(db: OpsDb, observedIssuer?: string) {
+  const issuer = db.independentBackupIssuer ?? observedIssuer;
+  const required = db.independentBackupIssuer !== undefined;
   if (!issuer) return {required: false, stale: true, exported_at: null};
+  const now = db.now();
   const row = db.db
     .prepare(
       `SELECT MAX(r.exported_at) AS exported_at
@@ -88,11 +90,11 @@ export function independentBackupHealth(db: OpsDb) {
     WHERE r.issuer_id = ? AND c.issuer_id = ? AND c.can_attest = 1
       AND c.revoked IS NULL AND r.exported_at > 0 AND r.exported_at <= ?`,
     )
-    .get(issuer, issuer, db.now()) as {exported_at: number | null};
+    .get(issuer, issuer, now) as {exported_at: number | null};
   const time = row.exported_at;
   return {
-    required: true,
-    stale: time === null || db.now() - time >= 86400,
+    required,
+    stale: time === null || now - time >= 86400,
     exported_at: time,
   };
 }

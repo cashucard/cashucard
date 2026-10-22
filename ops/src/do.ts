@@ -102,7 +102,10 @@ export class OpsStore extends DurableObject<Env> {
         !!this.env.OPS_BACKUPS && !!this.env.OPS_BACKUP_RECIPIENT;
       const stale =
         !status || Date.now() - status.last_success_at > 26 * 60 * 60 * 1000;
-      const independent_copy = independentBackupHealth(this.deps.db);
+      const independent_copy = independentBackupHealth(
+        this.deps.db,
+        this.env.OPS_RECOVERY_ISSUER_ID,
+      );
       return Response.json(
         {configured, stale, last_success: status ?? null, independent_copy},
         {

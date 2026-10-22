@@ -43,6 +43,11 @@ for (const [backend, make] of [
       .prepare('UPDATE recovery_copy_receipts SET exported_at = ?')
       .run(db.now() - 86399);
     assert.equal(independentBackupHealth(db).stale, false);
+    assert.deepEqual(independentBackupHealth(base, issuer), {
+      required: false,
+      stale: false,
+      exported_at: db.now() - 86399,
+    });
     db.db.prepare('UPDATE recovery_connections SET revoked = 1').run();
     assert.equal(independentBackupHealth(db).stale, true);
     db.db

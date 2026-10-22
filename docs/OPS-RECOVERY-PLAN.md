@@ -145,7 +145,10 @@ must not be described as satisfying the accepted maximum.
 
 ## Issuance enforcement implementation contract
 
-This is the next implementation slice, not a claim of deployed enforcement.
+The source implementation is merged in PRs #68–73. Policy remains opt-in; a
+bounded staging receipt/outage drill and production review are still required.
+Authenticated status can observe the configured recovery issuer before policy
+activation, so verifying copy health never requires enabling issuance enforcement.
 Keep the current D61 companion credentials read-only. Add a separately approved,
 revocable copy-attestation scope; existing connections must not gain that scope
 through migration. A recovery administrator must deliberately enroll the copier
