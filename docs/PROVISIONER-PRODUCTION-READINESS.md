@@ -51,11 +51,15 @@ capability, not a dependency of personalization or service completion.
 - An isolated app candidate has the staging HTTPS origin, disabled physical/
   recovery gates, release preflight and both JavaScript bundles. It is not an
   installed native release or a production artifact.
-- Remaining operational release gates: actual scheduled backup success,
-  independent recovery-key/artifact custody and alerts, accepted data-loss
-  window, restore from that remote artifact, and reviewed reconciliation/fencing
-  before reopening a recovered service. Do not equate backup configuration or
-  the local restore suite with completion of those gates.
+- Scheduled staging export, independently verified Nextcloud transfer, NTFY
+  failure/healthy web receipt and isolated restoration from that artifact now
+  passed. See the [recovery report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+  Production custody, separate-machine recovery, whole-host monitoring,
+  24-hour issuance enforcement and reviewed reconciliation/fencing before
+  reopening remain open. The rehearsal used the original Mac's staging identity.
+- Native Release builds now enforce the existing HTTPS-origin and disabled
+  recovery-drill preflight. This prevents accidentally packaging the committed
+  localhost configuration; it does not certify an endpoint or enable hardware.
 - Production deployment and physical enablement remain unapproved. The missing
   full Max drill still does not block software preparation or the staging work.
 

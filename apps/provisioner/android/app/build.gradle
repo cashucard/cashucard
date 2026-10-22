@@ -131,8 +131,16 @@ def validateCashuUploadSigning = tasks.register("validateCashuUploadSigning", Ex
     workingDir rootProject.projectDir.parentFile
     commandLine "node", "scripts/check-android-signing.cjs"
 }
+def validateCashuReleaseConfiguration = tasks.register("validateCashuReleaseConfiguration", Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine "node", "scripts/configure-service.cjs", "--check", "--production"
+}
 tasks.configureEach {
     if (name == "preReleaseBuild" || name == "validateSigningRelease") {
         dependsOn(validateCashuUploadSigning)
+        dependsOn(validateCashuReleaseConfiguration)
+    }
+    if (name == "createBundleReleaseJsAndAssets") {
+        dependsOn(validateCashuReleaseConfiguration)
     }
 }

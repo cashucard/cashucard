@@ -5,8 +5,9 @@ on:
       - 'apps/provisioner/android/**'
       - 'apps/provisioner/package.json'
       - 'apps/provisioner/yarn.lock'
-      - 'apps/provisioner/scripts/check-android-bundle.py'
-      - 'apps/provisioner/scripts/test_android_bundle.py'
+      - 'apps/provisioner/scripts/**'
+      - 'apps/provisioner/src/serviceOrigin.json'
+      - 'apps/provisioner/src/releaseGates.ts'
       - '.github/workflows/provisioner-android.yml'
   workflow_dispatch:
 permissions:
@@ -64,6 +65,15 @@ jobs:
             -dname 'CN=Cashu CI Test, O=NOT FOR DISTRIBUTION'
           node scripts/configure-service.cjs --origin https://cashu-card-ops-staging.old-cell-30e7.workers.dev
           node scripts/configure-service.cjs --check --production
+      - name: Prove native preflight rejects local configuration
+        run: |
+          node scripts/configure-service.cjs --origin http://127.0.0.1:8821 --local
+          if (cd android && ./gradlew :app:validateCashuReleaseConfiguration --console=plain --max-workers=2) > "$RUNNER_TEMP/release-preflight.txt" 2>&1; then
+            echo 'Local endpoint unexpectedly passed native Release preflight'
+            exit 1
+          fi
+          python3 -c 'import os, pathlib; assert "A valid service origin is required" in pathlib.Path(os.environ["RUNNER_TEMP"], "release-preflight.txt").read_text()'
+          node scripts/configure-service.cjs --origin https://cashu-card-ops-staging.old-cell-30e7.workers.dev
       - name: Build complete release AAB (no upload)
         working-directory: apps/provisioner/android
         run: ./gradlew :app:bundleRelease --console=plain --max-workers=2
