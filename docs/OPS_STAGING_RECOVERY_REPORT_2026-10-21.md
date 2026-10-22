@@ -205,3 +205,11 @@ is unavailable remains untested.
 No restore result authorizes clearing the recovery fence or resuming issuance.
 Production custody, production accepted-loss-window enforcement and reviewed reconciliation
 remain separate gates.
+
+## Separate-Mac follow-up (2026-10-22)
+
+The [dated separate-Mac report](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
+records the subsequent actual restore from the encrypted drive, exact escrow
+comparison, preserved recovery fence/disabled credentials and cleanup. This
+adds evidence beyond the earlier reported unlock without changing the limits
+of that earlier check. Production custody and reopening remain separate gates.

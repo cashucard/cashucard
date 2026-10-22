@@ -235,7 +235,9 @@ and [actual export/copy/restore report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.m
 Scheduled staging export, independent Nextcloud read-back, NTFY web receipt and
 isolated restoration from the copied artifact passed. Staging Vaultwarden custody
 and the operator-held encrypted-drive copy also passed their documented checks.
-Separate-machine restore, production custody, reviewed
+The [separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
+now passed from the encrypted offline copy, including exact escrow comparison,
+credential/fence checks and plaintext-database cleanup. Production custody, reviewed
 retention, whole-host monitoring, push delivery, human acknowledgement, production 24-hour
 issuance activation and the reopening procedure remain pending. The live staging
 refusal/recovery drill passed with the policy restored off afterward. The staging
