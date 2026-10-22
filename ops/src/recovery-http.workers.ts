@@ -290,7 +290,8 @@ export async function recoveryHttp(
         throw new Failure(400, 'invalid-body');
       const object = await env.OPS_BACKUPS!.head('escrow/' + input.name);
       const source =
-        object && sourceMetadata(object.customMetadata, object.size, db.now());
+        object &&
+        sourceMetadata(object.customMetadata, object.size, db.now(), issuerId);
       if (
         !source ||
         input.exported_at !== source.exported_at ||
@@ -313,7 +314,8 @@ export async function recoveryHttp(
       if (!EXPORT_NAME.test(name)) throw new Failure(404, 'not-found');
       const object = await env.OPS_BACKUPS!.head('escrow/' + name);
       const source =
-        object && sourceMetadata(object.customMetadata, object.size, db.now());
+        object &&
+        sourceMetadata(object.customMetadata, object.size, db.now(), issuerId);
       if (!source) throw new Failure(409, 'source-metadata-unavailable');
       return json({issuer_id: issuerId, name, ...source});
     }

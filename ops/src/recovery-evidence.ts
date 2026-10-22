@@ -10,8 +10,10 @@ export function sourceMetadata(
   metadata: Record<string, string> | undefined,
   size: number,
   now: number,
+  issuer: string,
 ): SourceMetadata | null {
-  if (!metadata || metadata.version !== '1') return null;
+  if (!metadata || metadata.version !== '1' || metadata.issuer_id !== issuer)
+    return null;
   const {exported_at, ciphertext_bytes, ciphertext_sha256} = metadata;
   if (
     !/^[1-9][0-9]*$/.test(exported_at ?? '') ||

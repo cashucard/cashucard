@@ -73,6 +73,7 @@ it('the scheduled R2 artifact restores a registered card without the original ma
   const payload = await decryptEscrowExport(armored, TEST_IDENTITY);
   expect(object!.customMetadata).toEqual({
     version: '1',
+    issuer_id: env.OPS_RECOVERY_ISSUER_ID,
     exported_at: String(payload.exported_at),
     ciphertext_sha256: createHash('sha256').update(armored).digest('hex'),
     ciphertext_bytes: String(new TextEncoder().encode(armored).length),

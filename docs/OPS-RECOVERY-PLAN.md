@@ -152,7 +152,7 @@ through migration. A recovery administrator must deliberately enroll the copier
 for this authority. It does not receive plaintext escrow or the recovery key.
 
 The exporter must publish the exact snapshot `exported_at`, ciphertext SHA-256
-and byte length as immutable source metadata. Atoll may submit a receipt only
+and byte length plus stable issuer UUID as immutable source metadata. Atoll may submit a receipt only
 after reading the artifact and its manifest back from Nextcloud and comparing
 both against the source. The issuer validates the object identity, digest, size,
 issuer and snapshot time against its own export metadata. Future-dated evidence,
