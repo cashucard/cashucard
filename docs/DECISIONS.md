@@ -2193,6 +2193,9 @@ the cycle. Missing metadata is never converted to filename-based freshness.
 
 ## <a id="d70"></a>D70: Read live backup policy at the authorization boundary
 
+**Superseded for Worker binding replacement by [D71](#d71).** The validated source
+accessor remains, but reading the object environment itself is insufficient.
+
 **Decided (ENG-740, 2026-10-21):** keep the shared policy accessor live on Workers,
 reading the current class environment on each use instead of retaining a scalar
 derived in the Durable Object constructor. Validate the issuer on every read as
@@ -2208,3 +2211,29 @@ refusal, invalid-issuer rejection and removal without reconstructing it.
 **Rejected:** treating control-plane binding metadata as proof of activation,
 requiring manual eviction/reset of durable state, passing client-controlled
 policy headers, or silently retaining the old policy until a future restart.
+
+
+## <a id="d71"></a>D71: Carry current deployment policy over private request RPC
+
+**Decided (ENG-740, 2026-10-21):** the edge handler validates its current policy
+binding and passes it plus the current recovery-admin allowlist as private RPC
+arguments together with the HTTP request.
+The object scopes that value to the single call using AsyncLocalStorage; the
+shared transactional accessor reads that scope. Explicit removal overrides an
+old object snapshot. Clients cannot set the RPC argument through HTTP. Both
+the edge and object validate it, and malformed bindings fail closed. Scheduled exports remain
+independent of issuance health. Request/Response RPC preserves streaming for
+large encrypted downloads without buffering them into JSON.
+
+A live retest proved that re-reading a warm object's environment reference was
+not enough: it retained the old binding object. The regression now supplies a new
+edge environment without mutating the object, then overlaps enabled/disabled
+calls to check request isolation. Recovery-admin removal also takes effect on
+the warm object without granting authority from stale bindings. This matches
+the platform's documented
+[Request/Response RPC support](https://developers.cloudflare.com/workers/runtime-apis/rpc/#readablestream-writablestream-request-and-response).
+
+**Rejected:** trusting the constructor snapshot, client policy headers, a shared
+mutable current-policy field, separate configure-then-fetch RPC calls that can
+interleave, resetting durable storage, or falling back to an older ungated path
+when a new RPC method is unavailable during deployment.
