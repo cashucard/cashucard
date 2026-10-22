@@ -2237,3 +2237,24 @@ the platform's documented
 mutable current-policy field, separate configure-then-fetch RPC calls that can
 interleave, resetting durable storage, or falling back to an older ungated path
 when a new RPC method is unavailable during deployment.
+
+## <a id="d72"></a>D72: Read offline recovery identities from protected local files
+
+**Decided (ENG-740, 2026-10-22):** the offline Node restore CLI accepts
+`OPS_RECOVERY_IDENTITY_FILE` as an alternative to the existing secret-manager
+environment input. The path is nonsecret; identity bytes stay inside the restore
+process and are never passed as arguments or printed. Reject simultaneous
+sources rather than selecting one implicitly. Open the file without following
+symlinks or blocking on a FIFO, require a private regular file, bound the read,
+and authenticate the artifact before opening the destination database.
+
+The existing empty-service restore, disabled credentials and recovery-required
+fence remain unchanged. This makes the operator's protected offline copy usable
+without pasting a key into a terminal. It does not certify the pending
+separate-machine restore, authorize access to a drive or service, create a
+production identity, or reopen a restored service.
+
+**Rejected:** key contents in command arguments, automatic precedence between
+two sources, silently relaxing file permissions, reading unbounded special
+files, exposing filesystem/crypto exception details, or treating a software
+regression as disaster-recovery evidence from another computer.
