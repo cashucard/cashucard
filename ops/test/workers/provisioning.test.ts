@@ -1,5 +1,10 @@
 import {env} from 'cloudflare:workers';
-import {SELF, evictDurableObject} from 'cloudflare:test';
+import {SELF, evictDurableObject, runInDurableObject} from 'cloudflare:test';
+import {OpsDb} from '../../src/db';
+import {openSqlStorage} from '../../src/sql-do';
+import {handleOpsRequest} from '../../src/do';
+import {HolderIssueState} from '../../src/issue';
+import {AnchorFeed} from '../../src/anchor';
 import {expect, it} from 'vitest';
 
 const DEVICE = '10000000-0000-4000-8000-000000000001';
@@ -123,4 +128,50 @@ it('reservation, binding and completion persist through DO eviction, without leg
     (await call('/keys/issue', {device_id: DEVICE, attempt_id: ATTEMPT}))
       .status,
   ).toBe(409);
+});
+
+it('configured freshness policy returns 503 through the real DO SQL and shared HTTP router', async () => {
+  const stub = env.OPS_DO.get(env.OPS_DO.idFromName('stale-backup-gate'));
+  const login = await stub.fetch('https://test/auth/operator/session', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'lead-setup',
+      password: 'correct horse battery',
+    }),
+  });
+  const {token} = (await login.json()) as {token: string};
+  await runInDurableObject(stub, async (_instance, ctx) => {
+    const db = new OpsDb({
+      sql: openSqlStorage(ctx.storage),
+      independentBackupIssuer: '11111111-2222-4333-8444-555555555555',
+      master: {getMaster: () => Buffer.alloc(32, 90)},
+    });
+    const response = await handleOpsRequest(
+      {
+        db,
+        holderState: new HolderIssueState(),
+        mints: [],
+        anchor: new AnchorFeed(async () => {
+          throw new Error('unused test feed');
+        }),
+      },
+      new Request('https://test/provisioning/batches', {
+        method: 'POST',
+        headers: {authorization: 'Bearer ' + token},
+        body: JSON.stringify({
+          device_id: DEVICE,
+          batch_request_id: REQUEST,
+          count: 1,
+          mint_url: 'https://mint.example',
+          pin_policy: 'perCard',
+          daily_usd: 25,
+          no_pin_usd: 5,
+          load_sha256: 'cd'.repeat(32),
+        }),
+      }),
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({reason: 'independent-backup-stale'});
+    expect(db.db.prepare('SELECT 1 FROM key_batches').get()).toBeUndefined();
+  });
 });

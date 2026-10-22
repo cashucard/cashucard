@@ -5,6 +5,7 @@
  * Holder issuance is disabled until consumer card authorization exists (D30).
  */
 import {OpsDb} from './db';
+import {assertIndependentBackup} from './recovery-evidence';
 
 export interface IssuedKeysRow {
   readonly batch_id: number;
@@ -85,6 +86,18 @@ export function issueKeys(
   ordinal: number,
   scope: IssueScope,
   _holderState: HolderIssueState,
+): IssueResult {
+  return db.db.transaction(() => {
+    assertIndependentBackup(db);
+    return readIssuedKeys(db, batchId, ordinal, scope);
+  });
+}
+
+function readIssuedKeys(
+  db: OpsDb,
+  batchId: number,
+  ordinal: number,
+  scope: IssueScope,
 ): IssueResult {
   if (scope.kind !== 'operator') {
     return {ok: false, reason: 'holder-disabled'};

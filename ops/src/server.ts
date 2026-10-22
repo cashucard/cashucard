@@ -22,13 +22,20 @@ export {DEFAULT_MINTS} from './config';
 export interface ServeOptions {
   readonly port: number;
   readonly dbPath: string;
+  readonly independentBackupIssuer?: string;
   readonly mints?: readonly string[];
 }
 
 export function serve(options: ServeOptions): http.Server {
   const master = new EnvMaster();
   master.getMaster(); // fail fast at boot, not on the first batch
-  const db = new OpsDb({sql: openSqliteFile(options.dbPath), master});
+  const db = new OpsDb({
+    sql: openSqliteFile(options.dbPath),
+    master,
+    independentBackupIssuer:
+      options.independentBackupIssuer ??
+      process.env.OPS_INDEPENDENT_BACKUP_ISSUER,
+  });
   const deps: RouterDeps = {
     db,
     // The last-good header persists to the anchor_tip table and seeds the

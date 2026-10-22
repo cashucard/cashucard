@@ -38,6 +38,7 @@ import {OpsDb} from './db';
 import type {PasswordHasher} from './pwhash';
 import {HolderIssueState} from './issue';
 import {ProvisioningError} from './provisioning';
+import {BackupFreshnessError} from './recovery-evidence';
 import {provisioningHttp, reservedKeys} from './provisioning-http';
 import {addCapRelease, listCapReleases, RegistryError} from './registry';
 
@@ -371,6 +372,10 @@ export async function route(
 
     sendJson(res, 404, {reason: 'no-such-route'});
   } catch (e) {
+    if (e instanceof BackupFreshnessError) {
+      sendJson(res, 503, {reason: 'independent-backup-stale'});
+      return;
+    }
     if (e instanceof ProvisioningError) {
       sendJson(res, e.status, {reason: e.code, message: e.message});
       return;

@@ -1,6 +1,7 @@
 /** Durable operator/device provisioning reservations and immutable receipts (D31). */
 import type {OpsDb} from './db';
 import {createBatch} from './batches';
+import {assertIndependentBackup} from './recovery-evidence';
 import type {IssuedKeysRow} from './issue';
 
 export class ProvisioningError extends Error {
@@ -434,6 +435,7 @@ export function reserveAttempt(
         conflict('attempt request changed');
       return presentAttempt(db, scoped);
     }
+    assertIndependentBackup(db);
     const batch = batchRow(db, scope, input.batch_id);
     const config = JSON.parse(batch.config_json) as ProvisioningConfig;
     if (input.ordinal !== batch.next_ordinal || input.ordinal >= config.count)
@@ -637,6 +639,7 @@ export function issueAttemptKeys(
     writable(db);
     const row = attemptRow(db, scope, attemptId);
     if (row.state !== 'active') conflict('attempt is terminal');
+    assertIndependentBackup(db);
     const keys = db.db
       .prepare('SELECT * FROM issued_keys WHERE batch_id = ? AND ordinal = ?')
       .get(row.batch_id, row.ordinal) as IssuedKeysRow | undefined;

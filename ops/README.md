@@ -261,3 +261,34 @@ retrieve plaintext recovery material. Existing snapshots in Nextcloud survive
 issuer outages; new downloads wait for issuer recovery. Direct R2 access remains
 an advanced recovery fallback. Re-enroll after a service restoration: exports do
 not restore companion sessions or grants.
+
+### Independent-copy freshness policy (not enabled by default)
+
+`OPS_INDEPENDENT_BACKUP_ISSUER` explicitly opts into the 24-hour issuance fence.
+Its value is the public issuer UUID; Workers require it to equal
+`OPS_RECOVERY_ISSUER_ID`. An invalid value fails startup. Do not set it on an
+existing deployment until the copier receipt flow, outage behavior and mobile
+refusal handling have passed a bounded staging drill. Existing configuration
+and cron remain unchanged. The current companion HTTP implementation is Workers;
+the Node domain supports the same policy, but has no companion enrollment API.
+
+A recovery administrator can separately grant a paired connection attestation
+with `POST /ops/recovery/connections/<id>/attestation`, body `{"enabled":true}`.
+The operator session must belong to the deployment's recovery-admin allowlist.
+Use `false` to remove the capability; either operation discards prior evidence.
+Ordinary pairing never grants it. Revoking the connection invalidates evidence.
+
+A companion reads `GET /recovery/metadata/<encoded-export-name>` and, **only after
+verifying the destination artifact and manifest by read-back**, submits
+`POST /recovery/copy-receipts` with `name`, `exported_at` (Unix seconds), `sha256`
+and `bytes` matching that source. The receipt uses the scoped companion bearer,
+never an operator credential. Legacy objects without metadata remain downloadable
+but are ineligible. The issuer trusts the authorized copier's read-back assertion;
+it does not have Nextcloud credentials or prove destination possession itself.
+
+When enabled, missing or expired evidence returns HTTP 503 with reason
+`independent-backup-stale` for new batch creation, reservation and key retrieval.
+Matching batch/reservation retries remain readable, and outcome/disposition
+submission remains available. `/ops/backup-status` reports `independent_copy`
+separately from R2 export status and returns unhealthy if a required copy is
+stale. A fresh receipt cannot reopen a service fenced for recovery.

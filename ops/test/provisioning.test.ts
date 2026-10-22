@@ -334,3 +334,95 @@ test('restored service permits inspection but pauses even identical mutations an
   }
   db.close();
 });
+
+test('24-hour independent-copy expiry stops issuance but preserves replay and terminal evidence', () => {
+  const db = fixture();
+  const issuer = uuid(80),
+    connection = uuid(81);
+  Object.defineProperty(db, 'independentBackupIssuer', {value: issuer});
+  assert.throws(
+    () => createProvisioningBatch(db, scope, config),
+    /independent-backup-stale/,
+  );
+  assert.equal(db.db.prepare('SELECT 1 FROM key_batches').get(), undefined);
+  db.db
+    .prepare(
+      `INSERT INTO recovery_connections (id,issuer_id,name,token_hash,approved_by,created,can_attest) VALUES (?,?,?,'test',1,?,1)`,
+    )
+    .run(connection, issuer, 'copier', db.now());
+  db.db
+    .prepare(`INSERT INTO recovery_copy_receipts VALUES (?,?,?,?,?,?,?)`)
+    .run(
+      connection,
+      issuer,
+      'escrow/test.age',
+      db.now() - 86399,
+      'a'.repeat(64),
+      3,
+      db.now(),
+    );
+  const batch = createProvisioningBatch(db, scope, config);
+  const attempt = reserveAttempt(db, scope, {
+    attempt_id: uuid(3),
+    batch_id: batch.batch_id,
+    ordinal: 0,
+  });
+  issueAttemptKeys(db, scope, attempt.attempt_id);
+  db.db
+    .prepare('UPDATE recovery_copy_receipts SET exported_at = ?')
+    .run(db.now() - 86400);
+  assert.deepEqual(createProvisioningBatch(db, scope, config), {
+    ...batch,
+    next_ordinal: 1,
+  });
+  assert.deepEqual(
+    reserveAttempt(db, scope, {
+      attempt_id: uuid(3),
+      batch_id: batch.batch_id,
+      ordinal: 0,
+    }),
+    attempt,
+  );
+  assert.throws(
+    () => issueAttemptKeys(db, scope, attempt.attempt_id),
+    /independent-backup-stale/,
+  );
+  assert.throws(
+    () =>
+      reserveAttempt(db, scope, {
+        attempt_id: uuid(4),
+        batch_id: batch.batch_id,
+        ordinal: 1,
+      }),
+    /independent-backup-stale/,
+  );
+  assert.throws(
+    () =>
+      createProvisioningBatch(db, scope, {
+        ...config,
+        batch_request_id: uuid(5),
+      }),
+    /independent-backup-stale/,
+  );
+  const terminal = disposeAttempt(db, scope, attempt.attempt_id, {
+    kind: 'abandoned',
+    reason: 'backup outage',
+    revision: 0,
+  });
+  assert.equal(terminal.kind, 'abandoned');
+  db.close();
+});
+
+test('stale backup still accepts completion evidence from an interrupted installation', () => {
+  const db = fixture();
+  const attempt = begin(db);
+  bindAttempt(db, scope, attempt.attempt_id, {revision: 0, chip_id: chip});
+  Object.defineProperty(db, 'independentBackupIssuer', {value: uuid(80)});
+  const receipt = recordAttempt(db, scope, attempt.attempt_id, {
+    revision: 1,
+    record: record(attempt),
+  });
+  assert.equal(receipt.verified_stage, 'rotated');
+  assert.equal(getAttempt(db, scope, attempt.attempt_id).state, 'recorded');
+  db.close();
+});

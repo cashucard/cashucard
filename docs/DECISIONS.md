@@ -2137,3 +2137,29 @@ enforcement and Atoll receipt delivery remain separate implementation slices.
 **Rejected:** automatically upgrading paired readers, treating caller timestamps
 as source evidence, keeping receipt health across capability removal/regrant, and
 letting an older retried copy replace a newer snapshot.
+
+## <a id="d68"></a>D68: Fence new issuance on the age of independent-copy evidence
+
+**Decided (ENG-740, 2026-10-21):** add an opt-in issuer-specific policy to the
+shared database domain. Only receipts from a live, currently authorized copier
+for that issuer count. Missing evidence, future source times and source age of
+24 hours or more fail closed. Evaluate inside batch creation, new reservation
+and key-disclosure transactions, including the legacy internal key helper.
+Return HTTP 503 `independent-backup-stale`. Workers additionally require the
+configured policy issuer to match their recovery issuer. No deployment enables
+this policy automatically.
+
+Matching batch/reservation replay may return existing state without allocating
+more work. Inspection, outcome recording and terminal dispositions remain usable;
+the recovery-required fence still takes precedence in the provisioning flow.
+There is no stale-backup key-disclosure exception for interrupted installs.
+Keys cached earlier on a phone cannot be remotely revoked by this check, so the
+remaining mobile refusal handling and staging drill must precede production
+activation. Export status reports independent-copy health separately; export
+success alone cannot satisfy the policy. Restored snapshots contain no copier
+credentials or receipts and retain the recovery fence.
+
+**Rejected:** applying the check to every writable operation, silently enabling
+it on staging, counting receipt time instead of source time, granting retry
+requests unrestricted key access, or calling a server-side check proof that a
+phone with previously cached keys has stopped.

@@ -5,6 +5,7 @@
  * The one transaction is what makes "issued but unescrowed" unrepresentable.
  */
 import {OpsDb} from './db';
+import {assertIndependentBackup} from './recovery-evidence';
 import {deriveKeySet, newOrdinalSalt} from './keys';
 
 export interface BatchInput {
@@ -51,6 +52,7 @@ export function createBatch(db: OpsDb, input: BatchInput): BatchRow {
   const salt = newOrdinalSalt(db.randomBytes);
   const created = db.now();
   const batchId = db.db.transaction(() => {
+    assertIndependentBackup(db);
     db.db
       .prepare(
         `INSERT INTO key_batches

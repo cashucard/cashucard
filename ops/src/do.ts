@@ -13,6 +13,7 @@
  */
 import {DurableObject} from 'cloudflare:workers';
 import {createHash} from 'node:crypto';
+import {independentBackupHealth} from './recovery-evidence';
 
 import {AnchorFeed, httpTipFetcher} from './anchor';
 import {EnvMaster} from './master';
@@ -29,6 +30,8 @@ import {recoveryHttp, type RecoveryBindings} from './recovery-http.workers';
 
 export interface Env extends RecoveryBindings {
   OPS_MASTER_KEY: string;
+  /** Explicit opt-in; must match this deployment's recovery issuer UUID. */
+  OPS_INDEPENDENT_BACKUP_ISSUER?: string;
   /** One-shot bootstrap/recovery command injected as a runtime secret. */
   OPS_OPERATOR_SETUP?: string;
   OPS_DO: DurableObjectNamespace;
@@ -47,7 +50,18 @@ export class OpsStore extends DurableObject<Env> {
     super(ctx, env);
     const master = new EnvMaster(() => env.OPS_MASTER_KEY);
     master.getMaster(); // fail fast at first touch, not on the first batch
-    const db = new OpsDb({sql: openSqlStorage(ctx.storage), master});
+    if (
+      env.OPS_INDEPENDENT_BACKUP_ISSUER !== undefined &&
+      env.OPS_INDEPENDENT_BACKUP_ISSUER !== env.OPS_RECOVERY_ISSUER_ID
+    )
+      throw new Error(
+        'independent backup issuer does not match recovery issuer',
+      );
+    const db = new OpsDb({
+      sql: openSqlStorage(ctx.storage),
+      master,
+      independentBackupIssuer: env.OPS_INDEPENDENT_BACKUP_ISSUER,
+    });
     const passwordHasher = new SubtlePwHash();
     ctx.blockConcurrencyWhile(async () => {
       await applyOperatorSetup(db, env.OPS_OPERATOR_SETUP, passwordHasher);
@@ -88,9 +102,17 @@ export class OpsStore extends DurableObject<Env> {
         !!this.env.OPS_BACKUPS && !!this.env.OPS_BACKUP_RECIPIENT;
       const stale =
         !status || Date.now() - status.last_success_at > 26 * 60 * 60 * 1000;
+      const independent_copy = independentBackupHealth(this.deps.db);
       return Response.json(
-        {configured, stale, last_success: status ?? null},
-        {status: configured && !stale ? 200 : 503},
+        {configured, stale, last_success: status ?? null, independent_copy},
+        {
+          status:
+            configured &&
+            !stale &&
+            !(independent_copy.required && independent_copy.stale)
+              ? 200
+              : 503,
+        },
       );
     }
     return handleOpsRequest(this.deps, request);
