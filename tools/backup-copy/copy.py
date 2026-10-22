@@ -146,9 +146,17 @@ def run_once(transfer, state_path, now=None):
                 transfer.get('dest', destination_name + '.json', readback)
                 if readback.read_bytes() != manifest.read_bytes():
                     raise ValueError('manifest read-back failed')
+                # Legacy/direct-R2 copies retain their stable manifest. Scoped
+                # issuer attestation additionally binds actual snapshot time;
+                # never submit before both destination reads above succeed.
+                confirm = getattr(transfer, 'confirm_copy', None)
+                snapshot_time = confirm(receipt) if confirm else None
+                if snapshot_time is None:
+                    snapshot_time = created
                 state['verified'][name] = receipt
-                if not state['latest'] or created >= state['latest']['source_time']:
-                    state['latest'] = {**receipt, 'verified_at': now}
+                if (not state['latest'] or snapshot_time >= state['latest']['source_time'] or
+                        name == state['latest']['name']):
+                    state['latest'] = {**receipt, 'source_time': snapshot_time, 'verified_at': now}
         state['last_cycle_ok'] = True
     except Exception:
         # Preserve last verified evidence; never serialize raw provider errors.

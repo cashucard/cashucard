@@ -46,6 +46,24 @@ class Checks(unittest.TestCase):
         wrong = Http([{'issuer_id': 'different', 'objects': [], 'cursor': None}])
         with self.assertRaises(ValueError): IssuerTransfer(CONFIG, dest, wrong).list()
 
+    def test_explicit_copy_attestation_binds_snapshot_and_ciphertext(self):
+        receipt = {'name': NAME, 'sha256': 'a' * 64, 'size': 10}
+        metadata = {'issuer_id': ISSUER, 'name': NAME, 'exported_at': 1700000000,
+                    'sha256': receipt['sha256'], 'bytes': 10}
+        http = Http([metadata, {'accepted': True}])
+        transfer = IssuerTransfer({**CONFIG, 'attest_copies': True}, None, http)
+        self.assertEqual(transfer.confirm_copy(receipt), 1700000000)
+        request = http.requests[1]
+        self.assertEqual(request.get_method(), 'POST')
+        self.assertEqual(json.loads(request.data), {'name': NAME, 'exported_at': 1700000000,
+                                                   'sha256': 'a' * 64, 'bytes': 10})
+        bad = IssuerTransfer({**CONFIG, 'attest_copies': True}, None,
+                             Http([{**metadata, 'sha256': 'b' * 64}]))
+        with self.assertRaises(ValueError): bad.confirm_copy(receipt)
+        legacy_http = Http([])
+        self.assertIsNone(IssuerTransfer(CONFIG, None, legacy_http).confirm_copy(receipt))
+        self.assertEqual(legacy_http.requests, [])
+
     def test_https_only_routes_and_bounded_metadata(self):
         for origin in ['http://issuer.invalid', 'https://user:pass@issuer.invalid', 'https://issuer.invalid/path', 'https://issuer.invalid?token=secret', 'https://issuer.invalid#fragment']:
             with self.assertRaises(ValueError): https_origin(origin)

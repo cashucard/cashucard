@@ -92,6 +92,28 @@ class CopyChecks(unittest.TestCase):
         self.assertFalse(self.run_copy(NOW + 120))
         self.assertEqual(self.transfer.dest[DEST_NAME], DATA)
 
+    def test_attestation_follows_both_readbacks_and_failed_delivery_retries_without_manifest_changes(self):
+        calls = []
+        def confirm(receipt):
+            self.assertEqual(self.transfer.dest[DEST_NAME], DATA)
+            self.assertEqual(json.loads(self.transfer.dest[DEST_NAME + '.json']), receipt)
+            calls.append(receipt)
+            if len(calls) == 1:
+                raise ValueError('lost issuer reply')
+            return copy.source_time(NAME) - 10
+        self.transfer.confirm_copy = confirm
+        self.assertFalse(self.run_copy())
+        self.assertIsNone(json.loads(self.state.read_text())['latest'])
+        manifest = self.transfer.dest[DEST_NAME + '.json']
+        self.assertTrue(self.run_copy(NOW + 60))
+        state = json.loads(self.state.read_text())
+        self.assertEqual(state['latest']['source_time'], copy.source_time(NAME) - 10)
+        self.assertEqual(self.transfer.dest[DEST_NAME + '.json'], manifest)
+        self.assertEqual(calls[0], calls[1])
+        self.transfer.corrupt = True
+        self.assertFalse(self.run_copy(NOW + 120))
+        self.assertEqual(len(calls), 2)
+
     def test_rejects_paths_and_future_sources(self):
         for name in ('../' + NAME, 'subdir/' + NAME, 'not-an-export.age'):
             with self.subTest(name=name), self.assertRaises(ValueError):

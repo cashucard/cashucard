@@ -450,3 +450,18 @@ jobs:
         run: |
           node_modules/.bin/react-native bundle --platform ios --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-ios.js"
           node_modules/.bin/react-native bundle --platform android --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-android.js"
+
+  backup-copy:
+    name: encrypted backup copier (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Copy, issuer authority and alert regressions (no credentials)
+        working-directory: tools/backup-copy
+        run: python -m unittest test_copy test_issuer test_alerts
