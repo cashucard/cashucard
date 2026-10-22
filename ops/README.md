@@ -185,6 +185,28 @@ the old service and artifacts until that drill succeeds.
 
 ## Deployment and rollback
 
+The explicit production configuration is `wrangler.production.toml`; the default
+`wrangler.toml` remains a starter template. Production uses its own recovery
+recipient/issuer and bucket, a 12-hour export schedule and required independent
+copy evidence. No initial receipt means issuance is blocked. The private age
+identity is never a Worker binding. See the
+[custody evidence](../docs/OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md) and
+[release plan](../docs/PROVISIONER-PRODUCTION-READINESS.md) for outstanding gates.
+Validate the explicit configuration locally before deploying it:
+
+```bash
+node node_modules/wrangler/bin/wrangler.js deploy --config wrangler.production.toml --dry-run --outdir /tmp/ops-production-worker
+```
+
+Deployment must preserve this issuer UUID, Durable Object identity and recovery
+recipient. Provision the named R2 bucket and inject a fresh production master
+privately; never copy staging secrets. Bootstrap `production-lead` using the
+existing one-shot setup mechanism, verify access, then remove its setup secret.
+Check cron capacity without removing an unrelated service's trigger. Pair the
+companion into a separate production destination while retaining staging
+artifacts; grant attestation only to the verified reader. Actual production
+copy/restore acceptance and independent alerting remain required before release.
+
 Deployments are operator-run after the rollout gates, using a dedicated
 Cloudflare environment and storage isolated from the mint. Confirm the account,
 bindings, independent backup access, alerting, and secret injection before the

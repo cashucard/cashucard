@@ -41,10 +41,13 @@ copy outside Zion on an encrypted removable drive; the specific medium and
 location are recorded privately. The drive is prepared and a staging identity
 copy restored successfully on the original Mac. A restricted organization
 Vaultwarden staging copy also passed fresh-unlock exact retrieval with
-authenticator MFA enabled. No production identity transfer
-has been performed. The operator reported successfully unlocking the drive on
-another Mac; backup verification and restore there remain untested. Test that
-standalone copy without Vaultwarden, Nextcloud or the normal laptop. Do not depend on
+authenticator MFA enabled. The subsequent
+[separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
+passed from that offline copy. The separate
+[production custody check](OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md)
+now records a new production identity, verified offline copy and fresh-unlock
+Vaultwarden retrieval; an actual production export/restore remains pending.
+Do not depend on
 cached vault sessions as the only escape, or store the only emergency copy in
 Nextcloud. Separately document Zion/Vaultwarden backup and account/MFA recovery;
 a recovery password stored only in that same unavailable vault is circular.
@@ -88,9 +91,11 @@ Nextcloud browser authorization succeeded. The runner starts and retains setup
 through restart. A controlled staging cron invocation now produced an encrypted
 export and fresh service backup status; the original nightly schedule was
 restored. The first paired copy hit an edge user-agent rejection, fixed in #58.
-Beta.5 is now installed: its runner copied the export into Nextcloud, read-back
+The beta.5 rehearsal copied the export into Nextcloud, read-back
 matched the source, and isolated restoration verified all escrow keys and the
-recovery fence. Separate-machine recovery and offline custody remain untested. See the [controlled recovery check](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+recovery fence. Beta.6 subsequently added the verified independent-copy receipt
+flow. Separate-Mac staging restoration also passed as linked above. See the
+[controlled recovery check](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
 
 Use an established transfer client such as rclone for
 [R2](https://developers.cloudflare.com/r2/examples/rclone/) and
@@ -237,7 +242,9 @@ isolated restoration from the copied artifact passed. Staging Vaultwarden custod
 and the operator-held encrypted-drive copy also passed their documented checks.
 The [separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
 now passed from the encrypted offline copy, including exact escrow comparison,
-credential/fence checks and plaintext-database cleanup. Production custody, reviewed
+credential/fence checks and plaintext-database cleanup. Production identity custody
+subsequently passed the [documented check](OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md).
+Actual production export/copy/restore acceptance, reviewed
 retention, whole-host monitoring, push delivery, human acknowledgement, production 24-hour
 issuance activation and the reopening procedure remain pending. The live staging
 refusal/recovery drill passed with the policy restored off afterward. The staging
