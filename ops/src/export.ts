@@ -95,6 +95,8 @@ export type EscrowExport = EscrowExportBase &
   );
 
 export interface ExportResult {
+  /** Snapshot time in Unix seconds, captured before encryption. */
+  readonly exported_at: number;
   /** The armored age file, R2-ready. */
   readonly armored: string;
   /** Plaintext byte count, for backup metrics; never the payload itself. */
@@ -183,7 +185,7 @@ export async function exportEscrowSql(
   encrypter.addRecipient(recipient);
   const ciphertext = await encrypter.encrypt(bytes);
   const armored = age.armor.encode(ciphertext);
-  return {armored, bytes: bytes.length};
+  return {armored, bytes: bytes.length, exported_at: snapshot.exported_at};
 }
 
 /** Decrypts an export with its age identity — the runbook's recovery read. */

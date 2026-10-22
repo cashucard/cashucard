@@ -57,7 +57,9 @@ test('the escrow export round-trips: decrypt(identity) returns the same rows', a
   const db = await seeded();
   const identity = await generateIdentity();
   const recipient = await identityToRecipient(identity);
-  const {armored} = await exportEscrowSql(db.db, recipient, 1_700_000_000);
+  const result = await exportEscrowSql(db.db, recipient, 1_700_000_000);
+  assert.equal(result.exported_at, 1_700_000_000);
+  const {armored} = result;
   assert.match(armored, /^-----BEGIN AGE ENCRYPTED FILE-----/);
 
   const out = await decryptEscrowExport(armored, identity);

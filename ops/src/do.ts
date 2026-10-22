@@ -12,6 +12,7 @@
  * through the pwhash seam.
  */
 import {DurableObject} from 'cloudflare:workers';
+import {createHash} from 'node:crypto';
 
 import {AnchorFeed, httpTipFetcher} from './anchor';
 import {EnvMaster} from './master';
@@ -108,9 +109,26 @@ export class OpsStore extends DurableObject<Env> {
       throw new Error('backup configuration is incomplete');
     }
     const {exportEscrowSql} = await import('./export');
-    const {armored, bytes} = await exportEscrowSql(this.deps.db.db, recipient);
+    const {armored, bytes, exported_at} = await exportEscrowSql(
+      this.deps.db.db,
+      recipient,
+    );
     const key = `escrow/${new Date().toISOString()}-${crypto.randomUUID()}.age`;
-    await bucket.put(key, armored);
+    await bucket
+      .put(key, armored, {
+        // Store source metadata with the ciphertext in the same R2 write. Copy
+        // time and the object filename are not the database snapshot time.
+        customMetadata: {
+          version: '1',
+          exported_at: String(exported_at),
+          ciphertext_sha256: createHash('sha256').update(armored).digest('hex'),
+          ciphertext_bytes: String(new TextEncoder().encode(armored).length),
+        },
+        onlyIf: {etagDoesNotMatch: '*'},
+      })
+      .then(object => {
+        if (!object) throw new Error('backup object already exists');
+      });
     await this.ctx.storage.put('backup-status', {
       last_success_at: Date.now(),
       key,
