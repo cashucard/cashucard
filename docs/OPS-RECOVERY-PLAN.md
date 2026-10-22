@@ -246,7 +246,13 @@ credential/fence checks and plaintext-database cleanup. Production identity cust
 subsequently passed the [documented check](OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md).
 Actual production export/copy/restore acceptance, reviewed
 retention, whole-host monitoring, push delivery, human acknowledgement, production 24-hour
-issuance activation and the reopening procedure remain pending. The live staging
+copy acceptance and the reopening procedure remain pending. The live staging
 refusal/recovery drill passed with the policy restored off afterward. The staging
 cron remains nightly; no production deployment or recovery identity transfer
 is certified by the rehearsal.
+
+The later [production deployment](OPS_PRODUCTION_DEPLOYMENT_REPORT_2026-10-22.md)
+has its required-copy policy enabled and initially rejects issuance for missing
+evidence. Staging remains nightly, with a separate production 12-hour cron in the
+operator-selected freed slot. D73 defines additive issuer support in Atoll so
+production does not replace staging's verified source or reuse its copy history.

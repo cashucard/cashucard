@@ -108,9 +108,13 @@ def run_check(config, check_copy, path, now=None, send=None):
                now - saved['last_attempt'] < 300)
     if due and not backoff:
         saved['last_attempt'] = now
+        label = config.get('label')
+        prefix = 'Atoll Recovery'
+        if isinstance(label, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}', label):
+            prefix += ' (' + label + ')'
         payload = {'event': 'atoll.recovery.health', 'status': status,
                    'source_age_seconds': age,
-                   'text': 'Atoll Recovery: independent-copy health is ' + status + '.'}
+                   'text': prefix + ': independent-copy health is ' + status + '.'}
         try:
             delivered = send(config['webhook_url'], payload) is True
         except Exception:

@@ -70,8 +70,9 @@ capability, not a dependency of personalization or service completion.
 
 The operator authorized work on production deployment, production app
 configuration, signed release builds and store preparation. This is not store
-submission or public rollout approval. No production Worker, signing identity,
-signed candidate or store upload has been created in this preparation pass.
+submission or public rollout approval. The inventory below records the initial
+preparation state; the subsequent deployment report records changes after that
+inventory. No signed candidate or store upload has been produced.
 
 - Exact Cloudflare lookups return not found for Worker `cashu-card-ops` and R2
   bucket `cashu-card-ops-backups`. The account's workers.dev subdomain is
@@ -111,8 +112,13 @@ records the separate production age identity, verified restricted Vaultwarden
 retrieval and encrypted-drive copy, and the Android upload-key backup check.
 The drive is unmounted and locked. `ops/wrangler.production.toml` now defines
 the explicit production recipient, issuer, isolated bucket, 12-hour export cron
-and independent-copy policy. It remains undeployed; private bootstrap/master
-injection and actual production export/copy/restore acceptance are pending.
+and independent-copy policy. The subsequent
+[production deployment report](OPS_PRODUCTION_DEPLOYMENT_REPORT_2026-10-22.md)
+records the deployed service, private bootstrap/master injection, removed
+one-shot setup secret and initial refusal checks. Both staging and production
+are scheduled after the operator freed `meridian-jabari`'s slot. Actual
+production export/copy/restore acceptance is still pending. The additive
+Atoll capability in D73 keeps staging intact while preparing a second issuer.
 
 The separate-Mac staging restore is complete. Remaining operational acceptance
 includes production export/copy/restore verification, monitoring independent of Zion,

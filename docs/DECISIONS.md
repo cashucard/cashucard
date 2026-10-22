@@ -2258,3 +2258,26 @@ production identity, or reopen a restored service.
 two sources, silently relaxing file permissions, reading unbounded special
 files, exposing filesystem/crypto exception details, or treating a software
 regression as disaster-recovery evidence from another computer.
+
+## <a id="d73"></a>D73: Keep separate issuer copy histories in Atoll Recovery
+
+**Decided (ENG-740, 2026-10-22):** retain the existing staging issuer and its
+nightly export while preparing production alongside it. Atoll's additional
+issuer setup uses a separately paired reader, a distinct Nextcloud directory,
+and its own copy/notification state and health checks. Sharing the dedicated
+Nextcloud account and notification route does not share copy receipts or
+freshness evidence. Additional issuer notifications name their backup source.
+Existing verified source/destination coordinates remain fixed; re-pairing the
+same coordinates may rotate credentials without replacing evidence. A lost
+claim reply reuses its privately journaled device secret.
+
+This is an additive package capability, not a migration that clears staging
+history. It needs package/runtime verification before production copy health
+can be accepted. The operator approved freeing `meridian-jabari`'s cron for
+production, leaving the staging schedule intact. Production's required-copy
+gate remains closed until its own authorized reader verifies a fresh artifact.
+
+**Rejected:** retargeting the verified staging source in place, deleting its
+history to permit setup, sharing a state path across environments, treating
+staging receipts as production evidence, or removing an unrelated cron without
+the operator selecting it.

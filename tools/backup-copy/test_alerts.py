@@ -73,6 +73,14 @@ class DeliveryChecks(unittest.TestCase):
         self.check(1001, config=changed)
         self.assertEqual(len(self.sent), 2)
 
+    def test_named_issuer_alerts_identify_the_source_without_changing_default_text(self):
+        self.check(1000, config={**CONFIG, 'label': 'Production'})
+        self.assertEqual(self.sent[0]['text'],
+                         'Atoll Recovery (Production): independent-copy health is failed.')
+        self.check(1060, config={**CONFIG, 'generation': 'other', 'label': 'bad\nlabel'})
+        self.assertEqual(self.sent[-1]['text'],
+                         'Atoll Recovery: independent-copy health is failed.')
+
     def test_ntfy_scoped_auth_payload_and_acceptance(self):
         received = []
         class Handler(BaseHTTPRequestHandler):
