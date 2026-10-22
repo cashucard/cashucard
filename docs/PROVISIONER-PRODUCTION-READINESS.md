@@ -61,8 +61,56 @@ capability, not a dependency of personalization or service completion.
 - Native Release builds now enforce the existing HTTPS-origin and disabled
   recovery-drill preflight. This prevents accidentally packaging the committed
   localhost configuration; it does not certify an endpoint or enable hardware.
-- Production deployment and physical enablement remain unapproved. The missing
-  full Max drill still does not block software preparation or the staging work.
+- Production deployment and signed release preparation were subsequently
+  authorized on October 22; see the current execution status below. Physical
+  enablement still requires its specific device/action evidence. The missing
+  full Max drill does not block software preparation or staging work.
+
+## Production and signing preparation (2026-10-22)
+
+The operator authorized work on production deployment, production app
+configuration, signed release builds and store preparation. This is not store
+submission or public rollout approval. No production Worker, signing identity,
+signed candidate or store upload has been created in this preparation pass.
+
+- Exact Cloudflare lookups return not found for Worker `cashu-card-ops` and R2
+  bucket `cashu-card-ops-backups`. The account's workers.dev subdomain is
+  `old-cell-30e7`. The committed `ops/wrangler.toml` remains an incomplete
+  deployment template; do not deploy it as a production-ready configuration.
+- Production needs its own issuer UUID, master key, age recipient/private
+  identity, restricted recovery custody and independently verified backup.
+  Do not reuse staging secrets or silently replace Atoll's staging pairing.
+  Configure the tested independent-copy gate from the first production
+  deployment; missing initial evidence must keep issuance closed.
+- Apple Developer is authenticated for `ISLAND BITCOIN LLC` (`H7UAM79QQP`) and
+  lists valid distribution certificates. Local signing identities are
+  development identities only. The existing Match repository has distribution
+  material but no `com.islandbitcoin.provisioner` App Store profile. Certificate
+  availability in the portal does not establish local private-key availability.
+- A local Android release keystore exists. Its public certificate SHA-256 is
+  `D1:C1:DE:8B:70:04:BF:43:14:BB:48:83:B1:7A:13:33:59:73:30:C6:0A:D4:47:E0:42:74:CC:B4:25:3D:1B:5E`.
+  The operator copied Play's enrolled **upload** fingerprint and it matches
+  exactly. The Play app-signing certificate is a different identity. No upload
+  key reset or enrollment change is needed.
+- Narrow searches in the unlocked Vaultwarden vault found no provisioner,
+  keystore or Fastlane item. An `Android dev keypair` password did not unlock
+  the local release keystore; it had no attachment or provisioner reference.
+  No vault credential was changed, and this does not establish that signing
+  material is absent from other custodians or locations.
+- Historical release configuration unlocked the original Android keystore.
+  A separate private working copy was imported with a new random password,
+  retaining its one private-key entry and verified enrolled certificate.
+  The original file's digest is unchanged. The copy and its local credentials
+  have mode `0600` in a directory with mode `0700`, outside all checkouts.
+  Android signing preflight passes with those private environment inputs.
+  Restricted-vault/offline backup of this new working copy remains outstanding;
+  local preparation alone is not completed signing custody or a signed build.
+
+The separate-Mac staging restore is complete. Remaining operational acceptance
+includes production custody/copy verification, monitoring independent of Zion,
+and reviewed restore reconciliation before reopening issuance. Signed artifacts
+must demonstrate their actual HTTPS origin, native transport policy, platform
+entitlements and included dependencies before final store declarations.
 
 ## Contract constraints already established
 
