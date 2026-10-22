@@ -42,8 +42,9 @@ location are recorded privately. The drive is prepared and a staging identity
 copy restored successfully on the original Mac. A restricted organization
 Vaultwarden staging copy also passed fresh-unlock exact retrieval with
 authenticator MFA enabled. No production identity transfer
-or separate-machine retrieval has been performed. Test that standalone
-copy without Vaultwarden, Nextcloud or the normal laptop. Do not depend on
+has been performed. The operator reported successfully unlocking the drive on
+another Mac; backup verification and restore there remain untested. Test that
+standalone copy without Vaultwarden, Nextcloud or the normal laptop. Do not depend on
 cached vault sessions as the only escape, or store the only emergency copy in
 Nextcloud. Separately document Zion/Vaultwarden backup and account/MFA recovery;
 a recovery password stored only in that same unavailable vault is circular.

@@ -101,8 +101,10 @@ unmounted and locked successfully.
 
 This establishes a working encrypted-drive staging copy, not Vaultwarden custody,
 physical storage placement, separate-machine recovery or production custody.
-Encrypted APFS needs a compatible recovery system; verify the designated separate
-computer can unlock it. Its password must be independently recoverable outside
+The operator subsequently reported connecting this drive to another Mac and
+unlocking it successfully. This confirms cross-machine unlock only: no file
+verification, decryption or restore was observed on that Mac. Its password must
+be independently recoverable outside
 Zion and must not exist only on the drive it unlocks.
 
 ## Organization Vaultwarden custody follow-up
@@ -142,8 +144,9 @@ occupied destination. The disposable plaintext database is removed afterward.
 
 The initial rehearsal used the protected staging identity on the original Mac;
 the follow-ups verified its encrypted-drive copy and fresh-unlock Vaultwarden
-retrieval on that same Mac. A second recovery computer and recovery while the
-normal laptop is unavailable remain untested.
+retrieval on that same Mac. The operator also reported successful drive unlock
+on another Mac. Restoring and verifying the backup there while the normal laptop
+is unavailable remains untested.
 No restore result authorizes clearing the recovery fence or resuming issuance.
 Production custody, accepted-loss-window enforcement and reviewed reconciliation
 remain separate gates.
