@@ -2281,3 +2281,22 @@ gate remains closed until its own authorized reader verifies a fresh artifact.
 history to permit setup, sharing a state path across environments, treating
 staging receipts as production evidence, or removing an unrelated cron without
 the operator selecting it.
+
+
+## <a id="d74"></a>D74: Enable installation in operator-approved internal builds
+
+The operator explicitly requested enabling installation after build 3 shipped
+with it disabled. Enable the authenticated coordinator on both platforms for
+internal testing. Keep recovery drills and bench writes disabled. Reservation,
+identity, replacement consent, quarantine, key recovery and independent-backup
+authorization checks remain enforced. No APDU or protocol behavior changes.
+This does not authorize operating physical devices.
+
+The Pixel report establishes one successful composite installation/recovery run.
+The Max report records an interrupted installation and quarantined attempt, not
+a successful full iPhone drill. Internal enablement is an explicit operator
+decision with those limits, not new hardware certification. Public publication
+and holder readiness remain separate decisions.
+
+Rejected retaining the global block for an operator-authorized provisioning
+test. Rejected enabling laboratory controls or bypassing stopped-card evidence.

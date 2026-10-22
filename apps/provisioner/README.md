@@ -2,8 +2,8 @@
 
 The issuer app installs and records supported Cashu cards through authenticated
 reservations, retaining interrupted-attempt evidence. Installation completion
-means awaiting holder setup. Its production capability remains gated pending
-reviewed platform evidence.
+means awaiting holder setup. Installation is enabled for operator-approved internal testing (D74).
+Public release still requires a separate capability review.
 
 The original ENG-738 spare-card bench is retained for approved laboratory Debug
 builds only. `BENCH_RUNS_ENABLED` defaults to false: Settings hides it, navigation
@@ -150,7 +150,7 @@ service cannot view attempt details or replay it. One operation queue survives
 React remounts. Actor changes cancel an armed session and block further commands;
 cancellation during key prefetch prevents NFC from opening later.
 
-`src/releaseGates.ts` keeps production installation disabled. Both batch creation
+`src/releaseGates.ts` enables installation for internal testing. Both batch creation
 and programming enforce the gate; software-only record recovery and explicit
 disposition remain usable. Reauthentication, foregrounding and a 30-second timer
 retry only frozen records, without keys or NFC. Summaries report acknowledged

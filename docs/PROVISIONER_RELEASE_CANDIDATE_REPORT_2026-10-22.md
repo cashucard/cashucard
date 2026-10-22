@@ -84,3 +84,26 @@ option matches the bundled SCP02 implementation. After compliance completion,
 the Alpha internal group shows build 1.0.0 (3) as Testing, with three testers
 and automatic Xcode-build distribution enabled. Build 2 remains available; no
 external group was changed. Both platforms are now available for internal testing.
+
+
+## Installation-enabled internal build 4
+
+D74 records the operator's explicit approval to enable installation on both
+platforms. Build 4 uses source `727c742` plus the candidate-only production-origin
+override. Both native builds succeeded. Actual Hermes disassembly independently
+confirms installation true, recovery drills false and bench runs false in each
+platform's bundled release-gate module. The iOS archive passed strict deep
+signature verification and build-number/origin checks. Android passed the
+enrolled signing-certificate match, version/origin checks, signing-password
+exclusion and the 24-library 16 KB ELF check.
+
+Android AAB SHA-256:
+`d0c22079c722c1bb9474c58ca6d7fdd50305b9b88d170b0d4d3f1405e967321c`.
+
+The new coordinator-default test failed before the flag change and passed
+afterward; all 133 app tests passed, TypeScript passed, and changed-file ESLint
+passed. No physical device or card was operated.
+
+The first iOS upload attempt failed before transport because Xcode's saved
+Apple account credentials were missing a username. Reauthentication was
+requested; the valid archive is retained for upload without another build.
