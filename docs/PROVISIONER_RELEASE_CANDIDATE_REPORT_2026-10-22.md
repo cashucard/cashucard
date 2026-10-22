@@ -78,9 +78,9 @@ deobfuscation file; this build does not enable ProGuard/R8 minification.
 Xcode uploaded the archive successfully with `testFlightInternalTestingOnly`
 enabled. App Store Connect acknowledged build 1.0.0 (3) and began processing.
 No public App Store submission or external TestFlight distribution was made.
-Processing completed and Apple identifies build 3 as Internal. It is awaiting
-export-compliance information. The standard-encryption-outside-Apple-OS option
-matches the bundled SCP02 implementation; the France distribution question
-is awaiting the operator. The existing Alpha internal group has three testers
-and automatic Xcode-build distribution enabled. Internal-group availability
-must be verified before claiming that iOS testers can install build 3.
+Processing completed and Apple identifies build 3 as Internal. The operator
+answered No to France distribution. The standard-encryption-outside-Apple-OS
+option matches the bundled SCP02 implementation. After compliance completion,
+the Alpha internal group shows build 1.0.0 (3) as Testing, with three testers
+and automatic Xcode-build distribution enabled. Build 2 remains available; no
+external group was changed. Both platforms are now available for internal testing.
