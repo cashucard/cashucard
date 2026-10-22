@@ -2,7 +2,8 @@
 
 These are review candidates, not approval for public store publication. Both
 artifacts use `com.islandbitcoin.provisioner`, version 1.0.0, build 3, and the
-production HTTPS ops-service origin. Neither artifact has been uploaded.
+production HTTPS ops-service origin. The operator subsequently approved
+internal distribution of both artifacts; see the upload record below.
 Source: main `1ff98eb978eb587d7703b4dd928259060880005e`, with the service-origin
 configuration overridden for the candidate builds only.
 
@@ -63,3 +64,19 @@ schedule alone was retired with operator approval.
   already has healthy independent staging and production copy histories.
 - Final store declarations, reviewer access/instructions and submission review
   remain necessary. No public submission is authorized by this report.
+
+## Internal distribution — operator approved
+
+Google Play accepted version code 3 and published release
+`1.0.0 (3) - production service internal` to the internal track on October 22.
+The console reports available to internal testers; the existing Flash Alpha
+Test List has five users. The release notes explicitly limit testing to sign-in,
+service connectivity and the operator interface, with physical installation
+disabled. No supported devices were removed. The sole warning is the absent
+deobfuscation file; this build does not enable ProGuard/R8 minification.
+
+Xcode uploaded the archive successfully with `testFlightInternalTestingOnly`
+enabled. App Store Connect acknowledged build 1.0.0 (3) and began processing.
+No public App Store submission or external TestFlight distribution was made.
+Processing, export-compliance and internal-group availability must be checked
+before claiming that iOS testers can install it.
