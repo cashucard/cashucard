@@ -41,7 +41,8 @@ class IssuerTransfer:
 
     def request(self, path):
         req = urllib.request.Request(self.origin + path, headers={
-            'Authorization': 'Bearer recovery-v1.' + self.secret})
+            'Authorization': 'Bearer recovery-v1.' + self.secret,
+            'User-Agent': 'Atoll Recovery'})
         return self.http.open(req, timeout=30)
 
     def list(self):

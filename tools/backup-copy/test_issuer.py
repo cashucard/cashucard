@@ -40,6 +40,8 @@ class Checks(unittest.TestCase):
             self.assertEqual(path.read_bytes(), b'ciphertext')
             transfer.put(path, NAME)
             self.assertEqual(dest.saved, NAME)
+        self.assertTrue(all(request.get_header('User-agent') == 'Atoll Recovery'
+                            for request in http.requests))
         with self.assertRaises(ValueError): transfer.get('source', '../outside', Path('/unused'))
         wrong = Http([{'issuer_id': 'different', 'objects': [], 'cursor': None}])
         with self.assertRaises(ValueError): IssuerTransfer(CONFIG, dest, wrong).list()
