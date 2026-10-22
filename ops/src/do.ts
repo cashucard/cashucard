@@ -13,6 +13,7 @@
  */
 import {DurableObject} from 'cloudflare:workers';
 import {createHash} from 'node:crypto';
+import {AsyncLocalStorage} from 'node:async_hooks';
 import {independentBackupHealth} from './recovery-evidence';
 
 import {AnchorFeed, httpTipFetcher} from './anchor';
@@ -45,6 +46,10 @@ export interface Env extends RecoveryBindings {
 
 export class OpsStore extends DurableObject<Env> {
   private readonly deps: RouterDeps;
+  private readonly requestPolicy = new AsyncLocalStorage<{
+    issuer: string | undefined;
+    recoveryAdmins: string | undefined;
+  }>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -71,7 +76,10 @@ export class OpsStore extends DurableObject<Env> {
   }
 
   private backupPolicyIssuer(): string | undefined {
-    const issuer = this.env.OPS_INDEPENDENT_BACKUP_ISSUER;
+    const context = this.requestPolicy.getStore();
+    const issuer = context
+      ? context.issuer
+      : this.env.OPS_INDEPENDENT_BACKUP_ISSUER;
     if (issuer !== undefined && issuer !== this.env.OPS_RECOVERY_ISSUER_ID)
       throw new Error(
         'independent backup issuer does not match recovery issuer',
@@ -79,8 +87,35 @@ export class OpsStore extends DurableObject<Env> {
     return issuer;
   }
 
+  /** Private capability RPC: policy comes from the edge binding, never HTTP data. */
+  async dispatch(
+    request: Request,
+    requiredIssuer: string | null,
+    recoveryAdmins?: string,
+  ): Promise<Response> {
+    if (
+      requiredIssuer !== null &&
+      requiredIssuer !== this.env.OPS_RECOVERY_ISSUER_ID
+    )
+      throw new Error(
+        'independent backup issuer does not match recovery issuer',
+      );
+    return this.requestPolicy.run(
+      {issuer: requiredIssuer ?? undefined, recoveryAdmins},
+      () => this.fetch(request),
+    );
+  }
+
   async fetch(request: Request): Promise<Response> {
-    const recovery = await recoveryHttp(this.deps.db, request, this.env);
+    const context = this.requestPolicy.getStore();
+    const recovery = await recoveryHttp(this.deps.db, request, {
+      OPS_BACKUPS: this.env.OPS_BACKUPS,
+      OPS_BACKUP_RECIPIENT: this.env.OPS_BACKUP_RECIPIENT,
+      OPS_RECOVERY_ISSUER_ID: this.env.OPS_RECOVERY_ISSUER_ID,
+      OPS_RECOVERY_ADMINS: context
+        ? context.recoveryAdmins
+        : this.env.OPS_RECOVERY_ADMINS,
+    });
     if (recovery) return recovery;
     if (
       new URL(request.url).pathname === '/ops/backup-status' &&

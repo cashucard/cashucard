@@ -238,3 +238,66 @@ it('a warm object observes policy binding activation and removal without reconst
     }
   });
 });
+
+it('each edge request supplies current policy even when the object retains an old environment snapshot', async () => {
+  const worker = (await import('../../src/worker')).default;
+  const login = await worker.fetch(
+    new Request('https://test/auth/operator/session', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'lead-setup',
+        password: 'correct horse battery',
+      }),
+    }),
+    env,
+  );
+  const {token} = (await login.json()) as {token: string};
+  const headers = {
+    authorization: 'Bearer ' + token,
+    'x-ops-independent-backup-issuer': '',
+  };
+  const changed = {
+    ...env,
+    OPS_INDEPENDENT_BACKUP_ISSUER: env.OPS_RECOVERY_ISSUER_ID!,
+  };
+  const status = async (bindings: typeof env) => {
+    const response = await worker.fetch(
+      new Request('https://test/ops/backup-status', {headers}),
+      bindings,
+    );
+    return (await response.json()) as {independent_copy: {required: boolean}};
+  };
+  expect((await status(env)).independent_copy.required).toBe(false);
+  expect((await status(changed)).independent_copy.required).toBe(true);
+  const pair = await Promise.all([status(changed), status(env)]);
+  expect(pair.map(s => s.independent_copy.required)).toEqual([true, false]);
+  const adminPath = new Request('https://test/ops/recovery/connections', {
+    headers,
+  });
+  expect(
+    (await worker.fetch(adminPath.clone(), {...env, OPS_RECOVERY_ADMINS: '[]'}))
+      .status,
+  ).toBe(403);
+  expect((await worker.fetch(adminPath.clone(), env)).status).toBe(200);
+  await expect(
+    status({
+      ...env,
+      OPS_INDEPENDENT_BACKUP_ISSUER: null,
+    } as unknown as typeof env),
+  ).rejects.toThrow('independent backup issuer does not match recovery issuer');
+  const refused = await worker.fetch(
+    new Request('https://test/provisioning/attempts', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        device_id: '20000000-0000-4000-8000-000000000001',
+        attempt_id: '20000000-0000-4000-8000-000000000003',
+        batch_id: 9007199254740991,
+        ordinal: 0,
+      }),
+    }),
+    changed,
+  );
+  expect(refused.status).toBe(503);
+  expect(await refused.json()).toEqual({reason: 'independent-backup-stale'});
+});

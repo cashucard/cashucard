@@ -11,9 +11,20 @@ export {OpsStore};
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const policy = env.OPS_INDEPENDENT_BACKUP_ISSUER;
+    if (
+      policy !== undefined &&
+      (typeof policy !== 'string' || policy !== env.OPS_RECOVERY_ISSUER_ID)
+    )
+      throw new Error(
+        'independent backup issuer does not match recovery issuer',
+      );
     const id = env.OPS_DO.idFromName('ops');
-    const stub = env.OPS_DO.get(id);
-    return stub.fetch(request);
+    const stub = env.OPS_DO.get(
+      id,
+    ) as DurableObjectStub<Rpc.DurableObjectBranded> &
+      Pick<OpsStore, 'dispatch'>;
+    return stub.dispatch(request, policy ?? null, env.OPS_RECOVERY_ADMINS);
   },
 
   async scheduled(_controller: unknown, env: Env): Promise<void> {
