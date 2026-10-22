@@ -101,9 +101,36 @@ unmounted and locked successfully.
 
 This establishes a working encrypted-drive staging copy, not Vaultwarden custody,
 physical storage placement, separate-machine recovery or production custody.
-Encrypted APFS needs a compatible recovery system; verify the designated separate
-computer can unlock it. Its password must be independently recoverable outside
+The operator subsequently reported connecting this drive to another Mac and
+unlocking it successfully. This confirms cross-machine unlock only: no file
+verification, decryption or restore was observed on that Mac. Its password must
+be independently recoverable outside
 Zion and must not exist only on the drive it unlocks.
+
+## Organization Vaultwarden custody follow-up
+
+The operator signed in privately and enabled an authenticator-app second factor;
+the account's two-step settings showed that provider turned on. A dedicated
+staging recovery collection was created in the existing organization. Its saved
+access list grants only the selected operator management access. Organization
+owner/administrator access was reviewed as part of the effective scope, rather
+than assuming a collection excludes those roles. No unrelated vault items were
+opened or changed.
+
+The staging identity and public matching metadata were saved as an explicitly
+staging-only secure note through the encrypted web vault. Private content was
+not returned in tool output, chat, command arguments or ordinary logs. The saved
+note matched the source exactly. After a full page reload locked the vault, the
+operator unlocked it privately and the saved item was retrieved again from the
+restricted collection; its content still matched exactly without displaying it.
+The note was closed and the vault locked afterward. The encrypted drive remained
+locked. No production identity was generated or transferred.
+
+This verifies staging organization custody and fresh-unlock retrieval on the
+original Mac. It does not prove a second operator's recovery access, standalone
+account/MFA recovery, separate-machine retrieval, physical storage placement or
+production custody. The unlock password and authenticator recovery arrangements
+must remain independently recoverable outside Zion.
 
 ## Recovery scope and remaining gates
 
@@ -116,9 +143,10 @@ absent sessions/companion credentials, the recovery fence and rejection of an
 occupied destination. The disposable plaintext database is removed afterward.
 
 The initial rehearsal used the protected staging identity on the original Mac;
-the follow-up verified its encrypted-drive copy on that same Mac. Vaultwarden
-retrieval, a second recovery computer and recovery while the normal laptop is
-unavailable remain untested.
+the follow-ups verified its encrypted-drive copy and fresh-unlock Vaultwarden
+retrieval on that same Mac. The operator also reported successful drive unlock
+on another Mac. Restoring and verifying the backup there while the normal laptop
+is unavailable remains untested.
 No restore result authorizes clearing the recovery fence or resuming issuance.
 Production custody, accepted-loss-window enforcement and reviewed reconciliation
 remain separate gates.
