@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {env} from 'cloudflare:workers';
 import {runInDurableObject} from 'cloudflare:test';
 import {expect, it} from 'vitest';
@@ -68,10 +69,14 @@ it('the scheduled R2 artifact restores a registered card without the original ma
   const objects = await env.OPS_BACKUPS!.list({prefix: 'escrow/'});
   expect(objects.objects.length).toBe(1);
   const object = await env.OPS_BACKUPS!.get(objects.objects[0]!.key);
-  const payload = await decryptEscrowExport(
-    await object!.text(),
-    TEST_IDENTITY,
-  );
+  const armored = await object!.text();
+  const payload = await decryptEscrowExport(armored, TEST_IDENTITY);
+  expect(object!.customMetadata).toEqual({
+    version: '1',
+    exported_at: String(payload.exported_at),
+    ciphertext_sha256: createHash('sha256').update(armored).digest('hex'),
+    ciphertext_bytes: String(new TextEncoder().encode(armored).length),
+  });
   const recovered = await runInDurableObject(
     env.OPS_DO.get(env.OPS_DO.idFromName('restored-service')),
     (_instance, ctx) => {

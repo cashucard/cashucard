@@ -2100,3 +2100,18 @@ demo mode, hiding only the row, relying only on disabled native buttons, or
 using a development bench to evade durable attempt and quarantine contracts.
 The regression invokes all three write handlers directly and proves no NFC
 session opens. No card operation was performed while implementing this guard.
+
+## <a id="d66"></a>D66: Bind recovery evidence to the encrypted source snapshot
+
+**Decided (ENG-740, 2026-10-21):** return the consistent database snapshot time
+from the exporter and store it with the armored ciphertext SHA-256, UTF-8 byte
+length and metadata version in the same conditional R2 creation. An existing
+object is never overwritten; failure does not advance export-success status.
+The snapshot timestamp uses Unix seconds and precedes encryption. Existing
+exports without metadata remain downloadable but cannot serve as validated
+freshness evidence. This metadata alone does not attest independent storage or
+enforce an issuance fence; those remain the next implementation slices.
+
+**Rejected:** inferring snapshot time from the filename, R2 upload time or the
+copier's clock; using the plaintext byte metric as ciphertext length; and
+silently reclassifying legacy downloads as verified independent copies.
