@@ -161,3 +161,24 @@ rejects redirects and validates a bounded message receipt for the same topic.
 Five focused alert tests include real loopback authorization/payload inspection,
 wrong-topic receipt rejection and redirects. Receipt acceptance still does not
 prove browser/mobile delivery, human acknowledgement or whole-host monitoring.
+
+
+### Opt-in issuer copy receipts
+
+The private issuer-source configuration may explicitly set `"attest_copies": true`
+after a recovery administrator grants this connection the separate attestation
+capability. The default is false; pairing and upgrades do not grant authority.
+No R2 credential or recovery identity is needed. An unsupported/unauthorized
+issuer fails the cycle when this option is enabled; it does not silently fall
+back to reporting success without evidence.
+
+After both destination read-backs pass, the runner fetches issuer-owned source
+metadata, checks its name/issuer, exact ciphertext hash/length and snapshot time,
+and submits the bounded authenticated receipt. Failed delivery is retried on the
+next cycle by repeating immutable copy and read-back. The stable destination
+manifest is preserved for existing exports. Local health uses the exact snapshot
+time after accepted attestation, including when it predates the filename time;
+legacy/direct-R2 mode retains its existing filename-based local health behavior.
+Only the issuer's separately enabled policy enforces issuance. This source
+implementation does not upgrade the installed StartOS package or enable the
+policy on any deployment; package configuration and a staging drill remain.

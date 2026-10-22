@@ -2163,3 +2163,20 @@ credentials or receipts and retain the recovery fence.
 it on staging, counting receipt time instead of source time, granting retry
 requests unrestricted key access, or calling a server-side check proof that a
 phone with previously cached keys has stopped.
+
+
+## <a id="d69"></a>D69: Submit copier evidence only after destination read-back
+
+**Decided (ENG-740, 2026-10-21):** add an explicit, default-disabled issuer
+receipt option to the encrypted-copy runner. Submit only after both ciphertext
+and manifest have been fetched back from the destination and verified. Match the
+issuer's bounded metadata against the actual ciphertext before submitting. A
+failed delivery leaves the cycle unhealthy and retries the immutable copy on the
+next cycle; an old source cannot become fresh because delivery is recent. Keep
+existing destination manifests stable while using the accepted exact snapshot
+time for local health, including migration from filename-based local health.
+
+**Rejected:** posting immediately after upload, advancing health despite failed
+receipt delivery, silently enabling the capability for existing installations,
+rewriting immutable manifests during migration, or treating this source change
+as an installed-package upgrade or production activation.

@@ -36,13 +36,16 @@ class IssuerTransfer:
                 not re.fullmatch(r'[A-Za-z0-9_-]{43}', self.secret) or
                 config['source'] != 'issuer:' + self.issuer_id):
             raise ValueError('invalid issuer configuration')
+        if type(config.get('attest_copies', False)) is not bool:
+            raise ValueError('invalid copy attestation setting')
+        self.attest_copies = config.get('attest_copies', False)
         self.destination = destination
         self.http = http or opener()
 
-    def request(self, path):
-        req = urllib.request.Request(self.origin + path, headers={
+    def request(self, path, data=None):
+        req = urllib.request.Request(self.origin + path, data=data, headers={
             'Authorization': 'Bearer recovery-v1.' + self.secret,
-            'User-Agent': 'Atoll Recovery'})
+            'User-Agent': 'Atoll Recovery', 'Content-Type': 'application/json'})
         return self.http.open(req, timeout=30)
 
     def list(self):
@@ -93,3 +96,36 @@ class IssuerTransfer:
 
     def put(self, path, name):
         return self.destination.put(path, name)
+
+    def confirm_copy(self, receipt):
+        """Called only after destination artifact AND manifest read-back succeed."""
+        if not self.attest_copies:
+            return None
+        name = receipt['name']
+        if not EXPORT.fullmatch(name):
+            raise ValueError('invalid export name')
+        with self.request('/recovery/metadata/' + urllib.parse.quote(name, safe='')) as response:
+            raw = response.read(4097)
+        if len(raw) > 4096:
+            raise ValueError('oversized source metadata')
+        metadata = json.loads(raw)
+        if (not isinstance(metadata, dict) or
+                set(metadata) != {'issuer_id', 'name', 'exported_at', 'sha256', 'bytes'} or
+                metadata['issuer_id'] != self.issuer_id or metadata['name'] != name or
+                type(metadata['exported_at']) is not int or
+                not 0 < metadata['exported_at'] <= time.time() or
+                type(metadata['bytes']) is not int or not 0 < metadata['bytes'] <= MAX_BYTES or
+                metadata['bytes'] != receipt['size'] or
+                not isinstance(metadata['sha256'], str) or
+                not re.fullmatch(r'[0-9a-f]{64}', metadata['sha256']) or
+                metadata['sha256'] != receipt['sha256']):
+            raise ValueError('source evidence mismatch')
+        body = {k: metadata[k] for k in ('name', 'exported_at', 'sha256', 'bytes')}
+        with self.request('/recovery/copy-receipts', json.dumps(body).encode()) as response:
+            raw = response.read(4097)
+        if len(raw) > 4096:
+            raise ValueError('copy receipt not accepted')
+        result = json.loads(raw)
+        if not isinstance(result, dict) or set(result) != {'accepted'} or result['accepted'] is not True:
+            raise ValueError('copy receipt not accepted')
+        return metadata['exported_at']
