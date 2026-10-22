@@ -75,6 +75,36 @@ A final independent Cloudflare API read confirmed the sole schedule remained
 `17 3 * * *`. The first failed bounded-run record is retained; this follow-up
 records the successful copy/restore without rewriting that earlier attempt.
 
+## Encrypted removable-drive custody rehearsal
+
+The operator selected themselves as offline custodian and an encrypted removable
+drive as the medium outside Zion. After a read-only inventory and explicit erase
+approval, the confirmed 246 GB external USB drive was formatted as encrypted
+APFS. The operator entered its password in private native dialogs; it was not
+placed in chat, command arguments, shell history or a saved password file.
+File ownership was enabled through native administrator authentication. Encryption
+and a lock/unlock cycle passed before copying any recovery material.
+
+The existing staging identity was copied without displaying its contents into a
+0700 directory with a 0600 key file. Its public recipient was derived and recorded
+with the staging issuer identifier. A copy of the previously verified independent
+Nextcloud ciphertext and manifest was added after size/hash verification. No
+production identity was generated, retargeted or copied.
+
+The supported restore CLI then read the identity and encrypted artifact from the
+drive into a fresh temporary database on the original Mac, without a service
+master. All escrow keys matched; one operator, one batch and one key set were
+restored, with zero card mappings. Recovery remained fenced, credentials disabled,
+and sessions/companion credentials absent. The temporary plaintext database was
+removed. A sanitized report and instructions were retained. The drive was then
+unmounted and locked successfully.
+
+This establishes a working encrypted-drive staging copy, not Vaultwarden custody,
+physical storage placement, separate-machine recovery or production custody.
+Encrypted APFS needs a compatible recovery system; verify the designated separate
+computer can unlock it. Its password must be independently recoverable outside
+Zion and must not exist only on the drive it unlocks.
+
 ## Recovery scope and remaining gates
 
 The intended artifact path is staging cron → encrypted R2 export → paired Atoll
@@ -85,9 +115,10 @@ escrow key sets and any available card mappings, disabled operator credentials,
 absent sessions/companion credentials, the recovery fence and rejection of an
 occupied destination. The disposable plaintext database is removed afterward.
 
-The rehearsal uses the protected staging identity already on the original Mac.
-It does not test Vaultwarden retrieval, the separately held offline identity,
-a second recovery computer or recovery while the normal laptop is unavailable.
+The initial rehearsal used the protected staging identity on the original Mac;
+the follow-up verified its encrypted-drive copy on that same Mac. Vaultwarden
+retrieval, a second recovery computer and recovery while the normal laptop is
+unavailable remain untested.
 No restore result authorizes clearing the recovery fence or resuming issuance.
 Production custody, accepted-loss-window enforcement and reviewed reconciliation
 remain separate gates.

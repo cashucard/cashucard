@@ -37,8 +37,10 @@ Vaultwarden and Nextcloud share a server failure domain. Before relying on
 this arrangement, retain a protected offline copy of the age identity, its
 public recipient/key identifier and concise recovery instructions outside Zion.
 The operator confirmed they will personally hold the protected offline
-copy outside Zion; the specific custodian, protected medium and location are
-recorded privately. No transfer has yet been performed. Test that standalone
+copy outside Zion on an encrypted removable drive; the specific medium and
+location are recorded privately. The drive is prepared and a staging identity
+copy restored successfully on the original Mac. No production identity transfer
+or separate-machine retrieval has been performed. Test that standalone
 copy without Vaultwarden, Nextcloud or the normal laptop. Do not depend on
 cached vault sessions as the only escape, or store the only emergency copy in
 Nextcloud. Separately document Zion/Vaultwarden backup and account/MFA recovery;
