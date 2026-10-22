@@ -47,6 +47,34 @@ stopped. The encrypted export remains available for retry without another cron
 change. This is a successful controlled staging export and schedule restoration,
 not a successful independent-copy/restore drill.
 
+## Beta.5 follow-up: copy and isolated restore passed
+
+The reviewed fix shipped in signed Atoll Recovery 0.1.0-beta.5:0 (package
+PR #4 and upstream PR #58 passed their checks and merged). Zion retained its
+setup through upgrade. Its runner copied the retained export into Nextcloud;
+no manual transfer seeded that destination. The dashboard reports a fresh
+verified copy. NTFY received the healthy transition at 17:39 Pacific after
+the failure notification at 17:38.
+
+An independent Nextcloud download verified the manifest, size (2,291 bytes)
+and SHA-256:
+`f7098790d9f14225cfcfd1f638c4793af9e5a1a6eb29527c66dba4f9cd4c762f`.
+A scoped read of the original R2 object matched the same ciphertext digest.
+
+The supported CLI restored that download into a fresh protected temporary
+SQLite database with the existing staging age identity and no service master.
+Verification found one operator, one batch and one escrow key set; all escrow
+keys matched the authenticated snapshot. There were zero card mappings, so
+populated card mapping recovery was not exercised. Recovery remained fenced,
+operator credentials were disabled, sessions and companion credentials were
+absent, and an occupied destination was refused. The plaintext database was
+removed. Source backup status remained fresh; the temporary operator session
+was revoked and verified rejected afterward.
+
+A final independent Cloudflare API read confirmed the sole schedule remained
+`17 3 * * *`. The first failed bounded-run record is retained; this follow-up
+records the successful copy/restore without rewriting that earlier attempt.
+
 ## Recovery scope and remaining gates
 
 The intended artifact path is staging cron → encrypted R2 export → paired Atoll

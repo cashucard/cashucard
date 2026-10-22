@@ -83,8 +83,9 @@ Nextcloud browser authorization succeeded. The runner starts and retains setup
 through restart. A controlled staging cron invocation now produced an encrypted
 export and fresh service backup status; the original nightly schedule was
 restored. The first paired copy hit an edge user-agent rejection, fixed in #58.
-Live transfer, read-back and authenticated restoration remain unverified until
-the corrected package is installed. See the [controlled recovery check](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+Beta.5 is now installed: its runner copied the export into Nextcloud, read-back
+matched the source, and isolated restoration verified all escrow keys and the
+recovery fence. Separate-machine recovery and offline custody remain untested. See the [controlled recovery check](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
 
 Use an established transfer client such as rclone for
 [R2](https://developers.cloudflare.com/r2/examples/rclone/) and
