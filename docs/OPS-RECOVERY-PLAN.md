@@ -80,8 +80,11 @@ The [local copy runner](../tools/backup-copy/README.md) implements additive
 read-back verification and source-time health with a loopback WebDAV check.
 Atoll Recovery beta.3 is installed on Zion, and live issuer pairing and dedicated
 Nextcloud browser authorization succeeded. The runner starts and retains setup
-through restart. Staging currently has no encrypted exports, so successful
-transfer, read-back and authenticated restoration remain unverified.
+through restart. A controlled staging cron invocation now produced an encrypted
+export and fresh service backup status; the original nightly schedule was
+restored. The first paired copy hit an edge user-agent rejection, fixed in #58.
+Live transfer, read-back and authenticated restoration remain unverified until
+the corrected package is installed. See the [controlled recovery check](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
 
 Use an established transfer client such as rclone for
 [R2](https://developers.cloudflare.com/r2/examples/rclone/) and
