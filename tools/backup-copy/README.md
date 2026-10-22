@@ -101,6 +101,11 @@ or production recovery readiness.
 0600 JSON file containing `webhook_url` (HTTPS) and `generation` (a new opaque
 identifier whenever notification routing is reconfigured). It needs no recovery
 identity or issued keys. The StartOS package supplies its private configuration.
+An optional `label` identifies a backup source in notification text. It accepts
+1–64 ASCII letters, digits, spaces, dots, underscores or hyphens, beginning with
+a letter or digit. Invalid or absent labels retain the original generic text.
+Each source/destination needs separate copy and notification state; notification
+routing may be shared, but delivery evidence must not cross between issuers.
 
 ```sh
 python3 tools/backup-copy/alerts.py --config /data/private/alerts.json --copy-state /data/state/copy.json --state /data/state/alerts.json
