@@ -375,3 +375,9 @@ and the full administrative audit trail. Use the updated recovery CLI from this
 revision or later: older restore tools reject v3. The new CLI still restores
 v1/v2 backups. All restored passwords remain disabled until controlled recovery,
 and the provisioning reconciliation fence remains enabled.
+
+`GET /admin/provisioning/attempts` and the console's read-only support section
+show the 100 most recent attempt identities, states and chip bindings. They
+expose no keys, PINs or frozen record bodies, and cannot repair or clear a
+quarantined card. Use this evidence alongside the phone's retained journal;
+a generic reconciliation conflict is not permission to retry card writes.

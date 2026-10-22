@@ -164,7 +164,11 @@ export async function route(
   const method = req.method ?? 'GET';
 
   try {
-    if (path === '/admin/operators' || path.startsWith('/admin/operators/')) {
+    if (
+      path === '/admin/provisioning/attempts' ||
+      path === '/admin/operators' ||
+      path.startsWith('/admin/operators/')
+    ) {
       const body = method === 'POST' ? parseJson(await readBody(req)) : {};
       const [status, answer] = await operatorAdminRequest(
         deps,

@@ -1,3 +1,8 @@
+import {
+  createProvisioningBatch,
+  reserveAttempt,
+  bindAttempt,
+} from '../src/provisioning';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createOperatorSession, hashPassword, resolveSession} from '../src/auth';
@@ -68,6 +73,45 @@ test('only deployment admins manage operators; disable/reset revoke sessions and
     assert.equal(
       (await call('GET', '/admin/operators', staff.token)).status,
       403,
+    );
+    assert.equal(
+      (await call('GET', '/admin/provisioning/attempts', staff.token)).status,
+      403,
+    );
+    const scope = {
+      operator_id: admin.session.principalId,
+      key_env: 'issued' as const,
+      device_id: '00000000-0000-4000-8000-000000000001',
+    };
+    const batch = createProvisioningBatch(db, scope, {
+      batch_request_id: '00000000-0000-4000-8000-000000000002',
+      count: 1,
+      mint_url: 'https://mint.test',
+      pin_policy: 'perCard',
+      daily_usd: 0,
+      no_pin_usd: 0,
+      load_sha256: 'a'.repeat(64),
+    });
+    const attempt = reserveAttempt(db, scope, {
+      attempt_id: '00000000-0000-4000-8000-000000000003',
+      batch_id: batch.batch_id,
+      ordinal: 0,
+    });
+    bindAttempt(db, scope, attempt.attempt_id, {
+      revision: 0,
+      chip_id: 'cplc-v1:4790d3213041093363205547',
+    });
+    const support = (
+      await call('GET', '/admin/provisioning/attempts', admin.token)
+    ).body as {attempts: Array<Record<string, unknown>>};
+    assert.equal(
+      support.attempts[0]!.chip_id,
+      'cplc-v1:4790d3213041093363205547',
+    );
+    assert.equal(support.attempts[0]!.state, 'active');
+    assert.ok(
+      !('enc' in support.attempts[0]!) &&
+        !('body_json' in support.attempts[0]!),
     );
     assert.equal(
       (

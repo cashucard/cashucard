@@ -7,6 +7,7 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
         '/ops/operators',
         '/admin/operators',
         '/admin/operators/audit',
+        '/admin/provisioning/attempts',
         '/auth/operator/sessions',
         '/ops/backup-status',
         '/ops/recovery/setup',

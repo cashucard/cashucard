@@ -41,6 +41,17 @@ export async function operatorAdminRequest(
   };
   authorize();
   const db = deps.db;
+  if (method === 'GET' && path === '/admin/provisioning/attempts')
+    return [
+      200,
+      {
+        attempts: db.db
+          .prepare(
+            'SELECT attempt_id,batch_id,ordinal,operator_id,device_id,state,revision,chip_id,created FROM provisioning_attempts ORDER BY created DESC,attempt_id DESC LIMIT 100',
+          )
+          .all(),
+      },
+    ];
   if (method === 'GET' && path === '/admin/operators')
     return [
       200,
