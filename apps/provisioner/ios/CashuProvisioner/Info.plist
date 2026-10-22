@@ -35,8 +35,6 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Installs the Cashu card applet on a card held to the phone.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Figtree-Bold.ttf</string>

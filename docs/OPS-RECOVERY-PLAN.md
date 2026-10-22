@@ -36,7 +36,7 @@ with the designated operators; do not create an unattended plaintext export.
 Vaultwarden and Nextcloud share a server failure domain. Before relying on
 this arrangement, retain a protected offline copy of the age identity, its
 public recipient/key identifier and concise recovery instructions outside Zion.
-The operator selected a designated recovery operator to hold that offline
+The operator confirmed they will personally hold the protected offline
 copy outside Zion; the specific custodian, protected medium and location are
 recorded privately. No transfer has yet been performed. Test that standalone
 copy without Vaultwarden, Nextcloud or the normal laptop. Do not depend on
@@ -165,9 +165,12 @@ must not be described as satisfying the accepted maximum.
    alerts, custody and release approval. Staging success never enables physical
    installation or establishes holder readiness.
 
-Current evidence is the [staging report](OPS_STAGING_REPORT_2026-10-21.md).
-Password-manager custody, the offline recovery copy, independent scheduled
-artifact copy, actual nightly success, remote-artifact restore, retention, push
-delivery, human acknowledgement and the reopening procedure remain pending.
-Setup evidence does not certify them. The staging cron remains unchanged; no production deployment or
-recovery identity transfer is part of this onboarding validation.
+Current evidence includes the [staging report](OPS_STAGING_REPORT_2026-10-21.md)
+and [actual export/copy/restore report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+Scheduled staging export, independent Nextcloud read-back, NTFY web receipt and
+isolated restoration from the copied artifact passed. Password-manager custody,
+the operator-held offline recovery copy, separate-machine recovery, reviewed
+retention, whole-host monitoring, push delivery, human acknowledgement, 24-hour
+issuance enforcement and the reopening procedure remain pending. The staging
+cron remains nightly; no production deployment or recovery identity transfer
+is certified by the rehearsal.
