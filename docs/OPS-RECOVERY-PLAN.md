@@ -143,6 +143,62 @@ provides retry margin; it cannot guarantee the objective through an unbounded
 outage. Nightly exports plus a later copy can exceed 24 hours even in routine scheduling, so cadence alone
 must not be described as satisfying the accepted maximum.
 
+## Issuance enforcement implementation contract
+
+This is the next implementation slice, not a claim of deployed enforcement.
+Keep the current D61 companion credentials read-only. Add a separately approved,
+revocable copy-attestation scope; existing connections must not gain that scope
+through migration. A recovery administrator must deliberately enroll the copier
+for this authority. It does not receive plaintext escrow or the recovery key.
+
+The exporter must publish the exact snapshot `exported_at`, ciphertext SHA-256
+and byte length as immutable source metadata. Atoll may submit a receipt only
+after reading the artifact and its manifest back from Nextcloud and comparing
+both against the source. The issuer validates the object identity, digest, size,
+issuer and snapshot time against its own export metadata. Future-dated evidence,
+unknown objects, invalid metadata and revoked attestors cannot advance health.
+A retried or delayed receipt cannot move freshness backward or refresh an old
+snapshot by changing its copy time. This is a trusted copier assertion, not an
+independent cryptographic proof of storage at Nextcloud.
+
+Evaluate the age of the latest eligible source snapshot using the service clock.
+Missing evidence or an age of **24 hours or more** blocks new issuance. Export
+success in R2 alone cannot satisfy this gate. Keep export health and independent
+copy health distinct in the authenticated status response. A restored service
+remains fenced and must not inherit usable attestation credentials or a healthy
+receipt from the snapshot.
+
+Enforce the decision inside the same shared domain transactions used by Node and
+Workers. New batch creation derives escrow keys eagerly, so it must be covered,
+as must new attempt reservation and key disclosure. Matching idempotent batch
+and reservation lookups can return their existing state without creating work.
+Do not add this check to the general `writable` helper: outcome recording,
+quarantine, terminal dispositions and safe reads must remain possible during a
+backup outage. Key disclosure during interrupted-install recovery needs an
+explicitly reviewed recovery exception; a stale backup must not become a generic
+permission to fetch keys by labeling a request a retry. Cached keys already on a
+phone cannot be revoked by this server check; the mobile flow must honor the
+service refusal before starting another installation, and that limit must be
+stated in the operational guarantee.
+
+Implement in reviewable slices:
+
+1. Export metadata and local receipt validation/persistence, with an explicit
+   separately granted capability and no credential upgrade by default.
+2. Shared transactional issuance checks, authenticated health and mobile refusal
+   handling; preserve the existing recovery fence and stopped-attempt evidence.
+3. Atoll read-back receipt delivery with durable retry, followed by a bounded
+   staging drill. Production activation and cadence changes remain separate.
+
+Keep regression coverage focused on authority and failure boundaries: legacy
+readers cannot attest; bad source metadata cannot advance health; an old snapshot
+with a new receipt stays stale; exact 24-hour expiry blocks new work atomically;
+replay does not allocate another batch/attempt; outcome recording still works;
+and restore cannot inherit healthy authorization. Exercise the shared domain on
+Node, with a small real Workers/R2 test for metadata and receipt routing. Run each
+behavior regression against the old implementation before the fix and record
+that result in its PR. No hardware or live production service is needed.
+
 ## Bounded execution sequence and acceptance
 
 1. Configure restricted Vaultwarden shared custody, designate recovery
@@ -173,8 +229,9 @@ must not be described as satisfying the accepted maximum.
 Current evidence includes the [staging report](OPS_STAGING_REPORT_2026-10-21.md)
 and [actual export/copy/restore report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
 Scheduled staging export, independent Nextcloud read-back, NTFY web receipt and
-isolated restoration from the copied artifact passed. Password-manager custody,
-the operator-held offline recovery copy, separate-machine recovery, reviewed
+isolated restoration from the copied artifact passed. Staging Vaultwarden custody
+and the operator-held encrypted-drive copy also passed their documented checks.
+Separate-machine restore, production custody, reviewed
 retention, whole-host monitoring, push delivery, human acknowledgement, 24-hour
 issuance enforcement and the reopening procedure remain pending. The staging
 cron remains nightly; no production deployment or recovery identity transfer
