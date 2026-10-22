@@ -116,12 +116,14 @@ and independent-copy policy. The subsequent
 [production deployment report](OPS_PRODUCTION_DEPLOYMENT_REPORT_2026-10-22.md)
 records the deployed service, private bootstrap/master injection, removed
 one-shot setup secret and initial refusal checks. Both staging and production
-are scheduled after the operator freed `meridian-jabari`'s slot. Actual
-production export/copy/restore acceptance is still pending. The additive
-Atoll capability in D73 keeps staging intact while preparing a second issuer.
+are scheduled after the operator freed `meridian-jabari`'s slot. Production export, independent Nextcloud copy and temporary-database restore
+acceptance have now passed. The additive Atoll capability in D73 keeps staging
+and production histories separate. See the
+[signed candidate and recovery acceptance report](PROVISIONER_RELEASE_CANDIDATE_REPORT_2026-10-22.md)
+for the evidence and remaining release gates.
 
 The separate-Mac staging restore is complete. Remaining operational acceptance
-includes production export/copy/restore verification, monitoring independent of Zion,
+includes monitoring independent of Zion,
 and reviewed restore reconciliation before reopening issuance. Signed artifacts
 must demonstrate their actual HTTPS origin, native transport policy, platform
 entitlements and included dependencies before final store declarations.
