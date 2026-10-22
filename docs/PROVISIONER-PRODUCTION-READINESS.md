@@ -89,14 +89,22 @@ signed candidate or store upload has been created in this preparation pass.
   availability in the portal does not establish local private-key availability.
 - A local Android release keystore exists. Its public certificate SHA-256 is
   `D1:C1:DE:8B:70:04:BF:43:14:BB:48:83:B1:7A:13:33:59:73:30:C6:0A:D4:47:E0:42:74:CC:B4:25:3D:1B:5E`.
-  Its match to Play's enrolled **upload** certificate remains unverified.
-  The Play app-signing certificate is a different identity. Do not replace or
-  reset the upload key merely to get a build through signing.
+  The operator copied Play's enrolled **upload** fingerprint and it matches
+  exactly. The Play app-signing certificate is a different identity. No upload
+  key reset or enrollment change is needed.
 - Narrow searches in the unlocked Vaultwarden vault found no provisioner,
   keystore or Fastlane item. An `Android dev keypair` password did not unlock
   the local release keystore; it had no attachment or provisioner reference.
   No vault credential was changed, and this does not establish that signing
   material is absent from other custodians or locations.
+- Historical release configuration unlocked the original Android keystore.
+  A separate private working copy was imported with a new random password,
+  retaining its one private-key entry and verified enrolled certificate.
+  The original file's digest is unchanged. The copy and its local credentials
+  have mode `0600` in a directory with mode `0700`, outside all checkouts.
+  Android signing preflight passes with those private environment inputs.
+  Restricted-vault/offline backup of this new working copy remains outstanding;
+  local preparation alone is not completed signing custody or a signed build.
 
 The separate-Mac staging restore is complete. Remaining operational acceptance
 includes production custody/copy verification, monitoring independent of Zion,
