@@ -1,7 +1,7 @@
-/** Enable only after the approved phone/CPLC/termination report is reviewed.
+/** Operator-approved installation for distributed internal testing (D74).
  * This gate never certifies mint/owner/PIN personalization or holder readiness.
  */
-export const CARD_INSTALLATION_VALIDATED = false;
+export const CARD_INSTALLATION_VALIDATED = true;
 
 /** Local validation builds only (including owner-built iOS Release binaries).
  * Never enable in a production commit or distribute an enabled validation build.

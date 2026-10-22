@@ -134,10 +134,26 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
+test('distributed defaults allow authenticated installation without laboratory controls', async () => {
+  const f = fixture();
+  const runCard = jest.fn(async () => 'interrupted' as const);
+  await mount({...f, runCard, serviceFor: () => f.service});
+  await signIn();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(true);
+  });
+  expect(f.service.batch).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    await flow.program();
+  });
+  expect(runCard).toHaveBeenCalledTimes(1);
+  expect(flow.drill).toBeUndefined();
+});
+
 test('the release gate blocks direct create and program calls, without collecting a PIN', async () => {
   const f = fixture();
   const runCard = jest.fn();
-  const tree = await mount({...f, runCard, serviceFor: () => f.service});
+  const tree = await mount({...f, hardwareValidated: false, runCard, serviceFor: () => f.service});
   await signIn();
   await act(async () => {
     expect(await flow.create(config)).toBe(false);
@@ -404,12 +420,13 @@ test('the real screen installs and rotates, then a restart retries its frozen re
       tree.unmount();
     });
     trees = [];
-    // New storage adapter models process loss. The production gate remains false;
+    // New storage adapter models process loss with installation explicitly disabled;
     // only software record recovery may run after signing back in.
     const runCard = jest.fn();
     const recovered = await mount({
       ...f,
       storage: {...f.storage},
+      hardwareValidated: false,
       runCard,
       serviceFor: () => f.service,
     });
@@ -575,6 +592,7 @@ test('enabling drill controls cannot bypass the independent installation gate', 
   const runCard = jest.fn();
   await mount({
     ...f,
+    hardwareValidated: false,
     recoveryDrillsEnabled: true,
     runCard,
     serviceFor: () => f.service,
