@@ -2182,3 +2182,10 @@ time for local health, including migration from filename-based local health.
 receipt delivery, silently enabling the capability for existing installations,
 rewriting immutable manifests during migration, or treating this source change
 as an installed-package upgrade or production activation.
+
+
+D69 compatibility clarification: verified legacy archives remain copyable when
+receipts are enabled, without becoming eligible evidence. An ineligible newest
+export fails health; older ineligible archives cannot invalidate a newer eligible
+snapshot. Authorization failure or an unsupported metadata endpoint still fails
+the cycle. Missing metadata is never converted to filename-based freshness.

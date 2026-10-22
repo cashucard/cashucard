@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import urllib.error
-from issuer_source import IssuerTransfer, https_origin
+from issuer_source import IssuerTransfer, https_origin, IneligibleExport
 import connect
 
 ISSUER = '11111111-2222-4333-8444-555555555555'
@@ -63,6 +63,17 @@ class Checks(unittest.TestCase):
         legacy_http = Http([])
         self.assertIsNone(IssuerTransfer(CONFIG, None, legacy_http).confirm_copy(receipt))
         self.assertEqual(legacy_http.requests, [])
+
+    def test_only_explicit_missing_source_metadata_is_an_ineligible_archive(self):
+        receipt = {'name': NAME, 'sha256': 'a' * 64, 'size': 10}
+        for status, reason, expected in [
+                (409, 'source-metadata-unavailable', IneligibleExport),
+                (403, 'attestation-required', urllib.error.HTTPError),
+                (404, 'not-found', urllib.error.HTTPError)]:
+            error = urllib.error.HTTPError('https://issuer.invalid', status, '', {},
+                                           io.BytesIO(json.dumps({'reason': reason}).encode()))
+            transfer = IssuerTransfer({**CONFIG, 'attest_copies': True}, None, Http([error]))
+            with self.assertRaises(expected): transfer.confirm_copy(receipt)
 
     def test_https_only_routes_and_bounded_metadata(self):
         for origin in ['http://issuer.invalid', 'https://user:pass@issuer.invalid', 'https://issuer.invalid/path', 'https://issuer.invalid?token=secret', 'https://issuer.invalid#fragment']:

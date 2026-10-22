@@ -182,3 +182,9 @@ legacy/direct-R2 mode retains its existing filename-based local health behavior.
 Only the issuer's separately enabled policy enforces issuance. This source
 implementation does not upgrade the installed StartOS package or enable the
 policy on any deployment; package configuration and a staging drill remain.
+
+Older archived exports without issuer-bound metadata are still copied and
+verified locally, but never submitted or counted as fresh evidence. An ineligible
+newest export fails health. Ineligible historical archives do not invalidate a
+newer eligible snapshot whose destination read-back and receipt succeeded.
+Authorization failures and unsupported issuer endpoints still fail the cycle.

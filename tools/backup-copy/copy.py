@@ -12,6 +12,7 @@ import stat
 import subprocess
 import tempfile
 import time
+from issuer_source import IneligibleExport
 
 EXPORT = re.compile(r'^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.age$')
 MAX_BYTES = 256 * 1024 * 1024
@@ -150,7 +151,15 @@ def run_once(transfer, state_path, now=None):
                 # issuer attestation additionally binds actual snapshot time;
                 # never submit before both destination reads above succeed.
                 confirm = getattr(transfer, 'confirm_copy', None)
-                snapshot_time = confirm(receipt) if confirm else None
+                try:
+                    snapshot_time = confirm(receipt) if confirm else None
+                except IneligibleExport:
+                    # Archive verification is still useful, but cannot certify
+                    # independent freshness. Never fall back to filename time.
+                    state['verified'][name] = receipt
+                    if name == entries[0][1]:
+                        raise ValueError('newest export is ineligible for attestation')
+                    continue
                 if snapshot_time is None:
                     snapshot_time = created
                 state['verified'][name] = receipt

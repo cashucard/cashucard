@@ -2,12 +2,17 @@
 import json
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
 MAX_BYTES = 256 * 1024 * 1024
 EXPORT = re.compile(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.age$')
 UUID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+
+class IneligibleExport(ValueError):
+    """A verified archive has no issuer-bound source metadata for attestation."""
+
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -104,8 +109,17 @@ class IssuerTransfer:
         name = receipt['name']
         if not EXPORT.fullmatch(name):
             raise ValueError('invalid export name')
-        with self.request('/recovery/metadata/' + urllib.parse.quote(name, safe='')) as response:
-            raw = response.read(4097)
+        try:
+            with self.request('/recovery/metadata/' + urllib.parse.quote(name, safe='')) as response:
+                raw = response.read(4097)
+        except urllib.error.HTTPError as error:
+            if error.code != 409:
+                raise
+            raw = error.read(4097)
+            error.close()
+            if len(raw) <= 4096 and json.loads(raw) == {'reason': 'source-metadata-unavailable'}:
+                raise IneligibleExport('source metadata unavailable') from None
+            raise ValueError('source metadata request failed') from None
         if len(raw) > 4096:
             raise ValueError('oversized source metadata')
         metadata = json.loads(raw)
