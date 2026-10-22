@@ -154,6 +154,20 @@ export const MIGRATIONS: readonly string[] = [
     connection_id TEXT REFERENCES recovery_connections(id)
   );
   `,
+  // 6. Copy attestation is separately granted; old readers stay read-only.
+  `
+  ALTER TABLE recovery_connections ADD COLUMN can_attest INTEGER NOT NULL DEFAULT 0 CHECK (can_attest IN (0, 1));
+  ALTER TABLE recovery_connections ADD COLUMN attestation_approved_by INTEGER REFERENCES operators(id);
+  CREATE TABLE recovery_copy_receipts (
+    connection_id TEXT PRIMARY KEY REFERENCES recovery_connections(id),
+    issuer_id TEXT NOT NULL,
+    object_key TEXT NOT NULL,
+    exported_at INTEGER NOT NULL,
+    sha256 TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    received_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export interface DbOptions {

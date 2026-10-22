@@ -1,6 +1,7 @@
 /** Existing encrypted exports only. This credential never enters the card API. */
 import {createHash, randomBytes, randomUUID} from 'node:crypto';
 import {resolveSession} from './auth';
+import {sourceMetadata, saveCopyReceipt} from './recovery-evidence';
 import type {OpsDb} from './db';
 import {recoverySetup} from './recovery-setup.workers';
 
@@ -100,10 +101,12 @@ function companion(db: OpsDb, request: Request, issuerId: string) {
   if (!SECRET.test(secret)) throw new Failure(401, 'no-recovery-credential');
   const found = db.db
     .prepare(
-      'SELECT id FROM recovery_connections WHERE token_hash = ? AND issuer_id = ? AND revoked IS NULL',
+      'SELECT id, can_attest FROM recovery_connections WHERE token_hash = ? AND issuer_id = ? AND revoked IS NULL',
     )
-    .get(digest(secret), issuerId);
+    .get(digest(secret), issuerId) as
+    {id: string; can_attest: number} | undefined;
   if (!found) throw new Failure(401, 'no-recovery-credential');
+  return found;
 }
 export async function recoveryHttp(
   db: OpsDb,
@@ -162,10 +165,37 @@ export async function recoveryHttp(
         return json({
           connections: db.db
             .prepare(
-              'SELECT id, name, approved_by, created, revoked FROM recovery_connections WHERE issuer_id = ? ORDER BY created',
+              'SELECT id, name, approved_by, created, revoked, can_attest, attestation_approved_by FROM recovery_connections WHERE issuer_id = ? ORDER BY created',
             )
             .all(issuerId),
         });
+      }
+      const grant =
+        /^\/ops\/recovery\/connections\/([0-9a-f-]{36})\/attestation$/.exec(
+          url.pathname,
+        );
+      if (grant && UUID.test(grant[1]!) && request.method === 'POST') {
+        const input = await body(request);
+        if (
+          Object.keys(input).length !== 1 ||
+          typeof input.enabled !== 'boolean'
+        )
+          throw new Failure(400, 'invalid-body');
+        db.db.transaction(() => {
+          const result = db.db
+            .prepare(
+              'UPDATE recovery_connections SET can_attest = ?, attestation_approved_by = ? WHERE id = ? AND issuer_id = ? AND revoked IS NULL',
+            )
+            .run(input.enabled ? 1 : 0, adminId, grant[1]!, issuerId);
+          if (!result.changes) throw new Failure(404, 'not-found');
+          // Re-enabling requires new evidence; an old grant cannot resurrect it.
+          db.db
+            .prepare(
+              'DELETE FROM recovery_copy_receipts WHERE connection_id = ?',
+            )
+            .run(grant[1]!);
+        });
+        return json({enabled: input.enabled});
       }
       const id = url.pathname.slice('/ops/recovery/connections/'.length);
       if (
@@ -243,7 +273,50 @@ export async function recoveryHttp(
       });
       return json({issuer_id: issuerId, connection_id: connectionId});
     }
-    companion(db, request, issuerId);
+    const connection = companion(db, request, issuerId);
+    if (
+      url.pathname === '/recovery/copy-receipts' &&
+      request.method === 'POST'
+    ) {
+      if (connection.can_attest !== 1)
+        throw new Failure(403, 'attestation-required');
+      const input = await body(request);
+      if (
+        Object.keys(input).sort().join(',') !==
+          'bytes,exported_at,name,sha256' ||
+        typeof input.name !== 'string' ||
+        !EXPORT_NAME.test(input.name)
+      )
+        throw new Failure(400, 'invalid-body');
+      const object = await env.OPS_BACKUPS!.head('escrow/' + input.name);
+      const source =
+        object && sourceMetadata(object.customMetadata, object.size, db.now());
+      if (
+        !source ||
+        input.exported_at !== source.exported_at ||
+        input.sha256 !== source.sha256 ||
+        input.bytes !== source.bytes
+      )
+        throw new Failure(409, 'source-mismatch');
+      // Re-check authority inside the transaction after the asynchronous R2 read.
+      if (!saveCopyReceipt(db, connection.id, issuerId, object!.key, source))
+        throw new Failure(403, 'attestation-required');
+      return json({accepted: true});
+    }
+    if (
+      url.pathname.startsWith('/recovery/metadata/') &&
+      request.method === 'GET'
+    ) {
+      const name = decodeURIComponent(
+        url.pathname.slice('/recovery/metadata/'.length),
+      );
+      if (!EXPORT_NAME.test(name)) throw new Failure(404, 'not-found');
+      const object = await env.OPS_BACKUPS!.head('escrow/' + name);
+      const source =
+        object && sourceMetadata(object.customMetadata, object.size, db.now());
+      if (!source) throw new Failure(409, 'source-metadata-unavailable');
+      return json({issuer_id: issuerId, name, ...source});
+    }
     if (request.method !== 'GET') throw new Failure(405, 'method-not-allowed');
     if (url.pathname === '/recovery/exports') {
       const cursor = url.searchParams.get('cursor') ?? undefined;
