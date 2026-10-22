@@ -132,6 +132,28 @@ local destination on protected storage, then run:
 node --import tsx src/recover.ts /path/to/escrow-artifact.age
 ```
 
+For a protected offline copy, set `OPS_RECOVERY_IDENTITY_FILE` instead of
+`OPS_RECOVERY_IDENTITY`. Its value is the local identity file's path, never the
+key itself. The CLI reads a regular, non-symlink file with no group/other
+permissions (for example, mode 0600), bounded to 4096 bytes. A trailing newline
+is accepted. Setting both identity sources is an error; neither silently wins.
+Unreadable, unsafe, empty or invalid key files fail before the destination is
+opened. Errors never echo the key, file contents or exception details.
+
+```sh
+OPS_DB=/protected/recovery/ops.sqlite \
+OPS_RECOVERY_IDENTITY_FILE=/protected/offline-copy/recovery-identity.txt \
+  node --import tsx src/recover.ts /protected/offline-copy/escrow-artifact.age
+```
+
+Use the actual protected paths on the recovery computer. Install this checkout's
+locked dependencies using Node 22 before running the CLI; do not copy a native
+SQLite module built for another Node version or CPU. A file-backed restore on
+the original computer is not evidence of a successful separate-machine drill.
+The restored SQLite file is plaintext operational escrow: keep it protected,
+never copy it back to Nextcloud as a backup, and remove rehearsal destinations
+after recording only nonsecret verification results.
+
 The CLI authenticates and validates the artifact, refuses an occupied service,
 and restores atomically. Newly created files use operator-only permissions.
 Version 1 artifacts remain supported as legacy data without reconstructed
