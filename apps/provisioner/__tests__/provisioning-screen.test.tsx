@@ -2,7 +2,7 @@ import React from 'react';
 import {Share} from 'react-native';
 import {recoveryDetails} from '../src/recoveryExport';
 import Renderer, {act} from 'react-test-renderer';
-import {ApiClient} from '../src/api';
+import {ApiClient, ApiServiceError} from '../src/api';
 import {AppStore, useApp, type AppStateShape} from '../src/store';
 import {
   ProvisioningProvider,
@@ -776,4 +776,33 @@ test('an explicit recovery export contains public full identities without secret
   expect(JSON.stringify(bounded)).not.toContain('not-exported-canary');
   expect(f.bytes()).toBe(before);
   expect(f.service.record).not.toHaveBeenCalled();
+});
+
+test('stale independent backup pauses before NFC and retains the reserved attempt', async () => {
+  const f = fixture();
+  (f.service.keys as jest.Mock).mockRejectedValue(
+    new ApiServiceError('independent-backup-stale', 503),
+  );
+  const withCard = jest.fn();
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+    withCard,
+  });
+  await signIn();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(true);
+  });
+  await act(async () => {
+    expect(await flow.program()).toBe(false);
+  });
+  expect(f.service.keys).toHaveBeenCalledTimes(1);
+  expect(withCard).not.toHaveBeenCalled();
+  expect(f.service.bind).not.toHaveBeenCalled();
+  expect(f.service.disposition).not.toHaveBeenCalled();
+  expect(f.bytes()).toContain('active');
+  expect(text(tree)).toContain(
+    'Provisioning is paused because the service needs a fresh independent backup. Your saved work is retained. Ask your operator to restore backup health, then retry.',
+  );
 });
