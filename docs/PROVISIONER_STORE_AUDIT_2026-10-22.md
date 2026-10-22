@@ -28,9 +28,12 @@ Apple App Privacy currently shows no policy URL and an unstarted collection
 questionnaire (Get Started). The operator-supplied privacy URL is
 `https://getflash.io/legal/privacy.html`, but its provisioner coverage remains
 unapproved. Do not mistake the app's working policy link for completed console
-metadata.
+metadata. The iOS Support URL and Marketing URL fields are empty. Its release
+mode is currently automatic after approval; choose a reviewed release mode
+before submitting rather than assuming approval cannot publish the app.
 
-Google App content lists ten actioned declarations dated October 19. Its saved
+Google already links `https://getflash.io/legal/privacy.html` in its policy
+declaration. Google App content lists ten actioned declarations dated October 19. Its saved
 Data safety questionnaire answers **No** to collecting or sharing required data
 types. That answer conflicts with the current app/service inventory: operator
 identifiers, generated device/chip identifiers, batch settings and attempt
