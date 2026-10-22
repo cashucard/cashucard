@@ -132,6 +132,61 @@ account/MFA recovery, separate-machine retrieval, physical storage placement or
 production custody. The unlock password and authenticator recovery arrangements
 must remain independently recoverable outside Zion.
 
+## Verified copy receipts and staging issuance policy
+
+The source implementation in PRs #68–77 adds issuer-bound snapshot metadata,
+separately granted copy-attestation authority and the shared 24-hour issuance
+gate. The app explains a stale-backup refusal and retains its saved attempt
+before opening NFC. The exact 24-hour boundary, replay, safe outcome recording,
+revocation and issuer/source binding are covered by focused local regressions.
+
+Atoll Recovery **0.1.0-beta.6:1** was built for both architectures, reviewed and
+published after green CI, indexed on the Atoll registry with a matching package
+commitment, and upgraded on Zion through its normal marketplace update. Real-SDK
+checks verify default-off receipt settings and explicit enable/disable without
+retargeting credentials or locations. All 19 Python tests passed in the Linux
+runner image, including the rclone/WebDAV round-trip. Existing encrypted copies,
+configuration and notification routing were retained; copy health and receiver
+acceptance were observed healthy after upgrade.
+
+Only the existing **Zion staging** connection received an explicit administrator
+grant. The stopped-service action then enabled receipt delivery. The first
+brought-forward cron windows did not observe an export and restored the nightly
+schedule; later scheduled exports were observed during the propagation window.
+The protected trace contains five scheduled events with zero scheduled exceptions.
+Atoll reported successful destination artifact/manifest read-back and the issuer
+accepted its matching source receipt. This remains a trusted copier assertion,
+not cryptographic proof of Nextcloud possession. No new artifact was decrypted
+or restored in this receipt drill.
+
+Initial policy-activation attempts correctly remained failed in the private
+records: warm objects retained old binding snapshots despite correct control-plane
+configuration. D71's private request RPC supplies current policy and recovery-admin
+permissions from the edge, using AsyncLocalStorage to isolate overlapping calls.
+A replacement-environment regression failed before this fix and passed afterward;
+all 72 Node and 19 Workers tests and relevant type/format checks passed.
+
+The final live drill warmed the service with enforcement off, then changed the
+staging policy binding without changing its code. Authenticated status showed
+`required: true` with fresh copy evidence. A reservation probe against a deliberately
+nonexistent batch returned 404. Removing attestation authority deleted its eligible
+evidence: health and the same reservation probe returned **503**, with reason
+`independent-backup-stale`. Regranting authority and restarting Atoll recovered
+fresh evidence through actual destination read-back and receipt submission; the
+same probe again returned 404. The recovered snapshot timestamp stayed unchanged
+through recopy; receipt time did not advance its source age. The probe created no batch, attempt or card mapping and
+requested no keys. The exact 24-hour expiry was tested with injected clocks;
+this live drill exercised missing-evidence refusal and recovery without changing
+the service clock.
+
+The temporary enabled Worker version was `2585e044-f62a-4410-9193-bfe34405c458`.
+The final restored version is `5c78abd8-9ff7-40f9-9d2f-ac9dcfcc6ea5`, with
+`required: false`, fresh copy evidence and HTTP 200. The schedule API confirmed
+only `17 3 * * *` after the drill. Temporary configuration was removed; no
+production deployment, production recovery-key transfer, physical gate change,
+card operation or production mint access occurred. Production activation, 12-hour export
+cadence and release approval remain separate gates.
+
 ## Recovery scope and remaining gates
 
 The intended artifact path is staging cron → encrypted R2 export → paired Atoll
@@ -148,5 +203,5 @@ retrieval on that same Mac. The operator also reported successful drive unlock
 on another Mac. Restoring and verifying the backup there while the normal laptop
 is unavailable remains untested.
 No restore result authorizes clearing the recovery fence or resuming issuance.
-Production custody, accepted-loss-window enforcement and reviewed reconciliation
+Production custody, production accepted-loss-window enforcement and reviewed reconciliation
 remain separate gates.

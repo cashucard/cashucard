@@ -145,8 +145,9 @@ must not be described as satisfying the accepted maximum.
 
 ## Issuance enforcement implementation contract
 
-The source implementation is merged in PRs #68–73. Policy remains opt-in; a
-bounded staging receipt/outage drill and production review are still required.
+The source implementation is merged in PRs #68–77. The bounded staging
+receipt/refusal/recovery drill passed; see the [staging recovery report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+Policy remains opt-in and production activation still requires release review.
 Authenticated status can observe the configured recovery issuer before policy
 activation, so verifying copy health never requires enabling issuance enforcement.
 Keep the current D61 companion credentials read-only. Add a separately approved,
@@ -235,7 +236,8 @@ Scheduled staging export, independent Nextcloud read-back, NTFY web receipt and
 isolated restoration from the copied artifact passed. Staging Vaultwarden custody
 and the operator-held encrypted-drive copy also passed their documented checks.
 Separate-machine restore, production custody, reviewed
-retention, whole-host monitoring, push delivery, human acknowledgement, 24-hour
-issuance enforcement and the reopening procedure remain pending. The staging
+retention, whole-host monitoring, push delivery, human acknowledgement, production 24-hour
+issuance activation and the reopening procedure remain pending. The live staging
+refusal/recovery drill passed with the policy restored off afterward. The staging
 cron remains nightly; no production deployment or recovery identity transfer
 is certified by the rehearsal.
