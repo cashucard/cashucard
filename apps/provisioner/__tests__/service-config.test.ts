@@ -65,7 +65,10 @@ test('release check rejects local endpoints and enabled or unrecognized recovery
   const file = join(dir, 'serviceOrigin.json');
   const gates = join(dir, 'releaseGates.ts');
   try {
-    writeFileSync(gates, 'export const RECOVERY_DRILLS_ENABLED = false;');
+    writeFileSync(
+      gates,
+      'export const RECOVERY_DRILLS_ENABLED = false; export const BENCH_RUNS_ENABLED = false;',
+    );
     configureFile(file, 'http://127.0.0.1:8821', true);
     expect(() => checkRelease(file, gates)).toThrow();
     configureFile(file, 'https://ops.example.com', false);
@@ -74,9 +77,19 @@ test('release check rejects local endpoints and enabled or unrecognized recovery
       'export const RECOVERY_DRILLS_ENABLED = true;',
       'export const RECOVERY_DRILLS_ENABLED = choose();',
     ]) {
-      writeFileSync(gates, source);
+      writeFileSync(
+        gates,
+        source + ' export const BENCH_RUNS_ENABLED = false;',
+      );
       expect(() => checkRelease(file, gates)).toThrow();
     }
+    writeFileSync(
+      gates,
+      'export const RECOVERY_DRILLS_ENABLED = false; export const BENCH_RUNS_ENABLED = true;',
+    );
+    expect(() => checkRelease(file, gates)).toThrow(
+      'BENCH_RUNS_ENABLED = false',
+    );
   } finally {
     rmSync(dir, {recursive: true});
   }

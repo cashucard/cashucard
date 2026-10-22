@@ -2083,3 +2083,20 @@ calling an installation UUID anonymous, leaving location copy that describes
 NFC, or treating a plist change as policy approval or completed store disclosure.
 Final deployed hosting, SDK aggregation, retention and policy coverage still
 need release review. This does not add data collection or a permission request.
+
+## <a id="d65"></a>D65: Keep laboratory card writes out of distributed builds
+
+**Decided (ENG-741, 2026-10-21):** add a literal-disabled bench gate independent
+of physical installation validation. Hide the bench entry, reject navigation
+and check the gate inside the handler before opening NFC. A directly mounted
+disabled bench cannot initiate or cancel a card session. Native Release
+preflight requires both bench runs and recovery drills disabled. Read-only
+identity and the reservation-based operator coordinator remain separate.
+Approved laboratory Debug builds may explicitly enable the bench gate; no
+production, stopped-card or hardware authorization is inferred from it.
+
+**Rejected:** leaving spare-card install/key-rotation controls reachable through
+demo mode, hiding only the row, relying only on disabled native buttons, or
+using a development bench to evade durable attempt and quarantine contracts.
+The regression invokes all three write handlers directly and proves no NFC
+session opens. No card operation was performed while implementing this guard.

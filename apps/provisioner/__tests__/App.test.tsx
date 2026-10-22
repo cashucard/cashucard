@@ -158,6 +158,20 @@ test('the sign-in screen demo door enters demo mode with no session (design revi
   expect(text()).toContain('DEMO — no card, no record');
   expect(text()).toContain('Demo batch — placeholder values');
 
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByProps({testID: 'settings'}).props.onPress();
+  });
+  expect(tree!.root.findAllByProps({testID: 'bench-entry'})).toHaveLength(0);
+  expect(tree!.root.findByProps({testID: 'identity-entry'})).toBeTruthy();
+  const {SettingsScreen} = require('../src/screens/SettingsScreen');
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByType(SettingsScreen).props.onBench();
+  });
+  expect(tree!.root.findByType(SettingsScreen)).toBeTruthy();
+  await ReactTestRenderer.act(() => {
+    tree!.root.findByType(SettingsScreen).props.onBack();
+  });
+
   // Demo rows are reachable: the loop's demo chooser is present.
   await ReactTestRenderer.act(() => {
     tree!.root.findByProps({testID: 'start-batch'}).props.onPress();

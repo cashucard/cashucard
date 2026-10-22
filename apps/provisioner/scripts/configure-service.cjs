@@ -87,30 +87,26 @@ function checkRelease(file, gates) {
     ts.ScriptTarget.Latest,
     true,
   );
-  const definitions = source.statements.flatMap(statement =>
-    ts.isVariableStatement(statement)
-      ? statement.declarationList.declarations
-          .filter(
-            d =>
-              ts.isIdentifier(d.name) &&
-              d.name.text === 'RECOVERY_DRILLS_ENABLED',
-          )
-          .map(d => ({statement, declaration: d}))
-      : [],
-  );
-  if (
-    source.parseDiagnostics.length ||
-    definitions.length !== 1 ||
-    definitions[0].declaration.initializer?.kind !==
-      ts.SyntaxKind.FalseKeyword ||
-    !(definitions[0].statement.declarationList.flags & ts.NodeFlags.Const) ||
-    !definitions[0].statement.modifiers?.some(
-      m => m.kind === ts.SyntaxKind.ExportKeyword,
-    )
-  ) {
-    throw new Error(
-      'Release requires an exported constant RECOVERY_DRILLS_ENABLED = false.',
+  for (const gate of ['RECOVERY_DRILLS_ENABLED', 'BENCH_RUNS_ENABLED']) {
+    const definitions = source.statements.flatMap(statement =>
+      ts.isVariableStatement(statement)
+        ? statement.declarationList.declarations
+            .filter(d => ts.isIdentifier(d.name) && d.name.text === gate)
+            .map(d => ({statement, declaration: d}))
+        : [],
     );
+    if (
+      source.parseDiagnostics.length ||
+      definitions.length !== 1 ||
+      definitions[0].declaration.initializer?.kind !==
+        ts.SyntaxKind.FalseKeyword ||
+      !(definitions[0].statement.declarationList.flags & ts.NodeFlags.Const) ||
+      !definitions[0].statement.modifiers?.some(
+        m => m.kind === ts.SyntaxKind.ExportKeyword,
+      )
+    ) {
+      throw new Error(`Release requires an exported constant ${gate} = false.`);
+    }
   }
   return origin;
 }

@@ -38,6 +38,7 @@ import {
 import {randomBytes} from '../random';
 import {formatReadout, locksOut, makeReadout, type Readout} from '../readout';
 import {cancelCard, setCardMessage, withCard} from '../session';
+import {BENCH_RUNS_ENABLED} from '../releaseGates';
 
 async function runAction(
   action: Action,
@@ -61,7 +62,9 @@ export function LoadTestScreen(): React.JSX.Element {
   const [running, setRunning] = useState<Action | null>(null);
   const [stopped, setStopped] = useState(false);
   const [replace, setReplace] = useState(false);
-  const [status, setStatus] = useState(HOLD);
+  const [status, setStatus] = useState(
+    BENCH_RUNS_ENABLED ? HOLD : 'Bench tools are unavailable in this build.',
+  );
   const [readout, setReadout] = useState<Readout | null>(null);
   const progress = useRef('');
   const cancelled = useRef(false);
@@ -69,14 +72,16 @@ export function LoadTestScreen(): React.JSX.Element {
   // leaving the screen ends any session (cancelCard never throws)
   useEffect(
     () => () => {
-      cancelCard();
+      if (BENCH_RUNS_ENABLED) {
+        cancelCard();
+      }
     },
     [],
   );
 
   const start = useCallback(
     async (action: Action) => {
-      if (running || stopped) {
+      if (!BENCH_RUNS_ENABLED || running || stopped) {
         return;
       }
       setRunning(action);
@@ -126,7 +131,7 @@ export function LoadTestScreen(): React.JSX.Element {
     [running, stopped, replace],
   );
 
-  const idle = running === null && !stopped;
+  const idle = BENCH_RUNS_ENABLED && running === null && !stopped;
   const text = readout ? formatReadout(readout) : '';
 
   return (

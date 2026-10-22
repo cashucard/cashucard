@@ -8,3 +8,6 @@ export const CARD_INSTALLATION_VALIDATED = false;
  * This flag does not bypass CARD_INSTALLATION_VALIDATED.
  */
 export const RECOVERY_DRILLS_ENABLED = false;
+
+/** Spare-card laboratory tools only. Never enable in a distributed Release. */
+export const BENCH_RUNS_ENABLED = false;
