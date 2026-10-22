@@ -54,7 +54,8 @@ capability, not a dependency of personalization or service completion.
 - Scheduled staging export, independently verified Nextcloud transfer, NTFY
   failure/healthy web receipt and isolated restoration from that artifact now
   passed. See the [recovery report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
-  Production custody, separate-machine recovery, whole-host monitoring,
+  The [separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
+  also passed from the protected offline copy. Production custody, whole-host monitoring,
   production activation of the tested 24-hour issuance gate and reviewed reconciliation/fencing before
   reopening remain open. The rehearsal used the original Mac's staging identity.
 - Native Release builds now enforce the existing HTTPS-origin and disabled
