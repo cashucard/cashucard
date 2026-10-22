@@ -50,17 +50,10 @@ export class OpsStore extends DurableObject<Env> {
     super(ctx, env);
     const master = new EnvMaster(() => env.OPS_MASTER_KEY);
     master.getMaster(); // fail fast at first touch, not on the first batch
-    if (
-      env.OPS_INDEPENDENT_BACKUP_ISSUER !== undefined &&
-      env.OPS_INDEPENDENT_BACKUP_ISSUER !== env.OPS_RECOVERY_ISSUER_ID
-    )
-      throw new Error(
-        'independent backup issuer does not match recovery issuer',
-      );
     const db = new OpsDb({
       sql: openSqlStorage(ctx.storage),
       master,
-      independentBackupIssuer: env.OPS_INDEPENDENT_BACKUP_ISSUER,
+      independentBackupIssuerSource: () => this.backupPolicyIssuer(),
     });
     const passwordHasher = new SubtlePwHash();
     ctx.blockConcurrencyWhile(async () => {
@@ -75,6 +68,15 @@ export class OpsStore extends DurableObject<Env> {
       holderState: new HolderIssueState(),
       mints: env.OPS_MINTS ? JSON.parse(env.OPS_MINTS) : DEFAULT_MINTS,
     };
+  }
+
+  private backupPolicyIssuer(): string | undefined {
+    const issuer = this.env.OPS_INDEPENDENT_BACKUP_ISSUER;
+    if (issuer !== undefined && issuer !== this.env.OPS_RECOVERY_ISSUER_ID)
+      throw new Error(
+        'independent backup issuer does not match recovery issuer',
+      );
+    return issuer;
   }
 
   async fetch(request: Request): Promise<Response> {

@@ -2189,3 +2189,22 @@ receipts are enabled, without becoming eligible evidence. An ineligible newest
 export fails health; older ineligible archives cannot invalidate a newer eligible
 snapshot. Authorization failure or an unsupported metadata endpoint still fails
 the cycle. Missing metadata is never converted to filename-based freshness.
+
+
+## <a id="d70"></a>D70: Read live backup policy at the authorization boundary
+
+**Decided (ENG-740, 2026-10-21):** keep the shared policy accessor live on Workers,
+reading the current class environment on each use instead of retaining a scalar
+derived in the Durable Object constructor. Validate the issuer on every read as
+well as startup, including its match to the recovery issuer. Node callers may
+retain a static startup policy. Both forms use the same transactional gate.
+
+The staging drill showed correct deployed bindings while a warm object still
+reported its constructor-cached policy as disabled. Cloudflare documents that
+[binding-only deployments may reuse isolates](https://developers.cloudflare.com/workers/runtime-apis/bindings/#making-changes-to-bindings).
+A real Workers regression changes policy on an existing object, checks activation,
+refusal, invalid-issuer rejection and removal without reconstructing it.
+
+**Rejected:** treating control-plane binding metadata as proof of activation,
+requiring manual eviction/reset of durable state, passing client-controlled
+policy headers, or silently retaining the old policy until a future restart.

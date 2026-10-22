@@ -173,6 +173,8 @@ export const MIGRATIONS: readonly string[] = [
 export interface DbOptions {
   /** Opt-in: require a verified independent copy for this issuer before issuance. */
   readonly independentBackupIssuer?: string;
+  /** Live runtime binding source; do not cache configuration-derived policy. */
+  readonly independentBackupIssuerSource?: () => string | undefined;
   /**
    * The DB seam. On Node: `openSqliteFile(path)` — ':memory:' for tests.
    * On Workers: `openSqlStorage(ctx.storage.sql)` inside the DO.
@@ -191,17 +193,31 @@ export class OpsDb {
   readonly randomBytes: (n: number) => Buffer;
   readonly now: () => number;
   readonly master?: {getMaster(): Buffer};
-  readonly independentBackupIssuer?: string;
+  private readonly backupIssuerSource: () => string | undefined;
+
+  get independentBackupIssuer(): string | undefined {
+    const value = this.backupIssuerSource();
+    if (
+      value !== undefined &&
+      (typeof value !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+          value,
+        ))
+    )
+      throw new Error('invalid independent backup issuer');
+    return value;
+  }
 
   constructor(options: DbOptions) {
     if (
-      options.independentBackupIssuer !== undefined &&
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
-        options.independentBackupIssuer,
-      )
+      options.independentBackupIssuerSource &&
+      options.independentBackupIssuer !== undefined
     )
-      throw new Error('invalid independent backup issuer');
-    this.independentBackupIssuer = options.independentBackupIssuer;
+      throw new Error('ambiguous independent backup policy source');
+    this.backupIssuerSource =
+      options.independentBackupIssuerSource ??
+      (() => options.independentBackupIssuer);
+    void this.independentBackupIssuer; // Validate at startup and again on every use.
     this.db = options.sql;
     this.randomBytes =
       options.randomBytes ?? (n => Buffer.from(randomBytes(n)));

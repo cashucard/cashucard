@@ -266,7 +266,9 @@ not restore companion sessions or grants.
 
 `OPS_INDEPENDENT_BACKUP_ISSUER` explicitly opts into the 24-hour issuance fence.
 Its value is the public issuer UUID; Workers require it to equal
-`OPS_RECOVERY_ISSUER_ID`. An invalid value fails startup. Do not set it on an
+`OPS_RECOVERY_ISSUER_ID`. An invalid value fails startup and authorization-time validation. Workers read
+the live binding at each policy check; a binding-only deployment must not leave a
+constructor-cached policy active. Verify authenticated status after activation. Do not set it on an
 existing deployment until the copier receipt flow, outage behavior and mobile
 refusal handling have passed a bounded staging drill. Existing configuration
 and cron remain unchanged. The current companion HTTP implementation is Workers;
