@@ -2067,3 +2067,19 @@ bundles; it never contacts the service or handles signing credentials.
 changing the committed localhost default to an unapproved production origin,
 and treating a syntactically valid public endpoint as reviewed deployment or
 hardware evidence. This adds no phone operation, signing change or store upload.
+
+## <a id="d64"></a>D64: Declare the provisioner's first-party operational data
+
+**Decided (ENG-741, 2026-10-21):** replace the empty first-party collected-data
+array with operator IDs, device/chip identities, submitted batch configuration
+and operational activity, using Apple's User ID, Device ID, Other User Content
+and Other Usage Data categories. Mark them linked to the operator, for app
+functionality and not for tracking. Remove the unused location-purpose string;
+NFC access and the existing required-reason API entries remain unchanged.
+Document the mapping to the actual requests and persistent records.
+
+**Rejected:** declaring no collection because there is no advertising SDK,
+calling an installation UUID anonymous, leaving location copy that describes
+NFC, or treating a plist change as policy approval or completed store disclosure.
+Final deployed hosting, SDK aggregation, retention and policy coverage still
+need release review. This does not add data collection or a permission request.

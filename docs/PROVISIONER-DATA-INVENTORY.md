@@ -35,3 +35,40 @@ operator account deletion requirements apply, and reconcile Apple privacy and
 Google Data safety answers with actual deployed behavior. Do not delete a local
 interruption journal or quarantined-chip evidence merely to implement a generic
 reset or account-removal button.
+
+## Native manifest and store mapping review (2026-10-21)
+
+The app privacy manifest now describes the first-party service flows instead of
+leaving collected data empty. All four categories are linked to the operator
+account, used for app functionality, and not used for tracking in this app:
+
+| Apple manifest category | Concrete first-party flow |
+| --- | --- |
+| User ID | Login handle and operator ID associated with sessions and issuance. |
+| Device ID | App-generated device UUID, chip CPLC identity and installation public-key identity associated with an attempt. The UUID is not an advertising identifier. |
+| Other User Content | Operator-selected batch configuration, including the mint URL and installation settings submitted to the service. |
+| Other Usage Data | Batch/attempt reservations, dispositions, completion receipts and their timestamps retained for interruption recovery and audit. |
+
+These names and the app-functionality purpose use Apple's documented
+[collected data types](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatype)
+and [purposes](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatypepurposes).
+The existing required-reason API entries remain unchanged. The unused location
+purpose string was removed: the app requests NFC access, not location access.
+This metadata change adds no permission, data field, analytics SDK or network call.
+
+For Google Data safety review, map these flows against user IDs, device/other
+IDs, other user-generated content and other app actions respectively. Review
+password/session handling and the ephemeral-processing rules separately; a
+hashed password stored by the service is not the same as no credential data.
+See Google's [Data safety instructions](https://support.google.com/googleplay/android-developer/answer/10787469).
+These are review inputs, not submitted console answers or a blanket claim
+about hosting-provider logs or all third-party SDKs. Inspect the final signed
+archive's aggregated privacy report before submission.
+
+The supplied live privacy and terms pages were checked on this date. Both are
+dated January 2024 and describe the consumer Flash wallet; they do not explicitly
+explain this tool's chip identities, interrupted-install journal or escrow
+recovery. A working link does not settle provisioner coverage. The policy owner
+must confirm coverage or approve a supplement, retention/deletion handling and
+hosting disclosures before either store submission. Keep the supplied URLs until
+a reviewed public replacement is available; no website was modified here.
