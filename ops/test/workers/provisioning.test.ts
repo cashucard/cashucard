@@ -175,3 +175,66 @@ it('configured freshness policy returns 503 through the real DO SQL and shared H
     expect(db.db.prepare('SELECT 1 FROM key_batches').get()).toBeUndefined();
   });
 });
+
+it('a warm object observes policy binding activation and removal without reconstruction', async () => {
+  const stub = env.OPS_DO.get(env.OPS_DO.idFromName('warm-policy-update'));
+  const login = await stub.fetch('https://test/auth/operator/session', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'lead-setup',
+      password: 'correct horse battery',
+    }),
+  });
+  const {token} = (await login.json()) as {token: string};
+  await runInDurableObject(stub, async instance => {
+    const store = instance as import('../../src/do').OpsStore;
+    const bindings = (
+      store as unknown as {
+        env: {
+          OPS_INDEPENDENT_BACKUP_ISSUER?: string;
+          OPS_RECOVERY_ISSUER_ID: string;
+        };
+      }
+    ).env;
+    const original = bindings.OPS_INDEPENDENT_BACKUP_ISSUER;
+    const status = async () =>
+      (await (
+        await store.fetch(
+          new Request('https://test/ops/backup-status', {
+            headers: {authorization: 'Bearer ' + token},
+          }),
+        )
+      ).json()) as {independent_copy: {required: boolean}};
+    try {
+      expect((await status()).independent_copy.required).toBe(false);
+      bindings.OPS_INDEPENDENT_BACKUP_ISSUER = bindings.OPS_RECOVERY_ISSUER_ID;
+      expect((await status()).independent_copy.required).toBe(true);
+      bindings.OPS_INDEPENDENT_BACKUP_ISSUER =
+        '99999999-2222-4333-8444-555555555555';
+      await expect(status()).rejects.toThrow(
+        'independent backup issuer does not match recovery issuer',
+      );
+      bindings.OPS_INDEPENDENT_BACKUP_ISSUER = bindings.OPS_RECOVERY_ISSUER_ID;
+      const refused = await store.fetch(
+        new Request('https://test/provisioning/attempts', {
+          method: 'POST',
+          headers: {authorization: 'Bearer ' + token},
+          body: JSON.stringify({
+            device_id: DEVICE,
+            attempt_id: ATTEMPT,
+            batch_id: 9007199254740991,
+            ordinal: 0,
+          }),
+        }),
+      );
+      expect(refused.status).toBe(503);
+      expect(await refused.json()).toEqual({
+        reason: 'independent-backup-stale',
+      });
+      bindings.OPS_INDEPENDENT_BACKUP_ISSUER = undefined;
+      expect((await status()).independent_copy.required).toBe(false);
+    } finally {
+      bindings.OPS_INDEPENDENT_BACKUP_ISSUER = original;
+    }
+  });
+});
