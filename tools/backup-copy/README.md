@@ -1,9 +1,13 @@
 # Independent encrypted backup copy runner
 
-Host-only orchestration for [the recovery plan](../../docs/OPS-RECOVERY-PLAN.md).
-It uses rclone for scoped R2 reads and Nextcloud WebDAV writes. It never decrypts
-an export or needs an age private identity. It is not yet a built StartOS package,
-a production issuance gate, an alert-delivery system or a tested Zion deployment.
+Copy orchestration for [the recovery plan](../../docs/OPS-RECOVERY-PLAN.md), used
+by [Atoll Recovery for StartOS](https://github.com/islandbitcoin/atoll-recovery-startos).
+It reads encrypted exports through a paired backup-only issuer reader or scoped
+R2 access, and uses rclone for Nextcloud WebDAV writes. It never decrypts an
+export or needs an age private identity. The package adds browser setup and the
+separate notification watcher below; neither component enforces issuance.
+See the [staging report](../../docs/OPS_STAGING_REPORT_2026-10-21.md) for observed
+Zion behavior and remaining recovery gates.
 
 Requires Python 3.9+ on Linux/macOS and rclone 1.75.2 (the locally validated
 version). Source names must match the Worker's timestamp/UUID `.age` naming
@@ -23,8 +27,8 @@ No configuration or credential belongs in git. Use a private directory (0700)
 and regular configuration files (0600), with access restricted to the service
 user. The rclone config must be self-contained; no interactive auth is supported.
 
-The runner's separate JSON config contains only the private rclone config path
-and scoped remote directories, for example:
+In advanced direct-R2 mode, the runner's private JSON config names the rclone
+configuration and scoped remote directories, for example:
 
 ```json
 {
