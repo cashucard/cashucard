@@ -64,7 +64,9 @@ export async function createOperatorSession(
 ): Promise<IssuedSession | null> {
   reserveLoginAttempt(db);
   const operator = db.db
-    .prepare('SELECT id, password_hash, key_env FROM operators WHERE name = ?')
+    .prepare(
+      'SELECT id, password_hash, key_env FROM operators WHERE name = ? AND disabled = 0',
+    )
     .get(name) as
     {id: number; password_hash: string; key_env: KeyEnv} | undefined;
   if (!operator || !(await pwHash.verify(password, operator.password_hash))) {
@@ -74,7 +76,9 @@ export async function createOperatorSession(
   // invalidate a login already in flight, as well as previously issued tokens.
   return db.db.transaction(() => {
     const current = db.db
-      .prepare('SELECT password_hash, key_env FROM operators WHERE id = ?')
+      .prepare(
+        'SELECT password_hash, key_env FROM operators WHERE id = ? AND disabled = 0',
+      )
       .get(operator.id) as {password_hash: string; key_env: KeyEnv} | undefined;
     if (
       !current ||
@@ -186,6 +190,12 @@ export function resolveSession(
   if (revokedAt !== null || row.expires_at <= db.now()) {
     return null;
   }
+  if (
+    !db.db
+      .prepare('SELECT id FROM operators WHERE id = ? AND disabled = 0')
+      .get(row.principal_id)
+  )
+    return null;
   return {
     tokenHash: row.token_hash,
     principalId: row.principal_id,

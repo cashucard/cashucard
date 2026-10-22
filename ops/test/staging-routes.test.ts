@@ -5,6 +5,14 @@ const attempt = '00000000-0000-4000-8000-000000000001';
 test('staging permits only operator provisioning and backup-status methods', () => {
   for (const [method, path] of [
     ['GET', '/mints'],
+    ['GET', '/ops/operators'],
+    ['GET', '/admin/operators'],
+    ['GET', '/admin/operators/audit'],
+    ['POST', '/admin/operators'],
+    ...['disable', 'enable', 'reset-password'].map(a => [
+      'POST',
+      `/admin/operators/2/${a}`,
+    ]),
     ['POST', '/auth/operator/session'],
     ['POST', '/auth/operator/signout'],
     ['GET', '/auth/operator/sessions'],
@@ -53,6 +61,8 @@ test('staging blocks anchor, holder, legacy, unknown paths and wrong methods', (
     ['POST', `/provisioning/attempts/${attempt}`],
     ['GET', '/provisioning/attempts/not-a-uuid'],
     ['GET', '/unknown'],
+    ['DELETE', '/admin/operators/2'],
+    ['GET', '/admin/operators/2/disable'],
     ['POST', '/recovery/exports'],
     ['DELETE', '/ops/recovery/connections'],
     ['GET', '/recovery/exports/other/path'],

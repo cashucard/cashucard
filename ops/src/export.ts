@@ -24,7 +24,15 @@ export interface EscrowRow {
 }
 
 /** Recovery metadata only: passwords, sessions, PINs and the master are excluded. */
+export interface OperatorAudit {
+  id: number;
+  actor_id: number;
+  target_id: number;
+  action: string;
+  created: number;
+}
 export interface RecoveryOperator {
+  disabled?: number;
   id: number;
   name: string;
   key_env: 'factory' | 'issued';
@@ -87,7 +95,8 @@ export type EscrowExport = EscrowExportBase &
   (
     | {readonly version: 1}
     | {
-        readonly version: 2;
+        readonly version: 2 | 3;
+        readonly operator_audit?: readonly OperatorAudit[];
         readonly provisioning_batches: readonly RecoveryProvisioningBatch[];
         readonly provisioning_attempts: readonly RecoveryProvisioningAttempt[];
         readonly provisioning_records: readonly RecoveryProvisioningRecord[];
@@ -141,11 +150,14 @@ export async function exportEscrowSql(
   const snapshot = db.transaction(
     () =>
       ({
-        version: 2 as const,
+        version: 3 as const,
+        operator_audit: db
+          .prepare('SELECT * FROM operator_audit ORDER BY id')
+          .all() as OperatorAudit[],
         exported_at: now,
         operators: db
           .prepare(
-            'SELECT id, name, key_env, created FROM operators ORDER BY id',
+            'SELECT id, name, key_env, created, disabled FROM operators ORDER BY id',
           )
           .all() as RecoveryOperator[],
         batches: (
@@ -238,9 +250,24 @@ export function validateEscrowExport(
     };
   const version = object(value).version;
   shape(value, {
-    version: x => x === 1 || x === 2,
+    version: x => x === 1 || x === 2 || x === 3,
+    ...(version === 3
+      ? {
+          operator_audit: rows({
+            id: positive,
+            actor_id: positive,
+            target_id: positive,
+            action: x =>
+              ['create', 'disable', 'enable', 'reset-password'].includes(
+                x as string,
+              ),
+            created: integer,
+          }),
+        }
+      : {}),
     exported_at: integer,
     operators: rows({
+      ...(version === 3 ? {disabled: (x: unknown) => x === 0 || x === 1} : {}),
       id: positive,
       name: text,
       key_env: x => x === 'factory' || x === 'issued',
@@ -276,7 +303,7 @@ export function validateEscrowExport(
       load_sha256: text,
     }),
     cap_releases: rows({version: text, sha256: hex(64), created: integer}),
-    ...(version === 2
+    ...(version === 2 || version === 3
       ? {
           provisioning_batches: rows({
             batch_id: positive,
@@ -324,6 +351,11 @@ export function validateEscrowExport(
   };
   const operators = unique(out.operators, x => x.id);
   unique(out.operators, x => x.name);
+  if (out.version === 3) {
+    unique(out.operator_audit!, x => x.id);
+    for (const e of out.operator_audit!)
+      if (!operators.has(e.actor_id) || !operators.has(e.target_id)) fail();
+  }
   unique(out.batches, x => x.id);
   unique(out.batches, x => x.ordinal_salt);
   unique(out.cards, x => x.short_id);
@@ -546,6 +578,7 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
     if (!control || control.recovery_required !== 0)
       throw new Error('recovery requires an empty service');
     for (const table of [
+      'operator_audit',
       'operators',
       'sessions',
       'key_batches',
@@ -562,8 +595,20 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
     }
     for (const r of payload.operators)
       db.prepare(
-        'INSERT INTO operators (id, name, password_hash, key_env, created) VALUES (?, ?, ?, ?, ?)',
-      ).run(r.id, r.name, '!recovery-disabled', r.key_env, r.created);
+        'INSERT INTO operators (id, name, password_hash, key_env, created, disabled) VALUES (?, ?, ?, ?, ?, ?)',
+      ).run(
+        r.id,
+        r.name,
+        '!recovery-disabled',
+        r.key_env,
+        r.created,
+        r.disabled ?? 0,
+      );
+    if (payload.version === 3)
+      for (const e of payload.operator_audit!)
+        db.prepare(
+          'INSERT INTO operator_audit (id,actor_id,target_id,action,created) VALUES (?,?,?,?,?)',
+        ).run(e.id, e.actor_id, e.target_id, e.action, e.created);
     for (const r of payload.batches)
       db.prepare(
         'INSERT INTO key_batches (id, ordinal_salt, count, mint_url, pin_policy, pin_batch, daily_usd, no_pin_usd, load_sha256, operator_id, created) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)',
@@ -598,7 +643,7 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
         r.installer,
         r.load_sha256,
       );
-    if (payload.version === 2) {
+    if (payload.version === 2 || payload.version === 3) {
       for (const r of payload.provisioning_batches)
         db.prepare(
           'INSERT INTO provisioning_batches (batch_id, request_id, operator_id, device_id, config_json, key_env, next_ordinal, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

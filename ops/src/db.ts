@@ -168,6 +168,15 @@ export const MIGRATIONS: readonly string[] = [
     received_at INTEGER NOT NULL
   );
   `,
+  // 7. Preserve operator identity/history while revoking access administratively.
+  `ALTER TABLE operators ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0 CHECK (disabled IN (0, 1));
+   CREATE TABLE operator_audit (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     actor_id INTEGER NOT NULL REFERENCES operators(id),
+     target_id INTEGER NOT NULL REFERENCES operators(id),
+     action TEXT NOT NULL CHECK (action IN ('create','disable','enable','reset-password')),
+     created INTEGER NOT NULL
+   );`,
 ];
 
 export interface DbOptions {

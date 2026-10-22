@@ -4,6 +4,9 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
     return (
       [
         '/mints',
+        '/ops/operators',
+        '/admin/operators',
+        '/admin/operators/audit',
         '/auth/operator/sessions',
         '/ops/backup-status',
         '/ops/recovery/setup',
@@ -19,6 +22,7 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
   if (method === 'POST') {
     return (
       [
+        '/admin/operators',
         '/auth/operator/session',
         '/auth/operator/signout',
         '/auth/operator/revoke',
@@ -29,6 +33,9 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
         '/provisioning/batches',
         '/provisioning/attempts',
       ].includes(path) ||
+      /^\/admin\/operators\/[1-9][0-9]*\/(disable|enable|reset-password)$/.test(
+        path,
+      ) ||
       /^\/ops\/recovery\/connections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/attestation$/.test(
         path,
       ) ||

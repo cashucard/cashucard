@@ -338,3 +338,40 @@ Matching batch/reservation retries remain readable, and outcome/disposition
 submission remains available. `/ops/backup-status` reports `independent_copy`
 separately from R2 export status and returns unhealthy if a required copy is
 stale. A fresh receipt cannot reopen a service fenced for recovery.
+
+## Operator administration
+
+Open `https://<ops-origin>/ops/operators` and sign in with a deployment-designated
+administrator. Production designates `production-lead`. Its password belongs in
+the restricted service-secrets vault item; never share that administrative login
+with routine provisioning operators.
+
+The console lists operators and their key environment/status. Create a separate
+named account with a password of at least 12 characters and the appropriate key
+environment (`issued` is the default). Deliver the password through your secrets
+vault. Disable access instead of deleting an operator: this revokes existing
+sessions while preserving batch/card history. Resetting a password also revokes
+sessions and does not re-enable a disabled account. Re-enable is an explicit
+separate action. Self-disable is refused. Resetting your own password signs you
+out; sign in again with the new password.
+
+Deployment administrators control `OPS_OPERATOR_ADMINS`, a JSON array of exact
+operator names. It defaults empty and is separate from `OPS_RECOVERY_ADMINS`.
+An ordinary operator cannot add administrators. Node reads the same environment
+variable; Workers forward its current value through private RPC to avoid a
+cached grant. Invalid configuration fails closed. Keep Cloudflare account
+recovery independent of the service. Deployment-only password recovery does not
+re-enable a deliberately disabled account.
+
+Authenticated endpoints: `GET /admin/operators`, `POST /admin/operators` with
+`{name,password,keyEnv?}`, `POST /admin/operators/:id/disable`, `/enable`, or
+`/reset-password` with `{password}`. `GET /admin/operators/audit` returns the 100
+most recent successful administrative mutations. These endpoints require the
+allowlisted administrator's bearer token. No password/hash is returned or
+recorded in the audit trail.
+
+New recovery artifacts use export format v3, preserving account disabled state
+and the full administrative audit trail. Use the updated recovery CLI from this
+revision or later: older restore tools reject v3. The new CLI still restores
+v1/v2 backups. All restored passwords remain disabled until controlled recovery,
+and the provisioning reconciliation fence remains enabled.

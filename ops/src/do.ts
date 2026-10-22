@@ -1,3 +1,4 @@
+import {operatorAdminPage} from './operator-admin-page';
 /**
  * The ops service on Workers (the ENG-740 hosting amendment): one Durable
  * Object, `OpsStore`, whose embedded SQLite IS the escrow DB. The DO gives
@@ -30,6 +31,7 @@ import {resolveSession} from './auth';
 import {recoveryHttp, type RecoveryBindings} from './recovery-http.workers';
 
 export interface Env extends RecoveryBindings {
+  OPS_OPERATOR_ADMINS?: string;
   OPS_MASTER_KEY: string;
   /** Explicit opt-in; must match this deployment's recovery issuer UUID. */
   OPS_INDEPENDENT_BACKUP_ISSUER?: string;
@@ -49,6 +51,7 @@ export class OpsStore extends DurableObject<Env> {
   private readonly requestPolicy = new AsyncLocalStorage<{
     issuer: string | undefined;
     recoveryAdmins: string | undefined;
+    operatorAdmins: string | undefined;
   }>();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -67,6 +70,10 @@ export class OpsStore extends DurableObject<Env> {
     this.deps = {
       db,
       passwordHasher,
+      operatorAdmins: () =>
+        this.requestPolicy.getStore()
+          ? this.requestPolicy.getStore()!.operatorAdmins
+          : this.env.OPS_OPERATOR_ADMINS,
       // The last-good header persists to the anchor_tip table and seeds the
       // feed at boot (the DO's constructor IS the boot).
       anchor: new AnchorFeed(httpTipFetcher, undefined, db.tipStore()),
@@ -92,6 +99,7 @@ export class OpsStore extends DurableObject<Env> {
     request: Request,
     requiredIssuer: string | null,
     recoveryAdmins?: string,
+    operatorAdmins?: string,
   ): Promise<Response> {
     if (
       requiredIssuer !== null &&
@@ -101,12 +109,19 @@ export class OpsStore extends DurableObject<Env> {
         'independent backup issuer does not match recovery issuer',
       );
     return this.requestPolicy.run(
-      {issuer: requiredIssuer ?? undefined, recoveryAdmins},
+      {issuer: requiredIssuer ?? undefined, recoveryAdmins, operatorAdmins},
       () => this.fetch(request),
     );
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (
+      request.method === 'GET' &&
+      new URL(request.url).pathname === '/ops/operators'
+    ) {
+      const page = operatorAdminPage();
+      return new Response(page.html, {headers: page.headers});
+    }
     const context = this.requestPolicy.getStore();
     const recovery = await recoveryHttp(this.deps.db, request, {
       OPS_BACKUPS: this.env.OPS_BACKUPS,
