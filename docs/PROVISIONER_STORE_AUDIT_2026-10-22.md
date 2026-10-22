@@ -72,3 +72,39 @@ sign-in input values were not inspected.
 
 No native build, phone/card operation, production service access, new signing
 identity, store upload or public release occurred in this audit.
+
+## Follow-up: saved disclosures and public deletion-request page
+
+Subsequent operator-authorized work saved Apple's Support URL as
+`https://userdocs.flashapp.me` and the supplied privacy-policy URL. Its four
+collection categories are saved with App Functionality, linked identity and no
+tracking. Google's draft now declares User IDs, Device or other IDs, Other
+user-generated content and Other actions as required, non-ephemeral collection.
+User IDs additionally cover account management and security; device IDs and
+provisioning actions cover security. Hosting is treated as service-provider
+processing under Google's sharing exemption. No store review was submitted.
+
+The operator confirmed that `support@getflash.io` handles provisioner deletion
+requests and approved the dedicated request page, including its statement that
+necessary recovery/security records currently have no fixed automatic expiry.
+Flash-site PR #30 passed all checks and merged. Production hosting was verified
+as Caddy on DigitalOcean behind Cloudflare, with Vercel serving previews/staging.
+Only the approved new HTML file was installed in the production document root;
+no application deployment, existing file replacement or server restart occurred.
+
+The public page is `https://getflash.io/legal/provisioner-data-deletion.html`.
+HTTP 200, approved content (accounting for Cloudflare email obfuscation), visible
+support email and working mail links were verified. Google's draft deletion
+answer is Yes and its URL persisted after a full reload.
+
+Google's transport-encryption answer remains a release verification gate.
+Do not treat the current draft as a completed production declaration: verify
+the final artifact's configured origin, native transport policy and included
+dependencies before publishing it. Policy coverage beyond deletion handling
+and the remaining release gates are still open.
+
+The follow-up also found that Info.plist hard-coded CFBundleVersion to 2 despite
+Xcode CURRENT_PROJECT_VERSION being 3. Info.plist now expands that build setting
+so future archives use the configured build number. Marketing versions and
+signing configuration are unchanged. This metadata correction does not itself
+produce or validate a signed archive.
