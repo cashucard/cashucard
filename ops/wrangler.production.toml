@@ -9,6 +9,7 @@ workers_dev = true
 routes = []
 
 [vars]
+OPS_OPERATOR_ADMINS = '["production-lead"]'
 OPS_RECOVERY_ADMINS = '["production-lead"]'
 OPS_RECOVERY_ISSUER_ID = '6d933aa4-b88b-402a-97fe-f0929a481b1e'
 OPS_BACKUP_RECIPIENT = 'age1xu35750fx9nccdhgn9z3a0cpprz4xzenk8a7nnmzsck5gv646v8s3a04yk'

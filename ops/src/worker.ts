@@ -24,7 +24,12 @@ export default {
       id,
     ) as DurableObjectStub<Rpc.DurableObjectBranded> &
       Pick<OpsStore, 'dispatch'>;
-    return stub.dispatch(request, policy ?? null, env.OPS_RECOVERY_ADMINS);
+    return stub.dispatch(
+      request,
+      policy ?? null,
+      env.OPS_RECOVERY_ADMINS,
+      env.OPS_OPERATOR_ADMINS,
+    );
   },
 
   async scheduled(_controller: unknown, env: Env): Promise<void> {

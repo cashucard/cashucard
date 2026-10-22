@@ -1,3 +1,4 @@
+import {operatorAdminPage} from './operator-admin-page';
 /**
  * The service entry — the Node/dev side (D29): node:http on loopback, TLS at
  * the reverse proxy. The deployed shape is the Workers entry
@@ -38,6 +39,7 @@ export function serve(options: ServeOptions): http.Server {
   });
   const deps: RouterDeps = {
     db,
+    operatorAdmins: () => process.env.OPS_OPERATOR_ADMINS,
     // The last-good header persists to the anchor_tip table and seeds the
     // feed at boot: a restart keeps the header the 503 fallback answers with.
     anchor: new AnchorFeed(httpTipFetcher, undefined, db.tipStore()),
@@ -45,6 +47,12 @@ export function serve(options: ServeOptions): http.Server {
     mints: options.mints ?? DEFAULT_MINTS,
   };
   const server = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/ops/operators') {
+      const page = operatorAdminPage();
+      res.writeHead(200, page.headers);
+      res.end(page.html);
+      return;
+    }
     route(deps, req, res).catch(() => {
       if (!res.headersSent) {
         res.writeHead(500, {'content-type': 'application/json'});

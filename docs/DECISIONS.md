@@ -2300,3 +2300,38 @@ and holder readiness remain separate decisions.
 
 Rejected retaining the global block for an operator-authorized provisioning
 test. Rejected enabling laboratory controls or bypassing stopped-card evidence.
+
+## <a id="d75"></a>D75: Deployment-designated operator administration
+
+Provide a same-origin web console at `/ops/operators` over the shared Node and
+Workers administration API. `OPS_OPERATOR_ADMINS` is a separate deployment-owned
+JSON allowlist of exact operator names, empty by default. Backup-reader admin
+permission confers no operator-management permission. Forward the live binding
+through private Worker-to-DO dispatch, including explicit removal; never trust
+an HTTP header or a client-supplied role. Recheck both session and policy after
+asynchronous password hashing before the transaction commits.
+
+Administrators can list/create operators, reset passwords and disable/re-enable
+accounts. Roles are not editable in this console. Password resets preserve the
+account's disabled state. Access changes revoke all affected sessions, and
+login checks disabled state again after password verification. Disabling oneself
+is refused; an active administrator always remains. Accounts are never deleted,
+so card, batch and recovery references remain valid. Successful mutations and
+audit events commit together; audit events contain IDs/actions/times, never
+passwords or password hashes. Deployment-only emergency credential recovery
+continues to preserve disabled state.
+
+The browser keeps its bearer only in memory and uses same-origin authenticated
+JSON calls, no authentication cookies or browser storage. Password fields clear
+on submission, output uses text nodes, and a restrictive hashed-script CSP
+blocks framing and third-party resources. Sign-out revokes the session.
+
+Recovery export v3 preserves disabled flags and the administrative event trail;
+passwords, password hashes and sessions remain excluded. Updated restore tools
+accept v1/v2/v3, restore credentials disabled and retain the reconciliation
+fence. Older restore binaries cannot read v3; recovery must use this revision or
+later. Atoll copies opaque encrypted objects and requires no format change.
+
+Rejected deleting operators, promoting ordinary operator tokens, or overloading
+the backup-reader allowlist. Rejected a native-only admin interface that would
+require an app-store release for routine account maintenance.

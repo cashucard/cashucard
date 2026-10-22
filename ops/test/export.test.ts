@@ -122,7 +122,7 @@ test('recovery export restores card lookup without the derivation master or cred
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal((payload as unknown as {version: number}).version, 2);
+  assert.equal((payload as unknown as {version: number}).version, 3);
   assert.ok(!JSON.stringify(payload).includes('123456'));
   assert.ok(!JSON.stringify(payload).includes('password_hash'));
   const {restoreEscrowExport} = await import('../src/export');
@@ -332,8 +332,8 @@ test('v2 preserves provisioning retry identities, blocked chips and receipts; v1
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal(payload.version, 2);
-  if (payload.version !== 2) throw new Error('expected v2');
+  assert.equal(payload.version, 3);
+  if (payload.version !== 3) throw new Error('expected v3');
   const target = new OpsDb({sql: openSqliteFile(':memory:')});
   restoreEscrowExport(target.db, payload);
   for (const table of [
@@ -390,13 +390,31 @@ test('v2 preserves provisioning retry identities, blocked chips and receipts; v1
   }
   // v1 retains old suffix-only mappings but must not invent modern ownership.
   const {
+    operator_audit: _audit,
     provisioning_batches: _b,
     provisioning_attempts: _a,
     provisioning_records: _r,
     ...base
   } = payload;
   const legacy = new OpsDb({sql: openSqliteFile(':memory:')});
-  restoreEscrowExport(legacy.db, {...base, version: 1});
+  const oldOperators = base.operators.map(({disabled: _disabled, ...op}) => op);
+  restoreEscrowExport(legacy.db, {
+    ...base,
+    operators: oldOperators,
+    version: 1,
+  });
+  const legacy2 = new OpsDb({sql: openSqliteFile(':memory:')});
+  const {operator_audit: _v3audit, ...v2} = payload;
+  restoreEscrowExport(legacy2.db, {...v2, operators: oldOperators, version: 2});
+  assert.equal(
+    (
+      legacy2.db
+        .prepare('SELECT count(*) AS n FROM provisioning_attempts')
+        .get() as {n: number}
+    ).n,
+    payload.provisioning_attempts.length,
+  );
+  legacy2.close();
   assert.deepEqual(
     legacy.db.prepare('SELECT * FROM provisioning_attempts').all(),
     [],

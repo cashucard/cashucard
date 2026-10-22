@@ -1,3 +1,4 @@
+import {operatorAdminRequest} from './operator-admin';
 /**
  * The one HTTP surface: a node:http router, no framework. Bearer-token auth
  * on every route but one: GET /anchor/tip is public, because its answer is
@@ -45,6 +46,7 @@ import {addCapRelease, listCapReleases, RegistryError} from './registry';
 const BODY_LIMIT = 1 << 20; // 1 MiB; a registry row is a few hundred bytes
 
 export interface RouterDeps {
+  readonly operatorAdmins?: () => string | undefined;
   readonly db: OpsDb;
   readonly passwordHasher?: PasswordHasher;
   readonly anchor: AnchorFeed;
@@ -162,6 +164,22 @@ export async function route(
   const method = req.method ?? 'GET';
 
   try {
+    if (
+      path === '/admin/provisioning/attempts' ||
+      path === '/admin/operators' ||
+      path.startsWith('/admin/operators/')
+    ) {
+      const body = method === 'POST' ? parseJson(await readBody(req)) : {};
+      const [status, answer] = await operatorAdminRequest(
+        deps,
+        bearer(req),
+        method,
+        path,
+        body,
+      );
+      sendJson(res, status, answer);
+      return;
+    }
     // ── auth ──────────────────────────────────────────────────────────────
     if (method === 'POST' && path === '/auth/operator/session') {
       const body = parseJson(await readBody(req));
