@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 import tempfile
 import unittest
+from issuer_source import IneligibleExport
 
 spec = importlib.util.spec_from_file_location('backup_copy', Path(__file__).with_name('copy.py'))
 copy = importlib.util.module_from_spec(spec)
@@ -113,6 +114,25 @@ class CopyChecks(unittest.TestCase):
         self.transfer.corrupt = True
         self.assertFalse(self.run_copy(NOW + 120))
         self.assertEqual(len(calls), 2)
+
+    def test_legacy_archives_do_not_block_a_verified_eligible_newest_snapshot(self):
+        newer = NAME.replace('03:17:00', '03:18:00')
+        self.transfer.source[newer] = DATA
+        def confirm(receipt):
+            if receipt['name'] == NAME:
+                raise IneligibleExport('legacy metadata')
+            return copy.source_time(newer) - 10
+        self.transfer.confirm_copy = confirm
+        self.assertTrue(self.run_copy())
+        saved = json.loads(self.state.read_text())
+        self.assertEqual(saved['latest']['name'], newer)
+        self.assertIn(NAME, saved['verified'])
+        self.assertEqual(self.transfer.dest[DEST_NAME], DATA)
+        # An ineligible newest export must never certify health by filename.
+        self.state.unlink()
+        del self.transfer.source[newer]
+        self.assertFalse(self.run_copy())
+        self.assertIsNone(json.loads(self.state.read_text())['latest'])
 
     def test_rejects_paths_and_future_sources(self):
         for name in ('../' + NAME, 'subdir/' + NAME, 'not-an-export.age'):
