@@ -119,6 +119,9 @@ const message = (e: unknown): string => {
     return 'The service could not be reached. Your saved work is retained. Reconnect and retry.';
   }
   if (e instanceof ApiServiceError) {
+    if (e.reason === 'independent-backup-stale') {
+      return 'Provisioning is paused because the service needs a fresh independent backup. Your saved work is retained. Ask your operator to restore backup health, then retry.';
+    }
     if (e.reason === 'recovery-required') {
       return 'The service is paused for recovery. Your saved work is retained. Contact your operator before continuing.';
     }
