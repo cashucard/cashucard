@@ -49,7 +49,7 @@ production card mappings. The separate staging restore covers populated keys.
 Both staging and production schedules remain enabled; meridian-jabari's
 schedule alone was retired with operator approval.
 
-## Remaining release gates
+## Release gates at build 3 (superseded for internal installation by D74)
 
 - Card installation remains disabled (`CARD_INSTALLATION_VALIDATED=false`).
   Recovery drills and bench tools also remain disabled. Existing hardware
@@ -107,3 +107,15 @@ passed. No physical device or card was operated.
 The first iOS upload attempt failed before transport because Xcode's saved
 Apple account credentials were missing a username. Reauthentication was
 requested; the valid archive is retained for upload without another build.
+
+
+### Build 4 distribution follow-up
+
+Google Play reports `1.0.0 (4) - card installation enabled` available to the
+existing internal testers. After the operator reauthenticated Xcode, the
+internal-only iOS upload succeeded on October 22 at 22:54 UTC. Apple accepted
+build 1.0.0 (4) for processing. Processing completed; standard encryption and
+the operator-approved No-France answer were saved. Alpha now shows build 4
+as Testing for all three internal testers. Both stores therefore have the
+installation-enabled build available internally. PR #87 passed all 29 checks and merged as
+`5733d1e7388632ed230723544995431e57a7cc29`. No public submission was made.
