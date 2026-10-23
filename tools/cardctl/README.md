@@ -253,6 +253,21 @@ python3 hwtest_65byte_pubkey.py -r 1   # reader index, as for cardctl
 
 ## Bounded read-only provisioning preflight
 
+For an owned, empty 2.1 card with retained spent entries,
+`spent-audit.cjs` defaults to an offline/no-reader preview. Explicit
+`--inspect` runs its restricted private Python child, checks the exact CPLC
+and applet key, and requires every retained proof to be SPENT at the explicitly
+matched HTTPS mint. It prints only counts, denomination totals and an evidence
+digest, never raw proof data. It has no PIN, manager login, clear or reset
+operation. The named-card approval and invocation are documented in
+[`SPENT-SETTLEMENT-AUDIT-PLAN.md`](../../docs/SPENT-SETTLEMENT-AUDIT-PLAN.md).
+Its tests need neither PC/SC nor a network:
+
+```bash
+node --test tools/cardctl/spent-audit.test.cjs  # from repo root
+python3 test_spent_audit.py                  # from tools/cardctl
+```
+
 `read_only_preflight.py` checks an exact CPLC identity before inspecting the
 2.1 applet's public state. It never authenticates or retries. It stops on an
 absent applet, unknown version, malformed response or identity mismatch.
