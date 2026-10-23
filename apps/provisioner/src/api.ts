@@ -3,6 +3,12 @@ import type {
   RemoteBatch,
   ReservedAttempt,
 } from './provisioningWorkflow';
+import type {
+  OwnedResetService,
+  ResetLookup,
+  ResetReceipt,
+  ResetDone,
+} from './ownedResetWorkflow';
 
 /**
  * The one HTTP surface to the ops service (ENG-740): fetch with a timeout and
@@ -319,6 +325,49 @@ export class ApiClient {
   }
 
   /** GET /mints — the real-mode mint list. */
+  resets(session: OperatorSession): OwnedResetService {
+    return {
+      scope: {
+        service_origin: this.options.baseUrl,
+        operator_id: session.operator_id,
+        key_env: session.env,
+      },
+      lookup: async (chip, installation) =>
+        (await this.call(
+          'GET',
+          `/provisioning/reset-source?chip_id=${encodeURIComponent(
+            chip,
+          )}&installation_id=${encodeURIComponent(installation)}`,
+          session.token,
+        )) as unknown as ResetLookup,
+      authorize: async (device_id, request) =>
+        (
+          await this.call(
+            'POST',
+            '/provisioning/reset-intents',
+            session.token,
+            {device_id, request},
+          )
+        ).receipt as ResetReceipt,
+      keys: async (device_id, id) =>
+        (await this.call(
+          'POST',
+          `/provisioning/reset-intents/${encodeURIComponent(id)}/keys`,
+          session.token,
+          {device_id},
+        )) as unknown as Awaited<ReturnType<OwnedResetService['keys']>>,
+      complete: async (device_id, id, record) =>
+        (
+          await this.call(
+            'POST',
+            `/provisioning/reset-intents/${encodeURIComponent(id)}/complete`,
+            session.token,
+            {device_id, record},
+          )
+        ).receipt as ResetDone,
+    };
+  }
+
   async mints(token: string): Promise<string[]> {
     const json = await this.call('GET', '/mints', token);
     const mints = json.mints;

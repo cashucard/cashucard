@@ -32,9 +32,9 @@ export type TapOutcome =
   | 'record_pending'
   | 'interrupted'
   | 'quarantined'
-  | 'replacement-consent-required';
+  | 'reset-required';
 export interface TapOptions extends RunOptions {
-  /** Consent for exactly this inspected old installation, never blanket replace. */
+  /** Legacy callers cannot authorize factory-key replacement; ignored. */
   replacementInstallationId?: string;
   /** Public inspection only; caller must wait for session closure before review. */
   onReplacementRequired?: (inspection: {
@@ -88,35 +88,30 @@ export async function runProvisioningTap(
   }
   try {
     const chip = await readChipIdentity(tx, j.chip_id);
+    let observed = await inspectInstallation(tx);
+    // Inspect before binding a fresh reservation. An installed card belongs in
+    // the escrow-backed reset flow, never a factory-key replacement attempt.
+    if (j.stage === 'reserved' && observed.state === 'present') {
+      options.onReplacementRequired?.({
+        chipId: chip.id,
+        installationId: observed.installationId,
+      });
+      return 'reset-required';
+    }
     if (!j.chip_id) {
       await bind(chip.id);
       await journal.bind(chip.id);
     }
-    let observed = await inspectInstallation(tx);
     if (j.stage === 'reserved') {
-      if (observed.state === 'present') {
-        if (!complete(observed)) {
-          await journal.quarantine('verification-failed');
-          return 'quarantined';
-        }
-        if (options.replacementInstallationId !== observed.installationId) {
-          options.onReplacementRequired?.({
-            chipId: chip.id,
-            installationId: observed.installationId,
-          });
-          return 'replacement-consent-required';
-        }
-      }
       await journal.installIntent({
-        installation_id:
-          observed.state === 'present' ? observed.installationId : null,
-        replacement_consent: observed.state === 'present',
+        installation_id: null,
+        replacement_consent: false,
       });
       await options.checkpoint?.('install-intent-saved');
       const installed = await provision(tx, CASHU_PLAN, {
         ...options,
         keys: FACTORY_KEYS,
-        replace: observed.state === 'present',
+        replace: false,
       });
       if (!installed.ok) {
         return stopped(journal, installed);

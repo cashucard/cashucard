@@ -782,7 +782,7 @@ test('enabling drill controls cannot bypass the independent installation gate', 
   expect(runCard).not.toHaveBeenCalled();
 });
 
-test('replacement requires a closed-session review and one-shot installation-specific consent', async () => {
+test('an installed card closes the read session and directs the operator to reset without a replacement action', async () => {
   const f = fixture();
   const chipId = 'cplc-v1:4790d3213041093363205547';
   const installationId =
@@ -802,7 +802,7 @@ test('replacement requires a closed-session review and one-shot installation-spe
     return options.withCard(async () => {
       options.onReplacementRequired?.({chipId, installationId});
       expect(flow.replacement).toBeNull();
-      return 'replacement-consent-required';
+      return 'reset-required';
     });
   };
   const tree = await mount({
@@ -823,17 +823,9 @@ test('replacement requires a closed-session review and one-shot installation-spe
   expect(flow.replacement).toMatchObject({chipId, installationId});
   expect(text(tree)).toContain(installationId);
   expect(tree.root.findAllByProps({testID: 'real-program'})).toHaveLength(0);
-  await act(async () => {
-    await tree.root
-      .findByProps({testID: 'replacement-confirm'})
-      .props.onPress();
-  });
-  expect(consents).toEqual([undefined, installationId]);
-  // A subsequent ordinary tap never reuses the previous confirmation.
-  await act(async () => {
-    await flow.program();
-  });
-  expect(consents).toEqual([undefined, installationId, undefined]);
+  expect(tree.root.findAllByProps({testID:'replacement-confirm'})).toHaveLength(0);
+  expect(text(tree)).toContain('This card needs reset first');
+  expect(consents).toEqual([undefined]);
   await act(async () => {
     app.signOut();
   });

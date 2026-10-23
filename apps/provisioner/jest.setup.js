@@ -1,4 +1,7 @@
 /* global jest */
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
 // The NFC module is native; the tests drive cardkit with their own transceivers.
 // Its error classes are plain JavaScript and are the library's own, so a test
 // throws what the phone would.

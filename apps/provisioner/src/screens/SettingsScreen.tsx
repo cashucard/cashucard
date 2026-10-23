@@ -129,12 +129,14 @@ export function SettingsScreen({
   onBack,
   onBench,
   onIdentity,
+  onReset,
   hardwareBusy = false,
   hasSavedBatch = false,
 }: {
   onBack: () => void;
   onBench: () => void;
   onIdentity?: () => void;
+  onReset?: () => void;
   hardwareBusy?: boolean;
   hasSavedBatch?: boolean;
 }) {
@@ -239,6 +241,23 @@ export function SettingsScreen({
                 </Pressable>
                 <View style={s.divider} />
               </>
+            ) : null}
+            {onReset ? (
+              <Pressable
+                testID="reset-entry"
+                accessibilityRole="button"
+                onPress={onReset}
+                disabled={hardwareBusy}
+                style={s.row}>
+                <View style={s.rowLabelCol}>
+                  <Text style={s.rowLabel}>Reset a card for reuse</Text>
+                  <Text style={s.rowSub}>
+                    Check value, settlement and the saved manager keys before
+                    resetting.
+                  </Text>
+                </View>
+                <Text style={s.chevron}>›</Text>
+              </Pressable>
             ) : null}
             {BENCH_RUNS_ENABLED ? (
               <Pressable

@@ -161,7 +161,7 @@ test('wrong chip and failed binding prevent authentication and mutation', async 
       {...options, verifiedAt: () => 1},
     ),
   ).rejects.toThrow('binding unavailable');
-  expect(denied.log.map(c => c[1])).toEqual([0xa4, 0xca]);
+  expect(denied.log.map(c => c[1])).toEqual([0xa4, 0xca, 0xa4]);
 });
 
 test('wrong manager keys latch quarantine across restart without a failed authentication', async () => {
@@ -207,7 +207,7 @@ test('a durably rotated attempt confirms the assigned keys without PUT KEY after
   expect(f.card.failedAuths).toBe(0);
 });
 
-test('an existing card requires key-specific replacement consent and a funded card cannot be overwritten', async () => {
+test('an existing card is directed to reset before binding or authentication, even with legacy replacement consent', async () => {
   const f = fixture();
   expect((await provision(f.tx, CASHU_PLAN, options)).ok).toBe(true);
   const at = f.log.length;
@@ -218,7 +218,7 @@ test('an existing card requires key-specific replacement consent and a funded ca
       verifiedAt: () => 1,
       onReplacementRequired: review,
     }),
-  ).toBe('replacement-consent-required');
+  ).toBe('reset-required');
   expect(review).toHaveBeenCalledWith({chipId: chip, installationId: key});
   expect(
     await runProvisioningTap(f.tx, await f.open(), SPIKE_KEYS, f.bind, {
@@ -226,7 +226,7 @@ test('an existing card requires key-specific replacement consent and a funded ca
       verifiedAt: () => 1,
       replacementInstallationId: '03' + key.slice(2),
     }),
-  ).toBe('replacement-consent-required');
+  ).toBe('reset-required');
   expect(destructive(f.log.slice(at))).toEqual([]);
   expect((await f.open()).snapshot().stage).toBe('reserved');
   f.card.setCardState({unspent: 1});
@@ -236,7 +236,9 @@ test('an existing card requires key-specific replacement consent and a funded ca
       replacementInstallationId: key,
       verifiedAt: () => 1,
     }),
-  ).toBe('quarantined');
+  ).toBe('reset-required');
+  expect(f.bind).not.toHaveBeenCalled();
+  expect((await f.open()).snapshot().chip_id).toBeUndefined();
   expect(destructive(f.log.slice(at))).toEqual([]);
   expect(f.log.slice(at).filter(c => c[1] === 0x82)).toEqual([]);
 });

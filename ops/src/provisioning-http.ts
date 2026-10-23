@@ -19,6 +19,9 @@ import {
   issueResetKeys,
 } from './reset-intents';
 import {completeReset} from './reset-results';
+import {assertResetWritable} from './reset-intents';
+import {assertIndependentBackup} from './recovery-evidence';
+import {hasPendingReset} from './reset-state';
 
 type Body = Record<string, unknown>;
 
@@ -111,14 +114,45 @@ export function provisioningHttp(
     }
   }
   if (method === 'GET' && path === '/provisioning/reset-source') {
+    const lookup = findResetSource(
+      db,
+      url.searchParams.get('chip_id') ?? '',
+      url.searchParams.get('installation_id') ?? '',
+    );
+    const owner =
+      lookup.status === 'found'
+        ? (db.db
+            .prepare(
+              `SELECT a.operator_id,b.key_env FROM provisioning_attempts a
+       JOIN provisioning_batches b ON b.batch_id=a.batch_id WHERE a.attempt_id=?`,
+            )
+            .get(lookup.source.attemptId) as
+            {operator_id: number; key_env: string} | undefined)
+        : undefined;
+    let ready = true;
+    try {
+      assertResetWritable(db);
+      assertIndependentBackup(db);
+    } catch {
+      ready = false;
+    }
+    const pending = hasPendingReset(
+      db,
+      'chip',
+      url.searchParams.get('chip_id') ?? '',
+    );
     return {
       status: 200,
       body: {
-        lookup: findResetSource(
-          db,
-          url.searchParams.get('chip_id') ?? '',
-          url.searchParams.get('installation_id') ?? '',
-        ),
+        lookup,
+        // A mobile preflight must establish actor ownership before holder cleanup.
+        // This is metadata, not reset/key authority; authorization rechecks it.
+        can_reset:
+          ready &&
+          !pending &&
+          !!owner &&
+          owner.operator_id === session.principalId &&
+          owner.key_env === session.env,
       },
     };
   }

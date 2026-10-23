@@ -24,6 +24,7 @@ export * from './gp/inspect';
 export * from './gp/reset-preflight';
 export * from './gp/registry';
 export * from './gp/reset';
+export * from './gp/settled-cleanup';
 
 export * from './gp/configuration';
 
