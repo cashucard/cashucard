@@ -66,6 +66,7 @@ export interface ResetDone {
 }
 export interface ResetLookup {
   can_reset: boolean;
+  blocked_reason?: string | null;
   lookup: {status: string; source?: {attemptId: string; keySourceRef: string}};
 }
 export interface OwnedResetService {

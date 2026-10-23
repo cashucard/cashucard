@@ -13,30 +13,32 @@ import {FONT, useTheme} from '../theme';
 import {Dim, GearButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
 
 const GATE =
-  'Card installation is paused until device validation is complete. Personalization is not available in this build.';
+  'Installation is unavailable in this build. You can still review the screens in demo mode.';
 const STAGES: Record<string, string> = {
-  reserved: 'Card reserved. No installation has been confirmed.',
+  reserved: 'Ready to check this card. Installation has not been confirmed.',
   install_intent:
-    'An installation was interrupted. The same card must be checked before continuing.',
-  installed: 'Installation verified. Key rotation is not yet confirmed.',
+    'Installation may be incomplete. Continue with this same card to check what finished.',
+  installed:
+    'Card software is installed. Continue with this card to finish security setup.',
   rotation_intent:
-    'Key rotation was interrupted. The same card must be checked before continuing.',
+    'Security setup may be incomplete. Continue with this same card to check what finished.',
   rotated:
-    'Key rotation verified. The installation record has not been sent yet.',
+    'Security setup is verified. Continue with this same card to finish saving the result.',
   record_pending:
-    'Installation and key rotation verified. The record is awaiting the service.',
+    'Card work is complete. Save the result online; no card tap is needed.',
   recorded:
-    'The service confirmed the installation record. Batch progress is awaiting confirmation.',
+    'Installation saved. Finish updating this batch; no card tap is needed.',
   quarantined:
-    'This attempt is stopped. Its evidence is retained for your operator.',
+    'Stopped for review. Keep this card and share support details with your administrator.',
 };
 const STOP_REASONS: Record<string, string> = {
   'identity-mismatch': 'Card identity did not match the saved attempt.',
-  'authentication-failed': 'Card manager authentication failed.',
+  'authentication-failed': 'The expected manager keys did not match this card.',
   'unsafe-partial-install':
-    'Installation stopped after an uncertain card change.',
-  'verification-failed': 'Card verification failed.',
-  'reconciliation-required': 'Operator reconciliation is required.',
+    'The installation could not be confirmed after an interruption.',
+  'verification-failed': 'Card checks could not confirm the expected state.',
+  'reconciliation-required':
+    'Administrator review is needed before another installation.',
 };
 const HISTORY_PAGE_SIZE = 20;
 
@@ -82,10 +84,10 @@ export function BatchHistory({
           </Text>
           <Dim>
             {j.stage === 'recorded'
-              ? 'Installation and rotation recorded. Holder wallet setup required before use.'
-              : `Stopped and acknowledged. ${
+              ? 'Installation saved. Set up this card in a holder wallet before loading or spending.'
+              : `Stopped and saved. ${
                   STOP_REASONS[j.quarantine_reason ?? ''] ??
-                  'Operator review required.'
+                  'Administrator review needed.'
                 }`}
           </Dim>
           <Dim>{`Attempt …${j.attempt_id.slice(-6)}${
@@ -298,8 +300,8 @@ export function ProvisioningScreen({
   const canQuarantine =
     !!stage && !['record_pending', 'recorded', 'quarantined'].includes(stage);
   const share =
-    `Installation record — ${recorded.length} rotation records, ${stopped} stops\n` +
-    'No holder readiness is certified.\n' +
+    `Installation record — ${recorded.length} installed, ${stopped} stopped\n` +
+    'Holder-wallet setup is a separate step.\n' +
     snapshot.history
       .map(
         j =>
@@ -307,7 +309,7 @@ export function ProvisioningScreen({
             j.installation_id ? ` …${j.installation_id.slice(-4)}` : ''
           }: ` +
           (j.stage === 'recorded'
-            ? 'installation and rotation recorded'
+            ? 'installation saved'
             : j.disposition_intent?.kind ?? 'stopped'),
       )
       .join('\n');
@@ -318,7 +320,7 @@ export function ProvisioningScreen({
           <Text style={s.line}>LOCAL VALIDATION BUILD — recovery drill</Text>
           <Dim>
             Pauses are held in memory only. Record the boundary and saved stage
-            before terminating the app. No holder readiness is certified.
+            before terminating the app. Holder-wallet setup is a separate step.
           </Dim>
           {flow.drill.paused ? (
             <>
@@ -359,7 +361,7 @@ export function ProvisioningScreen({
         </View>
       ) : null}
       <Text style={s.title} testID="real-progress">
-        {batch.next_ordinal} of {batch.request.count} attempts acknowledged
+        {batch.next_ordinal} of {batch.request.count} attempts finished
       </Text>
       <View style={s.batchTrack} testID="real-batch-progress">
         <View
@@ -374,11 +376,11 @@ export function ProvisioningScreen({
         />
       </View>
       <Dim>
-        {recorded.length} rotation records · {stopped} stops
+        {recorded.length} installed · {stopped} stopped
       </Dim>
       <Dim>
-        Installation and key rotation only. These cards are not ready for
-        holders.
+        Install cards here. Set up ownership and a PIN in a holder wallet before
+        loading or spending.
       </Dim>
       <View style={s.figure} testID="real-card-visual">
         <CardFigure fill={figureFill} state={figureState} />
@@ -407,7 +409,9 @@ export function ProvisioningScreen({
             <Dim>Card …{journal.installation_id.slice(-4)}</Dim>
           ) : null}
           <SecondaryButton
-            title={pendingRecord ? 'RETRY RECORD' : 'SYNC SAVED WORK'}
+            title={
+              pendingRecord ? 'SAVE INSTALLATION RESULT' : 'CHECK SAVED WORK'
+            }
             testID="recovery-retry"
             disabled={flow.busy}
             onPress={() => {
@@ -416,7 +420,7 @@ export function ProvisioningScreen({
           />
           {stage === 'quarantined' ? (
             <PrimaryButton
-              title="ACKNOWLEDGE STOP AND CONTINUE"
+              title="SAVE STOP AND CONTINUE"
               testID="recovery-acknowledge"
               disabled={flow.busy}
               onPress={() => {
@@ -427,7 +431,7 @@ export function ProvisioningScreen({
         </View>
       ) : null}
       {snapshot.active && !complete ? (
-        <Dim>Resolve and acknowledge this attempt before ending the batch.</Dim>
+        <Dim>Finish or save this stopped attempt before closing the batch.</Dim>
       ) : null}
       {flow.replacement ? (
         <View style={s.card} testID="replacement-review">
@@ -444,8 +448,8 @@ export function ProvisioningScreen({
             {flow.replacement.installationId}
           </Text>
           <Dim>
-            Stop this unused attempt, acknowledge the stop and close the batch.
-            Then open Settings → Reset a card.
+            Stop this unused attempt, save the stop and close the batch. Then
+            open Settings → Reset a card.
           </Dim>
           <SecondaryButton
             title="KEEP EXISTING INSTALLATION"
@@ -501,8 +505,9 @@ export function ProvisioningScreen({
           />
           {confirmQuarantine ? (
             <Dim>
-              The attempt will remain stopped across restarts. A bound card
-              stays blocked until your operator resolves it.
+              The stop stays saved after restarting. A card already assigned to
+              this attempt needs administrator review before another
+              installation.
             </Dim>
           ) : null}
         </>
@@ -510,7 +515,7 @@ export function ProvisioningScreen({
       <BatchHistory history={snapshot.history} />
       {snapshot.history.length ? (
         <SecondaryButton
-          title="SHARE INSTALLATION RECORD"
+          title="SHARE BATCH RESULTS"
           testID="real-share"
           onPress={() => {
             Share.share({message: share}).catch(() => setShareNote(true));
@@ -523,7 +528,7 @@ export function ProvisioningScreen({
         </Dim>
       ) : null}
       <SecondaryButton
-        title="EXPORT RECOVERY DETAILS"
+        title="SHARE SUPPORT DETAILS"
         testID="recovery-export"
         disabled={flow.busy}
         onPress={() => {
@@ -544,7 +549,7 @@ export function ProvisioningScreen({
       ) : null}
       {complete ? (
         <PrimaryButton
-          title="CLOSE ACKNOWLEDGED BATCH"
+          title="CLOSE BATCH"
           testID="real-close"
           disabled={flow.busy}
           onPress={() => {
@@ -556,9 +561,11 @@ export function ProvisioningScreen({
         <View style={s.card}>
           {ending ? (
             <>
-              <Text style={s.line}>Batch closure is awaiting the service.</Text>
+              <Text style={s.line}>
+                The service has not confirmed batch closure yet.
+              </Text>
               <Dim>
-                The saved decision and all attempt records remain on this phone.
+                The request and completed work stay saved on this phone.
               </Dim>
               <SecondaryButton
                 title="RETRY ENDING BATCH"
@@ -576,8 +583,8 @@ export function ProvisioningScreen({
                 unused card slots?
               </Text>
               <Dim>
-                Existing attempts stay in the service record. The unused slots
-                cannot be reserved later.
+                Completed and stopped attempts stay in the service history.
+                Unused places cannot be used later.
               </Dim>
               <PrimaryButton
                 title="END BATCH"
@@ -589,7 +596,7 @@ export function ProvisioningScreen({
                 }}
               />
               <SecondaryButton
-                title="KEEP BATCH"
+                title="KEEP WORKING"
                 testID="keep-batch"
                 onPress={() => setConfirmEndBatch(false)}
               />
@@ -606,7 +613,7 @@ export function ProvisioningScreen({
       ) : null}
       {!snapshot.active && !complete ? (
         <SecondaryButton
-          title="SYNC SAVED WORK"
+          title="CHECK SAVED WORK"
           testID="recovery-retry"
           disabled={flow.busy}
           onPress={() => {

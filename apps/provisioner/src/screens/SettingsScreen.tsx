@@ -224,7 +224,7 @@ export function SettingsScreen({
         </View>
 
         <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.bench}</Text>
+          <Text style={s.header}>{'Card tools'}</Text>
           <View style={s.card}>
             {onStatus ? (
               <Pressable
@@ -316,7 +316,7 @@ export function SettingsScreen({
             </Pressable>
             {confirmSignOut ? (
               <View style={s.confirmBlock}>
-                <Text style={s.rowLabel}>Saved batch on this phone</Text>
+                <Text style={s.rowLabel}>Saved work on this phone</Text>
                 <Text style={s.demoNote}>
                   Signing out stops any current card session. Sign in with the
                   same operator and service to continue saved work.

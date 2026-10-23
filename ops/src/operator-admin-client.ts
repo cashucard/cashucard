@@ -76,6 +76,12 @@ export const adminClient =
     .querySelectorAll('[data-environment]')
     .forEach((e) => (e.textContent = environment));
   const messages = {
+    'independent-backup-stale':'Card changes are paused until a fresh independent backup is confirmed. Check the backup service, then retry.',
+    'recovery-required':'The service is being recovered. Keep the original phone and saved card details until recovery is complete.',
+    'reconciliation-evidence-stale':'The card check is too old or does not follow the required reset. Obtain a new independent check before submitting.',
+    'reconciliation-target-changed':'This attempt changed after the review began. Refresh and review its latest details before submitting.',
+    'reconciliation-changed':'A different review is already saved for this attempt. Refresh its details; do not replace the evidence.',
+    'bad-reconciliation':'The public evidence is incomplete or invalid. Check the recovery guide and the exact card and attempt.',
     'operator-admin-required':
       'Ask your service administrator to grant administrator access to this account.',
     'operator-admin-policy-invalid':
@@ -93,6 +99,7 @@ export const adminClient =
     'no-session': 'Your session has expired. Sign in again to continue.',
     'bad-credentials': 'The operator name or password is incorrect.',
   };
+  const attemptLabels={active:'In progress',recorded:'Installation saved',quarantined:'Needs review',abandoned:'Stopped'};
   function notice(element, message, error = true) {
     element.hidden = !message;
     element.classList.toggle('error', error);
@@ -343,8 +350,8 @@ export const adminClient =
           '</span><div class="account-sub">' +
           esc(ago(a.created)) +
           '</div></td><td>' +
-          badge(a.state) +
-          (a.fence_released ? '<div class="state-note">Reset reconciled</div>' : '') +
+          badge(a.state,attemptLabels[a.state]) +
+          (a.fence_released ? '<div class="state-note">New installation allowed</div>' : '') +
           '<div class="state-note">Revision ' +
           esc(a.revision) +
           '</div></td><td><button class="icon-btn" data-action="attempt" data-id="' +
@@ -512,7 +519,7 @@ export const adminClient =
         operators:
           'Disable an operator to stop access while preserving their card history. Password resets revoke existing sessions.',
         attempts:
-          'Continue installations or export recovery details on the original phone. A chip block can be reconciled only after reviewing a completed reset and a fresh independent card check.',
+          'Continue saved work or share support details from the original phone. Allow a new installation only after reviewing a completed reset and a fresh independent card check.',
         activity:
           'The latest 100 successful account changes are shown, with the administrator, operator and time of each change.',
       }[view] +
@@ -731,13 +738,13 @@ export const adminClient =
     if (!a) return;
     const guidance = {
       quarantined:
-        'Provisioning is blocked for this chip. Keep the phone’s recovery details and ask your service administrator to reconcile the original failure before using the card again.',
+        'Further installation is paused for this chip. Keep the original phone’s support details for administrator review. This status does not report the card’s balance or wallet state.',
       abandoned:
-        'This attempt is saved as abandoned. Keep the phone’s recovery details for reconciliation; a saved chip assignment may block a new attempt.',
+        'This attempt was stopped and its history is retained. A card assigned to it may need administrator review before another installation.',
       active:
-        'A provisioning attempt is reserved. Follow the recovery instructions in the provisioner app on the original phone.',
+        'Work is saved for this attempt. Continue in the provisioner app on the original phone; do not create a duplicate attempt for the same chip.',
       recorded:
-        'The service saved this installation record. Complete holder setup in a compatible wallet before using the card.',
+        'Installation was saved. Use a compatible holder wallet for setup and use. This historical record does not report the card’s current balance or owner.',
     };
     dialog(
       'Installation details',
@@ -747,11 +754,11 @@ export const adminClient =
         '">' +
         icon(a.state === 'quarantined' ? 'shield' : 'info') +
         '<p><strong>' +
-        esc(a.state[0].toUpperCase() + a.state.slice(1)) +
+        esc(attemptLabels[a.state]||'Unknown state') +
         '</strong>' +
         esc(
           a.fence_released
-            ? 'The original status is retained. An administrator reviewed completed reset evidence and released this attempt’s chip block.'
+            ? 'A reviewed reset allows a new installation attempt. The original stopped record and its history are retained.'
             : guidance[a.state] || 'Review the saved evidence before continuing.',
         ) +
         '</p></div><dl class="detail-grid"><div><dt>Batch / card</dt><dd>Batch ' +
@@ -779,16 +786,16 @@ export const adminClient =
   }
   function reviewReset(a) {
     dialog(
-      'Reconcile completed reset',
-      'Release one chip block while retaining the original attempt and its receipts.',
+      'Allow installation after reset',
+      'Allow a new attempt for this chip while keeping its previous history.',
       '<div class="notice warning"><p>This requires a completed reset from the original key custodian and a fresh, independent identity and applet-absence check. An empty wallet balance alone is insufficient.</p></div>' +
       '<dl class="detail-grid"><div class="detail-full"><dt>Chip</dt><dd>' + esc(a.chip_id) +
       '</dd></div><div class="detail-full"><dt>Attempt</dt><dd>' + esc(a.attempt_id) +
       '</dd></div></dl><label class="field">Reviewed public reset evidence (JSON)' +
       '<textarea class="reset-evidence" id="reset-evidence" rows="12" spellcheck="false" required autofocus></textarea>' +
-      '<span class="help-caption">Use the documented reconciliation evidence packet. Never paste manager keys, PINs, wallet secrets or an encrypted backup.</span></label>' +
+      '<span class="help-caption">Use the documented public reset evidence. Never paste manager keys, PINs, wallet secrets or an encrypted backup.</span></label>' +
       '<label class="check-field"><input type="checkbox" id="reset-reviewed" required><span>I verified the original custodian’s reset completion and the fresh USB observation for this exact chip. I approve releasing this block.</span></label>',
-      cancel + '<button class="btn btn-primary" type="submit">Reconcile this reset</button>', true,
+      cancel + '<button class="btn btn-primary" type="submit">ALLOW A NEW ATTEMPT</button>', true,
     );
     $('operator-form').onsubmit = (e) => {
       e.preventDefault();
@@ -796,11 +803,11 @@ export const adminClient =
       perform(async () => {
         let evidence;
         try { evidence = JSON.parse($('reset-evidence').value); }
-        catch { throw Error('Enter a valid public reconciliation evidence packet.'); }
+        catch { throw Error('Enter the valid public reset evidence described in the recovery guide.'); }
         if (!evidence || evidence.chip_id !== a.chip_id || evidence.revision !== a.revision)
           throw Error('The evidence must match this chip and saved attempt revision.');
         await request('/admin/provisioning/attempts/' + a.attempt_id + '/reconcile-reset', {...evidence,reviewed:true});
-        await saved('Reset reconciled. Original history retained; the phone can retry its existing unbound attempt.');
+        await saved('New installation allowed. History is retained; continue the waiting attempt on its original phone.');
       });
     };
   }

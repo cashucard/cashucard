@@ -5,14 +5,12 @@ afterEach(() => {
   jest.useRealTimers();
 });
 test('settlement requests carry only public query data and reject redirects or oversized replies', async () => {
-  const fetcher = jest
-    .spyOn(global, 'fetch')
-    .mockResolvedValue({
-      ok: true,
-      redirected: false,
-      url: 'https://mint.test/v1/checkstate',
-      text: async () => '{"states":[]}',
-    } as Response);
+  const fetcher = jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true,
+    redirected: false,
+    url: 'https://mint.test/v1/checkstate',
+    text: async () => '{"states":[]}',
+  } as Response);
   await expect(
     mintSettlementJson('https://mint.test', '/v1/checkstate', {
       Ys: ['public-Y'],
@@ -44,9 +42,11 @@ test('a transport that ignores abort cannot keep the reset waiting indefinitely'
   jest.useFakeTimers();
   jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}));
   const request = mintSettlementJson('https://mint.test', '/v1/keysets');
-  const assertion = expect(request).rejects.toThrow(
-    'Settlement could not be confirmed',
-  );
+  const outcome = request.catch(error => error);
   await jest.advanceTimersByTimeAsync(15001);
-  await assertion;
+  expect(await outcome).toEqual(
+    new Error(
+      'Settlement could not be confirmed. Keep the card and retry after reconnecting.',
+    ),
+  );
 }, 1000);

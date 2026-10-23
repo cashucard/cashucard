@@ -97,6 +97,7 @@ test('lookup requires the exact chip and installation, and exposes only escrow m
   assert.deepEqual(answer.body, {
     lookup: findResetSource(db, chip, installation),
     can_reset: true,
+    blocked_reason: null,
   });
   const foreign = provisioningHttp(
     db,
@@ -107,9 +108,17 @@ test('lookup requires the exact chip and installation, and exposes only escrow m
     {},
   );
   assert.equal((foreign.body as {can_reset: boolean}).can_reset, false);
+  assert.equal(
+    (foreign.body as {blocked_reason: string}).blocked_reason,
+    'operator-mismatch',
+  );
   db.db.prepare('UPDATE provisioning_control SET recovery_required=1').run();
   const fenced = provisioningHttp(db, session, 'GET', url.pathname, url, {});
   assert.equal((fenced.body as {can_reset: boolean}).can_reset, false);
+  assert.equal(
+    (fenced.body as {blocked_reason: string}).blocked_reason,
+    'recovery-required',
+  );
   db.db.prepare('UPDATE provisioning_control SET recovery_required=0').run();
   assert.deepEqual(
     findResetSource(db, chip.replace('5547', '5548'), installation),

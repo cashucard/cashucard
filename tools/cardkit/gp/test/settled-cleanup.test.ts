@@ -143,6 +143,24 @@ test('review is read-only; cleanup checks the exact proof at the mint, saves int
   assert.equal(c.commands.filter(a => a[1] === 0x31).length, 1);
 });
 
+test('public review never exports credentials or arbitrary URL suffixes from a card record', async () => {
+  const c = card(),
+    unsafe = 'https://private-canary@mint.test/?token=private-canary';
+  const review = await readResetReview(async a => {
+    if (a[1] !== 0x16) return c.tx(a);
+    const record = new Array(109 + unsafe.length).fill(0);
+    record[0] = 4;
+    record[1] = 1;
+    record[105] = unsafe.length;
+    Array.from(unsafe, c => c.charCodeAt(0)).forEach((b, i) => {
+      record[106 + i] = b;
+    });
+    return [...record, 0x90, 0];
+  });
+  assert.equal(review.mint, '');
+  assert.ok(!JSON.stringify(review).includes('private-canary'));
+});
+
 test('pending settlement, changed card, failed storage and an untrusted PIN key never authenticate or clear', async () => {
   for (const mode of ['pending', 'changed', 'storage', 'pinkey']) {
     const c = card();
