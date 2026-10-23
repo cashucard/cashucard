@@ -1,5 +1,8 @@
 import React, {useEffect, useState, useRef} from 'react';
 import {
+  InputAccessoryView,
+  Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,6 +44,7 @@ export function ResetCardScreen({
     [valueHandled, setValueHandled] = useState(false),
     [pin, setPin] = useState('');
   const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const pinAccessoryId = React.useId();
   const saved = flow.resetState;
   const visible =
     saved &&
@@ -59,10 +63,7 @@ export function ResetCardScreen({
     !card.pinBlocked &&
     card.tag &&
     (card.spent === 0 ||
-      (card.pin &&
-        card.sealed &&
-        card.record &&
-        card.mint.length > 0)) &&
+      (card.pin && card.sealed && card.record && card.mint.length > 0)) &&
     lookup?.can_reset === true &&
     lookup.lookup.status === 'found';
   useEffect(() => {
@@ -79,6 +80,14 @@ export function ResetCardScreen({
     title: {color: t.ink, fontFamily: FONT.medium, fontSize: 23},
     check: {minHeight: 48, flexDirection: 'row', gap: 12, alignItems: 'center'},
     grow: {flex: 1},
+    keyboardBar: {backgroundColor: t.card, alignItems: 'flex-end'},
+    keyboardDone: {
+      minHeight: 44,
+      minWidth: 72,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     figure: {alignItems: 'center'},
     pin: {
       minHeight: 48,
@@ -113,6 +122,8 @@ export function ResetCardScreen({
     <Screen title="Reset a card" onBack={flow.busy ? undefined : onBack}>
       <ScrollView
         contentContainerStyle={s.scroll}
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled">
         <Dim>
           Reuse a card previously installed by this service. Reset removes its
@@ -226,6 +237,9 @@ export function ResetCardScreen({
                 </Dim>
                 {visible.review.spent > 0 ? (
                   <TextInput
+                    inputAccessoryViewID={
+                      Platform.OS === 'ios' ? pinAccessoryId : undefined
+                    }
                     testID="reset-pin"
                     accessibilityLabel="Current card PIN"
                     placeholder="Current card PIN"
@@ -362,6 +376,20 @@ export function ResetCardScreen({
           </>
         )}
       </ScrollView>
+      {Platform.OS === 'ios' && pending && visible.review.spent > 0 ? (
+        <InputAccessoryView nativeID={pinAccessoryId}>
+          <View style={s.keyboardBar}>
+            <Pressable
+              style={s.keyboardDone}
+              accessibilityRole="button"
+              accessibilityLabel="Done entering PIN"
+              testID="reset-pin-done"
+              onPress={Keyboard.dismiss}>
+              <Text style={s.text}>Done</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ) : null}
       {flow.cardActive ? (
         <SecondaryButton
           title="CANCEL TAP"

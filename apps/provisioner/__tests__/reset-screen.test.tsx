@@ -1,6 +1,12 @@
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
-import {Share} from 'react-native';
+import {
+  Share,
+  Platform,
+  ScrollView,
+  InputAccessoryView,
+  Keyboard,
+} from 'react-native';
 import {AppStore, useApp, type AppStateShape} from '../src/store';
 import {ApiClient} from '../src/api';
 import {ProvisioningProvider, useProvisioning} from '../src/ProvisioningStore';
@@ -187,3 +193,38 @@ test('a card with value offers holder recovery instructions and no reset prepara
   expect(f.service.authorize).not.toHaveBeenCalled();
   expect(f.service.keys).not.toHaveBeenCalled();
 });
+
+test.each(['ios', 'android'] as const)(
+  'PIN entry uses native %s keyboard scrolling and Done never starts card work',
+  async platform => {
+    jest.replaceProperty(Platform, 'OS', platform);
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    const f = await mount();
+    await press('reset-inspect');
+    await press('reset-consent-erase');
+    await press('reset-consent-value');
+    await press('reset-prepare');
+    const scroll = tree.root.findByType(ScrollView);
+    expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(
+      platform === 'ios',
+    );
+    expect(scroll.props.keyboardDismissMode).toBe(
+      platform === 'ios' ? 'interactive' : 'on-drag',
+    );
+    const pin = tree.root.findByProps({testID: 'reset-pin'});
+    expect(pin.props.secureTextEntry).toBe(true);
+    if (platform === 'ios') {
+      const accessory = tree.root.findByType(InputAccessoryView);
+      expect(pin.props.inputAccessoryViewID).toBe(accessory.props.nativeID);
+      const before = await f.resetStorage.read();
+      await press('reset-pin-done');
+      expect(dismiss).toHaveBeenCalledTimes(1);
+      expect(await f.resetStorage.read()).toBe(before);
+      expect(f.run).toHaveBeenCalledTimes(1);
+      expect(f.service.authorize).not.toHaveBeenCalled();
+      expect(f.service.keys).not.toHaveBeenCalled();
+    } else {
+      expect(tree.root.findAllByType(InputAccessoryView)).toHaveLength(0);
+    }
+  },
+);
