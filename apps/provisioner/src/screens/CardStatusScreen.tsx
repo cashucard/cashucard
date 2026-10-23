@@ -41,7 +41,8 @@ export function CardStatusScreen({
   return (
     <Screen
       title="Check a card"
-      onBack={flow.busy ? undefined : onBack}
+      onBack={onBack}
+      onStop={flow.busy ? flow.cancel : undefined}
       physicalReadOnly>
       <ScrollView contentContainerStyle={s.scroll}>
         <Dim>
@@ -144,7 +145,7 @@ export function CardStatusScreen({
           }}
         />
       </ScrollView>
-      {flow.cardActive ? (
+      {flow.busy ? (
         <SecondaryButton title="CANCEL READ" onPress={flow.cancel} />
       ) : null}
     </Screen>

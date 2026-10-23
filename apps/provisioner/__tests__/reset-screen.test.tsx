@@ -11,10 +11,15 @@ import {AppStore, useApp, type AppStateShape} from '../src/store';
 import {ApiClient} from '../src/api';
 import {ProvisioningProvider, useProvisioning} from '../src/ProvisioningStore';
 import {ResetCardScreen} from '../src/screens/ResetCardScreen';
+import {readCardStatus} from '../src/cardStatus';
 import {readResetReview, type ResetReview} from '../src/cardkit';
 import type {OwnedResetService} from '../src/ownedResetWorkflow';
 import type {JournalStorage} from '../src/journal';
 
+jest.mock('../src/cardStatus', () => ({
+  ...jest.requireActual('../src/cardStatus'),
+  readCardStatus: jest.fn(),
+}));
 jest.mock('../src/cardkit', () => ({
   ...jest.requireActual('../src/cardkit'),
   readResetReview: jest.fn(),
@@ -41,6 +46,7 @@ const card: ResetReview = {
 let app: AppStateShape,
   flow: ReturnType<typeof useProvisioning>,
   tree: Renderer.ReactTestRenderer;
+let leave = jest.fn();
 const disk = (): JournalStorage => {
   let v: string | null = null;
   return {
@@ -53,7 +59,7 @@ const disk = (): JournalStorage => {
 function Probe() {
   app = useApp();
   flow = useProvisioning();
-  return <ResetCardScreen onBack={() => {}} onInstall={() => {}} />;
+  return <ResetCardScreen onBack={leave} onInstall={() => {}} />;
 }
 async function signIn(operator = 1) {
   const client = new ApiClient({baseUrl: 'https://ops.test'});
@@ -68,6 +74,7 @@ async function signIn(operator = 1) {
 }
 async function mount(overrides: Partial<ResetReview> = {}) {
   let id = 0;
+  leave = jest.fn();
   const storage = disk(),
     resetStorage = disk();
   const service: OwnedResetService = {
@@ -109,7 +116,7 @@ async function mount(overrides: Partial<ResetReview> = {}) {
     );
   });
   await signIn();
-  return {service, resetStorage, run};
+  return {service, resetStorage, run, leave};
 }
 async function press(id: string) {
   await act(async () => {
@@ -228,3 +235,51 @@ test.each(['ios', 'android'] as const)(
     }
   },
 );
+
+test('leaving a prepared reset retains its exact durable review and makes no card/authentication calls', async () => {
+  const f = await mount({spent: 0});
+  await press('reset-inspect');
+  await press('reset-consent-erase');
+  await press('reset-consent-value');
+  await press('reset-prepare');
+  const before = await f.resetStorage.read();
+  await press('reset-leave');
+  expect(f.leave).toHaveBeenCalledTimes(1);
+  expect(await f.resetStorage.read()).toBe(before);
+  expect(f.run).toHaveBeenCalledTimes(1);
+  expect(f.service.authorize).not.toHaveBeenCalled();
+  expect(f.service.keys).not.toHaveBeenCalled();
+});
+
+test('cancel also stops a service-only read and ignores its late eligibility response', async () => {
+  const f = await mount();
+  jest
+    .mocked(readCardStatus)
+    .mockResolvedValue({state: 'present', chipId: card.chipId, card});
+  let finish!: (value: any) => void;
+  f.service.lookup = jest.fn(
+    () =>
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+  );
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = flow.inspectStatus();
+  });
+  expect(flow.busy).toBe(true);
+  expect(flow.cardReadout).not.toBeNull();
+  await act(async () => flow.cancel());
+  await act(async () => {
+    finish({
+      can_reset: true,
+      lookup: {
+        status: 'found',
+        source: {attemptId: uuid(3), keySourceRef: `escrow:${uuid(3)}`},
+      },
+    });
+    expect(await pending).toBe(false);
+  });
+  expect(flow.cardReadout).toBeNull();
+  expect(f.service.keys).not.toHaveBeenCalled();
+});

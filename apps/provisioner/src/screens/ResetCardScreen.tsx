@@ -45,6 +45,10 @@ export function ResetCardScreen({
     [pin, setPin] = useState('');
   const [shareNotice, setShareNotice] = useState<string | null>(null);
   const pinAccessoryId = React.useId();
+  const leave = () => {
+    flow.cancel();
+    onBack();
+  };
   const saved = flow.resetState;
   const visible =
     saved &&
@@ -119,7 +123,10 @@ export function ResetCardScreen({
     </Pressable>
   );
   return (
-    <Screen title="Reset a card" onBack={flow.busy ? undefined : onBack}>
+    <Screen
+      title="Reset a card"
+      onBack={leave}
+      onStop={flow.busy ? flow.cancel : undefined}>
       <ScrollView
         contentContainerStyle={s.scroll}
         automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
@@ -345,6 +352,12 @@ export function ResetCardScreen({
                 disabled={flow.busy}
               />
             )}
+            {pending && !flow.busy ? (
+              <Dim>
+                Saved work stays on this phone when you leave. Keep this card
+                aside until you continue.
+              </Dim>
+            ) : null}
             {flow.phase ? (
               <Text style={s.text} accessibilityLiveRegion="polite">
                 {flow.phase}
@@ -390,13 +403,25 @@ export function ResetCardScreen({
           </View>
         </InputAccessoryView>
       ) : null}
-      {flow.cardActive ? (
+      {flow.busy ? (
         <SecondaryButton
-          title="CANCEL TAP"
+          title={flow.cardActive ? 'CANCEL TAP' : 'STOP AND KEEP SAVED WORK'}
           testID="reset-cancel"
           onPress={flow.cancel}
         />
-      ) : null}
+      ) : (
+        <SecondaryButton
+          title={
+            pending
+              ? 'STOP AND SAVE FOR LATER'
+              : card
+              ? 'CANCEL REVIEW'
+              : 'BACK TO SETTINGS'
+          }
+          testID="reset-leave"
+          onPress={leave}
+        />
+      )}
     </Screen>
   );
 }

@@ -207,6 +207,7 @@ const local = (t: Theme) =>
 export function BatchSetupScreen({
   onStart,
   onSettings,
+  onStop,
   onCreate,
   canStart = true,
   installationOnly = false,
@@ -214,6 +215,7 @@ export function BatchSetupScreen({
 }: {
   onStart: () => void;
   onSettings: () => void;
+  onStop?: () => void;
   onCreate?: (config: BatchConfig) => Promise<boolean>;
   canStart?: boolean;
   installationOnly?: boolean;
@@ -319,7 +321,10 @@ export function BatchSetupScreen({
 
   if (installationOnly && review) {
     return (
-      <Screen title="Review batch" onBack={() => setReview(null)}>
+      <Screen
+        title="Review batch"
+        onBack={creating ? undefined : () => setReview(null)}
+        onStop={creating ? onStop : undefined}>
         <View style={s.grow}>
           <View style={s.section}>
             <Text style={s.sectionHeader}>Installation batch</Text>
@@ -357,6 +362,16 @@ export function BatchSetupScreen({
             />
           </View>
         </View>
+        <SecondaryButton
+          title={creating ? 'STOP AND KEEP SAVED WORK' : 'CANCEL SETUP'}
+          testID="cancel-batch-review"
+          onPress={() => {
+            if (creating) {
+              onStop?.();
+            }
+            onSettings();
+          }}
+        />
       </Screen>
     );
   }
@@ -365,7 +380,18 @@ export function BatchSetupScreen({
     <Screen
       title={SETUP.title}
       onBack={undefined}
-      headerRight={<GearButton onPress={onSettings} testID="settings" />}>
+      onStop={creating ? onStop : undefined}
+      headerRight={
+        <GearButton
+          onPress={() => {
+            if (creating) {
+              onStop?.();
+            }
+            onSettings();
+          }}
+          testID="settings"
+        />
+      }>
       <View style={s.grow}>
         <ScrollView contentContainerStyle={s.scroll} testID="setup-scroll">
           {mintsFailed ? (
@@ -627,6 +653,16 @@ export function BatchSetupScreen({
           </Text>
         </View>
       </View>
+      <SecondaryButton
+        title={creating ? 'STOP AND KEEP SAVED WORK' : 'CANCEL SETUP'}
+        testID="cancel-batch-setup"
+        onPress={() => {
+          if (creating) {
+            onStop?.();
+          }
+          onSettings();
+        }}
+      />
     </Screen>
   );
 }

@@ -3075,3 +3075,27 @@ keyboard; it must not authenticate, clear entries or start a reset. Keep PIN
 entry masked and out of storage/sharing. No manual screen measurements, timers,
 PIN visibility toggle or authentication change is needed. Preserve the durable
 zero-slot review when rebuilding the app after the successful cleanup.
+
+## <a id="d109"></a>D109: Cancel unsubmitted reviews; stop and retain durable card work
+
+Every shipped screen needs an explicit exit appropriate to its current state.
+Unsubmitted forms/reviews can be canceled. Durable installation/reset work can
+be stopped and left for later, retaining its actor/device/origin binding,
+request IDs, evidence, receipts and admission fences. The saved-reset landing
+page must offer Stop for now and Settings instead of only Continue. Keep the
+original recovery ID even while its local stage still says reviewed: service
+authorization may have committed before a lost reply. A UI exit cannot safely
+pretend to undo or abandon that service intent. Permanent reset-intent
+cancellation would require a separate service contract; no fence is released
+by this navigation change.
+
+Stop ends the owned NFC session, invalidates late reads and aborts service/mint
+waiting, including body reads. Request cancellation can lose a committed
+response, so existing frozen requests and idempotent recovery remain the source
+of truth. In-session automatic record retries pause after explicit Stop until
+the operator resumes work; reopening can still perform existing network-only
+reconciliation. Never automatically arm NFC. Leaving for Settings during busy
+card work requests Stop first; hardware Back uses the same action. Sign-in
+cancellation clears its input and refuses late session acceptance. Completed
+card changes remain in place; no journal, key escrow or recovery evidence is
+cleared as an exit shortcut.

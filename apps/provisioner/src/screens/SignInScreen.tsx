@@ -1,5 +1,5 @@
 /** Operator sign-in. Keep the action above the keyboard and the form scrollable. */
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import {ApiUnreachableError} from '../api';
+import {ApiCancelledError, ApiUnreachableError} from '../api';
 import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {APP_NAME, SIGNIN} from '../strings';
 import {useApp} from '../store';
@@ -104,21 +104,44 @@ export function SignInScreen() {
   const [password, setPassword] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const passwordInput = useRef<TextInput>(null);
+  const request = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      request.current?.abort();
+      request.current = null;
+    },
+    [],
+  );
+  const stop = () => {
+    request.current?.abort();
+    request.current = null;
+    setBusy(false);
+    setPassword('');
+    setFailed(null);
+    setStopped(true);
+  };
 
   const attempt = async () => {
     if (busy || name.trim() === '' || password === '') {
       return;
     }
     Keyboard.dismiss();
+    const controller = new AbortController();
+    request.current = controller;
     setBusy(true);
+    setStopped(false);
     setFailed(null);
     try {
       // The operator's name and password are typed here and held in memory
       // only: the password is the operator's one secret, never stored by the
       // app (the service keeps its scrypt hash).
-      await app.signIn(name.trim(), password);
+      await app.signIn(name.trim(), password, {signal: controller.signal});
     } catch (e) {
+      if (request.current !== controller || e instanceof ApiCancelledError) {
+        return;
+      }
       setFailed(
         e instanceof ApiUnreachableError
           ? SIGNIN.failed(SIGNIN.unreachable)
@@ -127,7 +150,10 @@ export function SignInScreen() {
           : SIGNIN.failed('unknown'),
       );
     } finally {
-      setBusy(false);
+      if (request.current === controller) {
+        request.current = null;
+        setBusy(false);
+      }
     }
   };
 
@@ -136,7 +162,7 @@ export function SignInScreen() {
       style={s.grow}
       enabled={Platform.OS === 'ios'}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen>
+      <Screen onStop={busy ? stop : undefined}>
         <ScrollView
           style={s.grow}
           contentContainerStyle={s.center}
@@ -200,7 +226,9 @@ export function SignInScreen() {
             </Text>
           ) : (
             <Text style={s.note} accessibilityLiveRegion="polite">
-              {busy
+              {stopped
+                ? 'Sign-in stopped.'
+                : busy
                 ? 'Checking your account… Keep this screen open.'
                 : SIGNIN.note}
             </Text>

@@ -18,6 +18,7 @@ import {AppState, useColorScheme, type AppStateStatus} from 'react-native';
 
 import {
   ApiClient,
+  ApiCancelledError,
   ApiServiceError,
   ApiUnreachableError,
   RegistryOutbox,
@@ -64,7 +65,7 @@ export interface AppStateShape {
   signIn(
     name: string,
     password: string,
-    options?: {client?: ApiClient},
+    options?: {client?: ApiClient; signal?: AbortSignal},
   ): Promise<void>;
   signOut(): void;
   setTheme(t: 'system' | 'dark' | 'light'): void;
@@ -222,7 +223,15 @@ export function AppStore({
       signIn: async (name, password, options) => {
         const client = options?.client ?? makeClient();
         try {
-          const s = await client.operatorSession(name, password);
+          if (options?.signal?.aborted) {
+            throw new ApiCancelledError();
+          }
+          const s = options?.signal
+            ? await client.operatorSession(name, password, options.signal)
+            : await client.operatorSession(name, password);
+          if (options?.signal?.aborted) {
+            throw new ApiCancelledError();
+          }
           clientRef.current = client;
           // Reuse an outbox that is still holding rows (a 401 expiry keeps
           // it alive for exactly this); a fresh outbox here would orphan

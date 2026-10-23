@@ -20,7 +20,9 @@ signing identities. The tracked protocol 2.1 CAP is unchanged:
 
 The sign-in follow-up (D105) keeps the action above the keyboard, adds Next/Go
 keyboard actions and removes demo entry points, fake-card flows and demo state.
-The local SuperMax candidate is rebuilt with this change before card acceptance.
+SuperMax acceptance confirmed the keyboard action is visible and demo entry is gone.
+D108 adds native PIN-field keyboard scrolling and Done. The [safe-exit audit](PROVISIONER-SAFE-EXITS.md)
+(D109) adds consistent exits while preserving durable work and service holds.
 
 No new applet wire behavior, manager-key guessing, proof/value deletion shortcut,
 service origin migration or recovery-drill enablement is included. Existing
@@ -58,12 +60,13 @@ See [performance evidence](OPERATOR_SIGN_IN_PERFORMANCE_2026-10-23.md).
 
 1. Review and pass CI for the final build identity commit. Native CI uses a
    disposable test signer and staging endpoint; its AAB is not a store artifact.
-2. Obtain the separate service/device authorization for the exact
+2. Continue the operator-approved
    [SuperMax cleanup/reset/reinstallation plan](OWNED-CARD-MOBILE-RESET.md).
    Require the reviewed public state again; do not infer an empty card has no
    pending merchant change merely from its balance. The operator must confirm
-   pending payments/change are finished. The new flow has focused software
-   coverage but no physical cleanup/reset result yet. Keep #92 open until that
+   pending payments/change are finished. The first physical cleanup returned the same chip/key at 0 unspent and 0
+   retained spent entries. Resume that saved review after the UI update; do not
+   repeat cleanup. Applet reset and fresh installation are still pending. Keep #92 open until that
    result is recorded or clearly document a failed acceptance.
 3. Produce signed candidates with the reviewed origin. Check actual bundled
    origin/gates, build numbers, NFC entitlement, production signature/certificate

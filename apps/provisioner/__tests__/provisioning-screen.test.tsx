@@ -487,6 +487,7 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     (f.service.record as jest.Mock).mockRejectedValueOnce(
       new Error('network unavailable'),
     );
+    const intervals = jest.spyOn(globalThis, 'setInterval');
     const tree = await mount({
       ...f,
       hardwareValidated: true,
@@ -504,6 +505,18 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     expect(card.failedAuths).toBe(0);
     expect(card.log.filter(c => c[1] === 0xd8)).toHaveLength(1);
     expect(flow.snapshot?.active?.journal?.stage).toBe('record_pending');
+    const savedBeforePause = f.bytes();
+    const recordCallsBeforePause = (f.service.record as jest.Mock).mock.calls.length;
+    await act(async () => {flow.cancel();});
+    await act(async () => {
+      for (const [callback, delay] of intervals.mock.calls) {
+        if (delay === 30_000 && typeof callback === 'function') callback();
+      }
+    });
+    intervals.mockRestore();
+    expect((f.service.record as jest.Mock).mock.calls).toHaveLength(recordCallsBeforePause);
+    expect(f.bytes()).toBe(savedBeforePause);
+
     expect(tree.root.findByType(CardFigure).props.fill).toBe(1);
     const active = flow.snapshot!.active!;
     const frozen = active.journal!.frozen_record;
@@ -1011,4 +1024,27 @@ test('stale independent backup pauses before NFC and retains the reserved attemp
   expect(text(tree)).toContain(
     'Card changes are paused until the service has a fresh independent backup. Your work is saved. Ask your administrator to check backups, then retry.',
   );
+});
+
+test('a canceled operation waiting for the shared queue never arms a later card session', async () => {
+  const f = fixture();
+  const resetWithCard = jest.fn(async () => {throw new Error('canceled read must not arm');});
+  const options = {...f, serviceFor: () => f.service, resetWithCard};
+  await mount(options);
+  await signIn();
+  const first = flow;
+  await mount(options);
+  await signIn();
+  const second = flow;
+  const create = f.service.batch;
+  let release!: () => void;
+  f.service.batch = jest.fn(request => new Promise<RemoteBatch>(resolve => {
+    release = () => {resolve(create(request));};
+  }));
+  let creating!: Promise<boolean>, reading!: Promise<boolean>;
+  await act(async () => {creating = first.create(config);});
+  await act(async () => {reading = second.inspectStatus();});
+  await act(async () => second.cancel());
+  await act(async () => {release(); await creating; expect(await reading).toBe(false);});
+  expect(resetWithCard).not.toHaveBeenCalled();
 });

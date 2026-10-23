@@ -126,15 +126,19 @@ test('a bind conflict carries a bounded operation, not a request path', async ()
 
 test('end-batch sends a scoped closure request and labels a service conflict', async () => {
   const {fetcher, bodies} = scriptedFetcher([
-    (url) => {
+    url => {
       expect(url).toBe('https://ops.test/provisioning/batches/42/end');
       return {status: 409, json: {reason: 'batch-active'}};
     },
   ]);
-  const service = new ApiClient({baseUrl: 'https://ops.test', fetcher})
-    .reservations({operator_id: 7, env: 'issued', token: 'secret'});
+  const service = new ApiClient({
+    baseUrl: 'https://ops.test',
+    fetcher,
+  }).reservations({operator_id: 7, env: 'issued', token: 'secret'});
   await expect(service.endBatch!('device', 42)).rejects.toMatchObject({
-    status: 409, reason: 'batch-active', operation: 'end-batch',
+    status: 409,
+    reason: 'batch-active',
+    operation: 'end-batch',
   });
   expect(bodies[0]).toEqual({device_id: 'device', reason: 'operator-ended'});
 });
@@ -417,3 +421,46 @@ test('sign-in has a bounded 30s budget while ordinary requests retain 10s', asyn
     jest.useRealTimers();
   }
 });
+
+test.each(['headers', 'body'])(
+  'cancel aborts a request while waiting for %s even if the transport ignores abort',
+  async phase => {
+    const controller = new AbortController();
+    let finish!: (value: any) => void;
+    const response = {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        kind: 'operator',
+        operator_id: 1,
+        env: 'issued',
+        token: 'public-test-token',
+      }),
+    } as Response;
+    const delayed = new Promise<any>(resolve => {
+      finish = resolve;
+    });
+    const client = new ApiClient({
+      baseUrl: 'https://ops.test',
+      signal: controller.signal,
+      fetcher: async () =>
+        phase === 'headers' ? delayed : {...response, json: () => delayed},
+    });
+    const pending = client.operatorSession('operator', 'public-test-fixture');
+    const outcome = pending.catch(error => error);
+    await Promise.resolve();
+    controller.abort();
+    const error = await outcome;
+    expect(error).toMatchObject({name: 'ApiCancelledError'});
+    finish(
+      phase === 'headers'
+        ? response
+        : {
+            kind: 'operator',
+            operator_id: 1,
+            env: 'issued',
+            token: 'public-test-token',
+          },
+    );
+  },
+);

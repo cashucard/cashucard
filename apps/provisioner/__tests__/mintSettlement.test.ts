@@ -1,4 +1,4 @@
-import {mintSettlementJson} from '../src/mintSettlement';
+import {mintSettlementJson, MintSettlementError} from '../src/mintSettlement';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -50,3 +50,25 @@ test('a transport that ignores abort cannot keep the reset waiting indefinitely'
     ),
   );
 }, 1000);
+
+test('operator stop aborts settlement checks without waiting for an unresponsive mint', async () => {
+  const controller = new AbortController();
+  const native = jest
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(() => new Promise(() => {}));
+  try {
+    const pending = mintSettlementJson(
+      'https://mint.test',
+      '/v1/checkstate',
+      {Ys: []},
+      controller.signal,
+    );
+    const outcome = pending.catch(error => error);
+    controller.abort();
+    expect(await outcome).toBeInstanceOf(MintSettlementError);
+    expect(native).toHaveBeenCalledTimes(1);
+    expect(native.mock.calls[0][1]?.signal?.aborted).toBe(true);
+  } finally {
+    native.mockRestore();
+  }
+});

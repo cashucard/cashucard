@@ -8,15 +8,24 @@ export class MintSettlementError extends Error {
 }
 
 /** Public mint requests only. No credentials, redirects, retries or raw errors. */
-export const mintSettlementJson: CleanupOptions['mintJson'] = async (
-  origin,
-  path,
-  body,
-) => {
+export const mintSettlementJson = async (
+  origin: string,
+  path: string,
+  body?: Parameters<CleanupOptions['mintJson']>[2],
+  signal?: AbortSignal,
+): Promise<unknown> => {
+  if (signal?.aborted) {
+    throw new MintSettlementError();
+  }
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let stop: (() => void) | undefined;
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, {once: true});
   try {
     return await new Promise<unknown>((resolve, reject) => {
+      stop = () => reject(new Error('cancelled'));
+      controller.signal.addEventListener('abort', stop, {once: true});
       timer = setTimeout(() => {
         controller.abort();
         reject(new Error('timeout'));
@@ -51,5 +60,9 @@ export const mintSettlementJson: CleanupOptions['mintJson'] = async (
     throw new MintSettlementError();
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
+    if (stop) {
+      controller.signal.removeEventListener('abort', stop);
+    }
   }
 };

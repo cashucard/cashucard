@@ -112,6 +112,13 @@ export class ApiUnreachableError extends Error {
   }
 }
 
+export class ApiCancelledError extends Error {
+  constructor() {
+    super('request-cancelled');
+    this.name = 'ApiCancelledError';
+  }
+}
+
 const TIMEOUT_MS = 10_000;
 // Deployed 600k PBKDF2 verification takes 8–12s; retain a bounded login.
 const SIGN_IN_TIMEOUT_MS = 30_000;
@@ -123,6 +130,7 @@ export interface ApiClientOptions {
   readonly baseUrl: string;
   readonly fetcher?: Fetcher;
   readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
 }
 
 export class ApiClient {
@@ -142,78 +150,82 @@ export class ApiClient {
     token: string | null,
     body?: unknown,
     timeoutMs = this.timeoutMs,
+    signal = this.options.signal,
   ): Promise<Record<string, unknown>> {
-    let res: Response;
-    // The documented timeout, actually applied: a hung ops socket must not
-    // stall past its budget. Only sign-in gets the longer password budget.
-    // The abort races the fetcher — a fetcher that ignores the signal (or a
-    // platform fetch that honors it late) still resolves the call.
+    if (signal?.aborted) {
+      throw new ApiCancelledError();
+    }
     const controller = new AbortController();
     let timedOut = false;
+    const forwardAbort = () => controller.abort();
+    signal?.addEventListener('abort', forwardAbort, {once: true});
+    let rejectAbort!: () => void;
+    const aborted = new Promise<never>((_resolve, reject) => {
+      rejectAbort = () => reject(new ApiCancelledError());
+      controller.signal.addEventListener('abort', rejectAbort, {once: true});
+    });
     const timer = setTimeout(() => {
       timedOut = true;
       controller.abort();
     }, timeoutMs);
     try {
-      const pending = this.fetcher(this.options.baseUrl + path, {
-        method,
-        headers: {
-          ...(token ? {Authorization: `Bearer ${token}`} : {}),
-          ...(body !== undefined ? {'Content-Type': 'application/json'} : {}),
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      } as RequestInit);
-      res = await new Promise<Response>((resolve, reject) => {
-        const onAbort = () => reject(new Error('the request timed out'));
-        controller.signal.addEventListener('abort', onAbort, {once: true});
-        pending.then(
-          v => {
-            controller.signal.removeEventListener('abort', onAbort);
-            resolve(v);
+      const request = (async () => {
+        const res = await this.fetcher(this.options.baseUrl + path, {
+          method,
+          headers: {
+            ...(token ? {Authorization: `Bearer ${token}`} : {}),
+            ...(body !== undefined ? {'Content-Type': 'application/json'} : {}),
           },
-          e => {
-            controller.signal.removeEventListener('abort', onAbort);
-            reject(e);
-          },
-        );
-      });
-    } catch (e) {
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        } as RequestInit);
+        let json: Record<string, unknown>;
+        try {
+          json = (await res.json()) as Record<string, unknown>;
+        } catch {
+          throw new ApiServiceError(
+            `HTTP ${res.status}`,
+            res.status,
+            serviceOperation(method, path),
+          );
+        }
+        if (!res.ok) {
+          throw new ApiServiceError(
+            typeof json.reason === 'string'
+              ? json.reason
+              : `HTTP ${res.status}`,
+            res.status,
+            serviceOperation(method, path),
+          );
+        }
+        return json;
+      })();
+      return await Promise.race([request, aborted]);
+    } catch (error) {
+      if (signal?.aborted) {
+        throw new ApiCancelledError();
+      }
       if (timedOut) {
         throw new ApiUnreachableError(
           new Error(`the request exceeded ${timeoutMs} ms`),
         );
       }
-      throw new ApiUnreachableError(e);
+      if (error instanceof ApiServiceError) {
+        throw error;
+      }
+      throw new ApiUnreachableError(error);
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', forwardAbort);
+      controller.signal.removeEventListener('abort', rejectAbort);
     }
-    let json: Record<string, unknown>;
-    try {
-      json = (await res.json()) as Record<string, unknown>;
-    } catch {
-      throw new ApiServiceError(
-        `HTTP ${res.status}`,
-        res.status,
-        serviceOperation(method, path),
-      );
-    }
-    if (!res.ok) {
-      const reason =
-        typeof json.reason === 'string' ? json.reason : `HTTP ${res.status}`;
-      throw new ApiServiceError(
-        reason,
-        res.status,
-        serviceOperation(method, path),
-      );
-    }
-    return json;
   }
 
   /** POST /auth/operator/session — the S1 call. */
   async operatorSession(
     name: string,
     password: string,
+    signal?: AbortSignal,
   ): Promise<OperatorSession> {
     const json = await this.call(
       'POST',
@@ -221,6 +233,7 @@ export class ApiClient {
       null,
       {name, password},
       this.signInTimeoutMs,
+      signal ?? this.options.signal,
     );
     const env = json.env;
     if (env !== 'factory' && env !== 'issued') {
