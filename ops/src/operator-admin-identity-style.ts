@@ -1,5 +1,5 @@
 export const adminIdentityStyle = String.raw`
-/* Cashu Card identity — original mascot, precise typography, physical card study. */
+/* Cashu Card identity: original mascot, precise typography, physical card study. */
 .brand {
   gap: 11px;
   letter-spacing: 0;

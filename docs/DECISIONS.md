@@ -2393,3 +2393,16 @@ clients and backup pairing; switching their origins is separate work.
 
 Rejected a continuously animated mascot, which distracts during operations,
 and a new frontend framework or remote assets for a small visual change.
+
+
+## D79 — Plain administration copy
+
+Apply the Ajene copy rules to the console: descriptive headings, concrete
+actions, full sentences and a single contextual explanation of each boundary.
+Replace slogan fragments and broad wallet claims with the tool's actual tasks.
+Keep card-state warnings and session consequences beside the relevant actions.
+Use explicit unavailable/loading labels instead of em-dash placeholders, and
+ask operators to check saved results before retrying an uncertain request.
+
+Rejected retaining marketing slogans in administration screens because they
+obscure the account and provisioning tasks operators came to complete.
