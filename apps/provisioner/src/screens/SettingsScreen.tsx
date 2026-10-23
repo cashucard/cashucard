@@ -130,6 +130,7 @@ export function SettingsScreen({
   onBench,
   onIdentity,
   onReset,
+  onStatus,
   hardwareBusy = false,
   hasSavedBatch = false,
 }: {
@@ -137,6 +138,7 @@ export function SettingsScreen({
   onBench: () => void;
   onIdentity?: () => void;
   onReset?: () => void;
+  onStatus?: () => void;
   hardwareBusy?: boolean;
   hasSavedBatch?: boolean;
 }) {
@@ -224,6 +226,23 @@ export function SettingsScreen({
         <View style={s.section}>
           <Text style={s.header}>{SETTINGS.bench}</Text>
           <View style={s.card}>
+            {onStatus ? (
+              <Pressable
+                testID="card-status-entry"
+                accessibilityRole="button"
+                onPress={onStatus}
+                disabled={hardwareBusy}
+                style={s.row}>
+                <View style={s.rowLabelCol}>
+                  <Text style={s.rowLabel}>Check a card</Text>
+                  <Text style={s.rowSub}>
+                    Read its state and see the next step. No changes to the
+                    card.
+                  </Text>
+                </View>
+                <Text style={s.chevron}>›</Text>
+              </Pressable>
+            ) : null}
             {onIdentity ? (
               <>
                 <Pressable

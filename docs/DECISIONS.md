@@ -2890,3 +2890,25 @@ calling the whole chip factory-reset, asking for a PIN in a terminal/chat,
 allowing pending mint states to authorize erasure, treating the earlier
 read-only audit as permission to clear, or claiming simulator success proves
 the new mobile hardware path. Release still requires its named-device drill.
+
+## D102 — Turn public card state into next steps without certifying payment readiness
+
+**Decided (2026-10-23):** A signed-in operator can deliberately check a card
+from batch setup or Settings. The shared operation queue owns this read-only
+NFC session. CPLC and applet selection distinguish absence from an unsupported
+version; an unknown version stops before further card reads. A supported card
+reports public state and matching service history, with no PIN, authentication,
+clearing or spending. A failed new read removes stale results.
+
+The screen distinguishes a new installation review, holder setup, a wallet-linked
+empty card, unspent value, retained spent entries, PIN/lock recovery, incomplete
+installation and unresolved history. Matching local interrupted work routes to
+its saved attempt rather than starting over. Holder instructions do not launch
+an installation; eligible reset is a separate review action. Counts are not a
+wallet balance, and spent entries do not imply mint settlement. Service history
+checks are separate from the physical read; unavailable history cannot authorize
+reset. The existing CPLC-only identity screen keeps its narrow command scope.
+
+**Rejected:** one generic “empty/ready” state, treating applet presence as
+holder readiness, silently beginning a reset from a status check, or reading
+additional applet data behind the existing identity-only control.
