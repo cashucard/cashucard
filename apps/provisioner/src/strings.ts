@@ -11,9 +11,16 @@ export const SIGNIN = {
   tagline: 'Programs blank cards into Cashu cards. Operators only.',
   button: 'SIGN IN',
   signingIn: 'SIGNING IN…',
-  failed: (reason: string) => `Sign-in failed: ${reason}. Try again.`,
+  failed: (reason: string) =>
+    reason === 'bad-credentials'
+      ? 'Check your operator name and password, then try again.'
+      : reason === 'login-rate-limited'
+      ? 'Too many sign-in attempts. Wait a minute, then try again.'
+      : reason === 'the record service cannot be reached'
+      ? 'The service could not be reached. Check your connection and try again.'
+      : 'Sign-in could not be completed. Try again, or ask your administrator for help.',
   unreachable: 'the record service cannot be reached',
-  note: 'The key service issues this session; keys never live on this phone.',
+  note: 'Use the operator account provided by your administrator.',
   namePlaceholder: 'Operator name',
   passwordPlaceholder: 'Password',
   demo: 'REVIEW IN DEMO MODE',
@@ -38,12 +45,12 @@ export const SETUP = {
 export const PHASES: Record<string, string> = {
   probe: 'Checking the card',
   selectIsd: 'Opening the card manager',
-  auth: 'Logging in',
+  auth: 'Verifying card access',
   sweep: 'Removing the old install',
   installForLoad: 'Starting the write',
-  load: 'Writing the applet',
-  putKey: 'Changing the manager keys',
-  reopen: 'Confirming the manager keys',
+  load: 'Writing card software',
+  putKey: 'Securing the card',
+  reopen: 'Checking card security',
   installOpener: 'Installing the opener',
   installCard: 'Installing the card',
   installTag: 'Installing the tag',
@@ -186,7 +193,7 @@ export const SETTINGS = {
   bench: 'Bench runs (load test)',
   session: 'Session',
   signOut: 'Sign out',
-  signOutSub: 'Ends this operator session; pending rows keep their place.',
+  signOutSub: 'Signs out without deleting saved batches or resets.',
 };
 
 export const DEMO_BANNER = 'DEMO — no card, no record';

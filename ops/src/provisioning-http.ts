@@ -20,7 +20,10 @@ import {
 } from './reset-intents';
 import {completeReset} from './reset-results';
 import {assertResetWritable} from './reset-intents';
-import {assertIndependentBackup} from './recovery-evidence';
+import {
+  assertIndependentBackup,
+  BackupFreshnessError,
+} from './recovery-evidence';
 import {hasPendingReset} from './reset-state';
 
 type Body = Record<string, unknown>;
@@ -129,30 +132,41 @@ export function provisioningHttp(
             .get(lookup.source.attemptId) as
             {operator_id: number; key_env: string} | undefined)
         : undefined;
-    let ready = true;
+    let blocked_reason: string | null = null;
     try {
       assertResetWritable(db);
       assertIndependentBackup(db);
-    } catch {
-      ready = false;
+    } catch (error) {
+      blocked_reason =
+        error instanceof BackupFreshnessError
+          ? 'independent-backup-stale'
+          : error instanceof ProvisioningError &&
+              error.code === 'recovery-required'
+            ? 'recovery-required'
+            : 'service-check-failed';
     }
     const pending = hasPendingReset(
       db,
       'chip',
       url.searchParams.get('chip_id') ?? '',
     );
+    if (!blocked_reason)
+      blocked_reason = pending
+        ? 'reset-unresolved'
+        : !owner
+          ? 'source-unavailable'
+          : owner.operator_id !== session.principalId ||
+              owner.key_env !== session.env
+            ? 'operator-mismatch'
+            : null;
     return {
       status: 200,
       body: {
         lookup,
         // A mobile preflight must establish actor ownership before holder cleanup.
         // This is metadata, not reset/key authority; authorization rechecks it.
-        can_reset:
-          ready &&
-          !pending &&
-          !!owner &&
-          owner.operator_id === session.principalId &&
-          owner.key_env === session.env,
+        can_reset: blocked_reason === null,
+        blocked_reason,
       },
     };
   }

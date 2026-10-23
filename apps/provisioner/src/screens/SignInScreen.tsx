@@ -184,7 +184,11 @@ export function SignInScreen() {
             {failed}
           </Text>
         ) : (
-          <Text style={s.note}>{SIGNIN.note}</Text>
+          <Text style={s.note} accessibilityLiveRegion="polite">
+            {busy
+              ? 'Checking your account… Keep this screen open.'
+              : SIGNIN.note}
+          </Text>
         )}
         {/* Demo's design-review door (PROVISIONER-APP "Demo mode"): the
             screens run against the fake card with no session at all — the

@@ -11,9 +11,21 @@ import {
 import {useProvisioning} from '../ProvisioningStore';
 import {useApp} from '../store';
 import {resetRecoveryDetails} from '../ownedResetWorkflow';
+
 import {CardFigure} from '../CardFigure';
 import {FONT, useTheme} from '../theme';
 import {Dim, PrimaryButton, Screen, SecondaryButton} from '../ui';
+
+const BLOCKED: Record<string, string> = {
+  'operator-mismatch':
+    'Sign in with the operator account that installed this card.',
+  'independent-backup-stale':
+    'Reset is paused until the service has a fresh independent backup. Ask your administrator to check backups.',
+  'recovery-required':
+    'The service is being recovered. Keep this card and ask your administrator when reset can continue.',
+  'reset-unresolved':
+    'This card already has a saved reset. Continue it on the original phone instead of starting another.',
+};
 
 export function ResetCardScreen({
   onBack,
@@ -46,7 +58,11 @@ export function ResetCardScreen({
     !card.locked &&
     !card.pinBlocked &&
     card.tag &&
-    (card.spent === 0 || (card.pin && card.sealed && card.record)) &&
+    (card.spent === 0 ||
+      (card.pin &&
+        card.sealed &&
+        card.record &&
+        card.mint.length > 0)) &&
     lookup?.can_reset === true &&
     lookup.lookup.status === 'found';
   useEffect(() => {
@@ -157,6 +173,11 @@ export function ResetCardScreen({
                 <Dim>{`Card key …${card.installationId.slice(-8)} · ${
                   card.unspent
                 } unspent · ${card.spent} retained spent entries`}</Dim>
+                {card.spent > 0 ? (
+                  <Dim>{`Settlement check: ${
+                    card.mint || 'unsupported mint address'
+                  }. Only derived proof identifiers go to this mint; the PIN is sent only to the card, encrypted.`}</Dim>
+                ) : null}
                 {card.unspent > 0 ? (
                   <Dim>
                     Use the holder wallet to spend or recover all value. This
@@ -177,11 +198,12 @@ export function ResetCardScreen({
                 ) : null}
                 {lookup && !lookup.can_reset ? (
                   <Dim>
-                    {lookup.lookup.status === 'unresolved'
-                      ? 'This card has unfinished installation history. Ask your administrator to reconcile it.'
-                      : lookup.lookup.status === 'found'
-                      ? 'Sign in with the operator account that installed this card. The service must support reset authorization.'
-                      : 'This service cannot confirm the card’s current manager keys. Use the original provisioning service or ask its administrator for recovery.'}
+                    {BLOCKED[lookup.blocked_reason ?? ''] ??
+                      (lookup.lookup.status === 'unresolved'
+                        ? 'This card has unfinished installation history. Share its support details with your administrator.'
+                        : lookup.lookup.status === 'found'
+                        ? 'Reset is unavailable for this account or service. Ask your administrator to check this card’s installation history.'
+                        : 'This service cannot confirm the card’s current manager keys. Use the original provisioning service or ask its administrator for recovery.')}
                   </Dim>
                 ) : null}
               </View>

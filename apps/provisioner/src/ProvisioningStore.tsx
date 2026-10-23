@@ -26,7 +26,7 @@ import {
   type ResetLookup,
   type OwnedResetRun,
 } from './ownedResetWorkflow';
-import {mintSettlementJson} from './mintSettlement';
+import {mintSettlementJson, MintSettlementError} from './mintSettlement';
 import {readCardStatus, type CardReadout} from './cardStatus';
 import type {JournalStorage} from './journal';
 import {
@@ -150,14 +150,20 @@ interface RealProvisioning {
 }
 const Ctx = createContext<RealProvisioning | null>(null);
 const message = (e: unknown): string => {
+  if (e instanceof MintSettlementError) {
+    return 'The mint could not confirm settlement. No entries were cleared. Keep the card, reconnect and retry the settlement check.';
+  }
   if (e instanceof CleanupError) {
+    if (e.code === 'cleanup-unconfirmed') {
+      return 'Cleanup may be incomplete. Keep this card with this phone. Continue the saved reset to check what finished; if it stops again, share reset details with your administrator.';
+    }
     if (e.code === 'settlement-pending') {
       return 'Some card entries are not confirmed settled. Keep the card unchanged. Reconnect the merchant terminal and finish its pending payments before trying reset again.';
     }
     if (e.code === 'holder-pin-required') {
       return 'The current card PIN is needed to clear settled entries. Enter it on this phone; no PIN is sent to the service.';
     }
-    return 'Card checks did not match the reset review. Nothing further was sent. Keep the card and saved reset details for your administrator.';
+    return 'Card checks stopped. Keep this card and the saved reset details for administrator review before further changes.';
   }
   if (e instanceof CardError && e.ins === 0x40) {
     return e.sw === 0x6983
@@ -176,22 +182,22 @@ const message = (e: unknown): string => {
       return 'Finish the saved card reset before starting another installation. Open Reset a card in Settings.';
     }
     if (e.reason === 'batch-active') {
-      return 'An attempt is still active. Resolve and acknowledge it before ending this batch.';
+      return 'The current card attempt is unfinished. Finish it or save its stop before ending this batch.';
     }
     if (e.reason === 'batch-ended') {
-      return 'This batch is already ended in the service. Sync saved work before continuing.';
+      return 'This batch is already closed online. Check saved work to update this phone.';
     }
     if (e.reason === 'independent-backup-stale') {
-      return 'Provisioning is paused because the service needs a fresh independent backup. Your saved work is retained. Ask your operator to restore backup health, then retry.';
+      return 'Card changes are paused until the service has a fresh independent backup. Your work is saved. Ask your administrator to check backups, then retry.';
     }
     if (e.reason === 'recovery-required') {
-      return 'The service is paused for recovery. Your saved work is retained. Contact your operator before continuing.';
+      return 'The service is being recovered. Keep the saved work on this phone. Ask your administrator when it is ready to continue.';
     }
     if (e.reason === 'escrow-missing') {
-      return 'The service cannot find the keys assigned to this attempt. Keep the card aside and ask your operator to restore escrow before continuing.';
+      return 'The service cannot find this card’s saved manager keys. Keep the card aside and ask your administrator to check its key history.';
     }
     if (e.reason === 'chip-unresolved') {
-      return 'This chip has an unresolved attempt. Keep the card aside and ask your operator to reconcile its history. Do not start another attempt for it.';
+      return 'This card has unfinished installation history. Keep it aside and share support details with your administrator before another installation.';
     }
     if (
       [
@@ -203,7 +209,7 @@ const message = (e: unknown): string => {
         'chip-binding-changed',
       ].includes(e.reason)
     ) {
-      return 'Saved attempt details differ from the service record. Keep this work on the phone and ask your operator to reconcile it.';
+      return 'This phone and the service have different saved details. Keep this work and share support details with your administrator.';
     }
     if (
       [
@@ -216,19 +222,19 @@ const message = (e: unknown): string => {
         'reservation-mismatch',
       ].includes(e.reason)
     ) {
-      return 'The service rejected this attempt state. Keep the card aside and ask your operator to reconcile it before continuing.';
+      return 'The service could not accept this saved attempt. Keep the card aside and share support details with your administrator.';
     }
     if (e.status === 401) {
       return 'Sign in again to continue your saved work.';
     }
     if (e.status === 404) {
-      return 'The service does not recognize this saved attempt. Keep it on this phone and ask your operator to reconcile it.';
+      return 'This service cannot find the saved attempt. Keep it on this phone and share support details with your administrator.';
     }
     if (e.status === 409) {
-      return 'The service could not confirm this saved work. Keep it on this phone and ask your operator to reconcile it.';
+      return 'This phone and the service could not confirm the same saved work. Keep the phone and card; share support details with your administrator.';
     }
   }
-  return 'Saved work could not be confirmed. It remains on this phone. Retry or ask your operator to reconcile it.';
+  return 'The operation stopped. Keep this phone and card. Reload saved work, or share support details with your administrator.';
 };
 function sameActor(
   snapshot: WorkflowSnapshot | null,
@@ -563,8 +569,8 @@ export function ProvisioningProvider({
     if (ok && mounted.current && !interruption) {
       setNotice(
         priorStage === 'record_pending' || priorStage === 'recorded'
-          ? 'Installation record confirmed by the service. No card tap was started.'
-          : 'Saved work synced with the service. No card tap was started.',
+          ? 'Installation saved online. No card tap was started.'
+          : 'Saved work checked. No card tap was started.',
       );
     }
     return ok;
@@ -716,13 +722,10 @@ export function ProvisioningProvider({
         },
       );
       if (allowed() && outcome === 'interrupted') {
-        const stage = w.snapshot().active?.journal?.stage ?? 'unconfirmed';
         setInterruption(
-          `Card connection interrupted. Last phase: ${
+          `Card connection lost. Last step: ${
             lastPhase ?? 'Not reported'
-          }. ` +
-            `Saved stage: ${stage}. Card changes may be incomplete. ` +
-            'Keep this card. Ask your operator before retrying.',
+          }. Keep this card with this phone. Choose Continue with the same card to check what finished. If it stops again, share support details with your administrator.`,
         );
       }
       if (allowed() && outcome === 'reset-required' && inspection) {

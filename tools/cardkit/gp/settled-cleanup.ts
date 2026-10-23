@@ -105,7 +105,16 @@ async function snapshot(
     record[1] !== Number(state.record)
   )
     stop('record-invalid');
-  const mint = String.fromCharCode(...record.slice(106, 106 + record[105]!));
+  const recordedMint = String.fromCharCode(
+    ...record.slice(106, 106 + record[105]!),
+  );
+  // Persist only a safe HTTPS origin, never credentials/query data from a card record.
+  const mint =
+    /^https:\/\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[1-9][0-9]{0,4})?\/?$/i.test(
+      recordedMint,
+    )
+      ? recordedMint
+      : '';
   const selected = await transmit(tx, selectAid(TAG_AID));
   if (![0x9000, 0x6a82].includes(selected.sw))
     throw new CardError(selected.sw, 0xa4);

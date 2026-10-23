@@ -187,11 +187,11 @@ test('sync saved work explains its service action and confirms a successful chec
   await act(async () => {
     await flow.create(config);
   });
-  expect(text(tree)).toContain('SYNC SAVED WORK');
+  expect(text(tree)).toContain('CHECK SAVED WORK');
   await act(async () => {
     await flow.recover();
   });
-  expect(text(tree)).toContain('Saved work synced with the service');
+  expect(text(tree)).toContain('Saved work checked. No card tap was started.');
 });
 
 test('acknowledged stop remains identifiable with its reason in batch history', async () => {
@@ -241,7 +241,7 @@ test('the release gate blocks direct create and program calls, without collectin
   expect(f.service.reserve).not.toHaveBeenCalled();
   expect(runCard).not.toHaveBeenCalled();
   expect(flow.drill).toBeUndefined();
-  expect(text(tree)).toContain('device validation');
+  expect(text(tree)).toContain('Installation is unavailable in this build');
   expect(tree.root.findAllByProps({testID: 'pin-batch'})).toHaveLength(0);
   expect(tree.root.findAllByProps({testID: 'pin-batch-input'})).toHaveLength(0);
 });
@@ -314,7 +314,7 @@ test('restart retains the pending reservation; a different operator cannot repla
   expect(flow.snapshot?.active?.attempt_id).toBe(
     w.snapshot().active?.attempt_id,
   );
-  expect(text(tree)).toContain('No installation has been confirmed');
+  expect(text(tree)).toContain('Installation has not been confirmed.');
 });
 
 test('cancellation during key prefetch prevents a later native session from arming', async () => {
@@ -559,7 +559,7 @@ test('the real screen installs and rotates, then a restart retries its frozen re
       fill: 1,
       state: 'done',
     });
-    expect(text(recovered)).toContain('Holder wallet setup required before use.');
+    expect(text(recovered)).toContain('Installation saved. Set up this card in a holder wallet before loading or spending.');
     expect(text(recovered)).not.toContain('PIN:');
   } finally {
     if (original) {
@@ -873,7 +873,7 @@ test('native pause messages report saved state only inside an active card sessio
 
 
 test.each([
-  ['load', 'Writing the applet'],
+  ['load', 'Writing card software'],
   [undefined, 'Not reported'],
   ['untrusted-detail', 'Not reported'],
 ])('interruption retains a public last phase (%s) through service reconciliation', async (phase, label) => {
@@ -890,12 +890,12 @@ test.each([
   await signIn();
   await act(async () => { await flow.create(config); });
   await act(async () => { await flow.program(); });
-  expect(text(tree)).toContain(`Card connection interrupted. Last phase: ${label}.`);
-  expect(text(tree)).toContain('Saved stage: reserved.');
-  expect(text(tree)).toContain('Ask your operator before retrying.');
+  expect(text(tree)).toContain(`Card connection lost. Last step: ${label}.`);
+  expect(text(tree)).not.toContain('Saved stage: reserved.');
+  expect(text(tree)).toContain('Continue with the same card to check what finished.');
   expect(text(tree)).not.toContain('untrusted-detail');
   await act(async () => { await flow.recover(); });
-  expect(text(tree)).toContain(`Card connection interrupted. Last phase: ${label}.`);
+  expect(text(tree)).toContain(`Card connection lost. Last step: ${label}.`);
   expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
   expect(f.service.record).not.toHaveBeenCalled();
   await act(async () => { app.signOut(); });
@@ -971,7 +971,7 @@ test('a reconciliation conflict exports bounded context and names the chip block
   });
   await signIn();
   await act(async () => {await flow.create(config); await flow.program();});
-  expect(text(tree)).toContain('This chip has an unresolved attempt.');
+  expect(text(tree)).toContain('This card has unfinished installation history.');
   await act(async () => {tree.root.findByProps({testID: 'recovery-export'}).props.onPress();});
   const report = JSON.parse((share.mock.calls.at(-1)![0] as {message: string}).message);
   expect(report.failure).toEqual({operation: 'bind-card', status: 409, reason: 'chip-unresolved'});
@@ -1009,6 +1009,6 @@ test('stale independent backup pauses before NFC and retains the reserved attemp
   expect(f.service.disposition).not.toHaveBeenCalled();
   expect(f.bytes()).toContain('active');
   expect(text(tree)).toContain(
-    'Provisioning is paused because the service needs a fresh independent backup. Your saved work is retained. Ask your operator to restore backup health, then retry.',
+    'Card changes are paused until the service has a fresh independent backup. Your work is saved. Ask your administrator to check backups, then retry.',
   );
 });

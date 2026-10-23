@@ -1,4 +1,11 @@
 import type {CleanupOptions} from './cardkit';
+export class MintSettlementError extends Error {
+  constructor() {
+    super(
+      'Settlement could not be confirmed. Keep the card and retry after reconnecting.',
+    );
+  }
+}
 
 /** Public mint requests only. No credentials, redirects, retries or raw errors. */
 export const mintSettlementJson: CleanupOptions['mintJson'] = async (
@@ -41,9 +48,7 @@ export const mintSettlementJson: CleanupOptions['mintJson'] = async (
       request().then(resolve, reject);
     });
   } catch {
-    throw new Error(
-      'Settlement could not be confirmed. Keep the card and retry after reconnecting.',
-    );
+    throw new MintSettlementError();
   } finally {
     clearTimeout(timer);
   }

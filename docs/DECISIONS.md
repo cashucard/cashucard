@@ -2849,7 +2849,7 @@ or transferring holder/manager keys to perform this audit. The completed
 61-sat physical run left 13 spent entries, making this a concrete preparation
 step for reusing that card in the hardware video.
 
-## D101 — Separate mobile reset from fresh installation and audit before cleanup
+## <a id="d101"></a>D101 — Separate mobile reset from fresh installation and audit before cleanup
 
 **Decided (2026-10-23):** The mobile app offers a signed-in, card-specific
 reset review outside a batch. A fresh installation inspects before binding:
@@ -2894,7 +2894,7 @@ allowing pending mint states to authorize erasure, treating the earlier
 read-only audit as permission to clear, or claiming simulator success proves
 the new mobile hardware path. Release still requires its named-device drill.
 
-## D102 — Turn public card state into next steps without certifying payment readiness
+## <a id="d102"></a>D102 — Turn public card state into next steps without certifying payment readiness
 
 **Decided (2026-10-23):** A signed-in operator can deliberately check a card
 from batch setup or Settings. The shared operation queue owns this read-only
@@ -2916,7 +2916,7 @@ reset. The existing CPLC-only identity screen keeps its narrow command scope.
 holder readiness, silently beginning a reset from a status check, or reading
 additional applet data behind the existing identity-only control.
 
-## D103 — Migrate successful operator sign-ins to native memory-hard hashing
+## <a id="d103"></a>D103 — Migrate successful operator sign-ins to native memory-hard hashing
 
 **Decided (2026-10-23):** Workers uses native scrypt with N=16384, r=8, p=5,
 16-byte random salts and 64-byte output. This is OWASP's listed 16 MiB scrypt
@@ -2953,3 +2953,34 @@ and [workerd PBKDF2/cost checks](https://github.com/cloudflare/workerd/blob/main
 calls into a different function, storing a reusable password-derived login
 secret, skipping verification after one success, or migrating an arbitrary
 custom/stronger hash solely because of its format prefix.
+
+## <a id="d104"></a>D104 — Explain operator outcomes without changing recovery contracts
+
+**Decided (2026-10-23):** The app and console use plain outcomes: installation
+saved, in progress, stopped, administrator review needed and new installation
+allowed. A completed install points to holder-wallet setup; historical records
+do not claim the card's current balance or owner. A stopped installation does
+not imply that wallet use is blocked. Operators can close a finished batch,
+check saved work, save a stop or share support details without needing to
+interpret rotation records, acknowledgements or reconciliation terminology.
+
+Interrupted work names the last known public step and asks for the same card;
+raw journal stages remain in the bounded support export and laboratory drill,
+not the normal recovery message. Pending completion records explicitly require
+online confirmation without a new card tap. PIN refusal, incomplete cleanup,
+mint unavailability and service-history disagreement remain distinct stops.
+Sign-in maps known failures to actions and never displays an arbitrary error
+payload. The console keeps protocol-neutral branding and its existing CSP.
+
+The read-only reset lookup adds a bounded `blocked_reason` to distinguish the
+wrong operator from overdue backup, restore fencing and an existing reset.
+`can_reset` retains all previous gates. The app identifies the recorded mint
+before checking settlement and explains the limited data sent. Public card
+reviews omit credentials/query data in malformed mint URLs; unsupported origins
+cannot authorize cleanup. Machine state values, API reason codes, receipt and
+journal schemas, revision checks and all destructive consent controls stay
+unchanged.
+
+**Rejected:** marking every historical record “ready to spend”, saying a stopped
+installation forbids spending, hiding uncertain card changes behind “nothing
+happened”, or relaxing a recovery check to make the wording simpler.

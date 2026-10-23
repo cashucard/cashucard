@@ -29,3 +29,11 @@ test('console uses wallet-neutral Cashu branding and a bundled logo', () => {
   assert.doesNotMatch(html, /\b(?:flash|foxy)\b/i);
   assert.match(html, /src="data:image\/png;base64,/);
 });
+
+test('installation states explain the outcome while preserving machine filter values', () => {
+  const {html} = operatorAdminPage();
+  assert.match(html, /<option value="recorded">Installation saved<\/option>/);
+  assert.match(html, /<option value="quarantined">Needs review<\/option>/);
+  assert.match(html, /<option value="abandoned">Stopped<\/option>/);
+  assert.doesNotMatch(html, /before using the card again/);
+});
