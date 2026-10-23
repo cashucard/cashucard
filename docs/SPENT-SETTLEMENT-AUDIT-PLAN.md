@@ -1,7 +1,10 @@
 # Read-only spent-entry audit — card 09336320
 
-Status: software prepared; physical execution is **not yet approved**.
-This plan adds no cleanup, authentication, reset or key change.
+Status: **approved and completed once, read-only, on 2026-10-23**. All 13
+retained entries were confirmed SPENT at the mint, totaling 61 sats. See the
+[run report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md#read-only-settlement-audit).
+This plan adds no cleanup, authentication, reset or key change; its completed
+execution is not approval to repeat it or perform writes.
 
 The [physical run report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 records provisioning, holder setup, a 61-sat load, four payments and a final
