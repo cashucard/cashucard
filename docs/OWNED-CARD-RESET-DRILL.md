@@ -45,6 +45,8 @@ The path variables identify protected local files; they contain no inline keys.
 1. Save a private journal and protected SQLite snapshot before migrating or
    writing the local source DB. The snapshot contains escrow and retains the
    source DB's custody requirements.
+   Hold exclusive SQLite access before opening the reader; a busy source stops
+   the invocation before any card authentication.
 2. Connect once to the named reader. Recheck CPLC, 2.1 applet identity, proof
    counts and tag through SELECT, GET DATA, GET_INFO and GET_PUBKEY. Stop on
    a mismatch or occupied proof slot, before authentication.

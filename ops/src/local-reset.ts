@@ -298,7 +298,14 @@ export async function executeLocalReset(
     )
       throw new Error('journal requires reconciliation');
     await backupSource(options, fingerprint, row);
-    service = new OpsDb({sql: openSqliteFile(options.db)});
+    const sql = openSqliteFile(options.db);
+    try {
+      sql.exec('PRAGMA locking_mode=EXCLUSIVE; BEGIN EXCLUSIVE; COMMIT;');
+      service = new OpsDb({sql});
+    } catch (error) {
+      sql.close?.();
+      throw error;
+    }
     const scope = {
       operator_id: journal.operator_id,
       device_id: journal.device_id,

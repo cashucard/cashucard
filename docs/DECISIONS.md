@@ -2750,7 +2750,8 @@ and opens no reader. Execution requires explicit consent flags, exact source
 and card selectors, and the historical loopback service scope. It creates a
 protected source snapshot before migrating the local DB, uses a private
 atomic journal with an exclusive invocation lock, and calls the same service
-and cardkit domains as the phone. PC/SC runs through a private, bounded pipe
+and cardkit domains as the phone. Exclusive SQLite access is held before opening
+the reader to prevent concurrent source changes. PC/SC runs through a private, bounded pipe
 whose Python bridge permits only inspection, reset and key-rotation commands.
 It adds no APDU or retry and prints no key or wire data. Production origins
 are rejected by this local-only tool.
