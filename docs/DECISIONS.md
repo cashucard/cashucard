@@ -2532,3 +2532,17 @@ want a specific protocol or application repository.
 already visible at common desktop heights. An in-page anchor produced no
 visible response to the button. A direct repository link matches its label
 and produces a clear action.
+
+## D86 — Name the card innovation and its settlement boundary
+
+**Decided (2026-10-22):** Lead the public site with “Cashu, now on a card.”
+Explain beneath it that wallets load ecash onto the card, terminals can accept
+a tap offline, and terminals settle with the mint when connected. Keep the
+draft-protocol label visible and align the page's description metadata with
+that explanation.
+
+**Why:** “Cashu, in your hand” described a feeling but did not explain what
+the protocol makes possible. “Pay offline. Settle online.” was shorter, but
+could imply that an offline tap is already final payment. Naming the actors
+and the later mint settlement makes the distinction clear without adding a
+long paragraph to the landing page.
