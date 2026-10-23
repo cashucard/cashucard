@@ -135,6 +135,7 @@ test('wrong card, changed applet, proof slots, missing consent and storage failu
     'consent',
     'storage',
     'manager',
+    'version',
   ] as const) {
     const card = await installed();
     const config = options();
@@ -158,6 +159,7 @@ test('wrong card, changed applet, proof slots, missing consent and storage failu
         mac: Array.from(FACTORY_KEYS.mac),
         dek: Array.from(FACTORY_KEYS.dek),
       };
+    if (variant === 'version') card.kvn = 0;
     assert.equal((await resetOwnedCard(card.transceive, config)).ok, false);
     assert.equal(
       card.insLog().some(i => [0xe4, 0xd8, 0x82].includes(i)),

@@ -132,6 +132,7 @@ export async function resetOwnedCard(
     const selected = await transmit(tx, selectAid(ISD_AID));
     if (selected.sw !== 0x9000) throw new CardError(selected.sw, 0xa4);
     const hs = await initializeUpdate(tx, options.random, 0);
+    if (hs.reply.kvn === 0) throw new ResetGuard(); // PUT KEY P1=0 adds a set rather than replacing it.
     const afterDeletion =
       stage === 'rotation_intent' || stage === 'factory_verified';
     const source =
