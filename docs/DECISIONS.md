@@ -1210,7 +1210,8 @@ repo's 2.1; their line numbers are theirs):
    the owner commands and the INS `22`–`26` family on a PIN-less card with
    `6A97`, and every load wants the PIN verified in the tap; 2.1 lets a PIN-less
    card take loads from any reader, and the next tap after any payment opens the
-   gate again (the hole `SECURITY-MODEL` #17 names).
+   gate again (the hole getfoxy/card's `SECURITY-MODEL` #17 names; this
+   repo's threat table has no row for it).
 2. **Change bound to the mint's key, unblinded on the card** — 1.21's
    `LOAD_CHANGE` (`53`) and 80-byte change record keep the blinding factor off
    the wire; 2.1's `GET_CHANGE` hands every reader the `r`, so "anybody who saw
