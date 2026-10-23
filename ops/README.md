@@ -381,3 +381,29 @@ show the 100 most recent attempt identities, states and chip bindings. They
 expose no keys, PINs or frozen record bodies, and cannot repair or clear a
 quarantined card. Use this evidence alongside the phone's retained journal;
 a generic reconciliation conflict is not permission to retry card writes.
+
+### Console experience and browser acceptance
+
+The console separates Operators, Installations and Activity. Search and status
+filters operate on the returned records; installation/activity views cover the
+latest 100 entries, not lifetime totals. Account details contain reset and access
+controls. Destructive access changes use a keyboard-accessible confirmation
+dialog; password creation/reset requires saving the new password to your vault
+before submission. Generated passwords use browser cryptographic randomness.
+Partial refresh failures are labelled rather than displayed as empty lists.
+
+For console changes, run the single real-browser acceptance journey with Node
+22 and an installed Chrome (from `ops/`):
+
+```sh
+node tools/admin-console-smoke.cjs
+# On other systems, set CHROME_BIN to the installed Chrome executable.
+```
+
+It starts a disposable loopback-only SQLite fixture with published test
+credentials and synthetic keys, uses a separate headless Chrome profile, checks
+sign-in/admin authorization, filters, account creation, reset, disable/re-enable,
+details, Escape, mobile layout/sign-out and partial-refresh recovery, then stops
+the fixture. No production origin is permitted. Screenshots are written to a
+temporary directory printed by the check. No browser automation dependency is
+added to the service or CI.

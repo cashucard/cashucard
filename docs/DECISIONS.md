@@ -2335,3 +2335,29 @@ later. Atoll copies opaque encrypted objects and requires no format change.
 Rejected deleting operators, promoting ordinary operator tokens, or overloading
 the backup-reader allowlist. Rejected a native-only admin interface that would
 require an app-store release for routine account maintenance.
+
+## <a id="d76"></a>D76: Task-oriented operator workspace without a new hosting surface
+
+Replace the initial administrative form with a responsive, branded workspace:
+operators, recent installation attempts and access activity have dedicated
+views, search/filter controls and focused account/detail dialogs. Account
+creation/password reset require explicit password-vault handoff acknowledgement;
+editing a password invalidates that acknowledgement. Native dialogs replace
+browser confirmation popups, keeping consequence text and keyboard focus within
+the relevant workflow. Partial refresh failures remain visibly distinct from an
+empty result, and successful mutations are not reported as failed just because
+the following refresh fails.
+
+Keep the existing APIs, deployment-controlled admin grant and server checks.
+The client retains its bearer only in a closure, clears displayed account data
+on sign-out/expiry, and holds no credentials in browser storage. Render dynamic
+text with escaping; compute CSP hashes over the exact served script/style.
+Use local icons and system fonts, no third-party resource or analytics requests.
+Read-only attempt details do not add a quarantine-clear or card action.
+
+Rejected introducing another framework, asset host, CDN or authentication layer
+for this console. The Worker continues serving one same-origin page, with its
+source separated into readable client/style/icon modules. A single optional
+Chrome acceptance journey runs against a disposable localhost fixture, covering
+actual admin workflows, authorization, keyboard/mobile behavior and partial
+refresh failures. It adds no browser dependency or additional CI matrix.
