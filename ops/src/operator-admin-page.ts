@@ -22,7 +22,8 @@ export function operatorAdminPage() {
   return {
     headers: {
       'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'no-store',
+      // Keep CDN-injected scripts out of these CSP-protected approval pages.
+      'cache-control': 'no-store, no-transform',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
       'content-security-policy': `default-src 'none'; script-src 'sha256-${hash(adminClient)}'; style-src 'sha256-${hash(adminStyle)}'; connect-src 'self'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`,

@@ -20,7 +20,7 @@ test('served console script/style match the restrictive CSP and require no third
   assert.ok(csp.includes("frame-ancestors 'none'"));
   assert.ok(!/unsafe-inline|unsafe-eval/.test(csp));
   assert.ok(!/<script[^>]+src=|<link[^>]+href=|@import\b/.test(page.html));
-  assert.equal(page.headers['cache-control'], 'no-store');
+  assert.equal(page.headers['cache-control'], 'no-store, no-transform');
 });
 
 test('console uses wallet-neutral Cashu branding and a bundled logo', () => {

@@ -22,6 +22,15 @@ const element = (): Element => ({
     this.children = [];
   },
 });
+test('approval HTML prevents CDN script injection without changing its CSP', () => {
+  const response = recoverySetup();
+  assert.equal(response.headers.get('cache-control'), 'no-store, no-transform');
+  assert.match(
+    response.headers.get('content-security-policy')!,
+    /script-src 'nonce-/,
+  );
+});
+
 test('administrator explicitly grants/removes copy attestation; revoked readers offer no grant', async () => {
   const html = await recoverySetup().text();
   const script = /<script nonce="[^"]+">([\s\S]*?)<\/script>/.exec(html)![1]!;
