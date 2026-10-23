@@ -26,7 +26,7 @@ type Bytes = number[];
 
 const hex = (b: ArrayLike<number>) =>
   Buffer.from(Array.from(b)).toString('hex').toUpperCase();
-const fromHex = (s: string) => Array.from(Buffer.from(s, 'hex'));
+const fromHex = (s: string): Bytes => Array.from<number>(Buffer.from(s, 'hex'));
 const sw = (v: number, data: Bytes = []) => [...data, v >> 8, v & 0xff];
 
 export const ISD = 'A000000151000000';

@@ -47,7 +47,7 @@ export interface ResetOptions extends RunOptions {
   keys: KeySet;
   stage: ResetStage;
   /** Must durably commit before resolving. One caller serializes this journal. */
-  persist(stage: ResetStage): Promise<void>;
+  persist(stage: ResetStage, evidence?: {keyVersion: number}): Promise<void>;
 }
 export interface ResetResult {
   ok: boolean;
@@ -80,9 +80,9 @@ export async function resetOwnedCard(
 ): Promise<ResetResult> {
   let stage = options.stage;
   const a = options.authority;
-  const save = async (next: ResetStage) => {
+  const save = async (next: ResetStage, evidence?: {keyVersion: number}) => {
     try {
-      await options.persist(next);
+      await options.persist(next, evidence);
     } catch {
       throw new ResetStorageError();
     }
@@ -132,6 +132,7 @@ export async function resetOwnedCard(
     const selected = await transmit(tx, selectAid(ISD_AID));
     if (selected.sw !== 0x9000) throw new CardError(selected.sw, 0xa4);
     const hs = await initializeUpdate(tx, options.random, 0);
+    if (hs.reply.kvn === 0) throw new ResetGuard(); // PUT KEY P1=0 adds a set rather than replacing it.
     const afterDeletion =
       stage === 'rotation_intent' || stage === 'factory_verified';
     const source =
@@ -184,7 +185,15 @@ export async function resetOwnedCard(
     await readChipIdentity(tx, a.chipId);
     if ((await inspectInstallation(tx)).state !== 'absent')
       throw new ResetGuard();
-    if (stage !== 'factory_verified') await save('factory_verified');
+    if (
+      typeof keyVersion !== 'number' ||
+      !Number.isInteger(keyVersion) ||
+      keyVersion < 0 ||
+      keyVersion > 255
+    )
+      throw new ResetGuard();
+    if (stage !== 'factory_verified')
+      await save('factory_verified', {keyVersion});
     return {ok: true, stage, keyVersion};
   } catch (error) {
     const kind =

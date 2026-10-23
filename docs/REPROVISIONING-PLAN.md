@@ -89,3 +89,9 @@ For the historical local cards, prefer executing against the original local
 escrow and retaining public completion evidence; transferring manager keys to
 production is not required merely to return an empty card to factory keys.
 Any production quarantine still needs a separate audited reconciliation.
+
+The local recovery runner and restricted PC/SC bridge are prepared for the
+named-card drill. Default preview matched card 09336320's exact historical
+source without accessing a card or key bytes. Fake integration tests cover a
+lost DELETE reply and a lost completion acknowledgement. The physical reset
+still requires approval of [its exact plan](OWNED-CARD-RESET-DRILL.md).

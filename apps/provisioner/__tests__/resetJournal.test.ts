@@ -48,9 +48,24 @@ test('the deletion intent persists before the operation and a lost reply cannot 
   expect((await loadResetJournal(disk))?.stage).toBe('delete_intent');
   await writeResetJournal(disk, {...authorized, stage: 'deletion_observed'});
   await writeResetJournal(disk, {...authorized, stage: 'rotation_intent'});
-  await writeResetJournal(disk, {...authorized, stage: 'factory_verified'});
-  await writeResetJournal(disk, {
+  const verified = {
     ...authorized,
+    factory_evidence: {gp_key_version: 1, verified_at: 1700000000},
+  };
+  await expect(
+    writeResetJournal(disk, {...authorized, stage: 'factory_verified'}),
+  ).rejects.toThrow();
+  await writeResetJournal(disk, {...verified, stage: 'factory_verified'});
+  await expect(
+    writeResetJournal(disk, {
+      ...verified,
+      stage: 'complete',
+      factory_evidence: {...verified.factory_evidence, gp_key_version: 2},
+      reconciliation_receipt: 'receipt-1',
+    }),
+  ).rejects.toThrow();
+  await writeResetJournal(disk, {
+    ...verified,
     stage: 'complete',
     reconciliation_receipt: 'receipt-1',
   });

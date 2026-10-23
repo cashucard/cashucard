@@ -381,6 +381,14 @@ from this revision or later: older restore tools reject v6. The CLI still
 restores v1/v2/v3/v4/v5 backups. All restored passwords remain disabled until
 controlled recovery, and the provisioning reconciliation fence remains enabled.
 
+For an owned test card whose keys remain in a historical local source DB,
+`src/local-reset.ts` previews metadata by default. Execution uses explicit
+consent, a protected DB snapshot, a durable journal and the restricted PC/SC
+bridge. It accepts only the historical loopback service scope. Follow the
+[named-card recovery drill](../docs/OWNED-CARD-RESET-DRILL.md); approval is
+required before its card-changing command. It does not clear a production
+quarantine or transfer keys to another service.
+
 `GET /admin/provisioning/attempts` and the console's read-only support section
 show the 100 most recent attempt identities, states and chip bindings. They
 expose no keys, PINs or frozen record bodies, and cannot repair or clear a
