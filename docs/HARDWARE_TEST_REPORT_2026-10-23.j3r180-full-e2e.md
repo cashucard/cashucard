@@ -1,6 +1,6 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **fresh provisioning/post-check passed; holder setup, load and first online payment reported complete; change/offline/final-payment checks pending**.
+Status: **fresh provisioning/post-check passed; holder setup, load and two online payments reported complete; offline/final-payment checks pending**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
 100-sat cumulative funding/fees cap. No funds have moved in this run.
@@ -226,9 +226,37 @@ If clear, the next approved online bill is **9 sats**, followed by every
 required change-return tap and another fresh card balance. Its fee-free
 expected remaining balance is 44 sats; this is not yet an observed result.
 
+## Second online payment — 9 sats
+
+The operator reported that a new 9-sat charge succeeded on Pixel and that
+Flash showed **44 sats** after reading the card. Card value reconciles as
+**61 − 8 − 9 = 44**. The final balance does not show an additional card debit.
+The intended change-bearing bill was completed, but the operator has not
+reported an explicit change amount from its receipt; **7 sats is the expected
+change, not a separately captured observation**.
+
+The operator first observed **15 sats in the till / settled at the mint**,
+then performed the 9-sat charge. This earlier till snapshot is not compared
+to both bills' combined 17 sats. After the second charge, the operator quoted:
+
+> 9 sat settled at the mint; it sweeps to your wallet once the till reaches 10 sat
+
+This is the terminal's report of settled ecash below its payout threshold,
+not an unsettled-payment warning. A prior sweep or starting settled balance
+has not been independently measured, and no completed Lightning payout is
+inferred. A read-only request to Forge's public `/v1/keysets` during this
+check listed active sat keyset `0059534ce0bfa19a` with `input_fee_ppk: 0`;
+no unexplained till difference is attributed to mint input fees.
+
+The next requested operation is one 8-sat charge prepared online on Pixel,
+then completed with both Wi-Fi and mobile data disabled and NFC enabled.
+Pixel must remain offline until its pending receipt and the fresh Flash card
+balance are reported. The expected remaining card balance is **36 sats**;
+offline acceptance and later settlement have not yet been reported.
+
 ## Not covered
 
-Independent owner-recovery restoration on another phone, returned change and independent mint-settlement evidence,
+Independent owner-recovery restoration on another phone, an explicitly captured change amount and independent mint-settlement evidence,
 offline acceptance/settlement, final balance, Max terminal coverage and the
 Apple review video have not run. Applet absence alone is not a fresh
 verification of factory manager keys; that evidence remains the prior reset
