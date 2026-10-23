@@ -62,12 +62,21 @@ export function CardIdentityScreen({
       }
     }
   };
+  const cancelRead = () => {
+    cancelled.current = true;
+    setNotice('Identity read cancelled.');
+    session.current?.cancel();
+  };
   const s = StyleSheet.create({
     content: {gap: 20},
     text: {fontFamily: FONT.regular, fontSize: 16, color: t.ink},
   });
   return (
-    <Screen title="Card identity check" onBack={onBack} physicalReadOnly>
+    <Screen
+      title="Card identity check"
+      onBack={onBack}
+      onStop={busy ? cancelRead : undefined}
+      physicalReadOnly>
       <ScrollView contentContainerStyle={s.content}>
         <Dim>
           This reads a physical card’s public CPLC identity only: no
@@ -85,11 +94,7 @@ export function CardIdentityScreen({
           <SecondaryButton
             title="CANCEL READ"
             testID="identity-cancel"
-            onPress={() => {
-              cancelled.current = true;
-              setNotice('Identity read cancelled.');
-              session.current?.cancel();
-            }}
+            onPress={cancelRead}
           />
         ) : null}
         {notice ? (

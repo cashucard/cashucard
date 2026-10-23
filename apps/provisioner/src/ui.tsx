@@ -3,7 +3,14 @@
  * only (src/theme.ts); nothing here draws its own color.
  */
 import React from 'react';
-import {Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {
+  BackHandler,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import {SafeAreaView} from 'react-native-safe-area-context';
 
@@ -14,18 +21,35 @@ import {PHYSICAL_READ_BANNER} from './strings';
 export function Screen({
   title,
   onBack,
+  onStop,
   headerRight,
   physicalReadOnly = false,
   children,
 }: {
   title?: string;
   onBack?: () => void;
+  onStop?: () => void;
   headerRight?: React.ReactNode;
   physicalReadOnly?: boolean;
   children: React.ReactNode;
 }) {
   const t = useTheme();
   const s = styles(t);
+  React.useEffect(() => {
+    const action = onStop ?? onBack;
+    if (!action) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        action();
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [onBack, onStop]);
+  const exit = onStop ?? onBack;
   return (
     <SafeAreaView style={s.screen}>
       <StatusBar barStyle={t.dark ? 'light-content' : 'dark-content'} />
@@ -38,16 +62,16 @@ export function Screen({
           </Text>
         </View>
       ) : null}
-      {title || onBack || headerRight ? (
+      {title || exit || headerRight ? (
         <View style={s.header}>
-          {onBack ? (
+          {exit ? (
             <Pressable
-              onPress={onBack}
+              onPress={exit}
               hitSlop={12}
-              testID="back"
+              testID={onStop ? 'screen-stop' : 'back'}
               accessibilityRole="button"
-              accessibilityLabel="Back">
-              <Text style={s.back}>‹ Back</Text>
+              accessibilityLabel={onStop ? 'Stop current operation' : 'Back'}>
+              <Text style={s.back}>{onStop ? 'Stop' : '‹ Back'}</Text>
             </Pressable>
           ) : null}
           {title ? (

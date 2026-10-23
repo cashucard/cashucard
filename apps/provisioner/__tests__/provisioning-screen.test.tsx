@@ -487,6 +487,7 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     (f.service.record as jest.Mock).mockRejectedValueOnce(
       new Error('network unavailable'),
     );
+    const intervals = jest.spyOn(globalThis, 'setInterval');
     const tree = await mount({
       ...f,
       hardwareValidated: true,
@@ -504,6 +505,18 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     expect(card.failedAuths).toBe(0);
     expect(card.log.filter(c => c[1] === 0xd8)).toHaveLength(1);
     expect(flow.snapshot?.active?.journal?.stage).toBe('record_pending');
+    const savedBeforePause = f.bytes();
+    const recordCallsBeforePause = (f.service.record as jest.Mock).mock.calls.length;
+    await act(async () => {flow.cancel();});
+    await act(async () => {
+      for (const [callback, delay] of intervals.mock.calls) {
+        if (delay === 30_000 && typeof callback === 'function') callback();
+      }
+    });
+    intervals.mockRestore();
+    expect((f.service.record as jest.Mock).mock.calls).toHaveLength(recordCallsBeforePause);
+    expect(f.bytes()).toBe(savedBeforePause);
+
     expect(tree.root.findByType(CardFigure).props.fill).toBe(1);
     const active = flow.snapshot!.active!;
     const frozen = active.journal!.frozen_record;

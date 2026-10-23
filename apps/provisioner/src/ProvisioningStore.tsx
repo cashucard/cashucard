@@ -309,9 +309,13 @@ export function ProvisioningProvider({
   });
   const busyRef = useRef(false);
   const cancelRequested = useRef(false);
+  const pausedByUser = useRef(false);
   const armedCancel = useRef<(() => Promise<void>) | null>(null);
   const actorGeneration = useRef(0);
+  const operationAbort = useRef<AbortController | null>(null);
   const invalidateCard = useCallback(() => {
+    actorGeneration.current++;
+    operationAbort.current?.abort();
     cancelRequested.current = true;
     setInterruption(null);
     setReplacement(null);
@@ -325,7 +329,6 @@ export function ProvisioningProvider({
     }
   }, []);
   useEffect(() => {
-    actorGeneration.current++;
     invalidateCard();
   }, [app.session?.token, app.serviceUrl, invalidateCard]);
   const latest = useRef(app);
@@ -412,6 +415,12 @@ export function ProvisioningProvider({
       }
       const session = actor.session;
       busyRef.current = true;
+      cancelRequested.current = false;
+      if (!resetOperation) {
+        pausedByUser.current = false;
+      }
+      const controller = new AbortController();
+      operationAbort.current = controller;
       setBusy(true);
       setNotice(null);
       setReplacement(null);
@@ -430,7 +439,10 @@ export function ProvisioningProvider({
             }
             const service =
               settings.serviceFor?.(session, actor.serviceUrl) ??
-              new ApiClient({baseUrl: actor.serviceUrl}).reservations(session);
+              new ApiClient({
+                baseUrl: actor.serviceUrl,
+                signal: controller.signal,
+              }).reservations(session);
             const reset = await OwnedResetWorkflow.open(getResetStorage());
             try {
               const pending = reset.snapshot()?.journal;
@@ -464,7 +476,11 @@ export function ProvisioningProvider({
             setResetState(result.reset!);
           }
           if ('failure' in result) {
-            setNotice(message(result.failure));
+            setNotice(
+              cancelRequested.current
+                ? 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.'
+                : message(result.failure),
+            );
             if (
               result.failure instanceof ApiServiceError &&
               result.failure.status === 401 &&
@@ -474,7 +490,7 @@ export function ProvisioningProvider({
             }
           }
         }
-        return result.ok;
+        return result.ok && !cancelRequested.current;
       } catch {
         if (mounted.current) {
           setStatus('blocked');
@@ -484,6 +500,9 @@ export function ProvisioningProvider({
         }
         return false;
       } finally {
+        if (operationAbort.current === controller) {
+          operationAbort.current = null;
+        }
         drill.current?.cancel(); // An unvisited target must not carry into another run.
         busyRef.current = false;
         if (mounted.current) {
@@ -503,7 +522,10 @@ export function ProvisioningProvider({
     }
     return (
       settings.resetServiceFor?.(actor.session, actor.serviceUrl) ??
-      new ApiClient({baseUrl: actor.serviceUrl}).resets(actor.session)
+      new ApiClient({
+        baseUrl: actor.serviceUrl,
+        signal: operationAbort.current?.signal,
+      }).resets(actor.session)
     );
   };
   const resetCard = async <T,>(
@@ -583,6 +605,7 @@ export function ProvisioningProvider({
       const current = latest.current;
       const stage = state.current?.active?.journal?.stage;
       if (
+        !pausedByUser.current &&
         current.session &&
         ready.current === 'ready' &&
         sameActor(state.current, current.session, current.serviceUrl) &&
@@ -817,7 +840,13 @@ export function ProvisioningProvider({
           pin,
           random: randomBytes,
           now: () => Math.floor(Date.now() / 1000),
-          mintJson: mintSettlementJson,
+          mintJson: (origin, path, body) =>
+            mintSettlementJson(
+              origin,
+              path,
+              body,
+              operationAbort.current?.signal,
+            ),
           canContinue: () =>
             mounted.current &&
             !cancelRequested.current &&
@@ -928,14 +957,18 @@ export function ProvisioningProvider({
     close: () => operate((w, service) => w.closeBatch(service)),
     end: () => operate((w, service) => w.endBatch(service)),
     cancel: () => {
-      if (!hardwareValidated || !cardActive) {
+      pausedByUser.current = true;
+      if (!busyRef.current) {
+        invalidateCard();
         return;
       }
-      cancelRequested.current = true;
-      drill.current?.cancel();
-      if (armedCancel.current) {
-        invalidateCard();
-      } else if (settings.cancelCard) {
+      if (cancelRequested.current) {
+        return;
+      }
+      const hasOwnedSession = !!armedCancel.current;
+      invalidateCard();
+      setNotice('Stopping. Saved work stays on this phone.');
+      if (!hasOwnedSession && cardActive && settings.cancelCard) {
         settings.cancelCard().catch(() => undefined);
       }
     },

@@ -74,7 +74,11 @@ test('Go submits typed credentials and dismisses the keyboard while waiting for 
       .findByProps({testID: 'sign-in-password'})
       .props.onSubmitEditing();
   });
-  expect(login).toHaveBeenCalledWith('operator', 'public-test-fixture');
+  expect(login).toHaveBeenCalledWith(
+    'operator',
+    'public-test-fixture',
+    expect.objectContaining({aborted: false}),
+  );
   expect(login).toHaveBeenCalledTimes(1);
   expect(dismiss).toHaveBeenCalledTimes(1);
   expect(tree.root.findByProps({testID: 'sign-in'}).props.disabled).toBe(true);

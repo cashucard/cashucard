@@ -159,19 +159,44 @@ export function ProvisioningScreen({
     },
     stickyAction: {paddingTop: 10, paddingBottom: 8, backgroundColor: t.bg},
   });
+  const leave = () => {
+    if (flow.busy) {
+      flow.cancel();
+    }
+    onSettings();
+  };
+  const pauseAndLeave = () => {
+    flow.cancel();
+    onSettings();
+  };
   const shell = (content: React.ReactNode) => (
     <Screen
-      title="Card installation"
-      headerRight={<GearButton testID="settings" onPress={onSettings} />}>
+      title={
+        flow.resetState && flow.resetState.journal.stage !== 'complete'
+          ? 'Saved card reset'
+          : 'Card installation'
+      }
+      onStop={flow.busy ? flow.cancel : undefined}
+      headerRight={<GearButton testID="settings" onPress={leave} />}>
       <ScrollView contentContainerStyle={s.scroll}>{content}</ScrollView>
-      {flow.cardActive ? (
+      {flow.busy ? (
         <View style={s.stickyAction} testID="sticky-card-action">
           <SecondaryButton
-            title="CANCEL TAP"
+            title={flow.cardActive ? 'CANCEL TAP' : 'STOP AND KEEP SAVED WORK'}
             testID="real-cancel"
             onPress={flow.cancel}
           />
         </View>
+      ) : flow.snapshot?.batch || flow.resetState || flow.status !== 'ready' ? (
+        <SecondaryButton
+          title="STOP FOR NOW"
+          testID={
+            flow.resetState && flow.resetState.journal.stage !== 'complete'
+              ? 'reset-stop-for-now'
+              : 'work-stop-for-now'
+          }
+          onPress={pauseAndLeave}
+        />
       ) : null}
     </Screen>
   );
@@ -221,7 +246,8 @@ export function ProvisioningScreen({
       <>
         <Text style={s.title}>A card reset is saved on this phone</Text>
         <Dim>
-          Continue with the same card before starting another installation.
+          You can stop and return later. Keep this card aside and use the same
+          account and service to continue.
         </Dim>
         <PrimaryButton
           title="CONTINUE CARD RESET"
@@ -255,7 +281,8 @@ export function ProvisioningScreen({
         ) : null}
         <BatchSetupScreen
           onStart={() => undefined}
-          onSettings={onSettings}
+          onSettings={leave}
+          onStop={flow.cancel}
           onCreate={flow.create}
           canStart={flow.hardwareValidated && !flow.busy}
           installationOnly
