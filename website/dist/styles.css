@@ -387,3 +387,5 @@ html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-moti
 .concept-ivory::before{width:125px;height:125px;right:5%;top:19%;border:2px solid #38654b;opacity:.2;box-shadow:0 0 0 14px #38654b16,0 0 0 34px #38654b12,0 0 0 56px #38654b0b}
 .concept-ivory::after{content:"";position:absolute;left:67%;top:18%;width:1px;height:66%;background:#6c937855;box-shadow:9px 0 #6c937844,19px 0 #6c937822;transform:rotate(23deg)}
 .concept-ivory img{width:21%;right:17%;top:43%;filter:grayscale(.45) opacity(.84) drop-shadow(0 6px 8px #3c695123)}
+@media(min-width:721px){.film-card{width:300px;height:185px;top:20px}.film-card-face{padding:19px 22px}.film-card-top{font-size:23px}.film-card-chip{left:22px;top:75px;width:36px;height:27px}.film-card-face img{width:86px;right:38px;top:38px}.film-card-foot{left:22px;right:22px;bottom:17px}}
+@media(max-width:480px){.callout-two{top:22px;right:5%}}

@@ -212,6 +212,13 @@ async function main() {
       await screenshot("hero-" + width);
       await evaluate("document.querySelector('#story').scrollIntoView()");
       await screenshot("story-" + width);
+      if (width === 390) {
+        assert.equal(
+          await evaluate("(()=>{const a=document.querySelector('.callout-two').getBoundingClientRect(),b=document.querySelector('.film-status-badge').getBoundingClientRect();return a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top})()"),
+          true,
+          "Mobile callout is not covered by the settlement badge",
+        );
+      }
     }
     await viewport(1440, 900);
     await click(".motion-toggle");
