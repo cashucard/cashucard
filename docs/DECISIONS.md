@@ -3003,3 +3003,51 @@ Keep existing service, journal, scope, consent and card-write checks. Software
 fakes remain in the cardkit tests; removed fake UI scenarios are not hardware
 evidence. App-review access requires a scoped account and the physical video.
 This supersedes earlier demo-mode UI instructions without changing the wire.
+
+## <a id="d106"></a>D106: A rendered film and a step-by-step tap on the public site
+
+**Decided (2026-10-23):** Add two rendered sections below the hero of
+cashucard.org, in the manner of daylightfob.com. The first is a 48-second film:
+the physical card in a dark studio, its key made on the chip, a wallet writing
+pieces into its slots, a tap at an offline till, one signature that burns the
+named pieces, and the till settling with the mint later. Each chapter is its
+action and then a hold of three seconds or more with one sentence on screen.
+Custom controls sit under it (play, sound, timecode, a chapter scrub bar), and
+"The film as text" carries its words. It plays once, muted, when most of it is
+in view, pauses out of view and holds its end frame.
+
+The second, "One tap, step by step", shows the tap in six steps (select, name,
+outputs, sign, check, settle) over 96 rendered frames of the card at a till's
+reader, with callouts that follow the card and the till and a panel of the
+card's slots. In the last step the card leaves the reader and a night passes,
+the light turning to morning, before the till comes online and settles; the
+payment is already accepted, so settling needs only the till. Wide screens
+scrub it by scroll; narrow screens and reduced motion get a stepper with
+Previous and Next; without JavaScript the steps read as a list beside one
+frame. With reduced motion nothing plays on its own; without JavaScript the
+film keeps the browser's controls. This supersedes D81's and D83's rejection of
+a video and D82's rejection of an autoplaying video and a scroll-driven render
+sequence.
+
+Both state only what `spec/NUT-XX.md` and `spec/APDU.md` say. The bill is an
+exact amount because an offline till cannot finish the card's change, and
+acceptance and settlement stay separate events (D86); the steps section states
+once that the till carries the risk of a piece spent elsewhere until it
+settles. The film and the steps show the protocol itself: wallet and app names
+stay off them, and the phone and till screens are generic. Recordings of the
+real apps may follow as their own section under the same rule.
+
+The site moves from Sites to a Cloudflare Worker (`website/wrangler.jsonc`)
+in the account that runs ops.cashucard.org. Static assets carry `_headers`;
+`/film/*` runs a small script that answers byte ranges, with Workers Caching
+on, because the asset server answers a range request with the whole file and
+Safari on iPhone plays video only from 206 responses. The film's render source
+stays private.
+
+**Why:** the user asked for daylightfob.com's motion treatment, then for slower
+pacing so each motion can be taken in, for the step-by-step sequence, for
+Workers hosting like daylightfob.com, and for no app names. Earlier reviews
+found animated diagrams busy and weak at explaining the exchange; rendered
+objects with one sentence per beat, chapters that can be chosen, and a stepper
+on phones answer that. Playing once and holding the end frame keeps D80's rule
+against continuously running decorative animation.

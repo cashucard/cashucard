@@ -1,0 +1,18 @@
+// cashucard.org: static assets from dist/, plus worker.js for byte ranges on /film/* (D106).
+// Deploy from website/: npx wrangler deploy. Preview a version without publishing it: npx wrangler versions upload.
+{
+  "name": "cashu-card-site",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-23",
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [{ "pattern": "cashucard.org", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/film/*"]
+  },
+  // Workers Caching: Cloudflare keeps the full film and serves byte-range slices of it from cache
+  "cache": { "enabled": true },
+  "observability": { "enabled": true }
+}

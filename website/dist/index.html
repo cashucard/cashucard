@@ -9,17 +9,24 @@
     <meta property="og:description" content="Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://cashucard.org/" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href="https://cashucard.org/" />
     <link rel="icon" href="/assets/cashu.png" />
     <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/seq/tap-1/anchors.js" defer></script>
+    <script src="/motion.js" defer></script>
     <title>Cashu Card | Open NFC ecash protocol</title>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
       <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu.png" alt="" width="32" height="37" /><span>cashu<span>card</span></span></a>
-      <nav aria-label="Main navigation"><a href="#source">Protocol and code</a></nav>
+      <nav aria-label="Main navigation"><a href="#film">Film</a><a href="#tap">One tap</a><a href="#source">Protocol and code</a></nav>
       <a class="header-link" href="https://github.com/lnflash/cashu-card">GitHub <span aria-hidden="true">↗</span></a>
     </header>
     <main id="main">
@@ -47,7 +54,75 @@
           </div>
           <span class="visual-cross cross-a">+</span><span class="visual-cross cross-b">+</span>
         </div>
-        <div class="hero-footer"><span class="hero-footer-rule"></span><a href="#source">Explore the source <span aria-hidden="true">↓</span></a></div>
+        <div class="hero-footer"><span class="hero-footer-rule"></span><a href="#film">Watch the film <span aria-hidden="true">↓</span></a></div>
+      </section>
+      <section class="film-section" id="film" aria-labelledby="film-title">
+        <div class="film-head">
+          <div class="eyebrow"><span class="status-dot"></span> THE FILM <span class="eyebrow-divider">/</span> 0:48</div>
+          <h2 id="film-title">The protocol in under a minute</h2>
+        </div>
+        <figure class="film">
+          <div class="film-screen" id="film-screen">
+            <video id="reel" controls playsinline muted preload="metadata" poster="/film/poster-1.jpg" aria-label="Cashu Card film, 48 seconds. A wallet loads the card, an offline till takes a tap, and the till settles with the mint later." aria-describedby="film-text">
+              <source src="/film/cashu-card-film-1-720.mp4" type="video/mp4" media="(max-width: 800px)" />
+              <source src="/film/cashu-card-film-1.mp4" type="video/mp4" />
+            </video>
+            <button class="film-play" id="film-play" type="button" hidden>Play the film <span aria-hidden="true">▶</span></button>
+          </div>
+          <figcaption class="film-ui" id="film-ui" hidden>
+            <button class="ctl" id="film-toggle" type="button" aria-label="Play the film"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" /></svg></button>
+            <button class="ctl" id="film-sound" type="button" aria-pressed="false">Sound off</button>
+            <span class="tc" id="film-tc">00:00:00:00</span>
+            <div class="scrub" id="film-scrub" role="slider" tabindex="0" aria-label="Film position" aria-valuemin="0" aria-valuemax="48" aria-valuenow="0" aria-valuetext="0 seconds">
+              <div class="scrub-track"><div class="scrub-fill" id="film-fill"></div></div>
+              <ol class="chapters" id="film-chapters"></ol>
+            </div>
+          </figcaption>
+        </figure>
+        <details class="film-text" id="film-text">
+          <summary>The film as text</summary>
+          <ol>
+            <li><b>Card.</b> The Cashu Card is an NFC smart card that runs an open protocol.</li>
+            <li><b>Key.</b> The card makes its key on the chip, and the key stays there.</li>
+            <li><b>Load.</b> A wallet writes eight pieces of ecash into the card's 128 slots.</li>
+            <li><b>Tap.</b> The till is offline. It selects the card and names the pieces for a 21 sat bill.</li>
+            <li><b>Sign.</b> The card signs once for the whole payment and burns the pieces it signed for.</li>
+            <li><b>Settle.</b> The till accepts the payment offline. Later, it settles with the mint.</li>
+          </ol>
+        </details>
+      </section>
+      <section class="tap-section" id="tap" aria-labelledby="tap-title">
+        <div class="tap-head">
+          <div class="eyebrow"><span class="status-dot"></span> ONE TAP <span class="eyebrow-divider">/</span> SIX STEPS</div>
+          <h2 id="tap-title">One tap, step by step</h2>
+        </div>
+        <div class="seq" id="seq">
+          <div class="seq-sticky">
+            <div class="seq-layout">
+              <div class="seq-side">
+                <ol class="steps" id="steps">
+                  <li data-a="0" data-b="0.15"><button type="button" disabled><b>Select</b><span class="bar"><i></i></span></button><p>The card comes into the till's field, and the till selects the Cashu Card applet.</p></li>
+                  <li data-a="0.15" data-b="0.3"><button type="button" disabled><b>Name</b><span class="bar"><i></i></span></button><p>The till reads the card's pieces and names the ones it wants for a 21 sat bill: 1, 4 and 16 sat.</p></li>
+                  <li data-a="0.3" data-b="0.45"><button type="button" disabled><b>Outputs</b><span class="bar"><i></i></span></button><p>The till sends the outputs it will swap those pieces for at the mint.</p></li>
+                  <li data-a="0.45" data-b="0.6"><button type="button" disabled><b>Sign</b><span class="bar"><i></i></span></button><p>The card signs once for the whole payment and burns each piece it signed for.</p></li>
+                  <li data-a="0.6" data-b="0.75"><button type="button" disabled><b>Check</b><span class="bar"><i></i></span></button><p>The till checks the mint's signature on each piece offline, then accepts the payment. Until it settles, the till carries the risk that a piece was spent elsewhere.</p></li>
+                  <li data-a="0.75" data-b="1"><button type="button" disabled><b>Settle</b><span class="bar"><i></i></span></button><p>The card leaves the reader. Later, back online, the till swaps the pieces at the mint and the payment settles.</p></li>
+                </ol>
+                <div class="slots" id="slots" aria-hidden="true"><span class="slots-label">Slots on the card <b id="slots-count">8 unspent</b></span><div class="slots-row"><i data-v="1">1</i><i data-v="2">2</i><i data-v="4">4</i><i data-v="8">8</i><i data-v="16">16</i><i data-v="32">32</i><i data-v="64">64</i><i data-v="128">128</i></div></div>
+              </div>
+              <figure class="seq-stage">
+                <div class="seq-screen" id="seq-screen">
+                  <img class="seq-poster" id="seq-poster" src="/seq/tap-1/tap_053.webp" width="1600" height="1000" alt="A Cashu Card held over a till's reader, its chip lit as it signs the payment." />
+                  <canvas id="seq-canvas" aria-hidden="true"></canvas>
+                  <svg class="seq-leaders" id="seq-leaders" aria-hidden="true"></svg>
+                  <div class="seq-callouts" id="seq-callouts" aria-hidden="true"></div>
+                </div>
+                <figcaption class="seq-caption" id="seq-caption" aria-live="polite"></figcaption>
+                <div class="seq-nav" id="seq-nav" hidden><button class="ctl" id="seq-prev" type="button">Previous</button><span class="seq-count" id="seq-count">1 of 6</span><button class="ctl" id="seq-next" type="button">Next</button></div>
+              </figure>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">

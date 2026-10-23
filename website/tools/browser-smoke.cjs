@@ -94,6 +94,11 @@ async function main() {
       }
       throw Error("Timed out: " + label);
     };
+    // navigate and wait for that document: checking for an element alone can pass on the previous page
+    const load = async (url, label) => {
+      await send("Page.navigate", { url });
+      await until("location.href===" + JSON.stringify(url) + "&&document.readyState==='complete'", label);
+    };
     const screenshot = async (name) => {
       const { data } = await send("Page.captureScreenshot", {
         format: "png",
@@ -114,6 +119,16 @@ async function main() {
 
     await send("Runtime.enable");
     await send("Page.enable");
+    // record content security policy violations; DevTools scripts are exempt from the page's policy
+    await send("Page.addScriptToEvaluateOnNewDocument", {
+      source: "window.__csp=[];document.addEventListener('securitypolicyviolation',e=>__csp.push(e.violatedDirective+' '+e.blockedURI))",
+    });
+    // the host must answer byte ranges (Safari plays the film only then) and apply dist/_headers
+    const media = await fetch(origin + "/film/cashu-card-film-1.mp4", { headers: { Range: "bytes=0-1" } });
+    assert.equal(media.status, 206, "Host answers byte-range requests for the film");
+    await media.arrayBuffer();
+    const home = await fetch(origin + "/");
+    assert.match(home.headers.get("content-security-policy") || "", /media-src 'self'/, "Host applies _headers, media allowed");
     await send("Emulation.setEmulatedMedia", {
       features: [{ name: "prefers-reduced-motion", value: "reduce" }],
     });
@@ -125,9 +140,13 @@ async function main() {
     assert.equal(await evaluate("document.querySelectorAll('h1').length"), 1, "One page heading");
     assert.equal(await evaluate("document.querySelector('#hero-title').innerText.replace(/\\s+/g,' ').trim()"), "Cashu, now on a card.", "Hero names the card innovation");
     assert.equal(await evaluate("document.querySelector('.hero-copy p').innerText.trim()"), "Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.", "Hero distinguishes offline acceptance from mint settlement");
-    assert.equal(await evaluate("document.querySelectorAll('script[src]').length"), 0, "Unused story script is gone");
-    assert.ok(await evaluate("document.body.innerText.trim().split(/\s+/).length < 100"), "Copy stays concise");
-    assert.ok(await evaluate("document.documentElement.scrollHeight <= innerHeight * 1.65"), "Desktop page stays short");
+    assert.equal(await evaluate("[...document.querySelectorAll('script[src]')].map(s=>new URL(s.src).pathname).join()"), "/seq/tap-1/anchors.js,/motion.js", "Two scripts: the sequence anchors and the controls");
+    const words = await evaluate("document.body.innerText.trim().split(/\\s+/).length");   // \\s survives the string literal
+    console.log("words " + words);
+    assert.ok(words < 240, "Copy stays concise");
+    const screens = await evaluate("document.documentElement.scrollHeight / innerHeight");
+    console.log("screens at 1440x900, reduced motion " + screens.toFixed(2));
+    assert.ok(screens <= 3.9, "Desktop page stays within its budget");
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
     assert.ok(await evaluate("document.querySelector('.button-bright').href.includes('/spec/NUT-XX.md')"), "Primary action opens the draft");
     assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/lnflash/cashu-card'"), "Secondary action opens the source repository");
@@ -139,16 +158,95 @@ async function main() {
     ]) {
       assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
     }
+    // the film: custom controls over the native video; with reduced motion it waits for a press
+    assert.equal(await evaluate("document.querySelectorAll('#reel source').length"), 2, "Film has 1080p and 720p sources");
+    assert.ok(await evaluate("document.querySelector('#reel').getAttribute('poster').startsWith('/film/')"), "Film has a local poster");
+    assert.equal(await evaluate("document.querySelector('#reel').controls"), false, "Custom controls replace the native ones");
+    assert.equal(await evaluate("document.querySelector('#film-ui').hidden"), false, "Film controls show");
+    assert.equal(await evaluate("document.querySelectorAll('#film-chapters button').length"), 7, "Seven chapters on the scrub bar");
     await screenshot("01-home-desktop");
+    await evaluate("document.querySelector('#film').scrollIntoView()");
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.equal(await evaluate("document.querySelector('#reel').paused"), true, "Reduced motion: the film waits");
+    assert.equal(await evaluate("document.querySelector('#film-play').hidden"), false, "Reduced motion: a play button shows");
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#film-screen')).transform"), "none", "Reduced motion: the screen does not scale");
+    await evaluate("document.querySelector('#film-play').click()");
+    await until("document.querySelector('#reel').currentTime > 0.3", "film plays after a press");
+    await evaluate("document.querySelector('#film-sound').click()");
+    assert.equal(await evaluate("document.querySelector('#reel').muted"), false, "Sound turns on");
+    await evaluate("document.querySelector('#film-sound').click()");
+    assert.equal(await evaluate("document.querySelector('#reel').muted"), true, "Sound turns off");
+    await evaluate("[...document.querySelectorAll('#film-chapters button')].find(b=>b.textContent==='Settle').click()");
+    await until("Math.abs(document.querySelector('#reel').currentTime-34)<1", "chapter jump");
+    await evaluate("document.querySelector('#film-scrub').focus()");
+    const before = await evaluate("document.querySelector('#reel').currentTime");
+    await send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
+    assert.ok(await evaluate("document.querySelector('#reel').currentTime") < before - 0.5, "Arrow keys scrub the film");
+    await screenshot("04-film-desktop");
+    // the step-by-step section: a stepper with reduced motion
+    assert.equal(await evaluate("document.querySelector('#seq').className"), "seq seq-stepper", "Reduced motion: the steps are a stepper");
+    assert.equal(await evaluate("document.querySelector('#seq-nav').hidden"), false, "Stepper controls show");
+    assert.equal(await evaluate("[...document.querySelectorAll('#steps button')].every(b=>!b.disabled)"), true, "Step buttons are live");
+    await evaluate("document.querySelector('#tap').scrollIntoView()");
+    await until("document.querySelector('#seq-poster').hidden", "first sequence frame drawn");
+    for (let i = 0; i < 3; i++) await evaluate("document.querySelector('#seq-next').click()");
+    await until("document.querySelector('#seq-count').textContent==='4 of 6'", "Next moves through the steps");
+    assert.ok(await evaluate("document.querySelector('#seq-caption').textContent.startsWith('Sign.')"), "Caption names the step");
+    assert.equal(await evaluate("document.querySelector('#slots-count').textContent"), "5 unspent, 3 spent", "Signing marks the named pieces spent");
+    await evaluate("document.querySelectorAll('#steps button')[5].click()");
+    assert.equal(await evaluate("document.querySelector('#seq-count').textContent"), "6 of 6", "A step button jumps to its step");
+    await screenshot("06-steps-stepper");
+    assert.deepEqual(await evaluate("window.__csp"), [], "No content security policy violations");
+    // with motion allowed it plays once, muted, when in view; pauses out of view; offers a replay at the end
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
+    await load(origin + "/?motion", "page with motion loaded");
+    assert.equal(await evaluate("document.querySelector('#reel').paused"), true, "Film waits below the fold");
+    await evaluate("document.querySelector('#film').scrollIntoView()");
+    await until("document.querySelector('#reel').currentTime>0.5", "film plays once in view");
+    assert.equal(await evaluate("document.querySelector('#reel').muted"), true, "Film plays muted");
+    await evaluate("scrollTo(0,0)");
+    await until("document.querySelector('#reel').paused", "film pauses out of view");
+    await evaluate("document.querySelector('#film').scrollIntoView()");
+    await until("!document.querySelector('#reel').paused", "film resumes in view");
+    await evaluate("(v=>v.currentTime=v.duration-0.5)(document.querySelector('#reel'))");
+    await until("document.querySelector('#reel').ended", "film reaches its end");
+    assert.equal(await evaluate("document.querySelector('#film-toggle').getAttribute('aria-label')"), "Replay the film", "Ended film offers a replay");
+    await screenshot("05-film-end");
+    // with motion, wide screens scrub the steps by scroll
+    assert.equal(await evaluate("document.querySelector('#seq').className"), "seq seq-live", "Motion: the steps scrub by scroll");
+    await evaluate("(r=>scrollTo(0,scrollY+r.top+0.56*(r.height-innerHeight)))(document.querySelector('#seq').getBoundingClientRect())");
+    await until("document.querySelector('#steps li.on b')?.textContent==='Sign'", "scroll reaches the signature");
+    await until("document.querySelector('#slots-count').textContent==='5 unspent, 3 spent'", "slots follow the scroll");
+    await screenshot("07-steps-scroll");
+    // the settle step: the card has left and the night passes before the till comes online
+    await evaluate("(r=>scrollTo(0,scrollY+r.top+0.86*(r.height-innerHeight)))(document.querySelector('#seq').getBoundingClientRect())");
+    await until("document.querySelector('#steps li.on b')?.textContent==='Settle'", "scroll reaches the settle step");
+    await until("[...document.querySelectorAll('#seq-callouts .co')].some(c=>c.textContent.startsWith('Hours later')&&+c.style.opacity>0.5)", "the night's callout shows");
+    await screenshot("08-steps-night");
+    assert.deepEqual(await evaluate("window.__csp"), [], "No content security policy violations with motion");
+    // without JavaScript the browser's own controls stay and the custom ones stay hidden
+    await send("Emulation.setScriptExecutionDisabled", { value: true });
+    await load(origin + "/?nojs", "page without JavaScript loaded");
+    assert.equal(await evaluate("document.querySelector('#reel').hasAttribute('controls')"), true, "Without JavaScript the native controls remain");
+    assert.equal(await evaluate("document.querySelector('#film-ui').hidden"), true, "Without JavaScript the custom controls stay hidden");
+    assert.equal(await evaluate("document.querySelector('#seq').className"), "seq", "Without JavaScript the steps are a list");
+    assert.equal(await evaluate("[...document.querySelectorAll('#steps p')].every(p=>getComputedStyle(p).display!=='none')"), true, "Without JavaScript every step's words show");
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#slots')).display"), "none", "Without JavaScript the live slots stay hidden");
+    await send("Emulation.setScriptExecutionDisabled", { value: false });
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+    await load(origin + "/", "page reloaded");
     await evaluate("document.querySelector('#source').scrollIntoView()");
     await screenshot("02-source-desktop");
     for (const [width, height, maxScreens] of [
-      [1024, 768, 2.1], [768, 900, 2.3], [390, 844, 2.5], [320, 740, 2.9],
+      [1024, 768, 3.7], [768, 900, 3.7], [390, 844, 3.4], [320, 740, 3.7],
     ]) {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
       assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "No overflow at " + width);
-      assert.ok(await evaluate("document.documentElement.scrollHeight<=innerHeight*" + maxScreens), "Short page at " + width);
+      const ratio = await evaluate("document.documentElement.scrollHeight/innerHeight");
+      console.log("screens at " + width + "x" + height + " " + ratio.toFixed(2));
+      assert.ok(ratio <= maxScreens, "Page within its budget at " + width);
       await screenshot("home-" + width);
       await evaluate("document.querySelector('#source').scrollIntoView()");
       await screenshot("source-" + width);
@@ -162,7 +260,7 @@ async function main() {
     await viewport(390, 844);
     assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Artwork options fit mobile");
     assert.deepEqual(errors, [], "No browser exceptions");
-    console.log("PASS: short landing page, direct source links, responsive artwork options, reduced motion");
+    console.log("PASS: landing page, film and steps, direct source links, responsive artwork options, reduced motion, no JavaScript");
     console.log("Screenshots: " + output);
   } finally {
     if (socket) socket.close();

@@ -479,5 +479,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check website/tools/browser-smoke.cjs
+      - run: node --check website/tools/browser-smoke.cjs && node --check website/tools/preview.cjs && node --check website/dist/motion.js
       - run: test -f website/dist/index.html && test ! -e website/dist/site.js
+      - run: test -f website/dist/film/cashu-card-film-1.mp4 && test -f website/dist/film/cashu-card-film-1-720.mp4 && test -f website/dist/film/poster-1.jpg
+      - run: test -f website/dist/seq/tap-1/anchors.js && test "$(ls website/dist/seq/tap-1/tap_*.webp | wc -l)" -eq 96 && node --check website/worker.js

@@ -2,5 +2,16 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+/film/*
+  Cache-Control: public, max-age=31536000, immutable
+/seq/*
+  Cache-Control: public, max-age=31536000, immutable
+https://:worker.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
+# HTML pages: no-transform keeps Cloudflare from injecting scripts (its analytics beacon, bot detections) that the policy above would block
+/
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+/concepts
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
