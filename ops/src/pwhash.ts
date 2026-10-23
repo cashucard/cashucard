@@ -3,20 +3,23 @@
  * verify through this interface, whose stored string carries its algorithm
  * and parameters so old rows keep verifying after the backend changes.
  *
- * Two implementations:
+ * Implementations:
  *  - `node` — scrypt (node:crypto), what the first deploy wrote. The Node
  *    server and the ops CLI use it.
- *  - `subtle` — PBKDF2-SHA256 over WebCrypto (`crypto.subtle.deriveBits`),
+ *  - `native` — Workers' native scrypt 32768/8/3 (D103), with exact legacy
+ *    verification and one-time successful-login migration.
+ *  - `subtle` — legacy PBKDF2-SHA256 over WebCrypto (`crypto.subtle.deriveBits`),
  *    600k iterations, OWASP's 2023 floor for PBKDF2-SHA256 and the path the
- *    Durable Object takes. Native WebCrypto is preferred; the deployed
+ *    legacy Durable Object format. Native WebCrypto is preferred; the deployed
  *    iteration-cap error uses the pinned noble implementation (D52).
  *
  * The stored format: `scrypt$N$r$p$salt$hash` or `pbkdf2$iter$salt$hash`,
  * hex salt and hash. Verify dispatches on the prefix; hash always writes the
  * backend the process is running on. Timing-safe compare on both paths.
  */
-import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
+import {randomBytes, scrypt, scryptSync, timingSafeEqual} from 'node:crypto';
 import {pbkdf2Async} from '@noble/hashes/pbkdf2';
+import {scryptAsync} from '@noble/hashes/scrypt';
 import {sha256} from '@noble/hashes/sha256';
 
 /** Which backend this process hashes with; verification is format-driven. */
@@ -25,10 +28,31 @@ export type PwHashBackend = 'node' | 'subtle';
 export interface PasswordHasher {
   hash(password: string): Promise<string>;
   verify(password: string, stored: string): Promise<boolean>;
+  /** Called only after verification; null retains the original hash. */
+  upgrade?(password: string, stored: string): Promise<string | null>;
 }
 
 const PBKDF2_ITERATIONS = 600_000;
 const KEY_LEN = 64;
+export const NATIVE_SCRYPT_PROFILE = Object.freeze({
+  N: 32768,
+  r: 8,
+  p: 3,
+  maxmem: 64 * 1024 * 1024,
+});
+type ScryptDeriver = (
+  password: string,
+  salt: Uint8Array,
+) => Promise<Uint8Array>;
+const nativeScrypt: ScryptDeriver = (password, salt) =>
+  new Promise((resolve, reject) => {
+    scrypt(password, salt, KEY_LEN, NATIVE_SCRYPT_PROFILE, (error, key) =>
+      error ? reject(error) : resolve(key),
+    );
+  });
+const costLimited = (e: unknown) =>
+  e instanceof RangeError &&
+  e.message.startsWith('Scrypt failed: cost exceeds maximum');
 
 export class NodePwHash implements PasswordHasher {
   hash(password: string): Promise<string> {
@@ -47,6 +71,45 @@ export class NodePwHash implements PasswordHasher {
       return verifyPbkdf2(password, stored);
     }
     return verifyScrypt(password, stored);
+  }
+}
+
+/** Workers: native memory-hard hashing; old formats remain readable unchanged. */
+export class NativePwHash extends NodePwHash {
+  private available = true;
+  constructor(private derive: ScryptDeriver = nativeScrypt) {
+    super();
+  }
+  private async nativeHash(password: string): Promise<string | null> {
+    if (!this.available) return null;
+    const salt = randomBytes(16);
+    try {
+      const key = await this.derive(password, salt);
+      if (key.length !== KEY_LEN)
+        throw new Error('Invalid password KDF result');
+      return `scrypt$32768$8$3$${toHex(salt)}$${toHex(key)}`;
+    } catch (error) {
+      // No work-factor reduction when an edge applies an additional native cap.
+      if (!costLimited(error)) throw error;
+      this.available = false;
+      return null;
+    }
+  }
+  override async hash(password: string): Promise<string> {
+    return (
+      (await this.nativeHash(password)) ?? new SubtlePwHash().hash(password)
+    );
+  }
+  async upgrade(password: string, stored: string): Promise<string | null> {
+    // Upgrade only formats this application actually issued; do not replace
+    // arbitrary stronger/custom costs based on a format prefix alone.
+    if (
+      !/^(?:pbkdf2\$600000\$[0-9a-f]{32}\$[0-9a-f]{128}|scrypt\$16384\$8\$1\$[0-9a-f]{32}\$[0-9a-f]{128})$/.test(
+        stored,
+      )
+    )
+      return null;
+    return this.nativeHash(password);
   }
 }
 
@@ -117,7 +180,12 @@ async function verifyPbkdf2(
   }
   const [, iterStr, saltHex, hashHex] = parts;
   const iterations = Number(iterStr);
-  if (!Number.isInteger(iterations) || iterations < 1) {
+  if (
+    !Number.isSafeInteger(iterations) ||
+    iterations < 1 ||
+    !/^[0-9a-f]{32}$/.test(saltHex!) ||
+    !/^[0-9a-f]{128}$/.test(hashHex!)
+  ) {
     return false;
   }
   const expected = fromHex(hashHex!);
@@ -125,18 +193,36 @@ async function verifyPbkdf2(
   return timingSafeEqualLen(expected, actual);
 }
 
-function verifyScrypt(password: string, stored: string): boolean {
+async function verifyScrypt(
+  password: string,
+  stored: string,
+): Promise<boolean> {
   const parts = stored.split('$');
   if (parts.length !== 6 || parts[0] !== 'scrypt') {
     return false;
   }
   const [, nStr, rStr, pStr, saltHex, hashHex] = parts;
+  if (!/^[0-9a-f]{32}$/.test(saltHex!) || !/^[0-9a-f]{128}$/.test(hashHex!))
+    return false;
   const expected = fromHex(hashHex!);
-  const actual = scryptSync(password, fromHex(saltHex!), expected.length, {
+  const profile = {
     N: Number(nStr),
     r: Number(rStr),
     p: Number(pStr),
-  });
+    maxmem: NATIVE_SCRYPT_PROFILE.maxmem,
+  };
+  let actual: Uint8Array;
+  try {
+    actual = scryptSync(password, fromHex(saltHex!), expected.length, profile);
+  } catch (error) {
+    if (!costLimited(error)) throw error;
+    // A migrated credential remains readable after a deployment/backend change.
+    // The JS fallback preserves every parameter; it cannot lower the KDF cost.
+    actual = await scryptAsync(password, fromHex(saltHex!), {
+      ...profile,
+      dkLen: expected.length,
+    });
+  }
   return timingSafeEqual(expected, actual);
 }
 

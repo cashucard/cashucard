@@ -22,7 +22,7 @@ it('constructor bootstraps the actual DO once and retains operator sessions afte
       .exec('SELECT password_hash FROM operators WHERE name = ?', 'lead-setup')
       .toArray()[0];
   });
-  expect(state.password_hash).toMatch(/^pbkdf2\$600000\$/);
+  expect(state.password_hash).toMatch(/^scrypt\$32768\$8\$3\$/);
   await evictDurableObject(stub);
   const alive = await stub.fetch('http://x/auth/operator/sessions', {
     headers: {authorization: `Bearer ${token}`},

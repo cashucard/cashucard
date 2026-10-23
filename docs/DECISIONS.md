@@ -1844,6 +1844,9 @@ and independent production backup custody are separate release gates.
 
 ## <a id="d52"></a>D52: Preserve password work factor under the deployed PBKDF2 cap
 
+D103 changes the default Workers credential writer. This PBKDF2 compatibility
+path remains for legacy hashes and native cost refusal.
+
 **Decided (ENG-740, 2026-10-21):** retain PBKDF2-SHA256 at 600,000
 iterations and the existing stored format. Prefer native WebCrypto; on its
 specific 100,000-iteration `NotSupportedError`, use the already pinned
@@ -2912,3 +2915,39 @@ reset. The existing CPLC-only identity screen keeps its narrow command scope.
 **Rejected:** one generic “empty/ready” state, treating applet presence as
 holder readiness, silently beginning a reset from a status check, or reading
 additional applet data behind the existing identity-only control.
+
+## D103 — Migrate successful operator sign-ins to native memory-hard hashing
+
+**Decided (2026-10-23):** Workers uses native scrypt with N=32768, r=8, p=3,
+16-byte random salts and 64-byte output. This is OWASP's listed 32 MiB scrypt
+profile; its allocation limit is 64 MiB, within the Workers isolate budget.
+The existing self-describing scrypt/PBKDF2 formats remain readable. The first
+successful login for an issued PBKDF2-600k or legacy scrypt-16384/8/1 credential
+verifies that exact hash, derives the new one, then rechecks the original hash,
+enabled state and key environment in the session-issuance transaction. Only
+then does it replace the hash and issue a session. Wrong passwords do not
+migrate; concurrent administrator recovery wins. Existing sessions are not
+revoked merely by rehashing, and the durable login work budget is unchanged.
+
+If an edge's native scrypt cost cap refuses the profile, an upgrade retains the
+old hash without a second PBKDF2 derivation. New credential creation retains
+the existing PBKDF2-600k path in that case. A migrated scrypt credential remains
+readable through the parameter-identical noble fallback if a later backend
+imposes a native cost cap. Unrelated crypto errors fail closed. Missing or
+truncated hash/salt fields cannot authenticate as an empty derived key.
+
+**Why:** both native PBKDF2 APIs call workerd's same iteration-cap check;
+switching APIs does not remove the deployed JavaScript fallback. The local
+public-fixture benchmark shows a substantial native scrypt improvement without
+reducing PBKDF2 iterations or changing the password. Deployed edge timings and
+native-cap behavior still require rollout verification; the initial legacy
+login retains its original verification cost.
+
+Sources: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt),
+[Workers Node crypto](https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/),
+and [workerd PBKDF2/cost checks](https://github.com/cloudflare/workerd/blob/main/src/workerd/api/node/crypto.c%2B%2B).
+
+**Rejected:** lowering PBKDF2 to the native 100k cap, chaining shorter PBKDF2
+calls into a different function, storing a reusable password-derived login
+secret, skipping verification after one success, or migrating an arbitrary
+custom/stronger hash solely because of its format prefix.

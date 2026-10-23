@@ -1,7 +1,7 @@
 /**
  * Operator and holder sessions. Operator auth v1 is a password whose hash
- * goes through the pwhash seam (scrypt on Node, PBKDF2-SHA256 over WebCrypto
- * on the Durable Object — the ENG-740 Workers amendment; the stored string's
+ * goes through the pwhash seam (scrypt on Node and Workers, with the legacy
+ * PBKDF2-SHA256 verifier retained — D103; the stored string's
  * prefix picks the verifier, so hashes outlive backend changes); the bearer
  * token is 12 h, revocable server-side, and stored hashed (the DB never holds
  * a live token). Holder access is disabled until verified identity and
@@ -29,7 +29,7 @@ export interface Session {
 
 /**
  * The process's hasher: scrypt on Node (the server, the ops CLI, the tests).
- * The Durable Object constructs a SubtlePwHash and hands it to
+ * The Durable Object constructs a NativePwHash and hands it to
  * `createOperatorSession` — hash/verify dispatch on the stored prefix either
  * way, so a row written by one backend verifies on the other.
  */
@@ -72,6 +72,8 @@ export async function createOperatorSession(
   if (!operator || !(await pwHash.verify(password, operator.password_hash))) {
     return null;
   }
+  const upgraded =
+    (await pwHash.upgrade?.(password, operator.password_hash)) ?? null;
   // Password verification yields to other requests. Credential recovery must
   // invalidate a login already in flight, as well as previously issued tokens.
   return db.db.transaction(() => {
@@ -87,6 +89,10 @@ export async function createOperatorSession(
     ) {
       return null;
     }
+    if (upgraded !== null)
+      db.db
+        .prepare('UPDATE operators SET password_hash=? WHERE id=?')
+        .run(upgraded, operator.id);
     return issueSession(db, operator.id, 'operator', current.key_env);
   });
 }

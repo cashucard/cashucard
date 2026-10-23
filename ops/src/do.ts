@@ -25,7 +25,7 @@ import {HttpError, RouterDeps} from './router';
 import {routeRequest} from './route-request';
 import {openSqlStorage} from './sql-do';
 import {DEFAULT_MINTS} from './config';
-import {SubtlePwHash} from './pwhash';
+import {NativePwHash} from './pwhash';
 import {applyOperatorSetup} from './operator-setup';
 import {resolveSession} from './auth';
 import {recoveryHttp, type RecoveryBindings} from './recovery-http.workers';
@@ -63,7 +63,7 @@ export class OpsStore extends DurableObject<Env> {
       master,
       independentBackupIssuerSource: () => this.backupPolicyIssuer(),
     });
-    const passwordHasher = new SubtlePwHash();
+    const passwordHasher = new NativePwHash();
     ctx.blockConcurrencyWhile(async () => {
       await applyOperatorSetup(db, env.OPS_OPERATOR_SETUP, passwordHasher);
     });
