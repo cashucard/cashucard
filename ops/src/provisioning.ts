@@ -3,6 +3,7 @@ import type {OpsDb} from './db';
 import {createBatch} from './batches';
 import {assertIndependentBackup} from './recovery-evidence';
 import type {IssuedKeysRow} from './issue';
+import {hasPendingReset} from './reset-state';
 
 export class ProvisioningError extends Error {
   constructor(
@@ -482,11 +483,7 @@ export function reserveAttempt(
     }
     assertIndependentBackup(db);
     const batch = batchRow(db, scope, input.batch_id);
-    if (
-      db.db
-        .prepare('SELECT 1 FROM reset_intents WHERE device_id = ?')
-        .get(scope.device_id)
-    )
+    if (hasPendingReset(db, 'device', scope.device_id))
       conflict('reset-unresolved', 'device has an unresolved reset intent');
     if (
       db.db
@@ -553,11 +550,7 @@ export function bindAttempt(
       return JSON.parse(row.bind_receipt) as BindReceipt;
     }
     transition(row, input.revision);
-    if (
-      db.db
-        .prepare('SELECT 1 FROM reset_intents WHERE chip_id = ?')
-        .get(input.chip_id)
-    )
+    if (hasPendingReset(db, 'chip', input.chip_id))
       conflict('reset-unresolved', 'chip has an unresolved reset intent');
     if (
       db.db

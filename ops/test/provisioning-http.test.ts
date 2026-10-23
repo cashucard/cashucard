@@ -5,6 +5,7 @@ import {HolderIssueState} from '../src/issue';
 import {routeRequest} from '../src/route-request';
 import type {RouterDeps} from '../src/router';
 import {testDb} from './helpers';
+import {reserveAttempt, bindAttempt, recordAttempt} from '../src/provisioning';
 
 const DEVICE = '00000000-0000-4000-8000-000000000001';
 const OTHER_DEVICE = '00000000-0000-4000-8000-000000000002';
@@ -57,6 +58,115 @@ async function setup() {
     ).body as {token: string; operator_id: number};
   return {db, call, alice: await login('alice'), bob: await login('bob')};
 }
+
+test('reset HTTP keeps keys scoped to an unfinished authorization and returns replayable completion', async () => {
+  const {db, call, alice, bob} = await setup();
+  try {
+    const created = await call('/provisioning/batches', batchBody, alice.token);
+    const batch_id = (created.body as {batch: {batch_id: number}}).batch
+      .batch_id;
+    const scope = {
+      operator_id: 1,
+      device_id: DEVICE,
+      key_env: 'issued' as const,
+    };
+    const chip_id = 'cplc-v1:4790d3213041093363205547';
+    const installation_id =
+      '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+    reserveAttempt(db, scope, {attempt_id: ATTEMPT, batch_id, ordinal: 0});
+    bindAttempt(db, scope, ATTEMPT, {revision: 0, chip_id});
+    recordAttempt(db, scope, ATTEMPT, {
+      revision: 1,
+      record: {
+        attempt_id: ATTEMPT,
+        batch_id,
+        ordinal: 0,
+        chip_id,
+        installation_id,
+        display_id: installation_id.slice(-4),
+        load_sha256: batchBody.load_sha256,
+        gp_key_version: 1,
+        operator_id: 1,
+        device_id: DEVICE,
+        key_env: 'issued',
+        configuration_revision: 1,
+        verified_stage: 'rotated',
+        verified_at: db.now(),
+      },
+    });
+    const request = {
+      reset_id: REQUEST,
+      source_attempt_id: ATTEMPT,
+      chip_id,
+      installation_id,
+      consent: {erase_owner_and_proofs: true, value_handled: true},
+      inspection: {
+        unspent: 0,
+        spent: 0,
+        tag_present: true,
+        has_owner: false,
+        pin_present: false,
+        record_present: false,
+      },
+    };
+    const body = {device_id: DEVICE, request};
+    const path = `/provisioning/reset-intents/${REQUEST}`;
+    assert.equal((await call('/provisioning/reset-intents', body)).status, 401);
+    assert.equal(
+      (await call('/provisioning/reset-intents', body, bob.token)).status,
+      409,
+    );
+    assert.equal(
+      (await call('/provisioning/reset-intents', body, alice.token)).status,
+      200,
+    );
+    const read = await call(
+      `${path}?device_id=${DEVICE}`,
+      undefined,
+      alice.token,
+    );
+    assert.equal(read.status, 200);
+    assert.equal(Object.hasOwn(read.body as object, 'enc'), false);
+    assert.equal(
+      (await call(`${path}/keys`, {device_id: DEVICE}, bob.token)).status,
+      404,
+    );
+    assert.equal(
+      (await call(`${path}/keys`, {device_id: OTHER_DEVICE}, alice.token))
+        .status,
+      404,
+    );
+    const keys = await call(`${path}/keys`, {device_id: DEVICE}, alice.token);
+    assert.equal(keys.status, 200);
+    assert.match((keys.body as {enc: string}).enc, /^[0-9a-f]{32}$/);
+    const record = {
+      reset_id: REQUEST,
+      source_attempt_id: ATTEMPT,
+      chip_id,
+      removed_installation_id: installation_id,
+      gp_key_version: 1,
+      manager_keys: 'factory',
+      cashu_package: 'absent',
+      verified_at: db.now(),
+    };
+    const completed = await call(
+      `${path}/complete`,
+      {device_id: DEVICE, record},
+      alice.token,
+    );
+    assert.equal(completed.status, 200);
+    assert.deepEqual(
+      await call(`${path}/complete`, {device_id: DEVICE, record}, alice.token),
+      completed,
+    );
+    assert.equal(
+      (await call(`${path}/keys`, {device_id: DEVICE}, alice.token)).status,
+      409,
+    );
+  } finally {
+    db.close();
+  }
+});
 
 test('HTTP batch retries return one escrowed batch and publish a stable operator identity', async () => {
   const {db, call, alice} = await setup();

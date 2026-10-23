@@ -1,13 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {testDb} from './helpers';
+import {OpsDb} from '../src/db';
 import {
   createProvisioningBatch,
   reserveAttempt,
   bindAttempt,
   recordAttempt,
 } from '../src/provisioning';
-import {authorizeResetIntent, getResetIntent} from '../src/reset-intents';
+import {
+  authorizeResetIntent,
+  getResetIntent,
+  issueResetKeys,
+} from '../src/reset-intents';
+import {completeReset} from '../src/reset-results';
+import {findResetSource} from '../src/reset-source';
 import {
   exportEscrowSql,
   decryptEscrowExport,
@@ -102,6 +109,7 @@ test('reset authorization is durable, card-specific, idempotent and fenced from 
   assert.deepEqual(getResetIntent(db, scope, request.reset_id), {
     request,
     receipt,
+    completion_receipt: null,
   });
   assert.throws(() =>
     authorizeResetIntent(db, scope, {...request, reset_id: uuid(5)}),
@@ -132,6 +140,67 @@ test('reset authorization is durable, card-specific, idempotent and fenced from 
   db.close();
 });
 
+test('only the authorized device gets escrow; completion is immutable and releases admission', () => {
+  const {db, batch} = fixture();
+  authorizeResetIntent(db, scope, request);
+  assert.throws(() =>
+    issueResetKeys(db, {...scope, device_id: uuid(9)}, request.reset_id),
+  );
+  const issued = issueResetKeys(db, scope, request.reset_id);
+  assert.equal(issued.enc.length, 16);
+  assert.equal(issued.chip_id, chip);
+  const staleBackup = new OpsDb({
+    sql: db.db,
+    now: db.now,
+    independentBackupIssuer: uuid(99),
+  });
+  assert.throws(
+    () => issueResetKeys(staleBackup, scope, request.reset_id),
+    /independent-backup-stale/,
+  );
+  const record = {
+    reset_id: request.reset_id,
+    source_attempt_id: request.source_attempt_id,
+    chip_id: chip,
+    removed_installation_id: key,
+    gp_key_version: 1,
+    manager_keys: 'factory' as const,
+    cashu_package: 'absent' as const,
+    verified_at: db.now(),
+  };
+  assert.throws(() =>
+    completeReset(db, scope, request.reset_id, {
+      ...record,
+      chip_id: chip.replace('5547', '5548'),
+    }),
+  );
+  const receipt = completeReset(staleBackup, scope, request.reset_id, record);
+  assert.deepEqual(
+    completeReset(db, scope, request.reset_id, {...record}),
+    receipt,
+  );
+  assert.deepEqual(
+    getResetIntent(db, scope, request.reset_id).completion_receipt,
+    receipt,
+  );
+  assert.throws(() =>
+    completeReset(db, scope, request.reset_id, {...record, gp_key_version: 2}),
+  );
+  assert.throws(() => issueResetKeys(db, scope, request.reset_id));
+  assert.deepEqual(findResetSource(db, chip, key), {status: 'reset-completed'});
+  const attempt = reserveAttempt(db, scope, {
+    attempt_id: uuid(6),
+    batch_id: batch.batch_id,
+    ordinal: 1,
+  });
+  assert.equal(
+    bindAttempt(db, scope, attempt.attempt_id, {revision: 0, chip_id: chip})
+      .chip_id,
+    chip,
+  );
+  db.close();
+});
+
 test('missing provenance, proof slots, consent, wrong actor and restore fence stop authorization', () => {
   const {db} = fixture();
   for (const changed of [
@@ -156,33 +225,58 @@ test('missing provenance, proof slots, consent, wrong actor and restore fence st
 });
 
 test('encrypted recovery retains reset intent and rejects changed bindings', async () => {
-  const {db} = fixture();
-  authorizeResetIntent(db, scope, request);
-  const identity = await generateIdentity();
-  const {armored} = await exportEscrowSql(
-    db.db,
-    await identityToRecipient(identity),
-    db.now(),
-  );
-  const payload = await decryptEscrowExport(armored, identity);
-  const restored = testDb();
-  restoreEscrowExport(restored.db, payload);
-  assert.deepEqual(
-    getResetIntent(restored, scope, request.reset_id),
-    getResetIntent(db, scope, request.reset_id),
-  );
-  assert.throws(
-    () => authorizeResetIntent(restored, scope, request),
-    /recovery-required/,
-  );
-  const corrupt = JSON.parse(JSON.stringify(payload));
-  corrupt.reset_intents[0].chip_id = chip.replace('5547', '5548');
-  const empty = testDb();
-  assert.throws(
-    () => restoreEscrowExport(empty.db, corrupt),
-    /invalid recovery/,
-  );
-  db.close();
-  restored.close();
-  empty.close();
+  for (const completed of [false, true]) {
+    const {db} = fixture();
+    authorizeResetIntent(db, scope, request);
+    if (completed)
+      completeReset(db, scope, request.reset_id, {
+        reset_id: request.reset_id,
+        source_attempt_id: request.source_attempt_id,
+        chip_id: chip,
+        removed_installation_id: key,
+        gp_key_version: 1,
+        manager_keys: 'factory',
+        cashu_package: 'absent',
+        verified_at: db.now(),
+      });
+    const identity = await generateIdentity();
+    const {armored} = await exportEscrowSql(
+      db.db,
+      await identityToRecipient(identity),
+      db.now(),
+    );
+    const payload = await decryptEscrowExport(armored, identity);
+    const restored = testDb();
+    restoreEscrowExport(restored.db, payload);
+    assert.deepEqual(
+      getResetIntent(restored, scope, request.reset_id),
+      getResetIntent(db, scope, request.reset_id),
+    );
+    assert.throws(
+      () => authorizeResetIntent(restored, scope, request),
+      /recovery-required/,
+    );
+    const corrupt = JSON.parse(JSON.stringify(payload));
+    corrupt.reset_intents[0].chip_id = chip.replace('5547', '5548');
+    const empty = testDb();
+    assert.throws(
+      () => restoreEscrowExport(empty.db, corrupt),
+      /invalid recovery/,
+    );
+    if (completed) {
+      const corruptResult = JSON.parse(JSON.stringify(payload));
+      const body = JSON.parse(corruptResult.reset_results[0].body_json);
+      corruptResult.reset_results[0].body_json = JSON.stringify({
+        ...body,
+        removed_installation_id: '03' + key.slice(2),
+      });
+      assert.throws(
+        () => restoreEscrowExport(empty.db, corruptResult),
+        /invalid recovery/,
+      );
+    }
+    db.close();
+    restored.close();
+    empty.close();
+  }
 });

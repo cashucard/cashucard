@@ -81,3 +81,11 @@ removal, durable rotation intent and confirmed factory keys. Tests cut before
 and after each destructive command and simulate failed journal commits. This
 has not run on a physical card. Service completion, historical escrow import,
 stopped-attempt reconciliation and the phone UI still gate a real reset.
+
+The service now supplies actor/device-scoped reset keys and immutable
+completion receipts. Completion closes that key endpoint and releases the
+matching reset admission block. Export v6 retains pending and completed work.
+For the historical local cards, prefer executing against the original local
+escrow and retaining public completion evidence; transferring manager keys to
+production is not required merely to return an empty card to factory keys.
+Any production quarantine still needs a separate audited reconciliation.

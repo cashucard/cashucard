@@ -15,6 +15,12 @@ import {
   type ResetIntentReceipt,
 } from './reset-intents';
 import {
+  assertResetCompletion,
+  canonicalResetCompletion,
+  type ResetResultRow,
+  type ResetCompletionReceipt,
+} from './reset-results';
+import {
   assertChipId,
   assertInstallationId,
   assertCompletionRecord,
@@ -107,13 +113,14 @@ export type EscrowExport = EscrowExportBase &
   (
     | {readonly version: 1}
     | {
-        readonly version: 2 | 3 | 4 | 5;
+        readonly version: 2 | 3 | 4 | 5 | 6;
         readonly operator_audit?: readonly OperatorAudit[];
         readonly provisioning_batches: readonly RecoveryProvisioningBatch[];
         readonly provisioning_attempts: readonly RecoveryProvisioningAttempt[];
         readonly provisioning_records: readonly RecoveryProvisioningRecord[];
         readonly provisioning_batch_closures?: readonly RecoveryBatchClosure[];
         readonly reset_intents?: readonly ResetIntentRow[];
+        readonly reset_results?: readonly ResetResultRow[];
       }
   );
 
@@ -164,7 +171,7 @@ export async function exportEscrowSql(
   const snapshot = db.transaction(
     () =>
       ({
-        version: 5 as const,
+        version: 6 as const,
         operator_audit: db
           .prepare('SELECT * FROM operator_audit ORDER BY id')
           .all() as OperatorAudit[],
@@ -204,6 +211,9 @@ export async function exportEscrowSql(
         reset_intents: db
           .prepare('SELECT * FROM reset_intents ORDER BY reset_id')
           .all() as ResetIntentRow[],
+        reset_results: db
+          .prepare('SELECT * FROM reset_results ORDER BY reset_id')
+          .all() as ResetResultRow[],
         cards: db
           .prepare('SELECT * FROM cards ORDER BY short_id')
           .all() as CardRow[],
@@ -272,8 +282,9 @@ export function validateEscrowExport(
     };
   const version = object(value).version;
   shape(value, {
-    version: x => x === 1 || x === 2 || x === 3 || x === 4 || x === 5,
-    ...(version === 3 || version === 4 || version === 5
+    version: x =>
+      x === 1 || x === 2 || x === 3 || x === 4 || x === 5 || x === 6,
+    ...(version === 3 || version === 4 || version === 5 || version === 6
       ? {
           operator_audit: rows({
             id: positive,
@@ -289,7 +300,7 @@ export function validateEscrowExport(
       : {}),
     exported_at: integer,
     operators: rows({
-      ...(version === 3 || version === 4 || version === 5
+      ...(version === 3 || version === 4 || version === 5 || version === 6
         ? {disabled: (x: unknown) => x === 0 || x === 1}
         : {}),
       id: positive,
@@ -327,7 +338,11 @@ export function validateEscrowExport(
       load_sha256: text,
     }),
     cap_releases: rows({version: text, sha256: hex(64), created: integer}),
-    ...(version === 2 || version === 3 || version === 4 || version === 5
+    ...(version === 2 ||
+    version === 3 ||
+    version === 4 ||
+    version === 5 ||
+    version === 6
       ? {
           provisioning_batches: rows({
             batch_id: positive,
@@ -366,7 +381,7 @@ export function validateEscrowExport(
           }),
         }
       : {}),
-    ...(version === 4 || version === 5
+    ...(version === 4 || version === 5 || version === 6
       ? {
           provisioning_batch_closures: rows({
             batch_id: positive,
@@ -376,7 +391,7 @@ export function validateEscrowExport(
           }),
         }
       : {}),
-    ...(version === 5
+    ...(version === 5 || version === 6
       ? {
           reset_intents: rows({
             reset_id: text,
@@ -391,6 +406,16 @@ export function validateEscrowExport(
           }),
         }
       : {}),
+    ...(version === 6
+      ? {
+          reset_results: rows({
+            reset_id: text,
+            body_json: text,
+            receipt_json: text,
+            completed_at: integer,
+          }),
+        }
+      : {}),
   });
   const out = value as EscrowExport;
   const unique = <T>(items: readonly T[], key: (x: T) => unknown) => {
@@ -400,7 +425,12 @@ export function validateEscrowExport(
   };
   const operators = unique(out.operators, x => x.id);
   unique(out.operators, x => x.name);
-  if (out.version === 3 || out.version === 4 || out.version === 5) {
+  if (
+    out.version === 3 ||
+    out.version === 4 ||
+    out.version === 5 ||
+    out.version === 6
+  ) {
     unique(out.operator_audit!, x => x.id);
     for (const e of out.operator_audit!)
       if (!operators.has(e.actor_id) || !operators.has(e.target_id)) fail();
@@ -613,7 +643,7 @@ export function validateEscrowExport(
   for (const row of out.provisioning_attempts)
     if ((row.state === 'recorded') !== recordedAttempts.has(row.attempt_id))
       fail();
-  if (out.version === 4 || out.version === 5) {
+  if (out.version === 4 || out.version === 5 || out.version === 6) {
     unique(out.provisioning_batch_closures!, x => x.batch_id);
     for (const closure of out.provisioning_batch_closures!) {
       const batch = provisioningBatches.get(closure.batch_id);
@@ -627,12 +657,14 @@ export function validateEscrowExport(
         fail();
     }
   }
-  if (out.version === 5) {
+  if (out.version === 5 || out.version === 6) {
+    const completed = new Set(out.reset_results?.map(r => r.reset_id) ?? []);
+    const pending = out.reset_intents!.filter(r => !completed.has(r.reset_id));
     unique(out.reset_intents!, x => x.reset_id);
-    unique(out.reset_intents!, x => x.chip_id);
+    unique(pending, x => x.chip_id);
     unique(out.reset_intents!, x => x.installation_id);
     unique(out.reset_intents!, x => x.source_attempt_id);
-    unique(out.reset_intents!, x => x.device_id);
+    unique(pending, x => x.device_id);
     for (const row of out.reset_intents!) {
       const source = out.provisioning_attempts.find(
         a => a.attempt_id === row.source_attempt_id,
@@ -663,12 +695,13 @@ export function validateEscrowExport(
         !record ||
         record.installation_id !== row.installation_id ||
         source.operator_id !== row.operator_id ||
-        out.provisioning_attempts.some(
-          a =>
-            (a.chip_id === row.chip_id &&
-              ['active', 'quarantined', 'abandoned'].includes(a.state)) ||
-            (a.device_id === row.device_id && a.state === 'active'),
-        ) ||
+        (!completed.has(row.reset_id) &&
+          out.provisioning_attempts.some(
+            a =>
+              (a.chip_id === row.chip_id &&
+                ['active', 'quarantined', 'abandoned'].includes(a.state)) ||
+              (a.device_id === row.device_id && a.state === 'active'),
+          )) ||
         !operators.has(row.operator_id) ||
         !uuid(row.device_id) ||
         row.request_json !== canonicalResetRequest(request) ||
@@ -685,6 +718,48 @@ export function validateEscrowExport(
         receipt.authorized_at !== row.created
       )
         fail();
+    }
+    if (out.version === 6) {
+      unique(out.reset_results!, x => x.reset_id);
+      for (const result of out.reset_results!) {
+        const intent = out.reset_intents!.find(
+          r => r.reset_id === result.reset_id,
+        );
+        const record = json(result.body_json);
+        try {
+          assertResetCompletion(record);
+        } catch {
+          fail();
+        }
+        const receipt = json(
+          result.receipt_json,
+        ) as unknown as ResetCompletionReceipt;
+        shape(receipt, {
+          reset_id: text,
+          chip_id: text,
+          removed_installation_id: text,
+          operator_id: positive,
+          device_id: text,
+          completed_at: integer,
+          manager_keys: x => x === 'factory',
+          cashu_package: x => x === 'absent',
+        });
+        if (
+          !intent ||
+          result.body_json !== canonicalResetCompletion(record) ||
+          record.reset_id !== result.reset_id ||
+          record.source_attempt_id !== intent.source_attempt_id ||
+          record.chip_id !== intent.chip_id ||
+          record.removed_installation_id !== intent.installation_id ||
+          receipt.reset_id !== result.reset_id ||
+          receipt.chip_id !== intent.chip_id ||
+          receipt.removed_installation_id !== intent.installation_id ||
+          receipt.operator_id !== intent.operator_id ||
+          receipt.device_id !== intent.device_id ||
+          receipt.completed_at !== result.completed_at
+        )
+          fail();
+      }
     }
   }
 }
@@ -714,6 +789,7 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
       'provisioning_records',
       'provisioning_batch_closures',
       'reset_intents',
+      'reset_results',
     ]) {
       if (db.prepare(`SELECT 1 FROM ${table} LIMIT 1`).get())
         throw new Error('recovery requires an empty service');
@@ -729,7 +805,12 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
         r.created,
         r.disabled ?? 0,
       );
-    if (payload.version === 3 || payload.version === 4 || payload.version === 5)
+    if (
+      payload.version === 3 ||
+      payload.version === 4 ||
+      payload.version === 5 ||
+      payload.version === 6
+    )
       for (const e of payload.operator_audit!)
         db.prepare(
           'INSERT INTO operator_audit (id,actor_id,target_id,action,created) VALUES (?,?,?,?,?)',
@@ -772,7 +853,8 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
       payload.version === 2 ||
       payload.version === 3 ||
       payload.version === 4 ||
-      payload.version === 5
+      payload.version === 5 ||
+      payload.version === 6
     ) {
       for (const r of payload.provisioning_batches)
         db.prepare(
@@ -815,13 +897,17 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
           r.receipt_json,
           r.recorded_at,
         );
-      if (payload.version === 4 || payload.version === 5)
+      if (
+        payload.version === 4 ||
+        payload.version === 5 ||
+        payload.version === 6
+      )
         for (const r of payload.provisioning_batch_closures!)
           db.prepare(
             'INSERT INTO provisioning_batch_closures (batch_id, reason, next_ordinal, closed_at) VALUES (?, ?, ?, ?)',
           ).run(r.batch_id, r.reason, r.next_ordinal, r.closed_at);
     }
-    if (payload.version === 5)
+    if (payload.version === 5 || payload.version === 6)
       for (const r of payload.reset_intents!)
         db.prepare('INSERT INTO reset_intents VALUES (?,?,?,?,?,?,?,?,?)').run(
           r.reset_id,
@@ -833,6 +919,14 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
           r.request_json,
           r.receipt_json,
           r.created,
+        );
+    if (payload.version === 6)
+      for (const r of payload.reset_results!)
+        db.prepare('INSERT INTO reset_results VALUES (?,?,?,?)').run(
+          r.reset_id,
+          r.body_json,
+          r.receipt_json,
+          r.completed_at,
         );
     for (const r of payload.cap_releases)
       db.prepare('INSERT INTO cap_releases VALUES (?, ?, ?)').run(

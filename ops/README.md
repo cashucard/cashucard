@@ -241,7 +241,11 @@ They are operational identifiers, not credentials. See the full
 | `POST /provisioning/batches`                                     | `device_id`, `batch_request_id`, `count`, `mint_url`, `pin_policy`, `daily_usd`, `no_pin_usd`, `load_sha256`; returns `batch` with immutable configuration and next ordinal |
 | `POST /provisioning/attempts`                                    | `device_id`, `attempt_id`, `batch_id`, `ordinal`; returns the owned reservation                                                                                             |
 | `GET /provisioning/attempts/:id?device_id=...`                   | Returns reservation state and any immutable receipts; no keys                                                                                                               |
-| `GET /provisioning/reset-source?chip_id=...&installation_id=...` | Returns `missing`, `unresolved`, `escrow-missing` or a matching recorded attempt and escrow reference; no keys and no reset authorization                                   |
+| `GET /provisioning/reset-source?chip_id=...&installation_id=...` | Returns `missing`, `unresolved`, `escrow-missing`, `reset-completed` or a matching recorded attempt and escrow reference; no keys and no reset authorization                |
+| `POST /provisioning/reset-intents`                               | `device_id`, strict `request`; saves card-specific authorization and inspection/consent before any card mutation                                                            |
+| `GET /provisioning/reset-intents/:id?device_id=...`              | Returns saved request, authorization receipt and completion receipt; no keys                                                                                                |
+| `POST /provisioning/reset-intents/:id/keys`                      | `device_id`; returns source escrow only to the authorized operator/device while unfinished, with restore and backup gates                                                   |
+| `POST /provisioning/reset-intents/:id/complete`                  | `device_id`, strict `record`; saves factory-key/absent-package evidence, closes key access and releases the reset fence                                                     |
 | `POST /provisioning/attempts/:id/bind`                           | `device_id`, `revision`, `chip_id`; returns binding receipt                                                                                                                 |
 | `POST /keys/issue`                                               | `device_id`, `attempt_id`; optional `batch_id`/`ordinal` must match; returns the same per-attempt hex keys while active                                                     |
 | `POST /provisioning/attempts/:id/record`                         | `device_id`, `revision`, strict `record`; returns a terminal rotation receipt, never holder readiness                                                                       |
@@ -371,10 +375,10 @@ most recent successful administrative mutations. These endpoints require the
 allowlisted administrator's bearer token. No password/hash is returned or
 recorded in the audit trail.
 
-New recovery artifacts use export format v5, preserving account disabled state,
-the administrative audit trail, ended-batch fences and reset intents. Use the recovery CLI
-from this revision or later: older restore tools reject v5. The CLI still
-restores v1/v2/v3/v4 backups. All restored passwords remain disabled until
+New recovery artifacts use export format v6, preserving account disabled state,
+the administrative audit trail, ended-batch fences, reset intents and completion receipts. Use the recovery CLI
+from this revision or later: older restore tools reject v6. The CLI still
+restores v1/v2/v3/v4/v5 backups. All restored passwords remain disabled until
 controlled recovery, and the provisioning reconciliation fence remains enabled.
 
 `GET /admin/provisioning/attempts` and the console's read-only support section

@@ -2718,3 +2718,27 @@ foreign-owned or unexpected lifecycle evidence stops the reset.
 **Rejected:** replaying DELETE after a lost reply, trying factory keys as an
 initial fallback, or treating fake-card success as chip evidence. Hardware
 execution still requires a named-device plan and card-specific approval.
+
+## D96 — Retain reset completion and release only the matching admission fence
+
+**Decided (2026-10-23):** The service exposes exact operator/device reset
+authorization, recovery reads, source-key fetch and immutable completion.
+Keys are available only to the unfinished intent's actor and device, behind
+restore and independent-backup gates. Completion records assert the exact
+removed installation, observed factory manager key version and absent Cashu
+package. An identical completion replays its receipt; changed evidence is a
+conflict. Completion is accepted when the independent copy becomes stale so
+verified work is retained, while restored-service reconciliation still stops
+mutations. Completed sources cannot authorize another reset.
+
+Completion releases only that reset's chip/device fence. Old installation
+records, escrow, authorizations and results remain; quarantined attempts keep
+their existing block. Export v6 preserves both pending and finished resets;
+v1–v5 remain readable. No production rollout or phone reset action is implied
+by adding the API.
+
+**Rejected:** deleting old attempts to free a chip, returning historical keys
+from a read endpoint, or treating a foreign service's public receipt as
+automatic authority to clear a target service's quarantine. Historical local
+cards should be reset where their keys are retained, with a separate audited
+target reconciliation when needed. This avoids an unnecessary key transfer.

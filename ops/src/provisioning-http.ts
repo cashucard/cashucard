@@ -13,6 +13,12 @@ import {
   issueAttemptKeys,
 } from './provisioning';
 import {findResetSource} from './reset-source';
+import {
+  authorizeResetIntent,
+  getResetIntent,
+  issueResetKeys,
+} from './reset-intents';
+import {completeReset} from './reset-results';
 
 type Body = Record<string, unknown>;
 
@@ -46,7 +52,9 @@ function scope(session: Session, deviceId: string) {
   };
 }
 
-function wireKeys(result: ReturnType<typeof issueAttemptKeys>) {
+function wireKeys<T extends {enc: Buffer; mac: Buffer; dek: Buffer}>(
+  result: T,
+) {
   return {
     ...result,
     enc: result.enc.toString('hex'),
@@ -63,6 +71,45 @@ export function provisioningHttp(
   url: URL,
   body: Body,
 ): {status: number; body: unknown} {
+  if (method === 'POST' && path === '/provisioning/reset-intents') {
+    fields(body, ['device_id', 'request']);
+    return {
+      status: 200,
+      body: {
+        receipt: authorizeResetIntent(
+          db,
+          scope(session, text(body, 'device_id')),
+          body.request,
+        ),
+      },
+    };
+  }
+  const reset = path.match(
+    /^\/provisioning\/reset-intents\/([^/]+)(?:\/(keys|complete))?$/,
+  );
+  if (reset) {
+    const [, id, action] = reset;
+    if (method === 'GET' && !action)
+      return {
+        status: 200,
+        body: getResetIntent(
+          db,
+          scope(session, url.searchParams.get('device_id') ?? ''),
+          id!,
+        ),
+      };
+    if (method === 'POST' && action) {
+      fields(body, action === 'keys' ? ['device_id'] : ['device_id', 'record']);
+      const actor = scope(session, text(body, 'device_id'));
+      return {
+        status: 200,
+        body:
+          action === 'keys'
+            ? wireKeys(issueResetKeys(db, actor, id!))
+            : {receipt: completeReset(db, actor, id!, body.record)},
+      };
+    }
+  }
   if (method === 'GET' && path === '/provisioning/reset-source') {
     return {
       status: 200,
