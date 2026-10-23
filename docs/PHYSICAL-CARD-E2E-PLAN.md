@@ -21,6 +21,10 @@ The successful USB reset is recorded in the
   recipient, production mint administration, balance override or database edit.
 - Proposed funding: **64 sats**, with cumulative new funding and fees capped
   at **100 sats**. Stop before any operation requiring a higher amount.
+  During execution, Flash's USD Cash-wallet input produced a reviewed
+  **USD 0.05 → 61 sats** quote with no fee shown. That smaller load was used;
+  subsequent payments and balance reconciliation use 61 sats, with no increase
+  to the total cap or number of permitted payments.
 
 Live app traffic would use `forge.flashapp.me` and the provisioner's configured
 production ops-service origin. AGENTS.md prohibits production and device work

@@ -1,6 +1,6 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **fresh provisioning/post-check passed; holder setup reported complete; funding and merchant tests pending**.
+Status: **fresh provisioning/post-check passed; holder setup and first load reported complete; merchant tests pending**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
 100-sat cumulative funding/fees cap. No funds have moved in this run.
@@ -186,9 +186,29 @@ the operator was asked not to pay before reporting the actual amount and fee.
 An older pending top-up must be reconciled rather than replaced. No successful
 load, quote payment or merchant transaction is claimed yet.
 
+## First load — 61 sats
+
+The installed Flash UI accepted the amount through its USD Cash-wallet field.
+The operator entered **USD 0.05**; the review showed **61 sats** loaded onto
+card `031b63ab…3f11f6`, **Fee: None**, paid from the Cash wallet. The initial
+screen quoted five of 128 free card slots. This establishes a sat-denominated
+card load funded from USD; it is not a USD-denominated card test. No particular
+covering-ladder shape is inferred from the local source checkout.
+
+The lower actual amount replaces the proposed 64-sat funding amount for this
+run, within the unchanged 100-sat cumulative funding/fees cap. The operator was
+instructed to pay once and preserve the same top-up if payment or loading was
+uncertain. They reported **Loaded successfully; balance is 61 sats**. This is
+operator-confirmed wallet evidence; no raw proofs, quote secrets or private
+wallet history were retrieved. No second funding request was made.
+
+The next step is an 8-sat online charge on Pixel. Merchant-account ownership,
+absence of older pending settlements and the exact charge amount are being
+checked before presenting the funded card to that terminal.
+
 ## Not covered
 
-Independent owner-recovery restoration on another phone, funding, online payment/change,
+Independent owner-recovery restoration on another phone, online payment/change,
 offline acceptance/settlement, final balance, Max terminal coverage and the
 Apple review video have not run. Applet absence alone is not a fresh
 verification of factory manager keys; that evidence remains the prior reset
