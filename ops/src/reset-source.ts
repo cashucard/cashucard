@@ -3,7 +3,7 @@ import type {OpsDb} from './db';
 import {assertChipId, assertInstallationId} from './provisioning';
 
 export type ResetSourceLookup =
-  | {status: 'missing' | 'unresolved' | 'escrow-missing'}
+  | {status: 'missing' | 'unresolved' | 'escrow-missing' | 'reset-completed'}
   | {
       status: 'found';
       source: {
@@ -32,6 +32,15 @@ export function findResetSource(
     )
     .get(chipId);
   if (unresolved) return {status: 'unresolved'};
+  if (
+    db.db
+      .prepare(
+        `SELECT 1 FROM reset_intents i JOIN reset_results r ON r.reset_id = i.reset_id
+    WHERE i.chip_id = ? AND i.installation_id = ?`,
+      )
+      .get(chipId, installationId)
+  )
+    return {status: 'reset-completed'};
   const row = db.db
     .prepare(
       `SELECT a.attempt_id, a.batch_id, a.ordinal,

@@ -18,6 +18,9 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
       /^\/recovery\/(exports|metadata)\/[0-9A-FTZ.:%a-f-]+\.age$/.test(path) ||
       /^\/provisioning\/attempts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
         path,
+      ) ||
+      /^\/provisioning\/reset-intents\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        path,
       )
     );
   }
@@ -34,6 +37,7 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
         '/keys/issue',
         '/provisioning/batches',
         '/provisioning/attempts',
+        '/provisioning/reset-intents',
       ].includes(path) ||
       /^\/admin\/operators\/[1-9][0-9]*\/(disable|enable|reset-password)$/.test(
         path,
@@ -42,6 +46,9 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
         path,
       ) ||
       /^\/provisioning\/attempts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(bind|record|disposition)$/i.test(
+        path,
+      ) ||
+      /^\/provisioning\/reset-intents\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(keys|complete)$/i.test(
         path,
       )
     );

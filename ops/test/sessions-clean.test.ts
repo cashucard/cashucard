@@ -86,7 +86,7 @@ async function call(
   return {status: res.status, json};
 }
 
-test('every phone-cacheable route carries no key material; only /keys/issue does', async () => {
+test('ordinary provisioning responses omit key material; reservation key issuance remains scoped', async () => {
   await withServer(async base => {
     const signin = await call(
       base,

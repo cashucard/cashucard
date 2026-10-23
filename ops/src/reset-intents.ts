@@ -8,6 +8,9 @@ import {
 } from './provisioning';
 import {findResetSource} from './reset-source';
 import {assertIndependentBackup} from './recovery-evidence';
+import {hasPendingReset} from './reset-state';
+import type {ResetCompletionReceipt} from './reset-results';
+import type {IssuedKeysRow} from './issue';
 
 export interface ResetRequest {
   reset_id: string;
@@ -146,10 +149,52 @@ export function getResetIntent(
     row.device_id !== scope.device_id
   )
     throw new ProvisioningError(404, 'not-found');
+  const completion = db.db
+    .prepare('SELECT receipt_json FROM reset_results WHERE reset_id = ?')
+    .get(id) as {receipt_json: string} | undefined;
   return {
     request: JSON.parse(row.request_json) as ResetRequest,
     receipt: JSON.parse(row.receipt_json) as ResetIntentReceipt,
+    completion_receipt: completion
+      ? (JSON.parse(completion.receipt_json) as ResetCompletionReceipt)
+      : null,
   };
+}
+export function assertResetWritable(db: OpsDb): void {
+  const control = db.db
+    .prepare('SELECT recovery_required FROM provisioning_control WHERE id = 1')
+    .get() as {recovery_required: number};
+  if (control.recovery_required !== 0)
+    throw new ProvisioningError(409, 'recovery-required');
+}
+/** Keys remain scoped to the immutable intent and are never a lookup response. */
+export function issueResetKeys(
+  db: OpsDb,
+  scope: ProvisioningScope,
+  id: string,
+) {
+  return db.db.transaction(() => {
+    const intent = getResetIntent(db, scope, id);
+    assertResetWritable(db);
+    assertIndependentBackup(db);
+    if (intent.completion_receipt)
+      throw new ProvisioningError(409, 'reset-completed');
+    const row = db.db
+      .prepare(
+        `SELECT k.* FROM issued_keys k JOIN provisioning_attempts a
+      ON a.batch_id = k.batch_id AND a.ordinal = k.ordinal WHERE a.attempt_id = ?`,
+      )
+      .get(intent.request.source_attempt_id) as IssuedKeysRow | undefined;
+    if (!row) throw new ProvisioningError(409, 'escrow-missing');
+    return {
+      reset_id: id,
+      chip_id: intent.request.chip_id,
+      installation_id: intent.request.installation_id,
+      enc: Buffer.from(row.enc),
+      mac: Buffer.from(row.mac),
+      dek: Buffer.from(row.dek),
+    };
+  });
 }
 export function authorizeResetIntent(
   db: OpsDb,
@@ -161,13 +206,7 @@ export function authorizeResetIntent(
   const serialized = canonicalResetRequest(request);
   return db.db.transaction(() => {
     actor(db, scope);
-    const control = db.db
-      .prepare(
-        'SELECT recovery_required FROM provisioning_control WHERE id = 1',
-      )
-      .get() as {recovery_required: number};
-    if (control.recovery_required !== 0)
-      throw new ProvisioningError(409, 'recovery-required');
+    assertResetWritable(db);
     const existing = db.db
       .prepare('SELECT * FROM reset_intents WHERE reset_id = ?')
       .get(request.reset_id) as ResetIntentRow | undefined;
@@ -208,17 +247,9 @@ export function authorizeResetIntent(
         .get(scope.device_id)
     )
       throw new ProvisioningError(409, 'device-busy');
-    if (
-      db.db
-        .prepare('SELECT 1 FROM reset_intents WHERE chip_id = ?')
-        .get(request.chip_id)
-    )
+    if (hasPendingReset(db, 'chip', request.chip_id))
       throw new ProvisioningError(409, 'reset-unresolved');
-    if (
-      db.db
-        .prepare('SELECT 1 FROM reset_intents WHERE device_id = ?')
-        .get(scope.device_id)
-    )
+    if (hasPendingReset(db, 'device', scope.device_id))
       throw new ProvisioningError(409, 'device-busy');
     const receipt: ResetIntentReceipt = {
       reset_id: request.reset_id,

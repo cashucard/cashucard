@@ -198,6 +198,15 @@ export const MIGRATIONS: readonly string[] = [
    );
    CREATE UNIQUE INDEX reset_intent_chip ON reset_intents(chip_id);
    CREATE UNIQUE INDEX reset_intent_device ON reset_intents(device_id);`,
+  // 10. Preserve completed resets and release only their admission fences.
+  `CREATE TABLE reset_results (
+     reset_id TEXT PRIMARY KEY REFERENCES reset_intents(reset_id),
+     body_json TEXT NOT NULL,
+     receipt_json TEXT NOT NULL,
+     completed_at INTEGER NOT NULL
+   );
+   DROP INDEX reset_intent_chip;
+   DROP INDEX reset_intent_device;`,
 ];
 
 export interface DbOptions {
