@@ -47,7 +47,10 @@ export function serve(options: ServeOptions): http.Server {
     mints: options.mints ?? DEFAULT_MINTS,
   };
   const server = http.createServer((req, res) => {
-    if (req.method === 'GET' && req.url === '/ops/operators') {
+    if (
+      req.method === 'GET' &&
+      (req.url === '/' || req.url === '/ops/operators')
+    ) {
       const page = operatorAdminPage();
       res.writeHead(200, page.headers);
       res.end(page.html);

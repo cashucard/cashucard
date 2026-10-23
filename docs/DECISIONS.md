@@ -2374,3 +2374,22 @@ boundaries; do not imply that a particular wallet has been certified.
 Rejected retaining a wallet sponsor's branding because it implies exclusive
 wallet affiliation. Remote image loading is unnecessary; the bundled image
 works without a third-party request and CSP permits only data images.
+
+
+## D78 — Cashu Card visual identity and console domain
+
+Keep the original Cashu mascot, set in a fine card frame beside a compact
+wallet-neutral cashucard wordmark. The sign-in illustration is made from
+HTML/CSS with a single entrance and foil pass, plus a hover response. No
+external scripts, fonts or image calls are added. Motion settles within
+three seconds and is disabled for reduced-motion preferences. The signed-in
+brand stays still until hovered, so administration remains focused.
+
+Prepare ops.cashucard.org as the console's custom domain. Serve the console
+at both / and /ops/operators without redirects or an API origin change.
+Activate the custom-domain route only after the domain is an active zone
+in the existing Cloudflare account. Retain workers.dev for current mobile
+clients and backup pairing; switching their origins is separate work.
+
+Rejected a continuously animated mascot, which distracts during operations,
+and a new frontend framework or remote assets for a small visual change.

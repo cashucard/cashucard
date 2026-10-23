@@ -93,7 +93,7 @@ async function main() {
         'http://127.0.0.1:' +
           port +
           '/json/new?' +
-          encodeURIComponent(origin + '/ops/operators'),
+          encodeURIComponent(origin + '/'),
         {method: 'PUT'},
       )
     ).json();
@@ -180,6 +180,39 @@ async function main() {
       '#name',
       'Sign-in skip link targets a visible control',
     );
+    assert.equal(
+      await evaluate(
+        `getComputedStyle(document.querySelector('.hero-card')).animationName`,
+      ),
+      'none',
+      'Reduced motion stops decorative animation',
+    );
+    await send('Emulation.setEmulatedMedia', {
+      features: [{name: 'prefers-reduced-motion', value: 'no-preference'}],
+    });
+    assert.equal(
+      await evaluate(
+        `getComputedStyle(document.querySelector('.hero-card')).animationIterationCount`,
+      ),
+      '1',
+      'Card entrance is finite',
+    );
+    await send('Emulation.setEmulatedMedia', {
+      features: [{name: 'prefers-reduced-motion', value: 'reduce'}],
+    });
+    for (const [width, height] of [
+      [1024, 768],
+      [768, 900],
+    ]) {
+      await viewport(width, height);
+      assert.equal(
+        await evaluate('document.documentElement.scrollWidth<=innerWidth'),
+        true,
+        'Sign-in fits tablet viewport',
+      );
+      await screenshot('sign-in-' + width);
+    }
+    await viewport(1440, 1000);
     await screenshot('01-sign-in-desktop');
     await viewport(390, 844);
     assert.equal(
@@ -419,8 +452,16 @@ async function main() {
         setTimeout(resolve, 3000);
       }
     });
-    await fs.rm(profile, {recursive: true, force: true});
-    if (fixture) fixture.kill('SIGTERM');
+    try {
+      await fs.rm(profile, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 200,
+      });
+    } finally {
+      if (fixture) fixture.kill('SIGTERM');
+    }
   }
 }
 main().catch(error => {

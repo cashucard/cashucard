@@ -3,6 +3,7 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
   if (method === 'GET') {
     return (
       [
+        '/',
         '/mints',
         '/ops/operators',
         '/admin/operators',
