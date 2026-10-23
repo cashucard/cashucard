@@ -248,3 +248,32 @@ test('local runner integrates private escrow, durable journal, interrupted reset
     rmSync(directory, {recursive: true, force: true});
   }
 });
+
+test('reader startup failure retains reviewed state and reports its safe phase', async () => {
+  const {directory, options} = await fixture();
+  try {
+    await assert.rejects(
+      () =>
+        executeLocalReset(options, async () => {
+          throw new Error('private native detail');
+        }),
+      error =>
+        error instanceof Error &&
+        'phase' in error &&
+        error.phase === 'reader-connect' &&
+        !error.message.includes('private native detail'),
+    );
+    assert.equal(
+      JSON.parse(readFileSync(options.journal, 'utf8')).journal.stage,
+      'reviewed',
+    );
+    const db = new OpsDb({sql: openSqliteFile(options.db)});
+    assert.deepEqual(
+      db.db.prepare('SELECT count(*) AS count FROM reset_intents').get(),
+      {count: 0},
+    );
+    db.close();
+  } finally {
+    rmSync(directory, {recursive: true, force: true});
+  }
+});

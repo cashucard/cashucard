@@ -4,6 +4,21 @@ import {createInterface} from 'node:readline';
 import {resolve} from 'node:path';
 import type {Transceiver} from '../../tools/cardkit';
 
+const FAILURE_CODES = new Set([
+  'reader-not-found',
+  'reader-not-unique',
+  'card-connect-failed',
+  'command-not-permitted',
+  'transport-failed',
+  'invalid-message',
+  'bridge-stopped',
+]);
+export class ResetReaderError extends Error {
+  constructor(readonly code: string) {
+    super('reset reader stopped');
+  }
+}
+
 export async function openResetReader(python: string, reader: string) {
   const child = spawn(
     python,
@@ -29,14 +44,19 @@ export async function openResetReader(python: string, reader: string) {
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
             child.kill();
-            reject(new Error('reader response unavailable'));
+            reject(new ResetReaderError('response-timeout'));
           }, 10000);
         }),
       ]);
       if (line.done || line.value.length > 4096)
-        throw new Error('reader stopped');
+        throw new ResetReaderError('bridge-stopped');
       const message = JSON.parse(line.value) as Record<string, unknown>;
-      if (!message || message.error) throw new Error('reader stopped');
+      if (!message || message.error)
+        throw new ResetReaderError(
+          typeof message?.error === 'string' && FAILURE_CODES.has(message.error)
+            ? message.error
+            : 'bridge-stopped',
+        );
       return message;
     } finally {
       if (timer) clearTimeout(timer);
@@ -64,9 +84,11 @@ export async function openResetReader(python: string, reader: string) {
   };
   try {
     if ((await next()).ready !== true) throw new Error('reader unavailable');
-  } catch {
+  } catch (error) {
     await close();
-    throw new Error('reader unavailable; no retry');
+    throw error instanceof ResetReaderError
+      ? error
+      : new ResetReaderError('bridge-start-failed');
   }
   const tx: Transceiver = async apdu => {
     if (closed || busy) throw new Error('reader unavailable');
@@ -81,9 +103,11 @@ export async function openResetReader(python: string, reader: string) {
       )
         throw new Error('invalid reader reply');
       return reply as number[];
-    } catch {
+    } catch (error) {
       await close();
-      throw new Error('reader stopped; no retry');
+      throw error instanceof ResetReaderError
+        ? error
+        : new ResetReaderError('bridge-stopped');
     } finally {
       busy = false;
     }

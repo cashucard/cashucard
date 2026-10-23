@@ -1,7 +1,11 @@
 # Local owned-card reset drill — card 09336320
 
-Status: software preparation and metadata preview only. Card-changing execution
-requires the operator's approval of this plan under AGENTS.md.
+Status: the operator approved execution. The first invocation stopped with the
+journal at `reviewed`, before service authorization or deletion intent. The
+protected snapshot is retained and no destructive command was reached. The
+operator subsequently confirmed that the same card remains on the reader.
+The next invocation follows this same approved plan after bounded diagnostics
+are checked; there is no automatic retry.
 
 ## Card and authority
 

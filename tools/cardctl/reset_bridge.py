@@ -15,6 +15,11 @@ DELETABLE = frozenset(bytes.fromhex(aid) for aid in (
 ))
 
 
+class BridgeFailure(Exception):
+    def __init__(self, code):
+        self.code = code
+
+
 def validate_command(command):
     if not isinstance(command, list) or any(type(v) is not int or not 0 <= v <= 255 for v in command):
         raise ValueError('invalid command')
@@ -54,11 +59,14 @@ def main():
     from smartcard.scard import SCARD_LEAVE_CARD
     matches = [r for r in readers() if str(r) == args.reader]
     if len(matches) != 1:
-        raise ValueError('reader mismatch')
+        raise BridgeFailure('reader-not-found' if not matches else 'reader-not-unique')
     connection = matches[0].createConnection()
     connected = False
     try:
-        connection.connect(disposition=SCARD_LEAVE_CARD)
+        try:
+            connection.connect(disposition=SCARD_LEAVE_CARD)
+        except Exception:
+            raise BridgeFailure('card-connect-failed') from None
         connected = True
         emit({'ready': True})
         while True:
@@ -72,8 +80,14 @@ def main():
                 return
             if not isinstance(value, dict) or set(value) != {'apdu'}:
                 raise ValueError('invalid message')
-            command = validate_command(value['apdu'])
-            data, sw1, sw2 = connection.transmit(list(command))
+            try:
+                command = validate_command(value['apdu'])
+            except ValueError:
+                raise BridgeFailure('command-not-permitted') from None
+            try:
+                data, sw1, sw2 = connection.transmit(list(command))
+            except Exception:
+                raise BridgeFailure('transport-failed') from None
             emit({'reply': data + [sw1, sw2]})
     finally:
         if connected:
@@ -83,6 +97,9 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except BridgeFailure as error:
+        emit({'error': error.code})
+        sys.exit(1)
     except Exception:
         emit({'error': 'bridge-stopped'})
         sys.exit(1)
