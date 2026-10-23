@@ -37,6 +37,7 @@ test('staging permits only operator provisioning and backup-status methods', () 
     ['POST', '/keys/issue'],
     ['POST', '/provisioning/batches'],
     ['POST', '/provisioning/attempts'],
+    ['GET', '/provisioning/reset-source'],
     ['GET', `/provisioning/attempts/${attempt}`],
     ...['bind', 'record', 'disposition'].map(action => [
       'POST',

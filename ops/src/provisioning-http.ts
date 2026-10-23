@@ -12,6 +12,7 @@ import {
   disposeAttempt,
   issueAttemptKeys,
 } from './provisioning';
+import {findResetSource} from './reset-source';
 
 type Body = Record<string, unknown>;
 
@@ -62,6 +63,18 @@ export function provisioningHttp(
   url: URL,
   body: Body,
 ): {status: number; body: unknown} {
+  if (method === 'GET' && path === '/provisioning/reset-source') {
+    return {
+      status: 200,
+      body: {
+        lookup: findResetSource(
+          db,
+          url.searchParams.get('chip_id') ?? '',
+          url.searchParams.get('installation_id') ?? '',
+        ),
+      },
+    };
+  }
   const endBatchMatch = path.match(/^\/provisioning\/batches\/(\d+)\/end$/);
   if (method === 'POST' && endBatchMatch) {
     fields(body, ['device_id', 'reason']);

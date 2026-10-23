@@ -2637,3 +2637,18 @@ service must verify the exact escrow row before releasing a reset intent.
 factory-key attempt as authority to delete. Those cannot identify the current
 applet or prove its manager keys. Also rejected an automatic retry after an
 interrupted DELETE: the card state and durable intent must be reconciled first.
+
+## D92 — Look up reset provenance without returning manager keys
+
+**Decided (2026-10-23):** The operator service offers a read-only lookup by
+full CPLC and applet public key. It reports a recorded attempt and escrow
+reference only when both identities match and the key row exists. Any active,
+quarantined or abandoned attempt on the chip takes precedence and reports an
+unresolved state. The endpoint returns metadata only; it cannot authorize a
+reset or assert which manager keys the card currently uses. Production,
+staging and local service databases must each be checked separately until an
+audited historical import exists.
+
+**Rejected:** returning manager keys from a lookup or treating a recorded
+installation alone as reset authority. The key set may have changed after the
+record, and a later interrupted attempt may have changed the card again.
