@@ -23,6 +23,13 @@ test('inspection reads the full applet identity and tag without authentication',
     installationId: key,
     empty: true,
     tagVerified: true,
+    publicState: {
+      unspent: 0,
+      spent: 0,
+      pin: false,
+      record: false,
+      owner: false,
+    },
   });
   assert.deepEqual(log, [
     '00A404000BF04341534855434152440100',
@@ -48,6 +55,13 @@ test('absence, nonempty state and a missing tag remain distinct inspection evide
     installationId: key,
     empty: false,
     tagVerified: false,
+    publicState: {
+      unspent: 1,
+      spent: 0,
+      pin: false,
+      record: false,
+      owner: false,
+    },
   });
 });
 test('unknown versions, malformed responses and card refusal stop without retries', async () => {

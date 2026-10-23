@@ -2620,3 +2620,20 @@ phone disagree about whether unused ordinals could be reserved. Deleting
 escrow or attempt rows would erase evidence needed for recovery. Closing an
 active attempt would hide an ambiguous card state, so it must be resolved or
 acknowledged first.
+
+## D91 — Gate owned-card reset on exact public state and escrow provenance
+
+**Decided (2026-10-23):** A reset review for a 2.1 card requires the same full
+CPLC and applet public key in the card-specific consent and the reviewed escrow
+reference. The read-only inspection exposes proof counts and owner/PIN/record
+presence. Any unspent or spent proof, missing tag, unresolved attempt, missing
+provenance or missing consent stops before card-manager authentication. An owner
+or PIN alone does not prevent review when there are no proof slots, because
+their removal is the explicitly acknowledged purpose of an owned-card reset.
+The escrow reference is metadata, not proof that the keys are present; the
+service must verify the exact escrow row before releasing a reset intent.
+
+**Rejected:** treating a wallet's “empty” display, a serial alone, or a
+factory-key attempt as authority to delete. Those cannot identify the current
+applet or prove its manager keys. Also rejected an automatic retry after an
+interrupted DELETE: the card state and durable intent must be reconciled first.
