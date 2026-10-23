@@ -2361,3 +2361,16 @@ source separated into readable client/style/icon modules. A single optional
 Chrome acceptance journey runs against a disposable localhost fixture, covering
 actual admin workflows, authorization, keyboard/mobile behavior and partial
 refresh failures. It adds no browser dependency or additional CI matrix.
+
+## D77 — Wallet-neutral provisioner administration
+
+The administration console uses Cashu Card Provisioner naming and the Cashu
+logo published at https://cashu.space/cashu-no-bg.png, bundled locally with
+source attribution and its checksum. Wallet-specific names and marks are
+removed: the provisioning tool serves the card protocol independently of
+the holder's wallet. Keep the existing workspace design and authorization
+boundaries; do not imply that a particular wallet has been certified.
+
+Rejected retaining a wallet sponsor's branding because it implies exclusive
+wallet affiliation. Remote image loading is unnecessary; the bundled image
+works without a third-party request and CSP permits only data images.
