@@ -1,11 +1,10 @@
 /**
  * S5. Settings, grouped the way a 2026 settings screen is grouped: section
  * headers, one card per group, hairline dividers, a segmented theme pill,
- * the key environment as a locked row, and signed-in card tools.
+ * the account scope as a read-only row, and signed-in card tools.
  *
  * The batch-setup revamp's rules hold here too: tabular figures for every
- * number, the accent only where a thing is live (the factory key set's dot,
- * the theme pill's active segment), and nothing that pretends to be a button
+ * number, the accent only where a thing is live (the theme pill's active segment), and nothing that pretends to be a button
  * that is not.
  */
 import React from 'react';
@@ -58,19 +57,30 @@ const local = (t: Theme) =>
       fontVariant: ['tabular-nums'],
       fontSize: 15,
     },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: t.accent,
+    sectionHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
-    dotOff: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      borderWidth: 1.5,
+    scopeHelp: {
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    question: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1,
       borderColor: t.dim,
+      color: t.dim,
+      textAlign: 'center',
+      lineHeight: 22,
+      fontFamily: FONT.medium,
+      fontSize: 17,
     },
+    scopeDetails: {paddingHorizontal: 18, paddingBottom: 16, gap: 10},
     pill: {
       flexDirection: 'row',
       backgroundColor: t.bg,
@@ -137,35 +147,51 @@ export function SettingsScreen({
 }) {
   const app = useApp();
   const [confirmSignOut, setConfirmSignOut] = React.useState(false);
+  const [scopeHelp, setScopeHelp] = React.useState(false);
   const t = useTheme();
   const s = local(t);
-  // S5: exactly one of the two environments is ever lit — the session's own.
-  const env = app.session?.env ?? 'factory';
-  const factoryActive = env === 'factory';
+  const env = app.session?.env;
+  const scopeLabel =
+    env === 'issued'
+      ? SETTINGS.issued
+      : env === 'factory'
+      ? SETTINGS.factory
+      : SETTINGS.scopeSignedOut;
   return (
     <Screen title={SETTINGS.title} onBack={onBack}>
       <ScrollView contentContainerStyle={s.scroll}>
         <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.keyEnv}</Text>
+          <View style={s.sectionHeading}>
+            <Text style={s.header}>{SETTINGS.provisioningScope}</Text>
+            <Pressable
+              style={s.scopeHelp}
+              accessibilityRole="button"
+              accessibilityLabel={SETTINGS.scopeHelpLabel}
+              accessibilityState={{expanded: scopeHelp}}
+              testID="provisioning-scope-help"
+              onPress={() => setScopeHelp(value => !value)}>
+              <Text style={s.question} accessible={false}>
+                ?
+              </Text>
+            </Pressable>
+          </View>
           <View style={s.card}>
             <View style={s.row}>
-              <View style={factoryActive ? s.dot : s.dotOff} />
-              <View style={s.rowLabelCol}>
-                <Text style={[s.rowLabel, !factoryActive && {color: t.dim}]}>
-                  {SETTINGS.factory}
-                </Text>
-              </View>
-              <Text style={s.rowValue}>{factoryActive ? 'active' : '—'}</Text>
+              <Text style={s.rowLabel}>{SETTINGS.accountScope}</Text>
+              <Text style={s.rowValue} testID="provisioning-scope-value">
+                {scopeLabel}
+              </Text>
             </View>
-            <View style={s.divider} />
-            <View style={s.row}>
-              <View style={!factoryActive ? s.dot : s.dotOff} />
-              <View style={s.rowLabelCol}>
-                <Text style={[s.rowLabel, factoryActive && {color: t.dim}]}>
-                  {SETTINGS.issued}
+            <View style={s.scopeDetails}>
+              <Text style={s.note}>{SETTINGS.scopeAssigned}</Text>
+              {scopeHelp ? (
+                <Text
+                  style={s.note}
+                  testID="provisioning-scope-explanation"
+                  accessibilityLiveRegion="polite">
+                  {SETTINGS.scopeExplanation}
                 </Text>
-              </View>
-              <Text style={s.rowValue}>{!factoryActive ? 'active' : '—'}</Text>
+              ) : null}
             </View>
           </View>
         </View>

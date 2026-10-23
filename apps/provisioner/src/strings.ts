@@ -67,8 +67,14 @@ export const SUMMARY = {
 
 export const SETTINGS = {
   title: 'Settings',
-  keyEnv: 'Key environment',
-  factory: 'Factory/test',
+  provisioningScope: 'Provisioning scope',
+  accountScope: 'Account scope',
+  scopeSignedOut: 'Sign in to view',
+  scopeHelpLabel: 'What is provisioning scope?',
+  scopeAssigned: 'Assigned to your account by your administrator.',
+  scopeExplanation:
+    'Saved batches and recovery work must match your account’s scope. Continue them with the original account and service. This value does not read or change a card’s keys. Use Check a card for card status.',
+  factory: 'Factory',
   issued: 'Issued',
   theme: 'Theme',
   themeSystem: 'System',
