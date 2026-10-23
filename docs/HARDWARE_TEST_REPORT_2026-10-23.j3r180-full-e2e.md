@@ -1,6 +1,6 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **fresh provisioning and independent post-check passed; holder setup and funded end-to-end run pending**.
+Status: **fresh provisioning/post-check passed; holder setup reported complete; funding and merchant tests pending**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
 100-sat cumulative funding/fees cap. No funds have moved in this run.
@@ -171,9 +171,24 @@ The operator was asked to open this card's setup screen in Flash on SuperMax
 and report seed-backed versus device-only ownership before committing setup.
 No owner key, seed or PIN is requested from the operator or read by the agent.
 
+## Holder setup reported complete
+
+The operator read the new card in Flash on SuperMax and reported the message
+that its owner key comes from the wallet's recovery phrase. They then confirmed
+both a verified recovery backup and successful setup after the guided private
+PIN/owner flow. The agent did not view or collect the phrase, PIN, wallet keys
+or Keychain data.
+
+The next requested step is a fresh Flash read showing zero sats and ownership
+by this phone, followed by a **64-sat** top-up quote review. Payment has not
+been authorized beyond the existing **100-sat cumulative funding/fees cap**;
+the operator was asked not to pay before reporting the actual amount and fee.
+An older pending top-up must be reconciled rather than replaced. No successful
+load, quote payment or merchant transaction is claimed yet.
+
 ## Not covered
 
-Holder setup/recovery, funding, online payment/change,
+Independent owner-recovery restoration on another phone, funding, online payment/change,
 offline acceptance/settlement, final balance, Max terminal coverage and the
 Apple review video have not run. Applet absence alone is not a fresh
 verification of factory manager keys; that evidence remains the prior reset
