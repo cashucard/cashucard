@@ -27,6 +27,7 @@ class ResetBridgeTest(unittest.TestCase):
             self.wrapped(0xe4, 0, 0, [0x4f, 8] + list(bytes.fromhex('A000000151000000'))),
             self.wrapped(0xe4, 0, 0x80, [0x4f, 7] + list(bytes.fromhex('D2760000850101'))),
             self.wrapped(0xd8, 1, 0x81, [0] * 67),
+            self.wrapped(0xd8, 2, 0x81, [1] + ([0x80, 16] + [0] * 16 + [3] + [0] * 3) * 3),
             [0x84, 0x82, 3, 0, 16] + [0] * 16 + [0],
             [0x80, 0x50, 0, 0, 8] + [0] * 7 + [0],
             [True, 0xa4, 0, 0],

@@ -37,7 +37,7 @@ def validate_command(command):
         return apdu
     if ins == 0xe4 and p1 == p2 == 0 and len(data) >= 2 and data[0] == 0x4f and data[1] == len(data) - 2 and data[2:] in DELETABLE:
         return apdu
-    if ins == 0xd8 and p2 == 0x81 and len(data) == 67 and all(data[at:at+2] == bytes([0x80, 16]) and data[at+18] == 3 for at in (1, 23, 45)):
+    if ins == 0xd8 and p1 != 0 and p2 == 0x81 and len(data) == 67 and data[0] == p1 and all(data[at:at+2] == bytes([0x80, 16]) and data[at+18] == 3 for at in (1, 23, 45)):
         return apdu
     raise ValueError('command not permitted')
 
