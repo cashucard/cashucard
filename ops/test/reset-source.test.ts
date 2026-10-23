@@ -96,7 +96,21 @@ test('lookup requires the exact chip and installation, and exposes only escrow m
   assert.equal(JSON.stringify(answer).includes('enc'), false);
   assert.deepEqual(answer.body, {
     lookup: findResetSource(db, chip, installation),
+    can_reset: true,
   });
+  const foreign = provisioningHttp(
+    db,
+    {...session, principalId: 2},
+    'GET',
+    url.pathname,
+    url,
+    {},
+  );
+  assert.equal((foreign.body as {can_reset: boolean}).can_reset, false);
+  db.db.prepare('UPDATE provisioning_control SET recovery_required=1').run();
+  const fenced = provisioningHttp(db, session, 'GET', url.pathname, url, {});
+  assert.equal((fenced.body as {can_reset: boolean}).can_reset, false);
+  db.db.prepare('UPDATE provisioning_control SET recovery_required=0').run();
   assert.deepEqual(
     findResetSource(db, chip.replace('5547', '5548'), installation),
     {status: 'missing'},

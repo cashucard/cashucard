@@ -13,3 +13,9 @@ export const journalStorage: JournalStorage = {
   replace: value =>
     AsyncStorage.setItem('cashu.provisioning.attempt.v1', value),
 };
+
+/** A separate, retained reset journal; sign-out never clears it. */
+export const resetStorage: JournalStorage = {
+  read: () => AsyncStorage.getItem('cashu.provisioning.reset.v1'),
+  replace: value => AsyncStorage.setItem('cashu.provisioning.reset.v1', value),
+};

@@ -30,10 +30,18 @@ import {
   type ProvisioningProviderOptions,
 } from './src/ProvisioningStore';
 import {CardIdentityScreen} from './src/screens/CardIdentityScreen';
+import {ResetCardScreen} from './src/screens/ResetCardScreen';
 import {ProvisioningScreen} from './src/screens/ProvisioningScreen';
 import {BENCH_RUNS_ENABLED} from './src/releaseGates';
 
-type Route = 'setup' | 'loop' | 'summary' | 'settings' | 'bench' | 'identity';
+type Route =
+  | 'setup'
+  | 'loop'
+  | 'summary'
+  | 'settings'
+  | 'bench'
+  | 'identity'
+  | 'reset';
 
 const benchStyles = {
   benchWrap: {flex: 1} as const,
@@ -53,8 +61,16 @@ function Navigator(): React.JSX.Element {
     return <SignInScreen />;
   }
 
-  if (!app.demo && !['settings', 'bench', 'identity'].includes(route)) {
-    return <ProvisioningScreen onSettings={() => setRoute('settings')} />;
+  if (
+    !app.demo &&
+    !['settings', 'bench', 'identity', 'reset'].includes(route)
+  ) {
+    return (
+      <ProvisioningScreen
+        onSettings={() => setRoute('settings')}
+        onReset={() => setRoute('reset')}
+      />
+    );
   }
 
   // A stale/direct route cannot mount laboratory write controls in this build.
@@ -75,8 +91,21 @@ function Navigator(): React.JSX.Element {
               setRoute('identity');
             }
           }}
+          onReset={
+            !app.demo && app.session
+              ? () => {
+                  if (!recovery.busy) {
+                    setRoute('reset');
+                  }
+                }
+              : undefined
+          }
           hardwareBusy={recovery.busy}
-          hasSavedBatch={!!recovery.snapshot?.batch}
+          hasSavedBatch={
+            !!recovery.snapshot?.batch ||
+            (!!recovery.resetState &&
+              recovery.resetState.journal.stage !== 'complete')
+          }
         />
       );
     case 'identity':
@@ -84,6 +113,15 @@ function Navigator(): React.JSX.Element {
         <CardIdentityScreen
           onBack={() => setRoute('settings')}
           disabled={recovery.busy}
+        />
+      );
+    case 'reset':
+      return app.demo ? (
+        <SettingsScreen onBack={() => setRoute('setup')} onBench={() => {}} />
+      ) : (
+        <ResetCardScreen
+          onBack={() => setRoute('settings')}
+          onInstall={() => setRoute('setup')}
         />
       );
     case 'bench':

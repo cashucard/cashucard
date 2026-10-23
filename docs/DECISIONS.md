@@ -2845,3 +2845,48 @@ dumping a card file into logs, treating a till message as proof for each slot,
 or transferring holder/manager keys to perform this audit. The completed
 61-sat physical run left 13 spent entries, making this a concrete preparation
 step for reusing that card in the hardware video.
+
+## D101 — Separate mobile reset from fresh installation and audit before cleanup
+
+**Decided (2026-10-23):** The mobile app offers a signed-in, card-specific
+reset review outside a batch. A fresh installation inspects before binding:
+an existing applet is directed to reset without manager authentication,
+factory-key replacement, or a new chip fence. Older interrupted installation
+journals retain their existing recovery semantics.
+
+Reset requires exact CPLC/public key, the original issuing service and operator,
+retained manager-key provenance, explicit erasure/value-handling consent, and
+no other saved batch. The read-only service lookup reports actor eligibility
+without returning keys, and withholds eligibility during restore, stale backup
+or an outstanding chip reset. Missing foreign provenance stops; it is not an
+implicit escrow import or a factory-key fallback.
+
+If an otherwise empty card retains spent entries, the app re-reads every slot,
+reconstructs format-4 proof identifiers, resolves sat keysets uniquely, and
+requires every mint response SPENT. It checks the same record/identity/slot
+bytes again before persisting a public digest and performing one sealed PIN
+verification followed by CLEAR_SPENT. Noble curves 1.9.7 supplies the same
+secp256k1/BIP-340 primitives used by the wallet; existing spec labels and
+hash-to-curve behavior are unchanged. No owner key is requested. PINs, raw
+proofs, tokens and manager keys stay out of journals, diagnostics and service
+requests; only derived Ys go to the recorded HTTPS mint, without credentials,
+redirects or automatic retries. Network waiting is bounded.
+
+Cleanup and reset are separate deliberate taps. A lost successful clear reply
+can be adopted from the same identity/record and observed zero slots. Remaining
+valid entries require a new settlement audit; malformed remnants stop for
+review rather than replaying a blind clear. Cleanup never relaxes the existing
+zero-proof reset authorization. A separate, retained mobile reset envelope
+binds review, cleanup digest and D93's journal to the original actor/device.
+It shares the installation coordinator's exclusive queue and blocks new work
+until completion. Each destructive boundary commits before its command;
+factory evidence is frozen before a completion request. A lost completion
+reply replays that record without a card connection or key fetch. Completed
+history remains in the service, and a later batch uses the existing fresh
+installation path followed by holder-wallet setup.
+
+**Rejected:** routing a provisioned card through factory-key replacement,
+calling the whole chip factory-reset, asking for a PIN in a terminal/chat,
+allowing pending mint states to authorize erasure, treating the earlier
+read-only audit as permission to clear, or claiming simulator success proves
+the new mobile hardware path. Release still requires its named-device drill.

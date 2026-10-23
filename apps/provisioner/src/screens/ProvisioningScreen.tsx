@@ -113,7 +113,13 @@ export function BatchHistory({
     </View>
   );
 }
-export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
+export function ProvisioningScreen({
+  onSettings,
+  onReset,
+}: {
+  onSettings: () => void;
+  onReset?: () => void;
+}) {
   const flow = useProvisioning();
   const t = useTheme();
   const [confirmQuarantine, setConfirmQuarantine] = React.useState(false);
@@ -206,6 +212,22 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
     );
   }
   const snapshot = flow.snapshot!;
+  if (flow.resetState && flow.resetState.journal.stage !== 'complete') {
+    return shell(
+      <>
+        <Text style={s.title}>A card reset is saved on this phone</Text>
+        <Dim>
+          Continue with the same card before starting another installation.
+        </Dim>
+        <PrimaryButton
+          title="CONTINUE CARD RESET"
+          testID="open-saved-reset"
+          onPress={onReset ?? onSettings}
+          disabled={flow.busy}
+        />
+      </>,
+    );
+  }
   if (!snapshot.batch) {
     return (
       <View style={s.grow}>
@@ -399,11 +421,11 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
       ) : null}
       {flow.replacement ? (
         <View style={s.card} testID="replacement-review">
-          <Text style={s.title}>Replace this installation?</Text>
+          <Text style={s.title}>This card needs reset first</Text>
           <Dim>
-            This erases the existing applet and creates a new card identity.
-            Continue only for an approved test card with known factory manager
-            keys.
+            This card already has an applet. No manager authentication or
+            installation was attempted. Use Reset a card to check its value and
+            current manager keys before replacing it.
           </Dim>
           <Text selectable style={s.line}>
             {flow.replacement.chipId}
@@ -412,15 +434,9 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
             {flow.replacement.installationId}
           </Text>
           <Dim>
-            Tap the same card again after confirming. Its identity and empty
-            state will be checked again before replacement.
+            Stop this unused attempt, acknowledge the stop and close the batch.
+            Then open Settings → Reset a card.
           </Dim>
-          <PrimaryButton
-            title="REPLACE THIS INSTALLATION"
-            testID="replacement-confirm"
-            disabled={flow.busy || !flow.hardwareValidated}
-            onPress={() => flow.confirmReplacement()}
-          />
           <SecondaryButton
             title="KEEP EXISTING INSTALLATION"
             testID="replacement-dismiss"

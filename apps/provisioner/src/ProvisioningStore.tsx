@@ -10,7 +10,23 @@ import React, {
 import {AppState} from 'react-native';
 import {ApiClient, ApiServiceError, ApiUnreachableError} from './api';
 import {publicFailureContext} from './recoveryExport';
-import {CASHU_PLAN, TransportError} from './cardkit';
+import {
+  CASHU_PLAN,
+  TransportError,
+  CleanupError,
+  CardError,
+  readResetReview,
+  type ResetReview,
+  type Transceiver,
+} from './cardkit';
+import {
+  OwnedResetWorkflow,
+  type OwnedResetState,
+  type OwnedResetService,
+  type ResetLookup,
+  type OwnedResetRun,
+} from './ownedResetWorkflow';
+import {mintSettlementJson} from './mintSettlement';
 import type {JournalStorage} from './journal';
 import {
   ProvisioningWorkflow,
@@ -72,6 +88,9 @@ function exclusive<T>(
 
 export interface ProvisioningProviderOptions {
   storage?: JournalStorage;
+  resetStorage?: JournalStorage;
+  resetServiceFor?: (session: AppSession, origin: string) => OwnedResetService;
+  resetWithCard?: OwnedResetRun['withCard'];
   uuid?: () => string;
   /** Test seam; production uses the immutable release gate above. */
   hardwareValidated?: boolean;
@@ -109,20 +128,49 @@ interface RealProvisioning {
   recover(): Promise<boolean>;
   replacement: ReplacementReview | null;
   program(): Promise<boolean>;
-  confirmReplacement(): Promise<boolean>;
   dismissReplacement(): void;
   quarantine(): Promise<boolean>;
   acknowledge(): Promise<boolean>;
   close(): Promise<boolean>;
   end(): Promise<boolean>;
   cancel(): void;
+  resetState: OwnedResetState | null;
+  resetReview: {card: ResetReview; source: ResetLookup} | null;
+  inspectReset(): Promise<boolean>;
+  prepareReset(consent: {
+    erase: boolean;
+    valueHandled: boolean;
+  }): Promise<boolean>;
+  continueReset(pin?: string): Promise<boolean>;
+  dismissResetReview(): void;
 }
 const Ctx = createContext<RealProvisioning | null>(null);
 const message = (e: unknown): string => {
+  if (e instanceof CleanupError) {
+    if (e.code === 'settlement-pending') {
+      return 'Some card entries are not confirmed settled. Keep the card unchanged. Reconnect the merchant terminal and finish its pending payments before trying reset again.';
+    }
+    if (e.code === 'holder-pin-required') {
+      return 'The current card PIN is needed to clear settled entries. Enter it on this phone; no PIN is sent to the service.';
+    }
+    return 'Card checks did not match the reset review. Nothing further was sent. Keep the card and saved reset details for your administrator.';
+  }
+  if (e instanceof CardError && e.ins === 0x40) {
+    return e.sw === 0x6983
+      ? 'The card PIN is blocked. Use the holder wallet to recover it before continuing.'
+      : Math.floor(e.sw / 16) === 0x63c
+      ? `The PIN was incorrect. ${
+          e.sw % 16
+        } tries remain. No entries were cleared. Stop if you are unsure of the PIN.`
+      : 'The card refused PIN verification. No entries were cleared. Check the card in its holder wallet.';
+  }
   if (e instanceof ApiUnreachableError) {
     return 'The service could not be reached. Your saved work is retained. Reconnect and retry.';
   }
   if (e instanceof ApiServiceError) {
+    if (e.reason === 'reset-unresolved') {
+      return 'Finish the saved card reset before starting another installation. Open Reset a card in Settings.';
+    }
     if (e.reason === 'batch-active') {
       return 'An attempt is still active. Resolve and acknowledge it before ending this batch.';
     }
@@ -203,6 +251,11 @@ export function ProvisioningProvider({
   const app = useApp();
   const [status, setStatus] = useState<RealProvisioning['status']>('loading');
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot | null>(null);
+  const [resetState, setResetState] = useState<OwnedResetState | null>(null);
+  const [resetReview, setResetReview] = useState<{
+    card: ResetReview;
+    source: ResetLookup;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [cardActive, setCardActive] = useState(false);
   const [phase, setPhase] = useState('');
@@ -216,6 +269,7 @@ export function ProvisioningProvider({
     null,
   );
   const storage = useRef(options.storage);
+  const resetDisk = useRef(options.resetStorage);
   const settings = useRef(options).current;
   const hardwareValidated =
     settings.hardwareValidated ?? CARD_INSTALLATION_VALIDATED;
@@ -247,6 +301,7 @@ export function ProvisioningProvider({
     cancelRequested.current = true;
     setInterruption(null);
     setReplacement(null);
+    setResetReview(null);
     setLoadProgress(null);
     drill.current?.cancel();
     const cancel = armedCancel.current;
@@ -268,6 +323,12 @@ export function ProvisioningProvider({
     ).journalStorage;
     return storage.current;
   }, []);
+  const getResetStorage = useCallback(() => {
+    resetDisk.current ??= (
+      require('./journalStorage') as typeof import('./journalStorage')
+    ).resetStorage;
+    return resetDisk.current;
+  }, []);
 
   const reload = useCallback(async () => {
     if (busyRef.current) {
@@ -282,10 +343,14 @@ export function ProvisioningProvider({
       const value = await exclusive(
         getStorage(),
         settings.uuid ?? randomUuid,
-        async w => w.snapshot(),
+        async w => ({
+          workflow: w.snapshot(),
+          reset: (await OwnedResetWorkflow.open(getResetStorage())).snapshot(),
+        }),
       );
       if (mounted.current) {
-        setSnapshot(value);
+        setSnapshot(value.workflow);
+        setResetState(value.reset);
         setStatus('ready');
         setNotice(null);
       }
@@ -302,7 +367,7 @@ export function ProvisioningProvider({
         setBusy(false);
       }
     }
-  }, [getStorage, settings]);
+  }, [getStorage, getResetStorage, settings]);
   useEffect(() => {
     mounted.current = true;
     reload();
@@ -317,7 +382,9 @@ export function ProvisioningProvider({
       work: (
         w: ProvisioningWorkflow,
         service: CardProvisioningService,
+        reset: OwnedResetWorkflow,
       ) => Promise<void>,
+      resetOperation = false,
     ) => {
       const actor = latest.current;
       if (
@@ -351,21 +418,38 @@ export function ProvisioningProvider({
             const service =
               settings.serviceFor?.(session, actor.serviceUrl) ??
               new ApiClient({baseUrl: actor.serviceUrl}).reservations(session);
+            const reset = await OwnedResetWorkflow.open(getResetStorage());
             try {
-              await work(w, service);
-              return {snapshot: w.snapshot(), ok: true};
+              const pending = reset.snapshot()?.journal;
+              if (!resetOperation && pending && pending.stage !== 'complete') {
+                throw new ApiServiceError('reset-unresolved', 409);
+              }
+              await work(w, service, reset);
+              return {
+                snapshot: w.snapshot(),
+                reset: reset.snapshot(),
+                ok: true,
+              };
             } catch (failure) {
               // Poisoned writes throw from snapshot and require a reload.
               const context = publicFailureContext(failure);
               if (context) {
                 await w.rememberFailure(context);
               }
-              return {snapshot: w.snapshot(), ok: false, failure};
+              return {
+                snapshot: w.snapshot(),
+                reset: reset.snapshot(),
+                ok: false,
+                failure,
+              };
             }
           },
         );
         if (mounted.current) {
           setSnapshot(result.snapshot);
+          if ('reset' in result) {
+            setResetState(result.reset!);
+          }
           if ('failure' in result) {
             setNotice(message(result.failure));
             if (
@@ -396,8 +480,64 @@ export function ProvisioningProvider({
         }
       }
     },
-    [getStorage, settings, snapshot, status],
+    [getStorage, getResetStorage, settings, snapshot, status],
   );
+
+  const resetService = () => {
+    const actor = latest.current;
+    if (!actor.session || actor.demo) {
+      throw new Error('Sign in to reset a card');
+    }
+    return (
+      settings.resetServiceFor?.(actor.session, actor.serviceUrl) ??
+      new ApiClient({baseUrl: actor.serviceUrl}).resets(actor.session)
+    );
+  };
+  const resetCard = async <T,>(
+    run: (tx: Transceiver) => Promise<T>,
+  ): Promise<T> => {
+    const actor = latest.current,
+      generation = actorGeneration.current;
+    const allowed = () =>
+      mounted.current &&
+      !cancelRequested.current &&
+      !latest.current.demo &&
+      latest.current.session?.token === actor.session?.token &&
+      latest.current.serviceUrl === actor.serviceUrl &&
+      actorGeneration.current === generation;
+    cancelRequested.current = false;
+    if (settings.resetWithCard) {
+      return settings.resetWithCard(run);
+    }
+    const session = (
+      require('./session') as typeof import('./session')
+    ).createCardSession();
+    armedCancel.current = () => session.cancel();
+    setCardActive(true);
+    try {
+      const result = await session.run(
+        'Hold this same card still until the check or reset finishes.',
+        tx =>
+          run(async a => {
+            if (!allowed()) {
+              throw new TransportError('Reset cancelled');
+            }
+            const r = await tx(a);
+            if (!allowed()) {
+              throw new TransportError('Reset cancelled');
+            }
+            return r;
+          }),
+      );
+      if (!allowed()) {
+        throw new TransportError('Reset cancelled');
+      }
+      return result.value;
+    } finally {
+      armedCancel.current = null;
+      setCardActive(false);
+    }
+  };
 
   const recover = useCallback(async () => {
     const priorStage = snapshot?.active?.journal?.stage;
@@ -453,8 +593,8 @@ export function ProvisioningProvider({
     };
   }, [app.session?.token, app.demo, app.serviceUrl, status]);
 
-  const program = (confirm = false): Promise<boolean> => {
-    if (!hardwareValidated || (confirm && !replacement)) {
+  const program = (): Promise<boolean> => {
+    if (!hardwareValidated) {
       return Promise.resolve(false);
     }
     return operate(async (w, service) => {
@@ -464,19 +604,6 @@ export function ProvisioningProvider({
       let lastPhase: string | undefined;
       const actor = latest.current;
       const generation = actorGeneration.current;
-      const active = w.snapshot().active;
-      const consent =
-        confirm &&
-        replacement &&
-        replacement.generation === generation &&
-        replacement.attemptId === active?.attempt_id &&
-        replacement.chipId === active?.journal?.chip_id &&
-        active?.journal?.stage === 'reserved'
-          ? replacement.installationId
-          : undefined;
-      if (confirm && !consent) {
-        throw new Error('replacement review expired');
-      }
       let inspection: {chipId: string; installationId: string} | undefined;
       const allowed = () =>
         mounted.current &&
@@ -533,7 +660,6 @@ export function ProvisioningProvider({
         service,
         {
           withCard,
-          replacementInstallationId: consent,
           onReplacementRequired: value => {
             inspection = value;
           },
@@ -590,15 +716,12 @@ export function ProvisioningProvider({
             'Keep this card. Ask your operator before retrying.',
         );
       }
-      if (
-        allowed() &&
-        outcome === 'replacement-consent-required' &&
-        inspection
-      ) {
+      if (allowed() && outcome === 'reset-required' && inspection) {
         const current = w.snapshot().active;
         if (
           current?.journal?.stage === 'reserved' &&
-          current.journal.chip_id === inspection.chipId
+          (!current.journal.chip_id ||
+            current.journal.chip_id === inspection.chipId)
         ) {
           setReplacement({
             ...inspection,
@@ -607,13 +730,79 @@ export function ProvisioningProvider({
           });
         }
         setNotice(
-          'This card already has an installation. Review it before choosing replacement.',
+          'This card is already installed. Stop the unused attempt and close this batch, then open Settings → Reset a card.',
         );
       }
     });
   };
 
   const value: RealProvisioning = {
+    resetState,
+    resetReview,
+    dismissResetReview: () => setResetReview(null),
+    inspectReset: () =>
+      operate(async (w, _service, reset) => {
+        if (
+          w.snapshot().batch ||
+          (reset.snapshot() && reset.snapshot()!.journal.stage !== 'complete')
+        ) {
+          throw new Error('Finish saved work first');
+        }
+        const generation = actorGeneration.current;
+        const card = await resetCard(readResetReview);
+        const source = await resetService().lookup(
+          card.chipId,
+          card.installationId,
+        );
+        if (generation === actorGeneration.current) {
+          setResetReview({card, source});
+        }
+      }, true),
+    prepareReset: consent =>
+      operate(async (w, _service, reset) => {
+        if (w.snapshot().batch || !resetReview) {
+          throw new Error('Check the card first');
+        }
+        await reset.begin(
+          resetService(),
+          w.snapshot().device_id,
+          (settings.uuid ?? randomUuid)(),
+          resetReview.card,
+          consent,
+        );
+        setResetReview(null);
+      }, true),
+    continueReset: pin =>
+      operate(async (w, _service, reset) => {
+        if (
+          !hardwareValidated ||
+          w.snapshot().batch ||
+          reset.snapshot()?.journal.device_id !== w.snapshot().device_id
+        ) {
+          throw new Error('Reset unavailable');
+        }
+        const actor = latest.current,
+          generation = actorGeneration.current;
+        cancelRequested.current = false;
+        const outcome = await reset.continue(resetService(), {
+          withCard: resetCard,
+          pin,
+          random: randomBytes,
+          now: () => Math.floor(Date.now() / 1000),
+          mintJson: mintSettlementJson,
+          canContinue: () =>
+            mounted.current &&
+            !cancelRequested.current &&
+            actorGeneration.current === generation &&
+            latest.current.session?.token === actor.session?.token,
+          onPhase: resetPhase => setPhase(resetPhase),
+        });
+        if (outcome === 'stopped') {
+          setNotice(
+            'The reset stopped. Keep this card and its saved work. Continue with the same card to check what completed; do not start a new installation.',
+          );
+        }
+      }, true),
     status,
     snapshot,
     busy,
@@ -656,7 +845,13 @@ export function ProvisioningProvider({
           stop: invalidateCard,
         }
       : undefined,
-    scopeMatches: sameActor(snapshot, app.session, app.serviceUrl),
+    scopeMatches:
+      sameActor(snapshot, app.session, app.serviceUrl) &&
+      (!resetState ||
+        resetState.journal.stage === 'complete' ||
+        (resetState.journal.operator_id === app.session?.operator_id &&
+          resetState.journal.key_env === app.session?.env &&
+          resetState.journal.service_origin === app.serviceUrl)),
     reload,
     recover,
     create: config => {
@@ -676,7 +871,6 @@ export function ProvisioningProvider({
     },
     replacement,
     program: () => program(),
-    confirmReplacement: () => program(true),
     dismissReplacement: () => setReplacement(null),
     quarantine: () =>
       operate((w, service) =>
