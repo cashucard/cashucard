@@ -1,9 +1,25 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **fresh provisioning/post-check passed; holder setup, load, two online payments and offline acceptance reported complete; reconnect settlement and final iOS-terminal payment pending**.
+Status: **core physical end-to-end path passed on Android and iOS; specific change-amount evidence remains unverified**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
-100-sat cumulative funding/fees cap. No funds have moved in this run.
+100-sat cumulative funding/fees cap. The actual load was USD 0.05 for 61 sats,
+with no fee shown. Four payments consumed all 61 sats; no further funding or
+card reset was performed.
+
+| Step | Terminal/network | Bill | Fresh Flash balance |
+|---|---|---:|---:|
+| Initial load | Flash on SuperMax | — | 61 sats |
+| First payment | Pixel, online | 8 sats | 53 sats |
+| Second payment | Pixel, online | 9 sats | 44 sats |
+| Offline acceptance | Pixel, Wi-Fi and mobile data off | 8 sats | 36 sats |
+| Final payment | Max, online | 36 sats | Empty |
+
+The independent final USB check confirmed the same installation identity,
+zero unspent slots, 13 spent slots, and retained owner/PIN/configuration. Pixel's
+offline payment automatically settled and swept after reconnecting. Max's
+final payment was reported settled. Evidence distinguishes direct USB reads,
+authenticated service observations and the operator's app/receipt reports.
 
 ## Initial mobile attempt
 
@@ -59,7 +75,8 @@ this checkpoint did not load a CAP or measure prior installed bytes.
 The [successful reset](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md)
 was completed against the original local escrow authority. It did not clear
 any target production quarantine. D96 deliberately preserves such blocks;
-the deployed service has no cross-service reconciliation action yet.
+the service deployed at the initial check had no cross-service reconciliation
+action.
 
 Inspect the exact target attempt through authenticated read-only history.
 Any reconciliation must preserve its original binding, terminal disposition,
@@ -179,12 +196,9 @@ both a verified recovery backup and successful setup after the guided private
 PIN/owner flow. The agent did not view or collect the phrase, PIN, wallet keys
 or Keychain data.
 
-The next requested step is a fresh Flash read showing zero sats and ownership
-by this phone, followed by a **64-sat** top-up quote review. Payment has not
-been authorized beyond the existing **100-sat cumulative funding/fees cap**;
-the operator was asked not to pay before reporting the actual amount and fee.
-An older pending top-up must be reconciled rather than replaced. No successful
-load, quote payment or merchant transaction is claimed yet.
+The operator was then asked to read the card again and review a top-up before
+paying, under the existing **100-sat cumulative funding/fees cap**. The actual
+quote/load differed from the proposed 64 sats as recorded below.
 
 ## First load — 61 sats
 
@@ -223,8 +237,8 @@ Before the next bill, the operator was asked to check that the first payment
 has no pending settlement or change owed. A settled merchant till balance
 awaiting Lightning payout is distinguished from an unsettled card payment.
 If clear, the next approved online bill is **9 sats**, followed by every
-required change-return tap and another fresh card balance. Its fee-free
-expected remaining balance is 44 sats; this is not yet an observed result.
+required change-return tap and another fresh card balance. Its expected
+remaining balance was 44 sats.
 
 ## Second online payment — 9 sats
 
@@ -244,15 +258,12 @@ to both bills' combined 17 sats. After the second charge, the operator quoted:
 This is the terminal's report of settled ecash below its payout threshold,
 not an unsettled-payment warning. A prior sweep or starting settled balance
 has not been independently measured, and no completed Lightning payout is
-inferred. A read-only request to Forge's public `/v1/keysets` during this
+inferred from this earlier snapshot. A read-only request to Forge's public `/v1/keysets` during this
 check listed active sat keyset `0059534ce0bfa19a` with `input_fee_ppk: 0`;
 no unexplained till difference is attributed to mint input fees.
 
-The next requested operation is one 8-sat charge prepared online on Pixel,
-then completed with both Wi-Fi and mobile data disabled and NFC enabled.
-Pixel must remain offline until its pending receipt and the fresh Flash card
-balance are reported. The expected remaining card balance is **36 sats**;
-offline acceptance and later settlement have not yet been reported.
+The next operation was an 8-sat charge prepared online on Pixel, then completed
+with Wi-Fi and mobile data disabled and NFC enabled, as recorded below.
 
 ## Offline acceptance — 8 sats on Pixel
 
@@ -273,14 +284,54 @@ was not tested, and no raw signed proofs were extracted.
 
 The operator was next asked to restore connectivity and leave POS open for
 automatic settlement of that same record, without another card tap, bill,
-manual dismissal or repeated settlement request. The reconnect result has not
-yet been reported. Three card payments have been made in this run; the fourth
-and final planned payment is on Max, after this queue is resolved.
+manual dismissal or repeated settlement request.
+
+## Automatic reconnect settlement and sweep
+
+The pending message remained longer than the initial one-minute observation.
+The operator asked about Settle now versus foregrounding. Before pressing
+anything, they reported that the pending message disappeared and the sweep's
+transaction appeared in Flash. Therefore this recovery completed automatically,
+without a manual settlement trigger, another card tap or a repeated charge.
+The exact payout amount/transaction ID has not been exported, so no cumulative
+Lightning-payout total is claimed. The terminal's reconnect delay is recorded
+as observed behavior; a particular backoff interval or cause is not proven.
+
+## Final online payment on Max — 36 sats
+
+Before the charge, the operator confirmed that Max (iPhone 13 Pro Max) was
+online, signed into their merchant account, had no older pending settlements,
+and was ready for a 36-sat Cashu card charge. They completed it and reported
+**merchant payment status: settled**, with a fresh Flash read showing **empty**.
+The four bills reconcile exactly: **8 + 9 + 8 + 36 = 61 sats**. No fifth
+payment or second top-up was requested.
+
+## Independent final state and release build
+
+After the operator returned the card to the ACS reader, the final approved
+read-only check observed the same CPLC and full applet public key, version
+2.1, **0 unspent**, **13 spent**, **115 empty** slots, **owner present**,
+**PIN set**, **record set**, **not locked**, and a selectable NFC tag.
+No authentication, clearing, reset, manager operation or retry occurred.
+The operator confirmed Cashu Provisioner Settings displayed **1.0.0 (6)** on
+SuperMax; native app-package enumeration had not provided that metadata.
+
+This is an empty, still-owned/provisioned card, not a factory-ready blank.
+The 13 spent entries have not been cleared. Preparing it for another actual
+installation requires a separately reviewed settlement audit/cleanup and reset;
+the final read-only checkpoint does not authorize those writes.
 
 ## Not covered
 
-Independent owner-recovery restoration on another phone, an explicitly captured change amount and independent mint-settlement evidence,
-reconnect settlement, final balance, Max terminal coverage and the
-Apple review video have not run. Applet absence alone is not a fresh
-verification of factory manager keys; that evidence remains the prior reset
-completion.
+- The intended forced-change subcheck has no explicit receipt/input-plan
+  capture. The 9-sat bill and final balances passed, but 7 sats of returned
+  change is not independently established. The final spent count alone does
+  not prove which intermediate change plan was used.
+- Holder recovery was backup-confirmed by the operator, not restored on a
+  second phone. The pending queue was observed while offline, not tested
+  through a process restart.
+- No independent mint ledger export, full payout reconciliation, native
+  wallet/POS build identification, installed-CAP byte extraction, full service
+  completion-record public-key comparison or NDEF-content read was performed.
+- Foxy, deliberately interrupted funded writes, wrong-PIN/lockout behavior,
+  other cards and the Apple review video are outside this run.

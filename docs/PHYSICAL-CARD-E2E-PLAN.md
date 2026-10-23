@@ -1,17 +1,21 @@
 # Physical card end-to-end plan — 09336320
 
 Status: operator approved on 2026-10-23, including the named devices, normal
-production app traffic and the 100-sat funding/fees cap. Provisioning is
-currently blocked by the target service's unresolved chip history; see the
-[run report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md).
-The review video will be recorded after this full test passes.
+production app traffic and the 100-sat funding/fees cap. The production block
+was reconciled with separate approval. The core physical run completed using
+61 sats and four payments on Pixel and Max, ending with zero unspent slots;
+see the [run report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) for
+observed results and the unverified forced-change subcheck. The review video
+has not yet been recorded.
 The successful USB reset is recorded in the
 [reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md).
 
 ## Devices, accounts and value bound
 
 - One card: `cplc-v1:4790d3213041093363205547`, serial `09336320`.
-  It currently has no Cashu package and has verified factory manager keys.
+  At the start it had no Cashu package and verified factory manager keys.
+  At the end it was installed, holder-owned, empty of unspent value, and still
+  held 13 spent entries. No cleanup/reset is authorized by that final state.
 - **SuperMax:** Cashu Provisioner, then Flash as the holder wallet. The holder
   key stays in this wallet; the operator service never owns the card.
 - **Pixel:** Flash POS, for the first online and offline merchant tests.
