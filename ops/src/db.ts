@@ -184,6 +184,20 @@ export const MIGRATIONS: readonly string[] = [
      next_ordinal INTEGER NOT NULL CHECK (next_ordinal >= 0),
      closed_at INTEGER NOT NULL
    );`,
+  // 9. Card-specific reset authorization remains fenced until a result is reconciled.
+  `CREATE TABLE reset_intents (
+     reset_id TEXT PRIMARY KEY,
+     chip_id TEXT NOT NULL,
+     installation_id TEXT NOT NULL UNIQUE,
+     source_attempt_id TEXT NOT NULL UNIQUE REFERENCES provisioning_attempts(attempt_id),
+     operator_id INTEGER NOT NULL REFERENCES operators(id),
+     device_id TEXT NOT NULL,
+     request_json TEXT NOT NULL,
+     receipt_json TEXT NOT NULL,
+     created INTEGER NOT NULL
+   );
+   CREATE UNIQUE INDEX reset_intent_chip ON reset_intents(chip_id);
+   CREATE UNIQUE INDEX reset_intent_device ON reset_intents(device_id);`,
 ];
 
 export interface DbOptions {

@@ -484,6 +484,12 @@ export function reserveAttempt(
     const batch = batchRow(db, scope, input.batch_id);
     if (
       db.db
+        .prepare('SELECT 1 FROM reset_intents WHERE device_id = ?')
+        .get(scope.device_id)
+    )
+      conflict('reset-unresolved', 'device has an unresolved reset intent');
+    if (
+      db.db
         .prepare('SELECT 1 FROM provisioning_batch_closures WHERE batch_id = ?')
         .get(input.batch_id)
     )
@@ -547,6 +553,12 @@ export function bindAttempt(
       return JSON.parse(row.bind_receipt) as BindReceipt;
     }
     transition(row, input.revision);
+    if (
+      db.db
+        .prepare('SELECT 1 FROM reset_intents WHERE chip_id = ?')
+        .get(input.chip_id)
+    )
+      conflict('reset-unresolved', 'chip has an unresolved reset intent');
     if (
       db.db
         .prepare(

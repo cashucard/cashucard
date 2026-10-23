@@ -68,3 +68,9 @@ The phone now has a separate nonsecret reset journal. Its deletion stage
 requires a service intent receipt and survives a lost reply. It is not wired
 to a card operation yet; the service intent endpoint, applet/package state
 inspection, reconciliation and the destructive operation remain gated.
+
+The service authorization core now persists an exact same-service source,
+inspection and consent, fences the chip/device, and retains those rows through
+export v5. It has no HTTP reset or key-release route yet. Completion evidence,
+cross-origin source import, reconciliation and cardkit execution must be in
+place before exposing the feature.

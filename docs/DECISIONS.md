@@ -2668,3 +2668,24 @@ The journal stores no manager keys or holder secrets.
 installation attempt journal, or advancing from intent directly to key
 rotation after a lost reply. Those would erase the distinction between a
 command being sent and its effect being observed.
+
+## D94 — Persist reset authorization and preserve it through recovery
+
+**Decided (2026-10-23):** The service stores immutable reset intents bound to
+the full chip and applet identities, source attempt, operator/device, explicit
+consent and the reviewed zero-proof-slot inspection. The initial source must
+be an exact recorded installation in this service, with an escrow row and the
+same operator/environment. Unresolved attempts, a stale required independent
+backup or a restored-service fence prevent authorization. A matching request
+replays its original receipt; changed input cannot reuse that identity.
+
+An outstanding intent blocks normal chip binding and new reservations on its
+phone. Recovery export v5 retains the intent and validates its relationships;
+v1–v4 remain readable. Restore retains the global reconciliation fence even
+for an identical authorization retry. This domain is not exposed through an
+HTTP reset action until execution and completion reconciliation are present.
+
+**Rejected:** relying on phone state alone, returning keys from the provenance
+lookup, or importing historical key material implicitly. Each can lose the
+authority or history needed to recover an interrupted reset. Cross-origin
+imports and resolving stopped attempts require their own audited contract.
