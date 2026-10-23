@@ -2406,3 +2406,22 @@ ask operators to check saved results before retrying an uncertain request.
 
 Rejected retaining marketing slogans in administration screens because they
 obscure the account and provisioning tasks operators came to complete.
+
+
+## D80 — Public Cashu Card protocol website
+
+Publish a wallet-neutral protocol introduction at cashucard.org, separate from
+ops.cashucard.org and its authenticated service. Keep a public source mirror
+in website/ with locally hosted fonts, the original Cashu mascot and native
+HTML/CSS/SVG card artwork. A buildless site avoids runtime dependencies and
+keeps the main content readable without JavaScript. Interactive protocol and
+audience tabs explain the implementation roles; motion is finite or driven
+by visitor actions and supports reduced-motion preferences.
+
+The site links to the draft proposal, wire reference, test vectors, simulator,
+MIT license and security model. State the draft status and offline settlement
+risk where they are explained; make no wallet certification or adoption claims.
+The source is packaged and published with Sites, with its returned apex and
+verification DNS records on the existing Cloudflare zone. Keep the ops custom
+domain and service bindings intact. Rejected a combined public/admin backend,
+external frontend dependencies and continuously running decorative animation.

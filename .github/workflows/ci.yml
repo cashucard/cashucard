@@ -468,3 +468,13 @@ jobs:
       - name: Copy, issuer authority and alert regressions (no credentials)
         working-directory: tools/backup-copy
         run: python -m unittest test_copy test_issuer test_alerts
+
+  website:
+    name: protocol website (JavaScript syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check website/dist/site.js
