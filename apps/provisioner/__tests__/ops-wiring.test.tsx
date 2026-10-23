@@ -207,7 +207,7 @@ function SettingsProbeWithSignIn(): React.JSX.Element {
   );
 }
 
-test('demo rows stay pending: false; real rows can be pending', async () => {
+test('record state distinguishes saved rows from pending rows', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   let state: ReturnType<typeof useApp> | undefined;
   function Probe(): React.JSX.Element {
@@ -232,10 +232,9 @@ test('demo rows stay pending: false; real rows can be pending', async () => {
     });
   });
   await ReactTestRenderer.act(() => {
-    state!.addDemoRecord({
+    state!.addRecord({
       id: 'd1',
       ok: true,
-      demo: 'ok',
       at: 1,
       pending: false,
     });
@@ -578,7 +577,7 @@ test('a real-mode stopped row carries no demo field; the summary prints no (demo
       pending: false,
     });
   });
-  expect(state!.batch!.done[0].demo).toBeUndefined();
+  expect(state!.batch!.done[0]).not.toHaveProperty('demo');
 
   // And the summary screen prints the row without a demo label.
   function SummaryProbe(): React.JSX.Element {

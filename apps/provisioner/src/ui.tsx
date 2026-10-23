@@ -9,8 +9,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {FONT, type Theme, useTheme} from './theme';
 import GearSvg from './assets/gear.svg';
-import {DEMO_BANNER, PHYSICAL_READ_BANNER} from './strings';
-import {useApp} from './store';
+import {PHYSICAL_READ_BANNER} from './strings';
 
 export function Screen({
   title,
@@ -26,17 +25,16 @@ export function Screen({
   children: React.ReactNode;
 }) {
   const t = useTheme();
-  const app = useApp();
   const s = styles(t);
   return (
     <SafeAreaView style={s.screen}>
       <StatusBar barStyle={t.dark ? 'light-content' : 'dark-content'} />
-      {physicalReadOnly || app.demo ? (
+      {physicalReadOnly ? (
         <View style={[s.banner, physicalReadOnly && s.physicalBanner]}>
           <Text
             testID="screen-mode-banner"
             style={[s.bannerText, physicalReadOnly && s.physicalBannerText]}>
-            {physicalReadOnly ? PHYSICAL_READ_BANNER : DEMO_BANNER}
+            {PHYSICAL_READ_BANNER}
           </Text>
         </View>
       ) : null}

@@ -1,4 +1,4 @@
-/** Explicit read-only hardware check, separate from provisioning and demo. */
+/** Explicit read-only hardware check, separate from provisioning. */
 import React, {useEffect, useRef, useState} from 'react';
 import {ScrollView, StyleSheet, Text} from 'react-native';
 import {readChipIdentity} from '../cardkit';
@@ -70,9 +70,8 @@ export function CardIdentityScreen({
     <Screen title="Card identity check" onBack={onBack} physicalReadOnly>
       <ScrollView contentContainerStyle={s.content}>
         <Dim>
-          This reads a physical card, including in demo mode. It reads public
-          CPLC identity only: no authentication, installation or service
-          request.
+          This reads a physical card’s public CPLC identity only: no
+          authentication, installation or service request.
         </Dim>
         <PrimaryButton
           title={

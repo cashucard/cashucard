@@ -1,7 +1,7 @@
 /**
  * S5. Settings, grouped the way a 2026 settings screen is grouped: section
  * headers, one card per group, hairline dividers, a segmented theme pill,
- * the key environment as a locked row, and demo mode as its own switch card.
+ * the key environment as a locked row, and signed-in card tools.
  *
  * The batch-setup revamp's rules hold here too: tabular figures for every
  * number, the accent only where a thing is live (the factory key set's dot,
@@ -9,14 +9,7 @@
  * that is not.
  */
 import React from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 
 import {SETTINGS} from '../strings';
 import appInfo from '../../package.json';
@@ -93,7 +86,7 @@ const local = (t: Theme) =>
     pillItemOn: {backgroundColor: t.ink},
     pillText: {color: t.dim, fontFamily: FONT.medium, fontSize: 14},
     pillTextOn: {color: t.bg, fontFamily: FONT.semibold, fontSize: 14},
-    demoNote: {
+    note: {
       color: t.dim,
       fontFamily: FONT.regular,
       fontSize: 13,
@@ -206,24 +199,6 @@ export function SettingsScreen({
         </View>
 
         <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.demo}</Text>
-          <View style={s.card}>
-            <View style={s.row}>
-              <Text style={s.rowLabel}>{SETTINGS.demo}</Text>
-              <Switch
-                value={app.demo}
-                onValueChange={app.setDemo}
-                testID="demo-switch"
-              />
-            </View>
-            <View style={s.divider} />
-            <View style={s.row}>
-              <Text style={s.demoNote}>{SETTINGS.demoOn}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={s.section}>
           <Text style={s.header}>{'Card tools'}</Text>
           <View style={s.card}>
             {onStatus ? (
@@ -317,7 +292,7 @@ export function SettingsScreen({
             {confirmSignOut ? (
               <View style={s.confirmBlock}>
                 <Text style={s.rowLabel}>Saved work on this phone</Text>
-                <Text style={s.demoNote}>
+                <Text style={s.note}>
                   Signing out stops any current card session. Sign in with the
                   same operator and service to continue saved work.
                 </Text>

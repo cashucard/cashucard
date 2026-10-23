@@ -1,4 +1,4 @@
-/** Real receipts and recovery controls; demo results never enter this screen. */
+/** Durable installation receipts and recovery controls. */
 import React from 'react';
 import {ScrollView, Share, StyleSheet, Text, View} from 'react-native';
 import {RECOVERY_BOUNDARIES} from '../recoveryDrills';
@@ -13,7 +13,7 @@ import {FONT, useTheme} from '../theme';
 import {Dim, GearButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
 
 const GATE =
-  'Installation is unavailable in this build. You can still review the screens in demo mode.';
+  'Installation is unavailable in this build. Ask your administrator for an installation-enabled release.';
 const STAGES: Record<string, string> = {
   reserved: 'Ready to check this card. Installation has not been confirmed.',
   install_intent:
