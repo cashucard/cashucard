@@ -42,3 +42,18 @@ The unresolved operator inputs are the authoritative locations of historical
 escrow records and the approved procedure for cards that may hold value. These
 are release gates for #92, not reasons to block the batch-count and diagnostic
 improvements in #89 and #91.
+
+## Three owner-held cards (2026-10-23)
+
+The operator owns the three known programmed cards, their mint and the phones
+with owner keys. A complete inventory of all three is not needed to develop
+the reset flow. Each destructive attempt still needs its own CPLC, applet
+public key, exact escrow row, proof-slot inspection and explicit consent.
+
+The first software slice exposes read-only proof and owner state and a pure
+preflight gate. It does not authenticate, delete, rotate keys or clear an
+attempt. Next, add a service escrow lookup and durable reset intent, followed
+by an interruption-aware cardkit reset operation and phone review. A card
+without a 2.1 applet needs a separate reconciliation path; the preflight does
+not treat applet absence as an authorized reset. The first physical run needs
+an approved plan naming that card and the specific commands.

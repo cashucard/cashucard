@@ -11,6 +11,13 @@ export type InstallationInspection =
       installationId: string;
       empty: boolean;
       tagVerified: boolean;
+      publicState: {
+        unspent: number;
+        spent: number;
+        pin: boolean;
+        record: boolean;
+        owner: boolean;
+      };
     };
 
 export class InspectionError extends Error {
@@ -42,5 +49,12 @@ export async function inspectInstallation(
     installationId: toHex(pubkey.data).toLowerCase(),
     empty: notEmpty(info.data) === null,
     tagVerified: tag.sw === 0x9000,
+    publicState: {
+      unspent: info.data[3]!,
+      spent: info.data[4]!,
+      pin: info.data[7] !== 0,
+      record: info.data[11] !== 0,
+      owner: info.data[16] !== 0,
+    },
   };
 }
