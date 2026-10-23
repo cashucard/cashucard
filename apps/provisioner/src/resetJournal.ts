@@ -24,6 +24,7 @@ export interface ResetJournal extends JournalScope {
   source_attempt_id: string;
   consent: {erase_owner_and_proofs: true; value_handled: true};
   service_intent_receipt?: string;
+  factory_evidence?: {gp_key_version: number; verified_at: number};
   reconciliation_receipt?: string;
   stopped_reason?:
     | 'identity-mismatch'
@@ -59,6 +60,7 @@ const FIELDS = new Set([
   'source_attempt_id',
   'consent',
   'service_intent_receipt',
+  'factory_evidence',
   'reconciliation_receipt',
   'stopped_reason',
 ]);
@@ -98,6 +100,26 @@ function validate(value: unknown): ResetJournal {
   }
   assertJournalScope(j);
   assertJournalScope({...j, service_origin: j.source_origin});
+  const evidence = j.factory_evidence;
+  if (
+    evidence !== undefined &&
+    (!evidence ||
+      Object.keys(evidence).sort().join(',') !== 'gp_key_version,verified_at' ||
+      !Number.isInteger(evidence.gp_key_version) ||
+      evidence.gp_key_version < 0 ||
+      evidence.gp_key_version > 255 ||
+      !Number.isSafeInteger(evidence.verified_at) ||
+      evidence.verified_at < 0)
+  ) {
+    throw new Error('reset journal requires reconciliation');
+  }
+  if (
+    ['factory_verified', 'complete'].includes(j.stage)
+      ? !evidence
+      : evidence !== undefined && j.stage !== 'stopped'
+  ) {
+    throw new Error('reset journal requires factory verification evidence');
+  }
   if (
     j.service_intent_receipt !== undefined &&
     (typeof j.service_intent_receipt !== 'string' ||
@@ -162,7 +184,10 @@ export async function writeResetJournal(
         next.consent.erase_owner_and_proofs ||
       previous.consent.value_handled !== next.consent.value_handled ||
       (previous.service_intent_receipt !== undefined &&
-        previous.service_intent_receipt !== next.service_intent_receipt)
+        previous.service_intent_receipt !== next.service_intent_receipt) ||
+      (previous.factory_evidence !== undefined &&
+        JSON.stringify(previous.factory_evidence) !==
+          JSON.stringify(next.factory_evidence))
     ) {
       throw new Error('reset identity or consent changed');
     }

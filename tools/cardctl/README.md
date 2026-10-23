@@ -267,3 +267,9 @@ After that approval, run in this directory with the documented Homebrew venv:
 ```
 
 Reader-free regression checks: `python3 test_read_only_preflight.py`.
+
+`reset_bridge.py` is a private transport for the local recovery runner, not a
+general cardctl command. It permits only the reset plan's APDUs, never retries,
+and imports PC/SC only on explicit execution. Its reader-free checks are
+`python3 test_reset_bridge.py`. Physical execution follows the separately
+approved [owned-card reset drill](../../docs/OWNED-CARD-RESET-DRILL.md).

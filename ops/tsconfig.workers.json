@@ -21,6 +21,8 @@
     "node_modules",
     "src/server.ts",
     "src/bootstrap.ts",
+    "src/local-reset.ts",
+    "src/pcsc-reset.ts",
     "src/sqlite-file.ts",
     "src/test-bootstrap.ts"
   ]

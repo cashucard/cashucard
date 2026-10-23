@@ -2742,3 +2742,26 @@ from a read endpoint, or treating a foreign service's public receipt as
 automatic authority to clear a target service's quarantine. Historical local
 cards should be reset where their keys are retained, with a separate audited
 target reconciliation when needed. This avoids an unnecessary key transfer.
+
+## D97 — Preview local escrow recovery and freeze completion evidence
+
+**Decided (2026-10-23):** The local recovery CLI defaults to a metadata preview
+and opens no reader. Execution requires explicit consent flags, exact source
+and card selectors, and the historical loopback service scope. It creates a
+protected source snapshot before migrating the local DB, uses a private
+atomic journal with an exclusive invocation lock, and calls the same service
+and cardkit domains as the phone. PC/SC runs through a private, bounded pipe
+whose Python bridge permits only inspection, reset and key-rotation commands.
+It adds no APDU or retry and prints no key or wire data. Production origins
+are rejected by this local-only tool.
+
+Factory verification saves key version and time before completion. That
+evidence is immutable through acknowledgement, allowing an identical record
+after a lost service reply. A completed invocation returns the receipt without
+another reader connection. Pending resets resume from their saved stage only
+when the operator explicitly runs the approved command again.
+
+**Rejected:** passing escrow keys to a command line, making a generic APDU
+bridge, silently using the local runner for production, or recording completion
+without durable verification evidence. The first physical run remains gated by
+the [named-card drill](OWNED-CARD-RESET-DRILL.md).
