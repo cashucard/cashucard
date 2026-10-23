@@ -123,47 +123,43 @@ async function main() {
     await send("Emulation.setEmulatedMedia", {
       features: [{ name: "prefers-reduced-motion", value: "reduce" }],
     });
-    await viewport(1440, 1000);
+    await viewport(1440, 900);
     await send("Page.navigate", { url: origin });
-    await until(
-      "!!document.querySelector('.hero-stack') && document.documentElement.dataset.motion==='reduce'",
-      "page ready",
-    );
+    await until("!!document.querySelector('.story-film')", "story loaded");
     await evaluate("document.fonts.ready");
+    assert.ok(
+      await evaluate("document.body.innerText.trim().split(/\s+/).length < 240"),
+      "Concise page copy",
+    );
+    assert.ok(
+      await evaluate("document.documentElement.scrollHeight <= innerHeight * 2.45"),
+      "Desktop page fits roughly two screens",
+    );
     assert.equal(
-      await evaluate(
-        "getComputedStyle(document.querySelector('.front-card')).animationName",
-      ),
+      await evaluate("getComputedStyle(document.querySelector('.scene-packet')).animationName"),
       "none",
+      "System reduced motion stops packet animation",
     );
-    await screenshot("01-desktop-hero");
     assert.equal(
-      await evaluate(
-        "[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>a.hash===''||!!document.querySelector(a.hash))",
-      ),
-      true,
-      "Internal anchors exist",
+      await evaluate("document.querySelector('.story-film').dataset.step"),
+      "0",
+      "Reduced motion starts on first frame",
     );
-    await evaluate("document.querySelector('#how-it-works').scrollIntoView()");
-    await screenshot("02-protocol-flow");
+    await screenshot("01-hero-desktop");
+    await evaluate("document.querySelector('#story').scrollIntoView()");
+    await screenshot("02-story-desktop");
     for (let i = 0; i < 4; i++) {
       await click("#step-" + i);
       assert.equal(
-        await evaluate("document.querySelector('.flow-stage').dataset.step"),
+        await evaluate("document.querySelector('.story-film').dataset.step"),
         String(i),
+        "Step " + i,
       );
       assert.equal(
-        await evaluate(
-          "document.querySelectorAll('.flow-tabs [aria-selected=true]').length",
-        ),
+        await evaluate("document.querySelectorAll('.story-steps [aria-selected=true]').length"),
         1,
       );
     }
-    await click(".flow-next");
-    assert.equal(
-      await evaluate("document.querySelector('.flow-stage').dataset.step"),
-      "0",
-    );
     await evaluate("document.querySelector('#step-0').focus()");
     await send("Input.dispatchKeyEvent", {
       type: "keyDown",
@@ -172,45 +168,34 @@ async function main() {
       windowsVirtualKeyCode: 35,
     });
     assert.equal(
-      await evaluate("document.querySelector('.flow-stage').dataset.step"),
+      await evaluate("document.querySelector('.story-film').dataset.step"),
       "3",
     );
-    await evaluate("document.querySelector('#build').scrollIntoView()");
-    for (const key of ["wallet", "terminal", "card"]) {
-      await click("#audience-" + key);
-      assert.equal(
-        await evaluate(
-          "document.querySelector('#audience-panel').getAttribute('aria-labelledby')",
-        ),
-        "audience-" + key,
-      );
-      assert.equal(
-        await evaluate(
-          "document.querySelectorAll('.audience-tabs [aria-selected=true]').length",
-        ),
-        1,
-      );
+    for (const repo of [
+      "lnflash/cashu-card",
+      "lnflash/flash-mobile",
+      "getfoxy/iOS",
+      "lnflash/flash-pos",
+    ]) {
       assert.ok(
-        await evaluate(
-          "document.querySelector('#audience-link').href.startsWith('https://github.com/lnflash/cashu-card')",
-        ),
+        await evaluate("[...document.querySelectorAll('a[href]')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"),
+        "Linked source " + repo,
       );
     }
-    await screenshot("03-builders");
-    await evaluate(
-      "document.querySelector('.developer-section').scrollIntoView()",
+    assert.ok(
+      await evaluate("[...document.querySelectorAll('a[href]')].some(a=>a.href.includes('/spec/NUT-XX.md'))"),
+      "Protocol spec linked",
     );
-    await click("#copy-command");
-    await until(
-      "!!document.querySelector('#copy-status').textContent",
-      "copy feedback",
+    assert.equal(
+      await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>a.hash===''||!!document.querySelector(a.hash))"),
+      true,
+      "Internal anchors exist",
     );
-    await screenshot("04-developers");
-    for (const [width, height] of [
-      [1024, 768],
-      [768, 900],
-      [390, 844],
-      [320, 740],
+    for (const [width, height, maxScreens] of [
+      [1024, 768, 2.8],
+      [768, 900, 3.1],
+      [390, 844, 3.5],
+      [320, 740, 4.2],
     ]) {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
@@ -219,57 +204,38 @@ async function main() {
         true,
         "No overflow at " + width,
       );
-      await screenshot("hero-" + width);
-      await evaluate("document.querySelector('#build').scrollIntoView()");
-      assert.equal(
-        await evaluate("document.documentElement.scrollWidth<=innerWidth"),
-        true,
-        "Build section fits " + width,
+      assert.ok(
+        await evaluate("document.documentElement.scrollHeight<=innerHeight*" + maxScreens),
+        "Compact page at " + width,
       );
+      await screenshot("hero-" + width);
+      await evaluate("document.querySelector('#story').scrollIntoView()");
+      await screenshot("story-" + width);
     }
-    await viewport(390, 844);
-    await evaluate("scrollTo(0,0)");
-    await click(".menu-button");
-    assert.equal(
-      await evaluate("document.querySelector('#mobile-nav').hidden"),
-      false,
-    );
-    await send("Input.dispatchKeyEvent", {
-      type: "keyDown",
-      key: "Escape",
-      code: "Escape",
-      windowsVirtualKeyCode: 27,
-    });
-    assert.equal(
-      await evaluate("document.querySelector('#mobile-nav').hidden"),
-      true,
-    );
-    await click(".menu-button");
-    await click('#mobile-nav a[href=\"#build\"]');
-    assert.equal(
-      await evaluate("document.querySelector('#mobile-nav').hidden"),
-      true,
-    );
+    await viewport(1440, 900);
     await click(".motion-toggle");
     assert.equal(
       await evaluate("document.documentElement.dataset.motion"),
       "full",
     );
+    await click("#step-0");
+    await click(".story-play");
     assert.equal(
-      await evaluate(
-        "getComputedStyle(document.querySelector('.front-card')).animationIterationCount",
-      ),
-      "1",
+      await evaluate("getComputedStyle(document.querySelector('.scene-packet')).animationName"),
+      "packet-travel",
+      "Play animates the transfer",
     );
-    await click(".motion-toggle");
+    await new Promise((r) => setTimeout(r, 700));
+    await screenshot("03-transfer-in-motion");
+    await until("document.querySelector('.story-film').dataset.step==='1'", "story advances");
+    await click(".story-play");
     assert.equal(
-      await evaluate("document.documentElement.dataset.motion"),
-      "reduce",
+      await evaluate("document.querySelector('.story-play').getAttribute('aria-label')"),
+      "Replay story",
+      "The story can be stopped",
     );
     assert.deepEqual(errors, [], "No browser exceptions");
-    console.log(
-      "PASS: responsive layouts, tabs, keyboard, menu, copy, motion settings and internal anchors",
-    );
+    console.log("PASS: compact responsive story, meaningful controls, source links, reduced motion");
     console.log("Screenshots: " + output);
   } finally {
     if (socket) socket.close();
