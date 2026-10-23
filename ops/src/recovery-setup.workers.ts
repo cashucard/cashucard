@@ -20,7 +20,8 @@ document.getElementById('pair').onsubmit=async e=>{e.preventDefault();const b=e.
   return new Response(html, {
     headers: {
       'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'no-store',
+      // Keep CDN-injected scripts out of these CSP-protected approval pages.
+      'cache-control': 'no-store, no-transform',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
       'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; connect-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`,
