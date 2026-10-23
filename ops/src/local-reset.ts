@@ -112,7 +112,7 @@ function sourceRow(
     !['factory', 'issued'].includes(row.key_env) ||
     db
       .prepare(
-        "SELECT 1 FROM provisioning_attempts WHERE chip_id=? AND state IN ('active','quarantined','abandoned')",
+        "SELECT 1 FROM provisioning_attempts WHERE chip_id=? AND state IN ('active','quarantined','abandoned') AND fence_released = 0",
       )
       .get(options.chipId)
   )

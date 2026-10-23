@@ -28,7 +28,7 @@ export function findResetSource(
   assertInstallationId(installationId);
   const unresolved = db.db
     .prepare(
-      "SELECT 1 FROM provisioning_attempts WHERE chip_id = ? AND state IN ('active','quarantined','abandoned') LIMIT 1",
+      "SELECT 1 FROM provisioning_attempts WHERE chip_id = ? AND state IN ('active','quarantined','abandoned') AND fence_released = 0 LIMIT 1",
     )
     .get(chipId);
   if (unresolved) return {status: 'unresolved'};

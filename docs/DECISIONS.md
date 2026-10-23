@@ -2781,3 +2781,37 @@ journal when startup fails. Reporting does not add an APDU or retry.
 generic message could not distinguish readiness from an identity or preflight
 failure. Repeating that invocation without useful evidence would not improve
 recovery. Dumping exceptions or wire data would weaken secret handling.
+
+## D99 — Reconcile a foreign reset through explicit administrator review
+
+**Decided (2026-10-23):** A deployment administrator may release one bound,
+terminal chip admission fence after reviewing the original custodian's public
+reset completion and a matching, independent CPLC/applet-absence observation
+made within 15 minutes. The packet binds the exact target attempt revision,
+source origin, reset/source identities, removed applet key, factory-key
+verification and original completion receipt. Evidence must follow the target
+disposition and precede reconciliation; later target bindings/installations,
+an outstanding reset, stale required backup or a restored-service fence stop
+admission. The same foreign reset cannot release another attempt.
+
+The administrator attests that the source completion was checked against its
+custodian. An unsigned JSON receipt does not authenticate a foreign issuer or
+prove factory keys. The independent read checks chip identity and applet
+absence only. No key import, card command or automatic cross-service trust is
+introduced by this operation.
+
+The original attempt state, revision, binding, disposition, escrow and receipts
+remain intact. One immutable reconciliation records actor, packet hash and
+time; only its fence flag changes in the same transaction. A partial unique
+index continues to prevent overlapping unresolved chip assignments. Identical
+retries return the receipt; different evidence cannot overwrite it. Export v7
+retains and validates both the released fence and its evidence, while v1–v6
+remain readable and restored services remain fenced. A current unbound phone
+reservation can resume without creating another batch or installing new app
+code.
+
+**Rejected:** deleting history, marking a failed install successful, accepting
+foreign receipts automatically, clearing every block for a chip, or exposing
+a general database editor. The physical end-to-end run exposed this missing
+boundary after a local reset; none would establish why production admission
+can safely resume.

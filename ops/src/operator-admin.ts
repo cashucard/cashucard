@@ -5,6 +5,7 @@ import {
   revokeSessionsForPrincipal,
 } from './auth';
 import {HttpError, type RouterDeps} from './router';
+import {reconcileReset} from './reconciliation';
 
 const fail = (status: number, code: string): never => {
   throw new HttpError(status, code, code);
@@ -39,15 +40,19 @@ export async function operatorAdminRequest(
       return fail(403, 'operator-admin-required');
     return session.principalId;
   };
-  authorize();
+  const actor = authorize();
   const db = deps.db;
+  const reconciliation =
+    /^\/admin\/provisioning\/attempts\/([^/]+)\/reconcile-reset$/.exec(path);
+  if (method === 'POST' && reconciliation)
+    return [200, {receipt: reconcileReset(db, actor, reconciliation[1], body)}];
   if (method === 'GET' && path === '/admin/provisioning/attempts')
     return [
       200,
       {
         attempts: db.db
           .prepare(
-            'SELECT attempt_id,batch_id,ordinal,operator_id,device_id,state,revision,chip_id,created FROM provisioning_attempts ORDER BY created DESC,attempt_id DESC LIMIT 100',
+            'SELECT attempt_id,batch_id,ordinal,operator_id,device_id,state,revision,chip_id,created,fence_released FROM provisioning_attempts ORDER BY created DESC,attempt_id DESC LIMIT 100',
           )
           .all(),
       },

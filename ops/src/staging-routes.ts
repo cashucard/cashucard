@@ -39,6 +39,9 @@ export function stagingRouteAllowed(method: string, path: string): boolean {
         '/provisioning/attempts',
         '/provisioning/reset-intents',
       ].includes(path) ||
+      /^\/admin\/provisioning\/attempts\/[0-9a-f-]{36}\/reconcile-reset$/.test(
+        path,
+      ) ||
       /^\/admin\/operators\/[1-9][0-9]*\/(disable|enable|reset-password)$/.test(
         path,
       ) ||

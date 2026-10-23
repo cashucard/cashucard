@@ -102,3 +102,10 @@ escrow/history retained and completion saved. See the
 [hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md).
 Fresh mobile installation, production quarantine reconciliation if needed,
 physical interruption testing and the phone reset UI remain separate work.
+
+The next mobile installation exposed the retained production quarantine for
+09336320. D99 adds a separate administrator-reviewed reconciliation action,
+retaining the old failed attempt and source completion evidence while releasing
+only its admission fence. The [reconciliation procedure](RESET-RECONCILIATION.md)
+requires a fresh independent chip/absence observation. This service change
+does not itself authorize production deployment or a reconciliation action.
