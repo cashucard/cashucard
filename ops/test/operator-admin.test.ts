@@ -255,7 +255,7 @@ test('disabled status and audit survive encrypted recovery; in-flight revoked ad
       await identityToRecipient(identity),
     );
     const payload = await decryptEscrowExport(artifact.armored, identity);
-    assert.equal(payload.version, 6);
+    assert.equal(payload.version, 7);
     assert.ok(!JSON.stringify(payload).includes('password_hash'));
     restoreEscrowExport(target.db, payload);
     assert.deepEqual(

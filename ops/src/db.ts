@@ -207,6 +207,22 @@ export const MIGRATIONS: readonly string[] = [
    );
    DROP INDEX reset_intent_chip;
    DROP INDEX reset_intent_device;`,
+  // 11. Release an admission fence only with retained, administrator-reviewed evidence.
+  `ALTER TABLE provisioning_attempts ADD COLUMN fence_released INTEGER NOT NULL DEFAULT 0
+     CHECK (fence_released IN (0,1) AND (fence_released = 0 OR state IN ('quarantined','abandoned')));
+   DROP INDEX provisioning_blocked_chip;
+   CREATE UNIQUE INDEX provisioning_blocked_chip ON provisioning_attempts(chip_id)
+     WHERE chip_id IS NOT NULL AND state IN ('active','quarantined','abandoned') AND fence_released = 0;
+   CREATE TABLE reset_reconciliations (
+     attempt_id TEXT PRIMARY KEY REFERENCES provisioning_attempts(attempt_id),
+     actor_id INTEGER NOT NULL REFERENCES operators(id),
+     source_origin TEXT NOT NULL,
+     reset_id TEXT NOT NULL,
+     request_json TEXT NOT NULL,
+     receipt_json TEXT NOT NULL,
+     reconciled_at INTEGER NOT NULL,
+     UNIQUE (source_origin, reset_id)
+   );`,
 ];
 
 export interface DbOptions {

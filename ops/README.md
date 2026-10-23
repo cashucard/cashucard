@@ -375,11 +375,17 @@ most recent successful administrative mutations. These endpoints require the
 allowlisted administrator's bearer token. No password/hash is returned or
 recorded in the audit trail.
 
-New recovery artifacts use export format v6, preserving account disabled state,
-the administrative audit trail, ended-batch fences, reset intents and completion receipts. Use the recovery CLI
-from this revision or later: older restore tools reject v6. The CLI still
-restores v1/v2/v3/v4/v5 backups. All restored passwords remain disabled until
+New recovery artifacts use export format v7, preserving account disabled state,
+the administrative audit trail, ended-batch fences, reset intents, completion
+receipts and reviewed cross-service reset reconciliations. Use the recovery CLI
+from this revision or later: older restore tools reject v7. The CLI still
+restores v1–v6 backups. All restored passwords remain disabled until
 controlled recovery, and the provisioning reconciliation fence remains enabled.
+
+For a completed reset whose original keys were held at another service, see
+[`RESET-RECONCILIATION.md`](../docs/RESET-RECONCILIATION.md). The administrator
+review action releases only one terminal attempt's chip block and retains
+its original history. It never imports manager keys or performs a card write.
 
 For an owned test card whose keys remain in a historical local source DB,
 `src/local-reset.ts` previews metadata by default. Execution uses explicit

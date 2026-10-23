@@ -344,6 +344,7 @@ export const adminClient =
           esc(ago(a.created)) +
           '</div></td><td>' +
           badge(a.state) +
+          (a.fence_released ? '<div class="state-note">Reset reconciled</div>' : '') +
           '<div class="state-note">Revision ' +
           esc(a.revision) +
           '</div></td><td><button class="icon-btn" data-action="attempt" data-id="' +
@@ -511,7 +512,7 @@ export const adminClient =
         operators:
           'Disable an operator to stop access while preserving their card history. Password resets revoke existing sessions.',
         attempts:
-          'This view is read-only. Use the provisioner app on the original phone to continue an installation or export recovery details.',
+          'Continue installations or export recovery details on the original phone. A chip block can be reconciled only after reviewing a completed reset and a fresh independent card check.',
         activity:
           'The latest 100 successful account changes are shown, with the administrator, operator and time of each change.',
       }[view] +
@@ -749,7 +750,9 @@ export const adminClient =
         esc(a.state[0].toUpperCase() + a.state.slice(1)) +
         '</strong>' +
         esc(
-          guidance[a.state] || 'Review the saved evidence before continuing.',
+          a.fence_released
+            ? 'The original status is retained. An administrator reviewed completed reset evidence and released this attempt’s chip block.'
+            : guidance[a.state] || 'Review the saved evidence before continuing.',
         ) +
         '</p></div><dl class="detail-grid"><div><dt>Batch / card</dt><dd>Batch ' +
         esc(a.batch_id) +
@@ -768,8 +771,38 @@ export const adminClient =
         '</dd></div><div class="detail-full"><dt>Device identity</dt><dd>' +
         copyValue(a.device_id) +
         '</dd></div></dl>',
-      '<button class="btn btn-secondary" data-action="close-dialog" autofocus>Close details</button>',
+      '<button class="btn btn-secondary" data-action="close-dialog" autofocus>Close details</button>' +
+        (a.chip_id && !a.fence_released && ['quarantined','abandoned'].includes(a.state)
+          ? '<button class="btn btn-primary" id="review-reset">Review completed reset</button>' : ''),
     );
+    if ($('review-reset')) $('review-reset').onclick = () => reviewReset(a);
+  }
+  function reviewReset(a) {
+    dialog(
+      'Reconcile completed reset',
+      'Release one chip block while retaining the original attempt and its receipts.',
+      '<div class="notice warning"><p>This requires a completed reset from the original key custodian and a fresh, independent identity and applet-absence check. An empty wallet balance alone is insufficient.</p></div>' +
+      '<dl class="detail-grid"><div class="detail-full"><dt>Chip</dt><dd>' + esc(a.chip_id) +
+      '</dd></div><div class="detail-full"><dt>Attempt</dt><dd>' + esc(a.attempt_id) +
+      '</dd></div></dl><label class="field">Reviewed public reset evidence (JSON)' +
+      '<textarea class="reset-evidence" id="reset-evidence" rows="12" spellcheck="false" required autofocus></textarea>' +
+      '<span class="help-caption">Use the documented reconciliation evidence packet. Never paste manager keys, PINs, wallet secrets or an encrypted backup.</span></label>' +
+      '<label class="check-field"><input type="checkbox" id="reset-reviewed" required><span>I verified the original custodian’s reset completion and the fresh USB observation for this exact chip. I approve releasing this block.</span></label>',
+      cancel + '<button class="btn btn-primary" type="submit">Reconcile this reset</button>', true,
+    );
+    $('operator-form').onsubmit = (e) => {
+      e.preventDefault();
+      if (!$('reset-reviewed').checked) return;
+      perform(async () => {
+        let evidence;
+        try { evidence = JSON.parse($('reset-evidence').value); }
+        catch { throw Error('Enter a valid public reconciliation evidence packet.'); }
+        if (!evidence || evidence.chip_id !== a.chip_id || evidence.revision !== a.revision)
+          throw Error('The evidence must match this chip and saved attempt revision.');
+        await request('/admin/provisioning/attempts/' + a.attempt_id + '/reconcile-reset', {...evidence,reviewed:true});
+        await saved('Reset reconciled. Original history retained; the phone can retry its existing unbound attempt.');
+      });
+    };
   }
   $('login').onsubmit = (e) => {
     e.preventDefault();

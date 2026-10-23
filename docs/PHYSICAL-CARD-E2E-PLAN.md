@@ -1,6 +1,10 @@
 # Physical card end-to-end plan — 09336320
 
-Status: proposed. The review video will be recorded after this full test passes.
+Status: operator approved on 2026-10-23, including the named devices, normal
+production app traffic and the 100-sat funding/fees cap. Provisioning is
+currently blocked by the target service's unresolved chip history; see the
+[run report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md).
+The review video will be recorded after this full test passes.
 The successful USB reset is recorded in the
 [reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md).
 

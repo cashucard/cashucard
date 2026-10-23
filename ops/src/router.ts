@@ -166,6 +166,7 @@ export async function route(
   try {
     if (
       path === '/admin/provisioning/attempts' ||
+      path.startsWith('/admin/provisioning/attempts/') ||
       path === '/admin/operators' ||
       path.startsWith('/admin/operators/')
     ) {

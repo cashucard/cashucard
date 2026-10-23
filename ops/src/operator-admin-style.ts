@@ -1,6 +1,7 @@
 import {adminIdentityStyle} from './operator-admin-identity-style';
 
 export const adminStyle = String.raw`
+.reset-evidence{width:100%;resize:vertical;font:12px monospace;padding:12px;border:1px solid var(--line);border-radius:8px}
 .brand-mark img{width:30px;height:34px;object-fit:contain;image-rendering:pixelated}.art-bottom img{width:25px;height:29px;object-fit:contain;image-rendering:pixelated}
 
 :root{color-scheme:light;--bg:#f5f6f2;--surface:#fff;--ink:#18281f;--muted:#6c786f;--line:#e5e9e1;--green:#235d3c;--lime:#c7f58c;--danger:#a23935;--shadow:0 24px 80px #10241b18;font-family:'Avenir Next',Avenir,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-synthesis:none}
