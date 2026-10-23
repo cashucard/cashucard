@@ -1,6 +1,6 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **fresh provisioning/post-check passed; holder setup, load and two online payments reported complete; offline/final-payment checks pending**.
+Status: **fresh provisioning/post-check passed; holder setup, load, two online payments and offline acceptance reported complete; reconnect settlement and final iOS-terminal payment pending**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
 100-sat cumulative funding/fees cap. No funds have moved in this run.
@@ -254,10 +254,33 @@ Pixel must remain offline until its pending receipt and the fresh Flash card
 balance are reported. The expected remaining card balance is **36 sats**;
 offline acceptance and later settlement have not yet been reported.
 
+## Offline acceptance — 8 sats on Pixel
+
+Following the instruction to disable both Wi-Fi and mobile data on Pixel
+while retaining NFC, the operator reported that the 8-sat charge went through
+offline. A fresh Flash read on SuperMax showed **36 sats**, reconciling the
+card debit as **44 − 8 = 36**. No new top-up or second charge was requested.
+
+The operator then supplied Pixel's offline queue message:
+
+> 17 sats in the till - 1 tapped payments settle automatically when online.
+> 9 sat settled at the mint; it sweeps to your wallet once the till reaches 10 sats
+
+The displayed total reconciles as **9 sats already settled + 8 sats pending**.
+This distinguishes offline acceptance from completed mint settlement. It
+observes the saved queue through the terminal UI; process-restart durability
+was not tested, and no raw signed proofs were extracted.
+
+The operator was next asked to restore connectivity and leave POS open for
+automatic settlement of that same record, without another card tap, bill,
+manual dismissal or repeated settlement request. The reconnect result has not
+yet been reported. Three card payments have been made in this run; the fourth
+and final planned payment is on Max, after this queue is resolved.
+
 ## Not covered
 
 Independent owner-recovery restoration on another phone, an explicitly captured change amount and independent mint-settlement evidence,
-offline acceptance/settlement, final balance, Max terminal coverage and the
+reconnect settlement, final balance, Max terminal coverage and the
 Apple review video have not run. Applet absence alone is not a fresh
 verification of factory manager keys; that evidence remains the prior reset
 completion.
