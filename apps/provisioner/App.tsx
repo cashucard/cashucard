@@ -76,6 +76,7 @@ function Navigator(): React.JSX.Element {
             }
           }}
           hardwareBusy={recovery.busy}
+          hasSavedBatch={!!recovery.snapshot?.batch}
         />
       );
     case 'identity':

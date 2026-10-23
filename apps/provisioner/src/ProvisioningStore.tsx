@@ -114,6 +114,7 @@ interface RealProvisioning {
   quarantine(): Promise<boolean>;
   acknowledge(): Promise<boolean>;
   close(): Promise<boolean>;
+  end(): Promise<boolean>;
   cancel(): void;
 }
 const Ctx = createContext<RealProvisioning | null>(null);
@@ -122,6 +123,12 @@ const message = (e: unknown): string => {
     return 'The service could not be reached. Your saved work is retained. Reconnect and retry.';
   }
   if (e instanceof ApiServiceError) {
+    if (e.reason === 'batch-active') {
+      return 'An attempt is still active. Resolve and acknowledge it before ending this batch.';
+    }
+    if (e.reason === 'batch-ended') {
+      return 'This batch is already ended in the service. Sync saved work before continuing.';
+    }
     if (e.reason === 'independent-backup-stale') {
       return 'Provisioning is paused because the service needs a fresh independent backup. Your saved work is retained. Ask your operator to restore backup health, then retry.';
     }
@@ -392,20 +399,27 @@ export function ProvisioningProvider({
     [getStorage, settings, snapshot, status],
   );
 
-  const recover = useCallback(
-    () =>
-      operate(async (w, service) => {
-        await w.reconcile(service);
-        if (
-          ['record_pending', 'recorded'].includes(
-            w.snapshot().active?.journal?.stage ?? '',
-          )
-        ) {
-          await w.postRecord(service);
-        }
-      }),
-    [operate],
-  );
+  const recover = useCallback(async () => {
+    const priorStage = snapshot?.active?.journal?.stage;
+    const ok = await operate(async (w, service) => {
+      await w.reconcile(service);
+      if (
+        ['record_pending', 'recorded'].includes(
+          w.snapshot().active?.journal?.stage ?? '',
+        )
+      ) {
+        await w.postRecord(service);
+      }
+    });
+    if (ok && mounted.current && !interruption) {
+      setNotice(
+        priorStage === 'record_pending' || priorStage === 'recorded'
+          ? 'Installation record confirmed by the service. No card tap was started.'
+          : 'Saved work synced with the service. No card tap was started.',
+      );
+    }
+    return ok;
+  }, [operate, snapshot, interruption]);
   const retry = useRef(recover);
   retry.current = recover;
   const state = useRef(snapshot);
@@ -692,6 +706,7 @@ export function ProvisioningProvider({
         ),
       ),
     close: () => operate((w, service) => w.closeBatch(service)),
+    end: () => operate((w, service) => w.endBatch(service)),
     cancel: () => {
       if (!hardwareValidated || !cardActive) {
         return;

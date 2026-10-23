@@ -19,11 +19,13 @@ import {
 } from 'react-native';
 
 import {SETTINGS} from '../strings';
+import appInfo from '../../package.json';
+import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {useApp} from '../store';
 import {LegalLinks} from '../LegalLinks';
 import {BENCH_RUNS_ENABLED} from '../releaseGates';
 import {FONT, useTheme, type Theme} from '../theme';
-import {Screen} from '../ui';
+import {Screen, SecondaryButton} from '../ui';
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -120,6 +122,7 @@ const local = (t: Theme) =>
     },
     rowCenter: {justifyContent: 'center'},
     rowLabelCol: {flex: 1},
+    confirmBlock: {padding: 18, gap: 10},
   });
 
 export function SettingsScreen({
@@ -127,13 +130,16 @@ export function SettingsScreen({
   onBench,
   onIdentity,
   hardwareBusy = false,
+  hasSavedBatch = false,
 }: {
   onBack: () => void;
   onBench: () => void;
   onIdentity?: () => void;
   hardwareBusy?: boolean;
+  hasSavedBatch?: boolean;
 }) {
   const app = useApp();
+  const [confirmSignOut, setConfirmSignOut] = React.useState(false);
   const t = useTheme();
   const s = local(t);
   // S5: exactly one of the two environments is ever lit — the session's own.
@@ -255,12 +261,40 @@ export function SettingsScreen({
         <View style={s.section}>
           <Text style={s.header}>{SETTINGS.session}</Text>
           <View style={s.card}>
-            <Pressable testID="sign-out" onPress={app.signOut} style={s.row}>
+            <Pressable
+              testID="sign-out"
+              onPress={() => {
+                if (hasSavedBatch) {
+                  setConfirmSignOut(true);
+                } else {
+                  app.signOut();
+                }
+              }}
+              style={s.row}>
               <View style={s.rowLabelCol}>
                 <Text style={s.rowLabel}>{SETTINGS.signOut}</Text>
                 <Text style={s.rowSub}>{SETTINGS.signOutSub}</Text>
               </View>
             </Pressable>
+            {confirmSignOut ? (
+              <View style={s.confirmBlock}>
+                <Text style={s.rowLabel}>Saved batch on this phone</Text>
+                <Text style={s.demoNote}>
+                  Signing out stops any current card session. Sign in with the
+                  same operator and service to continue saved work.
+                </Text>
+                <SecondaryButton
+                  title="SIGN OUT AND KEEP SAVED WORK"
+                  testID="confirm-sign-out"
+                  onPress={app.signOut}
+                />
+                <SecondaryButton
+                  title="KEEP SESSION"
+                  testID="keep-session"
+                  onPress={() => setConfirmSignOut(false)}
+                />
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -268,10 +302,18 @@ export function SettingsScreen({
           <Text style={s.header}>{SETTINGS.about}</Text>
           <View style={s.card}>
             <View style={s.identity}>
-              <Text style={s.version}>{SETTINGS.version('0.1.0')}</Text>
-              <Text style={s.loadSha}>{SETTINGS.loadSha('fe7d8ac3')}</Text>
+              <Text style={s.version}>
+                {SETTINGS.version(
+                  `${appInfo.version} (${appInfo.provisionerBuild})`,
+                )}
+              </Text>
+              <Text style={s.loadSha}>
+                {SETTINGS.loadSha(CASHU_LOAD_FILE.sha256.slice(0, 8))}
+              </Text>
               <Text style={s.loadSha}>{app.serviceUrl}</Text>
-              <Text style={s.loadSha}>{SETTINGS.capPin('fe7d8ac3')}</Text>
+              <Text style={s.loadSha}>
+                {SETTINGS.capPin(CASHU_LOAD_FILE.capSha256.slice(0, 8))}
+              </Text>
             </View>
           </View>
         </View>

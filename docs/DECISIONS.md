@@ -2579,6 +2579,9 @@ Backspace had no effect. Buttons make small changes immediate; selection on
 focus makes a replacement number easy to type. Rejected a slider because the
 range is too wide for precise selection.
 
+**Update (D90):** New phone batches are limited to 500 cards. Existing saved
+batches retain the earlier range so they remain recoverable.
+
 ## D89 — Report bounded provisioning conflicts
 
 **Decided (2026-10-22):** Give each provisioning 409 invariant a stable reason
@@ -2597,3 +2600,23 @@ failed before its receipt was stored. Keeping typed, bounded context lets an
 operator diagnose the conflict without exporting private request data or
 weakening recovery gates. Closing the batch clears the last failure together
 with its local attempt history.
+
+## D90 — End unfinished operator batches with a server fence
+
+**Decided (2026-10-22):** An operator may end an unfinished batch only when it
+has no active card attempt. The phone saves an ending intent before calling an
+idempotent service endpoint. The service stores a closure receipt and refuses
+new reservations for that batch. Existing attempts, records and escrow stay
+available for audit and recovery; a lost reply replays the same closure. The
+screen requires confirmation and states how many card slots remain unused.
+New phone batches are capped at 500 cards, and history is shown in bounded
+pages. Older saved batches remain valid under their original count limit.
+Encrypted recovery exports use format v4 so a restore retains ended-batch
+fences; earlier export versions remain readable.
+
+**Why:** an operator who stopped a card or chose the wrong count previously had
+no way to leave the batch. Clearing only the phone would make the service and
+phone disagree about whether unused ordinals could be reserved. Deleting
+escrow or attempt rows would erase evidence needed for recovery. Closing an
+active attempt would hide an ambiguous card state, so it must be resolved or
+acknowledged first.

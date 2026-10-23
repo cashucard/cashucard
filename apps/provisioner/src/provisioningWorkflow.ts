@@ -2,7 +2,10 @@
  * Single coordinator; no NFC, tokens or manager keys are persisted here.
  */
 import {randomUuid} from './random';
-import {isPublicFailureContext, type PublicFailureContext} from './recoveryExport';
+import {
+  isPublicFailureContext,
+  type PublicFailureContext,
+} from './recoveryExport';
 import {
   ProvisioningJournal,
   assertJournalScope,
@@ -60,6 +63,15 @@ export interface ReservationService {
     ordinal: number;
   }): Promise<ReservedAttempt>;
   attempt(device_id: string, attempt_id: string): Promise<ReservedAttempt>;
+  endBatch?(
+    device_id: string,
+    batch_id: number,
+  ): Promise<{
+    batch_id: number;
+    reason: 'operator-ended';
+    next_ordinal: number;
+    closed_at: number;
+  }>;
 }
 export interface IssuedAttemptKeys {
   attempt_id: string;
@@ -106,6 +118,7 @@ interface BatchState {
   request: BatchRequest;
   batch_id: number | null;
   next_ordinal: number;
+  ending?: true;
 }
 interface PendingAttempt {
   attempt_id: string;
@@ -212,7 +225,11 @@ export class ProvisioningWorkflow {
 
   private async validate(s: WorkflowSnapshot): Promise<void> {
     exact(s, [
-      'schema', 'device_id', 'batch', 'active', 'history',
+      'schema',
+      'device_id',
+      'batch',
+      'active',
+      'history',
       ...(s && Object.prototype.hasOwnProperty.call(s, 'last_failure')
         ? ['last_failure']
         : []),
@@ -226,7 +243,13 @@ export class ProvisioningWorkflow {
       return;
     }
     const b = s.batch;
-    exact(b, ['scope', 'request', 'batch_id', 'next_ordinal']);
+    exact(b, [
+      'scope',
+      'request',
+      'batch_id',
+      'next_ordinal',
+      ...(b.ending === true ? ['ending'] : []),
+    ]);
     exact(b.scope, ['service_origin', 'operator_id', 'device_id', 'key_env']);
     assertJournalScope(b.scope);
     check(
@@ -244,6 +267,10 @@ export class ProvisioningWorkflow {
         (b.batch_id === null || (uint(b.batch_id) && b.batch_id > 0)) &&
         uint(b.next_ordinal) &&
         b.next_ordinal <= b.request.count,
+    );
+    check(
+      b.ending === undefined ||
+        (b.ending === true && b.batch_id !== null && !s.active),
     );
     for (const j of [
       ...s.history,
@@ -375,6 +402,10 @@ export class ProvisioningWorkflow {
   reconcile(service: ReservationService): Promise<void> {
     return this.serial(async () => {
       await this.syncBatch(service);
+      if (this.state.batch?.ending) {
+        await this.finishEnd(service);
+        return;
+      }
       if (this.state.active) {
         await this.syncAttempt(service);
       }
@@ -386,6 +417,7 @@ export class ProvisioningWorkflow {
       const b = this.actor(service);
       check(
         b.batch_id !== null &&
+          !b.ending &&
           !this.state.active &&
           b.next_ordinal < b.request.count,
       );
@@ -592,6 +624,38 @@ export class ProvisioningWorkflow {
       delete next.last_failure;
       await this.commit({...next, batch: null, history: []});
     });
+  }
+
+  /** Persist the closure decision before HTTP so a lost reply can be replayed. */
+  endBatch(service: ReservationService): Promise<void> {
+    return this.serial(async () => {
+      await this.syncBatch(service);
+      const b = this.actor(service);
+      check(!this.state.active && b.next_ordinal < b.request.count);
+      if (!b.ending) {
+        const next = this.snapshot();
+        next.batch!.ending = true;
+        await this.commit(next);
+      }
+      await this.finishEnd(service);
+    });
+  }
+
+  private async finishEnd(service: ReservationService): Promise<void> {
+    const b = this.actor(service);
+    check(
+      b.ending && b.batch_id !== null && !this.state.active && service.endBatch,
+    );
+    const receipt = await service.endBatch(this.state.device_id, b.batch_id);
+    check(
+      receipt.batch_id === b.batch_id &&
+        receipt.reason === 'operator-ended' &&
+        receipt.next_ordinal === b.next_ordinal &&
+        uint(receipt.closed_at),
+    );
+    const next = this.snapshot();
+    delete next.last_failure;
+    await this.commit({...next, batch: null, history: []});
   }
 
   /** Reconcile server receipt first, then archive and advance in one commit. */

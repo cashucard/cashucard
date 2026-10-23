@@ -91,15 +91,22 @@ export interface RecoveryProvisioningRecord {
   receipt_json: string;
   recorded_at: number;
 }
+export interface RecoveryBatchClosure {
+  batch_id: number;
+  reason: 'operator-ended';
+  next_ordinal: number;
+  closed_at: number;
+}
 export type EscrowExport = EscrowExportBase &
   (
     | {readonly version: 1}
     | {
-        readonly version: 2 | 3;
+        readonly version: 2 | 3 | 4;
         readonly operator_audit?: readonly OperatorAudit[];
         readonly provisioning_batches: readonly RecoveryProvisioningBatch[];
         readonly provisioning_attempts: readonly RecoveryProvisioningAttempt[];
         readonly provisioning_records: readonly RecoveryProvisioningRecord[];
+        readonly provisioning_batch_closures?: readonly RecoveryBatchClosure[];
       }
   );
 
@@ -150,7 +157,7 @@ export async function exportEscrowSql(
   const snapshot = db.transaction(
     () =>
       ({
-        version: 3 as const,
+        version: 4 as const,
         operator_audit: db
           .prepare('SELECT * FROM operator_audit ORDER BY id')
           .all() as OperatorAudit[],
@@ -181,6 +188,11 @@ export async function exportEscrowSql(
         provisioning_records: db
           .prepare('SELECT * FROM provisioning_records ORDER BY attempt_id')
           .all() as RecoveryProvisioningRecord[],
+        provisioning_batch_closures: db
+          .prepare(
+            'SELECT * FROM provisioning_batch_closures ORDER BY batch_id',
+          )
+          .all() as RecoveryBatchClosure[],
         keys: readEscrow(db),
         cards: db
           .prepare('SELECT * FROM cards ORDER BY short_id')
@@ -250,8 +262,8 @@ export function validateEscrowExport(
     };
   const version = object(value).version;
   shape(value, {
-    version: x => x === 1 || x === 2 || x === 3,
-    ...(version === 3
+    version: x => x === 1 || x === 2 || x === 3 || x === 4,
+    ...(version === 3 || version === 4
       ? {
           operator_audit: rows({
             id: positive,
@@ -267,7 +279,9 @@ export function validateEscrowExport(
       : {}),
     exported_at: integer,
     operators: rows({
-      ...(version === 3 ? {disabled: (x: unknown) => x === 0 || x === 1} : {}),
+      ...(version === 3 || version === 4
+        ? {disabled: (x: unknown) => x === 0 || x === 1}
+        : {}),
       id: positive,
       name: text,
       key_env: x => x === 'factory' || x === 'issued',
@@ -303,7 +317,7 @@ export function validateEscrowExport(
       load_sha256: text,
     }),
     cap_releases: rows({version: text, sha256: hex(64), created: integer}),
-    ...(version === 2 || version === 3
+    ...(version === 2 || version === 3 || version === 4
       ? {
           provisioning_batches: rows({
             batch_id: positive,
@@ -342,6 +356,16 @@ export function validateEscrowExport(
           }),
         }
       : {}),
+    ...(version === 4
+      ? {
+          provisioning_batch_closures: rows({
+            batch_id: positive,
+            reason: x => x === 'operator-ended',
+            next_ordinal: integer,
+            closed_at: integer,
+          }),
+        }
+      : {}),
   });
   const out = value as EscrowExport;
   const unique = <T>(items: readonly T[], key: (x: T) => unknown) => {
@@ -351,7 +375,7 @@ export function validateEscrowExport(
   };
   const operators = unique(out.operators, x => x.id);
   unique(out.operators, x => x.name);
-  if (out.version === 3) {
+  if (out.version === 3 || out.version === 4) {
     unique(out.operator_audit!, x => x.id);
     for (const e of out.operator_audit!)
       if (!operators.has(e.actor_id) || !operators.has(e.target_id)) fail();
@@ -564,6 +588,20 @@ export function validateEscrowExport(
   for (const row of out.provisioning_attempts)
     if ((row.state === 'recorded') !== recordedAttempts.has(row.attempt_id))
       fail();
+  if (out.version === 4) {
+    unique(out.provisioning_batch_closures!, x => x.batch_id);
+    for (const closure of out.provisioning_batch_closures!) {
+      const batch = provisioningBatches.get(closure.batch_id);
+      if (
+        !batch ||
+        closure.next_ordinal !== batch.next_ordinal ||
+        out.provisioning_attempts.some(
+          a => a.batch_id === closure.batch_id && a.state === 'active',
+        )
+      )
+        fail();
+    }
+  }
 }
 
 /** Empty-service recovery only. Operators are disabled until controlled credential reset. */
@@ -589,6 +627,7 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
       'provisioning_batches',
       'provisioning_attempts',
       'provisioning_records',
+      'provisioning_batch_closures',
     ]) {
       if (db.prepare(`SELECT 1 FROM ${table} LIMIT 1`).get())
         throw new Error('recovery requires an empty service');
@@ -604,7 +643,7 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
         r.created,
         r.disabled ?? 0,
       );
-    if (payload.version === 3)
+    if (payload.version === 3 || payload.version === 4)
       for (const e of payload.operator_audit!)
         db.prepare(
           'INSERT INTO operator_audit (id,actor_id,target_id,action,created) VALUES (?,?,?,?,?)',
@@ -643,7 +682,11 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
         r.installer,
         r.load_sha256,
       );
-    if (payload.version === 2 || payload.version === 3) {
+    if (
+      payload.version === 2 ||
+      payload.version === 3 ||
+      payload.version === 4
+    ) {
       for (const r of payload.provisioning_batches)
         db.prepare(
           'INSERT INTO provisioning_batches (batch_id, request_id, operator_id, device_id, config_json, key_env, next_ordinal, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -685,6 +728,11 @@ export function restoreEscrowExport(db: SqlHandle, payload: unknown): void {
           r.receipt_json,
           r.recorded_at,
         );
+      if (payload.version === 4)
+        for (const r of payload.provisioning_batch_closures!)
+          db.prepare(
+            'INSERT INTO provisioning_batch_closures (batch_id, reason, next_ordinal, closed_at) VALUES (?, ?, ?, ?)',
+          ).run(r.batch_id, r.reason, r.next_ordinal, r.closed_at);
     }
     for (const r of payload.cap_releases)
       db.prepare('INSERT INTO cap_releases VALUES (?, ?, ?)').run(

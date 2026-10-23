@@ -15,6 +15,7 @@ import React, {useState} from 'react';
 import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 
 import {ApiUnreachableError} from '../api';
+import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {APP_NAME, SIGNIN} from '../strings';
 import {useApp} from '../store';
 import {LegalLinks} from '../LegalLinks';
@@ -202,4 +203,7 @@ export function SignInScreen() {
 }
 
 /** The load set this build makes, the same pin the batch screen states. */
-const SIGNIN_BUILD = 'Builds the 2.1 card · Load file fe7d8ac3…';
+const SIGNIN_BUILD = `Builds the 2.1 card · Load file ${CASHU_LOAD_FILE.sha256.slice(
+  0,
+  8,
+)}…`;

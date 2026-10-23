@@ -139,6 +139,28 @@ test('lost batch and reservation acknowledgements restart with exactly the origi
   );
 });
 
+test('ending an unused batch keeps its intent through a lost reply and replays one closure', async () => {
+  const f = fixture();
+  const endBatch = jest
+    .fn()
+    .mockRejectedValueOnce(new Error('reply lost'))
+    .mockResolvedValue({
+      batch_id: 42,
+      reason: 'operator-ended',
+      next_ordinal: 0,
+      closed_at: 100,
+    });
+  const service = {...f.service, endBatch};
+  let w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  await w.start(service, config);
+  await expect(w.endBatch(service)).rejects.toThrow('reply lost');
+  expect(w.snapshot().batch?.ending).toBe(true);
+  w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  await w.reconcile(service);
+  expect(w.snapshot().batch).toBeNull();
+  expect(endBatch).toHaveBeenCalledTimes(2);
+});
+
 test('a commit failure prevents the dependent POST and ambiguous committed state is recovered on reopening', async () => {
   const f = fixture();
   const w = await ProvisioningWorkflow.open(f.storage, f.newId);

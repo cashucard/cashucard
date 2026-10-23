@@ -35,6 +35,7 @@ export interface OperatorSession {
 /** The service's own reasons, surfaced verbatim (S1: never improvised). */
 export type ServiceOperation =
   | 'create-batch'
+  | 'end-batch'
   | 'reserve-attempt'
   | 'read-attempt'
   | 'bind-card'
@@ -48,6 +49,9 @@ function serviceOperation(
 ): ServiceOperation | null {
   if (method === 'POST' && path === '/provisioning/batches') {
     return 'create-batch';
+  }
+  if (method === 'POST' && /^\/provisioning\/batches\/\d+\/end$/.test(path)) {
+    return 'end-batch';
   }
   if (method === 'POST' && path === '/provisioning/attempts') {
     return 'reserve-attempt';
@@ -281,6 +285,17 @@ export class ApiClient {
             request,
           )
         ).batch as unknown as RemoteBatch,
+      endBatch: async (device_id, batch_id) =>
+        (
+          await this.call(
+            'POST',
+            `/provisioning/batches/${batch_id}/end`,
+            session.token,
+            {device_id, reason: 'operator-ended'},
+          )
+        ).receipt as Awaited<
+          ReturnType<NonNullable<CardProvisioningService['endBatch']>>
+        >,
       reserve: async request =>
         (
           await this.call(

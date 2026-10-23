@@ -1,5 +1,5 @@
 import React from 'react';
-import {Share} from 'react-native';
+import {ScrollView, Share} from 'react-native';
 import {publicFailureContext, recoveryDetails} from '../src/recoveryExport';
 import Renderer, {act} from 'react-test-renderer';
 import {ApiClient, ApiServiceError} from '../src/api';
@@ -75,6 +75,7 @@ function fixture() {
     bind: jest.fn(),
     record: jest.fn(),
     disposition: jest.fn(),
+    endBatch: jest.fn(async () => ({batch_id: 42, reason: 'operator-ended' as const, next_ordinal: batch.next_ordinal, closed_at: 100})),
   };
   return {
     storage,
@@ -151,6 +152,82 @@ test('distributed defaults allow authenticated installation without laboratory c
   expect(flow.drill).toBeUndefined();
 });
 
+test('unfinished batch requires confirmation to end and retains server closure', async () => {
+  const f = fixture();
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  expect(tree.root.findByProps({testID: 'end-batch'})).toBeTruthy();
+  await act(async () => {
+    tree.root.findByProps({testID: 'end-batch'}).props.onPress();
+  });
+  expect(f.service.endBatch).not.toHaveBeenCalled();
+  await act(async () => {
+    tree.root.findByProps({testID: 'confirm-end-batch'}).props.onPress();
+  });
+  expect(f.service.endBatch).toHaveBeenCalledTimes(1);
+  expect(flow.snapshot?.batch).toBeNull();
+  expect(text(tree)).toContain('Batch mint reference');
+});
+
+test('sync saved work explains its service action and confirms a successful check', async () => {
+  const f = fixture();
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  expect(text(tree)).toContain('SYNC SAVED WORK');
+  await act(async () => {
+    await flow.recover();
+  });
+  expect(text(tree)).toContain('Saved work synced with the service');
+});
+
+test('acknowledged stop remains identifiable with its reason in batch history', async () => {
+  const f = fixture();
+  (f.service.disposition as jest.Mock).mockImplementation(
+    async (_device, attempt_id, intent) => ({
+      attempt_id,
+      kind: intent.kind,
+      reason: intent.reason,
+      revision: intent.revision + 1,
+      acknowledged_at: 100,
+    }),
+  );
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+    runCard: async (w, service) => {
+      await w.withAttempt(service, async j => {
+        await j.quarantine('identity-mismatch');
+      });
+      return 'quarantined';
+    },
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+    await flow.program();
+  });
+  await act(async () => {
+    await flow.acknowledge();
+  });
+  expect(text(tree)).toContain('Card identity did not match');
+  expect(text(tree)).toContain('Attempt …');
+});
+
 test('the release gate blocks direct create and program calls, without collecting a PIN', async () => {
   const f = fixture();
   const runCard = jest.fn();
@@ -220,6 +297,8 @@ test('restart retains the pending reservation; a different operator cannot repla
   });
   await signIn(8);
   expect(text(tree)).toContain('another account or service');
+  expect(text(tree)).toContain('Operator #7');
+  expect(text(tree)).toContain('https://ops.test');
   const reads = (f.service.attempt as jest.Mock).mock.calls.length;
   await act(async () => {
     expect(await flow.recover()).toBe(false);
@@ -278,6 +357,40 @@ test('cancellation during key prefetch prevents a later native session from armi
   expect(cancelCard).toHaveBeenCalledTimes(1);
   expect(withCard).not.toHaveBeenCalled();
   expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+});
+
+test('cancel tap stays outside scrolling history while a card session is armed', async () => {
+  const f = fixture();
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    serviceFor: () => f.service,
+    runCard: async () => {
+      await pending;
+      return 'interrupted';
+    },
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+  });
+  let running!: Promise<boolean>;
+  await act(async () => {
+    running = flow.program();
+    await Promise.resolve();
+  });
+  expect(tree.root.findByProps({testID: 'sticky-card-action'})).toBeTruthy();
+  expect(
+    tree.root.findByType(ScrollView).findAllByProps({testID: 'real-cancel'}),
+  ).toHaveLength(0);
+  await act(async () => {
+    release();
+    await running;
+  });
 });
 
 test('sign-out while keys are pending cannot arm NFC under the old session', async () => {
@@ -533,14 +646,14 @@ test('real installation setup exposes no holder controls and submits inert legac
   });
   expect(countInput().props.value).toBe('');
   expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(true);
-  expect(text(tree)).toContain('Enter 1 to 100,000 cards.');
+  expect(text(tree)).toContain('Enter 1 to 500 cards.');
   expect(tree.root.findByProps({testID: 'batch-count-decrement'}).props.disabled).toBe(true);
   await act(async () => {
     tree.root.findByProps({testID: 'batch-count-increment'}).props.onPress();
   });
   expect(countInput().props.value).toBe('1');
   await act(async () => {
-    countInput().props.onChangeText('100001');
+    countInput().props.onChangeText('501');
   });
   expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(true);
   await act(async () => {
@@ -560,6 +673,9 @@ test('real installation setup exposes no holder controls and submits inert legac
   await act(async () => {
     await tree.root.findByProps({testID: 'start-batch'}).props.onPress();
   });
+  expect(f.service.batch).not.toHaveBeenCalled();
+  expect(text(tree)).toContain('Review batch');
+  await act(async () => {tree.root.findByProps({testID: 'confirm-start-batch'}).props.onPress();});
   expect(f.service.batch).toHaveBeenCalledTimes(1);
   expect((f.service.batch as jest.Mock).mock.calls[0][0]).toMatchObject({
     count: 2,
@@ -872,6 +988,8 @@ test('a reconciliation conflict exports bounded context and names the chip block
     .toEqual(report.failure);
   expect(publicFailureContext(new ApiServiceError('private-token=do-not-export', 409, 'bind-card')))
     .toEqual({operation: 'bind-card', status: 409, reason: null});
+  expect(publicFailureContext(new ApiServiceError('batch-active', 409, 'end-batch')))
+    .toEqual({operation: 'end-batch', status: 409, reason: 'batch-active'});
 });
 
 test('stale independent backup pauses before NFC and retains the reserved attempt', async () => {

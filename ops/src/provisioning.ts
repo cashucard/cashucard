@@ -48,6 +48,12 @@ export interface ProvisioningBatch {
   next_ordinal: number;
   created: number;
 }
+export interface BatchClosureReceipt {
+  batch_id: number;
+  reason: 'operator-ended';
+  next_ordinal: number;
+  closed_at: number;
+}
 export interface BindReceipt {
   attempt_id: string;
   chip_id: string;
@@ -407,6 +413,45 @@ export function getAttempt(
 ): Attempt {
   return presentAttempt(db, attemptRow(db, scope, attemptId));
 }
+/** End an unfinished batch without deleting escrow or attempt evidence. */
+export function endProvisioningBatch(
+  db: OpsDb,
+  scope: ProvisioningScope,
+  batchId: number,
+  reason: 'operator-ended',
+): BatchClosureReceipt {
+  scopeCheck(db, scope);
+  if (!uint(batchId) || batchId === 0 || reason !== 'operator-ended')
+    bad('invalid batch closure');
+  return db.db.transaction(() => {
+    const batch = batchRow(db, scope, batchId);
+    const old = db.db
+      .prepare('SELECT * FROM provisioning_batch_closures WHERE batch_id = ?')
+      .get(batchId) as BatchClosureReceipt | undefined;
+    if (old) return old;
+    writable(db);
+    if (
+      db.db
+        .prepare(
+          "SELECT 1 FROM provisioning_attempts WHERE batch_id = ? AND state = 'active'",
+        )
+        .get(batchId)
+    )
+      conflict('batch-active', 'resolve the active attempt first');
+    const receipt: BatchClosureReceipt = {
+      batch_id: batchId,
+      reason,
+      next_ordinal: batch.next_ordinal,
+      closed_at: db.now(),
+    };
+    db.db
+      .prepare(
+        'INSERT INTO provisioning_batch_closures (batch_id,reason,next_ordinal,closed_at) VALUES (?,?,?,?)',
+      )
+      .run(batchId, reason, receipt.next_ordinal, receipt.closed_at);
+    return receipt;
+  });
+}
 export function reserveAttempt(
   db: OpsDb,
   scope: ProvisioningScope,
@@ -437,6 +482,12 @@ export function reserveAttempt(
     }
     assertIndependentBackup(db);
     const batch = batchRow(db, scope, input.batch_id);
+    if (
+      db.db
+        .prepare('SELECT 1 FROM provisioning_batch_closures WHERE batch_id = ?')
+        .get(input.batch_id)
+    )
+      conflict('batch-ended', 'batch is ended');
     const config = JSON.parse(batch.config_json) as ProvisioningConfig;
     if (input.ordinal !== batch.next_ordinal || input.ordinal >= config.count)
       conflict(
