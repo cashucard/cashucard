@@ -214,8 +214,12 @@ test('terminal dispositions release devices but retain blocked chip and consumed
     batch_id: a.batch_id,
     ordinal: 1,
   });
-  rejects(() =>
-    bindAttempt(db, scope, b.attempt_id, {revision: 0, chip_id: chip}),
+  assert.throws(
+    () => bindAttempt(db, scope, b.attempt_id, {revision: 0, chip_id: chip}),
+    (e: unknown) =>
+      e instanceof ProvisioningError &&
+      e.status === 409 &&
+      e.code === 'chip-unresolved',
   );
   rejects(
     () =>

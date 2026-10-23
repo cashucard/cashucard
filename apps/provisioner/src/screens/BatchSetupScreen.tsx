@@ -126,6 +126,25 @@ const local = (t: Theme) =>
       flex: 1.2,
       padding: 0,
     },
+    countInput: {width: 64, flex: 0, textAlign: 'center'},
+    countStep: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: t.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    countStepText: {color: t.ink, fontFamily: FONT.semibold, fontSize: 24},
+    countStepDisabled: {opacity: 0.35},
+    countError: {
+      color: t.danger,
+      fontFamily: FONT.regular,
+      fontSize: 13,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+    },
     policyRow: {
       paddingHorizontal: 16,
       paddingVertical: 14,
@@ -221,10 +240,14 @@ export function BatchSetupScreen({
   const [count, setCount] = useState(app.demo ? '250' : '12');
 
   const [creating, setCreating] = useState(false);
+  const countNumber = Number(count);
+  const validCount =
+    /^\d+$/.test(count) &&
+    Number.isSafeInteger(countNumber) &&
+    countNumber >= 1 &&
+    countNumber <= 100000;
   const validNumbers =
-    Number.isSafeInteger(Number(count)) &&
-    Number(count) > 0 &&
-    Number(count) <= 100000 &&
+    validCount &&
     (installationOnly ||
       (daily.trim().length > 0 &&
         noPin.trim().length > 0 &&
@@ -248,7 +271,7 @@ export function BatchSetupScreen({
           pinBatch: installationOnly ? '' : pinBatch,
           dailyUsd: installationOnly ? 0 : Number(daily),
           noPinUsd: installationOnly ? 0 : Number(noPin),
-          count: Number(count),
+          count: countNumber,
         };
     if (onCreate) {
       setCreating(true);
@@ -294,7 +317,7 @@ export function BatchSetupScreen({
       alive = false;
     };
   }, [app.demo, app.session, app.serviceUrl, mintRequest]);
-  const mints = app.demo ? DEMO_MINTS : (serviceMints ?? []);
+  const mints = app.demo ? DEMO_MINTS : serviceMints ?? [];
 
   const customMint = mint !== null && !mints.includes(mint);
 
@@ -480,15 +503,53 @@ export function BatchSetupScreen({
               ) : null}
               <View style={s.fieldRow}>
                 <Text style={s.fieldLabel}>{SETUP.count}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease cards in batch"
+                  accessibilityState={{
+                    disabled: app.demo || !validCount || countNumber <= 1,
+                  }}
+                  disabled={app.demo || !validCount || countNumber <= 1}
+                  onPress={() => setCount(String(countNumber - 1))}
+                  style={[
+                    s.countStep,
+                    (app.demo || !validCount || countNumber <= 1) &&
+                      s.countStepDisabled,
+                  ]}
+                  testID="batch-count-decrement">
+                  <Text style={s.countStepText}>−</Text>
+                </Pressable>
                 <TextInput
                   value={count}
-                  onChangeText={setCount}
-                  keyboardType="numeric"
+                  onChangeText={value => setCount(value.replace(/\D/g, ''))}
+                  keyboardType="number-pad"
                   editable={!app.demo}
-                  style={s.fieldInput}
+                  selectTextOnFocus
+                  accessibilityLabel="Cards in batch"
+                  style={[s.fieldInput, s.countInput]}
                   testID="batch-count"
                 />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase cards in batch"
+                  accessibilityState={{
+                    disabled: app.demo || countNumber >= 100000,
+                  }}
+                  disabled={app.demo || countNumber >= 100000}
+                  onPress={() =>
+                    setCount(String(validCount ? countNumber + 1 : 1))
+                  }
+                  style={[
+                    s.countStep,
+                    (app.demo || countNumber >= 100000) && s.countStepDisabled,
+                  ]}
+                  testID="batch-count-increment">
+                  <Text style={s.countStepText}>+</Text>
+                </Pressable>
               </View>
+              {!app.demo && !validCount ? (
+                <Text style={s.countError}>Enter 1 to 100,000 cards.</Text>
+              ) : null}
             </View>
           </View>
 

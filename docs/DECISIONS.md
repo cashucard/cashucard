@@ -2565,3 +2565,35 @@ the signed-in installation path. That left an operator holding a card through
 the longest phase without the approved feedback. Emitting progress before a
 LOAD response could falsely show a block that the phone never confirmed.
 Rejected timed interpolation and treating 100% LOAD as a completed card.
+
+## D88 — Make batch count adjustable without cursor placement
+
+**Decided (2026-10-22):** Put decrement and increment buttons beside the
+editable card count. Select the whole value when the input receives focus,
+allow an empty value while editing, and block batch creation outside 1 to
+100,000 cards with an inline range message. Keep the same server range and
+batch request format.
+
+**Why:** focusing the default `12` could leave the cursor before it, where
+Backspace had no effect. Buttons make small changes immediate; selection on
+focus makes a replacement number easy to type. Rejected a slider because the
+range is too wide for precise selection.
+
+## D89 — Report bounded provisioning conflicts
+
+**Decided (2026-10-22):** Give each provisioning 409 invariant a stable reason
+code. The phone distinguishes an unresolved chip, changed saved requests,
+recovery fencing and missing escrow in its guidance. A recovery export made
+after a failed operation includes only an allowlisted operation, HTTP status
+and allowlisted reason code. This bounded context is saved with the local
+workflow so a restart does not erase it. Unknown service reasons
+are omitted; raw URLs, error messages, credentials and APDUs are never added.
+The saved journal, consent and quarantine rules remain unchanged. The context
+is diagnostic support data, not authority to recreate or retry an attempt.
+
+**Why:** a generic 409 message hid whether the service rejected chip binding
+or a changed reservation. A saved attempt can have no chip ID when binding
+failed before its receipt was stored. Keeping typed, bounded context lets an
+operator diagnose the conflict without exporting private request data or
+weakening recovery gates. Closing the batch clears the last failure together
+with its local attempt history.

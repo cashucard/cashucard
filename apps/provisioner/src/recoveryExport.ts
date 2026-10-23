@@ -1,6 +1,75 @@
 /** Public support details only; never serialize the workflow or raw receipts. */
+import {ApiServiceError, type ServiceOperation} from './api';
 import type {AttemptJournal} from './journal';
 import type {WorkflowSnapshot} from './provisioningWorkflow';
+
+export interface PublicFailureContext {
+  operation: ServiceOperation;
+  status: number;
+  reason: string | null;
+}
+
+const OPERATIONS = new Set<ServiceOperation>([
+  'create-batch', 'reserve-attempt', 'read-attempt', 'bind-card',
+  'issue-keys', 'record-installation', 'record-disposition',
+]);
+
+const REASONS = new Set([
+  'batch-request-changed',
+  'attempt-request-changed',
+  'ordinal-not-next',
+  'device-active',
+  'attempt-terminal',
+  'stale-revision',
+  'chip-binding-changed',
+  'chip-unresolved',
+  'completion-record-changed',
+  'completion-identity-mismatch',
+  'installation-recorded',
+  'disposition-changed',
+  'reservation-required',
+  'reservation-mismatch',
+  'recovery-required',
+  'escrow-missing',
+  'independent-backup-stale',
+  'not-found',
+  'conflict',
+]);
+
+export function isPublicFailureContext(value: unknown): value is PublicFailureContext {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    Object.keys(record).sort().join(',') === 'operation,reason,status' &&
+    OPERATIONS.has(record.operation as ServiceOperation) &&
+    Number.isInteger(record.status) &&
+    (record.status as number) >= 400 &&
+    (record.status as number) <= 599 &&
+    (record.reason === null ||
+      (typeof record.reason === 'string' && REASONS.has(record.reason)))
+  );
+}
+
+export function publicFailureContext(
+  error: unknown,
+): PublicFailureContext | null {
+  if (
+    !(error instanceof ApiServiceError) ||
+    !error.operation ||
+    !Number.isInteger(error.status) ||
+    error.status! < 400 ||
+    error.status! > 599
+  ) {
+    return null;
+  }
+  return {
+    operation: error.operation,
+    status: error.status!,
+    reason: REASONS.has(error.reason) ? error.reason : null,
+  };
+}
 function journalDetails(j: AttemptJournal) {
   return {
     attempt_id: j.attempt_id,
@@ -53,6 +122,7 @@ export function recoveryDetails(snapshot: WorkflowSnapshot) {
     // Bound share-sheet size for large batches; original evidence stays on device.
     history_count: snapshot.history.length,
     recent_history: snapshot.history.slice(-20).map(journalDetails),
+    failure: snapshot.last_failure ?? null,
     ready_for_payments: false,
   };
 }

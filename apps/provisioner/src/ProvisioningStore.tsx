@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import {AppState} from 'react-native';
 import {ApiClient, ApiServiceError, ApiUnreachableError} from './api';
+import {publicFailureContext} from './recoveryExport';
 import {CASHU_PLAN, TransportError} from './cardkit';
 import type {JournalStorage} from './journal';
 import {
@@ -127,6 +128,37 @@ const message = (e: unknown): string => {
     if (e.reason === 'recovery-required') {
       return 'The service is paused for recovery. Your saved work is retained. Contact your operator before continuing.';
     }
+    if (e.reason === 'escrow-missing') {
+      return 'The service cannot find the keys assigned to this attempt. Keep the card aside and ask your operator to restore escrow before continuing.';
+    }
+    if (e.reason === 'chip-unresolved') {
+      return 'This chip has an unresolved attempt. Keep the card aside and ask your operator to reconcile its history. Do not start another attempt for it.';
+    }
+    if (
+      [
+        'batch-request-changed',
+        'attempt-request-changed',
+        'completion-record-changed',
+        'disposition-changed',
+        'completion-identity-mismatch',
+        'chip-binding-changed',
+      ].includes(e.reason)
+    ) {
+      return 'Saved attempt details differ from the service record. Keep this work on the phone and ask your operator to reconcile it.';
+    }
+    if (
+      [
+        'ordinal-not-next',
+        'device-active',
+        'attempt-terminal',
+        'stale-revision',
+        'installation-recorded',
+        'reservation-required',
+        'reservation-mismatch',
+      ].includes(e.reason)
+    ) {
+      return 'The service rejected this attempt state. Keep the card aside and ask your operator to reconcile it before continuing.';
+    }
     if (e.status === 401) {
       return 'Sign in again to continue your saved work.';
     }
@@ -194,7 +226,9 @@ export function ProvisioningProvider({
     if (mounted.current) {
       setDrillState(state);
       if (state.paused) {
-        armedMessage.current?.(`Paused: ${state.paused}\nSaved: ${pauseStage.current}`);
+        armedMessage.current?.(
+          `Paused: ${state.paused}\nSaved: ${pauseStage.current}`,
+        );
       }
     }
   });
@@ -315,6 +349,10 @@ export function ProvisioningProvider({
               return {snapshot: w.snapshot(), ok: true};
             } catch (failure) {
               // Poisoned writes throw from snapshot and require a reload.
+              const context = publicFailureContext(failure);
+              if (context) {
+                await w.rememberFailure(context);
+              }
               return {snapshot: w.snapshot(), ok: false, failure};
             }
           },
@@ -456,7 +494,8 @@ export function ProvisioningProvider({
         armedCancel.current =
           settings.cancelCard ??
           (native ? () => native.cancelCard() : async () => undefined);
-        armedMessage.current = settings.cardMessage ?? native?.setCardMessage ?? null;
+        armedMessage.current =
+          settings.cardMessage ?? native?.setCardMessage ?? null;
         try {
           if (settings.withCard) {
             return await settings.withCard(guardedRun);
@@ -491,7 +530,8 @@ export function ProvisioningProvider({
                 }
                 const saved = w.snapshot();
                 setSnapshot(saved);
-                pauseStage.current = saved.active?.journal?.stage ?? 'unconfirmed';
+                pauseStage.current =
+                  saved.active?.journal?.stage ?? 'unconfirmed';
                 await drill.current!.checkpoint(boundary);
                 if (!allowed()) {
                   throw new TransportError('Card session cancelled');
@@ -506,7 +546,10 @@ export function ProvisioningProvider({
               return;
             }
             if (event.type === 'phase') {
-              lastPhase = Object.prototype.hasOwnProperty.call(PHASES, event.phase)
+              lastPhase = Object.prototype.hasOwnProperty.call(
+                PHASES,
+                event.phase,
+              )
                 ? PHASES[event.phase]
                 : undefined;
               setPhase(event.phase);
@@ -526,7 +569,9 @@ export function ProvisioningProvider({
       if (allowed() && outcome === 'interrupted') {
         const stage = w.snapshot().active?.journal?.stage ?? 'unconfirmed';
         setInterruption(
-          `Card connection interrupted. Last phase: ${lastPhase ?? 'Not reported'}. ` +
+          `Card connection interrupted. Last phase: ${
+            lastPhase ?? 'Not reported'
+          }. ` +
             `Saved stage: ${stage}. Card changes may be incomplete. ` +
             'Keep this card. Ask your operator before retrying.',
         );
