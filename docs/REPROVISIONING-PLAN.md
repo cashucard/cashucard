@@ -57,3 +57,9 @@ by an interruption-aware cardkit reset operation and phone review. A card
 without a 2.1 applet needs a separate reconciliation path; the preflight does
 not treat applet absence as an authorized reset. The first physical run needs
 an approved plan naming that card and the specific commands.
+
+The second slice adds a metadata-only service lookup for the exact CPLC and
+applet public key. An unresolved attempt blocks the lookup even when an older
+record exists. The response contains no key bytes and is not a reset permit.
+The durable intent, audited reconciliation and card operation remain the next
+implementation gates.
