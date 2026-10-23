@@ -123,6 +123,8 @@ async function main() {
     await evaluate("document.fonts.ready");
     assert.equal(await evaluate("!!document.querySelector('#story')"), false, "Four-step section is gone");
     assert.equal(await evaluate("document.querySelectorAll('h1').length"), 1, "One page heading");
+    assert.equal(await evaluate("document.querySelector('#hero-title').innerText.replace(/\\s+/g,' ').trim()"), "Cashu, now on a card.", "Hero names the card innovation");
+    assert.equal(await evaluate("document.querySelector('.hero-copy p').innerText.trim()"), "Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.", "Hero distinguishes offline acceptance from mint settlement");
     assert.equal(await evaluate("document.querySelectorAll('script[src]').length"), 0, "Unused story script is gone");
     assert.ok(await evaluate("document.body.innerText.trim().split(/\s+/).length < 100"), "Copy stays concise");
     assert.ok(await evaluate("document.documentElement.scrollHeight <= innerHeight * 1.65"), "Desktop page stays short");

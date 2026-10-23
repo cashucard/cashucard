@@ -19,6 +19,8 @@ reduced motion. It creates and removes a separate browser profile. Set
 Protocol facts come from lnflash/cashu-card's specification, APDU reference,
 security model and license. The NUT-XX proposal remains a draft. Review the
 source specification when changing the payment or ownership explanation.
+The hero describes offline terminal acceptance and later mint settlement as
+separate events; an offline tap does not guarantee final settlement.
 Footer links point to the draft and the Cashu Card source, with Flash Mobile,
 Foxy iOS and Flash POS grouped under Apps. The links do not claim completed
 integrations.
