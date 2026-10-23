@@ -1,6 +1,6 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **reconciliation passed; fresh installation and funded end-to-end run pending**.
+Status: **fresh provisioning and independent post-check passed; holder setup and funded end-to-end run pending**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
 100-sat cumulative funding/fees cap. No funds have moved in this run.
@@ -129,9 +129,51 @@ remain unverified; this is not evidence that the apps are absent. Pixel was
 not connected over ADB at this checkpoint. Max's merchant test remains later
 in the plan. No app build, installation or data wipe was performed by the agent.
 
+## Fresh mobile installation and independent post-check
+
+The operator resumed the existing batch 5 on SuperMax. Their screenshot at
+09:55 on October 23 showed **1 rotation record · 0 stops**, Card 1 ending
+`11f6`, attempt ending `2e3bf9` and chip ending `63205547`, with installation
+and rotation recorded. A refreshed production console independently showed
+attempt `65bfdfd9-60b0-43c2-a95d-06b5012e3bf9` as **Recorded**, revision 2,
+operator `dread`, bound to full CPLC
+`cplc-v1:4790d3213041093363205547` on the original phone device ID.
+
+After the operator put that card alone back on the ACS reader, the approved
+read-only post-check ran once at Unix `1792774627`. SELECT and GET_INFO both
+validated applet version **2.1**. Its public observations were:
+
+```json
+{
+  "chip_id": "cplc-v1:4790d3213041093363205547",
+  "installation_id": "031b63ab2c73c8825952be146d6a71b6a3c17353276a8fc234d990e0a45a3f11f6",
+  "unspent": 0,
+  "spent": 0,
+  "empty_slots": 128,
+  "has_owner": false,
+  "pin_state": "none",
+  "record_set": false,
+  "locked": false,
+  "tag_present": true,
+  "authentication_attempted": false
+}
+```
+
+The new applet public key differs from the removed installation and matches
+the suffix in the phone's completion screen. The entire public key has not
+yet been compared to an exported service completion record. Tag presence here
+means SELECT tag succeeded, not that its NDEF contents were independently read.
+No GP authentication, manager-key check, card write or retry was performed by
+this checkpoint. The app's recorded key rotation is not claimed as a separate
+USB authentication test.
+
+The operator was asked to open this card's setup screen in Flash on SuperMax
+and report seed-backed versus device-only ownership before committing setup.
+No owner key, seed or PIN is requested from the operator or read by the agent.
+
 ## Not covered
 
-Fresh provisioning, holder setup/recovery, funding, online payment/change,
+Holder setup/recovery, funding, online payment/change,
 offline acceptance/settlement, final balance, Max terminal coverage and the
 Apple review video have not run. Applet absence alone is not a fresh
 verification of factory manager keys; that evidence remains the prior reset
