@@ -200,6 +200,7 @@ export interface PhaseTiming {
 
 export type RunEvent =
   | {type: 'phase'; phase: string}
+  /** Emitted only after the LOAD response confirms this block. */
   | {type: 'block'; index: number; of: number}
   | {type: 'apdu'; record: ApduRecord};
 
@@ -556,8 +557,8 @@ export async function provision(
     load: async () => {
       for (let i = 0; i < blocks.length; i++) {
         run.blocks = {at: i + 1, of: blocks.length};
-        run.emit({type: 'block', index: i + 1, of: blocks.length});
         expectOk(await open().send(run.timed, blocks[i]), 0xe8);
+        run.emit({type: 'block', index: i + 1, of: blocks.length});
       }
     },
     installOpener: () => install('installOpener'),

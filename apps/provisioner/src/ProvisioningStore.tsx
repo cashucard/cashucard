@@ -94,6 +94,8 @@ interface RealProvisioning {
   busy: boolean;
   cardActive: boolean;
   phase: string;
+  /** Last LOAD block acknowledged in this card run; never a timed estimate. */
+  loadProgress: {index: number; of: number} | null;
   notice: string | null;
   hardwareValidated: boolean;
   drill?: DrillState & {
@@ -165,6 +167,10 @@ export function ProvisioningProvider({
   const [busy, setBusy] = useState(false);
   const [cardActive, setCardActive] = useState(false);
   const [phase, setPhase] = useState('');
+  const [loadProgress, setLoadProgress] = useState<{
+    index: number;
+    of: number;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [interruption, setInterruption] = useState<string | null>(null);
   const [replacement, setReplacement] = useState<ReplacementReview | null>(
@@ -200,6 +206,7 @@ export function ProvisioningProvider({
     cancelRequested.current = true;
     setInterruption(null);
     setReplacement(null);
+    setLoadProgress(null);
     drill.current?.cancel();
     const cancel = armedCancel.current;
     if (cancel) {
@@ -228,6 +235,7 @@ export function ProvisioningProvider({
     busyRef.current = true;
     setBusy(true);
     setReplacement(null);
+    setLoadProgress(null);
     setStatus('loading');
     try {
       const value = await exclusive(
@@ -400,6 +408,7 @@ export function ProvisioningProvider({
     return operate(async (w, service) => {
       cancelRequested.current = false;
       setInterruption(null);
+      setLoadProgress(null);
       let lastPhase: string | undefined;
       const actor = latest.current;
       const generation = actorGeneration.current;
@@ -493,11 +502,23 @@ export function ProvisioningProvider({
           now: Date.now,
           verifiedAt: () => Math.floor(Date.now() / 1000),
           onEvent: event => {
-            if (mounted.current && event.type === 'phase') {
+            if (!allowed()) {
+              return;
+            }
+            if (event.type === 'phase') {
               lastPhase = Object.prototype.hasOwnProperty.call(PHASES, event.phase)
                 ? PHASES[event.phase]
                 : undefined;
               setPhase(event.phase);
+            } else if (
+              event.type === 'block' &&
+              Number.isInteger(event.index) &&
+              Number.isInteger(event.of) &&
+              event.of > 0 &&
+              event.index >= 1 &&
+              event.index <= event.of
+            ) {
+              setLoadProgress({index: event.index, of: event.of});
             }
           },
         },
@@ -539,6 +560,7 @@ export function ProvisioningProvider({
     busy,
     cardActive,
     phase,
+    loadProgress,
     notice: notice ?? interruption,
     hardwareValidated,
     drill: drillsEnabled

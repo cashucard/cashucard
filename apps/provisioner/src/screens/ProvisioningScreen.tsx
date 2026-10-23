@@ -3,6 +3,7 @@ import React from 'react';
 import {ScrollView, Share, StyleSheet, Text, View} from 'react-native';
 import {RECOVERY_BOUNDARIES} from '../recoveryDrills';
 import {CASHU_PLAN} from '../cardkit';
+import {CardFigure} from '../CardFigure';
 import {useProvisioning} from '../ProvisioningStore';
 import {BatchSetupScreen} from './BatchSetupScreen';
 import {PHASES} from '../strings';
@@ -43,6 +44,21 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
     title: {color: t.ink, fontFamily: FONT.semibold, fontSize: 24},
     line: {color: t.ink, fontFamily: FONT.regular, fontSize: 16},
     card: {backgroundColor: t.card, padding: 16, borderRadius: 16, gap: 10},
+    batchTrack: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: t.line,
+      overflow: 'hidden',
+    },
+    batchFill: {height: '100%', backgroundColor: t.accent},
+    figure: {alignItems: 'center', gap: 12, paddingVertical: 8},
+    phase: {
+      color: t.ink,
+      fontFamily: FONT.medium,
+      fontSize: 17,
+      textAlign: 'center',
+      minHeight: 24,
+    },
   });
   const shell = (content: React.ReactNode) => (
     <Screen
@@ -121,6 +137,31 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
   const complete =
     !snapshot.active && batch.next_ordinal === batch.request.count;
   const pendingRecord = stage === 'record_pending' || stage === 'recorded';
+  const lastHistory = snapshot.history[snapshot.history.length - 1];
+  const loadFraction = flow.loadProgress
+    ? flow.loadProgress.index / flow.loadProgress.of
+    : 0;
+  const loadPercent = Math.round(loadFraction * 100);
+  const loadVerified = [
+    'installed',
+    'rotation_intent',
+    'rotated',
+    'record_pending',
+    'recorded',
+  ].includes(stage ?? '');
+  const recentlyRecorded = !snapshot.active && lastHistory?.stage === 'recorded';
+  const figureFill = loadVerified || recentlyRecorded
+    ? 1
+    : loadFraction;
+  const figureState = flow.busy
+    ? 'running'
+    : stage === 'quarantined'
+      ? 'danger'
+      : recentlyRecorded || stage === 'recorded'
+        ? 'done'
+        : snapshot.active && (flow.notice || stage !== 'reserved')
+          ? 'stop'
+          : 'idle';
   const canQuarantine =
     !!stage && !['record_pending', 'recorded', 'quarantined'].includes(stage);
   const share =
@@ -187,6 +228,14 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
       <Text style={s.title} testID="real-progress">
         {batch.next_ordinal} of {batch.request.count} attempts acknowledged
       </Text>
+      <View style={s.batchTrack} testID="real-batch-progress">
+        <View
+          style={[
+            s.batchFill,
+            {width: `${Math.round((batch.next_ordinal / batch.request.count) * 100)}%`},
+          ]}
+        />
+      </View>
       <Dim>
         {recorded.length} rotation records · {stopped} stops
       </Dim>
@@ -194,14 +243,19 @@ export function ProvisioningScreen({onSettings}: {onSettings: () => void}) {
         Installation and key rotation only. These cards are not ready for
         holders.
       </Dim>
+      <View style={s.figure} testID="real-card-visual">
+        <CardFigure fill={figureFill} state={figureState} />
+        {flow.busy ? (
+          <Text style={s.phase} testID="recovery-busy">
+            {flow.phase === 'load'
+              ? `Writing ${loadPercent}%`
+              : PHASES[flow.phase] ?? 'Confirming saved work…'}
+          </Text>
+        ) : null}
+      </View>
       {flow.notice ? (
         <Text style={s.line} testID="recovery-notice">
           {flow.notice}
-        </Text>
-      ) : null}
-      {flow.busy ? (
-        <Text style={s.line} testID="recovery-busy">
-          {PHASES[flow.phase] ?? 'Confirming saved work…'}
         </Text>
       ) : null}
       {snapshot.active ? (

@@ -10,6 +10,7 @@ import {
   type ProvisioningProviderOptions,
 } from '../src/ProvisioningStore';
 import {ProvisioningScreen} from '../src/screens/ProvisioningScreen';
+import {CardFigure} from '../src/CardFigure';
 import {
   ProvisioningWorkflow,
   type CardProvisioningService,
@@ -390,6 +391,7 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     expect(card.failedAuths).toBe(0);
     expect(card.log.filter(c => c[1] === 0xd8)).toHaveLength(1);
     expect(flow.snapshot?.active?.journal?.stage).toBe('record_pending');
+    expect(tree.root.findByType(CardFigure).props.fill).toBe(1);
     const active = flow.snapshot!.active!;
     const frozen = active.journal!.frozen_record;
     expect(frozen).toBe((f.service.record as jest.Mock).mock.calls[0][3]);
@@ -440,6 +442,10 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     expect(withCard).toHaveBeenCalledTimes(1);
     expect(flow.snapshot?.active).toBeNull();
     expect(flow.snapshot?.history).toHaveLength(1);
+    expect(recovered.root.findByType(CardFigure).props).toMatchObject({
+      fill: 1,
+      state: 'done',
+    });
     expect(text(recovered)).toContain('Holder wallet setup required before use.');
     expect(text(recovered)).not.toContain('PIN:');
   } finally {
@@ -542,6 +548,36 @@ test('real installation setup exposes no holder controls and submits inert legac
   });
   expect(f.bytes()).not.toContain('pinBatch');
   expect(tree.root.findByProps({testID: 'real-progress'})).toBeTruthy();
+  expect(tree.root.findByType(CardFigure).props.fill).toBe(0);
+});
+
+test('real card artwork follows observed LOAD blocks and retains partial state after interruption', async () => {
+  const f = fixture();
+  let entered!: () => void;
+  let release!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w, _s, options,
+  ) => {
+    options.onEvent?.({type: 'phase', phase: 'load'});
+    options.onEvent?.({type: 'block', index: 41, of: 82});
+    entered();
+    await held;
+    return 'interrupted';
+  };
+  const tree = await mount({
+    ...f, hardwareValidated: true, serviceFor: () => f.service, runCard,
+  });
+  await signIn();
+  await act(async () => { await flow.create(config); });
+  let running!: Promise<boolean>;
+  await act(async () => { running = flow.program(); await started; });
+  expect(tree.root.findByType(CardFigure).props.fill).toBe(0.5);
+  expect(text(tree)).toContain('Writing 50%');
+  await act(async () => { release(); await running; });
+  expect(tree.root.findByType(CardFigure).props.fill).toBe(0.5);
+  expect(tree.root.findByType(CardFigure).props.state).toBe('stop');
 });
 
 test('validation pauses keep the operation busy; sign-out releases the waiter and retains the attempt', async () => {
