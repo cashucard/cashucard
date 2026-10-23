@@ -8,6 +8,8 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 import GearSvg from '../src/assets/gear.svg';
+import {AppStore} from '../src/store';
+import {SettingsScreen} from '../src/screens/SettingsScreen';
 import {GearButton} from '../src/ui';
 import {DARK, ThemeProvider} from '../src/theme';
 
@@ -163,7 +165,6 @@ test('the sign-in screen demo door enters demo mode with no session (design revi
   });
   expect(tree!.root.findAllByProps({testID: 'bench-entry'})).toHaveLength(0);
   expect(tree!.root.findByProps({testID: 'identity-entry'})).toBeTruthy();
-  const {SettingsScreen} = require('../src/screens/SettingsScreen');
   await ReactTestRenderer.act(() => {
     tree!.root.findByType(SettingsScreen).props.onBench();
   });
@@ -181,6 +182,36 @@ test('the sign-in screen demo door enters demo mode with no session (design revi
   await ReactTestRenderer.act(() => {
     tree!.unmount();
   });
+});
+
+test('settings confirms sign-out while a saved batch exists', async () => {
+  let tree!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(() => {
+    tree = ReactTestRenderer.create(
+      <AppStore>
+        <SettingsScreen
+          onBack={() => undefined}
+          onBench={() => undefined}
+          hasSavedBatch
+        />
+      </AppStore>,
+    );
+  });
+  await ReactTestRenderer.act(() => {
+    tree.root.findByProps({testID: 'sign-out'}).props.onPress();
+  });
+  expect(tree.root.findByProps({testID: 'confirm-sign-out'})).toBeTruthy();
+  await ReactTestRenderer.act(() => {
+    tree.root.findByProps({testID: 'keep-session'}).props.onPress();
+  });
+  expect(tree.root.findByProps({testID: 'sign-out'})).toBeTruthy();
+  const words = tree.root
+    .findAll(n => typeof n.props.children === 'string')
+    .map(n => n.props.children)
+    .join(' ');
+  expect(words).toContain('Version 1.0.0 (5)');
+  expect(words).toContain('CAP pin f27d92ba');
+  tree.unmount();
 });
 
 test('the settings gear receives its theme tint through the SVG color prop', () => {

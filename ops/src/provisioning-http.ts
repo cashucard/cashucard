@@ -4,6 +4,7 @@ import type {OpsDb} from './db';
 import {
   ProvisioningError,
   createProvisioningBatch,
+  endProvisioningBatch,
   reserveAttempt,
   getAttempt,
   bindAttempt,
@@ -61,6 +62,21 @@ export function provisioningHttp(
   url: URL,
   body: Body,
 ): {status: number; body: unknown} {
+  const endBatchMatch = path.match(/^\/provisioning\/batches\/(\d+)\/end$/);
+  if (method === 'POST' && endBatchMatch) {
+    fields(body, ['device_id', 'reason']);
+    return {
+      status: 200,
+      body: {
+        receipt: endProvisioningBatch(
+          db,
+          scope(session, text(body, 'device_id')),
+          Number(endBatchMatch[1]),
+          text(body, 'reason') as 'operator-ended',
+        ),
+      },
+    };
+  }
   if (method === 'POST' && path === '/provisioning/batches') {
     fields(body, [
       'device_id',

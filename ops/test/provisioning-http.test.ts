@@ -98,6 +98,78 @@ test('HTTP batch retries return one escrowed batch and publish a stable operator
   }
 });
 
+test('ending an unfinished batch is idempotent and fences later reservations', async () => {
+  const {db, call, alice, bob} = await setup();
+  try {
+    const created = await call('/provisioning/batches', batchBody, alice.token);
+    const batchId = (created.body as {batch: {batch_id: number}}).batch
+      .batch_id;
+    const path = `/provisioning/batches/${batchId}/end`;
+    const body = {device_id: DEVICE, reason: 'operator-ended'};
+    assert.equal((await call(path, body, bob.token)).status, 404);
+    const first = await call(path, body, alice.token);
+    assert.equal(first.status, 200);
+    assert.deepEqual(await call(path, body, alice.token), first);
+    assert.equal(
+      (
+        await call(
+          '/provisioning/attempts',
+          {
+            device_id: DEVICE,
+            attempt_id: ATTEMPT,
+            batch_id: batchId,
+            ordinal: 0,
+          },
+          alice.token,
+        )
+      ).status,
+      409,
+    );
+    assert.equal(
+      (await call(path, {...body, reason: 'different'}, alice.token)).status,
+      400,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test('batch cannot end while a card attempt is active', async () => {
+  const {db, call, alice} = await setup();
+  try {
+    const created = await call('/provisioning/batches', batchBody, alice.token);
+    const batchId = (created.body as {batch: {batch_id: number}}).batch
+      .batch_id;
+    await call(
+      '/provisioning/attempts',
+      {
+        device_id: DEVICE,
+        attempt_id: ATTEMPT,
+        batch_id: batchId,
+        ordinal: 0,
+      },
+      alice.token,
+    );
+    const path = `/provisioning/batches/${batchId}/end`;
+    const body = {device_id: DEVICE, reason: 'operator-ended'};
+    assert.equal((await call(path, body, alice.token)).status, 409);
+    const disposed = await call(
+      `/provisioning/attempts/${ATTEMPT}/disposition`,
+      {
+        device_id: DEVICE,
+        revision: 0,
+        kind: 'abandoned',
+        reason: 'operator-ended',
+      },
+      alice.token,
+    );
+    assert.equal(disposed.status, 200);
+    assert.equal((await call(path, body, alice.token)).status, 200);
+  } finally {
+    db.close();
+  }
+});
+
 test('HTTP attempts enforce operator/device ownership and cannot bypass reservations via legacy routes', async () => {
   const {db, call, alice, bob} = await setup();
   try {

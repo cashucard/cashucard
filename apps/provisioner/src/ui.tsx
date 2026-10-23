@@ -43,7 +43,12 @@ export function Screen({
       {title || onBack || headerRight ? (
         <View style={s.header}>
           {onBack ? (
-            <Pressable onPress={onBack} hitSlop={12} testID="back">
+            <Pressable
+              onPress={onBack}
+              hitSlop={12}
+              testID="back"
+              accessibilityRole="button"
+              accessibilityLabel="Back">
               <Text style={s.back}>‹ Back</Text>
             </Pressable>
           ) : null}
@@ -85,6 +90,9 @@ export function PrimaryButton({
   return (
     <Pressable
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{disabled: !!disabled}}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -114,6 +122,9 @@ export function SecondaryButton({
   return (
     <Pressable
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{disabled: !!disabled}}
       disabled={disabled}
       onPress={onPress}
       style={[s.secondary, disabled && s.primaryDisabled]}>
@@ -132,7 +143,13 @@ export function GearButton({
   const t = useTheme();
   const s = styles(t);
   return (
-    <Pressable onPress={onPress} hitSlop={12} testID={testID} style={s.gear}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      testID={testID}
+      style={s.gear}
+      accessibilityRole="button"
+      accessibilityLabel="Settings">
       <Gear size={22} color={t.dim} />
     </Pressable>
   );

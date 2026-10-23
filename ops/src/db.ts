@@ -177,6 +177,13 @@ export const MIGRATIONS: readonly string[] = [
      action TEXT NOT NULL CHECK (action IN ('create','disable','enable','reset-password')),
      created INTEGER NOT NULL
    );`,
+  // 8. Immutable batch closure fences unused, pre-escrowed ordinals.
+  `CREATE TABLE provisioning_batch_closures (
+     batch_id INTEGER PRIMARY KEY REFERENCES provisioning_batches(batch_id),
+     reason TEXT NOT NULL CHECK (reason = 'operator-ended'),
+     next_ordinal INTEGER NOT NULL CHECK (next_ordinal >= 0),
+     closed_at INTEGER NOT NULL
+   );`,
 ];
 
 export interface DbOptions {

@@ -124,6 +124,21 @@ test('a bind conflict carries a bounded operation, not a request path', async ()
   });
 });
 
+test('end-batch sends a scoped closure request and labels a service conflict', async () => {
+  const {fetcher, bodies} = scriptedFetcher([
+    (url) => {
+      expect(url).toBe('https://ops.test/provisioning/batches/42/end');
+      return {status: 409, json: {reason: 'batch-active'}};
+    },
+  ]);
+  const service = new ApiClient({baseUrl: 'https://ops.test', fetcher})
+    .reservations({operator_id: 7, env: 'issued', token: 'secret'});
+  await expect(service.endBatch!('device', 42)).rejects.toMatchObject({
+    status: 409, reason: 'batch-active', operation: 'end-batch',
+  });
+  expect(bodies[0]).toEqual({device_id: 'device', reason: 'operator-ended'});
+});
+
 test('the outbox freezes the row body at first write and re-posts it byte-identical', async () => {
   const {fetcher, bodies} = scriptedFetcher([
     () => ({status: 503, json: {reason: 'upstream-unavailable'}}), // first try fails

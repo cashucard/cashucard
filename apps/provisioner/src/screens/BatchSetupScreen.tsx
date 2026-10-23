@@ -238,14 +238,16 @@ export function BatchSetupScreen({
   const [daily, setDaily] = useState('25.00');
   const [noPin, setNoPin] = useState('5.00');
   const [count, setCount] = useState(app.demo ? '250' : '12');
+  const maxCount = installationOnly ? 500 : 100000;
 
   const [creating, setCreating] = useState(false);
+  const [review, setReview] = useState<BatchConfig | null>(null);
   const countNumber = Number(count);
   const validCount =
     /^\d+$/.test(count) &&
     Number.isSafeInteger(countNumber) &&
     countNumber >= 1 &&
-    countNumber <= 100000;
+    countNumber <= maxCount;
   const validNumbers =
     validCount &&
     (installationOnly ||
@@ -258,6 +260,21 @@ export function BatchSetupScreen({
   const ready =
     canStart && !creating && (app.demo || (mint !== null && validNumbers));
 
+  const submit = async (config: BatchConfig) => {
+    if (onCreate) {
+      setCreating(true);
+      try {
+        if (await onCreate({...config, pinBatch: ''})) {
+          onStart();
+        }
+      } finally {
+        setCreating(false);
+      }
+    } else {
+      app.startBatch(config);
+      onStart();
+    }
+  };
   const start = async () => {
     if (!ready) {
       return;
@@ -273,18 +290,10 @@ export function BatchSetupScreen({
           noPinUsd: installationOnly ? 0 : Number(noPin),
           count: countNumber,
         };
-    if (onCreate) {
-      setCreating(true);
-      try {
-        if (await onCreate({...config, pinBatch: ''})) {
-          onStart();
-        }
-      } finally {
-        setCreating(false);
-      }
+    if (installationOnly) {
+      setReview(config);
     } else {
-      app.startBatch(config);
-      onStart();
+      await submit(config);
     }
   };
 
@@ -320,6 +329,50 @@ export function BatchSetupScreen({
   const mints = app.demo ? DEMO_MINTS : serviceMints ?? [];
 
   const customMint = mint !== null && !mints.includes(mint);
+
+  if (installationOnly && review) {
+    return (
+      <Screen title="Review batch" onBack={() => setReview(null)}>
+        <View style={s.grow}>
+          <View style={s.section}>
+            <Text style={s.sectionHeader}>Installation batch</Text>
+            <View style={s.card}>
+              <View style={s.fieldRow}>
+                <Text style={s.fieldLabel}>Cards</Text>
+                <Text style={s.mintName}>{review.count}</Text>
+              </View>
+              <View style={s.divider} />
+              <View style={s.fieldRow}>
+                <Text style={s.fieldLabel}>Mint reference</Text>
+                <Text style={s.mintName}>{review.mint}</Text>
+              </View>
+            </View>
+            <Text style={s.buildLine}>
+              Creating this batch assigns manager keys for every slot. The mint
+              reference is for the operator record; no mint, PIN or limits are
+              written to the card.
+            </Text>
+          </View>
+          <View style={s.footer}>
+            <PrimaryButton
+              title="CREATE BATCH"
+              testID="confirm-start-batch"
+              disabled={creating || !canStart}
+              onPress={() => {
+                submit(review);
+              }}
+            />
+            <SecondaryButton
+              title="EDIT BATCH"
+              testID="edit-batch"
+              disabled={creating}
+              onPress={() => setReview(null)}
+            />
+          </View>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -533,22 +586,26 @@ export function BatchSetupScreen({
                   accessibilityRole="button"
                   accessibilityLabel="Increase cards in batch"
                   accessibilityState={{
-                    disabled: app.demo || countNumber >= 100000,
+                    disabled: app.demo || countNumber >= maxCount,
                   }}
-                  disabled={app.demo || countNumber >= 100000}
+                  disabled={app.demo || countNumber >= maxCount}
                   onPress={() =>
                     setCount(String(validCount ? countNumber + 1 : 1))
                   }
                   style={[
                     s.countStep,
-                    (app.demo || countNumber >= 100000) && s.countStepDisabled,
+                    (app.demo || countNumber >= maxCount) &&
+                      s.countStepDisabled,
                   ]}
                   testID="batch-count-increment">
                   <Text style={s.countStepText}>+</Text>
                 </Pressable>
               </View>
               {!app.demo && !validCount ? (
-                <Text style={s.countError}>Enter 1 to 100,000 cards.</Text>
+                <Text
+                  style={
+                    s.countError
+                  }>{`Enter 1 to ${maxCount.toLocaleString()} cards.`}</Text>
               ) : null}
             </View>
           </View>

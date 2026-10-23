@@ -370,11 +370,11 @@ most recent successful administrative mutations. These endpoints require the
 allowlisted administrator's bearer token. No password/hash is returned or
 recorded in the audit trail.
 
-New recovery artifacts use export format v3, preserving account disabled state
-and the full administrative audit trail. Use the updated recovery CLI from this
-revision or later: older restore tools reject v3. The new CLI still restores
-v1/v2 backups. All restored passwords remain disabled until controlled recovery,
-and the provisioning reconciliation fence remains enabled.
+New recovery artifacts use export format v4, preserving account disabled state,
+the administrative audit trail, and ended-batch fences. Use the recovery CLI
+from this revision or later: older restore tools reject v4. The CLI still
+restores v1/v2/v3 backups. All restored passwords remain disabled until
+controlled recovery, and the provisioning reconciliation fence remains enabled.
 
 `GET /admin/provisioning/attempts` and the console's read-only support section
 show the 100 most recent attempt identities, states and chip bindings. They

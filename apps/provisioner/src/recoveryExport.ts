@@ -10,12 +10,14 @@ export interface PublicFailureContext {
 }
 
 const OPERATIONS = new Set<ServiceOperation>([
-  'create-batch', 'reserve-attempt', 'read-attempt', 'bind-card',
+  'create-batch', 'end-batch', 'reserve-attempt', 'read-attempt', 'bind-card',
   'issue-keys', 'record-installation', 'record-disposition',
 ]);
 
 const REASONS = new Set([
   'batch-request-changed',
+  'batch-active',
+  'batch-ended',
   'attempt-request-changed',
   'ordinal-not-next',
   'device-active',
