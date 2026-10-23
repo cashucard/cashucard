@@ -4,42 +4,38 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Cashu Card is an open NFC ecash protocol for wallets, cards and payment terminals. Explore the flow, specification and open source implementations." />
-    <meta property="og:title" content="Cashu Card | Ecash in your hand" />
-    <meta property="og:description" content="One open card protocol for wallets, cards and payment terminals." />
+    <meta name="description" content="Cashu Card is an open NFC ecash protocol for wallets and payment terminals. Read the draft specification and explore the code." />
+    <meta property="og:title" content="Cashu Card | Open NFC ecash protocol" />
+    <meta property="og:description" content="An open NFC card protocol for wallets and payment terminals." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://cashucard.org/" />
     <link rel="canonical" href="https://cashucard.org/" />
     <link rel="icon" href="/assets/cashu.png" />
     <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
-    <script src="/site.js" defer></script>
-    <title>Cashu Card | Ecash in your hand</title>
+    <title>Cashu Card | Open NFC ecash protocol</title>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
       <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu.png" alt="" width="32" height="37" /><span>cashu<span>card</span></span></a>
-      <nav aria-label="Main navigation"><a href="#story">How it works</a><a href="#source">Source &amp; spec</a></nav>
+      <nav aria-label="Main navigation"><a href="#source">Protocol and code</a></nav>
       <a class="header-link" href="https://github.com/lnflash/cashu-card">GitHub <span aria-hidden="true">↗</span></a>
     </header>
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-copy">
-          <div class="eyebrow"><span class="status-dot"></span> OPEN CARD PROTOCOL <span class="eyebrow-divider">/</span> DRAFT 2.1</div>
+          <div class="eyebrow"><span class="status-dot"></span> OPEN NFC PROTOCOL <span class="eyebrow-divider">/</span> DRAFT 2.1</div>
           <h1 id="hero-title">Cashu,<br /><em>in your hand.</em></h1>
-          <p>One NFC card protocol for wallets, payment terminals and card makers.</p>
+          <p>An open NFC card protocol for wallets and payment terminals.</p>
           <div class="hero-actions">
-            <a class="button button-bright" href="#story">Watch the flow <span aria-hidden="true">↓</span></a>
-            <a class="button button-outline" href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md">Read the protocol <span aria-hidden="true">↗</span></a>
+            <a class="button button-bright" href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md">Read the draft <span aria-hidden="true">↗</span></a>
+            <a class="button button-outline" href="#source">Browse the code <span aria-hidden="true">↓</span></a>
           </div>
-          <div class="hero-meta"><span>OPEN SOURCE</span><span class="meta-line"></span><span>MIT LICENSE</span></div>
         </div>
         <div class="hero-visual" aria-hidden="true">
           <div class="hero-halo halo-one"></div><div class="hero-halo halo-two"></div><div class="hero-halo halo-three"></div>
-          <span class="visual-caption caption-top">WALLET <i>→</i> CARD</span>
-          <span class="visual-caption caption-bottom">CARD <i>→</i> TERMINAL</span>
           <div class="hero-card-shadow"></div>
           <div class="card-underlay"><span>CASHU / OPEN ECASH</span></div>
           <div class="hero-card product-card" data-finish="sage">
@@ -51,60 +47,16 @@
           </div>
           <span class="visual-cross cross-a">+</span><span class="visual-cross cross-b">+</span>
         </div>
-        <div class="hero-footer"><span>WALLET / CARD / TERMINAL / MINT</span><span class="hero-footer-rule"></span><a href="#story">SCROLL TO SEE THE EXCHANGE <span aria-hidden="true">↓</span></a></div>
-      </section>
-      <section class="story" id="story" aria-labelledby="story-title">
-        <div class="story-heading">
-          <div><span class="section-kicker">THE CARD FLOW <span>/</span> 01–04</span><h2 id="story-title">One card.<br />Four moments.</h2></div>
-          <p>Follow the card from setup to settlement.</p>
-        </div>
-        <div class="story-film" data-step="0" data-phase="ready">
-          <div class="film-corner top-left" aria-hidden="true">+</div><div class="film-corner top-right" aria-hidden="true">+</div>
-          <div class="film-corner bottom-left" aria-hidden="true">+</div><div class="film-corner bottom-right" aria-hidden="true">+</div>
-          <div class="film-top"><span id="film-number">01 / 04</span><span>THE CARD, IN MOTION <span class="film-live">●</span></span></div>
-          <div class="film-stage" aria-hidden="true">
-            <div class="film-grid"></div>
-            <div class="film-orbit orbit-a"></div><div class="film-orbit orbit-b"></div>
-            <div class="film-device"><div class="device-screen"><span class="device-eyebrow">CASHU</span><strong class="device-title">PROVISIONER</strong><span class="device-progress"><i></i></span><span class="device-caption">INSTALL APPLET</span></div></div>
-            <div class="film-mint"><div class="mint-mark">◈</div><span>MINT</span></div>
-            <div class="film-terminal"><div class="terminal-display"><span>◉</span><b>REQUEST</b></div><div class="terminal-keypad"><i></i><i></i><i></i></div></div>
-            <div class="film-card product-card" data-finish="sage"><div class="film-card-face"><div class="film-card-top"><span class="film-card-name">cashu<span>card</span></span><span class="film-card-radio">◖))</span></div><div class="film-card-chip"><i></i><i></i><i></i></div><img src="/assets/cashu.png" alt="" width="90" height="103"/><div class="film-card-foot">OPEN ECASH <span>↗</span></div></div><div class="film-card-back">CASHU / 2.1<br><span>ONE OPEN WIRE</span></div></div>
-            <div class="film-proof proof-one">◈</div><div class="film-proof proof-two">◈</div><div class="film-proof proof-three">◈</div>
-            <div class="film-signal signal-one"></div><div class="film-signal signal-two"></div><div class="film-signal signal-three"></div>
-            <div class="film-leader leader-one"></div><div class="film-leader leader-two"></div>
-            <div class="film-callout callout-one"><span>01</span><strong id="callout-one">APPLET INSTALLED</strong></div>
-            <div class="film-callout callout-two"><span>02</span><strong id="callout-two">READY FOR HOLDER</strong></div>
-            <div class="film-status-badge"><span class="badge-icon">✓</span><span id="film-badge">READY FOR HOLDER</span></div>
-          </div>
-          <div class="film-bottom"><span id="film-status">01 / PROVISION</span><span class="film-rule"></span><span>CARD AUTHORIZES · MINT SETTLES</span></div>
-          <div class="film-progress" aria-hidden="true"><i></i></div>
-        </div>
-        <div class="story-controls">
-          <div class="story-steps" role="tablist" aria-label="Card flow steps">
-            <button type="button" role="tab" id="step-0" data-step="0" aria-selected="true" aria-controls="story-panel"><span>01</span> Provision</button>
-            <button type="button" role="tab" id="step-1" data-step="1" aria-selected="false" aria-controls="story-panel" tabindex="-1"><span>02</span> Load</button>
-            <button type="button" role="tab" id="step-2" data-step="2" aria-selected="false" aria-controls="story-panel" tabindex="-1"><span>03</span> Tap</button>
-            <button type="button" role="tab" id="step-3" data-step="3" aria-selected="false" aria-controls="story-panel" tabindex="-1"><span>04</span> Settle</button>
-          </div>
-          <button type="button" class="story-play" aria-label="Play story"><span aria-hidden="true">▶</span> <span class="play-label">Play</span></button>
-        </div>
-        <div class="story-detail" id="story-panel" role="tabpanel" aria-labelledby="step-0" tabindex="0">
-          <div><span class="detail-number">01 / PROVISION</span><h3 id="detail-title">A provisioner installs the applet.</h3></div>
-          <p id="detail-copy">The card is ready for a holder's wallet to take ownership.</p>
-          <button class="motion-toggle" type="button" aria-pressed="false">Reduce motion <span aria-hidden="true">◌</span></button>
-        </div>
-        <div class="source" id="source">
-          <div class="source-lead"><span class="section-kicker">BUILD ON IT</span><strong>Open source.<br />Free to build on.</strong><small>Draft protocol · MIT license</small></div>
-          <div class="source-links" aria-label="Protocol and implementations">
-            <a href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md"><span>SPECIFICATION</span><strong>Protocol <i aria-hidden="true">↗</i></strong></a>
-            <a href="https://github.com/lnflash/cashu-card"><span>REFERENCE APPLET &amp; TOOLS</span><strong>Cashu Card <i aria-hidden="true">↗</i></strong></a>
-            <a href="https://github.com/lnflash/flash-mobile"><span>WALLET</span><strong>Flash Mobile <i aria-hidden="true">↗</i></strong></a>
-            <a href="https://github.com/getfoxy/iOS"><span>WALLET</span><strong>Foxy <i aria-hidden="true">↗</i></strong></a>
-            <a href="https://github.com/lnflash/flash-pos"><span>TERMINAL</span><strong>Flash POS <i aria-hidden="true">↗</i></strong></a>
-          </div>
-        </div>
+        <div class="hero-footer"><span class="hero-footer-rule"></span><a href="#source">Explore the source <span aria-hidden="true">↓</span></a></div>
       </section>
     </main>
-    <footer><span>© CASHU CARD · OPEN PROTOCOL</span><a href="https://github.com/lnflash/cashu-card/blob/main/LICENSE">License &amp; credits ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></footer>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md">Draft specification ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/lnflash/cashu-card">Cashu Card ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="https://github.com/lnflash/flash-mobile">Flash Mobile ↗</a><a href="https://github.com/getfoxy/iOS">Foxy ↗</a><a href="https://github.com/lnflash/flash-pos">Flash POS ↗</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · OPEN PROTOCOL</span><a href="https://github.com/lnflash/cashu-card/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
   </body>
 </html>

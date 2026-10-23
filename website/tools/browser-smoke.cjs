@@ -94,12 +94,6 @@ async function main() {
       }
       throw Error("Timed out: " + label);
     };
-    const click = (selector) =>
-      evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
-    const fill = (selector, value) =>
-      evaluate(
-        `(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('input',{bubbles:true}));})()`,
-      );
     const screenshot = async (name) => {
       const { data } = await send("Page.captureScreenshot", {
         format: "png",
@@ -125,136 +119,48 @@ async function main() {
     });
     await viewport(1440, 900);
     await send("Page.navigate", { url: origin });
-    await until("!!document.querySelector('.story-film')", "story loaded");
-    assert.ok(await evaluate("!!document.querySelector('.film-card') && !!document.querySelector('.film-device') && !!document.querySelector('.film-mint')"), "One card travels through the physical protocol story");
+    await until("!!document.querySelector('#source')", "source section loaded");
     await evaluate("document.fonts.ready");
-    assert.ok(
-      await evaluate("document.body.innerText.trim().split(/\s+/).length < 240"),
-      "Concise page copy",
-    );
-    assert.ok(
-      await evaluate("document.documentElement.scrollHeight <= innerHeight * 2.45"),
-      "Desktop page fits roughly two screens",
-    );
-    assert.equal(
-      await evaluate("getComputedStyle(document.querySelector('.film-card')).animationName"),
-      "none",
-      "System reduced motion stops card animation",
-    );
-    assert.equal(
-      await evaluate("document.querySelector('.story-film').dataset.step"),
-      "0",
-      "Reduced motion starts on first frame",
-    );
-    await screenshot("01-hero-desktop");
-    await evaluate("document.querySelector('#story').scrollIntoView()");
-    await screenshot("02-story-desktop");
-    for (let i = 0; i < 4; i++) {
-      await click("#step-" + i);
-      assert.equal(
-        await evaluate("document.querySelector('.story-film').dataset.step"),
-        String(i),
-        "Step " + i,
-      );
-      assert.equal(
-        await evaluate("document.querySelectorAll('.story-steps [aria-selected=true]').length"),
-        1,
-      );
-    }
-    await evaluate("document.querySelector('#step-0').focus()");
-    await send("Input.dispatchKeyEvent", {
-      type: "keyDown",
-      key: "End",
-      code: "End",
-      windowsVirtualKeyCode: 35,
-    });
-    assert.equal(
-      await evaluate("document.querySelector('.story-film').dataset.step"),
-      "3",
-    );
+    assert.equal(await evaluate("!!document.querySelector('#story')"), false, "Four-step section is gone");
+    assert.equal(await evaluate("document.querySelectorAll('h1').length"), 1, "One page heading");
+    assert.equal(await evaluate("document.querySelectorAll('script[src]').length"), 0, "Unused story script is gone");
+    assert.ok(await evaluate("document.body.innerText.trim().split(/\s+/).length < 100"), "Copy stays concise");
+    assert.ok(await evaluate("document.documentElement.scrollHeight <= innerHeight * 1.65"), "Desktop page stays short");
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
+    assert.ok(await evaluate("document.querySelector('.button-bright').href.includes('/spec/NUT-XX.md')"), "Primary action opens the draft");
+    assert.equal(await evaluate("document.querySelector('.button-outline').hash"), "#source", "Secondary action reaches the code");
+    assert.equal(await evaluate("document.querySelector('#source').tagName"), "FOOTER", "Source links live in the footer");
+    assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===3)"), true, "Apps are grouped in the footer");
+    assert.equal(await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>!!document.querySelector(a.hash))"), true, "Every page anchor exists");
     for (const repo of [
-      "lnflash/cashu-card",
-      "lnflash/flash-mobile",
-      "getfoxy/iOS",
-      "lnflash/flash-pos",
+      "lnflash/cashu-card", "lnflash/flash-mobile", "getfoxy/iOS", "lnflash/flash-pos",
     ]) {
-      assert.ok(
-        await evaluate("[...document.querySelectorAll('a[href]')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"),
-        "Linked source " + repo,
-      );
+      assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
     }
-    assert.ok(
-      await evaluate("[...document.querySelectorAll('a[href]')].some(a=>a.href.includes('/spec/NUT-XX.md'))"),
-      "Protocol spec linked",
-    );
-    assert.equal(
-      await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>a.hash===''||!!document.querySelector(a.hash))"),
-      true,
-      "Internal anchors exist",
-    );
+    await screenshot("01-home-desktop");
+    await evaluate("document.querySelector('#source').scrollIntoView()");
+    await screenshot("02-source-desktop");
     for (const [width, height, maxScreens] of [
-      [1024, 768, 2.8],
-      [768, 900, 3.1],
-      [390, 844, 3.5],
-      [320, 740, 4.2],
+      [1024, 768, 2.1], [768, 900, 2.3], [390, 844, 2.5], [320, 740, 2.9],
     ]) {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
-      assert.equal(
-        await evaluate("document.documentElement.scrollWidth<=innerWidth"),
-        true,
-        "No overflow at " + width,
-      );
-      assert.ok(
-        await evaluate("document.documentElement.scrollHeight<=innerHeight*" + maxScreens),
-        "Compact page at " + width,
-      );
-      await screenshot("hero-" + width);
-      await evaluate("document.querySelector('#story').scrollIntoView()");
-      await screenshot("story-" + width);
-      if (width === 390) {
-        assert.equal(
-          await evaluate("(()=>{const a=document.querySelector('.callout-two').getBoundingClientRect(),b=document.querySelector('.film-status-badge').getBoundingClientRect();return a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top})()"),
-          true,
-          "Mobile callout is not covered by the settlement badge",
-        );
-      }
+      assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "No overflow at " + width);
+      assert.ok(await evaluate("document.documentElement.scrollHeight<=innerHeight*" + maxScreens), "Short page at " + width);
+      await screenshot("home-" + width);
+      await evaluate("document.querySelector('#source').scrollIntoView()");
+      await screenshot("source-" + width);
     }
     await viewport(1440, 900);
-    await click(".motion-toggle");
-    assert.equal(
-      await evaluate("document.documentElement.dataset.motion"),
-      "full",
-    );
-    await click("#step-0");
-    await click(".story-play");
-    assert.equal(
-      await evaluate("getComputedStyle(document.querySelector('.film-card')).animationName"),
-      "film-card-provision",
-      "Play animates the physical card",
-    );
-    await new Promise((r) => setTimeout(r, 700));
-    await screenshot("03-transfer-in-motion");
-    await until("document.querySelector('.story-film').dataset.step==='1'", "story advances");
-    assert.equal(
-      await evaluate("getComputedStyle(document.querySelector('.film-proof')).animationName"),
-      "proof-travel",
-      "Loading animates mint proofs toward the card",
-    );
-    await click(".story-play");
-    assert.equal(
-      await evaluate("document.querySelector('.story-play').getAttribute('aria-label')"),
-      "Replay story",
-      "The story can be stopped",
-    );
-    assert.deepEqual(errors, [], "No browser exceptions");
     await send("Page.navigate", { url: origin + "/concepts.html" });
-    await until("document.querySelectorAll('.concept-option').length===3", "Three card finishes load");
-    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Card finishes fit desktop");
-    await screenshot("04-card-finishes");
+    await until("document.querySelectorAll('.concept-option').length===3", "Card artwork options load");
+    assert.equal(await evaluate("document.querySelector('meta[name=robots]').content"), "noindex,nofollow", "Artwork options stay unindexed");
+    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Artwork options fit desktop");
+    await screenshot("03-card-options");
     await viewport(390, 844);
-    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Card finishes fit mobile");
-    console.log("PASS: compact responsive story, meaningful controls, source links, reduced motion");
+    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Artwork options fit mobile");
+    assert.deepEqual(errors, [], "No browser exceptions");
+    console.log("PASS: short landing page, direct source links, responsive artwork options, reduced motion");
     console.log("Screenshots: " + output);
   } finally {
     if (socket) socket.close();
