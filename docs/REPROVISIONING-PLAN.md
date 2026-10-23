@@ -74,3 +74,10 @@ inspection and consent, fences the chip/device, and retains those rows through
 export v5. It has no HTTP reset or key-release route yet. Completion evidence,
 cross-origin source import, reconciliation and cardkit execution must be in
 place before exposing the feature.
+
+Cardkit now implements the reset against a fake card: exact-chip/public-key
+inspection, durable deletion intent, observed registry ownership, ordered
+removal, durable rotation intent and confirmed factory keys. Tests cut before
+and after each destructive command and simulate failed journal commits. This
+has not run on a physical card. Service completion, historical escrow import,
+stopped-attempt reconciliation and the phone UI still gate a real reset.
