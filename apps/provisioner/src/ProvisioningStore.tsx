@@ -414,6 +414,7 @@ export function ProvisioningProvider({
         return false;
       }
       const session = actor.session;
+      const generation = actorGeneration.current;
       busyRef.current = true;
       cancelRequested.current = false;
       if (!resetOperation) {
@@ -432,6 +433,8 @@ export function ProvisioningProvider({
             const current = latest.current;
             if (
               !mounted.current ||
+              controller.signal.aborted ||
+              actorGeneration.current !== generation ||
               current.session?.token !== session.token ||
               current.serviceUrl !== actor.serviceUrl
             ) {

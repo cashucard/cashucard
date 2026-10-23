@@ -1025,3 +1025,26 @@ test('stale independent backup pauses before NFC and retains the reserved attemp
     'Card changes are paused until the service has a fresh independent backup. Your work is saved. Ask your administrator to check backups, then retry.',
   );
 });
+
+test('a canceled operation waiting for the shared queue never arms a later card session', async () => {
+  const f = fixture();
+  const resetWithCard = jest.fn(async () => {throw new Error('canceled read must not arm');});
+  const options = {...f, serviceFor: () => f.service, resetWithCard};
+  await mount(options);
+  await signIn();
+  const first = flow;
+  await mount(options);
+  await signIn();
+  const second = flow;
+  const create = f.service.batch;
+  let release!: () => void;
+  f.service.batch = jest.fn(request => new Promise<RemoteBatch>(resolve => {
+    release = () => {resolve(create(request));};
+  }));
+  let creating!: Promise<boolean>, reading!: Promise<boolean>;
+  await act(async () => {creating = first.create(config);});
+  await act(async () => {reading = second.inspectStatus();});
+  await act(async () => second.cancel());
+  await act(async () => {release(); await creating; expect(await reading).toBe(false);});
+  expect(resetWithCard).not.toHaveBeenCalled();
+});

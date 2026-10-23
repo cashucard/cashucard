@@ -34,7 +34,8 @@ Settings, support details and read-only tools remain reachable.
 ## Verification
 
 Focused regressions cover the saved-reset exit, hardware-Back priority, canceled
-sign-in and ignored late responses, service-only read cancellation, mint and
+sign-in and ignored late responses, cancellation before a queued operation can
+arm NFC, service-only read cancellation, mint and
 HTTP body cancellation, exact reset-state retention, and suppression of automatic
 record retries after Stop. All existing interrupted-install, source/actor,
 quarantine, immutable-record and reset tests still run. Tests use fixture
