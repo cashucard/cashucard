@@ -321,6 +321,31 @@ The 13 spent entries have not been cleared. Preparing it for another actual
 installation requires a separately reviewed settlement audit/cleanup and reset;
 the final read-only checkpoint does not authorize those writes.
 
+## Read-only settlement audit
+
+After PR #125 passed all 30 CI checks and merged as
+`1779f5537d4f6166cbe73b05e34922addb615ac4`, the operator separately approved
+the [bounded audit plan](SPENT-SETTLEMENT-AUDIT-PLAN.md). It ran once from
+that commit against the same card on the ACS ACR122U PICC Interface, with
+the Homebrew Python/pyscard environment. At **2026-10-23T20:28:24Z**
+(Unix `1792787304`), the summary reported:
+
+- Exact CPLC and full applet public key matched the installation above.
+- **0 unspent**, **13 spent**; the mint confirmed all 13 unique derived proof
+  identifiers **SPENT** through its read-only `/v1/checkstate` query.
+- Retained face value: **61 sats**. Denominations: three each of 1, 2, 4 and
+  8 sats, and one 16-sat entry.
+- Evidence SHA-256:
+  `5b872dd483bce1bd5dabe38e5fa150968f3151a464513ec04d1bf88566cfe35f`.
+- **No authentication or writes**. Raw proof fields and derived identifiers
+  remained in private pipe/process memory and were not printed or saved.
+
+Only the public summary was retained locally. This establishes the mint's
+spent-state responses for the retained entries at that observation time;
+it does not export the merchant ledger, prove a particular change plan, or
+authorize clearing/resetting the card. The 13 entries remain on the chip.
+A later write requires fresh checks and separate device/action approval.
+
 ## Not covered
 
 - The intended forced-change subcheck has no explicit receipt/input-plan
