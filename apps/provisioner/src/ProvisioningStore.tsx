@@ -27,6 +27,7 @@ import {
   type OwnedResetRun,
 } from './ownedResetWorkflow';
 import {mintSettlementJson} from './mintSettlement';
+import {readCardStatus, type CardReadout} from './cardStatus';
 import type {JournalStorage} from './journal';
 import {
   ProvisioningWorkflow,
@@ -143,6 +144,9 @@ interface RealProvisioning {
   }): Promise<boolean>;
   continueReset(pin?: string): Promise<boolean>;
   dismissResetReview(): void;
+  cardReadout: {readout: CardReadout; source?: ResetLookup} | null;
+  inspectStatus(): Promise<boolean>;
+  dismissCardReadout(): void;
 }
 const Ctx = createContext<RealProvisioning | null>(null);
 const message = (e: unknown): string => {
@@ -252,6 +256,10 @@ export function ProvisioningProvider({
   const [status, setStatus] = useState<RealProvisioning['status']>('loading');
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot | null>(null);
   const [resetState, setResetState] = useState<OwnedResetState | null>(null);
+  const [cardReadout, setCardReadout] = useState<{
+    readout: CardReadout;
+    source?: ResetLookup;
+  } | null>(null);
   const [resetReview, setResetReview] = useState<{
     card: ResetReview;
     source: ResetLookup;
@@ -302,6 +310,7 @@ export function ProvisioningProvider({
     setInterruption(null);
     setReplacement(null);
     setResetReview(null);
+    setCardReadout(null);
     setLoadProgress(null);
     drill.current?.cancel();
     const cancel = armedCancel.current;
@@ -737,6 +746,27 @@ export function ProvisioningProvider({
   };
 
   const value: RealProvisioning = {
+    cardReadout,
+    dismissCardReadout: () => setCardReadout(null),
+    inspectStatus: () =>
+      operate(async () => {
+        setCardReadout(null);
+        const generation = actorGeneration.current;
+        const readout = await resetCard(readCardStatus);
+        if (generation !== actorGeneration.current) {
+          throw new TransportError('Read cancelled');
+        }
+        setCardReadout({readout});
+        if (readout.state === 'present') {
+          const source = await resetService().lookup(
+            readout.chipId,
+            readout.card.installationId,
+          );
+          if (generation === actorGeneration.current) {
+            setCardReadout({readout, source});
+          }
+        }
+      }, true),
     resetState,
     resetReview,
     dismissResetReview: () => setResetReview(null),

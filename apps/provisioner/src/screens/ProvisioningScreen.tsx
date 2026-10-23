@@ -116,9 +116,11 @@ export function BatchHistory({
 export function ProvisioningScreen({
   onSettings,
   onReset,
+  onCheck,
 }: {
   onSettings: () => void;
   onReset?: () => void;
+  onCheck?: () => void;
 }) {
   const flow = useProvisioning();
   const t = useTheme();
@@ -231,6 +233,14 @@ export function ProvisioningScreen({
   if (!snapshot.batch) {
     return (
       <View style={s.grow}>
+        {onCheck ? (
+          <SecondaryButton
+            title="CHECK AN EXISTING CARD"
+            testID="open-card-status"
+            onPress={onCheck}
+            disabled={flow.busy}
+          />
+        ) : null}
         {!flow.hardwareValidated ? (
           <View style={s.card}>
             <Dim>{GATE}</Dim>

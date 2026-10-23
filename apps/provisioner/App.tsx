@@ -31,6 +31,7 @@ import {
 } from './src/ProvisioningStore';
 import {CardIdentityScreen} from './src/screens/CardIdentityScreen';
 import {ResetCardScreen} from './src/screens/ResetCardScreen';
+import {CardStatusScreen} from './src/screens/CardStatusScreen';
 import {ProvisioningScreen} from './src/screens/ProvisioningScreen';
 import {BENCH_RUNS_ENABLED} from './src/releaseGates';
 
@@ -41,7 +42,8 @@ type Route =
   | 'settings'
   | 'bench'
   | 'identity'
-  | 'reset';
+  | 'reset'
+  | 'status';
 
 const benchStyles = {
   benchWrap: {flex: 1} as const,
@@ -63,19 +65,23 @@ function Navigator(): React.JSX.Element {
 
   if (
     !app.demo &&
-    !['settings', 'bench', 'identity', 'reset'].includes(route)
+    !['settings', 'bench', 'identity', 'reset', 'status'].includes(route)
   ) {
     return (
       <ProvisioningScreen
         onSettings={() => setRoute('settings')}
         onReset={() => setRoute('reset')}
+        onCheck={() => setRoute('status')}
       />
     );
   }
 
   // A stale/direct route cannot mount laboratory write controls in this build.
   const visibleRoute =
-    route === 'bench' && !BENCH_RUNS_ENABLED ? 'settings' : route;
+    (route === 'bench' && !BENCH_RUNS_ENABLED) ||
+    (app.demo && ['reset', 'status'].includes(route))
+      ? 'settings'
+      : route;
   switch (visibleRoute) {
     case 'settings':
       return (
@@ -96,6 +102,15 @@ function Navigator(): React.JSX.Element {
               ? () => {
                   if (!recovery.busy) {
                     setRoute('reset');
+                  }
+                }
+              : undefined
+          }
+          onStatus={
+            !app.demo && app.session
+              ? () => {
+                  if (!recovery.busy) {
+                    setRoute('status');
                   }
                 }
               : undefined
@@ -122,6 +137,14 @@ function Navigator(): React.JSX.Element {
         <ResetCardScreen
           onBack={() => setRoute('settings')}
           onInstall={() => setRoute('setup')}
+        />
+      );
+    case 'status':
+      return (
+        <CardStatusScreen
+          onBack={() => setRoute('settings')}
+          onInstall={() => setRoute('setup')}
+          onReset={() => setRoute('reset')}
         />
       );
     case 'bench':
