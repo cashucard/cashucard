@@ -1,6 +1,6 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **fresh provisioning/post-check passed; holder setup and first load reported complete; merchant tests pending**.
+Status: **fresh provisioning/post-check passed; holder setup, load and first online payment reported complete; change/offline/final-payment checks pending**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
 100-sat cumulative funding/fees cap. No funds have moved in this run.
@@ -209,12 +209,26 @@ networking is on, no older Cashu settlements are pending, and the prepared
 charge is exactly **8 sats**. They were asked to complete that one charge,
 follow its private PIN/NFC prompts, then re-read the card in Flash and report
 the merchant receipt status, fee/change and remaining card balance. The
-fee-free expected balance is 53 sats; that is a prediction, not an observed
-result. No merchant payment or settlement result has been reported yet.
+fee-free expected balance was 53 sats.
+
+## First online payment — 8 sats
+
+The operator reported that the 8-sat payment succeeded on Pixel and that a
+fresh read in Flash showed **53 sats**. The observed card debit therefore
+equals the bill: **61 − 8 = 53**, with no additional card debit observed.
+This confirms the operator-observed payment and card balance; no separate
+merchant receipt or mint settlement record has been exported to the agent.
+
+Before the next bill, the operator was asked to check that the first payment
+has no pending settlement or change owed. A settled merchant till balance
+awaiting Lightning payout is distinguished from an unsettled card payment.
+If clear, the next approved online bill is **9 sats**, followed by every
+required change-return tap and another fresh card balance. Its fee-free
+expected remaining balance is 44 sats; this is not yet an observed result.
 
 ## Not covered
 
-Independent owner-recovery restoration on another phone, online payment/change,
+Independent owner-recovery restoration on another phone, returned change and independent mint-settlement evidence,
 offline acceptance/settlement, final balance, Max terminal coverage and the
 Apple review video have not run. Applet absence alone is not a fresh
 verification of factory manager keys; that evidence remains the prior reset
