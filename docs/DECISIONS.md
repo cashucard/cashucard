@@ -2512,7 +2512,8 @@ accurate place to learn the transaction flow.
 the footer instead of a standalone “Protocol and code” section. Group the
 Flash Mobile, Foxy and Flash POS links under “Apps”; keep separate Protocol
 and Source groups for the draft specification and Cashu Card repository.
-The hero's code action and navigation scroll to this footer. Keep the link
+The navigation scrolls to this footer. D85 changes the hero's code action to
+a direct source link. Keep the link
 labels simple and preserve draft status, license and operator-console links.
 
 **Why:** the separate source section gave a small set of links more visual
@@ -2520,3 +2521,14 @@ weight than it needed after the story was removed. A grouped footer makes
 the one-screen landing page easier to scan. Rejected individual app cards
 because they added bulk and suggested a stronger integration status than
 the links alone establish.
+
+## D85 — Direct code action on the short public page
+
+**Decided (2026-10-22):** Make “Browse the code” open the Cashu Card source
+repository directly. Keep the footer's grouped source links for visitors who
+want a specific protocol or application repository.
+
+**Why:** once the source links moved into the compact footer, that footer was
+already visible at common desktop heights. An in-page anchor produced no
+visible response to the button. A direct repository link matches its label
+and produces a clear action.
