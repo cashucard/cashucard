@@ -128,7 +128,7 @@ async function main() {
     assert.ok(await evaluate("document.documentElement.scrollHeight <= innerHeight * 1.65"), "Desktop page stays short");
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
     assert.ok(await evaluate("document.querySelector('.button-bright').href.includes('/spec/NUT-XX.md')"), "Primary action opens the draft");
-    assert.equal(await evaluate("document.querySelector('.button-outline').hash"), "#source", "Secondary action reaches the code");
+    assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/lnflash/cashu-card'"), "Secondary action opens the source repository");
     assert.equal(await evaluate("document.querySelector('#source').tagName"), "FOOTER", "Source links live in the footer");
     assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===3)"), true, "Apps are grouped in the footer");
     assert.equal(await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>!!document.querySelector(a.hash))"), true, "Every page anchor exists");
