@@ -184,11 +184,11 @@ test('the sign-in screen demo door enters demo mode with no session (design revi
   });
 });
 
-test('settings confirms sign-out while a saved batch exists', async () => {
+test('settings shows the public dashboard and confirms sign-out while a saved batch exists', async () => {
   let tree!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(() => {
     tree = ReactTestRenderer.create(
-      <AppStore>
+      <AppStore clientOptions={{baseUrl: 'https://api.example.test'}}>
         <SettingsScreen
           onBack={() => undefined}
           onBench={() => undefined}
@@ -210,6 +210,8 @@ test('settings confirms sign-out while a saved batch exists', async () => {
     .map(n => n.props.children)
     .join(' ');
   expect(words).toContain('Version 1.0.0 (6)');
+  expect(words).toContain('https://ops.cashucard.org');
+  expect(words).not.toContain('https://api.example.test');
   expect(words).toContain('CAP pin f27d92ba');
   tree.unmount();
 });

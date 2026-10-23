@@ -310,7 +310,7 @@ export function SettingsScreen({
               <Text style={s.loadSha}>
                 {SETTINGS.loadSha(CASHU_LOAD_FILE.sha256.slice(0, 8))}
               </Text>
-              <Text style={s.loadSha}>{app.serviceUrl}</Text>
+              <Text style={s.loadSha}>https://ops.cashucard.org</Text>
               <Text style={s.loadSha}>
                 {SETTINGS.capPin(CASHU_LOAD_FILE.capSha256.slice(0, 8))}
               </Text>
