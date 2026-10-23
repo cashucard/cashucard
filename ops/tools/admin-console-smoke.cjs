@@ -173,6 +173,13 @@ async function main() {
     });
     await viewport(1440, 1000);
     await until(`!!document.querySelector('#login-screen')`, 'sign-in page');
+    assert.equal(
+      await evaluate(
+        `document.querySelector('.skip-link').getAttribute('href')`,
+      ),
+      '#name',
+      'Sign-in skip link targets a visible control',
+    );
     await screenshot('01-sign-in-desktop');
     await viewport(390, 844);
     assert.equal(

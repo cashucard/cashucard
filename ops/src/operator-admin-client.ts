@@ -141,6 +141,8 @@ export const adminClient =
     $('operator-filter').value = 'all';
     $('attempt-filter').value = 'all';
     document.title = 'Flash · Card operations';
+    document.querySelector('.skip-link').href='#name';
+    document.querySelector('.skip-link').textContent='Skip to sign in';
     notice($('login-notice'), message, error);
   }
   async function revokeAndLock(message) {
@@ -792,6 +794,8 @@ export const adminClient =
         $('login-screen').hidden = true;
         $('admin').hidden = false;
         navigate('operators');
+        document.querySelector('.skip-link').href='#main';
+        document.querySelector('.skip-link').textContent='Skip to workspace';
         $('main').focus();
       } catch (e) {
         if (token) await revokeAndLock(e.message);
