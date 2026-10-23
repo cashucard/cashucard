@@ -95,3 +95,10 @@ named-card drill. Default preview matched card 09336320's exact historical
 source without accessing a card or key bytes. Fake integration tests cover a
 lost DELETE reply and a lost completion acknowledgement. The physical reset
 still requires approval of [its exact plan](OWNED-CARD-RESET-DRILL.md).
+
+The first approved physical reset has now passed on J3R180 card 09336320:
+Cashu package absent, factory manager keys verified at version 1, original
+escrow/history retained and completion saved. See the
+[hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md).
+Fresh mobile installation, production quarantine reconciliation if needed,
+physical interruption testing and the phone reset UI remain separate work.

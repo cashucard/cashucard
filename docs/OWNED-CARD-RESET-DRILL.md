@@ -1,11 +1,10 @@
 # Local owned-card reset drill — card 09336320
 
-Status: the operator approved execution. The first invocation stopped with the
-journal at `reviewed`, before service authorization or deletion intent. The
-protected snapshot is retained and no destructive command was reached. The
-operator subsequently confirmed that the same card remains on the reader.
-The next invocation follows this same approved plan after bounded diagnostics
-are checked; there is no automatic retry.
+Status: **completed on 2026-10-23**. Earlier invocations stopped at the CPLC
+gate before authorization. After identifying and isolating card 09336320, the
+approved run removed its Cashu package and verified factory manager keys,
+version 1. The source snapshot, journal and completion receipt are retained.
+See the [hardware result](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md).
 
 ## Card and authority
 
