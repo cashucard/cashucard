@@ -1,7 +1,7 @@
 /**
  * The designed app's root and its routes: the app opens on sign-in (ENG-740 —
  * the ops service issues real operator sessions), batch setup follows a
- * signed-in session, and demo mode's banner once the switch is on. The bench
+ * signed-in session. The bench
  * screen is reached from Settings only.
  */
 import React from 'react';
@@ -14,7 +14,7 @@ import {SettingsScreen} from '../src/screens/SettingsScreen';
 import {GearButton} from '../src/ui';
 import {DARK, ThemeProvider} from '../src/theme';
 
-test('opens on sign-in; a signed-in session reaches batch setup; demo mode raises its banner', async () => {
+test('sign-in is required for batch setup; Settings retains themes but has no demo mode', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(() => {
     tree = ReactTestRenderer.create(
@@ -95,10 +95,7 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   expect(tree!.root.findByProps({testID: 'legal-privacy'})).toBeDefined();
   expect(tree!.root.findByProps({testID: 'legal-terms'})).toBeDefined();
   expect(tree!.root.findByProps({testID: 'legal-support'})).toBeDefined();
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByProps({testID: 'demo-switch'}).props.onValueChange(true);
-  });
-  expect(text()).toContain('DEMO — no card, no record');
+  expect(tree!.root.findAllByProps({testID: 'demo-switch'})).toHaveLength(0);
 
   // the theme pill changes what the screens draw: dark then light
   const bg = () =>
@@ -132,57 +129,29 @@ test('opens on sign-in; a signed-in session reaches batch setup; demo mode raise
   jest.restoreAllMocks();
 });
 
-test('the sign-in screen demo door enters demo mode with no session (design review without a service)', async () => {
-  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
-  await ReactTestRenderer.act(() => {
+test('signed-out operators cannot enter demo, batches or card actions', async () => {
+  let tree!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
     tree = ReactTestRenderer.create(
       <App
         recovery={{
-          storage: {read: async () => null, replace: async () => undefined},
+          storage: {read: async () => null, replace: async () => {}},
           uuid: () => '00000000-0000-4000-8000-000000000001',
         }}
       />,
     );
   });
-  const text = () =>
-    tree!.root
-      .findAll(n => typeof n.props.children === 'string')
-      .map(n => n.props.children as string)
-      .join('\n');
-  expect(text()).toContain('SIGN IN');
-
-  // No ApiClient mock here: pressing the demo door must not sign in at all —
-  // demo runs with session null, no service reached.
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByProps({testID: 'demo-entry'}).props.onPress();
-  });
-  // Past the gate, into the batch screen, with the demo marks up.
-  expect(text()).toContain('NEW BATCH');
-  expect(text()).toContain('DEMO — no card, no record');
-  expect(text()).toContain('Demo batch — placeholder values');
-
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByProps({testID: 'settings'}).props.onPress();
-  });
-  expect(tree!.root.findAllByProps({testID: 'bench-entry'})).toHaveLength(0);
-  expect(tree!.root.findByProps({testID: 'identity-entry'})).toBeTruthy();
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByType(SettingsScreen).props.onBench();
-  });
-  expect(tree!.root.findByType(SettingsScreen)).toBeTruthy();
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByType(SettingsScreen).props.onBack();
-  });
-
-  // Demo rows are reachable: the loop's demo chooser is present.
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByProps({testID: 'start-batch'}).props.onPress();
-  });
-  expect(tree!.root.findByProps({testID: 'demo-ok'})).toBeTruthy();
-
-  await ReactTestRenderer.act(() => {
-    tree!.unmount();
-  });
+  expect(tree.root.findByProps({testID: 'sign-in'})).toBeTruthy();
+  for (const testID of [
+    'demo-entry',
+    'start-batch',
+    'settings',
+    'identity-entry',
+    'reset-entry',
+  ]) {
+    expect(tree.root.findAllByProps({testID})).toHaveLength(0);
+  }
+  await ReactTestRenderer.act(async () => tree.unmount());
 });
 
 test('settings shows the public dashboard and confirms sign-out while a saved batch exists', async () => {

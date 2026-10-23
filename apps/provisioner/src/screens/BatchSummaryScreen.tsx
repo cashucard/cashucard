@@ -1,6 +1,6 @@
 /**
  * S4. Batch summary and the record. The count, the stops, every row the
- * service would hold, and SHARE RECORD as text. Demo rows are marked DEMO.
+ * service would hold, and SHARE RECORD as text.
  *
  * The design tier of the other screens: a stat header (three figures, the
  * accent only on programmed), the record as one grouped card with per-row
@@ -85,12 +85,7 @@ const local = (t: Theme) =>
       fontSize: 15,
       flex: 1,
     },
-    recordDemo: {
-      color: t.dim,
-      fontFamily: FONT.medium,
-      fontSize: 11,
-      letterSpacing: 0.8,
-    },
+
     recordAt: {
       color: t.dim,
       fontFamily: FONT.tabular,
@@ -148,9 +143,7 @@ export function BatchSummaryScreen({
     batch.done
       .map(
         r =>
-          `${r.ok ? 'ok' : 'stopped'} ${r.id}${
-            r.demo ? ` (demo: ${r.demo})` : ''
-          }` +
+          `${r.ok ? 'ok' : 'stopped'} ${r.id}` +
           ` ${new Date(r.at).toISOString()}${
             r.pending ? ' record pending' : ''
           }`,
@@ -204,7 +197,6 @@ export function BatchSummaryScreen({
                       <View style={s.recordRow}>
                         <View style={dot} />
                         <Text style={s.recordId}>{`…${r.id}`}</Text>
-                        {r.demo ? <Text style={s.recordDemo}>DEMO</Text> : null}
                         {r.ok && !r.pending ? (
                           <Text style={s.recordAt}>{timeOf(r.at)}</Text>
                         ) : null}

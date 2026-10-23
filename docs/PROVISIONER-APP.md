@@ -1,5 +1,9 @@
 # The provisioner: the screens, as designed
 
+Build 7 removes the historical demo mode described below. The current app
+requires operator sign-in and uses the durable provisioning/recovery flow;
+there is no fake-card chooser or sign-in bypass. See [D105](DECISIONS.md#d105).
+
 What each screen is for, what is on it, and its states — the designer's brief
 before the screens exist (ENG-739; the pattern is the one
 [`FOXY-CARD-SCREENS.md`](FOXY-CARD-SCREENS.md) set for the card wallet: this

@@ -1,4 +1,4 @@
-/** Real workflow state, independent of the demo batch and legacy memory outbox. */
+/** Real workflow state, independent of the legacy memory outbox. */
 import React, {
   createContext,
   useCallback,
@@ -327,12 +327,12 @@ export function ProvisioningProvider({
   useEffect(() => {
     actorGeneration.current++;
     invalidateCard();
-  }, [app.session?.token, app.demo, app.serviceUrl, invalidateCard]);
+  }, [app.session?.token, app.serviceUrl, invalidateCard]);
   const latest = useRef(app);
   latest.current = app;
   const getStorage = useCallback(() => {
     // Older installed binaries may lack the newly added native module. Keep
-    // sign-in/demo usable and stop real work, rather than failing at import.
+    // sign-in usable and stop real work, rather than failing at import.
     storage.current ??= (
       require('./journalStorage') as typeof import('./journalStorage')
     ).journalStorage;
@@ -406,7 +406,6 @@ export function ProvisioningProvider({
         busyRef.current ||
         status !== 'ready' ||
         !actor.session ||
-        actor.demo ||
         !sameActor(snapshot, actor.session, actor.serviceUrl)
       ) {
         return false;
@@ -424,7 +423,6 @@ export function ProvisioningProvider({
             const current = latest.current;
             if (
               !mounted.current ||
-              current.demo ||
               current.session?.token !== session.token ||
               current.serviceUrl !== actor.serviceUrl
             ) {
@@ -500,7 +498,7 @@ export function ProvisioningProvider({
 
   const resetService = () => {
     const actor = latest.current;
-    if (!actor.session || actor.demo) {
+    if (!actor.session) {
       throw new Error('Sign in to reset a card');
     }
     return (
@@ -516,7 +514,6 @@ export function ProvisioningProvider({
     const allowed = () =>
       mounted.current &&
       !cancelRequested.current &&
-      !latest.current.demo &&
       latest.current.session?.token === actor.session?.token &&
       latest.current.serviceUrl === actor.serviceUrl &&
       actorGeneration.current === generation;
@@ -586,7 +583,6 @@ export function ProvisioningProvider({
       const current = latest.current;
       const stage = state.current?.active?.journal?.stage;
       if (
-        !current.demo &&
         current.session &&
         ready.current === 'ready' &&
         sameActor(state.current, current.session, current.serviceUrl) &&
@@ -606,7 +602,7 @@ export function ProvisioningProvider({
       clearInterval(timer);
       sub.remove();
     };
-  }, [app.session?.token, app.demo, app.serviceUrl, status]);
+  }, [app.session?.token, app.serviceUrl, status]);
 
   const program = (): Promise<boolean> => {
     if (!hardwareValidated) {
@@ -624,7 +620,6 @@ export function ProvisioningProvider({
         mounted.current &&
         !cancelRequested.current &&
         actorGeneration.current === generation &&
-        !latest.current.demo &&
         latest.current.session?.token === actor.session?.token &&
         latest.current.serviceUrl === actor.serviceUrl;
       if (!w.snapshot().active) {
@@ -851,7 +846,6 @@ export function ProvisioningProvider({
             if (
               !busyRef.current &&
               hardwareValidated &&
-              !latest.current.demo &&
               latest.current.session &&
               sameActor(
                 snapshot,
@@ -865,7 +859,6 @@ export function ProvisioningProvider({
           resume: () => {
             if (
               latest.current.session &&
-              !latest.current.demo &&
               sameActor(
                 snapshot,
                 latest.current.session,

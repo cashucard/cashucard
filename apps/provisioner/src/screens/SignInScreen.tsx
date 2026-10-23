@@ -1,18 +1,15 @@
-/**
- * S1. Sign-in, real (ENG-740): the button POSTs /auth/operator/session; a
- * failure renders the service's own reason in SIGNIN.failed(reason) and the
- * button retries on press. The stub's "admits any build" line is gone — the
- * ops service exists. Below the form sits demo's design-review door: demo
- * mode with no session at all, so the screens run without a service
- * (PROVISIONER-APP "Demo mode" — review on a phone before/without one).
- *
- * The design tier of the other screens: the wordmark as the screen's headline
- * with the load sha as its small print, the tagline centered, and the action
- * plus its honest note in a footer so the whole screen reads as one block —
- * nothing floats mid-air.
- */
-import React, {useState} from 'react';
-import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+/** Operator sign-in. Keep the action above the keyboard and the form scrollable. */
+import React, {useRef, useState} from 'react';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import {ApiUnreachableError} from '../api';
 import {CASHU_LOAD_FILE} from '../assets/cashu';
@@ -24,12 +21,14 @@ import {PrimaryButton, Screen} from '../ui';
 
 const local = (t: Theme) =>
   StyleSheet.create({
+    grow: {flex: 1},
     center: {
-      flex: 1,
+      flexGrow: 1,
       justifyContent: 'center',
       alignItems: 'center',
       gap: 14,
       paddingHorizontal: 24,
+      paddingVertical: 16,
     },
     mark: {
       width: 56,
@@ -95,12 +94,6 @@ const local = (t: Theme) =>
       fontSize: 13,
       textAlign: 'center',
     },
-    demoLink: {
-      color: t.dim,
-      fontFamily: FONT.medium,
-      fontSize: 14,
-      textAlign: 'center',
-    },
   });
 
 export function SignInScreen() {
@@ -111,11 +104,13 @@ export function SignInScreen() {
   const [password, setPassword] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const passwordInput = useRef<TextInput>(null);
 
   const attempt = async () => {
     if (busy || name.trim() === '' || password === '') {
       return;
     }
+    Keyboard.dismiss();
     setBusy(true);
     setFailed(null);
     try {
@@ -137,72 +132,82 @@ export function SignInScreen() {
   };
 
   return (
-    <Screen>
-      <View style={s.center}>
-        <View style={s.mark}>
-          <Text style={s.markBolt}>⚡</Text>
-        </View>
-        <Text style={s.wordmark}>{APP_NAME}</Text>
-        <Text style={s.loadSha}>{SIGNIN_BUILD}</Text>
-        <Text style={s.tagline}>{SIGNIN.tagline}</Text>
-        <View style={s.form}>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder={SIGNIN.namePlaceholder}
-            placeholderTextColor={t.dim}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!busy}
-            style={s.input}
-            testID="sign-in-name"
+    <KeyboardAvoidingView
+      style={s.grow}
+      enabled={Platform.OS === 'ios'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <ScrollView
+          style={s.grow}
+          contentContainerStyle={s.center}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag">
+          <View style={s.mark}>
+            <Text style={s.markBolt}>⚡</Text>
+          </View>
+          <Text style={s.wordmark}>{APP_NAME}</Text>
+          <Text style={s.loadSha}>{SIGNIN_BUILD}</Text>
+          <Text style={s.tagline}>{SIGNIN.tagline}</Text>
+          <View style={s.form}>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder={SIGNIN.namePlaceholder}
+              placeholderTextColor={t.dim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!busy}
+              style={s.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordInput.current?.focus()}
+              autoComplete="username"
+              textContentType="username"
+              accessibilityLabel="Operator name"
+              testID="sign-in-name"
+            />
+            <TextInput
+              ref={passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              placeholder={SIGNIN.passwordPlaceholder}
+              placeholderTextColor={t.dim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              editable={!busy}
+              style={s.input}
+              returnKeyType="go"
+              onSubmitEditing={attempt}
+              autoComplete="current-password"
+              textContentType="password"
+              accessibilityLabel="Password"
+              testID="sign-in-password"
+            />
+          </View>
+          <LegalLinks />
+        </ScrollView>
+        <View style={s.footer}>
+          <PrimaryButton
+            title={busy ? SIGNIN.signingIn : SIGNIN.button}
+            onPress={() => attempt()}
+            disabled={busy || name.trim() === '' || password === ''}
+            testID="sign-in"
           />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder={SIGNIN.passwordPlaceholder}
-            placeholderTextColor={t.dim}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-            editable={!busy}
-            style={s.input}
-            testID="sign-in-password"
-          />
+          {failed ? (
+            <Text style={s.failed} testID="sign-in-failed">
+              {failed}
+            </Text>
+          ) : (
+            <Text style={s.note} accessibilityLiveRegion="polite">
+              {busy
+                ? 'Checking your account… Keep this screen open.'
+                : SIGNIN.note}
+            </Text>
+          )}
         </View>
-      </View>
-      <View style={s.footer}>
-        <LegalLinks />
-        <PrimaryButton
-          title={busy ? SIGNIN.signingIn : SIGNIN.button}
-          onPress={() => attempt()}
-          disabled={busy || name.trim() === '' || password === ''}
-          testID="sign-in"
-        />
-        {failed ? (
-          <Text style={s.failed} testID="sign-in-failed">
-            {failed}
-          </Text>
-        ) : (
-          <Text style={s.note} accessibilityLiveRegion="polite">
-            {busy
-              ? 'Checking your account… Keep this screen open.'
-              : SIGNIN.note}
-          </Text>
-        )}
-        {/* Demo's design-review door (PROVISIONER-APP "Demo mode"): the
-            screens run against the fake card with no session at all — the
-            store holds demo with session null, and the batch screen falls
-            back to its own mints. No service needed. */}
-        <Pressable
-          onPress={() => app.setDemo(true)}
-          disabled={busy}
-          testID="demo-entry">
-          <Text style={s.demoLink}>{SIGNIN.demo}</Text>
-          <Text style={s.note}>{SIGNIN.demoSub}</Text>
-        </Pressable>
-      </View>
-    </Screen>
+      </Screen>
+    </KeyboardAvoidingView>
   );
 }
 

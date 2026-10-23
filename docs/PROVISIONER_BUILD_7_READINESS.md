@@ -18,6 +18,10 @@ signing identities. The tracked protocol 2.1 CAP is unchanged:
 | Sign-in password processing | [#130](https://github.com/lnflash/cashu-card/pull/130), D103 | Upgrade only after a valid legacy sign-in; retain existing credentials and sessions. Local KDF median approximately 75 ms versus 2.1 s; first legacy sign-in and live end-to-end timing remain separate. |
 | Completion and recovery messages | [#131](https://github.com/lnflash/cashu-card/pull/131), D104 | Separate installation saved, wallet setup, stopped attempts, card recovery and service-only retries. App and console use bounded, actionable reasons. |
 
+The sign-in follow-up (D105) keeps the action above the keyboard, adds Next/Go
+keyboard actions and removes demo entry points, fake-card flows and demo state.
+The local SuperMax candidate is rebuilt with this change before card acceptance.
+
 No new applet wire behavior, manager-key guessing, proof/value deletion shortcut,
 service origin migration or recovery-drill enablement is included. Existing
 quarantine and recovery fences remain enforced.

@@ -1,10 +1,9 @@
 /**
  * The designed app's whole shared state: the sign-in (real, against the ops
- * service — ENG-740), the demo switch, the open batch and its record rows.
+ * service — ENG-740), the open batch and its record rows.
  * A signed-in session holds its bearer token and key env in memory only; the
  * registry outbox re-posts pending rows on interval and app-foreground until
- * the service answers (the S4 retry contract). Demo rows never leave the
- * phone and are never pending.
+ * the service answers (the S4 retry contract).
  */
 import React, {
   createContext,
@@ -25,7 +24,6 @@ import {
   type ApiClientOptions,
   type CardRegistryRow,
 } from './api';
-import type {DemoStateId} from './strings';
 import serviceConfig from './serviceOrigin.json';
 import {resolveTheme, ThemeProvider} from './theme';
 
@@ -39,11 +37,10 @@ export interface BatchConfig {
 }
 
 export interface RecordRow {
-  id: string; // the card's short id, or the demo state's
+  id: string; // the card's short id
   ok: boolean;
-  demo?: DemoStateId;
   at: number; // epoch ms
-  pending: boolean; // registry write outstanding (never in demo)
+  pending: boolean; // registry write outstanding
 }
 
 export type KeyEnv = 'factory' | 'issued';
@@ -61,7 +58,6 @@ export const DEFAULT_SERVICE_URL = serviceConfig.serviceOrigin;
 export interface AppStateShape {
   signedIn: boolean;
   session: AppSession | null;
-  demo: boolean;
   theme: 'system' | 'dark' | 'light';
   batch: (BatchConfig & {done: RecordRow[]}) | null;
   serviceUrl: string;
@@ -71,7 +67,6 @@ export interface AppStateShape {
     options?: {client?: ApiClient},
   ): Promise<void>;
   signOut(): void;
-  setDemo(on: boolean): void;
   setTheme(t: 'system' | 'dark' | 'light'): void;
   startBatch(config: BatchConfig): void;
   endBatch(): void;
@@ -80,20 +75,9 @@ export interface AppStateShape {
   postRegistryCard(row: CardRegistryRow): void;
   /** One retry pass over the pending rows (interval and foreground call this). */
   retryPending(): Promise<void>;
-  /** A demo row: pending stays false forever. */
-  addDemoRecord(row: RecordRow): void;
 }
 
 const Ctx = createContext<AppStateShape | null>(null);
-
-export const DEMO_BATCH: BatchConfig = {
-  mint: 'https://forge.flashapp.me',
-  pinPolicy: 'perCard',
-  pinBatch: '',
-  dailyUsd: 25,
-  noPinUsd: 5,
-  count: 250,
-};
 
 const RETRY_INTERVAL_MS = 30_000;
 
@@ -107,7 +91,6 @@ export function AppStore({
 }) {
   const [signedIn, setSignedIn] = useState(false);
   const [session, setSession] = useState<AppSession | null>(null);
-  const [demo, setDemo] = useState(false);
   const [theme, setTheme] = useState<'system' | 'dark' | 'light'>('system');
   const [batch, setBatch] = useState<
     (BatchConfig & {done: RecordRow[]}) | null
@@ -233,7 +216,6 @@ export function AppStore({
     () => ({
       signedIn,
       session,
-      demo,
       theme,
       batch,
       serviceUrl: clientOptions?.baseUrl ?? DEFAULT_SERVICE_URL,
@@ -261,15 +243,10 @@ export function AppStore({
         }
       },
       signOut,
-      setDemo,
       setTheme,
       startBatch: config => setBatch({...config, done: []}),
       endBatch: () => setBatch(null),
       addRecord: row => setBatch(b => (b ? {...b, done: [...b.done, row]} : b)),
-      addDemoRecord: row =>
-        setBatch(b =>
-          b ? {...b, done: [...b.done, {...row, pending: false}]} : b,
-        ),
       postRegistryCard: row => {
         // The batch view's row shape (RecordRow) differs from the wire row's
         // (CardRegistryRow): id = short_id, at = installed_at. Spreading the
@@ -310,7 +287,6 @@ export function AppStore({
     [
       signedIn,
       session,
-      demo,
       theme,
       batch,
       clientOptions,

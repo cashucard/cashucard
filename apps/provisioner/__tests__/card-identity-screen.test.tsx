@@ -34,9 +34,15 @@ async function read() {
   });
 }
 
-test('Settings reaches a physical identity probe offline; only an explicit tap sends SELECT ISD and GET DATA', async () => {
+test('signed-in Settings reaches the identity probe; only an explicit tap sends SELECT ISD and GET DATA', async () => {
   const reservations = jest.spyOn(ApiClient.prototype, 'reservations');
-  const auth = jest.spyOn(ApiClient.prototype, 'operatorSession');
+  const auth = jest
+    .spyOn(ApiClient.prototype, 'operatorSession')
+    .mockResolvedValue({
+      operator_id: 1,
+      env: 'issued',
+      token: 'public-test-token',
+    });
   await act(async () => {
     tree = Renderer.create(
       <App
@@ -48,7 +54,15 @@ test('Settings reaches a physical identity probe offline; only an explicit tap s
     );
   });
   await act(async () => {
-    tree!.root.findByProps({testID: 'demo-entry'}).props.onPress();
+    tree!.root
+      .findByProps({testID: 'sign-in-name'})
+      .props.onChangeText('operator');
+    tree!.root
+      .findByProps({testID: 'sign-in-password'})
+      .props.onChangeText('public-test-fixture');
+  });
+  await act(async () => {
+    await tree!.root.findByProps({testID: 'sign-in'}).props.onPress();
   });
   await act(async () => {
     tree!.root.findByProps({testID: 'settings'}).props.onPress();
@@ -67,7 +81,7 @@ test('Settings reaches a physical identity probe offline; only an explicit tap s
   expect(commands).toHaveLength(2);
   expect(commands[0]).toEqual([0, 0xa4, 4, 0, ISD_AID.length, ...ISD_AID, 0]);
   expect(commands[1]).toEqual([0x80, 0xca, 0x9f, 0x7f, 0]);
-  expect(auth).not.toHaveBeenCalled();
+  expect(auth).toHaveBeenCalledTimes(1);
   expect(reservations).not.toHaveBeenCalled();
 });
 

@@ -67,15 +67,18 @@ carries nothing else; Android's errors keep their own text. A session that never
 reached the card is named on the screen the same way, for example
 `No card session: Timeout.`
 
-## The designed app and demo mode (ENG-739)
+## Operator app
 
-The app now boots the designed flow of
-[`docs/PROVISIONER-APP.md`](../../docs/PROVISIONER-APP.md): sign-in, batch
-setup, the programming loop, batch summary, settings. Demo mode (Settings →
-Demo mode) runs every state of the loop against a fake card
-(`src/demo/fakeCard.ts`) built on cardkit's own SCP02 crypto, in the measured
-cadence — the design review lives on a phone, with no card and no service.
-The real-hardware path is this spike's screen, kept at Settings → Bench runs.
+Sign-in opens real batch setup, installation/recovery, card checks and settings.
+Build 7 removes the former design-review demo mode, fake-card chooser and
+unauthenticated route into the app (D105). Device diagnostics remain explicit
+read-only actions after operator sign-in. The lab bench is still gated off in
+normal releases. Review access uses a scoped operator account and real hardware
+evidence; there is no demo substitute for that access.
+
+The sign-in form scrolls on small screens; its action stays above the keyboard.
+Next focuses Password, and Go submits the form. iOS uses keyboard avoidance;
+Android uses the activity's existing `adjustResize` without duplicate padding.
 
 The screens are set in bundled OFL Figtree (`assets/fonts/`, linked with
 `react-native-asset`; re-run it when fonts change). Type, color and spacing
@@ -143,9 +146,9 @@ device/batch. Sign-in now retains the service's stable `operator_id`; the typed
 reservation adapter keeps the token in memory and scopes all requests to it.
 
 `src/ProvisioningStore.tsx` now connects the coordinator to the real operator
-screens, separately from demo and the legacy outbox. Native storage/session
+screens, separately from the legacy outbox. Native storage/session
 adapters load lazily: a missing native module pauses real work without breaking
-sign-in or demo. Sign-out retains evidence, and another operator/environment or
+sign-in. Sign-out retains evidence, and another operator/environment or
 service cannot view attempt details or replay it. One operation queue survives
 React remounts. Actor changes cancel an armed session and block further commands;
 cancellation during key prefetch prevents NFC from opening later.
@@ -210,8 +213,8 @@ The next native validation steps are in the
 [proposed owner-run checklist](../../docs/PROVISIONER-DEVICE-VALIDATION.md).
 Settings → Read physical card identity supplies the read-only phone probe:
 entering the screen does not arm NFC; the explicit read issues SELECT ISD and
-GET DATA CPLC only. It also works through the demo door without a service, but
-labels its physical-card action. Cancel/back ends only its own session. It does
+GET DATA CPLC only. Its signed-in screen labels physical-card access; the read
+itself needs no further service request. Cancel/back ends only its own session. It does
 not authenticate, modify cards, alter saved attempts or enable installation.
 Local validation builds can additionally enable `RECOVERY_DRILLS_ENABLED` in
 `src/releaseGates.ts` to select a one-shot pause at a known durable boundary.
@@ -231,7 +234,7 @@ insets, including Android edge-to-edge windows. This adds a native dependency:
 run pod install and rebuild the phones before loading this revision's bundle.
 The root provider supplies all shared screens; titles wrap in normal header
 layout. The identity diagnostic always shows “PHYSICAL CARD — read-only”, while
-ordinary demo screens retain their demo banner. Its content can scroll at larger
+other screens have no simulated-card banner. Its content can scroll at larger
 text sizes. These changes do not arm NFC or enable installation.
 
 

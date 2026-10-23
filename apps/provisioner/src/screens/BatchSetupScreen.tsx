@@ -1,7 +1,6 @@
 /**
- * S2. Batch setup: mint, PIN policy, limits, count, then START BATCH. In demo
- * mode the batch comes preconfigured (DEMO marks), so the reviewer reaches
- * the loop without form work; the fields present as they will, greyed.
+ * Batch setup validates the service mint reference and count before review.
+ * Installation-only batches keep holder PIN and limits in the holder wallet.
  *
  * The design language is Settings': section headers in small caps, one raised
  * card per group, hairline dividers, the accent only where a choice is live.
@@ -20,18 +19,9 @@ import {
 
 import {ApiClient} from '../api';
 import {SETUP} from '../strings';
-import {DEMO_BATCH, useApp, type BatchConfig} from '../store';
+import {useApp, type BatchConfig} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
 import {GearButton, Screen, PrimaryButton, SecondaryButton} from '../ui';
-
-// Demo's mints (ENG-760: editable mint field with defaults). Real mode
-// fetches the service's list instead (ENG-740); these stay for demo only.
-const DEMO_MINTS = [
-  'https://forge.flashapp.me',
-  'https://mint.minibits.cash',
-  'https://mint.macadamia.cash',
-  'https://mint.cubabitcoin.org',
-];
 
 /** The design code this build's card art draws (docs/CARD-DESIGNS.md). */
 const CARD_DESIGN = 'FL1 — Flash, black, the bolt';
@@ -89,7 +79,7 @@ const local = (t: Theme) =>
     },
     cellDotOnAccent: {color: t.bg},
     cellLabelOnAccent: {color: t.bg},
-    demoNote: {color: t.dim, fontFamily: FONT.regular, fontSize: 13},
+    note: {color: t.dim, fontFamily: FONT.regular, fontSize: 13},
     cellWide: {minHeight: 48},
     customInput: {
       color: t.dim,
@@ -237,7 +227,7 @@ export function BatchSetupScreen({
   const [pinBatch, setPinBatch] = useState('');
   const [daily, setDaily] = useState('25.00');
   const [noPin, setNoPin] = useState('5.00');
-  const [count, setCount] = useState(app.demo ? '250' : '12');
+  const [count, setCount] = useState('12');
   const maxCount = installationOnly ? 500 : 100000;
 
   const [creating, setCreating] = useState(false);
@@ -257,8 +247,7 @@ export function BatchSetupScreen({
         Number(daily) >= 0 &&
         Number.isFinite(Number(noPin)) &&
         Number(noPin) >= 0));
-  const ready =
-    canStart && !creating && (app.demo || (mint !== null && validNumbers));
+  const ready = canStart && !creating && mint !== null && validNumbers;
 
   const submit = async (config: BatchConfig) => {
     if (onCreate) {
@@ -279,17 +268,15 @@ export function BatchSetupScreen({
     if (!ready) {
       return;
     }
-    const config: BatchConfig = app.demo
-      ? DEMO_BATCH
-      : {
-          mint: mint!,
-          // Legacy API fields are inert metadata in installation-only batches.
-          pinPolicy: installationOnly ? 'perCard' : pinPolicy,
-          pinBatch: installationOnly ? '' : pinBatch,
-          dailyUsd: installationOnly ? 0 : Number(daily),
-          noPinUsd: installationOnly ? 0 : Number(noPin),
-          count: countNumber,
-        };
+    const config: BatchConfig = {
+      mint: mint!,
+      // Legacy API fields are inert metadata in installation-only batches.
+      pinPolicy: installationOnly ? 'perCard' : pinPolicy,
+      pinBatch: installationOnly ? '' : pinBatch,
+      dailyUsd: installationOnly ? 0 : Number(daily),
+      noPinUsd: installationOnly ? 0 : Number(noPin),
+      count: countNumber,
+    };
     if (installationOnly) {
       setReview(config);
     } else {
@@ -297,7 +284,7 @@ export function BatchSetupScreen({
     }
   };
 
-  // Real mode reads the ops service's mint list; demo keeps its own.
+  // Use only the authenticated service mint list.
   const [serviceMints, setServiceMints] = useState<string[] | null>(null);
   const [mintsFailed, setMintsFailed] = useState(false);
   const [mintRequest, setMintRequest] = useState(0);
@@ -305,7 +292,7 @@ export function BatchSetupScreen({
     setServiceMints(null);
     setMintsFailed(false);
     setMint(null);
-    if (app.demo || !app.session) {
+    if (!app.session) {
       return;
     }
     let alive = true;
@@ -325,8 +312,8 @@ export function BatchSetupScreen({
     return () => {
       alive = false;
     };
-  }, [app.demo, app.session, app.serviceUrl, mintRequest]);
-  const mints = app.demo ? DEMO_MINTS : serviceMints ?? [];
+  }, [app.session, app.serviceUrl, mintRequest]);
+  const mints = serviceMints ?? [];
 
   const customMint = mint !== null && !mints.includes(mint);
 
@@ -381,13 +368,9 @@ export function BatchSetupScreen({
       headerRight={<GearButton onPress={onSettings} testID="settings" />}>
       <View style={s.grow}>
         <ScrollView contentContainerStyle={s.scroll} testID="setup-scroll">
-          {app.demo ? (
-            <Text style={s.demoNote}>
-              {'Demo batch — placeholder values. Nothing leaves the phone.'}
-            </Text>
-          ) : mintsFailed ? (
+          {mintsFailed ? (
             <View>
-              <Text style={s.demoNote}>{SETUP.mintsFailed}</Text>
+              <Text style={s.note}>{SETUP.mintsFailed}</Text>
               <SecondaryButton
                 title="RETRY MINT LIST"
                 testID="retry-mints"
@@ -395,9 +378,9 @@ export function BatchSetupScreen({
               />
             </View>
           ) : serviceMints === null ? (
-            <Text style={s.demoNote}>Loading the mint list…</Text>
+            <Text style={s.note}>Loading the mint list…</Text>
           ) : serviceMints.length === 0 ? (
-            <Text style={s.demoNote}>
+            <Text style={s.note}>
               The service has no mint references. Enter a batch reference below.
             </Text>
           ) : null}
@@ -457,7 +440,7 @@ export function BatchSetupScreen({
                   </View>
                 </>
               ) : null}
-              {!mint && !app.demo ? (
+              {!mint ? (
                 <>
                   <View style={s.divider} />
                   <View style={[s.cellRow, s.cellWide]}>
@@ -534,7 +517,7 @@ export function BatchSetupScreen({
                       value={daily}
                       onChangeText={setDaily}
                       keyboardType="numeric"
-                      editable={!app.demo}
+                      editable
                       style={s.fieldInput}
                       testID="daily-limit"
                     />
@@ -546,7 +529,7 @@ export function BatchSetupScreen({
                       value={noPin}
                       onChangeText={setNoPin}
                       keyboardType="numeric"
-                      editable={!app.demo}
+                      editable
                       style={s.fieldInput}
                       testID="no-pin-limit"
                     />
@@ -560,14 +543,13 @@ export function BatchSetupScreen({
                   accessibilityRole="button"
                   accessibilityLabel="Decrease cards in batch"
                   accessibilityState={{
-                    disabled: app.demo || !validCount || countNumber <= 1,
+                    disabled: !validCount || countNumber <= 1,
                   }}
-                  disabled={app.demo || !validCount || countNumber <= 1}
+                  disabled={!validCount || countNumber <= 1}
                   onPress={() => setCount(String(countNumber - 1))}
                   style={[
                     s.countStep,
-                    (app.demo || !validCount || countNumber <= 1) &&
-                      s.countStepDisabled,
+                    (!validCount || countNumber <= 1) && s.countStepDisabled,
                   ]}
                   testID="batch-count-decrement">
                   <Text style={s.countStepText}>−</Text>
@@ -576,7 +558,7 @@ export function BatchSetupScreen({
                   value={count}
                   onChangeText={value => setCount(value.replace(/\D/g, ''))}
                   keyboardType="number-pad"
-                  editable={!app.demo}
+                  editable
                   selectTextOnFocus
                   accessibilityLabel="Cards in batch"
                   style={[s.fieldInput, s.countInput]}
@@ -586,22 +568,21 @@ export function BatchSetupScreen({
                   accessibilityRole="button"
                   accessibilityLabel="Increase cards in batch"
                   accessibilityState={{
-                    disabled: app.demo || countNumber >= maxCount,
+                    disabled: countNumber >= maxCount,
                   }}
-                  disabled={app.demo || countNumber >= maxCount}
+                  disabled={countNumber >= maxCount}
                   onPress={() =>
                     setCount(String(validCount ? countNumber + 1 : 1))
                   }
                   style={[
                     s.countStep,
-                    (app.demo || countNumber >= maxCount) &&
-                      s.countStepDisabled,
+                    countNumber >= maxCount && s.countStepDisabled,
                   ]}
                   testID="batch-count-increment">
                   <Text style={s.countStepText}>+</Text>
                 </Pressable>
               </View>
-              {!app.demo && !validCount ? (
+              {!validCount ? (
                 <Text
                   style={
                     s.countError

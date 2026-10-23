@@ -2984,3 +2984,22 @@ unchanged.
 **Rejected:** marking every historical record “ready to spend”, saying a stopped
 installation forbids spending, hiding uncertain card changes behind “nothing
 happened”, or relaxing a recovery check to make the wording simpler.
+
+## <a id="d105"></a>D105: Keyboard-safe sign-in and removal of demo mode
+
+The operator found Sign In covered by the iPhone keyboard during build 7
+acceptance. Keep its primary action outside the scrollable form, inside a
+full-screen keyboard-avoiding container on iOS. Android retains native
+`adjustResize` without additional keyboard padding. Preserve safe areas, let
+fields/legal links scroll, move Next to Password and submit with Go; dismiss
+the keyboard only on a valid submission. Do not depend on an extra dismissal
+tap or fixed screen/keyboard dimensions.
+
+At the operator's request, remove the design-review demo feature from build 7:
+the sign-in door, Settings switch, banner, mode state, placeholder batches,
+fake-card generator and legacy fake installation navigation. All app routes
+require a real operator session and installation uses the durable workflow.
+Keep existing service, journal, scope, consent and card-write checks. Software
+fakes remain in the cardkit tests; removed fake UI scenarios are not hardware
+evidence. App-review access requires a scoped account and the physical video.
+This supersedes earlier demo-mode UI instructions without changing the wire.

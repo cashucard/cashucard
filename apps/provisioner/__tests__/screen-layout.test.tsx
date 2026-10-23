@@ -3,7 +3,7 @@ import Renderer, {act} from 'react-test-renderer';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import App from '../App';
 import {CardIdentityScreen} from '../src/screens/CardIdentityScreen';
-import {AppStore, useApp} from '../src/store';
+import {AppStore} from '../src/store';
 import {Screen, styles} from '../src/ui';
 import {LIGHT} from '../src/theme';
 
@@ -40,14 +40,12 @@ test('titles participate in header layout so Back has its own space', () => {
   expect(layout.titleWrap).toMatchObject({flex: 1, minWidth: 0});
 });
 
-test('a real identity check labels physical access even when entered through demo; ordinary demo keeps its banner', async () => {
-  let demo!: (value: boolean) => void;
+test('only a physical identity check displays the read-only hardware banner', async () => {
   function Probe() {
-    demo = useApp().setDemo;
     return (
       <>
         <CardIdentityScreen onBack={() => {}} />
-        <Screen title="Demo batch">{null}</Screen>
+        <Screen title="Settings">{null}</Screen>
       </>
     );
   }
@@ -60,17 +58,12 @@ test('a real identity check labels physical access even when entered through dem
     );
   });
   trees.push(tree);
-  await act(async () => {
-    demo(true);
-  });
   const banners = tree.root
     .findAllByProps({testID: 'screen-mode-banner'})
     .filter(n => typeof n.type !== 'string')
     .map(n => n.props.children);
   expect(banners).toContain('PHYSICAL CARD — read-only');
-  expect(banners.filter(s => s === 'DEMO — no card, no record')).toHaveLength(
-    1,
-  );
+  expect(banners).toEqual(['PHYSICAL CARD — read-only']);
   await act(async () => {
     tree.unmount();
   });
