@@ -229,7 +229,22 @@ async function main() {
     await screenshot('04-operator-profile');
     await click('#dialog [data-action="close-dialog"]');
     await click('[data-action="create"]');
+    await fill('#new-name', 'not valid');
+    assert.equal(
+      await evaluate(
+        `document.querySelector('#new-name').validity.patternMismatch`,
+      ),
+      true,
+      'Invalid operator names are rejected by the browser',
+    );
     await fill('#new-name', 'qa-operator');
+    assert.equal(
+      await evaluate(
+        `document.querySelector('#new-name').validity.patternMismatch`,
+      ),
+      false,
+      'Hyphenated operator names are valid',
+    );
     await click('[data-action="generate"]');
     assert.equal(
       await evaluate(`document.querySelector('#new-password').value.length`),

@@ -574,7 +574,7 @@ export const adminClient =
     dialog(
       'Add an operator',
       'Give a teammate their own provisioning account.',
-      '<label class="field">Operator name<input id="new-name" name="username" autocomplete="off" placeholder="e.g. alex-provisioning" pattern="[A-Za-z0-9._@-]{1,64}" maxlength="64" required autofocus autocapitalize="none" spellcheck="false"><small>Letters, numbers, dots, underscores, @ and hyphens.</small></label>' +
+      '<label class="field">Operator name<input id="new-name" name="username" autocomplete="off" placeholder="e.g. alex-provisioning" pattern="(?:[A-Za-z0-9._@]|-){1,64}" maxlength="64" required autofocus autocapitalize="none" spellcheck="false"><small>Letters, numbers, dots, underscores, @ and hyphens.</small></label>' +
         passwordField.replace(' required autofocus', ' required') +
         '<label class="field">Provisioning environment<select id="environment"><option value="issued">Issued — normal provisioning</option><option value="factory">Factory — authorized factory workflows</option></select><small>Use Issued for normal provisioning. This cannot be edited here later.</small></label>',
       cancel +
