@@ -37,10 +37,11 @@ counts towards a lock that is for good.
   job while running is one glanceable figure and a phase line, and its job at
   the ends is a word and a haptic.
 - **Progress is honest.** The phase name and, while the load writes, its
-  percent (`Writing 57%`) — computed from the run's own block events, the
-  user's unit, never an animation of its own pace. (The bench screen keeps
-  raw block counts; that surface is the debugger's.) No bar that animates at
-  its own pace, no spinner that lies.
+  percent (`Writing 57%`) come from LOAD blocks acknowledged by the card,
+  never a timer. The card artwork reveals in the same proportion. The bench
+  screen keeps raw block counts. A full card image means LOAD finished; the
+  screen reports installation, key rotation, and record confirmation
+  separately before calling the attempt complete.
 - **The button that commits says what it does** — `PROGRAM CARD`, `START
   BATCH` — and is grey until it can be pressed. A way back is at the top left;
   there is no CANCEL at the bottom except the in-tap Cancel on the loop screen
@@ -67,8 +68,12 @@ counts towards a lock that is for good.
   success state of the loop screen is the accent; nothing else is.
 - Type: Figtree, bundled with the app; numbers in progress in a tabular face
   (`tabular-nums` or the system's mono fallback).
-- No mascot, no card art on screen. The beauty here is legibility at arm's
-  length: big numerals, generous rows, the one strong color kept for done.
+- The approved printed-card artwork is the loop's single figure. Its muted
+  state and left-to-right LOAD reveal keep progress legible at arm's length;
+  an interrupted run retains its last acknowledged fill on the current screen.
+  After a restart, saved installation stages establish only whether LOAD was
+  verified, not a partial block count. The accent ring is reserved for a
+  recorded installation.
 
 ## S1. Sign-in
 
@@ -119,13 +124,16 @@ words and only these:
 - `Opening the card manager` (the ISD)
 - `Logging in`
 - `Removing the old install` (sweep — only on a partial or replaced state)
-- `Writing 37 of 82` (the load's block count, live)
+- `Writing 45%` (acknowledged LOAD blocks divided by this run's block count)
 - `Installing the card` (the three instantiations)
 - `Checking the install`
 
 …and the same words, first-person-shortened where Apple crowds them, on the
 iOS sheet's line. Estimates are never shown; the measured 9–13 s vary with the
 phone and the card's history and nobody does arithmetic while holding a card.
+An interrupted run keeps the last acknowledged fill while saved work is
+reviewed on the current screen. Starting another card resets it to the muted
+state.
 
 Done: the figure snaps solid in the accent, the haptic fires, the counter
 moves, the line under the counter reads the card's short id (the last bytes
