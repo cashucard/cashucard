@@ -1,7 +1,7 @@
 {
   "name": "cashu-provisioner",
   "version": "1.0.0",
-  "provisionerBuild": 5,
+  "provisionerBuild": 6,
   "private": true,
   "scripts": {
     "android": "react-native run-android",
