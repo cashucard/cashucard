@@ -2546,3 +2546,22 @@ the protocol makes possible. “Pay offline. Settle online.” was shorter, but
 could imply that an offline tap is already final payment. Naming the actors
 and the later mint settlement makes the distinction clear without adding a
 long paragraph to the landing page.
+
+## D87 — Show confirmed LOAD progress in the signed-in provisioner
+
+**Decided (2026-10-22):** Reuse the approved printed-card figure in the real
+operator installation screen. Reveal it from left to right and show `Writing
+NN%` from LOAD blocks only after each block's successful card response. Keep
+the last acknowledged fill on screen when a run is interrupted; reset it when
+a new run or operator scope begins. After a restart, the journal confirms
+whether LOAD completed but does not reconstruct a partial block count. A full
+figure confirms that LOAD finished, while
+installation, key rotation, and service recording retain their own stages and
+success requirements. Keep the figure's stop and completed rings tied to the
+saved attempt state.
+
+**Why:** the figure and progress existed in the demo loop but were absent from
+the signed-in installation path. That left an operator holding a card through
+the longest phase without the approved feedback. Emitting progress before a
+LOAD response could falsely show a block that the phone never confirmed.
+Rejected timed interpolation and treating 100% LOAD as a completed card.

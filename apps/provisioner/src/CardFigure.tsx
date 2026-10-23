@@ -21,7 +21,7 @@ export function CardFigure({
   fill,
   state,
 }: {
-  /** 0..1 of the load written; 1 = done. */
+  /** 0..1 of acknowledged LOAD blocks; 1 confirms LOAD, not the whole run. */
   fill: number;
   state: 'idle' | 'running' | 'done' | 'stop' | 'danger';
 }) {

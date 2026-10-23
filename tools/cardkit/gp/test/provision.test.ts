@@ -291,6 +291,24 @@ describe('provision: the Cashu card', () => {
     }
   });
 
+  it('reports only LOAD blocks whose successful response reached the host', async () => {
+    const card = new FakeCard();
+    const events: RunEvent[] = [];
+    const pull = pullAt(card, INSTALL_ORDER.indexOf(0xe8) + 36, 'after');
+    const result = await provision(
+      pull.tx,
+      CASHU,
+      options({onEvent: event => events.push(event)}),
+    );
+    assert.equal(result.kind, 'pulled');
+    assert.deepEqual(result.blocks, {at: 37, of: 82});
+    const written = events.filter(
+      (event): event is Extract<RunEvent, {type: 'block'}> =>
+        event.type === 'block',
+    );
+    assert.equal(written.at(-1)?.index, 36);
+  });
+
   it('stops at a mute INSTALL of the card applet, and the next run recovers', async () => {
     const card = new FakeCard();
     let installs = 0;
