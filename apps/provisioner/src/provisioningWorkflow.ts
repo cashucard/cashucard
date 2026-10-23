@@ -2,6 +2,7 @@
  * Single coordinator; no NFC, tokens or manager keys are persisted here.
  */
 import {randomUuid} from './random';
+import {isPublicFailureContext, type PublicFailureContext} from './recoveryExport';
 import {
   ProvisioningJournal,
   assertJournalScope,
@@ -118,6 +119,7 @@ export interface WorkflowSnapshot {
   batch: BatchState | null;
   active: PendingAttempt | null;
   history: AttemptJournal[];
+  last_failure?: PublicFailureContext | null;
 }
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -209,8 +211,16 @@ export class ProvisioningWorkflow {
   }
 
   private async validate(s: WorkflowSnapshot): Promise<void> {
-    exact(s, ['schema', 'device_id', 'batch', 'active', 'history']);
+    exact(s, [
+      'schema', 'device_id', 'batch', 'active', 'history',
+      ...(s && Object.prototype.hasOwnProperty.call(s, 'last_failure')
+        ? ['last_failure']
+        : []),
+    ]);
     check(s.schema === 2 && UUID.test(s.device_id) && Array.isArray(s.history));
+    if (s.last_failure !== undefined && s.last_failure !== null) {
+      check(isPublicFailureContext(s.last_failure));
+    }
     if (!s.batch) {
       check(s.active === null && s.history.length === 0);
       return;
@@ -302,6 +312,14 @@ export class ProvisioningWorkflow {
         sameScope(b.scope, {...service.scope, device_id: this.state.device_id}),
     );
     return b;
+  }
+
+  /** Persist only bounded public context; never a raw service error. */
+  rememberFailure(context: PublicFailureContext): Promise<void> {
+    return this.serial(async () => {
+      check(isPublicFailureContext(context));
+      await this.commit({...this.snapshot(), last_failure: context});
+    });
   }
 
   /** Persist request identity and exact PIN-free settings before the first POST. */
@@ -570,7 +588,9 @@ export class ProvisioningWorkflow {
       await this.syncBatch(service);
       const b = this.actor(service);
       check(!this.state.active && b.next_ordinal === b.request.count);
-      await this.commit({...this.snapshot(), batch: null, history: []});
+      const next = this.snapshot();
+      delete next.last_failure;
+      await this.commit({...next, batch: null, history: []});
     });
   }
 

@@ -103,6 +103,27 @@ test('a network failure is ApiUnreachableError, not a generic throw', async () =
   );
 });
 
+test('a bind conflict carries a bounded operation, not a request path', async () => {
+  const {fetcher} = scriptedFetcher([
+    () => ({
+      status: 409,
+      json: {reason: 'chip-unresolved', message: 'private detail'},
+    }),
+  ]);
+  const service = new ApiClient({
+    baseUrl: 'https://ops.test',
+    fetcher,
+  }).reservations({operator_id: 7, env: 'issued', token: 'secret'});
+  await expect(
+    service.bind('device', 'attempt', {revision: 0, chip_id: 'chip'}),
+  ).rejects.toMatchObject({
+    name: 'ApiServiceError',
+    status: 409,
+    reason: 'chip-unresolved',
+    operation: 'bind-card',
+  });
+});
+
 test('the outbox freezes the row body at first write and re-posts it byte-identical', async () => {
   const {fetcher, bodies} = scriptedFetcher([
     () => ({status: 503, json: {reason: 'upstream-unavailable'}}), // first try fails

@@ -1,6 +1,6 @@
 import React from 'react';
 import {Share} from 'react-native';
-import {recoveryDetails} from '../src/recoveryExport';
+import {publicFailureContext, recoveryDetails} from '../src/recoveryExport';
 import Renderer, {act} from 'react-test-renderer';
 import {ApiClient, ApiServiceError} from '../src/api';
 import {AppStore, useApp, type AppStateShape} from '../src/store';
@@ -521,6 +521,28 @@ test('real installation setup exposes no holder controls and submits inert legac
   }
   expect(text(tree)).toContain('The holder wallet sets the PIN, mint and limits.');
   expect(text(tree)).not.toContain('FL1 — Flash, black, the bolt');
+  const countInput = () => tree.root.findByProps({testID: 'batch-count'});
+  expect(countInput().props.selectTextOnFocus).toBe(true);
+  await act(async () => {
+    tree.root.findByProps({testID: 'batch-count-increment'}).props.onPress();
+  });
+  expect(countInput().props.value).toBe('13');
+  await act(async () => {
+    tree.root.findByProps({testID: 'batch-count-decrement'}).props.onPress();
+    countInput().props.onChangeText('');
+  });
+  expect(countInput().props.value).toBe('');
+  expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(true);
+  expect(text(tree)).toContain('Enter 1 to 100,000 cards.');
+  expect(tree.root.findByProps({testID: 'batch-count-decrement'}).props.disabled).toBe(true);
+  await act(async () => {
+    tree.root.findByProps({testID: 'batch-count-increment'}).props.onPress();
+  });
+  expect(countInput().props.value).toBe('1');
+  await act(async () => {
+    countInput().props.onChangeText('100001');
+  });
+  expect(tree.root.findByProps({testID: 'start-batch'}).props.disabled).toBe(true);
   await act(async () => {
     tree.root.findByProps({testID: 'mint-https://mint.test'}).props.onPress();
     tree.root.findByProps({testID: 'batch-count'}).props.onChangeText('0');
@@ -830,6 +852,26 @@ test('an explicit recovery export contains public full identities without secret
   expect(JSON.stringify(bounded)).not.toContain('not-exported-canary');
   expect(f.bytes()).toBe(before);
   expect(f.service.record).not.toHaveBeenCalled();
+});
+
+test('a reconciliation conflict exports bounded context and names the chip block', async () => {
+  const f = fixture();
+  const share = jest.spyOn(Share, 'share').mockResolvedValue({action: Share.sharedAction});
+  const tree = await mount({
+    ...f, hardwareValidated: true, serviceFor: () => f.service,
+    runCard: async () => {throw new ApiServiceError('chip-unresolved', 409, 'bind-card');},
+  });
+  await signIn();
+  await act(async () => {await flow.create(config); await flow.program();});
+  expect(text(tree)).toContain('This chip has an unresolved attempt.');
+  await act(async () => {tree.root.findByProps({testID: 'recovery-export'}).props.onPress();});
+  const report = JSON.parse((share.mock.calls.at(-1)![0] as {message: string}).message);
+  expect(report.failure).toEqual({operation: 'bind-card', status: 409, reason: 'chip-unresolved'});
+  expect(JSON.stringify(report)).not.toContain('token-7');
+  expect((await ProvisioningWorkflow.open(f.storage, f.uuid)).snapshot().last_failure)
+    .toEqual(report.failure);
+  expect(publicFailureContext(new ApiServiceError('private-token=do-not-export', 409, 'bind-card')))
+    .toEqual({operation: 'bind-card', status: 409, reason: null});
 });
 
 test('stale independent backup pauses before NFC and retains the reserved attempt', async () => {

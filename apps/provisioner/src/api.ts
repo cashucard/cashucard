@@ -33,8 +33,61 @@ export interface OperatorSession {
 }
 
 /** The service's own reasons, surfaced verbatim (S1: never improvised). */
+export type ServiceOperation =
+  | 'create-batch'
+  | 'reserve-attempt'
+  | 'read-attempt'
+  | 'bind-card'
+  | 'issue-keys'
+  | 'record-installation'
+  | 'record-disposition';
+
+function serviceOperation(
+  method: string,
+  path: string,
+): ServiceOperation | null {
+  if (method === 'POST' && path === '/provisioning/batches') {
+    return 'create-batch';
+  }
+  if (method === 'POST' && path === '/provisioning/attempts') {
+    return 'reserve-attempt';
+  }
+  if (method === 'POST' && path === '/keys/issue') {
+    return 'issue-keys';
+  }
+  if (
+    method === 'POST' &&
+    /^\/provisioning\/attempts\/[^/?]+\/bind$/.test(path)
+  ) {
+    return 'bind-card';
+  }
+  if (
+    method === 'POST' &&
+    /^\/provisioning\/attempts\/[^/?]+\/record$/.test(path)
+  ) {
+    return 'record-installation';
+  }
+  if (
+    method === 'POST' &&
+    /^\/provisioning\/attempts\/[^/?]+\/disposition$/.test(path)
+  ) {
+    return 'record-disposition';
+  }
+  if (
+    method === 'GET' &&
+    /^\/provisioning\/attempts\/[^/?]+\?device_id=/.test(path)
+  ) {
+    return 'read-attempt';
+  }
+  return null;
+}
+
 export class ApiServiceError extends Error {
-  constructor(readonly reason: string, readonly status?: number) {
+  constructor(
+    readonly reason: string,
+    readonly status?: number,
+    readonly operation: ServiceOperation | null = null,
+  ) {
     super(reason);
     this.name = 'ApiServiceError';
   }
@@ -129,12 +182,20 @@ export class ApiClient {
     try {
       json = (await res.json()) as Record<string, unknown>;
     } catch {
-      throw new ApiServiceError(`HTTP ${res.status}`, res.status);
+      throw new ApiServiceError(
+        `HTTP ${res.status}`,
+        res.status,
+        serviceOperation(method, path),
+      );
     }
     if (!res.ok) {
       const reason =
         typeof json.reason === 'string' ? json.reason : `HTTP ${res.status}`;
-      throw new ApiServiceError(reason, res.status);
+      throw new ApiServiceError(
+        reason,
+        res.status,
+        serviceOperation(method, path),
+      );
     }
     return json;
   }

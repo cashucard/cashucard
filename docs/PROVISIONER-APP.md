@@ -42,6 +42,9 @@ counts towards a lock that is for good.
   screen keeps raw block counts. A full card image means LOAD finished; the
   screen reports installation, key rotation, and record confirmation
   separately before calling the attempt complete.
+- **Batch size is easy to adjust.** The count has step buttons and selects its
+  value on focus. Empty or out-of-range input shows the supported range and
+  cannot create a batch.
 - **The button that commits says what it does** — `PROGRAM CARD`, `START
   BATCH` — and is grey until it can be pressed. A way back is at the top left;
   there is no CANCEL at the bottom except the in-tap Cancel on the loop screen
@@ -99,7 +102,8 @@ Reached from sign-in. `NEW BATCH`, then:
   holder apps own ownerless setup.
 - **Limits**: the daily limit and the no-PIN limit, amounts typed dollars
   first and sats under, in the wallet apps' own format.
-- **Count**: the batch size, typed.
+- **Count**: the batch size, adjusted with step buttons or replaced directly
+  by typing; 1 to 100,000 cards.
 - `START BATCH` at the bottom, grey until the four are set. Under it the load
   set's identity: `Builds the 2.1 card. Load file fe7d8ac3…` — the sha the app
   pins, so an operator can see before the first tap which card software the

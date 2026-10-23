@@ -17,8 +17,8 @@ export class ProvisioningError extends Error {
 function bad(message: string): never {
   throw new ProvisioningError(400, 'bad-field', message);
 }
-const conflict = (message: string): never => {
-  throw new ProvisioningError(409, 'conflict', message);
+const conflict = (code: string, message: string): never => {
+  throw new ProvisioningError(409, code, message);
 };
 const missing = (): never => {
   throw new ProvisioningError(404, 'not-found');
@@ -371,7 +371,7 @@ export function createProvisioningBatch(
         existing.device_id !== scope.device_id ||
         existing.config_json !== serialized
       )
-        conflict('batch request changed');
+        conflict('batch-request-changed', 'batch request changed');
       return presentBatch(existing);
     }
     const batch = createBatch(db, {
@@ -432,14 +432,17 @@ export function reserveAttempt(
         scoped.batch_id !== input.batch_id ||
         scoped.ordinal !== input.ordinal
       )
-        conflict('attempt request changed');
+        conflict('attempt-request-changed', 'attempt request changed');
       return presentAttempt(db, scoped);
     }
     assertIndependentBackup(db);
     const batch = batchRow(db, scope, input.batch_id);
     const config = JSON.parse(batch.config_json) as ProvisioningConfig;
     if (input.ordinal !== batch.next_ordinal || input.ordinal >= config.count)
-      conflict('ordinal is not the next unreserved ordinal');
+      conflict(
+        'ordinal-not-next',
+        'ordinal is not the next unreserved ordinal',
+      );
     if (
       db.db
         .prepare(
@@ -447,7 +450,7 @@ export function reserveAttempt(
         )
         .get(scope.device_id)
     )
-      conflict('device has an active attempt');
+      conflict('device-active', 'device has an active attempt');
     db.db
       .prepare(
         `INSERT INTO provisioning_attempts (attempt_id,batch_id,ordinal,operator_id,device_id,revision,state,created)
@@ -471,8 +474,10 @@ export function reserveAttempt(
 }
 function transition(row: AttemptRow, revision: unknown): void {
   if (!uint(revision)) bad('invalid revision');
-  if (row.state !== 'active') conflict('attempt is terminal');
-  if (row.revision !== revision) conflict('stale attempt revision');
+  if (row.state !== 'active')
+    conflict('attempt-terminal', 'attempt is terminal');
+  if (row.revision !== revision)
+    conflict('stale-revision', 'stale attempt revision');
 }
 export function bindAttempt(
   db: OpsDb,
@@ -486,7 +491,8 @@ export function bindAttempt(
     writable(db);
     const row = attemptRow(db, scope, attemptId);
     if (row.bind_receipt) {
-      if (row.chip_id !== input.chip_id) conflict('chip binding changed');
+      if (row.chip_id !== input.chip_id)
+        conflict('chip-binding-changed', 'chip binding changed');
       return JSON.parse(row.bind_receipt) as BindReceipt;
     }
     transition(row, input.revision);
@@ -497,7 +503,7 @@ export function bindAttempt(
         )
         .get(input.chip_id)
     )
-      conflict('chip has an unresolved attempt');
+      conflict('chip-unresolved', 'chip has an unresolved attempt');
     const receipt: BindReceipt = {
       attempt_id: attemptId,
       chip_id: input.chip_id,
@@ -530,7 +536,8 @@ export function recordAttempt(
       .get(attemptId) as {body_json: string; receipt_json: string} | undefined;
     const serialized = canonicalRecord(input.record);
     if (old) {
-      if (old.body_json !== serialized) conflict('completion record changed');
+      if (old.body_json !== serialized)
+        conflict('completion-record-changed', 'completion record changed');
       return JSON.parse(old.receipt_json) as CompletionReceipt;
     }
     transition(row, input.revision);
@@ -550,13 +557,16 @@ export function recordAttempt(
       r.configuration_revision !== config.configuration_revision ||
       r.load_sha256 !== config.load_sha256
     )
-      conflict('completion does not match reserved identity/configuration');
+      conflict(
+        'completion-identity-mismatch',
+        'completion does not match reserved identity/configuration',
+      );
     if (
       db.db
         .prepare('SELECT 1 FROM provisioning_records WHERE installation_id = ?')
         .get(r.installation_id)
     )
-      conflict('installation already recorded');
+      conflict('installation-recorded', 'installation already recorded');
     const receipt: CompletionReceipt = {
       attempt_id: attemptId,
       installation_id: r.installation_id,
@@ -604,7 +614,8 @@ export function disposeAttempt(
     writable(db);
     const row = attemptRow(db, scope, attemptId);
     if (row.disposition_receipt) {
-      if (row.disposition_json !== serialized) conflict('disposition changed');
+      if (row.disposition_json !== serialized)
+        conflict('disposition-changed', 'disposition changed');
       return JSON.parse(row.disposition_receipt) as DispositionReceipt;
     }
     transition(row, input.revision);
@@ -638,7 +649,8 @@ export function issueAttemptKeys(
   return db.db.transaction(() => {
     writable(db);
     const row = attemptRow(db, scope, attemptId);
-    if (row.state !== 'active') conflict('attempt is terminal');
+    if (row.state !== 'active')
+      conflict('attempt-terminal', 'attempt is terminal');
     assertIndependentBackup(db);
     const keys = db.db
       .prepare('SELECT * FROM issued_keys WHERE batch_id = ? AND ordinal = ?')
