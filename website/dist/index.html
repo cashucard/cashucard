@@ -41,12 +41,13 @@
           <span class="visual-caption caption-top">WALLET <i>→</i> CARD</span>
           <span class="visual-caption caption-bottom">CARD <i>→</i> TERMINAL</span>
           <div class="hero-card-shadow"></div>
-          <div class="hero-card">
+          <div class="card-underlay"><span>CASHU / OPEN ECASH</span></div>
+          <div class="hero-card product-card" data-finish="sage">
             <div class="hero-card-sheen"></div>
-            <div class="hero-card-top"><span>cashu<span>card</span></span><span class="nfc-mark">)))</span></div>
-            <div class="hero-chip"><i></i><i></i></div>
+            <div class="hero-card-top"><span>cashu<span>card</span></span><svg class="card-nfc" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M9 8a6 6 0 0 1 0 8m4-11a10 10 0 0 1 0 14m4-17a14 14 0 0 1 0 20"/></svg></div>
+            <div class="hero-chip"><i></i><i></i><i></i></div>
             <img class="hero-mascot" src="/assets/cashu.png" alt="" width="150" height="172" />
-            <div class="hero-card-bottom"><span>OPEN ECASH</span><span>◌ / 2.1</span></div>
+            <div class="hero-card-bottom"><span>CASHU ECASH CARD</span><span>↗</span></div>
           </div>
           <span class="visual-cross cross-a">+</span><span class="visual-cross cross-b">+</span>
         </div>
@@ -54,21 +55,29 @@
       </section>
       <section class="story" id="story" aria-labelledby="story-title">
         <div class="story-heading">
-          <div><span class="section-kicker">THE CARD FLOW <span>/</span> 01–04</span><h2 id="story-title">From blank card<br />to settled payment.</h2></div>
-          <p>Applet → proofs → signed spend → mint.</p>
+          <div><span class="section-kicker">THE CARD FLOW <span>/</span> 01–04</span><h2 id="story-title">One card.<br />Four moments.</h2></div>
+          <p>Follow the card from setup to settlement.</p>
         </div>
-        <div class="story-film" data-step="0">
+        <div class="story-film" data-step="0" data-phase="ready">
           <div class="film-corner top-left" aria-hidden="true">+</div><div class="film-corner top-right" aria-hidden="true">+</div>
           <div class="film-corner bottom-left" aria-hidden="true">+</div><div class="film-corner bottom-right" aria-hidden="true">+</div>
-          <div class="film-top"><span id="film-number">01 / 04</span><span>EXCHANGE DIAGRAM <span class="film-live">●</span></span></div>
-          <div class="scene-track" aria-hidden="true">
-            <div class="actor"><span class="actor-icon phone-icon" id="actor-icon-0"><i></i><i></i></span><strong id="actor-name-0">Provisioner</strong><small id="actor-detail-0">Installs applet</small></div>
-            <div class="rail"><span class="rail-label" id="rail-label-0">APPLET</span><span class="scene-packet"></span></div>
-            <div class="actor"><span class="actor-icon card-icon" id="actor-icon-1"><img src="/assets/cashu.png" alt="" /></span><strong id="actor-name-1">Cashu card</strong><small id="actor-detail-1">Receives applet</small></div>
-            <div class="rail rail-second"><span class="rail-label" id="rail-label-1">READY</span><span class="scene-packet"></span></div>
-            <div class="actor"><span class="actor-icon check-icon" id="actor-icon-2">✓</span><strong id="actor-name-2">Ready</strong><small id="actor-detail-2">For holder setup</small></div>
+          <div class="film-top"><span id="film-number">01 / 04</span><span>THE CARD, IN MOTION <span class="film-live">●</span></span></div>
+          <div class="film-stage" aria-hidden="true">
+            <div class="film-grid"></div>
+            <div class="film-orbit orbit-a"></div><div class="film-orbit orbit-b"></div>
+            <div class="film-device"><div class="device-screen"><span class="device-eyebrow">CASHU</span><strong class="device-title">PROVISIONER</strong><span class="device-progress"><i></i></span><span class="device-caption">INSTALL APPLET</span></div></div>
+            <div class="film-mint"><div class="mint-mark">◈</div><span>MINT</span></div>
+            <div class="film-terminal"><div class="terminal-display"><span>◉</span><b>REQUEST</b></div><div class="terminal-keypad"><i></i><i></i><i></i></div></div>
+            <div class="film-card product-card" data-finish="sage"><div class="film-card-face"><div class="film-card-top"><span class="film-card-name">cashu<span>card</span></span><span class="film-card-radio">◖))</span></div><div class="film-card-chip"><i></i><i></i><i></i></div><img src="/assets/cashu.png" alt="" width="90" height="103"/><div class="film-card-foot">OPEN ECASH <span>↗</span></div></div><div class="film-card-back">CASHU / 2.1<br><span>ONE OPEN WIRE</span></div></div>
+            <div class="film-proof proof-one">◈</div><div class="film-proof proof-two">◈</div><div class="film-proof proof-three">◈</div>
+            <div class="film-signal signal-one"></div><div class="film-signal signal-two"></div><div class="film-signal signal-three"></div>
+            <div class="film-leader leader-one"></div><div class="film-leader leader-two"></div>
+            <div class="film-callout callout-one"><span>01</span><strong id="callout-one">APPLET INSTALLED</strong></div>
+            <div class="film-callout callout-two"><span>02</span><strong id="callout-two">READY FOR HOLDER</strong></div>
+            <div class="film-status-badge"><span class="badge-icon">✓</span><span id="film-badge">READY FOR HOLDER</span></div>
           </div>
-          <div class="film-bottom"><span id="film-status">01 / PROVISION</span><span class="film-rule"></span><span>CARD AUTHORIZES. MINT SETTLES.</span></div>
+          <div class="film-bottom"><span id="film-status">01 / PROVISION</span><span class="film-rule"></span><span>CARD AUTHORIZES · MINT SETTLES</span></div>
+          <div class="film-progress" aria-hidden="true"><i></i></div>
         </div>
         <div class="story-controls">
           <div class="story-steps" role="tablist" aria-label="Card flow steps">

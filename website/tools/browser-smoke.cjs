@@ -126,6 +126,7 @@ async function main() {
     await viewport(1440, 900);
     await send("Page.navigate", { url: origin });
     await until("!!document.querySelector('.story-film')", "story loaded");
+    assert.ok(await evaluate("!!document.querySelector('.film-card') && !!document.querySelector('.film-device') && !!document.querySelector('.film-mint')"), "One card travels through the physical protocol story");
     await evaluate("document.fonts.ready");
     assert.ok(
       await evaluate("document.body.innerText.trim().split(/\s+/).length < 240"),
@@ -136,9 +137,9 @@ async function main() {
       "Desktop page fits roughly two screens",
     );
     assert.equal(
-      await evaluate("getComputedStyle(document.querySelector('.scene-packet')).animationName"),
+      await evaluate("getComputedStyle(document.querySelector('.film-card')).animationName"),
       "none",
-      "System reduced motion stops packet animation",
+      "System reduced motion stops card animation",
     );
     assert.equal(
       await evaluate("document.querySelector('.story-film').dataset.step"),
@@ -221,13 +222,18 @@ async function main() {
     await click("#step-0");
     await click(".story-play");
     assert.equal(
-      await evaluate("getComputedStyle(document.querySelector('.scene-packet')).animationName"),
-      "packet-travel",
-      "Play animates the transfer",
+      await evaluate("getComputedStyle(document.querySelector('.film-card')).animationName"),
+      "film-card-provision",
+      "Play animates the physical card",
     );
     await new Promise((r) => setTimeout(r, 700));
     await screenshot("03-transfer-in-motion");
     await until("document.querySelector('.story-film').dataset.step==='1'", "story advances");
+    assert.equal(
+      await evaluate("getComputedStyle(document.querySelector('.film-proof')).animationName"),
+      "proof-travel",
+      "Loading animates mint proofs toward the card",
+    );
     await click(".story-play");
     assert.equal(
       await evaluate("document.querySelector('.story-play').getAttribute('aria-label')"),
@@ -235,6 +241,12 @@ async function main() {
       "The story can be stopped",
     );
     assert.deepEqual(errors, [], "No browser exceptions");
+    await send("Page.navigate", { url: origin + "/concepts.html" });
+    await until("document.querySelectorAll('.concept-option').length===3", "Three card finishes load");
+    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Card finishes fit desktop");
+    await screenshot("04-card-finishes");
+    await viewport(390, 844);
+    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Card finishes fit mobile");
     console.log("PASS: compact responsive story, meaningful controls, source links, reduced motion");
     console.log("Screenshots: " + output);
   } finally {

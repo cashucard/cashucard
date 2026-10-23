@@ -11,7 +11,7 @@ then open http://127.0.0.1:9117. No package install or backend is needed.
 
 `tools/browser-smoke.cjs` uses Node 22 and installed Chrome to check the
 compact desktop and phone layouts, the four-step flow, keyboard controls,
-implementation links and reduced motion. It creates and removes a separate browser
+implementation links, the three card finishes and reduced motion. It creates and removes a separate browser
 profile. Set SITE_TEST_ORIGIN to another preview origin if needed.
 
 ## Content and assets
@@ -25,6 +25,8 @@ integration is complete.
 
 The original Cashu mascot is from https://cashu.space/cashu-no-bg.png.
 Physical card artwork, illustrations and motion are native HTML/CSS/SVG.
+`dist/concepts.html` is an unindexed comparison of Ops Sage, Forest Emboss and
+Ivory Signal. Ops Sage is the current public homepage finish.
 Figtree fonts are bundled from the provisioner app under the SIL Open Font
 License in `dist/assets/OFL.txt`. Reference implementation attribution is
 retained in LICENSE; the site links to the project's credits and license.
@@ -33,7 +35,8 @@ retained in LICENSE; the site links to the project's credits and license.
 
 The visual story starts once when the user reaches it, then stops after its
 four stages. Play, pause, replay and step buttons control it directly. Each
-stage animates the labeled transfer between participants. System reduced motion
+stage animates the same physical card, with mint proofs, NFC authorization and
+settlement shown as distinct events. System reduced motion
 disables autoplay and animation; the motion toggle provides the same control.
 Content and the first story frame remain readable without JavaScript. Tabs
 support arrows, Home and End. The site code uses no analytics, cookies, forms
@@ -41,10 +44,7 @@ or browser persistence. The hosting platform may set infrastructure cookies.
 
 ## Publication
 
-This directory is the public source mirror of the protocol website. The Sites
-checkout is `/Users/dread/Repos/cashu-card-protocol-site`, with its project
-identity tracked in `.openai/hosting.json` there. Keep the published `dist/`
-files and this mirror identical when editing. Use the Sites
+The Sites project identity is tracked in `.openai/hosting.json`. Use the Sites
 source workflow to push the exact source, package `dist/` and publish the saved
 version. The public site must use public access; custom-domain DNS records must
 come from the Sites domain response. Do not point the apex to the ops Worker.

@@ -2453,3 +2453,28 @@ links. A focused animated transfer makes the protocol legible with much less
 copy. Rejected a prerecorded video for this revision because native animation
 stays sharp at phone sizes, loads with the page and lets visitors inspect each
 stage without an added media asset.
+
+## D82 — Object-led motion and card finish studies for the public site
+
+**Decided (2026-10-22):** Use the ops console's restrained sage card as the
+public hero treatment. Keep two additional native-art finish studies, Forest
+Emboss and Ivory Signal, at the unindexed `/concepts` route for review. The
+homepage stays focused on the protocol and retains its roughly two-screen
+desktop length.
+
+Replace the three-icon transfer diagram with one card that persists through
+all four stages. The provisioner installs the applet, the holder's wallet
+loads mint-issued proofs, an NFC tap produces the card's authorization, and
+the terminal settles with the mint. Object movement, proof tokens, NFC waves,
+anchored callouts and a chapter timer distinguish the events. A settlement
+badge appears only in the settlement stage; the tap stage says authorization
+is pending mint settlement. The finite playback and reduced-motion controls
+from D81 remain.
+
+**Why:** review found the saturated hero card weaker than the existing ops
+artwork and the moving-packet diagram insufficiently expressive. An
+object-led sequence makes the card's role visible while preserving the short
+page, inspectable chapter controls, small payload and wallet-neutral claims.
+Rejected a long scroll-locked render sequence and an autoplaying video because
+they would expand the page and make individual protocol stages harder to
+inspect on a phone.
