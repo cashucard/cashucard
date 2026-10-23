@@ -2652,3 +2652,19 @@ audited historical import exists.
 **Rejected:** returning manager keys from a lookup or treating a recorded
 installation alone as reset authority. The key set may have changed after the
 record, and a later interrupted attempt may have changed the card again.
+
+## D93 — Persist a reset intent before any destructive tap
+
+**Decided (2026-10-23):** The phone keeps reset state separately from its
+installation attempt journal. The immutable binding includes the service and
+source origins, operator/device, reset ID, full CPLC, old applet public key,
+source attempt and card-specific consent. It cannot advance to deletion intent
+without a saved service intent receipt. Each later stage advances one step;
+a lost DELETE reply leaves `delete_intent` on disk until independent inspection
+establishes the deletion state. A stopped or completed journal is terminal.
+The journal stores no manager keys or holder secrets.
+
+**Rejected:** storing reset progress only in screen state, reusing the
+installation attempt journal, or advancing from intent directly to key
+rotation after a lost reply. Those would erase the distinction between a
+command being sent and its effect being observed.

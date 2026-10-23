@@ -63,3 +63,8 @@ applet public key. An unresolved attempt blocks the lookup even when an older
 record exists. The response contains no key bytes and is not a reset permit.
 The durable intent, audited reconciliation and card operation remain the next
 implementation gates.
+
+The phone now has a separate nonsecret reset journal. Its deletion stage
+requires a service intent receipt and survives a lost reply. It is not wired
+to a card operation yet; the service intent endpoint, applet/package state
+inspection, reconciliation and the destructive operation remain gated.
