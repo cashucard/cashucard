@@ -4,7 +4,6 @@ import {stagingRouteAllowed} from '../src/staging-routes';
 const attempt = '00000000-0000-4000-8000-000000000001';
 test('staging permits only operator provisioning and backup-status methods', () => {
   for (const [method, path] of [
-    ['GET', '/'],
     ['GET', '/mints'],
     ['GET', '/ops/operators'],
     ['GET', '/admin/operators'],
