@@ -16,12 +16,13 @@ the same OpsStore; no database, key, credential or cron migration is needed.
    CNAME to the workers.dev hostname. Workers Custom Domains create their own
    DNS record and managed certificate. An existing CNAME at `ops` must be
    resolved before attaching the custom domain.
-4. In `ops/wrangler.production.toml`, replace `routes = []` with:
+4. The prepared `ops/wrangler.production.toml` custom-domain route is:
 
    ```toml
    routes = [{ pattern = "ops.cashucard.org", custom_domain = true }]
    ```
 
+   Wait for the zone to be Active before merging and deploying this route.
    Keep `workers_dev = true`. Deploy that explicit production configuration.
    Do not remove other bindings, secrets or schedules. Keep this route in source
    control so subsequent deployments preserve it.
