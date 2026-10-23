@@ -10,7 +10,7 @@ The site is buildless HTML and CSS in `dist/`. Fonts and images are local. Run
 http://127.0.0.1:9117. No package install or backend is needed.
 
 `tools/browser-smoke.cjs` uses Node 22 and installed Chrome to check desktop
-and phone layouts, direct protocol and code links, the three card finishes and
+and phone layouts, footer protocol and code links, the three card finishes and
 reduced motion. It creates and removes a separate browser profile. Set
 `SITE_TEST_ORIGIN` to another preview origin if needed.
 
@@ -19,8 +19,9 @@ reduced motion. It creates and removes a separate browser profile. Set
 Protocol facts come from lnflash/cashu-card's specification, APDU reference,
 security model and license. The NUT-XX proposal remains a draft. Review the
 source specification when changing the payment or ownership explanation.
-Links point to the draft and the Cashu Card, Flash Mobile, Foxy iOS and Flash
-POS repositories. Their role labels do not claim completed integrations.
+Footer links point to the draft and the Cashu Card source, with Flash Mobile,
+Foxy iOS and Flash POS grouped under Apps. The links do not claim completed
+integrations.
 
 The original Cashu mascot is from https://cashu.space/cashu-no-bg.png.
 Physical card artwork is native HTML/CSS/SVG. `dist/concepts.html` is an

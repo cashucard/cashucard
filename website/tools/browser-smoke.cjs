@@ -129,11 +129,13 @@ async function main() {
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
     assert.ok(await evaluate("document.querySelector('.button-bright').href.includes('/spec/NUT-XX.md')"), "Primary action opens the draft");
     assert.equal(await evaluate("document.querySelector('.button-outline').hash"), "#source", "Secondary action reaches the code");
+    assert.equal(await evaluate("document.querySelector('#source').tagName"), "FOOTER", "Source links live in the footer");
+    assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===3)"), true, "Apps are grouped in the footer");
     assert.equal(await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>!!document.querySelector(a.hash))"), true, "Every page anchor exists");
     for (const repo of [
       "lnflash/cashu-card", "lnflash/flash-mobile", "getfoxy/iOS", "lnflash/flash-pos",
     ]) {
-      assert.ok(await evaluate("[...document.querySelectorAll('.source-links a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
+      assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
     }
     await screenshot("01-home-desktop");
     await evaluate("document.querySelector('#source').scrollIntoView()");
