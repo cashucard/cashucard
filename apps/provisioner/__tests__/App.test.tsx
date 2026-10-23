@@ -209,7 +209,7 @@ test('settings confirms sign-out while a saved batch exists', async () => {
     .findAll(n => typeof n.props.children === 'string')
     .map(n => n.props.children)
     .join(' ');
-  expect(words).toContain('Version 1.0.0 (5)');
+  expect(words).toContain('Version 1.0.0 (6)');
   expect(words).toContain('CAP pin f27d92ba');
   tree.unmount();
 });
