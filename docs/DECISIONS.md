@@ -2410,6 +2410,9 @@ obscure the account and provisioning tasks operators came to complete.
 
 ## D80 — Public Cashu Card protocol website
 
+The content layout and motion described below were superseded by D81. The
+separate hosting, public source mirror and asset decisions still apply.
+
 Publish a wallet-neutral protocol introduction at cashucard.org, separate from
 ops.cashucard.org and its authenticated service. Keep a public source mirror
 in website/ with locally hosted fonts, the original Cashu mascot and native
@@ -2425,3 +2428,28 @@ The source is packaged and published with Sites, with its returned apex and
 verification DNS records on the existing Cloudflare zone. Keep the ops custom
 domain and service bindings intact. Rejected a combined public/admin backend,
 external frontend dependencies and continuously running decorative animation.
+
+## D81 — Compact visual story for the public protocol site
+
+**Decided (2026-10-22):** Keep the public site to roughly two desktop screens:
+a brief hero, one four-stage visual story, and direct links to the draft
+protocol and public implementation repositories. The story shows the applet
+moving from provisioner to card, proofs moving from mint through wallet to
+card, a terminal/card authorization, and terminal/mint settlement. Each stage
+names its participants and what moves between them. It plays once when reached,
+then stops; visitors can choose a step, pause, or replay. Reduced-motion
+preferences disable autoplay and transfer animation.
+
+Link directly to Cashu Card, Flash Mobile, Foxy iOS and Flash POS as
+implementation sources, while avoiding claims that every integration is
+complete or certified. Keep the draft status, MIT license and separate
+operator-console link visible. D80's longer audience tabs, code example and
+resource catalogue move to the repository rather than occupying the landing
+page.
+
+**Why:** user review found the first flow diagram visually attractive but weak
+at explaining the exchange, and the five long sections hid the useful source
+links. A focused animated transfer makes the protocol legible with much less
+copy. Rejected a prerecorded video for this revision because native animation
+stays sharp at phone sizes, loads with the page and lets visitors inspect each
+stage without an added media asset.

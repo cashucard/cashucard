@@ -1,10 +1,141 @@
 "use strict";
 (() => {
-  const root = document.documentElement;
   const $ = (selector) => document.querySelector(selector);
-  const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
-  let explicitMotion = false;
+  const root = document.documentElement;
+  const film = $(".story-film");
+  const tabs = [...document.querySelectorAll(".story-steps [role=tab]")];
+  const playButton = $(".story-play");
   const motionButton = $(".motion-toggle");
+  const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
+  const stages = [
+    {
+      label: "PROVISION",
+      title: "A provisioner installs the applet.",
+      copy: "The card is ready for a holder's wallet to take ownership.",
+      actors: [
+        ["phone", "Provisioner", "Installs applet"],
+        ["card", "Cashu card", "Receives applet"],
+        ["check", "Ready", "For holder setup"],
+      ],
+      rails: ["APPLET", "READY"],
+    },
+    {
+      label: "LOAD",
+      title: "The wallet loads mint-issued ecash.",
+      copy: "The holder sets the owner key and loads proofs onto the card.",
+      actors: [
+        ["mint", "Mint", "Issues proofs"],
+        ["phone", "Holder's wallet", "Sets owner key"],
+        ["card", "Cashu card", "Holds ecash"],
+      ],
+      rails: ["PROOFS", "LOAD"],
+    },
+    {
+      label: "TAP",
+      title: "A tap authorizes the spend.",
+      copy: "The terminal requests payment. The card signs; mint settlement follows.",
+      actors: [
+        ["terminal", "Terminal", "Requests spend"],
+        ["card", "Cashu card", "Signs spend"],
+        ["signature", "Authorized", "Awaiting mint"],
+      ],
+      rails: ["TAP", "SIGNED"],
+    },
+    {
+      label: "SETTLE",
+      title: "The mint settles the payment.",
+      copy: "The terminal redeems the proofs and completes the card's change flow.",
+      actors: [
+        ["terminal", "Terminal", "Submits proofs"],
+        ["mint", "Mint", "Redeems ecash"],
+        ["check", "Payment", "Settled"],
+      ],
+      rails: ["REDEEM", "SETTLED"],
+    },
+  ];
+  let current = 0;
+  let playing = false;
+  let autoPlayed = false;
+  let explicitMotion = false;
+  let stepTimer;
+  let animationTimer;
+
+  function makeIcon(node, kind) {
+    node.className = "actor-icon " + kind + "-icon";
+    node.replaceChildren();
+    if (kind === "phone") {
+      node.append(document.createElement("i"), document.createElement("i"));
+    } else if (kind === "card") {
+      const image = document.createElement("img");
+      image.src = "/assets/cashu.png";
+      image.alt = "";
+      node.append(image);
+    } else {
+      node.textContent =
+        kind === "mint" ? "◈" : kind === "signature" ? "✦" : kind === "check" ? "✓" : "";
+    }
+  }
+  function selectStage(index, animate = true) {
+    current = index;
+    const stage = stages[index];
+    film.dataset.step = String(index);
+    $("#film-number").textContent = String(index + 1).padStart(2, "0") + " / 04";
+    $("#film-status").textContent =
+      String(index + 1).padStart(2, "0") + " / " + stage.label;
+    $(".detail-number").textContent =
+      String(index + 1).padStart(2, "0") + " / " + stage.label;
+    $("#detail-title").textContent = stage.title;
+    $("#detail-copy").textContent = stage.copy;
+    $("#story-panel").setAttribute("aria-labelledby", "step-" + index);
+    stage.actors.forEach(([kind, name, detail], i) => {
+      makeIcon($("#actor-icon-" + i), kind);
+      $("#actor-name-" + i).textContent = name;
+      $("#actor-detail-" + i).textContent = detail;
+    });
+    stage.rails.forEach((label, i) => {
+      $("#rail-label-" + i).textContent = label;
+    });
+    tabs.forEach((tab, i) => {
+      tab.setAttribute("aria-selected", String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+    });
+    clearTimeout(animationTimer);
+    film.classList.remove("is-animating");
+    if (animate && root.dataset.motion !== "reduce") {
+      void film.offsetWidth;
+      film.classList.add("is-animating");
+      animationTimer = setTimeout(() => film.classList.remove("is-animating"), 3150);
+    }
+  }
+  function setPlayLabel(label) {
+    playButton.setAttribute("aria-label", label + " story");
+    $(".play-label").textContent = label;
+    playButton.querySelector("span[aria-hidden]").textContent =
+      label === "Pause" ? "Ⅱ" : "▶";
+  }
+  function stopPlay() {
+    clearTimeout(stepTimer);
+    playing = false;
+    setPlayLabel("Replay");
+  }
+  function advance() {
+    if (!playing) return;
+    if (current === stages.length - 1) {
+      stopPlay();
+      return;
+    }
+    selectStage(current + 1);
+    stepTimer = setTimeout(advance, 3400);
+  }
+  function startPlay() {
+    if (root.dataset.motion === "reduce") return;
+    clearTimeout(stepTimer);
+    autoPlayed = true;
+    playing = true;
+    setPlayLabel("Pause");
+    selectStage(0);
+    stepTimer = setTimeout(advance, 3400);
+  }
   function setMotion(reduce) {
     root.dataset.motion = reduce ? "reduce" : "full";
     motionButton.setAttribute("aria-pressed", String(reduce));
@@ -12,289 +143,63 @@
       document.createTextNode(reduce ? "Enable motion " : "Reduce motion "),
     );
     const symbol = document.createElement("span");
+    symbol.setAttribute("aria-hidden", "true");
     symbol.textContent = reduce ? "↗" : "◌";
     motionButton.append(symbol);
+    playButton.disabled = reduce;
+    playButton.title = reduce ? "Choose a step to explore the flow" : "";
+    if (reduce) {
+      if (playing) stopPlay();
+      film.classList.remove("is-animating");
+    }
   }
   setMotion(motionPreference.matches);
   motionButton.addEventListener("click", () => {
     explicitMotion = true;
     setMotion(root.dataset.motion !== "reduce");
   });
-  motionPreference.addEventListener("change", (e) => {
-    if (!explicitMotion) setMotion(e.matches);
+  motionPreference.addEventListener("change", (event) => {
+    if (!explicitMotion) setMotion(event.matches);
+  });
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      if (playing) stopPlay();
+      autoPlayed = true;
+      selectStage(Number(tab.dataset.step));
+    });
+  });
+  $(".story-steps").addEventListener("keydown", (event) => {
+    const index = tabs.indexOf(document.activeElement);
+    if (index < 0) return;
+    let next;
+    if (["ArrowRight", "ArrowDown"].includes(event.key)) next = (index + 1) % tabs.length;
+    else if (["ArrowLeft", "ArrowUp"].includes(event.key))
+      next = (index + tabs.length - 1) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    tabs[next].click();
+    tabs[next].focus();
+  });
+  playButton.addEventListener("click", () => {
+    if (playing) stopPlay();
+    else startPlay();
   });
   if ("IntersectionObserver" in window) {
-    root.classList.add("js");
     const observer = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("revealed");
-            observer.unobserve(entry.target);
-          }
-        }),
-      { threshold: 0.08 },
+      (entries) => {
+        if (
+          entries.some((entry) => entry.isIntersecting) &&
+          !autoPlayed &&
+          root.dataset.motion !== "reduce"
+        ) {
+          observer.disconnect();
+          startPlay();
+        }
+      },
+      { threshold: 0.18 },
     );
-    document
-      .querySelectorAll("[data-reveal]")
-      .forEach((element) => observer.observe(element));
+    observer.observe($("#story"));
   }
-  const hero = $(".hero"),
-    stack = $(".hero-stack"),
-    progress = $(".reading-progress");
-  let scheduled = false;
-  function updateScroll() {
-    scheduled = false;
-    const range = document.documentElement.scrollHeight - innerHeight;
-    progress.style.transform =
-      "scaleX(" + (range > 0 ? Math.min(1, scrollY / range) : 0) + ")";
-    if (
-      root.dataset.motion !== "reduce" &&
-      scrollY < hero.offsetHeight &&
-      innerWidth > 800
-    )
-      stack.style.setProperty("--hero-y", Math.min(scrollY * 0.07, 42) + "px");
-  }
-  addEventListener(
-    "scroll",
-    () => {
-      if (!scheduled) {
-        scheduled = true;
-        requestAnimationFrame(updateScroll);
-      }
-    },
-    { passive: true },
-  );
-  addEventListener("resize", updateScroll, { passive: true });
-  updateScroll();
-  hero.addEventListener(
-    "pointermove",
-    (e) => {
-      if (
-        root.dataset.motion === "reduce" ||
-        !matchMedia("(pointer:fine)").matches ||
-        innerWidth <= 800
-      )
-        return;
-      const rect = hero.getBoundingClientRect();
-      stack.style.setProperty(
-        "--rx",
-        4 - ((e.clientY - rect.top) / rect.height - 0.5) * 7 + "deg",
-      );
-      stack.style.setProperty(
-        "--ry",
-        -9 + (e.clientX / innerWidth - 0.5) * 13 + "deg",
-      );
-    },
-    { passive: true },
-  );
-  hero.addEventListener("pointerleave", () => {
-    stack.style.removeProperty("--rx");
-    stack.style.removeProperty("--ry");
-  });
-  const menu = $(".menu-button"),
-    mobileNav = $("#mobile-nav");
-  function closeMenu(focus = false) {
-    mobileNav.hidden = true;
-    menu.setAttribute("aria-expanded", "false");
-    menu.setAttribute("aria-label", "Open navigation");
-    if (focus) menu.focus();
-  }
-  menu.addEventListener("click", () => {
-    const open = menu.getAttribute("aria-expanded") !== "true";
-    menu.setAttribute("aria-expanded", String(open));
-    menu.setAttribute(
-      "aria-label",
-      open ? "Close navigation" : "Open navigation",
-    );
-    mobileNav.hidden = !open;
-  });
-  mobileNav.addEventListener("click", (e) => {
-    if (e.target.closest("a")) closeMenu();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !mobileNav.hidden) closeMenu(true);
-  });
-  addEventListener(
-    "resize",
-    () => {
-      if (innerWidth > 520) closeMenu();
-    },
-    { passive: true },
-  );
-  const stages = [
-    {
-      title: "Provision the card",
-      copy: "A provisioner installs the applet and prepares the card for holder setup. Provisioning access and holder ownership have separate roles.",
-      left: "Provisioner",
-      leftDetail: "Install the applet",
-      right: "Mint",
-      rightDetail: "Issues and redeems ecash",
-      wireLeft: "PROVISION",
-      wireRight: "CASHU",
-    },
-    {
-      title: "Set up ownership and load ecash",
-      copy: "A compatible wallet establishes the holder’s owner key, configures the card and loads Cashu proofs locked to the card’s public key.",
-      left: "Holder’s wallet",
-      leftDetail: "Owner key and settings",
-      right: "Mint",
-      rightDetail: "Issues locked proofs",
-      wireLeft: "SET UP",
-      wireRight: "ISSUE",
-    },
-    {
-      title: "Authorize the payment",
-      copy: "The terminal presents the payment inputs and outputs. The card signs the transaction and commits the selected proofs as spent, with change locked back to the card.",
-      left: "Payment terminal",
-      leftDetail: "Prepare the payment",
-      right: "Mint",
-      rightDetail: "Settlement participant",
-      wireLeft: "AUTHORIZE",
-      wireRight: "CASHU",
-    },
-    {
-      title: "Settle with the mint",
-      copy: "The terminal submits the signed proofs to the mint. Successful redemption settles the payment; the terminal completes the card’s change flow.",
-      left: "Payment terminal",
-      leftDetail: "Submit signed proofs",
-      right: "Mint",
-      rightDetail: "Redeem and settle",
-      wireLeft: "CHANGE",
-      wireRight: "SETTLE",
-    },
-  ];
-  let currentStep = 0,
-    switchTimer;
-  const stageElement = $(".flow-stage");
-  function selectStage(index) {
-    currentStep = index;
-    const stage = stages[index];
-    document.querySelectorAll(".flow-tabs [role=tab]").forEach((tab, i) => {
-      tab.setAttribute("aria-selected", String(i === index));
-      tab.tabIndex = i === index ? 0 : -1;
-    });
-    stageElement.dataset.step = String(index);
-    $("#flow-panel").setAttribute("aria-labelledby", "step-" + index);
-    $("#flow-panel-title").textContent = stage.title;
-    $("#flow-panel-copy").textContent = stage.copy;
-    $("#left-node").textContent = stage.left;
-    $("#left-detail").textContent = stage.leftDetail;
-    $("#right-node").textContent = stage.right;
-    $("#right-detail").textContent = stage.rightDetail;
-    $("#wire-left").textContent = stage.wireLeft;
-    $("#wire-right").textContent = stage.wireRight;
-    clearTimeout(switchTimer);
-    stageElement.classList.remove("is-switching");
-    requestAnimationFrame(() => stageElement.classList.add("is-switching"));
-    switchTimer = setTimeout(
-      () => stageElement.classList.remove("is-switching"),
-      850,
-    );
-  }
-  document
-    .querySelectorAll(".flow-tabs button")
-    .forEach((tab) =>
-      tab.addEventListener("click", () =>
-        selectStage(Number(tab.dataset.step)),
-      ),
-    );
-  $(".flow-next").addEventListener("click", () =>
-    selectStage((currentStep + 1) % stages.length),
-  );
-  const audiences = {
-    wallet: {
-      title: "Connect a wallet to the card.",
-      copy: "Implement the owner-key commands, configure the card and load Cashu proofs through the documented NFC interface.",
-      items: [
-        "Holder-controlled owner key",
-        "Card settings and spending limits",
-        "Cashu proof loading and refresh",
-      ],
-      link: "Explore the card interface",
-      url: "https://github.com/lnflash/cashu-card/blob/main/spec/APDU.md",
-    },
-    terminal: {
-      title: "Implement card payments.",
-      copy: "Build an NFC reader integration that coordinates card authorization, mint redemption and the card’s change flow.",
-      items: [
-        "Documented payment command sequence",
-        "SIG_ALL transaction authorization",
-        "Mint settlement and change handling",
-      ],
-      link: "Read the payment flow",
-      url: "https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md#paying-one-signature-for-the-payment",
-    },
-    card: {
-      title: "Build and provision cards.",
-      copy: "Use the JavaCard reference applet, host tools and provisioning library to evaluate compatible card hardware.",
-      items: [
-        "JavaCard reference implementation",
-        "Provisioning and key-rotation tools",
-        "Hardware deployment guides and reports",
-      ],
-      link: "Explore the applet and tools",
-      url: "https://github.com/lnflash/cashu-card",
-    },
-  };
-  function selectAudience(key) {
-    const item = audiences[key];
-    document.querySelectorAll(".audience-tabs [role=tab]").forEach((tab) => {
-      const selected = tab.dataset.audience === key;
-      tab.setAttribute("aria-selected", String(selected));
-      tab.tabIndex = selected ? 0 : -1;
-    });
-    $("#audience-panel").setAttribute("aria-labelledby", "audience-" + key);
-    $("#audience-title").textContent = item.title;
-    $("#audience-copy").textContent = item.copy;
-    $("#audience-list").replaceChildren(
-      ...item.items.map((text) => {
-        const li = document.createElement("li");
-        li.textContent = text;
-        return li;
-      }),
-    );
-    $("#audience-link").replaceChildren(
-      document.createTextNode(item.link + " "),
-    );
-    const arrow = document.createElement("span");
-    arrow.textContent = "↗";
-    $("#audience-link").append(arrow);
-    $("#audience-link").href = item.url;
-  }
-  document
-    .querySelectorAll(".audience-tabs button")
-    .forEach((tab) =>
-      tab.addEventListener("click", () => selectAudience(tab.dataset.audience)),
-    );
-  function keyboardTabs(selector, choose) {
-    const tabs = Array.from(
-      document.querySelectorAll(selector + " [role=tab]"),
-    );
-    $(selector).addEventListener("keydown", (e) => {
-      const index = tabs.indexOf(document.activeElement);
-      if (index < 0) return;
-      let next;
-      if (["ArrowRight", "ArrowDown"].includes(e.key))
-        next = (index + 1) % tabs.length;
-      else if (["ArrowLeft", "ArrowUp"].includes(e.key))
-        next = (index + tabs.length - 1) % tabs.length;
-      else if (e.key === "Home") next = 0;
-      else if (e.key === "End") next = tabs.length - 1;
-      else return;
-      e.preventDefault();
-      choose(tabs[next]);
-      tabs[next].focus();
-    });
-  }
-  keyboardTabs(".flow-tabs", (tab) => selectStage(Number(tab.dataset.step)));
-  keyboardTabs(".audience-tabs", (tab) => selectAudience(tab.dataset.audience));
-  $("#copy-command").addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText("00A404000BF043415348554341524401");
-      $("#copy-status").textContent = "SELECT command copied.";
-    } catch {
-      $("#copy-status").textContent = "Select the command text to copy it.";
-    }
-  });
 })();
