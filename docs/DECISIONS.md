@@ -2766,3 +2766,18 @@ when the operator explicitly runs the approved command again.
 bridge, silently using the local runner for production, or recording completion
 without durable verification evidence. The first physical run remains gated by
 the [named-card drill](OWNED-CARD-RESET-DRILL.md).
+
+## D98 — Report bounded reset failure phases without printing native errors
+
+**Decided (2026-10-23):** Local reset failures report a fixed operation phase
+and a bounded reason code. Reader-not-found, card-connect, transport, command
+rejection and source/service checks can be distinguished without key data,
+APDUs or arbitrary native exception text. Read-only card refusals may include
+their public status word and instruction. Unknown child errors are normalized.
+Tests exercise the private pipe with fake executables and preserve a reviewed
+journal when startup fails. Reporting does not add an APDU or retry.
+
+**Why:** the first physical invocation stopped before authorization, but its
+generic message could not distinguish readiness from an identity or preflight
+failure. Repeating that invocation without useful evidence would not improve
+recovery. Dumping exceptions or wire data would weaken secret handling.

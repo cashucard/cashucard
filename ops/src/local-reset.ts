@@ -30,12 +30,16 @@ import {
   issueResetKeys,
 } from './reset-intents';
 import {completeReset} from './reset-results';
-import {openResetReader} from './pcsc-reset';
+import {openResetReader, ResetReaderError} from './pcsc-reset';
 import {
   assessResetPreflight,
   inspectInstallation,
   readChipIdentity,
   resetOwnedCard,
+  CardError,
+  ChipIdentityMismatch,
+  InspectionError,
+  TransportError,
   type ResetStage as CardResetStage,
 } from '../../tools/cardkit';
 import {
@@ -62,6 +66,16 @@ interface SourceRow {
   operator_id: number;
   key_env: 'factory' | 'issued';
   escrow_present: number;
+}
+export class LocalResetFailure extends Error {
+  constructor(
+    readonly phase: string,
+    readonly code: string,
+    readonly sw?: number,
+    readonly ins?: number,
+  ) {
+    super('local reset stopped; retain its journal and source backup');
+  }
 }
 function protectedFile(path: string): void {
   const stat = lstatSync(path);
@@ -218,6 +232,7 @@ export async function executeLocalReset(
   const lock = openSync(options.journal + '.lock', 'wx', 0o600);
   let service: OpsDb | undefined,
     reader: Awaited<ReturnType<typeof openResetReader>> | undefined;
+  let phase = 'source';
   try {
     protectedFile(options.db);
     const source = new Database(options.db, {
@@ -268,6 +283,7 @@ export async function executeLocalReset(
           JSON.stringify({fingerprint, binding, journal: JSON.parse(value)}),
         ),
     };
+    phase = 'journal';
     let journal = await loadResetJournal(storage);
     if (!journal) {
       journal = {
@@ -297,7 +313,9 @@ export async function executeLocalReset(
       journal.stage === 'stopped'
     )
       throw new Error('journal requires reconciliation');
+    phase = 'backup';
     await backupSource(options, fingerprint, row);
+    phase = 'source-lock';
     const sql = openSqliteFile(options.db);
     try {
       sql.exec('PRAGMA locking_mode=EXCLUSIVE; BEGIN EXCLUSIVE; COMMIT;');
@@ -312,6 +330,7 @@ export async function executeLocalReset(
       key_env: journal.key_env,
     };
     let intent: ReturnType<typeof getResetIntent> | undefined;
+    phase = 'service-read';
     try {
       intent = getResetIntent(service, scope, journal.reset_id);
     } catch (e) {
@@ -330,12 +349,16 @@ export async function executeLocalReset(
       journal.stage !== 'factory_verified' &&
       journal.stage !== 'complete'
     ) {
+      phase = 'reader-connect';
       reader = await connect(options.python, options.reader);
       if (!intent) {
         if (journal.stage !== 'reviewed')
           throw new Error('saved authority is missing');
+        phase = 'fresh-identity';
         await readChipIdentity(reader.tx, journal.chip_id);
+        phase = 'fresh-installation';
         const inspected = await inspectInstallation(reader.tx);
+        phase = 'preflight';
         const preflight = assessResetPreflight({
           chipId: journal.chip_id,
           installation: inspected,
@@ -353,6 +376,7 @@ export async function executeLocalReset(
         });
         if (!preflight.ok || inspected.state !== 'present')
           throw new Error('fresh inspection refused');
+        phase = 'authorization';
         authorizeResetIntent(service, scope, {
           reset_id: journal.reset_id,
           chip_id: journal.chip_id,
@@ -376,6 +400,7 @@ export async function executeLocalReset(
         journal.service_intent_receipt !== receipt
       )
         throw new Error('service authority changed');
+      phase = 'key-release';
       const issued = issueResetKeys(service, scope, journal.reset_id);
       const keys = {
         enc: Array.from<number>(issued.enc),
@@ -383,6 +408,7 @@ export async function executeLocalReset(
         dek: Array.from<number>(issued.dek),
       };
       try {
+        phase = 'card-reset';
         const result = await resetOwnedCard(reader.tx, {
           keys,
           authority: {
@@ -425,6 +451,7 @@ export async function executeLocalReset(
     }
     if (!intent || !journal.factory_evidence)
       throw new Error('factory evidence is missing');
+    phase = 'completion';
     const receipt = completeReset(service, scope, journal.reset_id, {
       reset_id: journal.reset_id,
       source_attempt_id: journal.source_attempt_id,
@@ -435,6 +462,7 @@ export async function executeLocalReset(
       manager_keys: 'factory',
       cashu_package: 'absent',
     });
+    phase = 'local-acknowledgement';
     await writeResetJournal(storage, {
       ...journal,
       stage: 'complete',
@@ -446,6 +474,38 @@ export async function executeLocalReset(
       chip_id: journal.chip_id,
       reset_id: journal.reset_id,
     };
+  } catch (error) {
+    const readerError =
+      error instanceof ResetReaderError
+        ? error
+        : error instanceof TransportError &&
+            error.cause instanceof ResetReaderError
+          ? error.cause
+          : null;
+    const code =
+      readerError?.code ??
+      (error instanceof ProvisioningError
+        ? error.code
+        : error instanceof ChipIdentityMismatch
+          ? 'chip-mismatch'
+          : error instanceof InspectionError
+            ? 'invalid-applet-evidence'
+            : error instanceof CardError
+              ? 'card-refused'
+              : error instanceof TransportError
+                ? 'transport-failed'
+                : error &&
+                    typeof error === 'object' &&
+                    'code' in error &&
+                    error.code === 'SQLITE_BUSY'
+                  ? 'source-busy'
+                  : 'stopped');
+    throw new LocalResetFailure(
+      phase,
+      code,
+      error instanceof CardError ? error.sw : undefined,
+      error instanceof CardError ? error.ins : undefined,
+    );
   } finally {
     try {
       await reader?.close();
@@ -519,9 +579,19 @@ async function main(): Promise<void> {
   if (!result.ok) process.exitCode = 1;
 }
 if (require.main === module)
-  main().catch(() => {
+  main().catch(error => {
     console.error(
-      'local reset stopped; retain the journal and source backup for reconciliation',
+      JSON.stringify(
+        error instanceof LocalResetFailure
+          ? {
+              ok: false,
+              phase: error.phase,
+              reason: error.code,
+              sw: error.sw,
+              ins: error.ins,
+            }
+          : {ok: false, phase: 'preparation', reason: 'stopped'},
+      ),
     );
     process.exitCode = 1;
   });
