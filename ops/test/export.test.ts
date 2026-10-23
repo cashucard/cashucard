@@ -104,8 +104,8 @@ test('an ended batch stays fenced across encrypted backup and restore', async ()
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal(payload.version, 4);
-  if (payload.version !== 4) throw new Error('expected v4');
+  assert.equal(payload.version, 5);
+  if (payload.version !== 5) throw new Error('expected v5');
   assert.deepEqual(payload.provisioning_batch_closures, [
     {
       batch_id: 1,
@@ -192,7 +192,7 @@ test('recovery export restores card lookup without the derivation master or cred
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal((payload as unknown as {version: number}).version, 4);
+  assert.equal((payload as unknown as {version: number}).version, 5);
   assert.ok(!JSON.stringify(payload).includes('123456'));
   assert.ok(!JSON.stringify(payload).includes('password_hash'));
   const {restoreEscrowExport} = await import('../src/export');
@@ -284,7 +284,7 @@ test('recovery rejects invalid relationships and rolls back a failed insertion',
   );
 });
 
-test('v4 preserves provisioning retry identities, blocked chips and receipts; older versions stay readable', async () => {
+test('v5 preserves provisioning retry identities, blocked chips and receipts; older versions stay readable', async () => {
   const source = await seeded();
   const {restoreEscrowExport} = await import('../src/export');
   const {OpsDb} = await import('../src/db');
@@ -402,8 +402,8 @@ test('v4 preserves provisioning retry identities, blocked chips and receipts; ol
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal(payload.version, 4);
-  if (payload.version !== 4) throw new Error('expected v4');
+  assert.equal(payload.version, 5);
+  if (payload.version !== 5) throw new Error('expected v5');
   const target = new OpsDb({sql: openSqliteFile(':memory:')});
   restoreEscrowExport(target.db, payload);
   for (const table of [
@@ -461,6 +461,7 @@ test('v4 preserves provisioning retry identities, blocked chips and receipts; ol
   // v1 retains old suffix-only mappings but must not invent modern ownership.
   const {
     operator_audit: _audit,
+    reset_intents: _resets,
     provisioning_batch_closures: _closures,
     provisioning_batches: _b,
     provisioning_attempts: _a,
@@ -477,10 +478,16 @@ test('v4 preserves provisioning retry identities, blocked chips and receipts; ol
   const legacy2 = new OpsDb({sql: openSqliteFile(':memory:')});
   const {
     operator_audit: _v3audit,
+    reset_intents: _v5resets,
     provisioning_batch_closures: _v4closures,
     ...v2
   } = payload;
   restoreEscrowExport(legacy2.db, {...v2, operators: oldOperators, version: 2});
+  const legacy4 = new OpsDb({sql: openSqliteFile(':memory:')});
+  const {reset_intents: _v5intents, ...v4} = payload;
+  restoreEscrowExport(legacy4.db, {...v4, version: 4});
+  assert.deepEqual(legacy4.db.prepare('SELECT * FROM reset_intents').all(), []);
+  legacy4.close();
   const legacy3 = new OpsDb({sql: openSqliteFile(':memory:')});
   restoreEscrowExport(legacy3.db, {
     ...v2,
