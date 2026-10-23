@@ -43,11 +43,11 @@ export const adminClient =
           year: 'numeric',
           ...(full ? { hour: 'numeric', minute: '2-digit' } : {}),
         }).format(d)
-      : '—';
+      : 'N/A';
   };
   const ago = (value) => {
     const d = Math.floor(Date.now() / 1000 - Number(value));
-    if (!Number.isFinite(d)) return '—';
+    if (!Number.isFinite(d)) return 'N/A';
     if (d < 0) return date(value);
     if (d < 60) return 'Just now';
     if (d < 3600) return Math.floor(d / 60) + 'm ago';
@@ -77,17 +77,17 @@ export const adminClient =
     .forEach((e) => (e.textContent = environment));
   const messages = {
     'operator-admin-required':
-      'This account doesn’t have administrator access. Contact your deployment administrator.',
+      'Ask your service administrator to grant administrator access to this account.',
     'operator-admin-policy-invalid':
-      'Administrator access is not configured correctly. Contact your deployment administrator.',
+      'Ask your service administrator to check the administrator access configuration.',
     'operator-exists':
       'That operator name is already in use. Choose a different name.',
     'bad-password': 'Use a password between 12 and 1,024 characters.',
     'bad-field': 'Check the form details and try again.',
     'cannot-disable-self':
-      'You can’t disable your own account. Ask another administrator to manage your access.',
+      'Ask another administrator to disable your account.',
     'operator-not-found':
-      'This operator no longer exists. Refresh the workspace.',
+      'Refresh the workspace to load the current operator list.',
     'login-rate-limited':
       'Too many sign-in attempts. Wait a minute before trying again.',
     'no-session': 'Your session has expired. Sign in again to continue.',
@@ -126,7 +126,7 @@ export const adminClient =
     ['operators', 'attempts', 'audit'].forEach((id) => $(id).replaceChildren());
     document
       .querySelectorAll('.metric-value,.nav-count')
-      .forEach((e) => (e.textContent = '—'));
+      .forEach((e) => (e.textContent = '…'));
     $('password').value = '';
     $('password').type = 'password';
     $('toast').hidden = true;
@@ -135,7 +135,7 @@ export const adminClient =
     reveal.setAttribute('aria-label', 'Show password');
     reveal.setAttribute('aria-pressed', 'false');
     $('profile-name').textContent = '';
-    $('profile-avatar').textContent = '—';
+    $('profile-avatar').textContent = '?';
     $('operator-search').value = '';
     $('attempt-search').value = '';
     $('operator-filter').value = 'all';
@@ -175,14 +175,14 @@ export const adminClient =
         value = await response.json();
       } catch {
         throw Error(
-          'The service returned an unexpected response. Please try again.',
+          'The service returned an unreadable response. Refresh to check for changes before trying again.',
         );
       }
       if (!response.ok) {
         const reason = value.reason || value.error;
         const message =
           messages[reason] ||
-          'The service couldn’t complete this request. Please refresh and try again.';
+          'The service could not confirm the request. Refresh to check for changes before trying again.';
         if ((response.status === 401 || response.status === 403) && token)
           await revokeAndLock(message);
         throw Error(message);
@@ -191,11 +191,11 @@ export const adminClient =
     } catch (e) {
       if (e.name === 'AbortError')
         throw Error(
-          'The service is taking too long. Your saved changes are not confirmed. Refresh before retrying.',
+          'The service response timed out. Refresh to check whether your change was saved before trying again.',
         );
       if (e instanceof TypeError)
         throw Error(
-          'Couldn’t reach the service. Check your connection and try again.',
+          'Connection failed. Check your connection, then refresh to check for changes before trying again.',
         );
       throw e;
     } finally {
@@ -301,7 +301,7 @@ export const adminClient =
     $('operators-empty').innerHTML = empty(
       'users',
       'No matching operators',
-      'Try a different name or status to find the operator you’re looking for.',
+      'Search by operator name or ID, or change the status filter.',
       true,
     );
   }
@@ -335,7 +335,7 @@ export const adminClient =
           ' · Card ' +
           esc(a.ordinal + 1) +
           '</div></td><td><span class="chip-text" title="' +
-          esc(a.chip_id || 'No identity binding saved') +
+          esc(a.chip_id || 'Chip identity pending') +
           '">' +
           esc(short(a.chip_id, 24)) +
           '</span></td><td><span class="account-name">' +
@@ -355,7 +355,7 @@ export const adminClient =
           '</button></td></tr>',
       )
       .join('');
-    $('attempts-count').textContent = attemptsError ? '—' : attempts.length;
+    $('attempts-count').textContent = attemptsError ? 'N/A' : attempts.length;
     $('attempts-showing').textContent =
       'Showing ' + rows.length + ' of ' + attempts.length + ' recent attempts';
     notice($('attempts-error'), attemptsError);
@@ -369,8 +369,8 @@ export const adminClient =
         )
       : empty(
           'cards',
-          'A clear start',
-          'Provisioning attempts will appear here as operators create them. This view is read-only.',
+          'Provisioning attempts',
+          'Attempts appear here when operators start provisioning cards.',
         );
   }
   function renderActivity() {
@@ -406,15 +406,15 @@ export const adminClient =
           '</time></article>',
       )
       .join('');
-    $('activity-count').textContent = activityError ? '—' : events.length;
+    $('activity-count').textContent = activityError ? 'N/A' : events.length;
     $('activity-showing').textContent =
       events.length + ' recent administration events';
     notice($('activity-error'), activityError);
     $('activity-empty').hidden = events.length > 0 || !!activityError;
     $('activity-empty').innerHTML = empty(
       'clock',
-      'Your activity starts here',
-      'Operator creation, access changes and password resets will appear here automatically.',
+      'Account activity',
+      'Account creations, access changes and password resets appear here after they are saved.',
     );
   }
   function render() {
@@ -427,14 +427,14 @@ export const adminClient =
     $('metric-disabled').textContent = operators.filter(
       (o) => o.disabled,
     ).length;
-    $('metric-attempts').textContent = attemptsError ? '—' : attempts.length;
+    $('metric-attempts').textContent = attemptsError ? 'N/A' : attempts.length;
     $('metric-stopped').textContent = attemptsError
-      ? '—'
+      ? 'N/A'
       : attempts.filter((a) => ['quarantined', 'abandoned'].includes(a.state))
           .length;
     $('nav-operators').textContent = operators.length;
-    $('nav-attempts').textContent = attemptsError ? '—' : attempts.length;
-    $('nav-activity').textContent = activityError ? '—' : events.length;
+    $('nav-attempts').textContent = attemptsError ? 'N/A' : attempts.length;
+    $('nav-activity').textContent = activityError ? 'N/A' : events.length;
     const partial = !!(attemptsError || activityError);
     notice(
       $('workspace-notice'),
@@ -490,15 +490,15 @@ export const adminClient =
     const titles = {
       operators: [
         'Operators',
-        'Manage who can provision cards and keep access up to date.',
+        'Create operator accounts and manage provisioning access.',
       ],
       attempts: [
         'Installations',
-        'A clearer picture of every attempt. Without touching a card.',
+        'Review provisioning attempts and their saved status.',
       ],
       activity: [
         'Activity',
-        'Every access change, with the people and context behind it.',
+        'Review account changes, who made them and when.',
       ],
     };
     $('page-title').textContent = titles[view][0];
@@ -511,9 +511,9 @@ export const adminClient =
         operators:
           'Disable an operator to stop access while preserving their card history. Password resets revoke existing sessions.',
         attempts:
-          'Quarantined and abandoned chip bindings remain blocked. Keep phone journals intact; this console cannot clear quarantine or perform a card reset.',
+          'This view is read-only. Use the provisioner app on the original phone to continue an installation or export recovery details.',
         activity:
-          'This trail records successful administration changes. It does not include card commands, passwords or sign-in history.',
+          'The latest 100 successful account changes are shown, with the administrator, operator and time of each change.',
       }[view] +
       '</p>';
     if (filter) {
@@ -557,7 +557,7 @@ export const adminClient =
   const passwordField =
     '<label class="field">New password<span class="password-wrap"><input id="new-password" name="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required autofocus><button class="icon-btn" type="button" data-action="reveal" data-input="new-password" aria-label="Show password" aria-pressed="false">' +
     icon('eye') +
-    '</button></span><span class="password-tools"><span>At least 12 characters</span><button class="text-btn" type="button" data-action="generate">Generate password</button></span></label><label class="check-field"><input type="checkbox" id="password-saved" required><span>I’ve saved this password in our organization’s vault. It won’t be shown again after saving.</span></label>';
+    '</button></span><span class="password-tools"><span>At least 12 characters</span><button class="text-btn" type="button" data-action="generate">Generate password</button></span></label><label class="check-field"><input type="checkbox" id="password-saved" required><span>I’ve saved this password in our organization’s vault. Future password changes require a reset.</span></label>';
   const copyValue = (value) =>
     '<div class="copy-value"><span class="mono">' +
     esc(value || 'Not bound') +
@@ -573,10 +573,10 @@ export const adminClient =
   function openCreate() {
     dialog(
       'Add an operator',
-      'Give a teammate their own provisioning account.',
+      'Create an account for a card provisioning operator.',
       '<label class="field">Operator name<input id="new-name" name="username" autocomplete="off" placeholder="e.g. alex-provisioning" pattern="(?:[A-Za-z0-9._@]|-){1,64}" maxlength="64" required autofocus autocapitalize="none" spellcheck="false"><small>Letters, numbers, dots, underscores, @ and hyphens.</small></label>' +
         passwordField.replace(' required autofocus', ' required') +
-        '<label class="field">Provisioning environment<select id="environment"><option value="issued">Issued — normal provisioning</option><option value="factory">Factory — authorized factory workflows</option></select><small>Use Issued for normal provisioning. This cannot be edited here later.</small></label>',
+        '<label class="field">Provisioning environment<select id="environment"><option value="issued">Issued: standard provisioning</option><option value="factory">Factory: authorized factory workflows</option></select><small>Choose Issued for standard provisioning. The environment is fixed when the account is created.</small></label>',
       cancel +
         '<button class="btn btn-primary" type="submit">' +
         icon('plus') +
@@ -614,7 +614,7 @@ export const adminClient =
         esc(o.key_env === 'issued' ? 'Issued' : 'Factory') +
         '</dd></div><div><dt>Created</dt><dd>' +
         esc(date(o.created)) +
-        '</dd></div><div><dt>Role management</dt><dd>Deployment controlled</dd></div></dl><p class="help-caption">Passwords can’t be retrieved. Set a new password to restore sign-in access; all existing sessions will be revoked.</p><div class="drawer-actions"><button class="btn btn-secondary" data-action="reset" data-id="' +
+        '</dd></div><div><dt>Administrator roles</dt><dd>Set in service configuration</dd></div></dl><p class="help-caption">Set a new password when an operator needs to regain sign-in access.</p><div class="drawer-actions"><button class="btn btn-secondary" data-action="reset" data-id="' +
         esc(o.id) +
         '">' +
         icon('key') +
@@ -629,7 +629,7 @@ export const adminClient =
         (o.disabled ? 'Enable access' : 'Disable access') +
         '</button></div>' +
         (o.id === principal
-          ? '<p class="help-caption">You can’t disable your own account.</p>'
+          ? '<p class="help-caption">Ask another administrator to disable your account.</p>'
           : ''),
       '<button class="btn btn-secondary" data-action="close-dialog" autofocus>Done</button>',
     );
@@ -642,9 +642,9 @@ export const adminClient =
       'Set a new password for ' + o.name + '.',
       '<div class="notice warning">' +
         icon('key') +
-        '<p><strong>All existing sessions will be revoked.</strong>' +
+        '<p><strong>Saving ends all current sessions for this operator.</strong>' +
         (o.disabled
-          ? 'This account is disabled and will stay disabled.'
+          ? 'Access remains disabled after the password reset.'
           : o.id === principal
             ? 'You’ll be signed out after saving. Sign back in with your new password.'
             : 'The operator will need to sign in with the new password.') +
@@ -683,8 +683,8 @@ export const adminClient =
         icon(o.disabled ? 'shield' : 'lock') +
         '</div><p class="help-caption">' +
         (o.disabled
-          ? 'This operator will be able to sign in using their current password. Previously revoked sessions will not be restored.'
-          : 'This operator will be signed out and won’t be able to sign in again until you restore access. Their card and batch history will be preserved.') +
+          ? 'This operator can sign in with their current password to start a new session.'
+          : 'This ends the operator’s sessions and blocks sign-in until access is enabled again. Card and batch history is retained.') +
         '</p>',
       cancel +
         '<button type="submit" class="btn ' +
@@ -730,17 +730,17 @@ export const adminClient =
     if (!a) return;
     const guidance = {
       quarantined:
-        'Further provisioning of this chip is blocked. Keep the saved phone journal and reconcile the original failure before any card operation.',
+        'Provisioning is blocked for this chip. Keep the phone’s recovery details and ask your service administrator to reconcile the original failure before using the card again.',
       abandoned:
-        'This stopped attempt remains part of the chip’s history and may block a new binding. Keep its evidence for reconciliation.',
+        'This attempt is saved as abandoned. Keep the phone’s recovery details for reconciliation; a saved chip assignment may block a new attempt.',
       active:
-        'An active reservation is saved. Continue only through the original phone’s supported workflow; this console cannot determine the physical installation stage.',
+        'A provisioning attempt is reserved. Follow the recovery instructions in the provisioner app on the original phone.',
       recorded:
-        'The service acknowledged this installation record. This does not certify holder setup, funds or payment readiness.',
+        'The service saved this installation record. Complete holder setup in a compatible wallet before using the card.',
     };
     dialog(
       'Installation details',
-      'A read-only view of the saved service evidence.',
+      'Saved provisioning status and identifiers.',
       '<div class="notice ' +
         (['quarantined', 'abandoned'].includes(a.state) ? 'warning' : '') +
         '">' +
@@ -802,7 +802,7 @@ export const adminClient =
         throw e;
       } finally {
         $('login-submit').innerHTML =
-          '<span>Sign in to workspace</span>' + icon('arrow');
+          '<span>Sign in</span>' + icon('arrow');
       }
     });
   };
@@ -827,7 +827,7 @@ export const adminClient =
         try {
           await request('/auth/operator/signout', {});
         } finally {
-          locked('You’ve signed out safely.', false);
+          locked('You’re signed out.', false);
           $('name').focus();
         }
       });
@@ -864,14 +864,14 @@ export const adminClient =
       if (navigator.clipboard)
         navigator.clipboard
           .writeText(b.dataset.value)
-          .then(() => toast('Identity copied.'))
+          .then(() => toast('Identifier copied.'))
           .catch(() =>
             toast(
-              'Couldn’t copy. Select the identity to copy it manually.',
+              'Copy failed. Select the identifier and copy it manually.',
               true,
             ),
           );
-      else toast('Select the identity to copy it manually.', true);
+      else toast('Select the identifier and copy it manually.', true);
     }
   });
   ['operator-search', 'attempt-search'].forEach((id) =>

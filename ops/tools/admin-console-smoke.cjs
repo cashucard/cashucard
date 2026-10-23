@@ -340,7 +340,7 @@ async function main() {
     await click('#attempts [data-action="attempt"]');
     assert.ok(
       await evaluate(
-        `document.querySelector('#dialog').textContent.includes('Further provisioning of this chip is blocked')`,
+        `document.querySelector('#dialog').textContent.includes('Provisioning is blocked for this chip')`,
       ),
     );
     await screenshot('07-installation-details');
