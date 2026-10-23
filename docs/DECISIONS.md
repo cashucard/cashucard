@@ -3063,3 +3063,15 @@ Settings must not invent a Factory scope. The help explains why saved batches
 and recovery work require the original account/service, and directs card-state
 questions to Check a card. No authorization, key derivation, journal or wire
 behavior changes.
+
+## <a id="d108"></a>D108: Keep the focused reset PIN visible with native keyboard scrolling
+
+The first physical mobile cleanup succeeded, but the operator reported its
+PIN field was covered by the iPhone number pad. Enable the iOS ScrollView's
+native keyboard-inset/focused-input handling and interactive dismissal. Keep
+Android's native resize behavior without duplicate insets. Add an iOS numeric
+keyboard accessory with an explicit Done control that only dismisses the
+keyboard; it must not authenticate, clear entries or start a reset. Keep PIN
+entry masked and out of storage/sharing. No manual screen measurements, timers,
+PIN visibility toggle or authentication change is needed. Preserve the durable
+zero-slot review when rebuilding the app after the successful cleanup.

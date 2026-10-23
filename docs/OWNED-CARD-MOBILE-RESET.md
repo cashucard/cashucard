@@ -31,7 +31,7 @@ API origin, erase app storage or guess manager keys to get past it. Follow
 [reset reconciliation](RESET-RECONCILIATION.md) for a historical foreign reset.
 Malformed remnants after interrupted cleanup require administrator review.
 
-## Proposed hardware validation — not yet approved or executed
+## Approved hardware validation — execution in progress
 
 - Phone: **SuperMax, iPhone 17 Pro (`iPhone18,1`)**, CoreDevice
   `FCA5FD0D-FFE0-551B-A6F4-D7BC44EC956D`. Install the reviewed candidate
@@ -64,6 +64,15 @@ Malformed remnants after interrupted cleanup require administrator review.
   Mac may read CPLC, SELECT Cashu, GET_INFO, GET_PUBKEY and tag selection only,
   once after installation; no USB authentication or writes.
 
-Review the final merged source and candidate build before seeking the separate
-device/action approval. Record results in a dated hardware report. Do not close
-issue #92 as physically validated or publish build 7 based on software checks.
+The operator approved this service/device/card plan on 2026-10-23. On SuperMax,
+build 1.0.0 (7), source #134, the initial read matched the exact CPLC/key with
+0 unspent and 13 retained spent entries. The operator completed the separate
+PIN-protected settlement cleanup; the supplied screenshot shows the same
+CPLC/key with 0 unspent and 0 retained spent entries and “Ready to reset this
+card.” Reset itself has not started.
+
+Execution pauses here for D108's PIN keyboard fix. Update the candidate without
+uninstalling or changing its origin, sign in as the same operator and resume the
+saved zero-slot review. Do not repeat cleanup merely to test the layout. Record
+the final results in a dated hardware report. Keep issue #92 open until physical
+reset and fresh installation complete; software checks alone do not close it.
