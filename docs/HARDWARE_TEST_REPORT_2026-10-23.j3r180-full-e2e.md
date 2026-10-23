@@ -1,6 +1,6 @@
 # Physical card end-to-end run — J3R180 09336320, 2026-10-23
 
-Status: **blocked before installation; not an end-to-end pass**.
+Status: **reconciliation passed; fresh installation and funded end-to-end run pending**.
 The operator approved the [named-device plan](PHYSICAL-CARD-E2E-PLAN.md),
 including normal production app traffic, 64 sats of proposed funding and a
 100-sat cumulative funding/fees cap. No funds have moved in this run.
@@ -69,12 +69,65 @@ foreign receipt as automatic authority. A reviewed implementation and a
 separately approved target-service action are required before releasing a
 production fence.
 
-The prepared D99 implementation adds administrator review, immutable evidence
-and a narrowly scoped fence release. It is not deployed and no production
-history has been changed. The source database's retained `reset_results`
+The D99 implementation adds administrator review, immutable evidence
+and a narrowly scoped fence release. The source database's retained `reset_results`
 metadata was read privately and matched the prior hardware report's reset ID,
 removed installation, factory-key version and completion time. No escrow keys
 were read for this comparison.
+
+## Approved service rollout and renewed observation
+
+PR #122 passed all 30 CI checks and merged as
+`ddb27190640fc908553097f04845733eb2cc7a60`. The operator separately approved
+production deployment and the one-chip reconciliation. Wrangler deployed that
+source with the explicit production configuration, Worker version
+`229f6a5e-573a-4fa6-a29e-a69e4d855252`, preserving the existing OpsStore/R2
+bindings, both origins and `17 3,15 * * *` backup schedule. Both public origins
+returned HTTP 200 with the new review action; anonymous installation-history
+access returned HTTP 401. The console retains no-store and restrictive CSP.
+
+The rollout applies migrations 9–11 when opening the existing service database.
+Recovery exports now require v7-capable tools. Use a compatible forward fix or
+the reviewed restore process if recovery is needed; an older binary is not
+assumed to understand released admission fences or the new export metadata.
+
+A fresh approved USB preflight at Unix `1792773639` again matched the exact
+CPLC and applet absence. It made one connection and the same three read-only
+commands, with no authentication, mutation or retry. A public reconciliation
+packet was prepared from this observation and the retained original source
+completion; no production reconciliation has been submitted at this point.
+The service enforces independent-backup freshness before accepting a release.
+
+## Production reconciliation accepted
+
+After the operator signed into the updated console as `production-lead`, the
+approved action was submitted once through the console for target attempt
+`fc65e485-9025-4924-a96e-6fe0c68b58d9`, revision 2. The packet used the retained
+local source completion and the renewed USB observation above. The console
+reported success, closed the review dialog and refreshed installation history
+from the service. That history showed the original **Quarantined**, revision 2
+row with **Reset reconciled** added. Batch 5's
+`65bfdfd9-60b0-43c2-a95d-06b5012e3bf9` remained **Active**, revision 0, unbound.
+
+The service's required independent-backup gate precedes this mutation and
+accepted the release. A separate backup-status read did not complete through
+the browser automation, so no specific last-copy time is claimed here. The
+immutable reconciliation packet/receipt are retained by the service; the local
+public packet and a console-state observation were also retained. The latter
+is UI confirmation, not a downloaded server receipt.
+
+No card command was sent by this action. No historical row or escrow was
+deleted, no failed installation was marked successful and no factory-key
+authentication was attempted during reconciliation. The operator was then
+asked to resume the existing Card 1 in batch 5 on SuperMax, rather than create
+a new reservation.
+
+The connected SuperMax was identified as iPhone 17 Pro (`iPhone18,1`), iOS
+26.6.2 (`23G90`). Native installed-app enumeration returned no app metadata,
+including with all-app enumeration, so the provisioner/Flash app versions
+remain unverified; this is not evidence that the apps are absent. Pixel was
+not connected over ADB at this checkpoint. Max's merchant test remains later
+in the plan. No app build, installation or data wipe was performed by the agent.
 
 ## Not covered
 
