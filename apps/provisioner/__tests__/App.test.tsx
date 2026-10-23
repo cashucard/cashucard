@@ -7,6 +7,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
+import appInfo from '../package.json';
 import GearSvg from '../src/assets/gear.svg';
 import {AppStore} from '../src/store';
 import {SettingsScreen} from '../src/screens/SettingsScreen';
@@ -209,7 +210,9 @@ test('settings shows the public dashboard and confirms sign-out while a saved ba
     .findAll(n => typeof n.props.children === 'string')
     .map(n => n.props.children)
     .join(' ');
-  expect(words).toContain('Version 1.0.0 (6)');
+  expect(words).toContain(
+    `Version ${appInfo.version} (${appInfo.provisionerBuild})`,
+  );
   expect(words).toContain('https://ops.cashucard.org');
   expect(words).not.toContain('https://api.example.test');
   expect(words).toContain('CAP pin f27d92ba');
