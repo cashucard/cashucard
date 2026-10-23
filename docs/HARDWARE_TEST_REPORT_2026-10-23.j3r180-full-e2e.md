@@ -202,9 +202,15 @@ uncertain. They reported **Loaded successfully; balance is 61 sats**. This is
 operator-confirmed wallet evidence; no raw proofs, quote secrets or private
 wallet history were retrieved. No second funding request was made.
 
-The next step is an 8-sat online charge on Pixel. Merchant-account ownership,
-absence of older pending settlements and the exact charge amount are being
-checked before presenting the funded card to that terminal.
+## Pixel online payment baseline
+
+The operator confirmed that Pixel's Flash POS is using their merchant account,
+networking is on, no older Cashu settlements are pending, and the prepared
+charge is exactly **8 sats**. They were asked to complete that one charge,
+follow its private PIN/NFC prompts, then re-read the card in Flash and report
+the merchant receipt status, fee/change and remaining card balance. The
+fee-free expected balance is 53 sats; that is a prediction, not an observed
+result. No merchant payment or settlement result has been reported yet.
 
 ## Not covered
 
