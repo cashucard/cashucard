@@ -236,16 +236,16 @@ and `attempt_id` are canonical lowercase UUIDs supplied by a durable client.
 They are operational identifiers, not credentials. See the full
 [identity and recovery contract](../docs/PROVISIONER-RECOVERY.md).
 
-| Method and path                                | Request and result                                                                                                                                                          |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /provisioning/batches`                   | `device_id`, `batch_request_id`, `count`, `mint_url`, `pin_policy`, `daily_usd`, `no_pin_usd`, `load_sha256`; returns `batch` with immutable configuration and next ordinal |
-| `POST /provisioning/attempts`                  | `device_id`, `attempt_id`, `batch_id`, `ordinal`; returns the owned reservation                                                                                             |
-| `GET /provisioning/attempts/:id?device_id=...` | Returns reservation state and any immutable receipts; no keys                                                                                                               |
-| `GET /provisioning/reset-source?chip_id=...&installation_id=...` | Returns `missing`, `unresolved`, `escrow-missing` or a matching recorded attempt and escrow reference; no keys and no reset authorization |
-| `POST /provisioning/attempts/:id/bind`         | `device_id`, `revision`, `chip_id`; returns binding receipt                                                                                                                 |
-| `POST /keys/issue`                             | `device_id`, `attempt_id`; optional `batch_id`/`ordinal` must match; returns the same per-attempt hex keys while active                                                     |
-| `POST /provisioning/attempts/:id/record`       | `device_id`, `revision`, strict `record`; returns a terminal rotation receipt, never holder readiness                                                                       |
-| `POST /provisioning/attempts/:id/disposition`  | `device_id`, `revision`, `kind` (`quarantined`/`abandoned`), `reason`; consumes the ordinal and frees the device while preserving unresolved chip blocking                  |
+| Method and path                                                  | Request and result                                                                                                                                                          |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /provisioning/batches`                                     | `device_id`, `batch_request_id`, `count`, `mint_url`, `pin_policy`, `daily_usd`, `no_pin_usd`, `load_sha256`; returns `batch` with immutable configuration and next ordinal |
+| `POST /provisioning/attempts`                                    | `device_id`, `attempt_id`, `batch_id`, `ordinal`; returns the owned reservation                                                                                             |
+| `GET /provisioning/attempts/:id?device_id=...`                   | Returns reservation state and any immutable receipts; no keys                                                                                                               |
+| `GET /provisioning/reset-source?chip_id=...&installation_id=...` | Returns `missing`, `unresolved`, `escrow-missing` or a matching recorded attempt and escrow reference; no keys and no reset authorization                                   |
+| `POST /provisioning/attempts/:id/bind`                           | `device_id`, `revision`, `chip_id`; returns binding receipt                                                                                                                 |
+| `POST /keys/issue`                                               | `device_id`, `attempt_id`; optional `batch_id`/`ordinal` must match; returns the same per-attempt hex keys while active                                                     |
+| `POST /provisioning/attempts/:id/record`                         | `device_id`, `revision`, strict `record`; returns a terminal rotation receipt, never holder readiness                                                                       |
+| `POST /provisioning/attempts/:id/disposition`                    | `device_id`, `revision`, `kind` (`quarantined`/`abandoned`), `reason`; consumes the ordinal and frees the device while preserving unresolved chip blocking                  |
 
 Idempotent retries are scoped and checked before revision conflicts. Changed
 request content is 409; missing or inaccessible reservations are 404. Restore
