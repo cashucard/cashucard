@@ -2918,9 +2918,11 @@ additional applet data behind the existing identity-only control.
 
 ## D103 — Migrate successful operator sign-ins to native memory-hard hashing
 
-**Decided (2026-10-23):** Workers uses native scrypt with N=32768, r=8, p=3,
-16-byte random salts and 64-byte output. This is OWASP's listed 32 MiB scrypt
-profile; its allocation limit is 64 MiB, within the Workers isolate budget.
+**Decided (2026-10-23):** Workers uses native scrypt with N=16384, r=8, p=5,
+16-byte random salts and 64-byte output. This is OWASP's listed 16 MiB scrypt
+profile; its allocation limit is 32 MiB, within the Workers isolate budget.
+The profile also fits the previous verifier’s default memory limit; a regression
+runs that exact older recipe to preserve credential readability on rollback.
 The existing self-describing scrypt/PBKDF2 formats remain readable. The first
 successful login for an issued PBKDF2-600k or legacy scrypt-16384/8/1 credential
 verifies that exact hash, derives the new one, then rechecks the original hash,

@@ -12,13 +12,13 @@ public fixture input, no accounts, no Durable Object/R2 bindings and no remote
 service calls. Timings were taken by the host around each request because the
 Worker's own clock is unsuitable for measuring a synchronous KDF.
 
-| Sample | Native scrypt 32768/8/3 | Existing PBKDF2-600k JS fallback |
+| Sample | Native scrypt 16384/8/5 | Existing PBKDF2-600k JS fallback |
 |---|---:|---:|
-| 1 | 128 ms | 2,131 ms |
-| 2 | 96 ms | 2,182 ms |
-| 3 | 148 ms | 2,116 ms |
+| 1 | 98 ms | 2,063 ms |
+| 2 | 74 ms | 2,105 ms |
+| 3 | 75 ms | 2,090 ms |
 
-The median local KDF difference is approximately 16.6×. This is not a claim
+The median local KDF difference is approximately 27.9×. This is not a claim
 about deployed network/login latency. It excludes database work, first-login
 legacy verification/migration, cold starts and edge-specific native cost caps.
 Run it from `ops/` after the frozen dependency install:
@@ -37,7 +37,7 @@ Only then can the transaction replace it with the memory-hard profile and
 issue a session. Subsequent logins use native scrypt. Incorrect passwords do
 not change credentials; administrator recovery during verification/rehashing
 must win. The durable rate budget, revocation and key-environment checks stay
-in place. Old PBKDF2 and scrypt hashes remain readable. An edge cost refusal
+in place. Old PBKDF2 and scrypt hashes remain readable. The new profile also fits the previous deployment’s default scrypt memory limit, so its verifier can read migrated credentials during a rollback. An edge cost refusal
 retains the legacy hash without doubling its PBKDF2 cost; unrelated crypto
 errors fail closed. See [D103](DECISIONS.md#d103).
 

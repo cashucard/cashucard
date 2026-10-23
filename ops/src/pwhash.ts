@@ -6,7 +6,7 @@
  * Implementations:
  *  - `node` — scrypt (node:crypto), what the first deploy wrote. The Node
  *    server and the ops CLI use it.
- *  - `native` — Workers' native scrypt 32768/8/3 (D103), with exact legacy
+ *  - `native` — Workers' native scrypt 16384/8/5 (D103), with exact legacy
  *    verification and one-time successful-login migration.
  *  - `subtle` — legacy PBKDF2-SHA256 over WebCrypto (`crypto.subtle.deriveBits`),
  *    600k iterations, OWASP's 2023 floor for PBKDF2-SHA256 and the path the
@@ -35,10 +35,10 @@ export interface PasswordHasher {
 const PBKDF2_ITERATIONS = 600_000;
 const KEY_LEN = 64;
 export const NATIVE_SCRYPT_PROFILE = Object.freeze({
-  N: 32768,
+  N: 16384,
   r: 8,
-  p: 3,
-  maxmem: 64 * 1024 * 1024,
+  p: 5,
+  maxmem: 32 * 1024 * 1024,
 });
 type ScryptDeriver = (
   password: string,
@@ -87,7 +87,7 @@ export class NativePwHash extends NodePwHash {
       const key = await this.derive(password, salt);
       if (key.length !== KEY_LEN)
         throw new Error('Invalid password KDF result');
-      return `scrypt$32768$8$3$${toHex(salt)}$${toHex(key)}`;
+      return `scrypt$16384$8$5$${toHex(salt)}$${toHex(key)}`;
     } catch (error) {
       // No work-factor reduction when an edge applies an additional native cap.
       if (!costLimited(error)) throw error;
@@ -209,7 +209,7 @@ async function verifyScrypt(
     N: Number(nStr),
     r: Number(rStr),
     p: Number(pStr),
-    maxmem: NATIVE_SCRYPT_PROFILE.maxmem,
+    maxmem: 64 * 1024 * 1024,
   };
   let actual: Uint8Array;
   try {

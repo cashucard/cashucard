@@ -14,7 +14,7 @@ async function main() {
           const password='public benchmark fixture; never an operator password';
           if(new URL(req.url).pathname==='/native') {
             const value=await new NativePwHash().hash(password);
-            if(!value.startsWith('scrypt$32768$8$3$'))throw new Error('Native profile unavailable');
+            if(!value.startsWith('scrypt$16384$8$5$'))throw new Error('Native profile unavailable');
             return Response.json({verified:true});
           }
           const value=await pbkdf2Async(sha256,password,new Uint8Array(16).fill(90),{c:600000,dkLen:64});

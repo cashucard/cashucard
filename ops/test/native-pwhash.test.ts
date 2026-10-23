@@ -11,15 +11,14 @@ const legacy =
 test('native profile is memory-hard, interoperable and preserves the legacy verifier', async () => {
   const hasher = new NativePwHash();
   const stored = await hasher.hash('public test password');
-  assert.match(stored, /^scrypt\$32768\$8\$3\$[0-9a-f]{32}\$[0-9a-f]{128}$/);
+  assert.match(stored, /^scrypt\$16384\$8\$5\$[0-9a-f]{32}\$[0-9a-f]{128}$/);
   const parts = stored.split('$');
   assert.equal(
     parts[5],
     scryptSync('public test password', Buffer.from(parts[4]!, 'hex'), 64, {
-      N: 32768,
+      N: 16384,
       r: 8,
-      p: 3,
-      maxmem: 64 * 1024 * 1024,
+      p: 5,
     }).toString('hex'),
   );
   assert.equal(
@@ -29,6 +28,19 @@ test('native profile is memory-hard, interoperable and preserves the legacy veri
   assert.equal(await hasher.verify('public test password', legacy), true);
   assert.equal(await hasher.verify('wrong', stored), false);
   assert.equal(await hasher.upgrade('public test password', stored), null);
+});
+
+test('the previous deployment default memory limit can verify the new profile', async () => {
+  const stored = await new NativePwHash().hash('public rollback fixture');
+  const parts = stored.split('$');
+  // This is the previous verifier's recipe, intentionally with no maxmem override.
+  const previous = scryptSync(
+    'public rollback fixture',
+    Buffer.from(parts[4]!, 'hex'),
+    64,
+    {N: Number(parts[1]), r: Number(parts[2]), p: Number(parts[3])},
+  );
+  assert.equal(previous.toString('hex'), parts[5]);
 });
 test('only a successful legacy login upgrades atomically, without changing password, session revocation or attempt budget', async () => {
   const db = testDb();
@@ -58,7 +70,7 @@ test('only a successful legacy login upgrades atomically, without changing passw
       password_hash: string;
     }
   ).password_hash;
-  assert.match(saved, /^scrypt\$32768\$8\$3\$/);
+  assert.match(saved, /^scrypt\$16384\$8\$5\$/);
   assert.ok(
     await createOperatorSession(db, 'operator', 'public test password', hasher),
   );
