@@ -22,3 +22,10 @@ test('served console script/style match the restrictive CSP and require no third
   assert.ok(!/<script[^>]+src=|<link[^>]+href=|@import\b/.test(page.html));
   assert.equal(page.headers['cache-control'], 'no-store');
 });
+
+test('console uses wallet-neutral Cashu branding and a bundled logo', () => {
+  const {html} = operatorAdminPage();
+  assert.match(html, /Cashu Card Provisioner/);
+  assert.doesNotMatch(html, /\b(?:flash|foxy)\b/i);
+  assert.match(html, /src="data:image\/png;base64,/);
+});

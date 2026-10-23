@@ -140,7 +140,7 @@ export const adminClient =
     $('attempt-search').value = '';
     $('operator-filter').value = 'all';
     $('attempt-filter').value = 'all';
-    document.title = 'Flash · Card operations';
+    document.title = 'Cashu Card Provisioner';
     document.querySelector('.skip-link').href='#name';
     document.querySelector('.skip-link').textContent='Skip to sign in';
     notice($('login-notice'), message, error);
@@ -528,7 +528,7 @@ export const adminClient =
     }
     renderOperators();
     renderAttempts();
-    document.title = 'Flash · ' + titles[view][0];
+    document.title = 'Cashu Card Provisioner · ' + titles[view][0];
   }
   function dialog(title, description, body, footer, form = false) {
     const d = $('dialog');

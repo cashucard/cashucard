@@ -1,5 +1,4 @@
 export const ADMIN_ICONS: Record<string, string> = {
-  bolt: '<path d="M13.5 2 4 14h6l-.5 8L20 10h-6l-.5-8Z"/>',
   users:
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',
   cards:
