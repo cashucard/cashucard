@@ -390,6 +390,14 @@ export class FakeCard {
     if (cla === 0x80 && ins === 0xca && p1 === 0xff && apdu[3] === 0x21) {
       return this.freeMemory();
     }
+    if (cla === 0x80 && ins === 0xca && p1 === 0x9f && apdu[3] === 0x7f) {
+      return sw(
+        0x9000,
+        fromHex(
+          '9F7F2A4790D32147000000000030410933632055470000000000000000048C2337323937360000000000000000',
+        ),
+      );
+    }
     if (ins === 0xe4 || ins === 0xe6 || ins === 0xe8 || ins === 0xd8) {
       return sw(0x6982);
     }
@@ -434,6 +442,35 @@ export class FakeCard {
     }
     if (ins === 0xe4) {
       return this.delete(data);
+    }
+    if (
+      ins === 0xf2 &&
+      (p1 === 0x40 || p1 === 0x20) &&
+      p2 === 2 &&
+      hex(data) === '4F00'
+    ) {
+      const tlv = (tag: Bytes, value: Bytes) => [
+        ...tag,
+        value.length,
+        ...value,
+      ];
+      const aid = (tag: number, value: string) => tlv([tag], fromHex(value));
+      const entry = (id: string, pkg?: string) => {
+        const fields = [
+          ...aid(0x4f, id),
+          ...tlv([0x9f, 0x70], [pkg ? 7 : 1]),
+          ...(pkg ? [...tlv([0xc5], [0, 0, 0]), ...aid(0xc4, pkg)] : []),
+          ...aid(0xcc, ISD),
+        ];
+        return tlv([0xe3], fields);
+      };
+      const entries =
+        p1 === 0x40
+          ? [...this.instances.values()].flatMap(i => entry(i.aid, i.pkg))
+          : [...this.packages.keys(), ...this.partial.keys()].flatMap(id =>
+              entry(id),
+            );
+      return sw(entries.length ? 0x9000 : 0x6a88, entries);
     }
     if (ins === 0xe6 && p1 === 0x02) {
       return this.installForLoad(data);

@@ -2689,3 +2689,32 @@ HTTP reset action until execution and completion reconciliation are present.
 lookup, or importing historical key material implicitly. Each can lose the
 authority or history needed to recover an interrupted reset. Cross-origin
 imports and resolving stopped attempts require their own audited contract.
+
+## D95 — Recover applet removal from registry evidence before rotating keys
+
+**Decided (2026-10-23):** Owned-card reset leaves the Cashu applet/package
+absent and manager keys verified as factory keys, ready for a later fresh
+installation. It rechecks the exact CPLC and installed public key, zero proof
+slots, explicit consent and service authority before saving deletion intent.
+Tagged GET STATUS then establishes which whitelisted objects remain and that
+they belong to the expected Cashu package and ISD. Only present objects are
+deleted, in tag/card/opener/package order; each acknowledged deletion is
+checked against a new registry observation. Lost replies retain intent, and
+the next connection inspects before choosing another command.
+
+After observed removal, rotation intent is saved before PUT KEY. Source and
+factory keys are compared to one INITIALIZE UPDATE cryptogram offline;
+factory keys are considered only after saved rotation intent. A confirmed
+factory state is adopted without another PUT KEY. CPLC is read again before
+acknowledgement because factory keys are shared by blank cards. No LOAD is
+part of reset. Completion and releasing the service fence remain separate.
+
+Registry commands and parsing are held to the existing owner `gp-list.txt`
+capture. Pagination follows the tagged GET STATUS sequence used by
+[GlobalPlatformPro](https://github.com/martinpaljak/GlobalPlatformPro/blob/next/library/src/main/java/pro/javacard/gp/GPSession.java),
+with bounded continuation and no legacy fallback. Malformed, duplicate,
+foreign-owned or unexpected lifecycle evidence stops the reset.
+
+**Rejected:** replaying DELETE after a lost reply, trying factory keys as an
+initial fallback, or treating fake-card success as chip evidence. Hardware
+execution still requires a named-device plan and card-specific approval.
