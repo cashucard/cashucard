@@ -2815,3 +2815,33 @@ foreign receipts automatically, clearing every block for a chip, or exposing
 a general database editor. The physical end-to-end run exposed this missing
 boundary after a local reset; none would establish why production admission
 can safely resume.
+
+## D100 — Audit spent entries without discarding their recovery data
+
+**Decided (2026-10-23):** An empty card's retained spent entries are audited
+before preparing a cleanup/reset. A separate read-only tool binds full CPLC,
+applet public key, version 2.1, zero unspent value, the expected spent count
+and the card's recorded mint. It reads only occupied spent slots, then checks
+identity/state again. Private slot material stays in the reader child's
+bounded pipe and parent memory; the tool never prints/exports nonces, C,
+secrets, Ys, witnesses or arbitrary native/mint errors.
+
+The parent reuses the existing vector-tested format-4 secret/hash-to-curve
+implementation on public-data operations only. HTTPS mint origin is explicit,
+must match the card record and cannot redirect. Keyset prefixes must resolve
+uniquely to sat keysets. Every derived Y must appear exactly once as SPENT in
+the bounded checkstate response; pending, missing, duplicate, unknown and
+malformed evidence stops the audit. The output contains counts, denomination
+totals, time and a digest, not a reset or cleanup permit.
+
+Default invocation is a preview with no reader/network access. Physical
+execution requires its named-card plan and explicit inspect flag. The reader
+contains no authentication, write or retry operation. Existing zero-proof
+reset gates remain unchanged; any future clearing must obtain separate
+authorization and recheck current evidence rather than trust an old report.
+
+**Rejected:** blindly clearing spent entries after a zero-balance display,
+dumping a card file into logs, treating a till message as proof for each slot,
+or transferring holder/manager keys to perform this audit. The completed
+61-sat physical run left 13 spent entries, making this a concrete preparation
+step for reusing that card in the hardware video.

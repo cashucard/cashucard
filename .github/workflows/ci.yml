@@ -195,6 +195,7 @@ jobs:
           python test_tip.py
           python test_read_only_preflight.py
           python test_reset_bridge.py
+          python test_spent_audit.py
 
       # Prove requirements.txt is actually installable. pyscard ships a native
       # _scard module and is the one dependency that can install "successfully"
