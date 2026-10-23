@@ -2431,6 +2431,9 @@ external frontend dependencies and continuously running decorative animation.
 
 ## D81 — Compact visual story for the public protocol site
 
+The four-stage story and its motion were superseded by D83. The short page
+and direct source links still apply.
+
 **Decided (2026-10-22):** Keep the public site to roughly two desktop screens:
 a brief hero, one four-stage visual story, and direct links to the draft
 protocol and public implementation repositories. The story shows the applet
@@ -2456,6 +2459,9 @@ stage without an added media asset.
 
 ## D82 — Object-led motion and card finish studies for the public site
 
+The four-stage object animation was superseded by D83. The Ops Sage hero
+and unindexed finish studies still apply.
+
 **Decided (2026-10-22):** Use the ops console's restrained sage card as the
 public hero treatment. Keep two additional native-art finish studies, Forest
 Emboss and Ivory Signal, at the unindexed `/concepts` route for review. The
@@ -2478,3 +2484,21 @@ page, inspectable chapter controls, small payload and wallet-neutral claims.
 Rejected a long scroll-locked render sequence and an autoplaying video because
 they would expand the page and make individual protocol stages harder to
 inspect on a phone.
+
+## D83 — Direct protocol and source landing page
+
+**Decided (2026-10-22):** Remove the four-stage “One card. Four moments.”
+section from the public site. Keep one concise hero and a plainly titled
+“Protocol and code” section linking directly to the draft specification,
+card applet and tools, Flash Mobile, Foxy and Flash POS. Describe each link by
+its source role without claiming that an integration is complete or certified.
+Use clear, concrete calls to action and remove labels that imply a transaction
+walkthrough where none is shown. Keep the site readable without JavaScript;
+retain the finite hero-card motion, reduced-motion support and the unindexed
+card-finish comparison.
+
+**Why:** repeated review found the animated story visually busy and still
+weak at explaining the exchange. Its script and controls added length without
+helping visitors reach the protocol or implementations. Rejected another
+story redesign or video for this revision; the source documents are the
+accurate place to learn the transaction flow.
