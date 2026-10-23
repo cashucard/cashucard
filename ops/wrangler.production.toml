@@ -6,6 +6,9 @@ main = "src/worker.ts"
 compatibility_date = "2026-10-13"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
+# After cashucard.org is an active Cloudflare zone, replace the line below with:
+# routes = [{ pattern = "ops.cashucard.org", custom_domain = true }]
+# See docs/OPS_CUSTOM_DOMAIN.md; preserve workers_dev during the transition.
 routes = []
 
 [vars]

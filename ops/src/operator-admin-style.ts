@@ -1,3 +1,5 @@
+import {adminIdentityStyle} from './operator-admin-identity-style';
+
 export const adminStyle = String.raw`
 .brand-mark img{width:30px;height:34px;object-fit:contain;image-rendering:pixelated}.art-bottom img{width:25px;height:29px;object-fit:contain;image-rendering:pixelated}
 
@@ -36,5 +38,6 @@ dialog{color:var(--ink);border:1px solid #dfe6d7;border-radius:20px;padding:0;ma
 #view-attempts .data-table .account-sub{font-size:9px}
 #view-attempts .data-table .state-note{display:none}
 }
+${adminIdentityStyle}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 `;

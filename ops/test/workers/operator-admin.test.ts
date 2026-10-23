@@ -63,6 +63,10 @@ it('real DO enforces live admin policy and persists disabled accounts and audit 
     await call('GET', '/admin/operators/audit')
   ).json()) as {events: unknown[]};
   expect(audit.events).toHaveLength(2);
+  const root = await stub.fetch('https://ops.test/');
+  expect(root.status).toBe(200);
+  expect(root.headers.get('Content-Type')).toContain('text/html');
+  expect(await root.text()).toContain('Cashu Card Provisioner');
   const page = await stub.fetch('https://ops.test/ops/operators');
   expect(page.headers.get('Content-Security-Policy')).toContain(
     "frame-ancestors 'none'",

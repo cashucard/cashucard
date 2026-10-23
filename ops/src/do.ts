@@ -117,7 +117,7 @@ export class OpsStore extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     if (
       request.method === 'GET' &&
-      new URL(request.url).pathname === '/ops/operators'
+      ['/', '/ops/operators'].includes(new URL(request.url).pathname)
     ) {
       const page = operatorAdminPage();
       return new Response(page.html, {headers: page.headers});
