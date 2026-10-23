@@ -1,43 +1,21 @@
 import {createHash} from 'node:crypto';
-const script = String.raw`
-let token = '', principal = null;
-const $ = id => document.getElementById(id);
-function status(s) { $('status').textContent = s; }
-function locked() { token = ''; $('admin').hidden = true; $('login').hidden = false; }
-async function request(path, body, method) {
-  const response = await fetch(path, {method: method || (body ? 'POST' : 'GET'), cache:'no-store', credentials:'omit', headers:{'Content-Type':'application/json', ...(token ? {Authorization:'Bearer '+token} : {})}, ...(body ? {body:JSON.stringify(body)} : {})});
-  const value = await response.json();
-  if (!response.ok) { if(response.status === 401) locked(); throw Error(value.reason || value.error || 'Request failed'); }
-  return value;
-}
-async function load() {
-  const data = await request('/admin/operators');
-  $('operators').replaceChildren(); $('target').replaceChildren();
-  for(const op of data.operators) {
-    const option=document.createElement('option'); option.value=op.id; option.textContent=op.name; $('target').append(option);
-    const row=document.createElement('tr');
-    for(const value of [op.name,op.key_env,op.disabled ? 'Disabled':'Active']) {const cell=document.createElement('td');cell.textContent=value;row.append(cell);}
-    const cell=document.createElement('td'), button=document.createElement('button');button.type='button';button.textContent=op.disabled?'Enable':'Disable';
-    button.onclick=()=>perform(async()=>{if(!confirm(button.textContent+' '+op.name+'? Existing sessions will be revoked.')) return;await request('/admin/operators/'+op.id+'/'+(op.disabled?'enable':'disable'),{});await load();status('Operator updated.');});
-    cell.append(button);row.append(cell);$('operators').append(row);
-  }
-  const names=new Map(data.operators.map(op=>[op.id,op.name+' (#'+op.id+')']));
-  const audit=await request('/admin/operators/audit');
-  $('audit').textContent=audit.events.map(e=>new Date(e.created*1000).toISOString()+' · '+e.action+' · actor '+names.get(e.actor_id)+' → operator '+names.get(e.target_id)).join('\n');
-  const attempts=await request('/admin/provisioning/attempts');
-  $('attempts').textContent=attempts.attempts.map(a=>a.attempt_id+' · batch '+a.batch_id+'/'+a.ordinal+' · '+names.get(a.operator_id)+' · '+a.state+' · revision '+a.revision+' · chip '+(a.chip_id||'not bound')+' · device '+a.device_id).join('\n');
-}
-let busy=false;
-async function perform(work) { if(busy) return;busy=true;document.querySelectorAll('button').forEach(e=>e.disabled=true);try {await work();} catch(e){status(e.message || 'Request failed');}finally{busy=false;document.querySelectorAll('button').forEach(e=>e.disabled=false);} }
-$('login').onsubmit=e=>{e.preventDefault();perform(async()=>{const password=$('password').value;$('password').value='';const auth=await request('/auth/operator/session',{name:$('name').value,password});token=auth.token;principal=auth.operator_id;try{await load();}catch(e){await request('/auth/operator/signout',{}).catch(()=>{});locked();throw e;}$('login').hidden=true;$('admin').hidden=false;status('Signed in.');});};
-$('create').onsubmit=e=>{e.preventDefault();perform(async()=>{const password=$('new-password').value;$('new-password').value='';await request('/admin/operators',{name:$('new-name').value,password,keyEnv:$('environment').value});$('new-name').value='';await load();status('Operator created. Deliver their password through your secrets vault.');});};
-$('reset').onsubmit=e=>{e.preventDefault();perform(async()=>{const password=$('reset-password').value;$('reset-password').value='';if(!confirm('Reset this operator password and revoke all their sessions?'))return;await request('/admin/operators/'+$('target').value+'/reset-password',{password});if(Number($('target').value)===principal){locked();status('Password changed. Sign in with your new password.');}else{await load();status('Password reset. Disabled accounts stay disabled.');}});};
-$('logout').onclick=()=>perform(async()=>{try{await request('/auth/operator/signout',{});}finally{locked();status('Signed out.');}});
-$('refresh').onclick=()=>perform(load);
-window.addEventListener('pagehide',()=>{if(token)fetch('/auth/operator/signout',{method:'POST',credentials:'omit',keepalive:true,headers:{Authorization:'Bearer '+token}}).catch(()=>{});token='';});
-`;
-const style =
-  'body{font:16px system-ui;max-width:850px;margin:40px auto;padding:0 20px}label{display:block;margin:12px 0}input,select,button{font:inherit;padding:8px}input{display:block;width: min(95%,420px)}button{margin:6px}td,th{text-align:left;padding:8px}pre{white-space:pre-wrap}#status{min-height:24px}';
+import {adminStyle} from './operator-admin-style';
+import {adminClient} from './operator-admin-client';
+import {adminIcon as icon} from './operator-admin-icons';
+
+const brand = `<span class="brand-mark">${icon('bolt')}</span><span class="brand-copy">flash<small>Card operations</small></span>`;
+const nav = (view: string, label: string, symbol: string) =>
+  `<button class="nav-btn" data-view="${view}" aria-label="${label}" ${view === 'operators' ? 'aria-current="page"' : ''}>${icon(symbol)}<span class="nav-label">${label}</span><span class="nav-count" id="nav-${view}">—</span></button>`;
+const metric = (
+  id: string,
+  label: string,
+  symbol: string,
+  foot: string,
+  view: string,
+  filter = 'all',
+) =>
+  `<button class="metric${id === 'stopped' ? ' attention' : ''}" data-view="${view}" data-filter="${filter}" aria-label="${label}"><span class="metric-top">${label}<span class="metric-icon">${icon(symbol)}</span></span><span class="metric-value" id="metric-${id}">—</span><span class="metric-foot">${foot}</span></button>`;
+
 export function operatorAdminPage() {
   const hash = (s: string) => createHash('sha256').update(s).digest('base64');
   return {
@@ -46,8 +24,25 @@ export function operatorAdminPage() {
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
-      'content-security-policy': `default-src 'none'; script-src 'sha256-${hash(script)}'; style-src 'sha256-${hash(style)}'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`,
+      'content-security-policy': `default-src 'none'; script-src 'sha256-${hash(adminClient)}'; style-src 'sha256-${hash(adminStyle)}'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`,
     },
-    html: `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cashu operator administration</title><style>${style}</style><body><h1>Operator administration</h1><p>Restricted to deployment-designated administrators. Disabling an account preserves its card history.</p><p id="status" role="status"></p><form id="login"><label>Operator name<input id="name" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form><section id="admin" hidden><button id="logout">Sign out</button><button id="refresh">Refresh</button><h2>Operators</h2><table><thead><tr><th>Name</th><th>Environment</th><th>Status</th><th>Access</th></tr></thead><tbody id="operators"></tbody></table><h2>Add operator</h2><form id="create"><label>Name<input id="new-name" pattern="[A-Za-z0-9._@-]{1,64}" maxlength="64" required></label><label>Password (at least 12 characters)<input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></label><label>Key environment<select id="environment"><option value="issued">Issued</option><option value="factory">Factory</option></select></label><button>Create operator</button></form><h2>Reset password</h2><form id="reset"><label>Operator<select id="target"></select></label><label>New password<input id="reset-password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></label><p>This revokes existing sessions. Disabled accounts remain disabled.</p><button>Reset password</button></form><h2>Recent administration events</h2><pre id="audit"></pre><h2>Recent provisioning attempts</h2><p>Read-only support evidence. Active, quarantined or abandoned attempts may prevent a new binding to the same chip. Keep the phone journal intact; this console cannot clear card quarantine.</p><pre id="attempts"></pre></section><script>${script}</script></body></html>`,
+    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#13291e"><title>Flash · Card operations</title><style>${adminStyle}</style></head><body>
+<a class="skip-link" href="#main">Skip to workspace</a>
+<section class="login-layout" id="login-screen" aria-label="Operator administration sign in">
+  <aside class="login-story"><div class="brand">${brand}</div><div class="story-content"><div class="card-art" aria-hidden="true"><span class="art-word">flash</span><span class="art-chip"></span><div class="art-bottom"><span>Cashu card</span>${icon('bolt')}</div></div><h1>Every card.<br><span>Accounted for.</span></h1><p>A clear view of your team, your installations and the access behind them.</p></div><div class="story-footer"><span class="icon"><span class="dot"></span>&nbsp; Operator administration</span><span>Built for the people behind the cards.</span></div></aside>
+  <div class="login-side"><div class="login-card"><div class="brand login-mobile-brand">${brand}</div><p class="eyebrow">Card operations</p><h2>Welcome back.</h2><p class="login-description">Sign in to manage your operators and keep card operations moving.</p><div id="login-notice" class="notice error" role="status" hidden></div><form id="login"><label class="field">Operator name<input id="name" name="username" autocomplete="username" placeholder="Your operator name" required maxlength="64" autocapitalize="none" spellcheck="false"></label><label class="field">Password<span class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required><button class="icon-btn" type="button" data-action="reveal" data-input="password" aria-label="Show password" aria-pressed="false">${icon('eye')}</button></span></label><button class="btn btn-primary" id="login-submit" type="submit"><span>Sign in to workspace</span>${icon('arrow')}</button></form><div class="login-footnote"><strong>Administrator access only</strong>Use your designated administrator account. Need access? Contact the person who manages your ops-service.</div></div></div>
+</section>
+<div class="workspace" id="admin" hidden>
+  <aside class="sidebar"><div class="brand">${brand}</div><p class="nav-heading">Your workspace</p><nav class="nav" aria-label="Workspace">${nav('operators', 'Operators', 'users')}${nav('attempts', 'Installations', 'cards')}${nav('activity', 'Activity', 'clock')}</nav><div class="sidebar-bottom"><div class="workspace-label"><span class="dot"></span><span data-environment>Workspace</span></div><div class="profile"><span class="avatar" id="profile-avatar">—</span><div class="profile-copy"><div class="profile-name" id="profile-name"></div><div class="profile-role">Administrator</div></div><button class="icon-btn" data-action="logout" aria-label="Sign out" title="Sign out">${icon('logout')}</button></div></div></aside>
+  <div class="content"><header class="topbar"><div class="breadcrumb"><span>Workspace</span>${icon('chevron')}<strong id="breadcrumb">Operators</strong></div><div class="mobile-brand"><span class="brand-mark">${icon('bolt')}</span>flash <span class="muted">ops</span></div><div class="topbar-right"><span class="sync" id="sync-status"><span class="dot"></span>Connecting</span><button class="icon-btn" data-action="refresh" aria-label="Refresh workspace" title="Refresh workspace">${icon('refresh')}</button><button class="icon-btn mobile-menu" data-action="logout" aria-label="Sign out">${icon('logout')}</button></div></header>
+  <main class="main" id="main" tabindex="-1"><div class="page-heading"><div><h1 id="page-title">Operators</h1><p id="page-description">Manage who can provision cards and keep access up to date.</p></div><div class="heading-actions"><button class="btn btn-primary" data-action="create" aria-label="Add operator">${icon('plus')}<span>Add operator</span></button></div></div>
+  <div class="metrics" aria-label="Workspace overview">${metric('active', 'Active operators', 'users', 'With provisioning access', 'operators', 'active')}${metric('disabled', 'Disabled accounts', 'lock', 'History safely retained', 'operators', 'disabled')}${metric('attempts', 'Recent attempts', 'cards', 'Latest 100 attempts', 'attempts')}${metric('stopped', 'Stopped attempts', 'shield', 'Quarantined or abandoned', 'attempts', 'stopped')}</div>
+  <div class="notice warning view-notice" id="workspace-notice" role="status" hidden></div>
+  <section id="view-operators" class="panel" aria-labelledby="operators-title"><div class="panel-heading"><div><h2 id="operators-title">Your operators <span class="count-pill" id="operators-count">—</span></h2><p>The right people. The right access.</p></div></div><div class="toolbar"><label class="search">${icon('search')}<input id="operator-search" type="search" aria-label="Search operators" placeholder="Search by name or operator ID"></label><select class="filter" id="operator-filter" aria-label="Filter operators by status"><option value="all">All statuses</option><option value="active">Active</option><option value="disabled">Disabled</option></select><span class="toolbar-meta">Access changes take effect immediately</span></div><div class="table-scroll"><table class="data-table"><thead><tr><th scope="col">Operator</th><th scope="col">Environment</th><th scope="col">Status</th><th scope="col" class="column-joined">Joined</th><th scope="col"><span class="muted">Manage</span></th></tr></thead><tbody id="operators"></tbody></table></div><div id="operators-empty" hidden></div><div class="table-footer"><span id="operators-showing">Loading operators…</span><span class="icon footer-security">${icon('shield')}Deployment-controlled administrator access</span></div></section>
+  <section id="view-attempts" class="panel" aria-labelledby="attempts-title" hidden><div class="panel-heading"><div><h2 id="attempts-title">Recent installations <span class="count-pill" id="attempts-count">—</span></h2><p>Read-only evidence from the latest 100 provisioning attempts.</p></div></div><div class="toolbar"><label class="search">${icon('search')}<input id="attempt-search" type="search" aria-label="Search installation attempts" placeholder="Find a chip, attempt, batch or operator"></label><select class="filter" id="attempt-filter" aria-label="Filter installation attempts by state"><option value="all">All states</option><option value="active">Active</option><option value="recorded">Recorded</option><option value="quarantined">Quarantined</option><option value="abandoned">Abandoned</option><option value="stopped">All stopped</option></select></div><div id="attempts-error" class="notice error view-notice" hidden></div><div class="table-scroll"><table class="data-table"><thead><tr><th scope="col">Attempt / batch</th><th scope="col">Chip identity</th><th scope="col">Operator</th><th scope="col">State</th><th scope="col">Details</th></tr></thead><tbody id="attempts"></tbody></table></div><div id="attempts-empty" hidden></div><div class="table-footer"><span id="attempts-showing">Loading attempts…</span><span class="icon footer-security">${icon('lock')}No card actions from this console</span></div></section>
+  <section id="view-activity" class="panel" aria-labelledby="activity-title" hidden><div class="panel-heading"><div><h2 id="activity-title">Access activity <span class="count-pill" id="activity-count">—</span></h2><p>The latest 100 successful administration events.</p></div></div><div id="activity-error" class="notice error view-notice" hidden></div><div id="audit" class="activity-list"></div><div id="activity-empty" hidden></div><div class="table-footer"><span id="activity-showing">Loading activity…</span><span class="icon footer-security">${icon('shield')}Recorded with each access change</span></div></section>
+  <div class="subtle-note" id="view-guidance">${icon('info')}<p>Disable an operator to stop access while preserving their card history. Password resets revoke existing sessions.</p></div><footer class="workspace-footer"><span>Flash · Card operations</span><span><span class="dot"></span><span data-environment>Workspace</span></span></footer></main></div>
+</div>
+<dialog id="dialog" aria-labelledby="dialog-title"></dialog><div id="toast" class="toast" role="status" hidden></div><script>${adminClient}</script></body></html>`,
   };
 }
