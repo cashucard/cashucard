@@ -1,0 +1,79 @@
+# Provisioner build 7 candidate — 2026-10-23
+
+This is the current preparation record. The October 21 store audit and build 3–6
+reports remain dated evidence; their pending-work lists are not the build 7
+status. Build 7 is not yet physically validated, uploaded or published.
+
+## Candidate scope
+
+Version **1.0.0 (7)** retains `com.islandbitcoin.provisioner` and existing store
+signing identities. The tracked protocol 2.1 CAP is unchanged:
+`applet/target/cashu-javacard-2.1.0.cap`, SHA-256
+`f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`.
+
+| Change | Review | Result |
+| --- | --- | --- |
+| Deliberate reset/reuse from the phone | [#128](https://github.com/lnflash/cashu-card/pull/128), D101 | Review exact identity and authorized key provenance; reject value; check retained spent entries at the recorded mint before separate PIN-protected cleanup; recover reset completion without replaying card writes. |
+| Actionable card status | [#129](https://github.com/lnflash/cashu-card/pull/129), D102 | A read-only check directs operators to wallet setup/use, saved work, administrator review or an eligible reset review. |
+| Sign-in password processing | [#130](https://github.com/lnflash/cashu-card/pull/130), D103 | Upgrade only after a valid legacy sign-in; retain existing credentials and sessions. Local KDF median approximately 75 ms versus 2.1 s; first legacy sign-in and live end-to-end timing remain separate. |
+| Completion and recovery messages | [#131](https://github.com/lnflash/cashu-card/pull/131), D104 | Separate installation saved, wallet setup, stopped attempts, card recovery and service-only retries. App and console use bounded, actionable reasons. |
+
+No new applet wire behavior, manager-key guessing, proof/value deletion shortcut,
+service origin migration or recovery-drill enablement is included. Existing
+quarantine and recovery fences remain enforced.
+
+## Build configuration
+
+Prepare the native candidates in an isolated release checkout using the existing
+API origin **`https://cashu-card-ops.old-cell-30e7.workers.dev`**. Do not replace
+it with the dashboard hostname: saved work and issuer scope retain the API origin.
+Settings shows the public dashboard **`https://ops.cashucard.org`**.
+
+Run `yarn configure:service --origin` with that origin, then `yarn check:release`
+in `apps/provisioner`. The repository development default stays loopback.
+Installation is enabled; recovery drills and bench runs stay disabled. A passed
+configuration check does not certify physical behavior or authorize distribution.
+
+## Service rollout and acceptance plan
+
+The rollout includes #128's eligibility metadata, #130's password processing and
+#131's operator copy and bounded reset reasons. It does not change the database
+schema, encrypted backup format, issuer, DO/R2 bindings, routes or export schedule.
+Deploy the reviewed source first to staging, then to production only within the
+approved rollout scope. Preserve the previous Worker version as the rollback
+reference. Do not restore an old database to roll back code.
+
+Check the public health response and signed-in console; test one normal valid
+sign-in and then one repeat sign-in using credentials entered by the operator.
+Collect browser timings only, never passwords or tokens. The first valid legacy
+sign-in may still pay the old verification cost; measure the repeat separately.
+A native scrypt cost cap retains compatible verification/fallback behavior.
+See [performance evidence](OPERATOR_SIGN_IN_PERFORMANCE_2026-10-23.md).
+
+## Remaining acceptance
+
+1. Review and pass CI for the final build identity commit. Native CI uses a
+   disposable test signer and staging endpoint; its AAB is not a store artifact.
+2. Obtain the separate service/device authorization for the exact
+   [SuperMax cleanup/reset/reinstallation plan](OWNED-CARD-MOBILE-RESET.md).
+   Require the reviewed public state again; do not infer an empty card has no
+   pending merchant change merely from its balance. The operator must confirm
+   pending payments/change are finished. The new flow has focused software
+   coverage but no physical cleanup/reset result yet. Keep #92 open until that
+   result is recorded or clearly document a failed acceptance.
+3. Produce signed candidates with the reviewed origin. Check actual bundled
+   origin/gates, build numbers, NFC entitlement, production signature/certificate
+   continuity and Android SDK/16 KB native alignment. Retain artifact hashes.
+4. Complete the approved SuperMax drill and record a dated hardware report.
+   The [build 6 end-to-end report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+   already covers holder setup, loading and online/offline payments; it does not
+   validate the new mobile spent-entry cleanup/reset implementation.
+5. Record the physical iPhone demonstration video and review final store access,
+   disclosures and release notes. Upload accepted candidates to existing internal
+   tracks before a public submission.
+
+The GitHub release must include the **tracked CAP and its SHA-256 file**. The
+existing [protocol v2.1.0 release](https://github.com/lnflash/cashu-card/releases/tag/v2.1.0)
+contains that unchanged CAP. Do not move its tag or label it a new applet build.
+A build 7 phone release should reference the protocol version and attach those
+same verified files. Signed phone binaries remain store artifacts.
