@@ -3051,3 +3051,15 @@ found animated diagrams busy and weak at explaining the exchange; rendered
 objects with one sentence per beat, chapters that can be chosen, and a stepper
 on phones answer that. Playing once and holding the end frame keeps D80's rule
 against continuously running decorative animation.
+
+## <a id="d107"></a>D107: Describe operator scope without implying a card-key selector
+
+Settings shows one read-only “Provisioning scope” value from the signed-in
+account, with an accessible, expandable explanation. Remove the two “active”
+rows: they look like a switch or a scan of the card’s credentials. “Issued”
+and “Factory” remain the service’s existing account scope values; neither
+label certifies deployment environment or current card-manager keys. Signed-out
+Settings must not invent a Factory scope. The help explains why saved batches
+and recovery work require the original account/service, and directs card-state
+questions to Check a card. No authorization, key derivation, journal or wire
+behavior changes.

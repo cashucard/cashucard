@@ -1,7 +1,7 @@
 /**
  * ENG-740's provisioner wiring: sign-in failure renders the service's reason
- * (never improvised); S5's key-env card lights exactly one environment; demo
- * rows never go pending; CLOSE BATCH with pending rows shows the note first.
+ * (never improvised); session scope remains service-owned;
+ * failed registry writes remain pending; CLOSE BATCH asks before closing them.
  * The api module is mocked; no test opens a socket.
  */
 import React from 'react';
@@ -136,76 +136,6 @@ test('the stub line "While the key service is pending…" is gone', () => {
   expect(all).not.toContain('admits any build');
   expect(all).not.toContain('While the key service is pending');
 });
-
-test('S5: exactly one environment is ever lit, from the session env', async () => {
-  // The screen's rule: both lit flags derive from ONE value (session env, or
-  // factory when signed out), so "both lit" is unrepresentable. The cases
-  // drive the store's real sign-in seam and read what the probe renders.
-  const cases: Array<['factory' | 'issued' | null, string]> = [
-    ['issued', 'factory-dim issued-lit'],
-    ['factory', 'factory-lit issued-dim'],
-    [null, 'factory-lit issued-dim'], // sign-in failed: signed out, factory default
-  ];
-  for (const [env, expected] of cases) {
-    if (env) {
-      (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-        operatorSession: async () => ({operator_id: 1, env, token: 't'}),
-      }));
-    } else {
-      (ApiClient as unknown as jest.Mock).mockImplementation(() => ({
-        operatorSession: async () => {
-          throw new ApiServiceImplError();
-        },
-      }));
-    }
-    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
-    await ReactTestRenderer.act(() => {
-      tree = ReactTestRenderer.create(
-        <AppStore
-          clientOptions={{baseUrl: 'http://ops.test'}}
-          key={String(env)}>
-          <SettingsProbeWithSignIn />
-        </AppStore>,
-      );
-    });
-    const rendered = tree!.root
-      .findAll(n => typeof n.props.children === 'string')
-      .map(n => n.props.children as string)
-      .join(' ');
-    expect(rendered).toContain(expected);
-    // and the rule's negation: never both lit in any rendered case
-    expect(rendered).not.toContain('factory-lit issued-lit');
-    await ReactTestRenderer.act(() => {
-      tree!.unmount();
-    });
-  }
-});
-
-/** Signs in (or fails) on mount, then renders the two lit flags' words. */
-function SettingsProbeWithSignIn(): React.JSX.Element {
-  const app = useApp();
-  const [done, setDone] = React.useState(false);
-  React.useEffect(() => {
-    app
-      .signIn('bench-lead', 'pw')
-      .catch(() => undefined)
-      .then(() => setDone(true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  if (!done) {
-    return <Text>signing-in</Text>;
-  }
-  const env = app.session?.env ?? 'factory';
-  const factoryLit = env === 'factory';
-  const issuedLit = env === 'issued';
-  return (
-    <Text>
-      {`${factoryLit ? 'factory-lit' : 'factory-dim'} ${
-        issuedLit ? 'issued-lit' : 'issued-dim'
-      }`}
-    </Text>
-  );
-}
 
 test('record state distinguishes saved rows from pending rows', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;

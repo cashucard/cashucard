@@ -2,7 +2,7 @@
 
 Issue #121 recorded production operator sign-in requests taking 8,847 and
 8,719 ms, versus 75–262 ms for subsequent authenticated admin reads. This
-change has not yet been deployed or measured against those accounts.
+change was subsequently deployed; operator-observed acceptance is recorded below.
 
 ## Local result and scope
 
@@ -41,9 +41,26 @@ in place. Old PBKDF2 and scrypt hashes remain readable. The new profile also fit
 retains the legacy hash without doubling its PBKDF2 cost; unrelated crypto
 errors fail closed. See [D103](DECISIONS.md#d103).
 
-Before closing #121, deploy the reviewed service, measure one normal successful
-legacy login and a subsequent successful login through the user-operated UI,
-and confirm failure/rate-limit behavior under an explicitly scoped check. Do
-not extract production passwords or hashes for a benchmark or introduce a
-public performance/debug endpoint. No production rollout occurred for this
-local result.
+## Production rollout and operator acceptance
+
+The reviewed service is deployed from `4dc623930d2a21f5527993f8fbcfd1d519dc0a19`
+as Worker version `e3591bcb-2492-404c-aaae-40ee2a22a3d0`, preserving the original
+API origin, database, bindings and export schedules. Both HTML surfaces retain
+no-transform and their original restrictive CSP. The deployment smoke check
+also confirmed the service authentication boundary.
+
+On SuperMax (iPhone 17 Pro, iOS 26.6.2), build 1.0.0 (7), source #134,
+the operator reported an initial successful sign-in taking **about four seconds**,
+then signed out and back in repeatedly; every repeat was **almost instant**.
+The Cards screen showed NEW BATCH. This matches the expected one-time legacy
+verification/upgrade followed by native verification, but no stored hash was
+inspected. These are user-observed phone timings, not browser instrumentation
+or an exact numeric before/after comparison with the earlier Chrome baseline.
+
+The operator also confirmed Sign In remains visible while typing with the
+keyboard open and the removed demo entry is absent. Compatibility, revocation,
+rate budgeting and failure behavior have focused Node/Workers regression
+coverage. No deliberate bad-password/rate-limit probe was run against the
+production operator, and no production password/hash was extracted. #121’s
+remaining instrumented success/failure timing acceptance is separate from this
+confirmed usability improvement.
