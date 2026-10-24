@@ -139,8 +139,13 @@ progress. An explicit `closeBatch` only releases local history after the entire
 batch is acknowledged and recognized by the service; device identity survives.
 Quarantined/abandoned server states stop for explicit disposition handling.
 
-`src/journalStorage.ts` replaces one AsyncStorage value under a fixed key. There
-is no fallback store or clearing on sign-out. A schema 1 standalone attempt or
+`src/journalStorage.ts` retains one atomic schema 3 envelope under the original
+fixed key. `src/workspaceStorage.ts` migrates the old batch/reset journals and
+keeps separate workspaces for each service origin, operator ID and key environment,
+with one unchanged device ID. Sign-out never clears evidence, late writes stay
+bound to their original workspace, and malformed data blocks rather than opening
+a fresh store. Older app binaries reject the migrated envelope; coordinate any
+downgrade with the administrator. There is no fallback store. A schema 1 standalone attempt or
 malformed snapshot is preserved and stops; it cannot silently generate another
 device/batch. Sign-in now retains the service's stable `operator_id`; the typed
 reservation adapter keeps the token in memory and scopes all requests to it.
@@ -298,3 +303,16 @@ Do not generate a replacement upload key until Play Console signing/enrollment
 state and certificate continuity have been reviewed. This setup does not grant
 store access or authorize a signed upload. See the
 [store release plan](../../docs/PROVISIONER-STORE-RELEASE.md).
+
+
+### Cards home and shared phones
+
+Sign-in opens Cards. Continue a saved batch/reset deliberately, or open Settings
+and card tools. Stop for now returns to Cards; it does not end or erase work.
+End batch is available on Cards when no attempt is active and asks for
+confirmation before closing unused places through the service. Close finished
+batch releases a fully acknowledged batch so New batch is available. A pending
+card attempt must be completed or its stop acknowledged before ending its batch.
+Another operator can prepare their own batch, while device/chip holds continue
+to prevent a second installation around unresolved work. See
+[D111](../../docs/DECISIONS.md#d111).
