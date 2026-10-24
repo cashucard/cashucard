@@ -1,27 +1,27 @@
 # App icon
 
-`cashu.png` is the exact mascot served at
-[https://cashucard.org/assets/cashu.png](https://cashucard.org/assets/cashu.png),
-matching `website/dist/assets/cashu.png`. The square icon uses the website's
-`#10271E` background. Pixel edges are preserved with nearest-neighbor scaling.
-
-Regenerate on macOS from the repository root:
+The icon is the Cashu Card mark, the cashew drawn as a card's chip, on the
+site's deep green (D119). `brand/generate.swift` draws it, with the rest of the
+brand library in [`brand/`](../../../../brand/). Regenerate on macOS from
+anywhere:
 
 ```sh
-swift apps/provisioner/scripts/generate-app-icons.swift
+swift brand/generate.swift
 ```
 
 This writes both existing iOS catalogs, the 1024px master, the 512px Play icon,
 Android legacy/round/adaptive assets at each density, the legacy upload icon
 path, and both store feature-graphic paths. iOS/store icon images are
 opaque squares; Android applies its adaptive mask to a separate foreground.
+Icons of 40px and below, such as iOS's 20pt@2x, use the plain cashew: there the
+chip's lines would be under a pixel wide.
 
 The Play asset is a 32-bit RGBA PNG with a fully opaque background, following
 [Google Play's icon format](https://developer.android.com/distribute/google-play/resources/icon-design-specifications).
 iOS catalog/master PNGs use RGB with no alpha channel.
 
 
-Store upload assets use this same mascot. The Play listing copy is in
+Store upload assets use this same mark. The Play listing copy is in
 `../play-assets/listing-en-US.txt`. The current Play screenshots are unedited
 1080 × 1920 captures of Cards home and the read-only status screen from build
 10's app code in an isolated Android 35 emulator. A local fixture account was
