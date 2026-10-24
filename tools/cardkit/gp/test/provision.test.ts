@@ -32,7 +32,7 @@ import {
 } from '../provision';
 import {SPIKE_KEYS, parseCommand, selectAid, type Transceiver} from '../scp02';
 import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
-import {FakeCard, ISD, pullAt} from './fake-card';
+import {FakeCard, ISD, pullAt} from '../../testing/fake-card';
 
 const CASHU = cashuPlan(CASHU_LOAD_FILE);
 const HELLO = helloPlan(HELLO_LOAD_FILE);

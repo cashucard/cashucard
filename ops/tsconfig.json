@@ -3,7 +3,6 @@
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
-    "paths": {"@noble/hashes/*": ["./node_modules/@noble/hashes/*"]},
     "module": "commonjs",
     "moduleResolution": "node",
     "strict": true,

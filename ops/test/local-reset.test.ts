@@ -32,9 +32,9 @@ import {
   rotateKeys,
   FACTORY_KEYS,
   fromHex,
-} from '../../tools/cardkit';
-import {FakeCard} from '../../tools/cardkit/gp/test/fake-card';
-import {CASHU_LOAD_FILE} from '../../tools/cardkit/gp/test/assets';
+} from '@cashu-card/cardkit';
+import {FakeCard} from '@cashu-card/cardkit/testing';
+import {CASHU_LOAD_FILE} from '../../apps/provisioner/src/assets/cashu';
 import {randomBytes} from 'node:crypto';
 
 const uuid = (n: number) =>

@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["ES2020"],
+    "lib": [
+      "ES2020"
+    ],
     "types": [],
     "module": "commonjs",
     "moduleResolution": "node",
@@ -16,6 +18,16 @@
     "skipLibCheck": false,
     "noEmit": true
   },
-  "include": ["index.ts", "gp/**/*.ts"],
-  "exclude": ["node_modules", "gp/test/**"]
+  "include": [
+    "index.ts",
+    "cleanup.ts",
+    "gp/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "gp/test/**",
+    "testing/**",
+    "test/**"
+  ]
 }

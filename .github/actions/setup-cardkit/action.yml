@@ -1,0 +1,10 @@
+name: Build the local cardkit package
+description: Prepare the versioned package before a consumer installs its file dependency.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: tools/cardkit
+      run: |
+        yarn install --frozen-lockfile
+        yarn build

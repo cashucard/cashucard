@@ -41,7 +41,7 @@ import {
   InspectionError,
   TransportError,
   type ResetStage as CardResetStage,
-} from '../../tools/cardkit';
+} from '@cashu-card/cardkit';
 import {
   loadResetJournal,
   writeResetJournal,

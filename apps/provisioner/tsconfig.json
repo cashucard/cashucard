@@ -3,12 +3,6 @@
   "exclude": ["node_modules", "ios", "android"],
   "extends": "@react-native/typescript-config/tsconfig.json",
   "compilerOptions": {
-    "types": ["react-native", "jest", "node"],
-    // tools/cardkit is bundled from the repo; its one dependency resolves from
-    // this app's node_modules, as Metro's nodeModulesPaths has it
-    "paths": {
-      "@noble/hashes/*": ["./node_modules/@noble/hashes/*"],
-      "@noble/curves/*": ["./node_modules/@noble/curves/*"]
-    }
+    "types": ["react-native", "jest", "node"]
   }
 }

@@ -35,3 +35,7 @@ apps/provisioner/android/app/src/main/assets/
 
 # Wrangler local state (website/, ops/)
 .wrangler/
+
+# Built cardkit package (source is tracked; releases build the distributable)
+tools/cardkit/dist/
+*.tgz

@@ -41,7 +41,7 @@ import {
   type KeySet,
 } from '../scp02';
 import {HELLO_LOAD_FILE} from './assets';
-import {FakeCard} from './fake-card';
+import {FakeCard} from '../../testing/fake-card';
 import {
   formatGpExchange,
   parseGpLog,

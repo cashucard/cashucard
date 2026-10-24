@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["index.ts", "cleanup.ts", "testing.ts", "gp/*.ts", "testing/*.ts"],
+  "exclude": ["node_modules", "dist", "gp/test", "test"]
+}

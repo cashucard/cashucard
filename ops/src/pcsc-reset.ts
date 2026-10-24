@@ -2,7 +2,7 @@
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import {resolve} from 'node:path';
-import type {Transceiver} from '../../tools/cardkit';
+import type {Transceiver} from '@cashu-card/cardkit';
 
 const FAILURE_CODES = new Set([
   'reader-not-found',

@@ -19,7 +19,7 @@ import {describeSessionError} from '../src/copy';
 import {randomBytes} from '../src/random';
 import {formatReadout, makeReadout} from '../src/readout';
 import {createCardSession, nfcErrorName, withCard} from '../src/session';
-import {FakeCard} from '../../../tools/cardkit/gp/test/fake-card';
+import {FakeCard} from '@cashu-card/cardkit/testing';
 
 const nfc = jest.mocked(NfcManager);
 
