@@ -18,7 +18,7 @@
     <link rel="icon" href="/assets/cashu.png" />
     <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
-    <script src="/seq/tap-1/anchors.js" defer></script>
+    <script src="/seq/tap-2/anchors.js" defer></script>
     <script src="/motion.js" defer></script>
     <title>Cashu Card | Open NFC ecash protocol</title>
   </head>
@@ -26,7 +26,7 @@
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
       <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu.png" alt="" width="32" height="37" /><span>cashu<span>card</span></span></a>
-      <nav aria-label="Main navigation"><a href="#film">Film</a><a href="#tap">One tap</a><a href="#source">Protocol and code</a></nav>
+      <nav aria-label="Main navigation"><a href="#film">Film</a><a href="#tap">One tap</a><a href="#buy">Get cards</a><a href="/guide">Install guide</a><a href="#source">Protocol and code</a></nav>
       <a class="header-link" href="https://github.com/lnflash/cashu-card">GitHub <span aria-hidden="true">↗</span></a>
     </header>
     <main id="main">
@@ -59,13 +59,13 @@
       <section class="film-section" id="film" aria-labelledby="film-title">
         <div class="film-head">
           <div class="eyebrow"><span class="status-dot"></span> THE FILM <span class="eyebrow-divider">/</span> 0:48</div>
-          <h2 id="film-title">The protocol in under a minute</h2>
+          <h2 id="film-title">How it works</h2>
         </div>
         <figure class="film">
           <div class="film-screen" id="film-screen">
-            <video id="reel" controls playsinline muted preload="metadata" poster="/film/poster-1.jpg" aria-label="Cashu Card film, 48 seconds. A wallet loads the card, an offline till takes a tap, and the till settles with the mint later." aria-describedby="film-text">
-              <source src="/film/cashu-card-film-1-720.mp4" type="video/mp4" media="(max-width: 800px)" />
-              <source src="/film/cashu-card-film-1.mp4" type="video/mp4" />
+            <video id="reel" controls playsinline muted preload="metadata" poster="/film/poster-2.jpg" aria-label="Cashu Card film, 48 seconds. A wallet loads the card, an offline till takes a tap, and the till settles with the mint later." aria-describedby="film-text">
+              <source src="/film/cashu-card-film-2-720.mp4" type="video/mp4" media="(max-width: 800px)" />
+              <source src="/film/cashu-card-film-2.mp4" type="video/mp4" />
             </video>
             <button class="film-play" id="film-play" type="button" hidden>Play the film <span aria-hidden="true">▶</span></button>
           </div>
@@ -101,21 +101,22 @@
             <div class="seq-layout">
               <div class="seq-side">
                 <ol class="steps" id="steps">
-                  <li data-a="0" data-b="0.15"><button type="button" disabled><b>Select</b><span class="bar"><i></i></span></button><p>The card comes into the till's field, and the till selects the Cashu Card applet.</p></li>
-                  <li data-a="0.15" data-b="0.3"><button type="button" disabled><b>Name</b><span class="bar"><i></i></span></button><p>The till reads the card's pieces and names the ones it wants for a 21 sat bill: 1, 4 and 16 sat.</p></li>
-                  <li data-a="0.3" data-b="0.45"><button type="button" disabled><b>Outputs</b><span class="bar"><i></i></span></button><p>The till sends the outputs it will swap those pieces for at the mint.</p></li>
+                  <li data-a="0" data-b="0.15"><button type="button" disabled><b>Select</b><span class="bar"><i></i></span></button><p>The customer holds the card to the back of the merchant's phone, and the phone selects the Cashu Card applet.</p></li>
+                  <li data-a="0.15" data-b="0.3"><button type="button" disabled><b>Name</b><span class="bar"><i></i></span></button><p>The phone reads the card's pieces and names the ones it wants for a 21 sat bill: 1, 4 and 16 sat.</p></li>
+                  <li data-a="0.3" data-b="0.45"><button type="button" disabled><b>Outputs</b><span class="bar"><i></i></span></button><p>The phone sends the outputs it will swap those pieces for at the mint.</p></li>
                   <li data-a="0.45" data-b="0.6"><button type="button" disabled><b>Sign</b><span class="bar"><i></i></span></button><p>The card signs once for the whole payment and burns each piece it signed for.</p></li>
-                  <li data-a="0.6" data-b="0.75"><button type="button" disabled><b>Check</b><span class="bar"><i></i></span></button><p>The till checks the mint's signature on each piece offline, then accepts the payment. Until it settles, the till carries the risk that a piece was spent elsewhere.</p></li>
-                  <li data-a="0.75" data-b="1"><button type="button" disabled><b>Settle</b><span class="bar"><i></i></span></button><p>The card leaves the reader. Later, back online, the till swaps the pieces at the mint and the payment settles.</p></li>
+                  <li data-a="0.6" data-b="0.75"><button type="button" disabled><b>Check</b><span class="bar"><i></i></span></button><p>The phone checks the mint's signature on each piece offline, then accepts the payment. Until it settles, the merchant carries the risk that a piece was spent elsewhere.</p></li>
+                  <li data-a="0.75" data-b="1"><button type="button" disabled><b>Settle</b><span class="bar"><i></i></span></button><p>The card leaves the phone. Later, back online, the phone swaps the pieces at the mint and the payment settles.</p></li>
                 </ol>
                 <div class="slots" id="slots" aria-hidden="true"><span class="slots-label">Slots on the card <b id="slots-count">8 unspent</b></span><div class="slots-row"><i data-v="1">1</i><i data-v="2">2</i><i data-v="4">4</i><i data-v="8">8</i><i data-v="16">16</i><i data-v="32">32</i><i data-v="64">64</i><i data-v="128">128</i></div></div>
               </div>
               <figure class="seq-stage">
                 <div class="seq-screen" id="seq-screen">
-                  <img class="seq-poster" id="seq-poster" src="/seq/tap-1/tap_053.webp" width="1600" height="1000" alt="A Cashu Card held over a till's reader, its chip lit as it signs the payment." />
+                  <img class="seq-poster" id="seq-poster" src="/seq/tap-2/tap_053.webp" width="1600" height="1000" alt="A Cashu Card held to the back of a merchant's phone, its chip lit as it signs the payment." />
                   <canvas id="seq-canvas" aria-hidden="true"></canvas>
                   <svg class="seq-leaders" id="seq-leaders" aria-hidden="true"></svg>
                   <div class="seq-callouts" id="seq-callouts" aria-hidden="true"></div>
+                  <div class="seq-net" id="seq-net" aria-hidden="true"><i></i><span>OFFLINE</span></div>
                 </div>
                 <figcaption class="seq-caption" id="seq-caption" aria-live="polite"></figcaption>
                 <div class="seq-nav" id="seq-nav" hidden><button class="ctl" id="seq-prev" type="button">Previous</button><span class="seq-count" id="seq-count">1 of 6</span><button class="ctl" id="seq-next" type="button">Next</button></div>
@@ -124,10 +125,49 @@
           </div>
         </div>
       </section>
+      <section class="buy-section" id="buy" aria-labelledby="buy-title">
+        <div class="buy-head">
+          <div class="eyebrow"><span class="status-dot"></span> CARDS <span class="eyebrow-divider">/</span> NXP J3R180</div>
+          <h2 id="buy-title">Where to get cards</h2>
+          <p>The Cashu Card applet runs on NXP J3R180 cards (JCOP 4, Java Card 3.0.5) with contact and contactless interfaces. Buy them unfused and initialized, with the default GlobalPlatform keys, and the <a href="/guide">install guide</a> takes you through installing the applet.</p>
+        </div>
+        <div class="buy-grid">
+          <article class="buy-option" aria-labelledby="buy-test-title">
+            <span class="buy-kicker">01 / FOR TESTING</span>
+            <h3 id="buy-test-title">A few blank cards</h3>
+            <p>This Amazon listing names the dual interface and the default SCP02 keys. A few cards are enough to try the protocol with a phone or a desk reader.</p>
+            <ul class="buy-facts"><li>Packs of 2 or 5</li><li>About $9 a card</li><li>Ships from Amazon</li></ul>
+            <a class="button button-outline" href="https://www.amazon.com/dp/B0HD7Z44HJ">See the 5-pack on Amazon <span aria-hidden="true">↗</span></a>
+          </article>
+          <article class="buy-option" aria-labelledby="buy-bulk-title">
+            <span class="buy-kicker">02 / IN BULK</span>
+            <h3 id="buy-bulk-title">Blank cards by the hundred</h3>
+            <p>Two suppliers list dual-interface J3R180 cards for volume orders. CardLogix quotes larger orders from California, and Feitian publishes its price breaks on Alibaba.</p>
+            <div class="buy-sources">
+              <div class="buy-source"><b>CardLogix</b><span>$11.95 a card list price, with volume quotes. Ships from California.</span><a class="button button-outline" href="https://www.cardlogix.com/product/nxp-jcop-4-java-card-3-0-5-classic/">Get a quote <span aria-hidden="true">↗</span></a></div>
+              <div class="buy-source"><b>Feitian on Alibaba</b><span>$7.89 a card from 100 and $5.69 from 500. Sold from Beijing.</span><a class="button button-outline" href="https://www.alibaba.com/product-detail/JCOP4-P71-Dual-Interface-Support-SHA_62572399362.html">See it on Alibaba <span aria-hidden="true">↗</span></a></div>
+            </div>
+          </article>
+          <p class="buy-asof">Prices are as listed on 23 October 2026.</p>
+          <article class="buy-option buy-custom" aria-labelledby="buy-custom-title">
+            <span class="buy-kicker">03 / CUSTOM PRINTED</span>
+            <h3 id="buy-custom-title">Cards with your design</h3>
+            <figure class="buy-shot"><img src="/assets/custom-cards-1.webp" width="1200" height="750" alt="Three sample custom printed Cashu Cards: a café, a night market and a members' club." /><figcaption class="buy-soon"><span>Coming soon</span></figcaption></figure>
+            <p>Your artwork goes on J3R180 cards, and each card ships with the Cashu Card applet installed and tested. Prices per card are set to compete with the blank cards above.</p>
+            <!-- placeholder: the quantities, the price per card and both checkouts wait for the store's launch -->
+            <fieldset class="buy-qty"><legend>Quantity</legend><label><input type="radio" name="buy-qty" value="100" checked /><span>100</span></label><label><input type="radio" name="buy-qty" value="250" /><span>250</span></label><label><input type="radio" name="buy-qty" value="500" /><span>500</span></label><label><input type="radio" name="buy-qty" value="1000" /><span>1,000</span></label></fieldset>
+            <div class="buy-pay">
+              <button class="pay pay-lightning" type="button" aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z" /></svg>Pay with Lightning</button>
+              <button class="pay pay-card" type="button" aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M2.5 9.5h19" stroke="currentColor" stroke-width="1.8" /></svg>Pay with Stripe</button>
+            </div>
+            <ol class="buy-steps"><li>Choose a quantity and pay.</li><li>Send your artwork.</li><li>Approve a printed proof.</li><li>Cards ship with the applet installed.</li></ol>
+          </article>
+        </div>
+      </section>
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md">Draft specification ↗</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md">Draft specification ↗</a><a href="/guide">Install guide</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/lnflash/cashu-card">Cashu Card ↗</a></div>
         <div class="footer-group"><span class="footer-label">APPS</span><a href="https://github.com/lnflash/flash-mobile">Flash Mobile ↗</a><a href="https://github.com/getfoxy/iOS">Foxy ↗</a><a href="https://github.com/lnflash/flash-pos">Flash POS ↗</a></div>
       </div>

@@ -315,6 +315,12 @@ jobs:
             echo "::error::docs/HARDWARE_DEPLOYMENT.md does not publish the tracked CAP's sha256 $sha"
             exit 1
           }
+          for page in website/dist/guide.html website/dist/guide.md; do
+            grep -q "$sha" "$page" || {
+              echo "::error::the site's install guide ($page) does not publish the tracked CAP's sha256 $sha"
+              exit 1
+            }
+          done
           echo "tracked CAP $sha matches this source in every entry but META-INF/MANIFEST.MF"
 
       # The phone-side provisioner (ENG-738) carries two load files: the tracked
@@ -479,7 +485,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check website/tools/browser-smoke.cjs && node --check website/tools/preview.cjs && node --check website/dist/motion.js
-      - run: test -f website/dist/index.html && test ! -e website/dist/site.js
-      - run: test -f website/dist/film/cashu-card-film-1.mp4 && test -f website/dist/film/cashu-card-film-1-720.mp4 && test -f website/dist/film/poster-1.jpg
-      - run: test -f website/dist/seq/tap-1/anchors.js && test "$(ls website/dist/seq/tap-1/tap_*.webp | wc -l)" -eq 96 && node --check website/worker.js
+      - run: node --check website/tools/browser-smoke.cjs && node --check website/tools/preview.cjs && node --check website/dist/motion.js && node --check website/dist/guide.js
+      - run: test -f website/dist/index.html && test ! -e website/dist/site.js && test -f website/dist/guide.md && test -f website/dist/llms.txt
+      - run: test -f website/dist/film/cashu-card-film-2.mp4 && test -f website/dist/film/cashu-card-film-2-720.mp4 && test -f website/dist/film/poster-2.jpg
+      - run: test -f website/dist/seq/tap-2/anchors.js && test "$(ls website/dist/seq/tap-2/tap_*.webp | wc -l)" -eq 96 && node --check website/worker.js

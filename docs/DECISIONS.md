@@ -3099,3 +3099,72 @@ card work requests Stop first; hardware Back uses the same action. Sign-in
 cancellation clears its input and refuses late session acceptance. Completed
 card changes remain in place; no journal, key escrow or recovery evidence is
 cleared as an exit shortcut.
+
+## <a id="d110"></a>D110: A phone as the till, the provisioner in the film, where to get cards, and an install guide
+
+**Decided (2026-10-23):** Five changes to cashucard.org.
+
+The film section is black and headed "How it works". The film's scene fades
+to black over the outer nine percent of the frame's height, under its text
+layer, so the frame has no visible edge on the page, and the screen loses its
+outline and shadow. Headlines carry a soft dark halo so they read over bright
+objects.
+
+The till, in the film and in "One tap, step by step", is an Android phone
+running a point-of-sale app with nothing branded on it. The customer holds
+the card to the phone's back, set to one side so its chip shows past the
+phone's edge, while the camera watches the screen. The screen's flow follows
+flash-pos's card checkout: a sheet asks for the card while rings close on it,
+the charge screen shows the card, its pieces and the payment and names each
+step, and a check and a green screen mark the payment accepted. It stays the
+offline, exact-amount payment of D106: the card is lifted away once the
+payment is accepted, and the receipt waits through the night until the phone
+is back online and settles, while the phone's clock runs from evening to
+morning. In the steps an OFFLINE badge in the frame's top right turns to
+ONLINE at that moment. The frames move to `seq/tap-2/` and the film to
+`film-2`.
+
+The film's key chapter shows the provisioner (apps/provisioner) installing
+the applet: the phone is set down on the card, its installation screen runs
+through the app's own phases and writes the card in, and the chip makes its
+key as the card's applet is installed. The screen is the app's dark theme
+with the Cashu Card's face in place of its branded card art.
+
+A section, "Where to get cards", names the chip the applet runs on (NXP
+J3R180) and how to buy it: unfused and initialized, with the default
+GlobalPlatform keys over SCP02, which the phone's install uses (D27). It
+links one Amazon listing that states those, for testing, and CardLogix and
+Feitian's J3R180 on Alibaba for volume, with prices dated 23 October 2026. A
+third option, custom printed cards with the applet installed, shows three
+made-up designs rendered in the film's studio under a "Coming soon" stamp;
+its quantities and its Lightning and Stripe checkouts are placeholders. The
+smoke test's word and page budgets grow to hold the section.
+
+`docs/HARDWARE_DEPLOYMENT.md` becomes an install guide on the site at
+`/guide`: six steps from a blank card and a reader to an applet that answers,
+each command with its expected answer, plus reinstalling, troubleshooting and
+reference tables. It follows `tools/cardctl`'s README on PC/SC for macOS,
+names no mint in its setup example, and publishes the tracked CAP's sha256,
+which CI's `cap` job now checks. It links the ACS ACR122U, the reader the
+hardware reports used, on Amazon and at GoToTags. For people whose AI agent
+does the work, `/guide.md` carries the same steps as Markdown with the stops
+as rules, the page offers a one-line prompt that points an agent at it, and
+`/llms.txt` lists it. An MCP server was considered and left for later: the
+install is a few `gp` commands an agent with a terminal can already run, and
+a server would have to run beside the reader and hold the card manager's
+keys.
+
+**Rejected:** a matte on the finished film frames, which would also have
+dimmed the corner marks and readouts near the edge; an Amazon search link,
+which returns cards that cannot run the applet; the JavaCardOS store and
+Smartcard Focus, whose cards are Java Card 3.0.4; and a hand-drawn card with
+a dashed artwork box for custom cards, which the user found weak.
+
+**Why:** the user asked for the film's section to be black so its edge
+disappears and for it to be headed "How it works"; for the till to be an
+Android phone tapped on its back, with flash-pos's screens as the model and a
+clear offline and online indicator; for the film's key chapter to show the
+provisioner and its words to be readable; and for "Where to get cards" with
+an Alibaba option, custom printed cards marked "Coming soon", and the
+hardware deployment guide as an easy page on the site, with a reader to buy
+and a ready handoff for people whose AI agent installs the applet.

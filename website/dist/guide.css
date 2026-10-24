@@ -1,0 +1,141 @@
+/* The install guide at /guide, on the site's palette: styles.css loads first and gives the header, footer and type */
+.header nav a[aria-current="page"]{color:#edf3e7}
+.guide code,.guide pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+
+/* first screen: what the guide does, how long it takes, and its six steps */
+.guide-hero{position:relative;padding:clamp(48px,6vw,92px) clamp(24px,5vw,86px) clamp(40px,5vw,64px);border-bottom:1px solid #b8d1b320;background:radial-gradient(circle at 88% -10%,#25523a 0,transparent 52%),radial-gradient(circle at 0% 120%,#163a2a 0,transparent 45%),#10271e;overflow:hidden;isolation:isolate}
+.guide-hero::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.22;background-image:linear-gradient(#b8d1b313 1px,transparent 1px),linear-gradient(90deg,#b8d1b313 1px,transparent 1px);background-size:68px 68px;mask-image:linear-gradient(90deg,transparent 10%,#000 70%)}
+.guide-hero-inner{max-width:1180px;margin:0 auto}
+.guide-hero h1{max-width:12ch;margin:28px 0 22px;font-size:clamp(46px,6.4vw,96px);line-height:.93;letter-spacing:-.078em;font-weight:800}
+.guide-hero h1 em{font-style:normal;color:#d3f39a}
+.guide-hero-top{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(32px,4vw,64px);align-items:center}
+.hero-term{margin:0;border:1px solid #b8d1b333;border-radius:10px;background:#06130de6;box-shadow:0 30px 70px #020a0699,0 0 0 1px #00000040;overflow:hidden;transform:rotate(-1.2deg)}
+.hero-term-bar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid #b8d1b31f;background:#0c2018}
+.hero-term-bar i{width:10px;height:10px;border-radius:50%;background:#b8d1b333}
+.hero-term-bar i:first-child{background:#d3f39a}
+.hero-term-bar span{margin-left:auto;color:#7f978a;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.hero-term pre{margin:0;padding:18px 20px 22px;overflow:hidden;color:#e9f3e2;font-size:clamp(11px,1vw,13.5px);line-height:1.75}
+.hero-term .prompt{color:#7f978a}
+.hero-term .out{color:#c9f18e}
+.guide-lead{max-width:660px;margin:0;color:#becfc0;font-size:clamp(17px,1.45vw,21px);line-height:1.45}
+.guide-facts{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 0;padding:0;list-style:none}
+.guide-facts li{padding:7px 12px;border-radius:999px;background:#edf3e70d;box-shadow:inset 0 0 0 1px #b8d1b326;color:#c5d8bd;font-size:12px;font-weight:700}
+.guide-steps{margin:clamp(32px,4vw,52px) 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.guide-steps a{height:100%;display:flex;flex-direction:column;gap:8px;padding:16px 16px 18px;border:1px solid #b8d1b324;border-radius:4px;background:#0c2018cc;transition:border-color .2s,transform .2s,background .2s}
+.guide-steps a:hover{border-color:#d3f39a80;background:#0f2a1c;transform:translateY(-2px)}
+.guide-steps b{color:#d3f39a;font-size:10px;font-weight:800;letter-spacing:.16em}
+.guide-steps strong{font-size:16px;font-weight:700;line-height:1.15;letter-spacing:-.02em}
+.guide-steps span{color:#9eb4a2;font-size:12.5px;line-height:1.35}
+
+/* the page body: a contents rail beside the steps */
+.guide-layout{max-width:1180px;margin:0 auto;padding:clamp(36px,4.5vw,64px) clamp(24px,5vw,86px) clamp(56px,6vw,104px);display:grid;grid-template-columns:210px minmax(0,1fr);gap:clamp(32px,5vw,72px);align-items:start}
+.guide-rail{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto}
+.rail-label{display:block;margin-bottom:12px;color:#7f978a;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.guide-rail ol,.guide-toc ol{margin:0;padding:0;list-style:none;display:grid;gap:2px}
+.guide-rail a,.guide-toc a{display:flex;align-items:baseline;gap:9px;padding:7px 10px;border-left:2px solid #b8d1b31f;color:#9eb4a2;font-size:13.5px;font-weight:600;line-height:1.3;transition:color .2s,border-color .2s,background .2s}
+.guide-rail a b,.guide-toc a b{color:#7f978a;font-size:10px;font-weight:800;letter-spacing:.14em}
+.guide-rail a:hover,.guide-toc a:hover{color:#edf3e7}
+.guide-rail a.on{border-left-color:#d3f39a;background:#edf3e70a;color:#edf3e7}
+.guide-rail a.on b{color:#d3f39a}
+.guide-toc{display:none;margin:0 0 36px;border:1px solid #b8d1b326;border-radius:4px;background:#0c2018}
+.guide-toc summary{padding:14px 16px;cursor:pointer;color:#c5d8bd;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.guide-toc summary::marker{color:#d3f39a}
+.guide-toc ol{padding:0 12px 14px}
+
+/* the steps */
+.guide-doc{min-width:0;max-width:800px}
+.guide-doc section{margin-bottom:clamp(48px,5vw,72px);scroll-margin-top:24px}
+.guide-doc h2{display:flex;align-items:baseline;gap:14px;margin:0 0 18px;font-size:clamp(28px,3vw,40px);line-height:1.05;letter-spacing:-.055em;font-weight:800}
+.step-no{flex:none;color:#d3f39a;font-size:12px;font-weight:800;letter-spacing:.16em}
+.guide-doc h3{margin:30px 0 12px;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.guide-doc p,.guide-doc li,.guide-doc dd{color:#becfc0;font-size:16px;line-height:1.55}
+.guide-doc p{margin:16px 0 0}
+.guide-doc h2+p{margin-top:0}
+.guide-doc a:not(.copy){color:#d3f39a;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.guide-doc a:not(.copy):hover{color:#e7ffb7}
+.guide-doc :not(pre)>code{padding:.08em .38em;border-radius:3px;background:#edf3e712;color:#e3efda;font-size:.86em;overflow-wrap:anywhere}
+.guide-doc b{color:#edf3e7}
+.need{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.need li{padding:16px 18px;border:1px solid #b8d1b324;border-radius:4px;background:#0c2018}
+.need li b{display:block;margin-bottom:4px;font-size:16px}
+
+/* a command, with the answer to expect under it */
+.cmd{margin:16px 0 0;border:1px solid #b8d1b329;border-radius:6px;background:#06130d;overflow:hidden}
+.cmd-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:38px;padding:6px 8px 6px 14px;border-bottom:1px solid #b8d1b31a;color:#7f978a;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.cmd pre{margin:0;padding:14px 16px;overflow-x:auto;color:#e9f3e2;font-size:13px;line-height:1.65;tab-size:4}
+.cmd pre code{white-space:pre}
+.cmd-expect{border-top:1px solid #d3f39a2e;background:#0d2419}
+.cmd-expect pre{color:#c9f18e}
+.cmd-expect p{margin:0;padding:12px 16px 14px;color:#c5d8bd;font-size:14px}
+.cmd-expect pre+p{padding-top:0}
+.cmd-label{display:block;padding:10px 16px 0;color:#9ec982;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.copy{flex:none;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:0;border-radius:999px;background:#edf3e712;color:#c5d8bd;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;transition:background .2s,color .2s}
+.copy:hover{background:#edf3e724;color:#edf3e7}
+.copy.done{background:#d3f39a;color:#12271d}
+
+/* the three applets, in the order the chip takes them */
+.order{margin:20px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;counter-reset:none}
+.order li{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0;padding:16px;border:1px solid #b8d1b329;border-radius:4px;background:#0c2018}
+.order li+li::before{content:"";position:absolute;left:-12px;top:50%;width:12px;height:1px;background:#d3f39a80}
+.order b{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#d3f39a;color:#12271d;font-size:12px;font-weight:800}
+.order strong{color:#edf3e7;font-size:15px}
+.guide-doc .order code{padding:0;background:none;color:#9eb4a2;font-size:12px;overflow-wrap:anywhere}
+
+/* a boundary, said once where it applies */
+.note{padding:14px 16px 14px 18px;border:1px solid #e6c46a40;border-left:3px solid #e6c46a;border-radius:4px;background:#2a2a1414}
+.guide-doc .note{margin-top:18px;color:#e3dcc0}
+.note b{display:block;margin-bottom:2px;color:#f3dd9a}
+
+/* optional paths, folded away */
+.more{margin-top:22px;border:1px solid #b8d1b326;border-radius:4px;background:#0c2018}
+.more summary{display:flex;align-items:center;gap:10px;padding:15px 18px;cursor:pointer;color:#edf3e7;font-size:15px;font-weight:700;list-style:none}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{content:"+";display:grid;place-items:center;width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px #d3f39a80;color:#d3f39a;font-size:15px;line-height:1}
+.more[open] summary::before{content:"\2212"}
+.more-body{padding:0 18px 20px}
+.more-body>p:first-child{margin-top:0}
+
+/* troubleshooting and reference */
+.faults{margin:0;display:grid;gap:10px}
+.faults div{padding:16px 18px;border:1px solid #b8d1b324;border-radius:4px;background:#0c2018}
+.faults dt{margin-bottom:6px;color:#edf3e7;font-size:15.5px;font-weight:700;line-height:1.4;overflow-wrap:anywhere}
+.faults dd{margin:0}
+.table-wrap{overflow-x:auto;border:1px solid #b8d1b324;border-radius:4px}
+.ref{width:100%;border-collapse:collapse;font-size:14px}
+.ref th{padding:11px 14px;background:#0c2018;color:#9eb4a2;font-size:10px;font-weight:800;letter-spacing:.14em;text-align:left;text-transform:uppercase;white-space:nowrap}
+.ref td{padding:12px 14px;border-top:1px solid #b8d1b31a;color:#becfc0;line-height:1.45;vertical-align:top}
+.ref td:first-child{color:#edf3e7;min-width:180px}
+.ref td code{white-space:nowrap}
+.ok,.maybe,.no{font-weight:700}
+.ok{color:#c9f18e}
+.maybe{color:#f3dd9a}
+.no{color:#f0a493}
+.links{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+
+.agent{max-width:1008px;margin:clamp(28px,3.5vw,48px) auto 0;padding:clamp(18px,2.2vw,26px);display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(16px,2.6vw,32px);align-items:center;border:1px solid #d3f39a40;border-radius:6px;background:linear-gradient(160deg,#173a2a,#10271e 60%)}
+.agent-kicker{color:#9eb4a2;font-size:10px;font-weight:800;letter-spacing:.16em}
+.agent h2{margin:8px 0 10px;font-size:clamp(22px,2.2vw,28px);line-height:1.1;letter-spacing:-.04em;font-weight:700}
+.agent p{margin:0;color:#becfc0;font-size:15px;line-height:1.5}
+.agent a{color:#d3f39a;text-decoration:underline;text-underline-offset:3px}
+.agent .agent-cmd{margin:0}
+.agent .agent-cmd pre,.agent .agent-cmd pre code{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:1180px){.agent{margin-left:clamp(24px,5vw,86px);margin-right:clamp(24px,5vw,86px)}}
+@media(max-width:760px){.agent{grid-template-columns:1fr}}
+@media(max-width:1100px){
+.guide-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
+.guide-hero-top{grid-template-columns:1fr}
+.hero-term{display:none}
+}
+@media(max-width:960px){
+.guide-layout{grid-template-columns:minmax(0,1fr)}
+.guide-rail{display:none}
+.guide-toc{display:block}
+}
+@media(max-width:600px){
+.guide-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+.order{grid-template-columns:1fr}
+.order li+li::before{left:50%;top:-12px;width:1px;height:12px}
+.guide-doc p,.guide-doc li,.guide-doc dd{font-size:15px}
+.cmd pre{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){.guide-steps a,.guide-rail a{transition:none}.guide-steps a:hover{transform:none}}

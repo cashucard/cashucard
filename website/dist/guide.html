@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#10271e" />
+    <meta name="description" content="Install the Cashu Card applet on a blank NXP J3R180 card with a card reader and GlobalPlatformPro, then check that the card answers. Every command comes with the answer to expect." />
+    <meta property="og:title" content="Install guide | Cashu Card" />
+    <meta property="og:description" content="Put the Cashu Card applet on a blank NXP J3R180 card and check that it answers, step by step." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cashucard.org/guide" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://cashucard.org/guide" />
+    <link rel="icon" href="/assets/cashu.png" />
+    <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/guide.css" />
+    <script src="/guide.js" defer></script>
+    <title>Install guide | Cashu Card</title>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu.png" alt="" width="32" height="37" /><span>cashu<span>card</span></span></a>
+      <nav aria-label="Main navigation"><a href="/#film">Film</a><a href="/#tap">One tap</a><a href="/#buy">Get cards</a><a href="/guide" aria-current="page">Install guide</a></nav>
+      <a class="header-link" href="https://github.com/lnflash/cashu-card">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main" class="guide">
+      <section class="guide-hero" aria-labelledby="guide-title">
+        <div class="guide-hero-inner">
+          <div class="guide-hero-top">
+          <div class="guide-hero-copy">
+          <div class="eyebrow"><span class="status-dot"></span> INSTALL GUIDE <span class="eyebrow-divider">/</span> APPLET 2.1</div>
+          <h1 id="guide-title">Install the <em>Cashu Card applet</em></h1>
+          <p class="guide-lead">This guide puts the Cashu Card applet on a blank NXP J3R180 card from a computer with a card reader, then checks that the card answers. The first card takes about 20 minutes, most of it spent installing tools, and each card after that takes a few minutes.</p>
+          <ul class="guide-facts" aria-label="At a glance">
+            <li>Applet 2.1</li>
+            <li>NXP J3R180 cards</li>
+            <li>GlobalPlatformPro</li>
+            <li>About 20 minutes</li>
+          </ul>
+          </div>
+          <figure class="hero-term" aria-hidden="true">
+            <div class="hero-term-bar"><i></i><i></i><i></i><span>After the install</span></div>
+            <pre><code><span class="prompt">$</span> gp --list
+<span class="out">APP: F04341534855434152444D (SELECTABLE)</span>
+<span class="out">APP: F043415348554341524401 (SELECTABLE)</span>
+<span class="out">APP: D2760000850101 (SELECTABLE)</span>
+<span class="prompt">$</span> gp --apdu 00A404000BF043415348554341524401
+<span class="out">0201 9000</span></code></pre>
+          </figure>
+          </div>
+          <ol class="guide-steps" aria-label="The six steps">
+            <li><a href="#tools"><b>01</b><strong>Install the tools</strong><span>Set up Java, PC/SC and GlobalPlatformPro.</span></a></li>
+            <li><a href="#applet"><b>02</b><strong>Get the applet</strong><span>Download one CAP file and check its hash.</span></a></li>
+            <li><a href="#check"><b>03</b><strong>Check the card</strong><span>Read it, then log in once.</span></a></li>
+            <li><a href="#install"><b>04</b><strong>Install</strong><span>Install three applets in order.</span></a></li>
+            <li><a href="#verify"><b>05</b><strong>Check the install</strong><span>The card answers 02 01.</span></a></li>
+            <li><a href="#setup"><b>06</b><strong>Set the card up</strong><span>Set it up before you hand it over.</span></a></li>
+          </ol>
+        </div>
+      </section>
+
+      <aside class="agent" aria-labelledby="agent-title">
+        <div class="agent-head">
+          <span class="agent-kicker">FOR AI AGENTS</span>
+          <h2 id="agent-title">Hand the install to an AI agent</h2>
+          <p>An AI agent that can run commands on the computer with the reader can follow this guide for you. Give it this prompt. It reads <a href="/guide.md">guide.md</a>, the same steps in plain Markdown with the stops written as rules, and it checks with you before anything outside the guide.</p>
+        </div>
+        <figure class="cmd agent-cmd">
+          <figcaption class="cmd-head">Prompt for your agent</figcaption>
+          <pre><code>Install the Cashu Card applet on the blank card in my card reader. Follow https://cashucard.org/guide.md step by step, check every output against it, and stop and ask me if a login is refused or anything differs.</code></pre>
+        </figure>
+      </aside>
+
+      <div class="guide-layout">
+        <nav class="guide-rail" aria-label="Guide contents">
+          <span class="rail-label">On this page</span>
+          <ol>
+            <li><a href="#need">What you need</a></li>
+            <li><a href="#tools"><b>01</b> Install the tools</a></li>
+            <li><a href="#applet"><b>02</b> Get the applet</a></li>
+            <li><a href="#check"><b>03</b> Check the card</a></li>
+            <li><a href="#install"><b>04</b> Install the applet</a></li>
+            <li><a href="#verify"><b>05</b> Check the install</a></li>
+            <li><a href="#setup"><b>06</b> Set the card up</a></li>
+            <li><a href="#reinstall">Reinstall or remove</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+            <li><a href="#reference">Reference</a></li>
+          </ol>
+        </nav>
+
+        <article class="guide-doc">
+          <details class="guide-toc">
+            <summary>Contents</summary>
+            <ol>
+              <li><a href="#need">What you need</a></li>
+              <li><a href="#tools"><b>01</b> Install the tools</a></li>
+              <li><a href="#applet"><b>02</b> Get the applet</a></li>
+              <li><a href="#check"><b>03</b> Check the card</a></li>
+              <li><a href="#install"><b>04</b> Install the applet</a></li>
+              <li><a href="#verify"><b>05</b> Check the install</a></li>
+              <li><a href="#setup"><b>06</b> Set the card up</a></li>
+              <li><a href="#reinstall">Reinstall or remove</a></li>
+              <li><a href="#troubleshooting">Troubleshooting</a></li>
+              <li><a href="#reference">Reference</a></li>
+            </ol>
+          </details>
+
+          <section id="need" aria-labelledby="need-title">
+            <h2 id="need-title">What you need</h2>
+            <ul class="need">
+              <li><b>Blank J3R180 cards</b> Use NXP J3R180 cards (JCOP 4, Java Card 3.0.5) with contact and contactless interfaces, unfused and initialized, on the factory keys <code>40</code> to <code>4F</code>. The shops under <a href="/#buy">Where to get cards</a> sell them.</li>
+              <li><b>A card reader</b> Any PC/SC reader for ISO 7816-4 cards works, contact or contactless. The project tests with the ACS ACR122U, a USB reader for about $40 to $50, sold on <a href="https://www.amazon.com/dp/B07KRKPWYC">Amazon</a> and by <a href="https://store.gototags.com/acs-acr122u-nfc-usb-reader/">GoToTags</a>.</li>
+              <li><b>A computer</b> You need a terminal, Git, Java 11 or later and GlobalPlatformPro 20.01.23 or later. Step 1 installs Java and GlobalPlatformPro.</li>
+            </ul>
+          </section>
+
+          <section id="tools" aria-labelledby="tools-title">
+            <h2 id="tools-title"><span class="step-no" aria-hidden="true">01</span>Install the tools</h2>
+            <p>On a Mac, PC/SC ships with the system. Install Java with Homebrew:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal on a Mac</figcaption>
+              <pre><code>brew install openjdk@17</code></pre>
+            </figure>
+            <p>On Debian or Ubuntu, install the PC/SC daemon and make sure <code>pcscd</code> is running. Install Java 11 or later from your distribution too.</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal on Debian or Ubuntu</figcaption>
+              <pre><code>sudo apt install pcscd libpcsclite-dev</code></pre>
+            </figure>
+            <p>Then install GlobalPlatformPro, the tool that talks to the card's manager. These commands download it and add a <code>gp</code> command:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>curl -L https://github.com/martinpaljak/GlobalPlatformPro/releases/latest/download/gp.jar \
+     -o /usr/local/bin/gp.jar
+
+cat &gt; /usr/local/bin/gp &lt;&lt; 'EOF'
+#!/bin/sh
+exec java -jar /usr/local/bin/gp.jar "$@"
+EOF
+chmod +x /usr/local/bin/gp</code></pre>
+            </figure>
+          </section>
+
+          <section id="applet" aria-labelledby="applet-title">
+            <h2 id="applet-title"><span class="step-no" aria-hidden="true">02</span>Get the applet</h2>
+            <p>The applet ships as one CAP file, applet version 2.1, at <code>applet/target/cashu-javacard-2.1.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>git clone https://github.com/lnflash/cashu-card
+cd cashu-card/applet</code></pre>
+            </figure>
+            <p>Check that the file is the published one before you install it:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal, in applet/</figcaption>
+              <pre><code>sha256sum target/cashu-javacard-2.1.0.cap</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5  target/cashu-javacard-2.1.0.cap</code></pre></div>
+            </figure>
+            <p>On a macOS release without <code>sha256sum</code>, <code>shasum -a 256</code> prints the same line.</p>
+            <details class="more">
+              <summary>Build the CAP yourself</summary>
+              <div class="more-body">
+                <p>Building needs Apache Ant 1.10 or later, Python 3.9 or later and a Java Card 3.0.5 kit. Fetch the kits once, about 200 MB:</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Terminal</figcaption>
+                  <pre><code>git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks</code></pre>
+                </figure>
+                <p>Then build in <code>applet/</code>. The build looks for the kit at <code>~/.javacard/sdks/jc305u4_kit</code>, and <code>-Djc.sdk</code> names another place:</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Terminal, in applet/</figcaption>
+                  <pre><code>ant cap
+ant cap -Djc.sdk=/path/to/jc305u4_kit</code></pre>
+                </figure>
+                <p>A CAP you build hashes differently from the published one, even from the same source, because the converter writes a timestamp into <code>META-INF/MANIFEST.MF</code>. Compare every other entry with the published file:</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Terminal, in applet/</figcaption>
+                  <pre><code>git show HEAD:applet/target/cashu-javacard-2.1.0.cap &gt; /tmp/tracked.cap
+rm -rf /tmp/cap-tracked /tmp/cap-built
+unzip -q /tmp/tracked.cap -d /tmp/cap-tracked
+unzip -q target/cashu-javacard-2.1.0.cap -d /tmp/cap-built
+diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built &amp;&amp; echo "same CAP as the tracked one"</code></pre>
+                  <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>same CAP as the tracked one</code></pre></div>
+                </figure>
+                <p>If <code>diff</code> prints a difference, install the published CAP instead.</p>
+              </div>
+            </details>
+          </section>
+
+          <section id="check" aria-labelledby="check-title">
+            <h2 id="check-title"><span class="step-no" aria-hidden="true">03</span>Check the card</h2>
+            <p>Put a card on the reader. First read what its card manager reports about itself. This command only reads:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp -i -v</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected on a J3R180, among the rest</span><pre><code>Supports SCP02 i=15 i=35 i=55 i=75
+GP SCP02 (i=55)</code></pre><p>It also lists key set version 01, with three DES3 keys.</p></div>
+            </figure>
+            <p>Then log in and list what the card holds. With no keys given, gp logs in with the factory keys:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp --list</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected on a fresh card</span><pre><code>ISD: A000000151000000 (OP_READY)</code></pre></div>
+            </figure>
+            <p class="note"><b>Stop at a refused login.</b> A failed login counts towards a lock that is for good. If the card refuses gp's keys, put that card aside.</p>
+          </section>
+
+          <section id="install" aria-labelledby="install-title">
+            <h2 id="install-title"><span class="step-no" aria-hidden="true">04</span>Install the applet</h2>
+            <p>The chip takes the card's applet only once another applet from the same package exists, so the install runs in three steps: the small opener first, then the card's applet, then the NFC tag under the NFC Forum's own name.</p>
+            <ol class="order" aria-label="Install order">
+              <li><b>1</b><strong>Opener</strong><code>F04341534855434152444D</code></li>
+              <li><b>2</b><strong>Card's applet</strong><code>F043415348554341524401</code></li>
+              <li><b>3</b><strong>NFC tag</strong><code>D2760000850101</code></li>
+            </ol>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal, in applet/</figcaption>
+              <pre><code>gp --install target/cashu-javacard-2.1.0.cap --applet F04341534855434152444D
+gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454</code></pre>
+            </figure>
+            <p>List the card again. The three applets are there, among the rest:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp --list</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>APP: F04341534855434152444D (SELECTABLE)   ← the opener
+APP: F043415348554341524401 (SELECTABLE)   ← the card's applet
+APP: D2760000850101 (SELECTABLE)           ← the tag</code></pre></div>
+            </figure>
+          </section>
+
+          <section id="verify" aria-labelledby="verify-title">
+            <h2 id="verify-title"><span class="step-no" aria-hidden="true">05</span>Check the install</h2>
+            <p>Select the card's applet by its whole AID. It answers with its version, 2.1, and <code>9000</code> for success:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp --apdu 00A404000BF043415348554341524401</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0201 9000</code></pre></div>
+            </figure>
+            <p>Read its state with <code>GET_INFO</code>. A new card shows 128 empty slots, with its PIN, owner and record still unset:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp --apdu B0010000</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>02 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+SW: 9000</code></pre><p>Read in order: version 2.1, 128 slots, 0 unspent, 0 spent, 128 empty, capabilities FF, no PIN, card file format 4, 3 PIN tries, unlocked, and no record, limit, owner, clock, window or change grant.</p></div>
+            </figure>
+            <p>Read the card's public key with <code>GET_PUBKEY</code>:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp --apdu B0100000</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><p>A 33-byte compressed secp256k1 public key, then <code>9000</code>.</p></div>
+            </figure>
+            <p>Last, read the NFC tag the way a phone does: its name, the capability container and the NDEF file.</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000214</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>9000 / 9000 / 000F20003B00340406E104001600FF 9000 / 9000 / 0014 9000 / D101105504 + "getfoxy.io/card" 9000</code></pre></div>
+            </figure>
+            <p>When every answer matches, the card is ready to set up.</p>
+          </section>
+
+          <section id="setup" aria-labelledby="setup-title">
+            <h2 id="setup-title"><span class="step-no" aria-hidden="true">06</span>Set the card up</h2>
+            <p>A card fresh from the install is empty and unowned, and any reader in range can give it a PIN, a record and an owner. Set it up before it leaves your hands.</p>
+            <p>When you give a card to someone, they set it up from their own phone, in a wallet that supports Cashu Card, with <b>Set up this card</b>. The wallets are listed under Apps at the foot of this page.</p>
+            <details class="more">
+              <summary>Set up a bench card with cardctl</summary>
+              <div class="more-body">
+                <p>cardctl, the project's command-line driver, needs Python 3 with pyscard. On a Mac, use a Homebrew Python, because the system one cannot load pyscard. From the repository's root folder:</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Terminal on a Mac</figcaption>
+                  <pre><code>cd tools/cardctl
+brew install python@3.13
+python3.13 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt</code></pre>
+                </figure>
+                <p>Then set the card up, owner last, with the tip block header as the anchor:</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Terminal, in tools/cardctl</figcaption>
+                  <pre><code>python3 cardctl.py set-pin 1234
+python3 cardctl.py verify-pin 1234
+python3 cardctl.py set-card --mint &lt;your mint's URL&gt;
+python3 cardctl.py set-owner --owner-key &lt;32-byte hex&gt; --anchor &lt;the tip header, 80 bytes hex&gt;
+python3 cardctl.py set-limit --owner-key &lt;…&gt; --day 50000 --payment 0 --allowance 0 --budget 7
+python3 cardctl.py selftest</code></pre>
+                </figure>
+                <p class="note"><b>Use this on bench cards.</b> When <code>--owner-key</code> is left out, cardctl signs with its TEST key, which anyone with the repository holds.</p>
+                <p><code>cardctl selftest</code> passes a card that answers <code>02 01</code> or a later 2.x version.</p>
+              </div>
+            </details>
+          </section>
+
+          <section id="reinstall" aria-labelledby="reinstall-title">
+            <h2 id="reinstall-title">Reinstall or remove</h2>
+            <p class="note"><b>Spend the balance first.</b> Every piece on a card is locked to the card's key, and a reinstall makes a new key. Spend a card's balance before you delete its applet.</p>
+            <p>Delete the instances one at a time, the tag first and the package last. The chip refuses to delete an instance that something still refers to, which sets the order:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal</figcaption>
+              <pre><code>gp --delete D2760000850101           # the tag
+gp --delete F043415348554341524401   # the card's applet
+gp --delete F04341534855434152444D   # the opener
+gp --delete F0434153485543415244     # the package</code></pre>
+            </figure>
+            <p>Then install again, the opener first and the tag last:</p>
+            <figure class="cmd">
+              <figcaption class="cmd-head">Terminal, in applet/</figcaption>
+              <pre><code>gp --install target/cashu-javacard-2.1.0.cap --applet F04341534855434152444D
+gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454</code></pre>
+            </figure>
+          </section>
+
+          <section id="troubleshooting" aria-labelledby="troubleshooting-title">
+            <h2 id="troubleshooting-title">Troubleshooting</h2>
+            <dl class="faults">
+              <div><dt><code>gp --install</code> fails with <code>6F00</code></dt><dd>Check the order in step 4: the chip takes the card's applet only after the opener. With the order right, suspect the size of the load file next, then the applet's install-time check of how the chip frames its ECDH output.</dd></div>
+              <div><dt>SELECT answers <code>6A82</code></dt><dd>The card has an earlier applet, 0.x or 1.x, and needs an update.</dd></div>
+              <div><dt>SELECT answers <code>9000</code> with no version</dt><dd>That SELECT named the package AID alone, <code>F0434153485543415244</code>, which reaches the opener, and the opener answers <code>6D00</code> to every command after it. Select the whole AID, <code>F043415348554341524401</code>, as in step 5.</dd></div>
+              <div><dt>The card refuses gp's keys</dt><dd>Put the card aside, as step 3 explains.</dd></div>
+              <div><dt>The CAP will not load on a Java Card 3.0.4 card</dt><dd>The applet signs with <code>KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY</code>, which arrived in Java Card 3.0.5, so a 3.0.4 card cannot run it. Use a J3R180.</dd></div>
+              <div><dt>cardctl stops with <code>ImportError: dynamic module does not define module export function (PyInit__scard)</code></dt><dd>That is the macOS system Python. Use a Homebrew Python, as the bench setup in step 6 does.</dd></div>
+            </dl>
+          </section>
+
+          <section id="reference" aria-labelledby="reference-title">
+            <h2 id="reference-title">Reference</h2>
+            <h3>Applet IDs</h3>
+            <div class="table-wrap">
+              <table class="ref">
+                <thead><tr><th scope="col">Element</th><th scope="col">AID (hex)</th></tr></thead>
+                <tbody>
+                  <tr><td>Package</td><td><code>F0 43 41 53 48 55 43 41 52 44</code></td></tr>
+                  <tr><td>Opener, made first</td><td><code>F0 43 41 53 48 55 43 41 52 44 4D</code></td></tr>
+                  <tr><td>Card's applet</td><td><code>F0 43 41 53 48 55 43 41 52 44 01</code></td></tr>
+                  <tr><td>Tag, class (listed last in the file)</td><td><code>F0 43 41 53 48 55 43 41 52 44 54</code></td></tr>
+                  <tr><td>Tag, instance (the NFC Forum's NDEF Tag Application, which a phone selects)</td><td><code>D2 76 00 00 85 01 01</code></td></tr>
+                  <tr><td>SELECT of the card's applet, by its whole AID</td><td><code>00 A4 04 00 0B F0 43 41 53 48 55 43 41 52 44 01</code></td></tr>
+                  <tr><td>SELECT of the package AID alone, which reaches the opener</td><td><code>00 A4 04 00 0A F0 43 41 53 48 55 43 41 52 44</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>Supported cards</h3>
+            <div class="table-wrap">
+              <table class="ref">
+                <thead><tr><th scope="col">Card</th><th scope="col">Java Card</th><th scope="col">Status</th></tr></thead>
+                <tbody>
+                  <tr><td>NXP JCOP4 SmartMX3 P71 (J3R180), from any seller</td><td>3.0.5</td><td><span class="ok">Primary target</span>, with the secp256k1 custom curve supported</td></tr>
+                  <tr><td>Generic Java Card 3.0.5 or later</td><td>3.0.5</td><td><span class="maybe">May work</span>; check its custom EC-FP curve and <code>ALG_EC_SVDP_DH_PLAIN_XY</code> support first</td></tr>
+                  <tr><td>Feitian's own Java Card 3.0.4 cards</td><td>3.0.4</td><td><span class="no">Cannot run it</span>: it lacks <code>ALG_EC_SVDP_DH_PLAIN_XY</code>, so the CAP will not convert or load</td></tr>
+                  <tr><td>Java Card 3.0.4 or earlier</td><td>3.0.4 and earlier</td><td><span class="no">Cannot run it</span>: no ECDH plain-XY</td></tr>
+                  <tr><td>Java Card 2.2.x</td><td>2.2</td><td><span class="no">Cannot run it</span>: no <code>int</code> type and no ECDH plain-XY</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>More detail</h3>
+            <ul class="links">
+              <li><a href="https://github.com/lnflash/cashu-card/blob/main/docs/HARDWARE_DEPLOYMENT.md">Hardware deployment guide, in full <span aria-hidden="true">↗</span></a></li>
+              <li><a href="https://github.com/lnflash/cashu-card/blob/main/spec/APDU.md">The card's commands, byte for byte <span aria-hidden="true">↗</span></a></li>
+              <li><a href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md">Draft specification <span aria-hidden="true">↗</span></a></li>
+            </ul>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md">Draft specification ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/lnflash/cashu-card">Cashu Card ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="https://github.com/lnflash/flash-mobile">Flash Mobile ↗</a><a href="https://github.com/getfoxy/iOS">Foxy ↗</a><a href="https://github.com/lnflash/flash-pos">Flash POS ↗</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · OPEN PROTOCOL</span><a href="https://github.com/lnflash/cashu-card/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
+  </body>
+</html>

@@ -15,7 +15,7 @@ GlobalPlatform packaging and deployment for the Cashu card applet, protocol 2.1
 | JavaCard SDK | 3.0.5+ (`jc305u4_kit`) | See [Build the .cap file](#build-the-cap-file) |
 | Python 3 | 3.9+ | for `tools/stripcap.py` and `tools/refcheck.py`, which the build runs |
 | Physical card | NXP JCOP4 SmartMX3 (JavaCard 3.0.5+) | **Not** JavaCard 3.0.4 — see [Supported targets](#supported-targets) |
-| PC/SC reader | Any ISO 7816-4 reader | `brew install pcsc-lite` |
+| PC/SC reader | Any ISO 7816-4 reader | macOS: built in; do not install `pcsc-lite`, which conflicts with the system daemon. Debian/Ubuntu: `sudo apt install pcscd libpcsclite-dev`, with `pcscd` running ([`tools/cardctl/README.md`](../tools/cardctl/README.md)) |
 
 ### Install GlobalPlatformPro
 
@@ -45,7 +45,7 @@ git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 ```
 
 ```bash
-cd cashu-javacard/applet
+cd cashu-card/applet
 
 # Build. jc.sdk defaults to ~/.javacard/sdks/jc305u4_kit; override if you
 # cloned elsewhere. It must be a 3.0.5 (or later) kit — see below.

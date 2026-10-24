@@ -124,7 +124,7 @@ async function main() {
       source: "window.__csp=[];document.addEventListener('securitypolicyviolation',e=>__csp.push(e.violatedDirective+' '+e.blockedURI))",
     });
     // the host must answer byte ranges (Safari plays the film only then) and apply dist/_headers
-    const media = await fetch(origin + "/film/cashu-card-film-1.mp4", { headers: { Range: "bytes=0-1" } });
+    const media = await fetch(origin + "/film/cashu-card-film-2.mp4", { headers: { Range: "bytes=0-1" } });
     assert.equal(media.status, 206, "Host answers byte-range requests for the film");
     await media.arrayBuffer();
     const home = await fetch(origin + "/");
@@ -140,13 +140,13 @@ async function main() {
     assert.equal(await evaluate("document.querySelectorAll('h1').length"), 1, "One page heading");
     assert.equal(await evaluate("document.querySelector('#hero-title').innerText.replace(/\\s+/g,' ').trim()"), "Cashu, now on a card.", "Hero names the card innovation");
     assert.equal(await evaluate("document.querySelector('.hero-copy p').innerText.trim()"), "Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.", "Hero distinguishes offline acceptance from mint settlement");
-    assert.equal(await evaluate("[...document.querySelectorAll('script[src]')].map(s=>new URL(s.src).pathname).join()"), "/seq/tap-1/anchors.js,/motion.js", "Two scripts: the sequence anchors and the controls");
+    assert.equal(await evaluate("[...document.querySelectorAll('script[src]')].map(s=>new URL(s.src).pathname).join()"), "/seq/tap-2/anchors.js,/motion.js", "Two scripts: the sequence anchors and the controls");
     const words = await evaluate("document.body.innerText.trim().split(/\\s+/).length");   // \\s survives the string literal
     console.log("words " + words);
-    assert.ok(words < 240, "Copy stays concise");
+    assert.ok(words < 500, "Copy stays concise");   // about half of it is the section on where to buy cards
     const screens = await evaluate("document.documentElement.scrollHeight / innerHeight");
     console.log("screens at 1440x900, reduced motion " + screens.toFixed(2));
-    assert.ok(screens <= 3.9, "Desktop page stays within its budget");
+    assert.ok(screens <= 5.0, "Desktop page stays within its budget");
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
     assert.ok(await evaluate("document.querySelector('.button-bright').href.includes('/spec/NUT-XX.md')"), "Primary action opens the draft");
     assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/lnflash/cashu-card'"), "Secondary action opens the source repository");
@@ -158,7 +158,17 @@ async function main() {
     ]) {
       assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
     }
+    // where to buy cards: two shops for blank cards, then custom printed cards whose checkout waits for launch
+    assert.equal(await evaluate("document.querySelectorAll('#buy .buy-option').length"), 3, "Three ways to get cards");
+    assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.amazon.com/dp/\"]')"), "Cards for testing link to an Amazon listing");
+    assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.cardlogix.com/\"]')"), "Cards in bulk link to CardLogix");
+    assert.equal(await evaluate("document.querySelectorAll('#buy input[name=\"buy-qty\"]').length"), 4, "Custom cards come in four quantities");
+    assert.equal(await evaluate("[...document.querySelectorAll('#buy .pay')].map(b=>b.getAttribute('aria-disabled')).join()"), "true,true", "Lightning and Stripe checkouts wait for launch");
+    // the till in the steps is a phone, with the card held to its back
+    assert.ok(await evaluate("document.querySelector('#steps li p').textContent.includes(\"to the back of the merchant's phone\")"), "The steps show a phone as the till");
     // the film: custom controls over the native video; with reduced motion it waits for a press
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#film')).backgroundColor"), "rgb(0, 0, 0)", "The film sits on black, like its frame's edge");
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#film-screen')).boxShadow"), "none", "Nothing outlines the film's edge");
     assert.equal(await evaluate("document.querySelectorAll('#reel source').length"), 2, "Film has 1080p and 720p sources");
     assert.ok(await evaluate("document.querySelector('#reel').getAttribute('poster').startsWith('/film/')"), "Film has a local poster");
     assert.equal(await evaluate("document.querySelector('#reel').controls"), false, "Custom controls replace the native ones");
@@ -239,7 +249,7 @@ async function main() {
     await evaluate("document.querySelector('#source').scrollIntoView()");
     await screenshot("02-source-desktop");
     for (const [width, height, maxScreens] of [
-      [1024, 768, 3.7], [768, 900, 3.7], [390, 844, 3.4], [320, 740, 3.7],
+      [1024, 768, 5.0], [768, 900, 5.3], [390, 844, 5.6], [320, 740, 6.5],
     ]) {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
@@ -259,6 +269,26 @@ async function main() {
     await screenshot("03-card-options");
     await viewport(390, 844);
     assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Artwork options fit mobile");
+    // the install guide: its own page, linked from where to get cards, publishing the tracked CAP's hash
+    await viewport(1440, 900);
+    await send("Page.navigate", { url: origin + "/guide.html" });
+    // wait for its stylesheets too: unstyled, its long commands would widen the page
+    await until("document.readyState==='complete'&&document.querySelectorAll('.guide-doc h2').length===10", "Install guide loads with its ten sections");
+    await evaluate("document.fonts.ready");
+    assert.ok(await evaluate("document.body.textContent.includes('f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5')"), "Guide publishes the CAP's sha256");
+    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Install guide fits desktop");
+    assert.ok(await evaluate("!!document.querySelector('#need a[href^=\"https://www.amazon.com/dp/\"]')"), "The guide links a card reader to buy");
+    assert.ok(await evaluate("document.querySelector('.agent pre code').textContent.includes('https://cashucard.org/guide.md')"), "The guide hands the install to an AI agent");
+    const agentGuide = await fetch(origin + "/guide.md").then(async (r) => ({ status: r.status, type: r.headers.get("content-type") || "", text: await r.text() }));
+    assert.equal(agentGuide.status, 200, "The agent's guide is served");
+    assert.match(agentGuide.type, /^text\/markdown/, "The agent's guide is Markdown");
+    assert.ok(agentGuide.text.includes("f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5"), "The agent's guide publishes the CAP's sha256");
+    assert.ok((await fetch(origin + "/llms.txt").then((r) => r.text())).includes("https://cashucard.org/guide.md"), "llms.txt points agents at the guide");
+    await screenshot("09-install-guide");
+    for (const width of [390, 320]) {
+      await viewport(width, 844);
+      assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Install guide fits " + width);
+    }
     assert.deepEqual(errors, [], "No browser exceptions");
     console.log("PASS: landing page, film and steps, direct source links, responsive artwork options, reduced motion, no JavaScript");
     console.log("Screenshots: " + output);

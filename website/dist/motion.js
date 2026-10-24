@@ -127,28 +127,29 @@
   if (!root || !window.TAP_ANCHORS) return;
   const byId = (id) => document.getElementById(id);
   const canvas = byId("seq-canvas"), ctx = canvas.getContext("2d"), leaders = byId("seq-leaders"), callouts = byId("seq-callouts");
-  const caption = byId("seq-caption"), poster = byId("seq-poster"), nav = byId("seq-nav");
+  const caption = byId("seq-caption"), poster = byId("seq-poster"), nav = byId("seq-nav"), net = byId("seq-net");
   const prev = byId("seq-prev"), next = byId("seq-next"), count = byId("seq-count"), slotsCount = byId("slots-count");
   const steps = [...root.querySelectorAll("#steps li")], cells = [...root.querySelectorAll("#slots i")];
   const A = window.TAP_ANCHORS, N = A.length;
-  const frameUrl = (i) => "/seq/tap-1/tap_" + String(i).padStart(3, "0") + ".webp";
+  const frameUrl = (i) => "/seq/tap-2/tap_" + String(i).padStart(3, "0") + ".webp";
   const reduce = matchMedia("(prefers-reduced-motion: reduce)"), narrow = matchMedia("(max-width: 900px)");
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x)), lerp = (a, b, t) => a + (b - a) * t;
   // steps 1 to 5 take 0.15 of the frames each and step 6 the last 0.25 (the steps' data-a and data-b)
   const SHOW = [0.12, 0.27, 0.41, 0.56, 0.73, 0.99];   // the frame each step rests on in the stepper
   const CALLOUTS = [
     // rx, ry: how far the leader runs out (in multiples of its base reach) before the text shelf
-    { k: "reader", a: 0.028, b: 0.15, side: 1, rx: 2.4, ry: 0.4, t: "Till reader", s: "Selects the card's applet" },
-    { k: "chip", a: 0.159, b: 0.30, side: -1, rx: 3.4, ry: -0.15, t: "Card chip", s: "Its pieces, read by the till" },
-    { k: "screenR", a: 0.309, b: 0.45, side: 1, rx: 1.3, ry: 0.5, t: "Till", s: "Sends its outputs" },
-    { k: "chip", a: 0.459, b: 0.60, side: -1, rx: 3.4, ry: -0.15, t: "One signature", s: "The named pieces burn" },
-    { k: "screenR", a: 0.609, b: 0.75, side: 1, rx: 1.3, ry: 0.5, t: "Mint signatures", s: "Checked on the till, offline" },
-    // step 6: the card leaves the reader, the night passes with the till offline, then the till comes online
-    { k: "reader", a: 0.78, b: 0.835, side: 1, rx: 2.4, ry: 1.4, t: "Card removed", s: "The payment is already accepted" },
-    { k: "screenR", a: 0.835, b: 0.912, side: 1, rx: 1.3, ry: 0.5, t: "Hours later", s: "The till is still offline" },
-    { k: "screenR", a: 0.912, b: 1.01, side: 1, rx: 1.3, ry: 0.5, t: "Back online", s: "Swapped at the mint" },
+    { k: "reader", a: 0.028, b: 0.15, side: -1, rx: 2.2, ry: 1.7, t: "Back of the phone", s: "Its reader selects the applet" },
+    { k: "chip", a: 0.159, b: 0.30, side: -1, rx: 1.6, ry: -0.6, t: "Card chip", s: "Its pieces, read by the phone" },
+    { k: "screenR", a: 0.309, b: 0.45, side: 1, rx: 1.3, ry: 0.5, t: "Point-of-sale app", s: "Sends its outputs" },
+    { k: "chip", a: 0.459, b: 0.60, side: -1, rx: 1.6, ry: -0.6, t: "One signature", s: "The named pieces burn" },
+    { k: "screenR", a: 0.609, b: 0.75, side: 1, rx: 1.3, ry: 0.5, t: "Mint signatures", s: "Checked on the phone, offline" },
+    // step 6: the card leaves the phone, the night passes with the phone offline, then the phone comes online
+    { k: "reader", a: 0.78, b: 0.835, side: -1, rx: 2.2, ry: 1.7, t: "Card removed", s: "The payment is already accepted" },
+    { k: "status", a: 0.835, b: 0.912, side: 1, rx: 1.3, ry: 0.5, t: "Hours later", s: "The phone is still offline" },
+    { k: "status", a: 0.912, b: 1.01, side: 1, rx: 1.3, ry: 0.5, t: "Back online", s: "Swapped at the mint" },
   ];
   const NAMED = [0, 2, 4];   // the slots holding 1, 4 and 16 sat
+  const ONLINE = 0.9156;   // the frame the phone comes back online (CARDART.SEQ.online on the render's timeline)
   const range = steps.map((li) => [Number(li.dataset.a), Number(li.dataset.b)]);
   const words = steps.map((li) => [li.querySelector("b").textContent, li.querySelector("p").textContent]);
   const imgs = new Array(N);
@@ -205,6 +206,9 @@
     const named = live ? P >= 0.168 && P < 0.521 : on === 1 || on === 2, spent = live ? P >= 0.521 : on >= 3;
     cells.forEach((c, n) => { c.classList.toggle("named", NAMED.includes(n) && named); c.classList.toggle("spent", NAMED.includes(n) && spent); });
     slotsCount.textContent = spent ? "5 unspent, 3 spent" : "8 unspent";
+    // the phone stays offline through the tap and the night, and comes online in step 6
+    const online = P >= ONLINE;
+    if (net.classList.contains("on") !== online) { net.classList.toggle("on", online); net.lastChild.textContent = online ? "ONLINE" : "OFFLINE"; }
     // callouts follow the rendered points they name
     const f = P * (N - 1), i0 = Math.floor(f), i1 = Math.min(N - 1, i0 + 1), u = f - i0;
     let svg = "";

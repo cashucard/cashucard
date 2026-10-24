@@ -15,3 +15,5 @@ https://:worker.:subdomain.workers.dev/*
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 /concepts
   Cache-Control: public, max-age=0, must-revalidate, no-transform
+/guide
+  Cache-Control: public, max-age=0, must-revalidate, no-transform

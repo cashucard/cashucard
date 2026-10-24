@@ -10,7 +10,7 @@ const port = Number(process.argv[2] || process.env.PORT || 9117);
 const types = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml", ".ttf": "font/ttf",
-  ".mp4": "video/mp4", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml",
+  ".mp4": "video/mp4", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml", ".md": "text/markdown; charset=utf-8",
 };
 
 // _headers: a line without indentation is a path pattern (one * splat), indented lines are headers for it

@@ -30,27 +30,66 @@ Footer links point to the draft and the Cashu Card source, with Flash Mobile,
 Foxy iOS and Flash POS grouped under Apps. The links do not claim completed
 integrations.
 
-`dist/film/` holds the 48-second film at 1080p, a 720p copy that narrow
-screens load, and its poster; `dist/assets/og.jpg` is the share image, from
-the film's end frame. `dist/seq/tap-1/` holds the 96 rendered frames of the
-"One tap, step by step" section and `anchors.js`, the points its callouts
-follow. Steps 1 to 5 take 0.15 of the frames each and the settle step the last
-0.25, because in it the card leaves and a night passes before the till comes
-online; the steps' `data-a` and `data-b` and the callouts in `motion.js` use
-those bounds. Media names carry a version (`-1`) because `_headers` caches `/film/*`
-and `/seq/*` for a year: publish a new render under a new number. Both are
-rendered with a private fork of the Daylight Fob film renderer (a WebGL2 scene
-driven by headless Chrome, with a synthesized score at -18 LUFS and a
-look-ahead limiter rather than clipping); the render
-source stays outside this repository. What they state comes from
-`spec/NUT-XX.md` and `spec/APDU.md`: the card makes its key on the chip and
-keeps it there, a wallet writes pieces into its 128 slots, the till names the
-pieces, the card signs once for the payment and burns them, and an offline
-till accepts the payment and settles with the mint later. The bill is an
-exact amount because an offline till cannot finish the card's change. The
-phone and till screens are generic and name no wallet or point-of-sale app;
-the film and the steps show the protocol itself, so app and wallet names
-stay off them.
+`dist/film/` holds the 48-second film ("How it works") at 1080p, a 720p copy
+that narrow screens load, and its poster; `dist/assets/og.jpg` is the share
+image, from the film's end frame. The film section is black, and the film's
+scene fades to black at the frame's edge under its text layer, so the frame
+has no visible edge on the page. In the film's key chapter the provisioner
+app (apps/provisioner, its installation screen in the dark theme, with the
+Cashu Card's face in place of its branded card art) installs the applet on a
+blank card while the chip makes its key; its tap and settle chapters use the
+same Android till as the steps.
+
+`dist/seq/tap-2/` holds the 96 rendered frames of the "One tap, step by step"
+section and `anchors.js`, the points its callouts follow. In it the till is an
+Android phone running an unbranded point-of-sale app: the customer holds the
+card to the phone's back while the camera watches the screen, whose flow
+follows flash-pos's card checkout (a sheet asks for the card, the charge
+screen names each step, a green screen marks the payment accepted). An
+OFFLINE badge in the frame's top right turns to ONLINE when the phone comes
+back online in step 6. Steps 1 to 5 take 0.15 of the frames each and the
+settle step the last 0.25, because in it the card leaves and a night passes
+before the phone comes online; the steps' `data-a` and `data-b`, the callouts
+and the badge's switch in `motion.js` use those bounds. Media names carry a
+version (`-2`) because `_headers` caches `/film/*` and `/seq/*` for a year:
+publish a new render under a new number.
+
+The film, the frames and `dist/assets/custom-cards-1.webp` are rendered with a
+private fork of the Daylight Fob film renderer (a WebGL2 scene driven by
+headless Chrome, with a synthesized score at -18 LUFS and a look-ahead limiter
+rather than clipping); the render source stays outside this repository. What
+they state comes from `spec/NUT-XX.md` and `spec/APDU.md`: the card makes its
+key on the chip and keeps it there, a wallet writes pieces into its 128
+slots, the till names the pieces, the card signs once for the payment and
+burns them, and an offline till accepts the payment and settles with the mint
+later. The bill is an exact amount because an offline till cannot finish the
+card's change. The phone and till screens are generic and name no wallet or
+point-of-sale app; the film and the steps show the protocol itself, so app
+and wallet names stay off them.
+
+"Where to get cards" names the chip the applet runs on (NXP J3R180, Java Card
+3.0.5, dual interface) and how to buy it: unfused and initialized, with the
+default GlobalPlatform keys over SCP02. It links one Amazon listing that
+states those for testing, and for volume CardLogix and Feitian's J3R180 on
+Alibaba, with prices as listed on 23 October 2026; check them before relying
+on them. The third option, custom printed cards with the applet installed,
+shows three made-up designs under a "Coming soon" stamp. Its quantities and
+its Lightning and Stripe checkouts are placeholders that are not connected to
+anything yet. When a checkout goes live, `_headers`' content security policy
+needs the provider's origins (it allows no connections or form posts today).
+
+`dist/guide.html` (with `guide.css` and `guide.js`) is the install guide at
+`/guide`: the steps of `docs/HARDWARE_DEPLOYMENT.md` for someone with a blank
+card and a reader, each command with its expected answer. It publishes the
+tracked CAP's sha256, and CI's `cap` job fails when the CAP changes and the
+guide does not; change the guide with the doc it comes from. `dist/guide.md`
+is the same install for an AI agent working in someone's terminal: the steps
+and expected answers as Markdown, with the points where the agent stops and
+asks its person written as rules. The guide's "Hand the install to an AI
+agent" box gives a one-line prompt that points an agent at it, and
+`dist/llms.txt` lists it for agents that look there first. CI checks
+`guide.md` for the CAP's sha256 too. The guide's reader is the ACS ACR122U,
+the reader the project's hardware reports were run with.
 
 The original Cashu mascot is from https://cashu.space/cashu-no-bg.png.
 Physical card artwork is native HTML/CSS/SVG. `dist/concepts.html` is an

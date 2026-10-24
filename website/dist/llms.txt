@@ -1,0 +1,14 @@
+# Cashu Card
+
+> Cashu Card is an open NFC ecash protocol, draft 2.1. Wallets load Cashu ecash onto an NFC smart card, and a till can accept a tap offline and settle with the mint when it is connected. The applet runs on NXP J3R180 cards (Java Card 3.0.5).
+
+## Guides
+
+- [Install the Cashu Card applet, for AI agents](https://cashucard.org/guide.md): installs the applet on a blank J3R180 card from a computer with a card reader, with every command, its expected answer and the points where the agent stops and asks its person.
+- [Install guide](https://cashucard.org/guide): the same steps as a page for people.
+
+## Protocol and code
+
+- [Draft specification](https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md): what the bytes mean to a wallet and a mint.
+- [APDU reference](https://github.com/lnflash/cashu-card/blob/main/spec/APDU.md): the card's wire, byte for byte.
+- [Source](https://github.com/lnflash/cashu-card): the applet, its host tools and simulator, and the provisioning app.
