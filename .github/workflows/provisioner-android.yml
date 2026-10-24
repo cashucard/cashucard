@@ -1,15 +1,11 @@
 name: Provisioner Android native release
 on:
-  pull_request:
-    paths:
-      - 'apps/provisioner/android/**'
-      - 'apps/provisioner/package.json'
-      - 'apps/provisioner/yarn.lock'
-      - 'apps/provisioner/scripts/**'
-      - 'apps/provisioner/src/serviceOrigin.json'
-      - 'apps/provisioner/src/releaseGates.ts'
-      - '.github/workflows/provisioner-android.yml'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
 permissions:
   contents: read
 concurrency:
@@ -30,15 +26,31 @@ jobs:
       CASHU_ANDROID_UPLOAD_KEY_PASSWORD: cashu-ci-test-only
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: yarn
           cache-dependency-path: apps/provisioner/yarn.lock
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler: "2.6.9"
+          bundler-cache: true
+          working-directory: apps/provisioner
+      - name: Smoke-test locked mobile release tools (no credentials)
+        env:
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+          FASTLANE_OPT_OUT_USAGE: "1"
+        run: |
+          bundle check
+          bundle exec ruby scripts/check-mobile-tools.rb
+          bundle exec fastlane lanes
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
           cache: gradle
           cache-dependency-path: |
             apps/provisioner/android/**/*.gradle*
@@ -47,9 +59,10 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
+      - uses: ./.github/actions/setup-cardkit
       - name: Install dependencies and Android tools
         run: |
-          yarn install --frozen-lockfile
+          yarn install --frozen-lockfile --force
           sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
       - name: Prepare test-only signer and public build configuration
         run: |

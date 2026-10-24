@@ -25,18 +25,17 @@ copied there after each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 > 2.0 has a neutral identity ([D19](docs/DECISIONS.md#d19)) and our fixes
 > ([D20](docs/DECISIONS.md#d20) to [D24](docs/DECISIONS.md#d24)).
 
-> ### Status: 2.0 proven in simulation; 1.20 has run on one card
+> ### Status: protocol 2.1 tested on J3R180 and real phones
 >
-> Foxy's 1.20 has run on one NXP JCOP4 J3R180 with the Foxy iPhone app: installed,
-> set up, loaded, paid from with change written back. Our 0.x applet ran the full
-> money loop on a J3R180 against `forge.flashapp.me` (the
-> [hardware test report](docs/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)). The 2.0
-> build has run under jCardSim, through the bridge, and in a real `SIG_ALL` swap at
-> a Nutshell 0.20.3 mint in CI; it has **not** yet been installed on silicon (its
-> load file is a size the J3R180 has not been tried at:
-> [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md)). Read
-> [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) before trusting anything here
-> with real money at scale.
+> The [23 October physical E2E report](docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+> records installation, holder setup, funding, online/offline payments, change and
+> eventual mint settlement on the named card/phones. The
+> [mobile reset report](docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+> records reset and reinstall. These bounded tests do not establish compatibility
+> with every device or failure mode. The repository also includes the operator
+> provisioner and Cloudflare-capable ops-service. Read the
+> [architecture](docs/ARCHITECTURE.md), [security model](docs/SECURITY-MODEL.md) and
+> [component release guide](docs/COMPONENT-RELEASES.md) before changing or shipping a component.
 
 ## Start here
 

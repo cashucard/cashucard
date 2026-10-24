@@ -1,8 +1,7 @@
 /**
  * cardkit: GlobalPlatform over an injected transceiver, for the phone-side
- * provisioner (ENG-738, D27). Plain TypeScript with one dependency
- * (@noble/hashes, for the load file's sha256), so the phone and Node run the
- * same code.
+ * provisioner (ENG-738, D27). Environment-neutral core; holder-PIN cleanup and
+ * Node test utilities are opt-in package entry points.
  */
 export * from './gp/aids';
 export {concat, equal, fromHex, swHex, toHex} from './gp/bytes';

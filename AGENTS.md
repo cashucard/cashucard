@@ -13,8 +13,7 @@ how the card behaves.
 `cashucard/cashucard` is the working repository of the shared Cashu card
 (protocol 2.1, one wire for Flash and for Foxy's wallet): the JavaCard applet,
 its host tools and simulator, the protocol in `spec/`, the TypeScript card
-library with the bench-spike app that installs the card from a phone, and the
-provisioning app still to come. It began as a copy of
+library with the bench-spike app that installs the card from a phone, the provisioning app and its ops-service. It began as a copy of
 `cashucard/javacard` main with its whole history. `cashucard/javacard`
 stays the protocol reference, and from now on it is a read-only mirror of this
 repo's `spec/`: every PR that touches `spec/` here is mirrored there with
@@ -42,15 +41,30 @@ tools/mirror-spec.sh <path-to-javacard-checkout> --apply  # copy spec/ as commit
 | `tools/chip/` | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below). |
 | `tools/` | Also: `stripcap.py` and `refcheck.py`, which the CAP build runs; `e2e-melt.cjs` and `e2e-redeem.cjs`, 0.x tools that drive a 0.x card and a mint, kept for the sweep of 0.x field cards; `mirror-spec.sh` and its test `mirror-spec.test.sh`. |
 | `spec/` | The protocol, mirrored to cashucard/javacard: `NUT-XX.md` (what the bytes mean to a wallet and a mint), `APDU.md` (the wire, byte for byte), `CARD-FILE.md` (the 0.x interchange format) and `vectors/` (`headers.json`, `owner.json`, `secret.json`, `transcript.json`). |
-| `docs/` | `ARCHITECTURE.md`, `DECISIONS.md` (D1 to D27), `SECURITY-MODEL.md`, `HARDWARE_DEPLOYMENT.md` (build, install, reinstall, the AIDs), Foxy's design (`FOXY-CARD-*.md`), the provisioner's (`PROVISIONER-APP.md`), and one hardware report for each silicon milestone, named `HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md` (`HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md` is the newest). |
+| `docs/` | `ARCHITECTURE.md`, `DECISIONS.md` (settled decisions and historical supersessions), `SECURITY-MODEL.md`, `HARDWARE_DEPLOYMENT.md` (build, install, reinstall, the AIDs), Foxy's design (`FOXY-CARD-*.md`), the provisioner's (`PROVISIONER-APP.md`), and one hardware report for each silicon milestone, named `HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md` (including the 2026-10-23 full E2E and mobile reset reports). |
 | `tools/cardkit/` | Installs the card's applet and rotates the card manager's keys over GlobalPlatform SCP02, as environment-agnostic TypeScript (ENG-738, [D27](docs/DECISIONS.md#d27)): a vendored DES, the session, the commands and the recovering install, with no NFC, HTTP or platform import. The transport is injected as `type Transceiver = (apdu: number[]) => Promise<number[]>`, so the phone and Node run the same code and `gp/test/` runs it against a fake card. Also here: `make-assets.py`, which writes the provisioner's load files from the CAPs, and `hello/`, the smoke test's one-applet package (not the card's: `ant -f applet/build.xml hello-cap` builds it, `HelloTest` runs it in jCardSim). |
-| `apps/provisioner/` | The card's provisioning app (ENG-739): the designed flow from [`docs/PROVISIONER-APP.md`](docs/PROVISIONER-APP.md) (sign-in, batch setup, the loop, summary, settings), with demo mode driving a fake card (`src/demo/`) for the design review on a phone, and ENG-738's bench spike kept at Settings → Bench runs. Bare React Native (yarn classic, bundle id `com.flash.provisioner`); it installs the 2.1 applet on the spare J3R180 over NFC through `tools/cardkit`, which Metro bundles from `tools/` (`src/cardkit.ts` is its one way in), and reads out the timings. Its [`README.md`](apps/provisioner/README.md) says what it does and will not do; `src/assets/` is generated, `assets/` carries the OFL Figtree fonts. |
+| `apps/provisioner/` | React Native operator app (bundle `com.islandbitcoin.provisioner`): authenticated batches, installation, recovery, card status and owned-card reset. It consumes `@cashu-card/cardkit` through `src/cardkit.ts`; demo mode is removed and bench tools are release-gated off. `src/assets/` is generated from the pinned CAP. Holder ownership/PIN/funding belongs in a wallet. |
+| `ops/` | Operator APIs/admin console, scoped reservations, chip identity, manager-key escrow, installation/reset receipts, backup exports and recovery fences. Node/SQLite locally; Workers/Durable Object SQLite in deployment. |
+| `.github/workflows/`, `tools/ci/`, `tools/release/` | Affected-component CI and the always-running CI gate; independent tag releases and explicit deploy/store-upload pipelines. See `docs/COMPONENT-RELEASES.md` for versions, signing/environment setup and unverified live steps. |
 
 ## Build, test and check
 
-CI (`.github/workflows/ci.yml`) runs on every push to every branch and on every
-pull request. These are its commands, copied from it, under the job each belongs
+CI (`.github/workflows/ci.yml`) runs on main pushes and pull requests.
+Affected-component selection retains full integration for protocol/recovery and
+unknown source paths; manual and release verification are full. Require `CI gate`
+in branch protection; see `docs/COMPONENT-RELEASES.md`. These are its commands, copied from it, under the job each belongs
 to; run the jobs your change touches before you push. Nothing here needs a card.
+Build cardkit before either consumer installs its `file:` dependency:
+
+```bash
+(cd tools/cardkit && yarn install --frozen-lockfile && yarn build)
+(cd apps/provisioner && yarn install --frozen-lockfile)
+(cd ops && yarn install --frozen-lockfile)
+```
+
+Runtime imports use `@cashu-card/cardkit` and `/cleanup`; only Node tests use
+`/testing`. Deep `tools/cardkit/gp` imports are unsupported. Yarn classic copies
+file dependencies: rebuild and refresh consumer installs after SDK edits.
 Two blocks are marked CI-only: they need the runner (`sudo apt-get`, a `pip`
 outside any venv, `$RUNNER_TEMP`), and the workstation's way follows each.
 
@@ -166,7 +180,7 @@ The README also has the tests, which CI runs in the jobs above:
 mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
 mvn -f tools/cardsim/pom.xml package # card simulator bridge, its suite, and the jar
 node --test 'tools/**/*.test.cjs'    # client and Cashu arithmetic (bridge and mint cases skip)
-(cd tools/cardkit && yarn install --frozen-lockfile && node --import tsx --test 'gp/test/**/*.test.ts')  # SCP02 and the phone's install, against a fake card
+(cd tools/cardkit && yarn install --frozen-lockfile && yarn build && node --import tsx --test 'gp/test/**/*.test.ts')  # SCP02 and the phone's install, against a fake card
 (cd apps/provisioner && yarn install --frozen-lockfile && node_modules/.bin/jest)                         # the provisioner app
 cd tools/cardctl && for t in test_bip340 test_p256 test_apdu test_spec_consistency test_card_file test_hwtest_65byte_pubkey; do python3 $t.py; done
 ```
@@ -182,11 +196,12 @@ yarn install --frozen-lockfile
 node_modules/.bin/tsc -p tsconfig.json --noEmit
 node_modules/.bin/tsc -p tsconfig.test.json --noEmit
 node --import tsx --test 'gp/test/**/*.test.ts'
+yarn build && yarn test:package
 node_modules/.bin/prettier --check .
 ```
 
 `provisioner`, the app (Node 22, yarn classic), run in `apps/provisioner`. The
-bundles prove Metro resolves `tools/cardkit` with no cardkit install;
+bundles prove Metro resolves the installed public cardkit package;
 `$RUNNER_TEMP` is the runner's, so point it at a scratch directory first.
 
 ```bash
@@ -225,7 +240,7 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   ([`CONTRIBUTING.md`](CONTRIBUTING.md), principle 5; the one exception is
   [D17](docs/DECISIONS.md#d17)'s).
 - **Every design change gets a D-entry in [`docs/DECISIONS.md`](docs/DECISIONS.md):**
-  what was decided, what was rejected and why. The next is D29; anchors are
+  what was decided, what was rejected and why. Use the next unused D-number; anchors are
   stable, and a superseded entry is marked and kept.
 - **Every silicon milestone gets a hardware report file,**
   `docs/HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md`: the card, the

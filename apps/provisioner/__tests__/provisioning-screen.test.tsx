@@ -19,7 +19,7 @@ import {
 } from '../src/provisioningWorkflow';
 import type {JournalStorage} from '../src/journal';
 import {SPIKE_KEYS, fromHex, toHex} from '../src/cardkit';
-import {FakeCard} from '../../../tools/cardkit/gp/test/fake-card';
+import {FakeCard} from '@cashu-card/cardkit/testing';
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const config = {

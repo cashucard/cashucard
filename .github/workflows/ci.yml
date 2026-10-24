@@ -7,27 +7,92 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
+      full:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.ref || 'event' }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Affected components
+    runs-on: ubuntu-latest
+    outputs:
+      selected: ${{ steps.select.outputs.selected }}
+      full: ${{ steps.select.outputs.full }}
+      test: ${{ steps.select.outputs.test }}
+      cardsim: ${{ steps.select.outputs.cardsim }}
+      cardctl: ${{ steps.select.outputs.cardctl }}
+      e2e_tools: ${{ steps.select.outputs.e2e_tools }}
+      tools: ${{ steps.select.outputs.tools }}
+      cap: ${{ steps.select.outputs.cap }}
+      cardkit: ${{ steps.select.outputs.cardkit }}
+      ops: ${{ steps.select.outputs.ops }}
+      provisioner: ${{ steps.select.outputs.provisioner }}
+      backup_copy: ${{ steps.select.outputs.backup_copy }}
+      website: ${{ steps.select.outputs.website }}
+      backup_roundtrip: ${{ steps.select.outputs.backup_roundtrip }}
+      android: ${{ steps.select.outputs.android }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - id: select
+        env:
+          CI_FULL: ${{ inputs.full || false }}
+        run: node tools/ci/affected.cjs
+
+  policy:
+    name: CI and release policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: node --test tools/ci/*.test.cjs tools/release/*.test.cjs
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color
+
   test:
+    needs: changes
+    if: needs.changes.outputs.test == 'true'
     name: jCardSim tests (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         # 11 is the floor the pom declares; 17 is what contributors actually run.
-        java: ['11', '17']
+        java: ["11", "17"]
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v5
@@ -42,6 +107,8 @@ jobs:
         run: mvn -B -f applet/pom.xml test
 
   cardsim:
+    needs: changes
+    if: needs.changes.outputs.cardsim == 'true'
     name: cardsim bridge (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
     # A wedged bridge used to hang this job for the 360-minute default; the
@@ -51,9 +118,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: ['11', '17']
+        java: ["11", "17"]
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v5
@@ -64,7 +133,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
 
       # tools/cardsim compiles applet/src/main/java in as a second source
       # root, so this also proves the applet still builds from a path other
@@ -77,7 +146,7 @@ jobs:
       - name: Start the bridge
         run: |
           java -jar tools/cardsim/target/cardsim.jar --port 9876 &
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf localhost:9876/state > /dev/null && exit 0
             sleep 0.5
           done
@@ -108,7 +177,7 @@ jobs:
           docker run -d --name nutshell -p 127.0.0.1:3338:3338 \
             -e MINT_BACKEND_BOLT11_SAT=FakeWallet -e MINT_LISTEN_HOST=0.0.0.0 -e MINT_LISTEN_PORT=3338 \
             -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY cashubtc/nutshell:0.20.3 poetry run mint
-          for i in $(seq 1 120); do
+          for _ in $(seq 1 120); do
             curl -sf localhost:3338/v1/keysets > /dev/null && exit 0
             sleep 1
           done
@@ -134,7 +203,7 @@ jobs:
             docker run -d --name nutv1 -p 127.0.0.1:3339:3338 -v nutv1:/app/data \
               -e MINT_BACKEND_BOLT11_SAT=FakeWallet -e MINT_LISTEN_HOST=0.0.0.0 -e MINT_LISTEN_PORT=3338 \
               -e MINT_PRIVATE_KEY=TEST_PRIVATE_KEY -e MINT_INPUT_FEE_PPK=0 "$@" cashubtc/nutshell:0.20.3 poetry run mint
-            for i in $(seq 1 120); do
+            for _ in $(seq 1 120); do
               curl -sf localhost:3339/v1/keysets > /dev/null && return 0
               sleep 1
             done
@@ -164,14 +233,18 @@ jobs:
           if-no-files-found: error
 
   cardctl:
+    needs: changes
+    if: needs.changes.outputs.cardctl == 'true'
     name: cardctl tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.11', '3.13']
+        python: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -209,14 +282,18 @@ jobs:
           python -c "import smartcard.scard; print('pyscard import OK')"
 
   e2e-tools:
+    needs: changes
+    if: needs.changes.outputs.e2e_tools == 'true'
     name: e2e tool tests (Node)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
 
       # Argument parsing for tools/e2e-melt.cjs (a 0.x tool), the pure half of
       # tools/cardsim/client.test.cjs (encoders, parsers, no-retry) and the
@@ -229,10 +306,14 @@ jobs:
         run: node --test 'tools/**/*.test.cjs'
 
   tools:
+    needs: changes
+    if: needs.changes.outputs.tools == 'true'
     name: spec mirror script
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       # tools/mirror-spec.sh copies spec/ into a javacard checkout and
       # deletes what is no longer here, so its test drives it against two
@@ -243,16 +324,20 @@ jobs:
         run: sh tools/mirror-spec.test.sh
 
   cap:
+    needs: changes
+    if: needs.changes.outputs.cap == 'true'
     name: CAP conversion
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Install Ant
         run: sudo apt-get update && sudo apt-get install -y ant
@@ -333,6 +418,9 @@ jobs:
           ant -f applet/build.xml hello-cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
           python3 tools/cardkit/make-assets.py --check --cap "$RUNNER_TEMP/tracked.cap"
 
+      - name: Restore the pinned release CAP
+        run: cp "$RUNNER_TEMP/tracked.cap" applet/target/cashu-javacard-2.1.0.cap
+
       - name: Upload CAP
         uses: actions/upload-artifact@v5
         with:
@@ -341,6 +429,8 @@ jobs:
           if-no-files-found: error
 
   cardkit:
+    needs: changes
+    if: needs.changes.outputs.cardkit == 'true'
     name: cardkit (SCP02 and the install, against a fake card)
     runs-on: ubuntu-latest
     defaults:
@@ -348,15 +438,20 @@ jobs:
         working-directory: tools/cardkit
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: yarn
           cache-dependency-path: tools/cardkit/yarn.lock
 
       - name: Install
         run: yarn install --frozen-lockfile
+
+      - name: Build and verify the public package
+        run: yarn build && yarn test:package
 
       # The library is typechecked with no Node types (it runs on the phone),
       # the tests with them.
@@ -379,6 +474,8 @@ jobs:
   # The ops service (ENG-740, D29): business rules run on Node's SQLite
   # adapter; platform checks run separately in the local Workers runtime.
   ops:
+    needs: changes
+    if: needs.changes.outputs.ops == 'true'
     name: ops service (key issuance, registries, anchor tip)
     runs-on: ubuntu-latest
     defaults:
@@ -386,15 +483,19 @@ jobs:
         working-directory: ops
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: yarn
           cache-dependency-path: ops/yarn.lock
 
+      - uses: ./.github/actions/setup-cardkit
+
       - name: Install
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --force
 
       - name: Typecheck
         run: |
@@ -425,6 +526,8 @@ jobs:
         run: yarn format:check
 
   provisioner:
+    needs: changes
+    if: needs.changes.outputs.provisioner == 'true'
     name: provisioner app (typecheck, lint, tests, bundles)
     runs-on: ubuntu-latest
     defaults:
@@ -432,15 +535,19 @@ jobs:
         working-directory: apps/provisioner
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: yarn
           cache-dependency-path: apps/provisioner/yarn.lock
 
+      - uses: ./.github/actions/setup-cardkit
+
       - name: Install
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --force
 
       - name: Typecheck
         run: node_modules/.bin/tsc --noEmit
@@ -455,7 +562,7 @@ jobs:
         run: python3 scripts/test_android_bundle.py
 
       # The release bundles prove Metro resolves cardkit from tools/ and its
-      # dependency from here, with no cardkit install. Native builds and
+      # dependency from its installed public package. Native builds and
       # signing are the owner's (H1).
       - name: Bundle for iOS and Android
         run: |
@@ -463,13 +570,17 @@ jobs:
           node_modules/.bin/react-native bundle --platform android --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-android.js"
 
   backup-copy:
+    needs: changes
+    if: needs.changes.outputs.backup_copy == 'true'
     name: encrypted backup copier (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ['3.9', '3.13']
+        python: ["3.9", "3.13"]
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -478,14 +589,65 @@ jobs:
         run: python -m unittest test_copy test_issuer test_alerts
 
   website:
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
     name: protocol website (static source)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - run: node --check website/tools/browser-smoke.cjs && node --check website/tools/preview.cjs && node --check website/dist/motion.js && node --check website/dist/guide.js
       - run: test -f website/dist/index.html && test ! -e website/dist/site.js && test -f website/dist/guide.md && test -f website/dist/llms.txt
       - run: test -f website/dist/film/cashu-card-film-2.mp4 && test -f website/dist/film/cashu-card-film-2-720.mp4 && test -f website/dist/film/poster-2.jpg
-      - run: test -f website/dist/seq/tap-2/anchors.js && test "$(ls website/dist/seq/tap-2/tap_*.webp | wc -l)" -eq 96 && node --check website/worker.js
+      - run: test -f website/dist/seq/tap-2/anchors.js && test "$(find website/dist/seq/tap-2 -maxdepth 1 -name 'tap_*.webp' -type f | wc -l)" -eq 96 && node --check website/worker.js
+
+  android:
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    uses: ./.github/workflows/provisioner-android.yml
+    with:
+      ref: ${{ inputs.ref || github.sha }}
+
+  backup-roundtrip:
+    needs: changes
+    if: needs.changes.outputs.backup_roundtrip == 'true'
+    uses: ./.github/workflows/backup-copy.yml
+    with:
+      ref: ${{ inputs.ref || github.sha }}
+
+  gate:
+    name: CI gate
+    if: always()
+    needs:
+      [
+        changes,
+        policy,
+        test,
+        cardsim,
+        cardctl,
+        e2e-tools,
+        tools,
+        cap,
+        cardkit,
+        ops,
+        provisioner,
+        backup-copy,
+        backup-roundtrip,
+        website,
+        android,
+      ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - env:
+          CI_RESULTS: ${{ toJSON(needs) }}
+        run: node tools/ci/gate.cjs

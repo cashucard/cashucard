@@ -1,15 +1,11 @@
 name: Independent backup copy
 on:
-  pull_request:
-    paths:
-      - 'tools/backup-copy/**'
-      - '.github/workflows/backup-copy.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'tools/backup-copy/**'
-      - '.github/workflows/backup-copy.yml'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -19,9 +15,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
       - name: Install pinned transfer client
         run: |
           curl --fail --location --retry 3 \

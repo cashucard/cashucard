@@ -5,7 +5,7 @@ import {resetOwnedCard, type ResetStage, type ResetOptions} from '../reset';
 import {cashuPlan, provision, rotateKeys} from '../provision';
 import {FACTORY_KEYS, SPIKE_KEYS} from '../scp02';
 import {toHex} from '../bytes';
-import {FakeCard, pullAt} from './fake-card';
+import {FakeCard, pullAt} from '../../testing/fake-card';
 import {CASHU_LOAD_FILE} from './assets';
 
 const authority = {

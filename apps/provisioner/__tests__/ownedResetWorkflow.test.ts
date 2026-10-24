@@ -4,7 +4,7 @@ import {
 } from '../src/ownedResetWorkflow';
 import type {ResetReview} from '../src/cardkit';
 import type {JournalStorage} from '../src/journal';
-import {FakeCard} from '../../../tools/cardkit/gp/test/fake-card';
+import {FakeCard} from '@cashu-card/cardkit/testing';
 import {
   FACTORY_KEYS,
   SPIKE_KEYS,

@@ -1,0 +1,75 @@
+name: Deploy versioned ops service
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published ops-vX.Y.Z release
+        type: string
+        required: true
+      target:
+        description: Deployment target
+        type: choice
+        options: [staging, production]
+        required: true
+      confirmation:
+        description: Type the exact release tag again
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: ops-deploy-${{ inputs.target }}
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ops-${{ inputs.target }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify deploy intent and tag
+        env:
+          RELEASE_RESOLVE_TAG: "true"
+          RELEASE_TAG: ${{ inputs.tag }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          test "$RELEASE_TAG" = "$CONFIRMATION"
+          node tools/release/component.cjs > "$RUNNER_TEMP/identity.json"
+          node -e 'if(require(process.env.RUNNER_TEMP + "/identity.json").component !== "ops") process.exit(1)'
+      - name: Download and verify published artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          RELEASE_COMMIT=$(node -p 'require(process.env.RUNNER_TEMP + "/identity.json").commit')
+          export RELEASE_COMMIT
+          gh release view "$RELEASE_TAG" --json isDraft --jq 'if .isDraft then error("Release is still a draft") else "Published release" end'
+          gh release download "$RELEASE_TAG" --pattern "$RELEASE_TAG.tar.gz" --dir "$RUNNER_TEMP"
+          python3 tools/release/manifest.py extract "$RUNNER_TEMP/$RELEASE_TAG.tar.gz" "$RUNNER_TEMP/ops-release"
+          python3 tools/release/manifest.py verify "$RUNNER_TEMP/ops-release"
+          for target in staging production; do
+            cmp "ops/wrangler.$target.toml" "$RUNNER_TEMP/ops-release/$target/wrangler.toml"
+          done
+      - uses: ./.github/actions/setup-cardkit
+      - run: yarn install --frozen-lockfile --force
+        working-directory: ops
+      - name: Deploy verified bundle without rebuilding or replacing secrets
+        working-directory: ops
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_TARGET: ${{ inputs.target }}
+        run: |
+          node node_modules/wrangler/bin/wrangler.js deploy \
+            "$RUNNER_TEMP/ops-release/$DEPLOY_TARGET/worker.js" \
+            --config "$RUNNER_TEMP/ops-release/$DEPLOY_TARGET/wrangler.toml" \
+            --no-bundle --keep-vars

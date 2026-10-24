@@ -1,4 +1,5 @@
 app_identifier "com.islandbitcoin.provisioner"
-apple_id "jabari.ennis@islandbitcoin.com"
 team_id "H7UAM79QQP"
-itc_team_id "5d7392ae-9415-4ef5-ab6a-96c178151984"
+# CI uploads authenticate with the scoped App Store Connect API key.
+# Local interactive use may supply FASTLANE_USER without committing a login.
+apple_id ENV['FASTLANE_USER'] if ENV['FASTLANE_USER']

@@ -18,7 +18,7 @@ Start with [`docs/VISION.md`](docs/VISION.md) and
 [`docs/GLOSSARY.md`](docs/GLOSSARY.md). You do not need a card, a reader, or any
 JavaCard knowledge to help.
 
-Genuinely useful without hardware:
+Useful without hardware:
 - **Documentation that is true.** See the warning below first.
 - **`cardctl`** (`tools/cardctl/`) is plain Python with tests that run anywhere.
 - **`cashu-client`** ([separate repo](https://github.com/cashucard/client))
@@ -53,7 +53,8 @@ Then pick a layer:
 | Host driver (`tools/cardctl/`) | Python | Only for `selftest` |
 | Phone-side install (`tools/cardkit/`, `apps/provisioner/`) | TypeScript, React Native | No for the suites; the spare card and two phones for the bench run |
 | Mint protocol ([cashu-client](https://github.com/cashucard/client)) | TypeScript | No |
-| **Merchant terminal** | — | **Nobody is building this. It is the biggest gap.** |
+| Ops-service (`ops/`) | TypeScript | No — Node/SQLite and local Workers tests |
+| Merchant terminal / holder wallet (external repositories) | React Native / Swift | Simulator for logic; named device/card plan for hardware validation |
 
 ### AI agent
 
@@ -85,6 +86,15 @@ more here than in an ordinary repo:
 
 ### Running tests
 
+Build cardkit before installing app/ops dependencies (Yarn classic file dependencies
+copy the built package):
+
+```bash
+(cd tools/cardkit && yarn install --frozen-lockfile && yarn build)
+(cd apps/provisioner && yarn install --frozen-lockfile)
+(cd ops && yarn install --frozen-lockfile)
+```
+
 ```bash
 mvn -f applet/pom.xml test                    # applet
 mvn -f tools/cardsim/pom.xml test             # card simulator bridge (compiles the applet in)
@@ -102,16 +112,25 @@ No hardware required for any of them.
 ant -f applet/build.xml cap
 ```
 
-CI runs the applet suite and the `tools/cardsim` bridge (its Java suite, then
-the shaded jar started and driven by the Node client, and a `SIG_ALL` swap at two
-Nutshell 0.20.3 mints: an 8-byte keyset id with no fee, as forge runs, and a
-33-byte v2 id with a fee) on JDK 11 and 17, the `cardctl` suite on Python 3.11 and
-3.13, and the CAP conversion with its size check, on every push. The conversion is also
-compared with the CAP tracked at `applet/target/cashu-javacard-2.1.0.cap`: every
-entry but `META-INF/MANIFEST.MF` must match, and
-[`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) must publish the
-tracked CAP's sha256. So a change to the applet source ships with the rebuilt
-CAP (JDK 17, `jc305u4_kit`) and its new hash in that guide.
+CI selects affected components on pull requests and main pushes. App UI changes
+run app checks and both Metro bundles; native/build changes also build Android.
+Protocol, firmware, cardkit, authentication, recovery/persistence, CI policy and
+unknown source paths run full integration, including simulated mint swaps. The
+always-running `CI gate` fails if a required job is missing, skipped, cancelled or
+unsuccessful. Manual and release CI run everything. See
+[component releases](docs/COMPONENT-RELEASES.md) for exact job/deployment boundaries.
+
+Use only `@cashu-card/cardkit`, `/cleanup`, and (for Node tests) `/testing` in
+consumers. Do not import its private `gp/` files. A public API change moves the
+SDK's own version and includes migration notes when incompatible. Firmware,
+provisioner and ops versions are independent; app version/build identities must
+agree across package.json, Android and iOS. Release tags do not themselves deploy
+ops or upload mobile apps. Existing signing identities are preserved.
+
+CAP conversion still compares every entry except `META-INF/MANIFEST.MF` to the
+tracked CAP. An applet change ships its rebuilt CAP and new published hash;
+ordinary host/UI changes preserve that file. Hardware reports remain the evidence
+for actual device/card behavior, not a passing simulator suite.
 
 ## Key design principles
 

@@ -10,7 +10,7 @@ import {
   labelFor,
 } from '../src/copy';
 import {randomBytes} from '../src/random';
-import {FakeCard, pullAt} from '../../../tools/cardkit/gp/test/fake-card';
+import {FakeCard, pullAt} from '@cashu-card/cardkit/testing';
 
 const result = (extra: object) => ({
   ok: false,

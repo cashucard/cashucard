@@ -15,7 +15,7 @@ import {
   provision,
   type RunOptions,
 } from '../src/cardkit';
-import {FakeCard} from '../../../tools/cardkit/gp/test/fake-card';
+import {FakeCard} from '@cashu-card/cardkit/testing';
 const key =
   '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
 const chip = 'cplc-v1:4790d3213180072976207515';

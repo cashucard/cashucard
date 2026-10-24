@@ -1,14 +1,17 @@
 {
   "name": "@cashu-card/cardkit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "GlobalPlatform over an injected transceiver: SCP02, the install commands and a recovering install, for the phone-side provisioner (ENG-738).",
+  "description": "Versioned Cashu Card installation and recovery API over an injected APDU transport.",
   "license": "MIT",
-  "main": "index.ts",
+  "main": "dist/index.js",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "node --import tsx --test 'gp/test/**/*.test.ts'",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "yarn build",
+    "test:package": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@noble/curves": "1.9.7",
@@ -22,5 +25,44 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "types": "dist/index.d.ts",
+  "react-native": "index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "react-native": "./index.ts",
+      "default": "./dist/index.js"
+    },
+    "./cleanup": {
+      "types": "./dist/cleanup.d.ts",
+      "react-native": "./cleanup.ts",
+      "default": "./dist/cleanup.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "cleanup": [
+        "dist/cleanup.d.ts"
+      ],
+      "testing": [
+        "dist/testing.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "index.ts",
+    "cleanup.ts",
+    "testing.ts",
+    "gp/*.ts",
+    "testing/*.ts",
+    "README.md",
+    "LICENSE"
+  ]
 }

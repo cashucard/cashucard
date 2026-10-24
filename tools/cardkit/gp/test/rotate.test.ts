@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import {toHex} from '../bytes';
 import {rotateKeys, type RotateOptions} from '../provision';
 import {FACTORY_KEYS, SPIKE_KEYS, parseCommand, type KeySet} from '../scp02';
-import {FakeCard, pullAt} from './fake-card';
+import {FakeCard, pullAt} from '../../testing/fake-card';
 
 function options(extra: Partial<RotateOptions> = {}): RotateOptions {
   let t = 0;

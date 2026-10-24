@@ -13,7 +13,7 @@ import {
   rotateKeys,
 } from '../src/cardkit';
 import {randomBytes} from '../src/random';
-import {FakeCard} from '../../../tools/cardkit/gp/test/fake-card';
+import {FakeCard} from '@cashu-card/cardkit/testing';
 
 let t = 0;
 const options = () => ({random: randomBytes, now: () => (t += 3)});
