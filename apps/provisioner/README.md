@@ -1,9 +1,18 @@
-# Cashu card provisioner (ENG-738)
+# Cashu Card Provisioner
 
-The issuer app installs and records supported Cashu cards through authenticated
-reservations, retaining interrupted-attempt evidence. Installation completion
-means awaiting holder setup. Installation is enabled for operator-approved internal testing (D74).
-Public release still requires a separate capability review.
+The shipping app signs operators into the ops-service, installs the shared Cashu
+card applet, records manager-key rotation, restores interrupted work and supports
+explicit owned-card reset. Holder wallets own PIN/ownership setup, funding and
+payments. Demo mode is removed; the legacy bench described below is gated off in
+distributed builds. Bundle ID: `com.islandbitcoin.provisioner`.
+
+Build `tools/cardkit` first, then install this app's dependencies. The app consumes
+`@cashu-card/cardkit` through `src/cardkit.ts`; Metro resolves the installed public
+package rather than a sibling `gp/` source path. Refresh the file dependency after
+SDK edits. See the [architecture](../../docs/ARCHITECTURE.md) and
+[independent release/signing guide](../../docs/COMPONENT-RELEASES.md).
+
+## Legacy bench reference (not a shipping route)
 
 The original ENG-738 spare-card bench is retained for approved laboratory Debug
 builds only. `BENCH_RUNS_ENABLED` defaults to false: Settings hides it, navigation
@@ -14,7 +23,7 @@ bypass the production coordinator or its stopped-card evidence.
 The historical bench operations below are described for that controlled Debug
 workflow. The decision behind the GlobalPlatform implementation is
 [D27](../../docs/DECISIONS.md#d27); the shared library is
-[`tools/cardkit`](../../tools/cardkit), bundled from the repository.
+[`@cashu-card/cardkit`](../../tools/cardkit), installed as a public package.
 
 ## What it does
 
@@ -236,7 +245,6 @@ The root provider supplies all shared screens; titles wrap in normal header
 layout. The identity diagnostic always shows “PHYSICAL CARD — read-only”, while
 other screens have no simulated-card banner. Its content can scroll at larger
 text sizes. These changes do not arm NFC or enable installation.
-
 
 ### Service origin for a release candidate
 

@@ -1,0 +1,180 @@
+name: Signed provisioner candidates
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      commit:
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    environment: provisioner-release
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: apps/provisioner
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
+      - uses: ./.github/actions/setup-cardkit
+      - run: |
+          yarn install --frozen-lockfile --force
+          sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+          node scripts/configure-service.cjs --origin https://ops.cashucard.org
+          node scripts/configure-service.cjs --check --production
+      - name: Restore existing upload signer and build
+        env:
+          CASHU_ANDROID_KEYSTORE_BASE64: ${{ secrets.CASHU_ANDROID_KEYSTORE_BASE64 }}
+          CASHU_ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.CASHU_ANDROID_UPLOAD_STORE_PASSWORD }}
+          CASHU_ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.CASHU_ANDROID_UPLOAD_KEY_ALIAS }}
+          CASHU_ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.CASHU_ANDROID_UPLOAD_KEY_PASSWORD }}
+          EXPECTED_CERT: ${{ vars.CASHU_ANDROID_UPLOAD_CERT_SHA256 }}
+        run: |
+          umask 077
+          export CASHU_ANDROID_UPLOAD_KEYSTORE="$RUNNER_TEMP/upload.p12"
+          python3 -c 'import base64,os,pathlib; pathlib.Path(os.environ["CASHU_ANDROID_UPLOAD_KEYSTORE"]).write_bytes(base64.b64decode(os.environ["CASHU_ANDROID_KEYSTORE_BASE64"], validate=True))'
+          node scripts/check-android-signing.cjs
+          keytool -exportcert -keystore "$CASHU_ANDROID_UPLOAD_KEYSTORE" -alias "$CASHU_ANDROID_UPLOAD_KEY_ALIAS" -storepass:env CASHU_ANDROID_UPLOAD_STORE_PASSWORD -file "$RUNNER_TEMP/upload-cert.der"
+          python3 -c 'import hashlib,os,pathlib; assert hashlib.sha256(pathlib.Path(os.environ["RUNNER_TEMP"],"upload-cert.der").read_bytes()).hexdigest() == os.environ["EXPECTED_CERT"].lower().replace(":", "")'
+          (cd android && ./gradlew :app:bundleRelease --console=plain --max-workers=2)
+      - name: Verify signed AAB
+        run: |
+          export BUNDLETOOL_JAR="$RUNNER_TEMP/bundletool.jar"
+          curl --fail --location --retry 3 https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar --output "$BUNDLETOOL_JAR"
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $BUNDLETOOL_JAR" | sha256sum --check
+          python3 scripts/check-android-bundle.py android/app/build/outputs/bundle/release/app-release.aab --readelf "$ANDROID_HOME/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
+      - uses: actions/upload-artifact@v5
+        with:
+          name: provisioner-android
+          path: apps/provisioner/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      - if: always()
+        run: rm -f "$RUNNER_TEMP/upload.p12" "$RUNNER_TEMP/upload-cert.der"
+  ios:
+    runs-on: macos-latest
+    environment: provisioner-release
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/provisioner
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: apps/provisioner
+      - uses: ./.github/actions/setup-cardkit
+      - name: Prepare app and pods
+        run: |
+          python3 -c 'import subprocess; assert int(subprocess.check_output(["xcrun","--sdk","iphoneos","--show-sdk-version"],text=True).split(".")[0]) >= 26, "Xcode with iOS SDK 26+ is required"'
+          yarn install --frozen-lockfile --force
+          node scripts/configure-service.cjs --origin https://ops.cashucard.org
+          node scripts/configure-service.cjs --check --production
+          (cd ios && bundle exec pod install --deployment)
+      - name: Import existing distribution identity and provisioning profile
+        env:
+          APPLE_P12_BASE64: ${{ secrets.CASHU_APPLE_DISTRIBUTION_P12_BASE64 }}
+          APPLE_P12_PASSWORD: ${{ secrets.CASHU_APPLE_DISTRIBUTION_P12_PASSWORD }}
+          APPLE_PROFILE_BASE64: ${{ secrets.CASHU_APPLE_PROFILE_BASE64 }}
+        run: |
+          umask 077
+          python3 - <<'PY'
+          import base64, os, pathlib
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          for name, env in [('distribution.p12','APPLE_P12_BASE64'),('distribution.mobileprovision','APPLE_PROFILE_BASE64')]:
+              (root/name).write_bytes(base64.b64decode(os.environ[env],validate=True))
+          PY
+          keychain_password=$(openssl rand -hex 32)
+          echo "::add-mask::$keychain_password"
+          security create-keychain -p "$keychain_password" "$RUNNER_TEMP/release.keychain-db"
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/release.keychain-db"
+          security unlock-keychain -p "$keychain_password" "$RUNNER_TEMP/release.keychain-db"
+          security import "$RUNNER_TEMP/distribution.p12" -P "$APPLE_P12_PASSWORD" -A -t cert -f pkcs12 -k "$RUNNER_TEMP/release.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$RUNNER_TEMP/release.keychain-db" > /dev/null
+          security list-keychains -d user -s "$RUNNER_TEMP/release.keychain-db"
+          security cms -D -i "$RUNNER_TEMP/distribution.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          python3 - <<'PY'
+          import os, pathlib, plistlib, re, shutil
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          p=plistlib.loads((root/'profile.plist').read_bytes())
+          assert p['Name'] and '\n' not in p['Name'] and '\r' not in p['Name']
+          assert re.fullmatch(r'[a-fA-F0-9-]{36}', p['UUID'])
+          assert p['TeamIdentifier']==['H7UAM79QQP']
+          assert p['Entitlements']['application-identifier']=='H7UAM79QQP.com.islandbitcoin.provisioner'
+          assert 'TAG' in p['Entitlements']['com.apple.developer.nfc.readersession.formats']
+          assert not p['Entitlements'].get('get-task-allow')
+          target=pathlib.Path.home()/'Library/MobileDevice/Provisioning Profiles'
+          target.mkdir(parents=True,exist_ok=True)
+          shutil.copy(root/'distribution.mobileprovision',target/(p['UUID']+'.mobileprovision'))
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('CASHU_APPLE_PROFILE_NAME='+p['Name']+'\n')
+          PY
+      - name: Build candidate without changing versions or signing assets
+        run: bundle exec fastlane ios build_release
+      - name: Verify exported application
+        run: python3 ../../tools/release/check-ios.py release/CashuProvisioner.ipa package.json
+      - uses: actions/upload-artifact@v5
+        with:
+          name: provisioner-ios
+          path: apps/provisioner/release/CashuProvisioner.ipa
+          if-no-files-found: error
+      - if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" || true
+          rm -f "$RUNNER_TEMP/distribution.p12" "$RUNNER_TEMP/distribution.mobileprovision" "$RUNNER_TEMP/profile.plist"
+  publish:
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.commit }}
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: provisioner-*
+          path: release
+          merge-multiple: true
+      - name: Create reviewable store candidate release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_COMPONENT: provisioner
+          RELEASE_COMMIT: ${{ inputs.commit }}
+        run: |
+          cp applet/target/cashu-javacard-2.1.0.cap release/
+          python3 tools/release/manifest.py write release
+          gh release create "$RELEASE_TAG" --verify-tag --draft --generate-notes --latest=false release/*

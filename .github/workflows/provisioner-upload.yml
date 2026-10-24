@@ -1,0 +1,94 @@
+name: Upload versioned provisioner candidate
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing provisioner-vX.Y.Z-build.N candidate release
+        type: string
+        required: true
+      platform:
+        type: choice
+        options: [testflight, play]
+        required: true
+      play_track:
+        type: choice
+        options: [internal, beta]
+        default: internal
+      confirmation:
+        description: Type the exact candidate tag again
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: provisioner-upload-${{ inputs.platform }}
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: macos-latest
+    environment: provisioner-store
+    defaults:
+      run:
+        working-directory: apps/provisioner
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify candidate identity and download signed artifacts
+        env:
+          RELEASE_RESOLVE_TAG: "true"
+          RELEASE_TAG: ${{ inputs.tag }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          test "$RELEASE_TAG" = "$CONFIRMATION"
+          (cd ../.. && node tools/release/component.cjs) > "$RUNNER_TEMP/identity.json"
+          node -e 'if(require(process.env.RUNNER_TEMP + "/identity.json").component !== "provisioner") process.exit(1)'
+          gh release view "$RELEASE_TAG" --json isDraft --jq 'if .isDraft then error("Publish the reviewed candidate before upload") else "Published candidate" end'
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/candidate"
+          (cd "$RUNNER_TEMP/candidate" && shasum -a 256 --check SHA256SUMS)
+          python3 - <<'PY'
+          import json,os,pathlib
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          expected=json.loads((root/'identity.json').read_text())
+          actual=json.loads((root/'candidate/release.json').read_text())
+          assert all(actual[k]==expected[k] for k in ('component','tag','commit'))
+          PY
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: apps/provisioner
+      - name: Upload IPA to TestFlight (eligible for external review)
+        if: inputs.platform == 'testflight'
+        env:
+          APP_STORE_CONNECT_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          umask 077
+          export APP_STORE_CONNECT_KEY_FILE="$RUNNER_TEMP/appstore.p8"
+          export CASHU_RELEASE_IPA="$RUNNER_TEMP/candidate/CashuProvisioner.ipa"
+          python3 -c 'import base64,os,pathlib; pathlib.Path(os.environ["APP_STORE_CONNECT_KEY_FILE"]).write_bytes(base64.b64decode(os.environ["APP_STORE_CONNECT_KEY_BASE64"],validate=True))'
+          bundle exec fastlane ios upload_testflight
+      - name: Upload AAB to the selected Play testing track
+        if: inputs.platform == 'play'
+        env:
+          PLAY_SERVICE_ACCOUNT_BASE64: ${{ secrets.PLAY_SERVICE_ACCOUNT_BASE64 }}
+          CASHU_PLAY_TRACK: ${{ inputs.play_track }}
+        run: |
+          umask 077
+          export CASHU_PLAY_SERVICE_ACCOUNT_FILE="$RUNNER_TEMP/play-service-account.json"
+          export CASHU_RELEASE_AAB="$RUNNER_TEMP/candidate/app-release.aab"
+          python3 -c 'import base64,os,pathlib; pathlib.Path(os.environ["CASHU_PLAY_SERVICE_ACCOUNT_FILE"]).write_bytes(base64.b64decode(os.environ["PLAY_SERVICE_ACCOUNT_BASE64"],validate=True))'
+          bundle exec fastlane android upload_play
+      - if: always()
+        run: rm -f "$RUNNER_TEMP/appstore.p8" "$RUNNER_TEMP/play-service-account.json"

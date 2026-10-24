@@ -1,0 +1,128 @@
+name: Component release
+on:
+  push:
+    tags: ["firmware-v*", "cardkit-v*", "ops-v*", "provisioner-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing component tag on main
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: component-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    outputs:
+      component: ${{ steps.release.outputs.component }}
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - id: release
+        env:
+          RELEASE_RESOLVE_TAG: "true"
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node tools/release/component.cjs
+  verify:
+    needs: identity
+    uses: ./.github/workflows/ci.yml
+    with:
+      full: true
+      ref: ${{ needs.identity.outputs.commit }}
+  package:
+    needs: [identity, verify]
+    if: needs.identity.outputs.component != 'provisioner'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.identity.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: ./.github/actions/setup-cardkit
+      - name: Package verified component
+        env:
+          RELEASE_COMPONENT: ${{ needs.identity.outputs.component }}
+          RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.identity.outputs.commit }}
+        run: |
+          mkdir -p release
+          case "$RELEASE_COMPONENT" in
+            firmware)
+              cp applet/target/cashu-javacard-*.cap release/
+              ;;
+            cardkit)
+              (cd tools/cardkit && npm pack --ignore-scripts --pack-destination ../../release)
+              ;;
+            ops)
+              (cd ops && yarn install --frozen-lockfile --force)
+              for target in staging production; do
+                (cd ops && node node_modules/wrangler/bin/wrangler.js deploy --config "wrangler.$target.toml" --dry-run --outdir "../release/$target")
+                cp "ops/wrangler.$target.toml" "release/$target/wrangler.toml"
+                python3 tools/release/manifest.py normalize "release/$target"
+                node --check "release/$target/worker.js"
+                (cd ops && node node_modules/wrangler/bin/wrangler.js deploy "../release/$target/worker.js" --config "../release/$target/wrangler.toml" --no-bundle --dry-run --outdir "$RUNNER_TEMP/verify-$target")
+              done
+              ;;
+          esac
+          python3 tools/release/manifest.py write release
+      - uses: actions/upload-artifact@v5
+        with:
+          name: component-release
+          path: release/
+          if-no-files-found: error
+  provisioner:
+    permissions:
+      contents: write
+    needs: [identity, verify]
+    if: needs.identity.outputs.component == 'provisioner'
+    uses: ./.github/workflows/provisioner-release.yml
+    with:
+      tag: ${{ needs.identity.outputs.tag }}
+      commit: ${{ needs.identity.outputs.commit }}
+    secrets: inherit
+  publish:
+    needs: [identity, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v5
+        with:
+          name: component-release
+          path: release
+      - name: Publish component artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+        run: |
+          tar -czf "$RUNNER_TEMP/$RELEASE_TAG.tar.gz" -C release .
+          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            assets=("$RUNNER_TEMP/$RELEASE_TAG.tar.gz" release/SHA256SUMS release/release.json)
+            while IFS= read -r -d '' file; do assets+=("$file"); done < <(find release -maxdepth 1 -type f \( -name '*.cap' -o -name '*.tgz' \) -print0)
+            gh release create "$RELEASE_TAG" --verify-tag --draft --generate-notes --latest=false "${assets[@]}"
+            gh release edit "$RELEASE_TAG" --draft=false --latest=false
+          else
+            echo 'Release already exists; its immutable candidate artifacts are retained.'
+          fi

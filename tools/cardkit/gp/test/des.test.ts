@@ -17,7 +17,12 @@ import {
   tdesCbcMac,
   tdesEcb,
 } from '../des';
-import {nodeCbc, nodeEcb, nodeFullMac, nodeRetailMac} from '../../testing/node-des';
+import {
+  nodeCbc,
+  nodeEcb,
+  nodeFullMac,
+  nodeRetailMac,
+} from '../../testing/node-des';
 
 const NOW_IS_THE_TIME = fromHex(
   '4E6F772069732074 68652074696D6520 666F7220616C6C20',

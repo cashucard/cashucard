@@ -426,3 +426,12 @@ details, Escape, mobile layout/sign-out and partial-refresh recovery, then stops
 the fixture. No production origin is permitted. Screenshots are written to a
 temporary directory printed by the check. No browser automation dependency is
 added to the service or CI.
+
+## Package and deployment boundary
+
+The service consumes the versioned `@cashu-card/cardkit` package through its public
+exports; build the SDK before installing this directory. Node-only fakes use the
+`/testing` entry point in tests. Ops versions/tags are independent of firmware and
+the mobile app. The [component release guide](../docs/COMPONENT-RELEASES.md)
+describes checked staging/production artifacts and explicit scoped deployment.
+A tag does not deploy a Worker or rotate recovery/master secrets.

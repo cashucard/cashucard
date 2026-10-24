@@ -3168,3 +3168,45 @@ provisioner and its words to be readable; and for "Where to get cards" with
 an Alibaba option, custom printed cards marked "Coming soon", and the
 hardware deployment guide as an easy page on the site, with a reader to buy
 and a ready handoff for people whose AI agent installs the applet.
+
+
+## D112 — Public cardkit package and independently released components
+
+**Decided:** keep the monorepo, with an explicit `@cashu-card/cardkit` 0.2 API.
+Core, optional cleanup and Node-only testing entry points have package exports;
+private GP paths are unsupported. React Native selects TypeScript source and
+Node selects compiled JavaScript/declarations. App and ops install explicit file
+dependencies after building the SDK; no Metro sibling-source alias is required.
+The real packed package is tested in ordinary Node, alongside existing GP tests.
+
+Firmware, cardkit, provisioner and ops retain separate manifest versions and
+component tags. A guarded release checks exact tag/main ancestry and committed
+identity, then requires reusable full CI before artifacts. Firmware publishes the
+tracked pinned CAP; host changes do not rebuild/re-pin it. Ops has separate
+staging/production bundles, file provenance and an explicit prebuilt deploy.
+Mobile candidates use existing signers, committed version/build identities and
+explicit store uploads; no automatic build bump or certificate creation remains.
+Recovery/master secrets are not part of CI. Environments/signing credentials and
+live execution remain separate configuration/authorization steps.
+
+Affected-component CI is a conservative allowlist. UI/docs/site edits avoid
+unrelated jobs; protocol, firmware, cardkit, admission/auth/schema, phone recovery
+and persistence, recovery contract tests, workflow policy and unknown paths retain
+full integration. Missing history runs full; push diffs compare trees directly so
+force-push deletions cannot disappear behind a merge-base diff. `CI gate` always
+runs and rejects missing/failed/cancelled/unexpectedly skipped jobs. Require that
+gate in branch protection instead of individual checks that legitimately skip.
+
+**Rejected:** splitting tightly coupled recovery work across repositories now;
+deep relative imports as an API; a single global version/release; publishing a
+freshly converted timestamp-different CAP instead of the pinned file; automatic
+production deployment/store rollout on branch pushes; and path filters that can
+leave required integration checks silently absent.
+
+**Why:** #141 requested clear package boundaries, independent releases, focused
+CI and documentation reflecting the shipping system. Architecture/contributor
+instructions now distinguish installation from holder-wallet setup and bounded
+hardware evidence from simulation. API boundary, diff/gate, version identity,
+archive integrity and signing-identity regressions are hardware-free. No protocol,
+applet behavior, production data, device or signing-custody change is authorized
+by this refactor.

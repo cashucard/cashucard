@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync} from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -17,12 +24,27 @@ test('consumers use the public package, with no private-source or runtime testin
       if (entry.isDirectory()) visit(path, production);
       else if (/\.[cm]?[jt]sx?$/.test(entry.name)) {
         const source = readFileSync(path, 'utf8');
-        const imports = [...source.matchAll(/(?:from\s+|require\(\s*)['"]([^'"]+)['"]/g)].map(m => m[1]);
+        const imports = [
+          ...source.matchAll(/(?:from\s+|require\(\s*)['"]([^'"]+)['"]/g),
+        ].map(m => m[1]);
         for (const specifier of imports) {
-          assert.ok(!specifier.includes('tools/cardkit'), `${path}: private cardkit import ${specifier}`);
+          assert.ok(
+            !specifier.includes('tools/cardkit'),
+            `${path}: private cardkit import ${specifier}`,
+          );
           if (specifier.startsWith('@cashu-card/cardkit')) {
-            assert.ok(['@cashu-card/cardkit', '@cashu-card/cardkit/cleanup', '@cashu-card/cardkit/testing'].includes(specifier), `${path}: unsupported API`);
-            assert.ok(!production || !specifier.endsWith('/testing'), `${path}: Node-only fake in runtime code`);
+            assert.ok(
+              [
+                '@cashu-card/cardkit',
+                '@cashu-card/cardkit/cleanup',
+                '@cashu-card/cardkit/testing',
+              ].includes(specifier),
+              `${path}: unsupported API`,
+            );
+            assert.ok(
+              !production || !specifier.endsWith('/testing'),
+              `${path}: Node-only fake in runtime code`,
+            );
           }
         }
       }
@@ -30,7 +52,10 @@ test('consumers use the public package, with no private-source or runtime testin
   }
   for (const component of ['ops', 'apps/provisioner']) {
     visit(join(repo, component, 'src'), true);
-    visit(join(repo, component, component === 'ops' ? 'test' : '__tests__'), false);
+    visit(
+      join(repo, component, component === 'ops' ? 'test' : '__tests__'),
+      false,
+    );
   }
 });
 
@@ -39,15 +64,35 @@ test('the packed API works in ordinary Node and rejects private subpaths', () =>
   try {
     // Pack the actual distributable, not a symlink to repository source. Only
     // declared runtime dependencies are supplied from the installed fixture.
-    const packed = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch], {cwd: root, encoding: 'utf8'}))[0];
+    const packed = JSON.parse(
+      execFileSync(
+        'npm',
+        ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch],
+        {cwd: root, encoding: 'utf8'},
+      ),
+    )[0];
     const target = join(scratch, 'node_modules/@cashu-card/cardkit');
     mkdirSync(target, {recursive: true});
-    execFileSync('tar', ['-xzf', join(scratch, packed.filename), '--strip-components=1', '-C', target]);
+    execFileSync('tar', [
+      '-xzf',
+      join(scratch, packed.filename),
+      '--strip-components=1',
+      '-C',
+      target,
+    ]);
     mkdirSync(join(scratch, 'node_modules/@noble'), {recursive: true});
     for (const dependency of ['hashes', 'curves']) {
-      symlinkSync(join(root, 'node_modules/@noble', dependency), join(scratch, 'node_modules/@noble', dependency), 'dir');
+      symlinkSync(
+        join(root, 'node_modules/@noble', dependency),
+        join(scratch, 'node_modules/@noble', dependency),
+        'dir',
+      );
     }
-    const output = execFileSync(process.execPath, ['-e', `
+    const output = execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `
       const assert = require('node:assert/strict');
       const api = require('@cashu-card/cardkit');
       const cleanup = require('@cashu-card/cardkit/cleanup');
@@ -64,9 +109,17 @@ test('the packed API works in ordinary Node and rejects private subpaths', () =>
       assert.equal(api.cleanupSettledEntries, undefined);
       assert.equal(api.FakeCard, undefined);
       console.log('packed API verified');
-    `], {cwd: scratch, encoding: 'utf8'});
+    `,
+      ],
+      {cwd: scratch, encoding: 'utf8'},
+    );
     assert.match(output, /packed API verified/);
-    assert.ok(!packed.files.some(file => /gp\/test\/|fixtures\/|\.test\./.test(file.path)), 'private tests or captures shipped');
+    assert.ok(
+      !packed.files.some(file =>
+        /gp\/test\/|fixtures\/|\.test\./.test(file.path),
+      ),
+      'private tests or captures shipped',
+    );
   } finally {
     rmSync(scratch, {recursive: true, force: true});
   }

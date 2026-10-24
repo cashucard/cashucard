@@ -7,6 +7,12 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["index.ts", "cleanup.ts", "testing.ts", "gp/*.ts", "testing/*.ts"],
+  "include": [
+    "index.ts",
+    "cleanup.ts",
+    "testing.ts",
+    "gp/*.ts",
+    "testing/*.ts"
+  ],
   "exclude": ["node_modules", "dist", "gp/test", "test"]
 }

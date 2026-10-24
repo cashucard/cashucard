@@ -1,49 +1,64 @@
-default_platform :ios
+require 'shellwords'
+# Versions/builds are committed together before tagging. Never increment here.
+def review_api_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch('APP_STORE_CONNECT_KEY_ID'),
+    issuer_id: ENV.fetch('APP_STORE_CONNECT_ISSUER_ID'),
+    key_filepath: ENV.fetch('APP_STORE_CONNECT_KEY_FILE'),
+    in_house: false
+  )
+end
 
 platform :ios do
-  desc "Build and upload to TestFlight (internal)"
-  lane :beta do
-    # Ensure certs/profiles
-    match(type: "appstore", readonly: false)
-    
-    # Bump build number
-    increment_build_number(xcodeproj: "CashuProvisioner.xcodeproj")
-    
-    # Build and archive
+  desc 'Build the tagged App Store/TestFlight candidate using an existing signer'
+  lane :build_release do
     gym(
-      workspace: "CashuProvisioner.xcworkspace",
-      scheme: "CashuProvisioner",
-      configuration: "Release",
+      workspace: 'ios/CashuProvisioner.xcworkspace',
+      scheme: 'CashuProvisioner',
+      configuration: 'Release',
       clean: true,
-      export_method: "app-store",
+      output_directory: 'release',
+      output_name: 'CashuProvisioner.ipa',
+      archive_path: 'release/CashuProvisioner.xcarchive',
+      export_method: 'app-store',
+      skip_profile_detection: true,
+      codesigning_identity: 'Apple Distribution',
+      xcargs: "DEVELOPMENT_TEAM=H7UAM79QQP CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER=#{Shellwords.escape(ENV.fetch('CASHU_APPLE_PROFILE_NAME'))}",
       export_options: {
-        method: "app-store-connect",
-        team_id: "H7UAM79QQP",
-        upload_bitcode: false,
-        upload_symbols: true,
-        compile_bitcode: false
+        method: 'app-store-connect', teamID: 'H7UAM79QQP', signingStyle: 'manual',
+        provisioningProfiles: {'com.islandbitcoin.provisioner' => ENV.fetch('CASHU_APPLE_PROFILE_NAME')},
+        uploadSymbols: true, testFlightInternalTestingOnly: false
       }
-    )
-    
-    # Upload to TestFlight
-    pilot(
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: ["Internal Testers"],
-      changelog: "v#{lane_context[SharedValues::VERSION_NUMBER]} (#{lane_context[SharedValues::BUILD_NUMBER]}) — internal release"
     )
   end
 
-  desc "Build for internal testing only (no upload)"
-  lane :build_only do
-    match(type: "appstore", readonly: true)
-    increment_build_number(xcodeproj: "CashuProvisioner.xcodeproj")
-    gym(
-      workspace: "CashuProvisioner.xcworkspace",
-      scheme: "CashuProvisioner",
-      configuration: "Release",
-      clean: true,
-      export_method: "app-store"
+  desc 'Upload the already signed candidate; external eligibility remains intact'
+  lane :upload_testflight do
+    pilot(
+      api_key: review_api_key,
+      ipa: ENV.fetch('CASHU_RELEASE_IPA'),
+      app_identifier: 'com.islandbitcoin.provisioner',
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+  end
+end
+
+platform :android do
+  desc 'Upload an already signed AAB without modifying listing metadata'
+  lane :upload_play do
+    track = ENV.fetch('CASHU_PLAY_TRACK', 'internal')
+    UI.user_error!('Choose internal or beta explicitly') unless ['internal', 'beta'].include?(track)
+    upload_to_play_store(
+      package_name: 'com.islandbitcoin.provisioner',
+      json_key: ENV.fetch('CASHU_PLAY_SERVICE_ACCOUNT_FILE'),
+      aab: ENV.fetch('CASHU_RELEASE_AAB'),
+      track: track,
+      release_status: 'completed',
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
     )
   end
 end

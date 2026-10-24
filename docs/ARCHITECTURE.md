@@ -1,238 +1,149 @@
 # Architecture
 
-How the pieces fit together, what each is responsible for, and — stated
-explicitly — which parts do not exist yet.
+Cashu Card is an open protocol and a set of reference components. This
+repository owns the protocol, firmware, installation library, provisioner,
+ops-service, recovery copier and public website. Wallets and merchant terminals
+integrate the protocol from their own repositories. See [DECISIONS](DECISIONS.md)
+for settled design calls and [COMPONENT-RELEASES](COMPONENT-RELEASES.md) for the
+version and deployment contracts.
 
-For *why* it is shaped this way, read [`VISION.md`](VISION.md) first. For the
-specific engineering calls, [`DECISIONS.md`](DECISIONS.md).
+## Components and ownership
 
-## The system
+| Component | Source | Responsibility |
+| --- | --- | --- |
+| Protocol | `spec/` | APDUs, ownership, spending and interoperability; this is the edit authority. `cashucard/javacard` mirrors the committed specification after merge. |
+| Firmware | `applet/` | JavaCard 3.0.5 applet, on-card keys/proofs, spend protection and NFC tag. The tracked CAP and its hashes are release evidence. |
+| cardkit | `tools/cardkit/` | Environment-neutral TypeScript API for installation, SCP02 manager-key rotation, interrupted-install recovery and owned-card reset. It receives an APDU transceiver; it does not open NFC, call HTTP or decide operator authorization. |
+| Provisioner | `apps/provisioner/` | React Native operator app (`com.islandbitcoin.provisioner`): sign-in, batch setup, card installation, saved recovery, status and reset. Platform NFC and HTTP adapters surround cardkit. |
+| Ops-service | `ops/` | Operator sessions/administration, reservations, chip binding, manager-key escrow, durable installation/reset records, recovery fences and encrypted exports. Node/SQLite is the local adapter; Workers/Durable Object SQLite is the deployment adapter. |
+| Independent recovery copy | `tools/backup-copy/` | Copies and verifies encrypted R2 exports into independent storage and reports freshness. Its process needs transfer credentials, not the decryption identity. StartOS/Atoll packaging lives separately. |
+| Host tools and simulator | `tools/cardctl/`, `tools/cardsim/` | PC/SC reference driver and hardware-free protocol simulation. The simulator's external client/routes remain a contract with wallet and terminal repositories. |
+| Public site | `website/` | Protocol introduction, implementation links and installation guide. It is not the operator app or an ops-service deployment. |
 
-Five components across four repositories plus a running mint:
+Flash Mobile, Foxy and Flash POS are external implementations, not required
+wallet brands. Mint interactions are implemented by wallets/terminals and
+[the separate client library](https://github.com/cashucard/client). A batch's
+mint reference is operator metadata; the provisioner does not set holder
+ownership, fund the card, or make it spend-ready.
 
-| Component | Repo | Language | Status |
-|---|---|---|---|
-| **Applet** — the card firmware | [`cashu-javacard`](https://github.com/cashucard/javacard) `applet/` | JavaCard | **Hardware-proven** — selftest 10/10; load/spend/melt/PIN all run on silicon (see the [test report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)) |
-| **cardctl** — host driver | [`cashu-javacard`](https://github.com/cashucard/javacard) `tools/cardctl/` | Python | Proven against a real card (ACR122U) |
-| **cashu-client** — mint protocol | [`cashu-client`](https://github.com/cashucard/client) | TypeScript | Load + redeem implemented; both proven end-to-end on hardware via `tools/e2e-*.cjs` |
-| **Card artwork** — physical design | [`flash-card-assets`](https://github.com/lnflash/flash-card-assets) | SVG/PDF | Draft v1, not released to plate |
-| **Flash Forge** — the mint | `forge.flashapp.me` | Nutshell (Python) | **Live, solvent, in production** |
-| **Merchant terminal** | [`flash-pos`](https://github.com/lnflash/flash-pos) | React Native | Read path (`SELECT/GET_INFO/GET_PUBKEY/GET_BALANCE`) **hardware-validated on iOS**; spend wiring pending — the offline settlement queue (#68) is merged and waiting for it |
+## Trust and data flow
 
-The terminal gap is closing. flash-pos carries the Cashu card spike (#67:
-IsoDep APDU transport) and the offline settlement queue for card payments
-(#68); on 2026-09-23 its read path ran against a real card from an iPhone —
-see the test report. What remains before a card can be *spent in the field* is
-the spend wiring: the mint round-trip from `cashu-client` behind the
-settlement queue, plus the top-up (PIN) path.
-
-## Trust boundaries
-
-This is the diagram that matters most, because almost every design decision
-follows from where these lines sit.
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│ THE MINT (forge.flashapp.me)                                 │
-│  · issues proofs, honours redemptions, holds the reserve     │
-│  · is the ONLY authority on whether a proof is still unspent │
-│  · trusted for solvency; NOT trusted for unlinkability       │
-│    (that is what NUT-12 DLEQ checks)                         │
-└──────────────────────────────────────────────────────────────┘
-            ▲                                    ▲
-   issue    │                                    │  redeem (melt)
-            │                                    │
-┌───────────┴────────────┐          ┌────────────┴───────────────┐
-│ PROVISIONING HOST      │          │ MERCHANT TERMINAL          │
-│  · does the BDHKE math │          │  · reads proofs off card   │
-│  · knows blinding r    │          │  · asks card to sign       │
-│  · loads proofs        │          │  · submits melt to mint    │
-│  · NOT trusted by card │          │  · NOT trusted by card     │
-└───────────┬────────────┘          └────────────┬───────────────┘
-            │ APDU                               │ APDU
-            ▼                                    ▼
-┌──────────────────────────────────────────────────────────────┐
-│ THE CARD                                                     │
-│  · holds proofs + a secp256k1 key that NEVER leaves          │
-│  · signs a 32-byte message on request                        │
-│  · marks a slot SPENT before releasing the signature         │
-│  · trusts nobody: it authorises, it does not authenticate    │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+  Operator[Operator] --> P[Provisioner]
+  P -->|sessions, scoped reservations and receipts| O[Ops-service]
+  P --> K[cardkit public API]
+  K -->|injected NFC transceiver| C[JavaCard]
+  W[Holder wallet] -->|ownership, PIN and funding| C
+  T[Merchant terminal] -->|payment APDUs| C
+  W --> M[Cashu mint]
+  T -->|settlement when online| M
+  O --> D[Durable Object SQLite]
+  O -->|encrypted exports| R[R2]
+  R --> B[Independent recovery copier]
+  B --> N[Nextcloud / recovery storage]
 ```
 
-**The card trusts no one.** It does not verify that a terminal is a real
-merchant, that a message is a real payment, or that a proof it is handed is
-genuine. It does exactly one security-relevant thing: it will not produce a
-second signature for a slot it has already marked spent.
+The mint issues proofs and determines whether redemption succeeds. An offline
+terminal's local acceptance is not a mint settlement receipt. It retains its
+payment and change obligations until reconciliation; the ops-service does not
+settle payments or hold the holder wallet's recovery phrase.
 
-**The terminal is not trusted either** — by anyone. It cannot forge proofs (it
-lacks the mint's key) and it cannot spend a card's proofs elsewhere (they are
-P2PK-locked to the card). It *can* refuse to settle, or lie to the customer
-about the amount, which is ordinary merchant risk.
+The card generates its secp256k1 installation key on chip. Proofs are locked to
+that key. The holder controls a separate P-256 owner key through a holder
+wallet; Flash's tested setup derives it from the wallet's recovery phrase.
+Neither the provisioner nor an ops-service operator becomes the card owner by
+installing the applet. Ownership, PINs, limits and mint personalization are
+holder-wallet responsibilities.
 
-**The mint is trusted for solvency and nothing else.** It could try to tag users
-by signing with per-user keys — [NUT-12 DLEQ](https://github.com/cashubtc/nuts/blob/main/12.md)
-detects that, and `cashu-client` verifies it. It could become insolvent — which
-is why [the reserve is monitored publicly](https://forge.flashapp.me/reserves).
+GlobalPlatform manager keys are a third authority: they authorize applet
+management, not payment ownership. Issued keys are scoped/escrowed by the
+ops-service and used for the reserved installation or reset. Phone journals
+retain public identifiers, intents and receipts, never manager keys, PINs,
+session tokens or wallet recovery phrases. The SCP02 implementation and
+vendored DES are justified in [D27](DECISIONS.md#d27); failed authentication is
+not retried.
 
-## Division of labour: why the card does so little
+Encrypted backup files and their private recovery identity have separate
+custody. The recovery identity belongs in the designated restricted vault and
+protected offline copy, not R2, Nextcloud or the copier configuration. A fresh
+independent copy is an admission requirement for card changes; restoring data
+also installs the recovery fences before issuance resumes. See
+[OPS-THREAT-MODEL](OPS-THREAT-MODEL.md) and the recovery runbooks.
 
-The card **does not** do BDHKE. It never blinds, never unblinds, never talks to
-a mint, and never sees a blinding factor. It stores proofs and it signs.
+## Installation and reset boundaries
 
-That is deliberate. JavaCard has no big-integer arithmetic, no `long`, and no
-garbage collector; every byte of scratch space must be allocated once at install
-time. Implementing blinding on-card would multiply the applet's size and its
-attack surface to buy nothing — the blinding math is not secret and the host is
-already the party that must know `r` in order to unblind.
+`apps/provisioner/src/cardkit.ts` is the phone's adapter to the public package.
+Runtime consumers import `@cashu-card/cardkit` or the explicit optional
+`@cashu-card/cardkit/cleanup` API. `@cashu-card/cardkit/testing` exposes the
+Node-only fake for tests; it must never enter a mobile/Worker runtime bundle.
+Private `gp/*` imports are unsupported. Native Metro and ordinary Node receive
+the same API through different package export conditions.
 
-So the split is:
+The workflow saves request IDs before HTTP and durable intent before card
+commands. It reconciles the same attempt after interruption, verifies card
+identity before mutation, and freezes completion evidence before posting it.
+A record-only retry never starts NFC or another rotation. A stopped attempt's
+chip remains fenced until an authorized reconciliation, not merely until its
+screen is dismissed.
 
-| Concern | Where |
-|---|---|
-| Blinding, unblinding, denomination splitting | `cashu-client` (host) |
-| Mint HTTP: quotes, mint, melt, swap, checkstate | `cashu-client` (host) |
-| DLEQ verification | `cashu-client` (host) |
-| Proof storage, slot lifecycle; from software 1.20 also the mint's DLEQ proof kept with each piece, which the applet stores and gives back and never checks | **Applet** |
-| The private key, and BIP-340 signing | **Applet** |
-| Single-spend enforcement (on-card) | **Applet** |
-| APDU transport | `cardctl` (host) |
+Owned-card reset is an explicit workflow: inspect public identity/state, resolve
+any value/settlement obligations, confirm erasure and holder authorization where
+required, use the source installation's escrow, verify removal and manager-key
+state, and obtain the service receipt. It is not permission to discard uncertain
+value or to reinstall an arbitrary provisioned card. A successful reinstall
+creates a new installation key; old proofs cannot be recovered by replacing the
+applet. See [OWNED-CARD-MOBILE-RESET](OWNED-CARD-MOBILE-RESET.md).
 
-The card holds the one thing that cannot live anywhere else: **a private key
-that has never existed outside the secure element.**
+The card's full applet AID is `F043415348554341524401`; the package AID reaches
+an opener on hardware. Installation orders opener, Cashu applet, then tag;
+deletion reverses references before deleting the package. CAP/load-file pins
+and deployment instructions are checked together. Host package releases do not
+change those pinned bytes.
 
-## On-card data model
+## Versions, builds and deployments
 
-Each proof occupies exactly 78 bytes of EEPROM:
+| Component | Version authority | Tag |
+| --- | --- | --- |
+| Firmware | `applet/pom.xml`, aligned with CAP path and protocol version | `firmware-vX.Y.Z` |
+| cardkit | `tools/cardkit/package.json` | `cardkit-vX.Y.Z` |
+| Provisioner | `apps/provisioner/package.json` plus matching native version/build | `provisioner-vX.Y.Z-build.N` |
+| Ops-service | `ops/package.json` | `ops-vX.Y.Z` |
 
-```
-Offset  Size  Field
-0       1     status (0=empty, 1=unspent, 2=spent)
-1       8     keyset_id (the NUT-02 keyset id as 8 RAW bytes = 16 hex chars)
-9       4     amount (uint32, big-endian, in the keyset's base unit)
-13      32    nonce (the 32-byte nonce from the NUT-10 P2PK secret)
-45      33    C (compressed secp256k1 point — the mint's unblinded signature)
-```
+A protocol major/minor move changes the firmware's SELECT/GET_INFO version and
+requires coordinated interoperability work. An app build or ops-service deploy
+does not imply a protocol change. A cardkit API change follows its own version
+and documented compatibility policy. File dependencies deliberately consume the
+committed package built in the same checkout; external consumers use the packed
+release. There is no implicit npm publication.
 
-Two fields here are easy to get wrong, and both make proofs unspendable:
+Tags must identify a commit on main and match its component manifest. Component
+release pipelines require the full CI matrix before building artifacts. Firmware
+publishes the tracked, pinned CAP, rather than the timestamp-different CI
+conversion. Ops releases contain separate staging/production bundles and a hash
+manifest. Deploy and store-upload workflows are explicit, environment-scoped
+steps; pushing an ordinary branch cannot deploy production or upload a store
+build. See [COMPONENT-RELEASES](COMPONENT-RELEASES.md) for signing/secret setup and
+remaining external configuration.
 
-- **`keyset_id` is raw bytes, not ASCII.** A NUT-02 keyset id is 16 hex
-  characters. Stored raw it is exactly 8 bytes; stored as ASCII text only the
-  first 8 hex characters fit, which is half an id and matches no keyset at the
-  mint.
-- **The 32 bytes are the *nonce*, not the secret.** A NUT-10 P2PK secret is a
-  JSON string of roughly 150 bytes and cannot fit in a proof slot. The card
-  stores only the nonce; a reader rebuilds the full secret from the nonce plus
-  the card's public key. See [`spec/NUT-XX.md`](../spec/NUT-XX.md) —
-  *Reconstructing the full Proof from card storage*.
+## Verification and evidence
 
-Protocol 2.0: 128 slots × 82 bytes (the 78 above and a 4-byte date) = **10,496
-bytes** of proof storage, 130 bytes a slot more of the hex text a payment hashes,
-and, reserved by the first `SET_CARD`, 96 bytes a slot for the mint's DLEQ proof.
-The `amount` unit follows the keyset — sats for a `sat` keyset, cents for `usd`.
+Affected-component CI uses a conservative allowlist. UI changes run provisioner
+checks; native/build changes also run the Android native build; website-only
+changes run site checks. Protocol, firmware, cardkit, ops admission/auth/schema,
+phone persistence/recovery, workflow policy, recovery contract tests and unknown
+source paths retain full integration. Missing diff history also runs everything.
+The always-running `CI gate` rejects failed, cancelled, missing or unexpectedly
+skipped selected jobs. Branch protection should require that gate.
 
-`MAX_PROOFS = 128` is a real constraint on the product, not just the code: a
-Cashu balance is split into powers of two, so 128 slots comfortably holds a
-useful balance but is not unlimited. `cashu-client`'s `splitIntoDenominations`
-takes a `maxSlots` argument for exactly this reason.
+jCardSim and fake transports prove protocol/workflow logic; they cannot prove
+EEPROM behavior, RF stability, torn writes or silicon cryptographic framing.
+The [23 October physical E2E report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+records the particular card/phones and tested online/offline payment and
+settlement loop. The [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+records reset/reinstall evidence. These are bounded observations, not blanket
+compatibility or production-safety claims for all devices/cards.
 
-## Key management
-
-- The card keypair is generated **at install time**, on-card, via
-  `KeyPair.genKeyPair()`.
-- The private key lives in JavaCard's protected key storage — never in a
-  `byte[]`, never exported, no APDU returns it.
-- `GET_PUBKEY` returns the 33-byte compressed public key. That is the card's
-  identity and the key proofs are locked to.
-- For [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md), the
-  provisioning host puts this key in each proof's P2PK secret, so the mint will
-  only redeem those proofs against a signature from this card.
-
-**Consequence:** a card is unrecoverable by design. There is no seed, no backup,
-no derivation path. Destroy the card and the key is gone, and with it any proofs
-locked to it. See [`DECISIONS.md`](DECISIONS.md#d5) for why BIP-39 was rejected
-and what the open alternative is.
-
-## Spend protection
-
-A 2.0 payment (`SPEND_ALL_SIGN`) signs in RAM, then commits one byte that burns
-every place it names (with the day's count, the log and the signature kept for
-`SPEND_ALL_AGAIN`), and only then answers; the places' status bytes are marked
-after the commit, or at the next command if the card left the field. No APDU can
-reset a slot to unspent — the command does not exist. `CLEAR_SPENT` zeroes
-already-spent slots to reclaim space; it does not undo a spend.
-
-Two honest caveats:
-
-1. **This is a status byte, not a counter.** Earlier documentation called it a
-   "non-resettable hardware spend counter", which overstates it.
-2. **Tear-off is analysed, not yet tested on hardware.** No slot write is
-   wrapped in a `JCSystem` transaction. Every slot write changes the data first
-   and the status byte last ([D14](DECISIONS.md#d14)), and every write outside a
-   transaction is reviewed in [D23](DECISIONS.md#d23). A card pulled as a
-   payment's answer is on the air has burned the places and kept the signature:
-   the terminal asks again with `SPEND_ALL_AGAIN`. No card has been pulled
-   mid-write on purpose: see [`SECURITY-MODEL.md`](SECURITY-MODEL.md) #11.
-
-## The two flows
-
-### Loading a card (online)
-
-```
-1. cashu-client: requestMintQuote(mint, amount, unit)     → bolt11 invoice
-2. (pay the invoice by any means)
-3. wallet: split the amount into powers of two            → [64, 16, 4, …]
-4. wallet: blind each format-4 secret, SIG_ALL, locked to the CARD's key
-                 ↳ spec/NUT-XX.md, "The card piece"
-5. wallet: mint                                             → blind signatures with DLEQ
-6. wallet: unblind, check the DLEQ                          → offline check
-7. owner's phone: GET_NONCE, ALLOW_LOAD, LOAD_PROOF (P1 = 1) × n
-                                                             → written to slots with the mint's proof
-```
-
-Step 4 is the pivot: the host locks each proof to a key it does not control.
-From that moment the proof is only spendable by that card.
-
-### Spending at a terminal
-
-```
-1. terminal: SET_HEADER (the tip), GET_INFO, GET_PIECES, GET_DLEQ, AUTH
-                                                  → the card, its pieces checked offline
-2. terminal: pick pieces, make the swap's outputs
-3. card:     SPEND_ALL_BEGIN / OUTPUTS / CHANGE   → the card makes its own change outputs
-4. card:     SPEND_ALL_SIGN (VERIFY_PIN first unless the allowance covers it)
-                                                  → every place burned, one SIG_ALL signature
-5. terminal: swap at the mint, the signature as the first input's witness
-6. terminal: unblind the change, LOAD_PROOF it back (the tap after a payment needs no PIN)
-```
-
-Step 4 is the whole reason the card exists: the signature that unlocks the
-pieces can only be produced by the chip, and only for the swap it was shown.
-
-Note the ordering hazard — **the card burns its places at step 4, before the mint
-has accepted anything at step 5.** That asymmetry is why `cashu-client` refuses
-locally rather than optimistically submitting; see
-[`DECISIONS.md`](DECISIONS.md#d7).
-
-## Hardware floor
-
-**JavaCard 3.0.5 or later.** Not a preference — the Schnorr signer computes
-`k·G` with `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY`, a constant that **does not
-exist in the 3.0.4 API**. Verified directly against the SDK jars. JCOP3, J3H145
-and Feitian 3.0.4 parts cannot run this applet at all.
-
-The card must also be **dual-interface** (contactless ISO/IEC 14443-4 for taps,
-contact ISO/IEC 7816 for reliable applet loading) and supplied **unlocked**, with
-known GlobalPlatform keys, or the applet can never be installed.
-
-## Where to go next
-
-| You want to… | Read |
-|---|---|
-| Understand a specific design call | [`DECISIONS.md`](DECISIONS.md) |
-| Know what an attacker can do | [`SECURITY-MODEL.md`](SECURITY-MODEL.md) |
-| Talk to a card | [`../tools/cardctl/README.md`](../tools/cardctl/README.md) |
-| Load the applet onto silicon | [`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md) |
-| Read the wire protocol | [`../spec/APDU.md`](../spec/APDU.md) |
-| Read the protocol spec | [`../spec/NUT-XX.md`](../spec/NUT-XX.md) |
-| Look up a term | [`GLOSSARY.md`](GLOSSARY.md) |
+For wire and data layouts, use [NUT-XX](../spec/NUT-XX.md) and
+[APDU](../spec/APDU.md). For zero-allocation and hardware rules, use
+[CONTRIBUTING](../CONTRIBUTING.md) and [AGENTS](../AGENTS.md).

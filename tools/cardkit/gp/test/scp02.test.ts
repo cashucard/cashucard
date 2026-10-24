@@ -46,7 +46,12 @@ import {
   type KeySet,
   type Transceiver,
 } from '../scp02';
-import {nodeCbc, nodeEcb, nodeFullMac, nodeRetailMac} from '../../testing/node-des';
+import {
+  nodeCbc,
+  nodeEcb,
+  nodeFullMac,
+  nodeRetailMac,
+} from '../../testing/node-des';
 
 function rnd(n: number): number[] {
   return Array.from(randomBytes(n));
