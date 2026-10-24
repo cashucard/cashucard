@@ -1,111 +1,93 @@
-# Ops governance — PROPOSED, pending Foxy sign-off
+<a id="ops-governance--proposed-pending-foxy-sign-off"></a>
 
-The partner conversation's agenda: the questions Foxy's review of the ops
-service will ask, with lnflash's proposed answer for each. Nothing here is
-agreed until Foxy agrees to it; **the service builds against the proposals
-below and this document is marked pending until the sign-off lands** —
-ENG-740 does not close with the sign-off outstanding, and Phase 5b (the
-holder-facing consumer flows, where Foxy's holders meet the service) is
-gated on it.
+# Ops governance proposal
 
-The security context is [`OPS-THREAT-MODEL.md`](OPS-THREAT-MODEL.md); the
-service's shape is [D29](DECISIONS.md#d29). This document holds the decisions
-that are a partner's to share in, not the service's to make alone.
+Status: pending Foxy sign-off. These proposals describe partner custody and
+consumer access. [D30](DECISIONS.md#d30) allows the operator release to proceed
+separately; partner-facing consumer flows remain gated on agreement.
 
-## Q1. Hosting and who can see the escrow
+The service architecture is in [D29](DECISIONS.md#d29), with its
+[threat model](OPS-THREAT-MODEL.md) and [deployment plan](OPS-WORKERS-PLAN.md).
+The table below records the outstanding partner decisions. Proposed contracts
+require implementation and validation before they can be offered as guarantees.
 
-**Proposed: lnflash alone, one shared root.** The deployment target is a
-lnflash-operated Cloudflare Worker and one SQLite-backed Durable Object
-([D30](DECISIONS.md#d30)), isolated from the forge mint with its own backups
-and alerting. This replaces the dedicated-droplet proposal and remains pending
-Foxy sign-off. Cloudflare account administrators and a compromised service
-runtime are within the escrow's trust boundary; independent encrypted exports
-and a tested restore are deployment gates in
-[`OPS-WORKERS-PLAN.md`](OPS-WORKERS-PLAN.md).
-Foxy's card-manager keys live in the same escrow
-as Flash's, under the same master.
+<a id="q1-hosting-and-who-can-see-the-escrow"></a>
 
-What this asks Foxy to accept: lnflash's operators can, technically, read the
-key sets of Foxy-issued cards. The control offered in return is the governance
-one — escrow reads are per-batch, scoped by the batch's ownership recorded at
-issuance, and the audit of who read what is a deliverable of the sign-off, not
-a promise made here.
+## Q1. Hosting and escrow access
 
-**Alternatives on the table:** a Foxy-run mirror of the service (two masters,
-two escrows, the registry split by owner — more perimeter, more drift);
-per-partner master keys under one service (derivation becomes per-tenant, the
-D29 scheme changes before Foxy's review has seen it).
+Proposed: a lnflash-operated Cloudflare Worker and one SQLite-backed Durable
+Object, with one shared derivation root and escrow. Its backups and alerting
+are separate from the Forge mint. Independent encrypted exports and a tested
+restore are deployment gates.
 
-## Q2. Foxy cards at rotation time: service down, or relationship over
+This custody model gives service runtime and Cloudflare account administrators
+technical access to every escrowed manager-key set, including Foxy-issued
+cards. Partner-scoped reads and access auditing must be specified and accepted
+at sign-off. Current operator reservation checks do not establish that complete
+partner-governance contract.
 
-**Proposed: signed escrow export, wrapped to Foxy's key, contractually
-deliverable.** At any time — announced or not — lnflash delivers an export of
-every key set whose batch Foxy owns: each set signed by the service's export
-key and encrypted to a public key Foxy holds, so the export is useless to
-anyone but Foxy and provably came from the service.
+Alternatives are a Foxy-operated service with its own root and escrow, or
+per-partner roots within one service. Both require changes to operation,
+derivation or recovery that the partners must review.
 
-The contract clause this proposal pairs with: the export is deliverable within
-a stated window of a relationship's end, and while the relationship stands
-Foxy may request a current export on a stated cadence, so "the service is
-down" never means "Foxy's holders cannot re-claim a card" — the last export
-already holds every set issued before it.
+<a id="q2-foxy-cards-at-rotation-time-service-down-or-relationship-over"></a>
 
-What this does not cover: sets issued after the last export and before a
-service outage. The window is the export cadence, and the cadence is Foxy's
-to set.
+## Q2. Escrow export and service continuity
 
-## Q3. What Foxy's security review sees
+Proposed: lnflash supplies a partner-filtered escrow export, signed by the
+service and encrypted to a Foxy-held public key. The contract specifies the
+export cadence and the delivery window after a relationship ends.
 
-**Proposed: the derivation spec and this document — never KMS access.** The
-review scope is the HKDF-SHA256 derivation (master → per-card `enc`/`mac`/
-`dek`, the scheme D29 records and `ops/src/keys.ts` implements), the threat
-model's honest rows, and the API surface the holder apps touch. No access to
-the master, the KMS seam's configuration, or the escrow DB itself.
+The last delivered export covers the sets issued before that snapshot.
+Sets issued afterward remain exposed to loss until the next export. Foxy must
+accept the cadence and test recovery with its retained decryption authority.
+The operator backup format does not implement this proposed partner export.
 
-The reasoning: what Foxy needs to assure itself of is that the keys its cards
-get are derived the way the spec says and escrowed the way the contract says —
-arithmetic and behaviour, both inspectable in documents and code. Giving a
-reviewer KMS access widens the perimeter (#11 of the threat table) for a
-assurance the documents already carry.
+<a id="q3-what-foxys-security-review-sees"></a>
 
-**Alternatives on the table:** a full source-and-infra audit by Foxy's
-reviewer of their choice (bigger ask, slower); a third-party audit paid
-jointly (the honest choice once real money is fleet-wide, but not before).
+## Q3. Security review scope
 
-## Q4. Holder-session vs operator-session minting rights
+Proposed review materials are the HKDF-SHA256 derivation, source code,
+custody agreement, threat model and holder-facing API. [D29](DECISIONS.md#d29)
+and `ops/src/keys.ts` describe master-to-card derivation for `enc`, `mac`
+and `dek`.
 
-**Proposed: the holder mints key sets only for cards it proves it installed,
-one-shot per card, rate-limited; the operator does everything else.** A
-holder-session token (`kind='holder'`) can call `/keys/issue` for a short id
-only where the registry shows that short id was installed by that holder's
-session, and only once — a second call is refused, because the set is already
-on the phone that installed the card and a re-issue is an operator question.
-Rate limits bound the damage of a stolen holder token to a stream of one-shot
-requests, not a bulk read.
+The reviewer examines the derivation and escrow behavior through documents
+and code. Live master keys, escrow contents and KMS configuration stay within
+the operational custody boundary. Alternatives include a wider infrastructure
+audit by Foxy's chosen reviewer or a jointly commissioned independent audit.
 
-The operator session reads batches, posts registries, creates batches, writes
-cap releases — everything except the one holder path.
+<a id="q4-holder-session-vs-operator-session-minting-rights"></a>
 
-What this asks Foxy to accept: a Foxy holder app gets the same narrow path
-Flash's does, and nothing wider. The IdP behind the holder session is Q5.
+## Q4. Holder and operator issuance rights
 
-## Q5. The holder session's identity provider
+Proposed: a holder session (`kind='holder'`) may request one key set through
+`/keys/issue` for a card it proves it installed. The registry must bind that
+card to the holder session. Requests are rate-limited; repeat issuance requires
+operator review. The same restrictions apply to Flash and Foxy holder apps.
 
-**Proposed: deferred — holder access disabled until Phase 5b.** The IdP may
-be Flash account, Foxy's own, or both, subject to sign-off. The shape-only
-holder proof stub is development-only: deployed holder-session creation and
-holder key issuance stay disabled until verified identity and per-card
-authorization exist. The operator release does not depend on choosing the
-consumer IdP; Phase 5b does.
+Operator sessions manage batches, registry records and CAP releases under
+their own authorization rules. The consumer proposal requires verified
+identity and per-card authorization before holder-session creation or key
+issuance can be enabled.
+
+<a id="q5-the-holder-sessions-identity-provider"></a>
+
+## Q5. Holder identity provider
+
+The identity provider is deferred to Phase 5b. It may use Flash accounts,
+Foxy accounts or both, subject to agreement. The shape-only holder proof stub
+is development-only. Deployed holder access stays disabled until the chosen
+identity and per-card authorization path is implemented and reviewed.
 
 ## Sign-off status
 
 | Question | lnflash proposal | Foxy answer |
-|---|---|---|
-| Q1 hosting | lnflash alone, one shared root | pending |
-| Q2 rotation-time | signed export, wrapped to Foxy's key | pending |
-| Q3 review scope | derivation spec + this doc, no KMS | pending |
-| Q4 minting rights | holder: one-shot, proved install, rate-limited | pending |
-| Q5 holder IdP | deferred to Phase 5b | pending |
+| --- | --- | --- |
+| Q1 hosting | lnflash operation, one shared root | pending |
+| Q2 continuity | Signed partner export encrypted to Foxy's key | pending |
+| Q3 review scope | Derivation, source and agreement within the custody boundary | pending |
+| Q4 issuance rights | Holder: one request, proven installation, rate-limited | pending |
+| Q5 holder IdP | Deferred to Phase 5b | pending |
 
-Phase 5b does not start until this table has a Foxy column.
+Phase 5b requires a recorded Foxy answer for each question.

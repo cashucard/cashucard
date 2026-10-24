@@ -1,7 +1,7 @@
 # Architecture
 
 Cashu Card is an open protocol and a set of reference components. This
-repository owns the protocol, firmware, installation library, provisioner,
+repository maintains the firmware, installation library, provisioner,
 ops-service, recovery copier and public website. Wallets and merchant terminals
 integrate the protocol from their own repositories. See [DECISIONS](DECISIONS.md)
 for settled design calls and [COMPONENT-RELEASES](COMPONENT-RELEASES.md) for the
@@ -11,17 +11,18 @@ version and deployment contracts.
 
 | Component | Source | Responsibility |
 | --- | --- | --- |
-| Protocol | `spec/` | APDUs, ownership, spending and interoperability; this is the edit authority. `cashucard/javacard` mirrors the committed specification after merge. |
+| Protocol | [cashucard/nut](https://github.com/cashucard/nut), `spec/` | NUT-CCP in cashucard/nut defines the shared core. This repository maintains the applet command reference and implementation profiles; cashucard/javacard mirrors `spec/` after merge. |
 | Firmware | `applet/` | JavaCard 3.0.5 applet, on-card keys/proofs, spend protection and NFC tag. The tracked CAP and its hashes are release evidence. |
 | cardkit | `tools/cardkit/` | Environment-neutral TypeScript API for installation, SCP02 manager-key rotation, interrupted-install recovery and owned-card reset. It receives an APDU transceiver; it does not open NFC, call HTTP or decide operator authorization. |
 | Provisioner | `apps/provisioner/` | React Native operator app (`com.islandbitcoin.provisioner`): sign-in, batch setup, card installation, saved recovery, status and reset. Platform NFC and HTTP adapters surround cardkit. |
 | Ops-service | `ops/` | Operator sessions/administration, reservations, chip binding, manager-key escrow, durable installation/reset records, recovery fences and encrypted exports. Node/SQLite is the local adapter; Workers/Durable Object SQLite is the deployment adapter. |
-| Independent recovery copy | `tools/backup-copy/` | Copies and verifies encrypted R2 exports into independent storage and reports freshness. Its process needs transfer credentials, not the decryption identity. StartOS/Atoll packaging lives separately. |
+| Independent recovery copy | `tools/backup-copy/` | Copies and verifies encrypted R2 exports into independent storage and reports freshness. Its process uses scoped transfer credentials. The recovery identity stays with its custodian. StartOS/Atoll packaging lives separately. |
 | Host tools and simulator | `tools/cardctl/`, `tools/cardsim/` | PC/SC reference driver and hardware-free protocol simulation. The simulator's external client/routes remain a contract with wallet and terminal repositories. |
 | Public site | `website/` | Protocol introduction, implementation links and installation guide. It is not the operator app or an ops-service deployment. |
 
-Flash Mobile, Foxy and Flash POS are external implementations, not required
-wallet brands. Mint interactions are implemented by wallets/terminals and
+Flash Mobile, Foxy and Flash POS implement the protocol in their own
+repositories. Other wallets and terminals can integrate the same protocol.
+Mint interactions are implemented by wallets/terminals and
 [the separate client library](https://github.com/cashucard/client). A batch's
 mint reference is operator metadata; the provisioner does not set holder
 ownership, fund the card, or make it spend-ready.
@@ -57,16 +58,16 @@ installing the applet. Ownership, PINs, limits and mint personalization are
 holder-wallet responsibilities.
 
 GlobalPlatform manager keys are a third authority: they authorize applet
-management, not payment ownership. Issued keys are scoped/escrowed by the
-ops-service and used for the reserved installation or reset. Phone journals
-retain public identifiers, intents and receipts, never manager keys, PINs,
-session tokens or wallet recovery phrases. The SCP02 implementation and
-vendored DES are justified in [D27](DECISIONS.md#d27); failed authentication is
-not retried.
+management. Holder ownership uses its own separate key. Issued keys are
+scoped/escrowed by the ops-service and used for the reserved installation or
+reset. Phone journals retain public identifiers, intents and receipts, never
+manager keys, PINs, session tokens or wallet recovery phrases. The SCP02
+implementation and vendored DES are justified in [D27](DECISIONS.md#d27); failed
+authentication is not retried.
 
 Encrypted backup files and their private recovery identity have separate
 custody. The recovery identity belongs in the designated restricted vault and
-protected offline copy, not R2, Nextcloud or the copier configuration. A fresh
+protected offline copy. Keep it outside R2, Nextcloud and copier configuration. A fresh
 independent copy is an admission requirement for card changes; restoring data
 also installs the recovery fences before issuance resumes. See
 [OPS-THREAT-MODEL](OPS-THREAT-MODEL.md) and the recovery runbooks.
@@ -82,18 +83,18 @@ the same API through different package export conditions.
 
 The workflow saves request IDs before HTTP and durable intent before card
 commands. It reconciles the same attempt after interruption, verifies card
-identity before mutation, and freezes completion evidence before posting it.
-A record-only retry never starts NFC or another rotation. A stopped attempt's
-chip remains fenced until an authorized reconciliation, not merely until its
-screen is dismissed.
+identity before mutation, and freezes completion evidence before posting it. A
+record-only retry never starts NFC or another rotation. An authorized
+reconciliation releases a stopped attempt's chip fence. Dismissing its screen
+preserves that fence.
 
 Owned-card reset is an explicit workflow: inspect public identity/state, resolve
 any value/settlement obligations, confirm erasure and holder authorization where
 required, use the source installation's escrow, verify removal and manager-key
-state, and obtain the service receipt. It is not permission to discard uncertain
-value or to reinstall an arbitrary provisioned card. A successful reinstall
-creates a new installation key; old proofs cannot be recovered by replacing the
-applet. See [OWNED-CARD-MOBILE-RESET](OWNED-CARD-MOBILE-RESET.md).
+state, and obtain the service receipt. Uncertain value or an unrelated
+installation blocks reset eligibility. A successful reinstall creates a new
+installation key; old proofs cannot be recovered by replacing the applet. See
+[OWNED-CARD-MOBILE-RESET](OWNED-CARD-MOBILE-RESET.md).
 
 The card's full applet AID is `F043415348554341524401`; the package AID reaches
 an opener on hardware. Installation orders opener, Cashu applet, then tag;
@@ -137,12 +138,14 @@ The always-running `CI gate` rejects failed, cancelled, missing or unexpectedly
 skipped selected jobs. Branch protection should require that gate.
 
 jCardSim and fake transports prove protocol/workflow logic; they cannot prove
-EEPROM behavior, RF stability, torn writes or silicon cryptographic framing.
-The [23 October physical E2E report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
-records the particular card/phones and tested online/offline payment and
-settlement loop. The [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
-records reset/reinstall evidence. These are bounded observations, not blanket
-compatibility or production-safety claims for all devices/cards.
+EEPROM behavior, RF stability, torn writes or silicon cryptographic framing. The
+[23 October physical E2E
+report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) records the
+particular card/phones and tested online/offline payment and settlement loop.
+The [mobile reset
+report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md) records
+reset/reinstall evidence. Their coverage is limited to the recorded devices,
+cards and actions.
 
 For wire and data layouts, use [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md) and
 [APDU](../spec/APDU.md). For zero-allocation and hardware rules, use

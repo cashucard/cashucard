@@ -176,8 +176,8 @@ response retrieves the same batch. Initially allocate each batch to one device
 run; sharing a batch across phones needs server-side ordinal reservation.
 Use cardkit's offline cryptogram matching for the known factory and assigned
 key sets when recovering a lost PUT KEY reply; never trial-login with alternate
-sets. A completed installation must be verified and registered, not swept merely
-because its previous success response was lost. Define the mint, PIN, owner and
+sets. Verify and register a completed installation after a lost success response.
+Preserve its applet while recovering the original attempt. Define the mint, PIN, owner and
 limit-setting sequence separately: install and rotation alone do not complete
 the designed provisioning workflow.
 

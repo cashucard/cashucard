@@ -1,4 +1,6 @@
-# Provisioner stop/cancel audit — 2026-10-23
+<a id="provisioner-stopcancel-audit--2026-10-23"></a>
+
+# Provisioner stop/cancel audit: 2026-10-23
 
 The operator found the saved-reset landing page offered only Continue after
 reopening build 7. The following audit covers all shipped routes and the gated

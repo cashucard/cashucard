@@ -35,7 +35,7 @@ card or phone was accessed.
 
 The tracked reference CAP is `applet/target/cashu-javacard-2.1.0.cap`, SHA-256
 `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`.
-That is a repository reference, not a claim that this card contains that CAP.
+That identifies the repository artifact. The card's installed CAP was not attested.
 
 ## Procedure and observations
 
@@ -61,8 +61,9 @@ or other key operation. Connections 2 and 3 were checked against the explicit
 three-APDU allowlist and the first observed identity before continuing.
 
 The tool ended each connection with `SCardDisconnect(..., false)`. The card
-remained on the reader. These were fresh PC/SC connections, not a physical
-remove/replace, RF power-cycle or card-reset test.
+remained on the reader. The test used fresh PC/SC connections while leaving the
+card in place. Physical remove/replace, RF power-cycle and card-reset behavior
+remain untested.
 
 ## Contract comparison
 

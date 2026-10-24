@@ -1,9 +1,11 @@
-# Production recovery custody — 2026-10-22
+<a id="production-recovery-custody--2026-10-22"></a>
+
+# Production recovery custody: 2026-10-22
 
 The operator authorized production preparation and supplied the encrypted
 recovery drive on the separately accessible Mac. Existing staging files were
-preserved. This report covers custody preparation, not a production deployment
-or restoration of production escrow.
+preserved. This report covers custody preparation. Production deployment and escrow
+restoration are separate operations.
 
 ## Recovery identity
 

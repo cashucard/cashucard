@@ -1,4 +1,6 @@
-# Android API 36 native build — local test signing only
+<a id="android-api-36-native-build--local-test-signing-only"></a>
+
+# Android API 36 native build: local test signing only
 
 2026-10-21. Based on merged #46 (`281a936`) with compile SDK 36, AGP 8.10.1,
 Gradle 8.11.1/checksum and an isolated staging-origin override. The existing
@@ -39,11 +41,12 @@ native-build evidence directory. No private key/password is included here.
 
 ## Limits and reproducible checks
 
-This proves host compilation and artifact format/alignment, not execution on
+This verifies host compilation and artifact format/alignment. Execution on
 Android 16/16KB devices, NFC correctness, iOS compatibility, production backend
-readiness, Play signing continuity or store approval. No upload, store connection
-or installation occurred. CMake emitted SDK-XML-version warnings from the local
-installed tools; these were nonfatal and are not hidden by this change.
+readiness, Play signing continuity and store approval require separate checks.
+No upload, store connection or installation occurred. CMake emitted
+SDK-XML-version warnings from the local installed tools; these were nonfatal and
+are not hidden by this change.
 
 The PR adds a native workflow restricted to Android toolchain/native dependency
 and checker changes. It builds with a fresh test-only signer, verifies artifact

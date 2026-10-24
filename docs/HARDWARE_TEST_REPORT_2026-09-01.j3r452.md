@@ -1,4 +1,6 @@
-> This is upstream's own report of their applet on their hardware (cashucard/javacard), kept as received. It is not a report on the Foxy fork.
+> Historical upstream report for cashucard/javacard. Editorial punctuation
+> and headings have been normalized; the recorded commands, values and outcomes
+> are retained. Log excerpts use punctuation-normalized separators.
 
 # Cashu JavaCard Physical Hardware Test Report
 
@@ -138,11 +140,11 @@ Command:
 Successful checks:
 
 ```text
-PASS  SELECT applet — version 0.1
-PASS  GET_INFO — v0.1, 32 slots, PIN unset
-PASS  Schnorr capability advertised — caps=0x07
-PASS  GET_BALANCE — 0
-PASS  GET_SLOT_STATUS — 32 status bytes
+PASS  SELECT applet, version 0.1
+PASS  GET_INFO, v0.1, 32 slots, PIN unset
+PASS  Schnorr capability advertised, caps=0x07
+PASS  GET_BALANCE, 0
+PASS  GET_SLOT_STATUS, 32 status bytes
 ```
 
 SELECT APDU:
@@ -179,7 +181,7 @@ Request and response:
 The response is a 65-byte uncompressed secp256k1 public key with a `0x04` prefix. `cardctl selftest` reports:
 
 ```text
-FAIL  GET_PUBKEY well-formed — 042f3253009b4481805a… (65 bytes)
+FAIL  GET_PUBKEY well-formed, 042f3253009b4481805a… (65 bytes)
 ```
 
 It then terminates while attempting BIP-340 verification:
@@ -204,7 +206,7 @@ Therefore:
 
 - the signing APDU succeeds;
 - unmodified `cardctl sign` fails during host-side verification; and
-- the failure occurs in public-key format handling, not because the card rejects the signature request.
+- the card accepts the signature request; host public-key format handling raises the exception.
 
 ## 7. Safe read-only checks
 
@@ -212,7 +214,7 @@ Therefore:
 
 ```text
 applet version   : 0.1
-slots            : 32 total — 0 unspent, 0 spent, 32 empty
+slots            : 32 total, 0 unspent, 0 spent, 32 empty
 capabilities     : 0x07 (secp256k1 native=True, schnorr=True)
 PIN              : unset
 balance          : 0

@@ -1,6 +1,9 @@
-# Signed release candidate acceptance — 2026-10-22
+<a id="signed-release-candidate-acceptance--2026-10-22"></a>
 
-These are review candidates, not approval for public store publication. Both
+# Signed release candidate acceptance: 2026-10-22
+
+These artifacts were prepared for review. Public store publication requires
+separate approval. Both
 artifacts use `com.islandbitcoin.provisioner`, version 1.0.0, build 3, and the
 production HTTPS ops-service origin. The operator subsequently approved
 internal distribution of both artifacts; see the upload record below.
@@ -43,11 +46,12 @@ and copy receipts were absent. The temporary plaintext database and associated
 files were removed. No identity file was written to the laptop.
 
 Snapshot: `2026-10-22T21:14:55.704Z-e135fc43-608e-44c9-bd5d-ff285ce21978.age`.
-This initial production snapshot contains no batches, issued keys or cards.
-It proves the production custody/copy/decryption/fencing path, not recovery of
-production card mappings. The separate staging restore covers populated keys.
-Both staging and production schedules remain enabled; meridian-jabari's
-schedule alone was retired with operator approval.
+This initial production snapshot contains no batches, issued keys or cards. It
+verifies the production custody/copy/decryption/fencing path with an empty
+snapshot. Recovery of populated production card mappings remains untested. The
+separate staging restore covers populated keys. Both staging and production
+schedules remain enabled; meridian-jabari's schedule alone was retired with
+operator approval.
 
 ## Release gates at build 3 (superseded for internal installation by D74)
 
@@ -65,7 +69,9 @@ schedule alone was retired with operator approval.
 - Final store declarations, reviewer access/instructions and submission review
   remain necessary. No public submission is authorized by this report.
 
-## Internal distribution — operator approved
+<a id="internal-distribution--operator-approved"></a>
+
+## Internal distribution: operator approved
 
 Google Play accepted version code 3 and published release
 `1.0.0 (3) - production service internal` to the internal track on October 22.

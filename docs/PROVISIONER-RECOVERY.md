@@ -1,13 +1,15 @@
 # Provisioner card identity and interrupted install recovery contract
 
-ENG-741, 2026-10-20. This is the implementation contract for the operator app,
-cardkit and ops service after [D30](DECISIONS.md#d30). It does not enable consumer
-issuance or change the 2.1 applet wire. [D31](DECISIONS.md#d31) records the
-decisions. The service reservation endpoints below are implemented; the durable
-attempt journal, durable batch coordinator, reservation transport and injected
-card orchestration now exist. The real recovery screens and native session
-adapter are wired behind a disabled installation gate ([D36](DECISIONS.md#d36)). [D32](DECISIONS.md#d32) records
-the HTTP migration and restored-service admission gate.
+ENG-741, introduced 2026-10-20. This is the implementation contract for the
+operator app, cardkit and ops service after [D30](DECISIONS.md#d30). It does not
+enable consumer issuance or change the 2.1 applet wire. [D31](DECISIONS.md#d31)
+records the decisions. The service reservation endpoints below are implemented;
+the durable attempt journal, durable batch coordinator, reservation transport
+and injected card orchestration now exist. The recovery screens and native
+session adapter were initially held behind the installation gate
+([D36](DECISIONS.md#d36)); reviewed builds enabled installation under
+[D74](DECISIONS.md#d74). [D32](DECISIONS.md#d32) records the HTTP migration and
+restored-service admission gate.
 
 An interrupted run keeps the same reserved batch and ordinal. Resume identifies
 the presented chip, inspects the existing installation, and continues only the
@@ -18,15 +20,15 @@ neither a lost reply nor a restarted app authorizes reinstalling a completed car
 
 | Identifier | Meaning and use | Limits |
 |---|---|---|
-| `chip_id` | Operational identity before and after applet installation | Public, not proof of ownership or resistance to cloning |
+| `chip_id` | Operational identity before and after applet installation | Public operational identifier; ownership and anti-cloning claims require separate evidence |
 | `installation_id` | Full compressed 33-byte secp256k1 applet public key, lowercase hex | Generated on-card; changes on reinstall; absent on a blank card |
 | `display_id` | Last two public-key bytes, lowercase hex | Display only; collisions are allowed |
-| `attempt_id` | Random UUID persisted before creating a server reservation | Idempotency and workflow identity, not a credential |
-| `device_id` | Random UUID persisted once per app installation | Operational batch binding, not device attestation |
+| `attempt_id` | Random UUID persisted before creating a server reservation | Idempotency and workflow identity; authorization uses the operator session |
+| `device_id` | Random UUID persisted once per app installation | Operational batch binding; device attestation is outside this identifier |
 
 For the J3R180 target, select the ISD and read GET DATA CPLC (`80CA9F7F00`)
 before authentication. Require success and a well-formed `9F7F` TLV containing
-42 bytes. Interpret fields as opaque bytes, not calendar dates. Define:
+42 bytes. Interpret fields as opaque bytes. Define:
 
 ```text
 chip_id = "cplc-v1:" + lowercase_hex(
@@ -51,15 +53,15 @@ reset, phones or reinstall; those gates remain open.
 
 CPLC is a guard against accidental card substitution. Authorization comes from
 the operator session and its permitted reservation. A card cryptogram proves
-possession of a candidate manager key set, not globally unique silicon identity;
+possession of a candidate manager key set. Silicon identity is checked separately;
 factory keys are shared. No claim here turns public CPLC into authentication.
 
 The full applet key must have the expected compressed-key encoding and be
 validated as a secp256k1 point before registry acceptance. Reading it requires
-the complete card applet AID. Cardkit's install result currently returns APDU
-metadata, not GET_PUBKEY response bytes; add an explicit read or a typed result.
-The load-file hash records the intended pinned artifact, not chip attestation
-of its installed code.
+the complete card applet AID. Cardkit's install result returns APDU metadata.
+Obtain GET_PUBKEY response bytes through an explicit read or typed result. The
+load-file hash identifies the intended pinned artifact. Attesting the chip's
+installed code requires a separate mechanism.
 
 Cardkit now exposes `parseCplc(data)` and `readChipIdentity(tx, expectedId?)`
 through its public entry point. The reader selects the full ISD AID and issues
@@ -77,7 +79,7 @@ loop uses this reader; installation stays disabled.
 ## Service reservations and retry identity
 
 Each batch belongs to one operator and one device for this rollout. Enforce
-that association on the service, not only in the screen. Device IDs do not
+that association on the service as well as in the screen. Device IDs do not
 replace operator authentication. Sharing batches or automatic device takeover
 is outside this first contract; operator reassignment needs an explicit,
 audited reconciliation procedure.
@@ -169,11 +171,11 @@ sign-out does not erase it. Bearer tokens, manager keys, PINs, owner private key
 and sensitive APDU transcripts never enter this store, diagnostics or exports.
 
 A failed journal commit sends no dependent destructive APDU. Cardkit's `onEvent`
-is synchronous, ignores callback exceptions and is not awaited; it is progress
-reporting, not a persistence boundary. Write intent outside `provision()` and
-`rotateKeys()`. The storage implementation must demonstrate app-termination
-recovery on each phone; local fake-store tests cannot establish power-loss
-durability on a device.
+is synchronous, ignores callback exceptions and is not awaited; it reports
+progress. Persistence requires an awaited write. Write intent outside
+`provision()` and `rotateKeys()`. The storage implementation must demonstrate
+app-termination recovery on each phone; local fake-store tests cannot establish
+power-loss durability on a device.
 
 `apps/provisioner/src/journal.ts` handles attempt transitions; the schema 2
 `provisioningWorkflow.ts` coordinator embeds that journal with the batch request,
@@ -204,7 +206,7 @@ rules. The real screen/NFC session adapter remains gated.
 
 Every resumed NFC session reads and matches `chip_id` before authentication.
 Where an installation key is saved, read it again and require equality before
-rotation or completion. A changed key is a conflict, not permission to overwrite
+rotation or completion. A changed key is a conflict that blocks overwriting
 the saved identity. A retry is a new intentional tap after reauthentication and
 inspection; there is no automatic authentication retry loop.
 
@@ -278,8 +280,8 @@ and device IDs, configuration revision and explicit verified stage. Define its
 timestamp as `verified_at`, when this app most recently established the recorded
 state. Do not invent an exact original install time after a lost reply. Persist
 this body before its first POST; retry never substitutes a fresh timestamp.
-The final ready-for-holder receipt requires personalization evidence from that
-separate contract, not an `installed` or `rotated` observation alone.
+The final ready-for-holder receipt requires the personalization evidence defined in that
+separate contract.
 
 Preserve existing suffix-only rows as explicitly legacy/unresolved. Never
 fabricate missing full keys or merge rows by suffix. Recovery exports must
@@ -306,9 +308,9 @@ attempt binding. Newer phone evidence is not automatically authoritative over
 the service restored from an older backup.
 
 Replace the ambiguous placeholder `key_id: 2` with an explicit observed
-`gp_key_version` in the new record. It is the SCP02 key version, not the ordinal,
-escrow identity or applet version. Current captures use in-place KVN `01`;
-expose the actual handshake/result metadata rather than hardcoding it.
+`gp_key_version` in the new record. It is the SCP02 key version, separate from
+the ordinal, escrow identity or applet version. Current captures use in-place
+KVN `01`; expose the actual handshake/result metadata rather than hardcoding it.
 
 Cardkit now exposes `inspectInstallation(tx)` for typed, read-only 2.1
 inspection and `confirmManagerKeys(tx, keys, options)` for assigned-only

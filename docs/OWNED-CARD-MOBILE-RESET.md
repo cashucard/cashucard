@@ -1,4 +1,6 @@
-# Mobile reset and reuse — issue #92
+<a id="mobile-reset-and-reuse--issue-92"></a>
+
+# Mobile reset and reuse: issue #92
 
 The implementation adds Settings → Reset a card. It uses the existing reset
 authorization/completion APIs and cardkit engine, plus a fresh settlement check
@@ -31,7 +33,9 @@ API origin, erase app storage or guess manager keys to get past it. Follow
 [reset reconciliation](RESET-RECONCILIATION.md) for a historical foreign reset.
 Malformed remnants after interrupted cleanup require administrator review.
 
-## Approved hardware validation — completed
+<a id="approved-hardware-validation--completed"></a>
+
+## Approved hardware validation: completed
 
 - Phone: **SuperMax, iPhone 17 Pro (`iPhone18,1`)**, CoreDevice
   `FCA5FD0D-FFE0-551B-A6F4-D7BC44EC956D`. Install the reviewed candidate

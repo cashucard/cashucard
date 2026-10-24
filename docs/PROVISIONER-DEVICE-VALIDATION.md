@@ -1,4 +1,12 @@
-# Provisioner device validation — proposed owner-run plan
+<a id="provisioner-device-validation--proposed-owner-run-plan"></a>
+
+# Provisioner device validation: proposed owner-run plan
+
+Historical validation plan from 2026-10-20. Gate values and proposed actions
+below describe that stage. Current operator behavior is documented in
+[Provisioner screens](PROVISIONER-APP.md); execution results belong to
+the dated hardware reports. Repeating a hardware drill requires its
+own approved device/card scope.
 
 ENG-741, 2026-10-20. This checklist prepares the remaining installation release
 gate. It is not a hardware report, authorization to operate a device, or evidence
@@ -30,7 +38,9 @@ The owner runs native builds, iOS pods/signing and phone actions, as required by
 [AGENTS.md](../AGENTS.md). No credential or nonpublic manager key belongs in this
 checklist, a screenshot, transcript, shell history or shared test artifact.
 
-## Authorized read-only phone run — 2026-10-20
+<a id="authorized-read-only-phone-run--2026-10-20"></a>
+
+## Authorized read-only phone run: 2026-10-20
 
 The operator explicitly instructed the agent to rebuild on the Pixel and Max
 and start read-only identity tests. This authorizes the necessary dependency,

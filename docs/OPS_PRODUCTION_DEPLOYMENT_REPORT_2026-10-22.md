@@ -1,4 +1,6 @@
-# Production service preparation and deployment — 2026-10-22
+<a id="production-service-preparation-and-deployment--2026-10-22"></a>
+
+# Production service preparation and deployment: 2026-10-22
 
 The operator authorized production deployment and release preparation. The
 explicit production configuration and custody evidence passed CI in PR #84,
@@ -58,7 +60,9 @@ production collection, with saved-view comparison. No existing team certificate
 was revoked. This does not establish a provisioner distribution profile, NFC
 entitlement approval, a signed archive or a store upload.
 
-## Still closed
+<a id="still-closed"></a>
+
+## Remaining release gates
 
 Production has no accepted independent-copy receipt. Its first actual encrypted
 export, independent destination verification, receipt authorization and restore

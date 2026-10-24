@@ -1,4 +1,12 @@
-# Max write validation — proposed, not authorized
+<a id="max-write-validation--proposed-not-authorized"></a>
+
+# Max write validation: proposed scope
+
+Historical validation plan from 2026-10-20. Gate values and proposed actions
+below describe that stage. Current operator behavior is documented in
+[Provisioner screens](PROVISIONER-APP.md); execution results belong to
+the dated hardware reports. Repeating a hardware drill requires its
+own approved device/card scope.
 
 ENG-741 follow-up, 2026-10-20. The Pixel's three saved-boundary recovery
 checks, Max's read-only post-check and local encrypted escrow restore passed.
@@ -31,7 +39,7 @@ evidence that the tested operator password is incorrect.
   stays loopback-only. Do not open a public tunnel, deploy a Worker, alter a
   firewall, contact production or broaden the shared server's binding.
 
-These ports and routes are candidates, not configured infrastructure. Check
+These ports and routes are proposed configuration. Check
 for occupied ports and document substitutions without stopping other services.
 If local-network reachability cannot be established, revise the plan before
 choosing a different transport or publicly reachable endpoint.
@@ -55,7 +63,9 @@ serial for every physical handoff and write approval. Do not trial keys, clear
 the other cards or reset the Pixel attempt. Further preflight is not automatic;
 stop if state/provenance changes before the approved write run.
 
-## Setup phase — approval required before phone/network actions
+<a id="setup-phase--approval-required-before-phonenetwork-actions"></a>
+
+## Setup phase: approval required before phone/network actions
 
 1. Pin reviewed merged source and run the relevant software checks. Preserve
    the main checkout's unrelated edits and all Pixel recovery material.
@@ -90,7 +100,9 @@ stop if state/provenance changes before the approved write run.
    reserving an attempt. Retain a consistent private database/master snapshot
    and check recovery material before requesting card-write approval.
 
-## Proposed write phase — separate final approval
+<a id="proposed-write-phase--separate-final-approval"></a>
+
+## Proposed write phase: separate final approval
 
 Use one Max-owned batch, ordinal and attempt, tied to the approved card.
 

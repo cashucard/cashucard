@@ -31,10 +31,12 @@ the critical path for the following software milestones.
 | 5 | Operational release preparation | Review production origin/build configuration, bootstrap, backup destination/alerts and accepted data-loss window, restore/reconciliation procedure, access control and rollback. Prepare deployable artifacts/runbook without accessing production. |
 | 6 | Release review by capability/platform | Review software/integration evidence separately from hardware coverage. Internal installation is operator-approved in D74; public capability approval remains separate. Keep consumer provisioning and recovery-drill controls disabled in distributed builds. |
 
-The owner authority decision and [holder-handoff contract](PROVISIONER-HOLDER-HANDOFF.md)
-now define the boundary. The next slices are honest operator handoff UX and
-portable card configuration/read-back, followed by wallet-owned setup orchestration. Supervised repair of the stopped card is a separate future
-capability, not a dependency of personalization or service completion.
+The owner authority decision and [holder-handoff
+contract](PROVISIONER-HOLDER-HANDOFF.md) now define the boundary. The next
+slices are honest operator handoff UX and portable card configuration/read-back,
+followed by wallet-owned setup orchestration. Supervised repair of the stopped
+card is a separate future capability. Personalization and service completion can
+proceed independently.
 
 ## Execution status after the isolated staging rehearsal (2026-10-21)
 
@@ -132,7 +134,7 @@ entitlements and included dependencies before final store declarations.
 
 - The current wire defines PIN setup/verification, card configuration, owner
   with anchor, and owner-signed limits; use [APDU Personalisation](../spec/APDU.md#personalisation)
-  as the wire authority, not the old design's optimistic retry copy.
+  as the wire authority. The historical screen brief is superseded.
 - Limits on the card are sats. Dollar inputs need an explicit conversion
   source, rounding, timestamp and frozen configuration; never silently treat
   dollars as sats or change limits on replay.

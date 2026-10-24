@@ -1,181 +1,106 @@
-# Vision — why a Cashu bearer card exists
+<a id="vision--why-a-cashu-bearer-card-exists"></a>
+<a id="the-one-sentence-version"></a>
 
-> **Read this first.** The rest of the documentation explains *how* the system
-> works. This explains why it is shaped the way it is, and why several obvious
-> alternatives were rejected. If you are about to propose a change that makes
-> the card more like a debit card, the answer is probably here.
+# Cashu Card purpose and scope
 
-## The one-sentence version
+Cashu Card puts Bitcoin-denominated ecash on a physical NFC card. A holder
+loads the card through a compatible wallet, taps to pay, and the merchant
+settles with the mint when online. The protocol is open to wallets, terminals
+and card vendors. Flash and Foxy are reference integrations.
 
-**A physical card that holds Bitcoin-denominated ecash on its own chip, spends
-it by tapping — with no phone, no account, and no internet at the point of sale
-— and is worth exactly what it holds to whoever is holding it.**
+This document explains the product goals. [Architecture](ARCHITECTURE.md)
+describes the components, [design decisions](DECISIONS.md) record their
+tradeoffs, and the [security model](SECURITY-MODEL.md) describes the risks.
 
-## The problem this is for
+<a id="the-problem-this-is-for"></a>
+<a id="where-this-sits-in-flash"></a>
 
-Flash operates in the Caribbean. Three constraints shape everything:
+## Payment requirements
 
-**Connectivity is not a given.** A Lightning payment needs both parties online
-at the moment of payment. In practice that fails at the checkout counter often
-enough to matter — and a payment method that works *almost* always is a payment
-method merchants stop reaching for.
+The project began with Flash's payment work in the Caribbean. Checkout
+connectivity, access to a suitable phone, and account onboarding can each
+prevent a small payment. A physical card gives the customer a way to carry
+ecash and pay through a merchant's NFC reader. An offline terminal retains
+the payment for later settlement.
 
-**Not every user wants an account.** Onboarding a person into a custodial wallet
-means KYC, a phone that can run the app, a phone number that survives, and a
-recovery story they will not follow. For a tourist buying a coconut, or someone
-paid in cash who wants to hold value in Bitcoin, that is an enormous amount of
-ceremony for a small transaction.
+The card holds mint-issued proofs locked to a spending key generated inside
+its secure element. The holder's wallet manages setup and funding. The mint
+remains responsible for honoring its proofs and maintaining reserves.
 
-**Custody is a liability.** Flash currently holds customer funds. That carries
-regulatory weight, operational risk, and a permanent obligation — as this very
-project demonstrated when the mint backing our ecash was found insolvent and had
-to be re-funded. Every product that moves value *off* Flash's books and into the
-user's own possession reduces that exposure.
+<a id="what-bearer-actually-means-here"></a>
 
-A bearer card answers all three at once. It works offline because the value is
-already on the card. It needs no account because it *is* the account. And it is
-not custodial in the usual sense — Flash cannot spend what is on someone's card,
-because Flash does not hold the key that authorises it.
+## Possession and ownership
 
-## What "bearer" actually means here
+Possession gives access to the card's payment interface, subject to its PIN,
+allowance and daily-limit settings. A separate holder-controlled owner key
+administers those settings. The holder wallet is responsible for that key's
+backup and recovery.
 
-This is the part people try to soften, so it is stated plainly:
+The spending key stays on the chip. Losing or destroying the card can strand
+its funds; a backup of the owner key does not recreate the spending key.
+The [security model](SECURITY-MODEL.md) explains PIN lockout, owner-key loss
+and the optional recovery mechanisms retained in historical designs.
 
-**Whoever physically holds the card controls the funds on it.** There is no
-cardholder name, no card number, no PIN on spending in the base profile, no
-remote freeze, and no recovery. Lose the card and the money is gone, exactly as
-if you had lost a banknote.
+Provisioning is a separate administrative step. The provisioner installs the
+applet and rotates manager keys. The holder then establishes ownership and
+a PIN in a compatible wallet before funding the card. Manager-key custody
+can affect the applet and its funds, so reset requires explicit authorization
+and resolved value and settlement obligations.
 
-That is not an unfinished feature set. It is the product. The card is *cash*,
-and cash has these properties. Every one of them is also a design constraint
-that shows up later in the architecture — the applet is small because a bearer
-instrument should be auditable; there is no personalisation because a card that
-identifies you is not cash; the physical card carries the disclaimer in plain
-language because users genuinely need to know.
+<a id="what-this-replaces"></a>
 
-If you want an instrument with recovery, freezing and an identity attached, that
-already exists: it is the Flash app, backed by an account. This is the other
-thing.
+## Earlier Flash card integration
 
-## What this replaces
+Flash's earlier BoltCard integration used NTAG 424 DNA tags and AES keys to
+authenticate access to a server-side balance through a BTCPayServer plugin.
+FIP-04 records that internal design; its repository is private.
 
-**[FIP-04: Flash BTCPayServer Plugin](https://github.com/lnflash/fips) —
-status: Implemented.** *(FIPs are internal to Flash; the repository is private.)*
+| Property | Earlier BoltCard integration | Cashu Card |
+| --- | --- | --- |
+| Payment authority | Server-side balance | Mint proofs and the chip's spending key |
+| Checkout connectivity | Terminal contacts the balance service | Terminal can accept offline and settle later |
+| Card operations | AES-128 CMAC authentication | secp256k1 / BIP-340 authorization |
 
-The previous generation of Flash cards were **BoltCards**: NTAG 424 DNA tags
-carrying an AES key, which authenticate a *server-side* balance over a
-BTCPayServer plugin. That design works, and it shipped. It also has three
-properties this project rejects:
+<a id="why-cashu-specifically"></a>
 
-| | BoltCard (FIP-04) | Cashu bearer card |
-|---|---|---|
-| Where the value lives | Server-side balance | **On the card's chip** |
-| Works offline at POS | ✗ — the terminal must reach the server | **✓** |
-| Custody | Flash holds the funds | **The holder does** |
-| Cryptography on card | AES-128 CMAC (authentication) | **secp256k1 / BIP-340 (authorisation)** |
+## Cashu integration
 
-The BoltCard proves *who is tapping*. This card proves *that the value being
-handed over is genuine* — which is a different and stronger claim, and the one
-that makes offline payment possible at all. `btcpayserver-flash-plugin` is being
-decommissioned (ENG-176).
+Cashu provides compact proofs and published mint interfaces. NUT-11 P2PK
+locks proofs to the card's public key. Reading stored proof data alone is
+insufficient to authorize a payment; redemption requires the corresponding
+signature. Readers can verify NUT-12 DLEQ evidence using the mint's keys.
 
-## Why Cashu specifically
+The shared protocol core is [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md).
+The [APDU reference](../spec/APDU.md) describes this applet's wire format and
+its owner, clock, limit and NFC-tag profiles.
 
-Cashu ecash gives three properties that together are unusual:
+<a id="the-honest-trade-offline-double-spend"></a>
 
-1. **Proofs are bearer tokens.** A Cashu proof is valid because it carries the
-   mint's blind signature, not because a server says a balance exists. It can be
-   verified by arithmetic, offline.
-2. **It is small enough to fit.** A proof is 78 bytes in our on-card layout. A
-   32-slot card holds a useful balance in ~2.5 KB of EEPROM — well within a
-   JavaCard's budget.
-3. **[NUT-11 P2PK](https://github.com/cashubtc/nuts/blob/main/11.md) locks a
-   proof to a public key.** This is the load-bearing piece: proofs are locked to
-   a key that exists only inside the card's secure element and is never
-   exported. Copying the data off a card gets you proofs you cannot spend.
+## Offline acceptance and settlement
 
-That third property is what makes a bearer *card* possible rather than merely a
-bearer *token*. Without it, reading a card's memory would be equivalent to
-stealing its balance.
+The card commits a payment before releasing its signature. The mint decides
+whether a proof is still redeemable. An offline merchant therefore carries
+double-spend and mint-solvency risk until settlement. Proof validation alone
+does not establish that a proof remains unspent.
 
-## The honest trade: offline double-spend
+Terminals retain payment and change obligations across interruptions and
+settle promptly after reconnecting. Small card balances and merchant risk
+limits bound exposure. See [Security model](SECURITY-MODEL.md) for the threat
+analysis and tested mitigations.
 
-The card marks a proof `SPENT` before it releases a signature, and nothing in
-the APDU set can unmark it. That stops *the card* from spending the same proof
-twice.
+<a id="status-the-milestone-is-behind-us--scale-is-ahead"></a>
+<a id="what-would-make-this-project-fail"></a>
 
-It does not — and cannot — stop someone who copied a proof's data from
-redeeming it at the mint while the card still believes it is unspent. **An
-offline merchant cannot detect this.** Only the mint knows what has been melted.
+## Hardware evidence
 
-Every offline bearer instrument has this property; it is the reason physical
-cash uses anti-counterfeiting rather than double-spend detection. The mitigations
-are practical rather than cryptographic: the mint is the final authority and
-rejects the second redemption, terminals settle promptly when they regain
-connectivity, and cards hold small balances. Anyone claiming this design has
-"zero double-spend risk" is wrong, and one of the documentation contributions to
-this repo claimed exactly that.
+The [September J3R180 report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)
+records early installation, signing and payment tests. The
+[October full E2E report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+records provisioning, holder setup, loading, online and offline payments,
+reconnection settlement and an empty final balance. The
+[mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+records authorized reset and fresh installation of the same test chip.
 
-## Where this sits in Flash
-
-```
-Flash app (custodial, online, KYC'd)     ← accounts, Lightning, USD, cash-out
-        │
-        │  top up a card
-        ▼
-Flash Card (bearer, offline-capable)     ← this project
-        │
-        │  tap to pay
-        ▼
-Merchant terminal → mint redemption      ← settles back into the Flash rails
-```
-
-The card is not a replacement for the app. It is the instrument for the
-transactions the app is bad at: small, offline, anonymous, no-onboarding.
-
-Related internal proposals for the surrounding context:
-**FIP-05** (MonCash cross-border), **FIP-06** (phone-number Bitcoin sends) —
-both are about reaching people the app cannot, which is the same motivation.
-
-## Status: the milestone is behind us — scale is ahead
-
-The milestone this document set — *the first real signature off a JavaCard
-3.0.5 chip* — has happened, and then some. As of this writing:
-
-- The applet **runs on physical silicon** (NXP JCOP4 J3R180): selftest 10/10,
-  and every command the applet advertises except `LOCK_CARD` has executed on
-  hardware. Three bugs the simulator could not show were found and fixed on
-  silicon — including a 65-byte `GET_PUBKEY` that would have failed every
-  merchant reader in the field.
-- **The whole money loop has run end to end**: fund → load → tap-to-spend →
-  NUT-03 redemption → NUT-05 Lightning melt, twice over, against a live mint —
-  and then again from the merchant terminal: `flash-pos` spent a real card
-  over phone NFC and settled it at the mint (see the
-  [hardware test report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)).
-- The settlement queue, spend orchestrator, and payout melt are implemented in
-  `flash-pos` against the production mint.
-- What is **still ahead**: the backend sweep that credits merchant balances
-  from settled proofs, fleet provisioning, key-rotation policy, and the
-  remaining PIN/top-up surface in the terminal.
-
-The milestone that turns this from a validated design into a product is no
-longer a signature — it is **the second card**. Everything above was proven
-with one card, one reader and one phone.
-
-## What would make this project fail
-
-Worth naming, so contributors can push back early:
-
-1. **Nobody builds the terminal.** Without a merchant-side reader, this is a
-   card that can be loaded and never spent in the real world.
-2. **The bearer model gets softened into a debit card.** Adding names, freezes
-   and recovery re-introduces custody and the reason to exist evaporates.
-3. **The mint stays fragile.** A bearer card is only as good as the mint that
-   honours its proofs. See [`docs/SECURITY-MODEL.md`](SECURITY-MODEL.md).
-4. **Hardware reality bites.** Chip position, EEPROM budget, module supply and
-   card cost are all still unproven at volume.
-
----
-
-**Next:** [`ARCHITECTURE.md`](ARCHITECTURE.md) for how the pieces fit together,
-or [`DECISIONS.md`](DECISIONS.md) for the specific calls and their reasoning.
+Each report identifies its card, devices, software and coverage. Fleet-scale
+RF reliability, silicon tear behavior, supply, cost and independent security
+review remain separate work.

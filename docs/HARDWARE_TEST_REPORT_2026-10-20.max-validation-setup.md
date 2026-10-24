@@ -1,4 +1,6 @@
-# Max validation setup — persistence passed, no card operations
+<a id="max-validation-setup--persistence-passed-no-card-operations"></a>
+
+# Max validation setup: persistence passed, no card operations
 
 ENG-741, 2026-10-20. The operator explicitly approved the setup scope in
 PR #27: dedicated HTTPS service, temporary public-CA trust on Max, isolated
@@ -46,8 +48,8 @@ Cashu Max Validation 2026-10-20, enable its certificate trust and open the
 HTTPS readiness page in Safari. The operator initially reported an untrusted
 certificate after profile installation, then enabled full trust through
 Settings → General → About → Certificate Trust Settings and confirmed the
-page worked. This is operator-confirmed phone reachability, not an independent
-screenshot/TLS capture. The profile should be removed after this validation
+page worked. The operator confirmed phone reachability. An independent screenshot/TLS
+capture was not retained. The profile should be removed after this validation
 session.
 
 ## Native build checkpoint

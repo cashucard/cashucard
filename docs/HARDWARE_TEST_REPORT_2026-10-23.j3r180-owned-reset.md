@@ -1,4 +1,6 @@
-# Owned-card reset — J3R180 09336320, 2026-10-23
+<a id="owned-card-reset--j3r180-09336320-2026-10-23"></a>
+
+# Owned-card reset: J3R180 09336320, 2026-10-23
 
 ## Scope and environment
 
@@ -25,10 +27,10 @@ load bytes were not measured.
 The source was the retained local `eng-741-2026-10-20` service database,
 historical scope `http://127.0.0.1:8821`, operator 1, issued environment,
 recorded attempt `ac3575ad-6be4-4595-b213-97f89afabda6`. Its exact chip and
-installation record had an escrow row. Keys were read internally, not passed
-through arguments, prompts or logs. A protected SQLite snapshot preceded
-migration and authorization; exclusive access prevented concurrent source
-changes during the run.
+installation record had an escrow row. Keys were read into the running process
+through its private recovery path. Arguments, prompts and logs excluded them. A
+protected SQLite snapshot preceded migration and authorization; exclusive access
+prevented concurrent source changes during the run.
 
 Earlier invocations stopped with the journal at `reviewed`, no reset
 authorization and no deletion intent. Bounded diagnostics identified a chip

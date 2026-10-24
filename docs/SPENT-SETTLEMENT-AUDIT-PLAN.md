@@ -1,4 +1,6 @@
-# Read-only spent-entry audit — card 09336320
+<a id="read-only-spent-entry-audit--card-09336320"></a>
+
+# Read-only spent-entry audit: card 09336320
 
 Status: **approved and completed once, read-only, on 2026-10-23**. All 13
 retained entries were confirmed SPENT at the mint, totaling 61 sats. See the
@@ -25,7 +27,7 @@ at the mint; preserve those entries until that has been checked.
   of the 13 bitmap-confirmed spent slots. Re-read INFO/key/CPLC before closing.
   That is at most **24 commands** for this expected count, without retries.
 - Network: one GET `/v1/keysets` and one POST `/v1/checkstate` at that exact
-  HTTPS mint. Checkstate is a state query, not a spend, swap or payment. Only
+  HTTPS mint. Checkstate only queries proof state. Only
   derived Ys go to the mint; the tool uses no account credentials.
 - Raw spent-slot fields stay in the private child pipe and process memory.
   No nonce, C, secret, witness or Y is printed or saved. The summary may retain
@@ -40,7 +42,7 @@ to make the audit pass. Keep the original phone receipts and card unchanged.
 ## Invocation after review and approval
 
 Use the Homebrew/pyscard venv documented in `tools/cardctl/README.md`.
-The path is an environment choice, not a password or key.
+The path selects the protected local environment file.
 
 ```bash
 node tools/cardctl/spent-audit.cjs \
@@ -54,7 +56,8 @@ node tools/cardctl/spent-audit.cjs \
 
 The command above is a **preview**. Only after this plan is approved, append
 `--inspect` to perform the reads and state query. Do not invoke
-`spent_audit_reader.py` directly; it is a private child, not a card-dump CLI.
+`spent_audit_reader.py` directly; it is the private child process of the
+reviewed audit runner.
 
 If every entry is SPENT, retain the summary and prepare the separately reviewed
 cleanup/production-reset operation. This audit does not clear the 13 entries,

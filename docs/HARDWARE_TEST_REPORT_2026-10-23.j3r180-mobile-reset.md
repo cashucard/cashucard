@@ -1,4 +1,6 @@
-# Mobile reset and reuse — J3R180 09336320, 2026-10-23
+<a id="mobile-reset-and-reuse--j3r180-09336320-2026-10-23"></a>
+
+# Mobile reset and reuse: J3R180 09336320, 2026-10-23
 
 Status: **on-phone cleanup, reset, fresh installation and independent USB
 post-check passed**. This run validates the

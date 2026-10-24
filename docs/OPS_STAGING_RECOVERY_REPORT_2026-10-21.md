@@ -99,8 +99,9 @@ and sessions/companion credentials absent. The temporary plaintext database was
 removed. A sanitized report and instructions were retained. The drive was then
 unmounted and locked successfully.
 
-This establishes a working encrypted-drive staging copy, not Vaultwarden custody,
-physical storage placement, separate-machine recovery or production custody.
+This establishes a working encrypted-drive staging copy. Vaultwarden custody,
+physical storage placement, separate-machine recovery and production custody
+require their own acceptance checks.
 The operator subsequently reported connecting this drive to another Mac and
 unlocking it successfully. This confirms cross-machine unlock only: no file
 verification, decryption or restore was observed on that Mac. Its password must

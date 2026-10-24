@@ -44,7 +44,7 @@ demo door, without signing into a service. Its strict reader selects the full
 ISD AID and reads CPLC. No card-manager key is requested or used. The source's
 APDU allowlist is SELECT ISD `00A4040008A00000015100000000`, then GET DATA CPLC
 `80CA9F7F00`; this run does not capture the native APDU transport, so those bytes
-are an implementation reference, not a silicon transcript.
+supply an implementation reference. A silicon transcript was not captured.
 
 The [USB baseline](HARDWARE_TEST_REPORT_2026-10-20.d321-cplc.md) is
 `cplc-v1:4790d3213180072976207515`.
@@ -75,8 +75,8 @@ results.
 The Pixel screenshot shows the demo banner overlapping the system status bar
 and the Back/title row crowded. The full identity and read/cancel controls were
 usable. The shared demo banner still says “no card” on this explicitly physical
-read-only screen; its body correctly describes the real-card action. These are
-UI follow-ups, not evidence of a card/protocol failure. The Android readout's
+read-only screen; its body correctly describes the real-card action. These observations
+identify UI follow-ups. The identity reads passed. The Android readout's
 `37` is the platform API level; the OS release is Android 17.
 
 ## Limits and release status
@@ -109,4 +109,4 @@ Max's updated Release app was installed/launched; its revised layout was not
 independently captured or visually confirmed in this follow-up. No additional
 CPLC reads, authentication, service login, installation, rotation or recovery
 drill ran. The six identity observations and their original build hashes above
-remain evidence for source `1b54cf9`, not a claim of six retests on this revision.
+remain evidence for source `1b54cf9`. Those six reads were not repeated on this revision.

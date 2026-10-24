@@ -1,4 +1,6 @@
-# USB preflight attempt — incomplete
+<a id="usb-preflight-attempt--incomplete"></a>
+
+# USB preflight attempt: incomplete
 
 2026-10-20, ENG-741 / PR #23. The operator explicitly approved Phase A on
 ACS ACR122U PICC Interface for `cplc-v1:4790d3213180072976207515`.
@@ -25,7 +27,9 @@ Phase A remains incomplete. No manager-key provenance, disposable status,
 installation state or write readiness is inferred. A new physical attempt needs
 operator approval; no automatic retry is included.
 
-## Second attempt — identity matched, unexpected applet version
+<a id="second-attempt--identity-matched-unexpected-applet-version"></a>
+
+## Second attempt: identity matched, unexpected applet version
 
 The operator explicitly approved one new attempt after the cleanup fix.
 Source `f1c22c3` ran the same command once with the same environment and reader.
@@ -46,13 +50,15 @@ read-only version inspection that records the SELECT response. Disposability,
 manager-key provenance, funds/owner state and installation public key remain
 unknown. No further physical attempt was made.
 
-## Replacement card — read-only identity and version
+<a id="replacement-card--read-only-identity-and-version"></a>
+
+## Replacement card: read-only identity and version
 
 The operator supplied another card and requested a check for the right version.
 On the same named ACS reader, one connection sent only SELECT ISD, GET CPLC
 and SELECT full card applet, using the plan's exact APDUs. CPLC framing and
-nonzero/non-FF serial were validated before applet selection. This was discovery
-of the newly supplied card, not a comparison against the previous card's ID.
+nonzero/non-FF serial were validated before applet selection. This discovery identified
+the newly supplied card. The previous card's ID was not used as an expected identity.
 The connection used SCARD_LEAVE_CARD and disconnected normally; no retries.
 
 - Operational identity: `cplc-v1:4790d3213041093363205547`.
@@ -60,12 +66,14 @@ The connection used SCARD_LEAVE_CARD and disconnected normally; no retries.
 - Serial: `09336320`, matching the earlier 2026-10-18 install-report spare.
 - No GET_INFO, GET_PUBKEY, tag inspection, authentication or writes were sent.
 
-This establishes the expected SELECT version only, not CAP identity, current
-manager-key state, funds, ownership or replacement consent. The existing
+This establishes the expected SELECT version. CAP identity, manager-key state,
+funds, ownership and replacement consent require separate checks. The existing
 first-write plan names a different card and requires absence of the applet;
 this result does not authorize that plan on the replacement card.
 
-## Replacement card — complete public-state preflight
+<a id="replacement-card--complete-public-state-preflight"></a>
+
+## Replacement card: complete public-state preflight
 
 After the operator instructed continuation of the stated public-state check,
 one execution of the bounded preflight at source `b066f45` selected the same
@@ -82,9 +90,9 @@ exit status 0. No authentication, signing, PIN or write command was attempted.
 | Owner / configuration record / locked | false / false / false |
 | NFC tag | present |
 
-These are applet-reported public indicators, not a balance proof against a
-mint or proof of manager keys. This card is outside the absent-applet drill's
-precondition. The next implementation gap is the real flow's explicit
+These are applet-reported public indicators. Mint reconciliation and manager-key
+verification require separate checks. This card is outside the absent-applet
+drill's precondition. The next implementation gap is the real flow's explicit
 replacement confirmation bound to this inspected installation ID: cardkit and
 the tap contract support it, but ProvisioningStore currently stops with an
 operator-review message. Operator disposability/replacement consent and current

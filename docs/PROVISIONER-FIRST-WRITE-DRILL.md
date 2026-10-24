@@ -1,4 +1,12 @@
-# First provisioning write drill — proposed, not yet authorized
+<a id="first-provisioning-write-drill--proposed-not-yet-authorized"></a>
+
+# First provisioning write drill: proposed scope
+
+Historical validation plan from 2026-10-20. Gate values and proposed actions
+below describe that stage. Current operator behavior is documented in
+[Provisioner screens](PROVISIONER-APP.md); execution results belong to
+the dated hardware reports. Repeating a hardware drill requires its
+own approved device/card scope.
 
 ENG-741, 2026-10-20. The six CPLC reads passed; they did not establish that the
 card is blank, disposable or on factory manager keys. This document separates
@@ -13,7 +21,7 @@ release flags stay false. No step here authorizes itself.
 - Read-only post-check: Max, iPhone 13 Pro Max, UDID
   `00008110-001E4CC014D8401E`.
 
-The older 2026-10-18 install report used serial `09336320`, not this card.
+The older 2026-10-18 install report covers a different card, serial `09336320`.
 Its successful return to factory keys is not key-provenance evidence for this
 card. The operator must identify its actual manager-key provenance without
 pasting key material into chat. Unknown provenance prevents authentication.
@@ -164,15 +172,16 @@ action. A Node service listens only on `127.0.0.1:8822`; its mint list is only
 list retrieval and sign-out passed. No mint was contacted, and no batch, card
 reservation, card key retrieval or card mutation was requested.
 
-Private run directory:
-`/Users/dread/Library/Application Support/cashu-card/eng-741-2026-10-20`.
-It has mode 0700; `ops.db`, `private-runtime.json` and `operator-login.txt`
-have mode 0600. The runtime file retains the generated derivation master and
-operator credential; the separate login file contains only the local operator
-login, never the derivation master. Do not paste either file into chat or logs.
-The local launcher preserves these files across restarts. The database is the
-local escrow store; no independently encrypted export or restore drill has
-been performed. Retention here is local test preparation, not production DR.
+Private run directory: `/Users/dread/Library/Application
+Support/cashu-card/eng-741-2026-10-20`. It has mode 0700; `ops.db`,
+`private-runtime.json` and `operator-login.txt` have mode 0600. The runtime file
+retains the generated derivation master and operator credential; the separate
+login file contains only the local operator login, never the derivation master.
+Do not paste either file into chat or logs. The local launcher preserves these
+files across restarts. The database is the local escrow store; no independently
+encrypted export or restore drill has been performed. This retention supports
+the local test. Production disaster recovery requires its own verified export
+and restore.
 
 The Pixel USB mapping, phone-side sign-in, one-card batch/reservation
 persistence, validation binary and native replacement review remain pending.

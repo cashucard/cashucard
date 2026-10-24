@@ -1,9 +1,9 @@
 # Provisioner data inventory for release review
 
 2026-10-21. This inventory describes the issuer provisioning app and ops
-service. It is a review input, not a completed store privacy declaration or
-legal determination. Review the final deployed service and included SDKs again
-before submission.
+service. Use it when completing store privacy declarations and obtaining legal
+review. Review the final deployed service and included SDKs again before
+submission.
 
 The operator supplied [Privacy Policy](https://getflash.io/legal/privacy.html)
 and [Terms](https://getflash.io/legal/terms.html). The app exposes both before
@@ -13,9 +13,9 @@ the existing consumer-wallet wording alone is not evidence of coverage.
 
 | Data | Purpose and handling | Release review still needed |
 | --- | --- | --- |
-| Operator name and password | Operator authentication; typed password held in app memory. Service stores a password hash, not the typed password. | Account administration, access requests and retention policy. |
+| Operator name and password | Operator authentication; typed password held in app memory. Service retains the password hash; typed passwords remain transient. | Account administration, access requests and retention policy. |
 | Session bearer token | App memory; service persists token hashes, expiry and revocation. | Hosting/log redaction and operational retention verification. |
-| Device identifier, batch and attempt IDs | Associate an operator/device with a reservation and interrupted attempt. These are operational identifiers, not a claim of anonymity. | Map to store identifier categories and document linkage/retention. |
+| Device identifier, batch and attempt IDs | Associate an operator/device with a reservation and interrupted attempt. These identifiers link operational records. | Map to store identifier categories and document linkage/retention. |
 | Chip CPLC identity, install configuration, dispositions and receipts | Prevent chip reuse, recover interrupted work and retain installation evidence. Service persists journals/records; the app persists its recovery journal through AsyncStorage. | User-facing explanation, device backup behavior and retention/deletion rules that preserve recovery safety. |
 | Issued GlobalPlatform manager keys | Service derives and escrows manager keys; they are operational secrets, distinct from holder ownership. They are not holder private keys or PINs. Database schema stores key bytes; no application-level encryption claim is made for those fields. | Restrict service/operator access, verify platform storage protection and complete recovery custody. |
 | Escrow backup and recovery metadata | Exports are encrypted to an age recipient. Planned independent Nextcloud copies contain ciphertext. The recovery identity belongs in restricted Vaultwarden custody plus a protected offline copy outside Zion. | Scheduled copy integrity/freshness, retention, alert delivery and actual restore evidence. Selection of custody locations is not proof of implementation. |
@@ -49,20 +49,24 @@ account, used for app functionality, and not used for tracking in this app:
 | Other User Content | Operator-selected batch configuration, including the mint URL and installation settings submitted to the service. |
 | Other Usage Data | Batch/attempt reservations, dispositions, completion receipts and their timestamps retained for interruption recovery and audit. |
 
-These names and the app-functionality purpose use Apple's documented
-[collected data types](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatype)
-and [purposes](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatypepurposes).
+These names and the app-functionality purpose use Apple's documented [collected
+data
+types](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatype)
+and
+[purposes](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatypepurposes).
 The existing required-reason API entries remain unchanged. The unused location
-purpose string was removed: the app requests NFC access, not location access.
-This metadata change adds no permission, data field, analytics SDK or network call.
+purpose string was removed: the app requests NFC access. Location permission was
+removed. This metadata change adds no permission, data field, analytics SDK or
+network call.
 
 For Google Data safety review, map these flows against user IDs, device/other
 IDs, other user-generated content and other app actions respectively. Review
 password/session handling and the ephemeral-processing rules separately; a
-hashed password stored by the service is not the same as no credential data.
-See Google's [Data safety instructions](https://support.google.com/googleplay/android-developer/answer/10787469).
-These are review inputs, not submitted console answers or a blanket claim
-about hosting-provider logs or all third-party SDKs. Inspect the final signed
+hashed password stored by the service is not the same as no credential data. See
+Google's [Data safety
+instructions](https://support.google.com/googleplay/android-developer/answer/10787469).
+Use these inputs when completing the console answers. Hosting-provider logs and
+third-party SDK behavior require their own review. Inspect the final signed
 archive's aggregated privacy report before submission.
 
 The supplied live privacy and terms pages were checked on this date. Both are

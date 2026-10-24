@@ -1,11 +1,14 @@
-# Provisioner build 7 candidate — 2026-10-23
+<a id="provisioner-build-7-candidate--2026-10-23"></a>
 
-This is the current preparation record. The October 21 store audit and build 3–6
-reports remain dated evidence; their pending-work lists are not the build 7
-status. Build 7 passed the on-phone cleanup/reset/reinstallation drill; it is
-uploaded to Apple for internal processing; Google upload and final internal
-availability remain pending. See the [hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
-and [distribution record](PROVISIONER_BUILD7_DISTRIBUTION_REPORT_2026-10-23.md).
+# Provisioner build 7 candidate: 2026-10-23
+
+This records build 7 preparation on 2026-10-23. The October 21 store audit and
+build 3–6 reports remain dated evidence; their pending-work lists are not the
+build 7 status. Build 7 passed the on-phone cleanup/reset/reinstallation drill;
+it is uploaded to Apple for internal processing; Google upload and final
+internal availability remain pending. See the [hardware
+report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md) and
+[distribution record](PROVISIONER_BUILD7_DISTRIBUTION_REPORT_2026-10-23.md).
 
 ## Candidate scope
 
