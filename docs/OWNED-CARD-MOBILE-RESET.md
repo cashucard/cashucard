@@ -31,7 +31,7 @@ API origin, erase app storage or guess manager keys to get past it. Follow
 [reset reconciliation](RESET-RECONCILIATION.md) for a historical foreign reset.
 Malformed remnants after interrupted cleanup require administrator review.
 
-## Approved hardware validation — execution in progress
+## Approved hardware validation — completed on phone
 
 - Phone: **SuperMax, iPhone 17 Pro (`iPhone18,1`)**, CoreDevice
   `FCA5FD0D-FFE0-551B-A6F4-D7BC44EC956D`. Install the reviewed candidate
@@ -64,15 +64,15 @@ Malformed remnants after interrupted cleanup require administrator review.
   Mac may read CPLC, SELECT Cashu, GET_INFO, GET_PUBKEY and tag selection only,
   once after installation; no USB authentication or writes.
 
-The operator approved this service/device/card plan on 2026-10-23. On SuperMax,
-build 1.0.0 (7), source #134, the initial read matched the exact CPLC/key with
-0 unspent and 13 retained spent entries. The operator completed the separate
-PIN-protected settlement cleanup; the supplied screenshot shows the same
-CPLC/key with 0 unspent and 0 retained spent entries and “Ready to reset this
-card.” Reset itself has not started.
+The operator approved this service/device/card plan on 2026-10-23. SuperMax
+completed inspection, fresh settlement/PIN cleanup (13 spent entries to zero),
+the separate reset, and a one-card fresh installation. The new installation is
+batch 6, attempt `ba9aa33e-78a4-4d5d-913a-3e16a540aa6a`, public-key ending
+`72fe`, with service completion acknowledged and no pending record. The operator
+also verified that Stop for now preserves the same saved zero-slot reset review
+across navigation after the keyboard and safe-exit updates.
 
-Execution pauses here for D108's PIN keyboard fix. Update the candidate without
-uninstalling or changing its origin, sign in as the same operator and resume the
-saved zero-slot review. Do not repeat cleanup merely to test the layout. Record
-the final results in a dated hardware report. Keep issue #92 open until physical
-reset and fresh installation complete; software checks alone do not close it.
+See the [dated hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+for evidence, source versions and coverage limits. The optional independent USB
+post-check awaits card placement. No holder setup or funding followed the fresh
+installation in this drill.

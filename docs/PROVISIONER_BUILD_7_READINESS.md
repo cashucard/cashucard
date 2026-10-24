@@ -2,7 +2,8 @@
 
 This is the current preparation record. The October 21 store audit and build 3–6
 reports remain dated evidence; their pending-work lists are not the build 7
-status. Build 7 is not yet physically validated, uploaded or published.
+status. Build 7 passed the on-phone cleanup/reset/reinstallation drill; it is
+not yet uploaded or published. See the [hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md).
 
 ## Candidate scope
 
@@ -58,23 +59,23 @@ See [performance evidence](OPERATOR_SIGN_IN_PERFORMANCE_2026-10-23.md).
 
 ## Remaining acceptance
 
-1. Review and pass CI for the final build identity commit. Native CI uses a
-   disposable test signer and staging endpoint; its AAB is not a store artifact.
-2. Continue the operator-approved
-   [SuperMax cleanup/reset/reinstallation plan](OWNED-CARD-MOBILE-RESET.md).
-   Require the reviewed public state again; do not infer an empty card has no
-   pending merchant change merely from its balance. The operator must confirm
-   pending payments/change are finished. The first physical cleanup returned the same chip/key at 0 unspent and 0
-   retained spent entries. Resume that saved review after the UI update; do not
-   repeat cleanup. Applet reset and fresh installation are still pending. Keep #92 open until that
-   result is recorded or clearly document a failed acceptance.
+1. Build identity and subsequent app changes passed all required CI checks
+   before merge. The final safe-exit change passed 173 app tests and all 30 CI
+   checks. Native CI uses a disposable test signer and staging endpoint; its AAB
+   is not a store artifact.
+2. The approved SuperMax drill completed fresh settlement/PIN cleanup, reset and
+   fresh installation. Batch 6 is acknowledged with a new key ending `72fe` and
+   no pending record. The optional independent read-only USB post-check awaits
+   card placement. See the [hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+   before treating this as evidence for scenarios outside the successful path.
 3. Produce signed candidates with the reviewed origin. Check actual bundled
    origin/gates, build numbers, NFC entitlement, production signature/certificate
    continuity and Android SDK/16 KB native alignment. Retain artifact hashes.
-4. Complete the approved SuperMax drill and record a dated hardware report.
+4. Retain the completed SuperMax drill and its dated hardware report.
    The [build 6 end-to-end report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
    already covers holder setup, loading and online/offline payments; it does not
-   validate the new mobile spent-entry cleanup/reset implementation.
+   validate the new mobile spent-entry cleanup/reset implementation; the separate
+   build 7 report above records that acceptance.
 5. Record the physical iPhone demonstration video and review final store access,
    disclosures and release notes. Upload accepted candidates to existing internal
    tracks before a public submission.
