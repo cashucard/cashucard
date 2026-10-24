@@ -91,6 +91,8 @@ jobs:
   provisioner:
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     needs: [identity, verify]
     if: needs.identity.outputs.component == 'provisioner'
     uses: ./.github/workflows/provisioner-release.yml
@@ -103,6 +105,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -117,6 +121,12 @@ jobs:
         with:
           name: component-release
           path: release
+      # Sigstore-signed build provenance for every published file:
+      # `gh attestation verify <file> --repo cashucard/cashucard` names the
+      # commit and workflow run that made it (docs/PROVENANCE.md).
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: "release/**"
       - name: Publish component artifacts
         env:
           GH_TOKEN: ${{ github.token }}

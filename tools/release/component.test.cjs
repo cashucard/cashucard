@@ -113,6 +113,9 @@ test("a release must be the exact tag on main, not another checkout or an unmerg
     git("init", "-q");
     git("config", "user.name", "Release fixture");
     git("config", "user.email", "release@example.invalid");
+    // The fixture's tags are lightweight, whatever the developer's signing config says.
+    git("config", "commit.gpgsign", "false");
+    git("config", "tag.gpgsign", "false");
     writeFileSync(join(root, "file"), "base");
     git("add", ".");
     git("commit", "-qm", "base");

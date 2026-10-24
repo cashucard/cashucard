@@ -58,6 +58,28 @@ export function ResetCardScreen({
       ? saved
       : null;
   const pending = visible && visible.journal.stage !== 'complete';
+  const previousReset = useRef(visible?.journal);
+  const [completedId, setCompletedId] = useState<string | null>(null);
+  useEffect(() => {
+    const previous = previousReset.current;
+    previousReset.current = visible?.journal;
+    if (
+      previous &&
+      previous.stage !== 'complete' &&
+      visible?.journal.stage === 'complete' &&
+      previous.reset_id === visible.journal.reset_id
+    ) {
+      setCompletedId(visible.journal.reset_id);
+    }
+  }, [visible]);
+  const showCompletion =
+    visible?.journal.stage === 'complete' &&
+    completedId === visible.journal.reset_id;
+  const inspect = () => {
+    setCompletedId(null);
+    setShareNotice(null);
+    return flow.inspectReset();
+  };
   const card = pending ? visible.review : flow.resetReview?.card;
   const lookup = flow.resetReview?.source;
   const allowed =
@@ -164,11 +186,11 @@ export function ResetCardScreen({
           <>
             <View style={s.figure}>
               <CardFigure
-                fill={visible?.journal.stage === 'complete' && !card ? 1 : 0}
+                fill={showCompletion && !card ? 1 : 0}
                 state={
                   flow.busy
                     ? 'running'
-                    : visible?.journal.stage === 'complete' && !card
+                    : showCompletion && !card
                     ? 'done'
                     : 'idle'
                 }
@@ -320,11 +342,11 @@ export function ResetCardScreen({
                 <SecondaryButton
                   title="CHECK A CARD AGAIN"
                   testID="reset-inspect"
-                  onPress={flow.inspectReset}
+                  onPress={inspect}
                   disabled={flow.busy}
                 />
               </>
-            ) : visible?.journal.stage === 'complete' ? (
+            ) : showCompletion ? (
               <>
                 <Text style={s.title}>Reset complete</Text>
                 <Dim>
@@ -340,7 +362,7 @@ export function ResetCardScreen({
                 <SecondaryButton
                   title="CHECK ANOTHER CARD"
                   testID="reset-inspect"
-                  onPress={flow.inspectReset}
+                  onPress={inspect}
                   disabled={flow.busy}
                 />
               </>
@@ -348,7 +370,7 @@ export function ResetCardScreen({
               <PrimaryButton
                 title={flow.busy ? 'WAITING FOR CARD…' : 'CHECK CARD FOR RESET'}
                 testID="reset-inspect"
-                onPress={flow.inspectReset}
+                onPress={inspect}
                 disabled={flow.busy}
               />
             )}
@@ -365,7 +387,11 @@ export function ResetCardScreen({
             ) : null}
             {visible ? (
               <SecondaryButton
-                title="SHARE RESET DETAILS"
+                title={
+                  pending || showCompletion
+                    ? 'SHARE RESET DETAILS'
+                    : 'SHARE LAST RESET DETAILS'
+                }
                 testID="reset-share"
                 disabled={flow.busy}
                 onPress={async () => {

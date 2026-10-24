@@ -2512,7 +2512,7 @@ accurate place to learn the transaction flow.
 
 ## D84 — Compact grouped source footer
 
-The home page's Flash Mobile, Foxy and Flash POS links were removed by D116,
+The home page's Flash Mobile, Foxy and Flash POS links were removed by D117,
 and the install guide's footer keeps them. The grouped footer still applies.
 
 **Decided (2026-10-22):** Put the public protocol and repository links in
@@ -3280,7 +3280,38 @@ asked for the website's existing icon, and the shared provisioner serves wallets
 implementing the protocol. This is a visual asset change, with no card/protocol
 behavior or app build-number change.
 
-## D114 — The protocol's core lives in cashucard/nut as NUT-CCP
+## D114 — Keep reset results separate from the next card check
+
+**Decided:** a completed reset receipt is history, not the starting state of the
+next card check. Show Reset complete when the reset being worked on finishes.
+After Check another card or leaving/reopening, start with Check card for reset;
+cancelling that new check cannot restore the old success headline or green card.
+The old receipt stays available as Share last reset details. Unfinished resets
+still resume their original card and never take this fresh-start path.
+
+Reset preparation checks its caller's cancellation and actor before
+looking up eligibility, after that reply and immediately before its first durable
+write. A late eligibility reply cannot create a saved reset after Stop or after
+leaving the account. Starting another read expires the previous card review and
+its consents, including when the new NFC read is cancelled. When a stopped
+operation finishes, replace its temporary Stopping notice with the final stopped
+or cancelled outcome.
+
+Once a storage write starts, its outcome can be uncertain: retain any committed
+reset and recover it with the original card, account and service. Existing saved
+resets, service intents, keys and admission fences are unchanged. This does not
+add permanent reset-intent cancellation or clear historical saved work (D109).
+
+**Rejected:** discarding a journal on navigation, treating a cancelled service
+request as proof that no durable work exists, or leaving the previous card's
+consents actionable after a cancelled new check.
+
+**Why:** cancelling preparation could still save a late response, preventing the
+next card check. Regressions reproduce that race, a cancelled second NFC check,
+Stop during a durable write, and completed-result re-entry/cancel/retry. This is a host lifecycle fix; no protocol,
+firmware, CAP, production data or physical device is changed.
+
+## D115 — The protocol's core lives in cashucard/nut as NUT-CCP
 
 **Decided:** the core every card and reader share (selecting the card, card
 proofs, reading, paying, the card's own change, loading, card policy and offline
@@ -3306,7 +3337,7 @@ from CCP.md in its version labels, terms and layout; and vendoring cashucard/nut
 as a submodule for the tests, which would make every checkout and CI job fetch
 the spec when the check needs only the two secret forms.
 
-## D115 — cashucard.org offers the provisioner beside the install guide
+## D116 — cashucard.org offers the provisioner beside the install guide
 
 **Decided:** the home page's "Install the applet" section (`#install`, the
 nav's "Install") gives two ways to install the applet. The Cashu Card
@@ -3322,7 +3353,7 @@ test grow by what the section measures.
 a Play listing link, which a visitor who has not joined the test gets as not
 found. When the app is published, the store listings replace both beta links.
 
-## D116 — The home page's footer lists the provisioner alone under Apps
+## D117 — The home page's footer lists the provisioner alone under Apps
 
 **Decided (2026-10-24):** the home page's footer drops the Flash Mobile, Foxy
 and Flash POS links, so its Apps group holds the Cashu Card Provisioner alone.
