@@ -16,8 +16,8 @@ let files = FileManager.default
 var written = 0
 
 func render(_ size: Int, to relative: String, fraction: CGFloat = 0.76,
-            foreground: Bool = false, round: Bool = false) throws {
-    let alpha: CGImageAlphaInfo = foreground || round ? .premultipliedLast : .noneSkipLast
+            foreground: Bool = false, round: Bool = false, alphaChannel: Bool = false) throws {
+    let alpha: CGImageAlphaInfo = foreground || round || alphaChannel ? .premultipliedLast : .noneSkipLast
     guard let context = CGContext(data: nil, width: size, height: size,
                                   bitsPerComponent: 8, bytesPerRow: size * 4,
                                   space: colorSpace, bitmapInfo: alpha.rawValue) else {
@@ -58,7 +58,7 @@ for catalog in ["Images.xcassets", "Assets.xcassets"] {
     }
 }
 try render(1024, to: "assets/app-icon/icon-1024.png")
-try render(512, to: "assets/play-assets/icon-512-generic.png")
+try render(512, to: "assets/play-assets/icon-512-generic.png", alphaChannel: true)
 
 for (density, scale) in [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0), ("xxhdpi", 3.0), ("xxxhdpi", 4.0)] {
     let size = Int(48 * scale)
