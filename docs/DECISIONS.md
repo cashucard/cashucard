@@ -3278,9 +3278,16 @@ implementing the protocol. This is a visual asset change, with no card/protocol
 behavior or app build-number change.
 
 
-## D114 — Stop cancelled reset preparation before it becomes saved work
+## D114 — Keep reset results separate from the next card check
 
-**Decided:** reset preparation checks its caller's cancellation and actor before
+**Decided:** a completed reset receipt is history, not the starting state of the
+next card check. Show Reset complete when the reset being worked on finishes.
+After Check another card or leaving/reopening, start with Check card for reset;
+cancelling that new check cannot restore the old success headline or green card.
+The old receipt stays available as Share last reset details. Unfinished resets
+still resume their original card and never take this fresh-start path.
+
+Reset preparation checks its caller's cancellation and actor before
 looking up eligibility, after that reply and immediately before its first durable
 write. A late eligibility reply cannot create a saved reset after Stop or after
 leaving the account. Starting another read expires the previous card review and
@@ -3299,5 +3306,5 @@ consents actionable after a cancelled new check.
 
 **Why:** cancelling preparation could still save a late response, preventing the
 next card check. Regressions reproduce that race, a cancelled second NFC check,
-and Stop during a durable write. This is a host lifecycle fix; no protocol,
+Stop during a durable write, and completed-result re-entry/cancel/retry. This is a host lifecycle fix; no protocol,
 firmware, CAP, production data or physical device is changed.
