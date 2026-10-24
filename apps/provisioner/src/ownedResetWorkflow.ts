@@ -336,6 +336,7 @@ export class OwnedResetWorkflow {
     resetId: string,
     observed: ResetReview,
     consent: {erase: boolean; valueHandled: boolean},
+    canContinue: () => boolean = () => true,
   ) {
     check(
       !this.running && (!this.state || this.state.journal.stage === 'complete'),
@@ -350,9 +351,16 @@ export class OwnedResetWorkflow {
         !review.pinBlocked &&
         review.tag,
     );
+    const active = () => {
+      if (!canContinue()) {
+        throw new TransportError('Reset cancelled');
+      }
+    };
     this.running = true;
     try {
+      active();
       const lookup = await service.lookup(review.chipId, review.installationId);
+      active();
       check(
         lookup.can_reset === true &&
           lookup.lookup.status === 'found' &&
@@ -376,6 +384,8 @@ export class OwnedResetWorkflow {
         {read: async () => null, replace: async () => {}},
         journal,
       );
+      // Once the write starts it may commit despite Stop; retain that work.
+      active();
       await this.save({schema: 1, journal, review, cleanup: null});
     } finally {
       this.running = false;

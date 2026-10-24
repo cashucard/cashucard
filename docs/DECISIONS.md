@@ -3276,3 +3276,35 @@ Pixel edges use nearest-neighbor scaling.
 asked for the website's existing icon, and the shared provisioner serves wallets
 implementing the protocol. This is a visual asset change, with no card/protocol
 behavior or app build-number change.
+
+
+## D114 — Keep reset results separate from the next card check
+
+**Decided:** a completed reset receipt is history, not the starting state of the
+next card check. Show Reset complete when the reset being worked on finishes.
+After Check another card or leaving/reopening, start with Check card for reset;
+cancelling that new check cannot restore the old success headline or green card.
+The old receipt stays available as Share last reset details. Unfinished resets
+still resume their original card and never take this fresh-start path.
+
+Reset preparation checks its caller's cancellation and actor before
+looking up eligibility, after that reply and immediately before its first durable
+write. A late eligibility reply cannot create a saved reset after Stop or after
+leaving the account. Starting another read expires the previous card review and
+its consents, including when the new NFC read is cancelled. When a stopped
+operation finishes, replace its temporary Stopping notice with the final stopped
+or cancelled outcome.
+
+Once a storage write starts, its outcome can be uncertain: retain any committed
+reset and recover it with the original card, account and service. Existing saved
+resets, service intents, keys and admission fences are unchanged. This does not
+add permanent reset-intent cancellation or clear historical saved work (D109).
+
+**Rejected:** discarding a journal on navigation, treating a cancelled service
+request as proof that no durable work exists, or leaving the previous card's
+consents actionable after a cancelled new check.
+
+**Why:** cancelling preparation could still save a late response, preventing the
+next card check. Regressions reproduce that race, a cancelled second NFC check,
+Stop during a durable write, and completed-result re-entry/cancel/retry. This is a host lifecycle fix; no protocol,
+firmware, CAP, production data or physical device is changed.
