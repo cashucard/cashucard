@@ -100,7 +100,9 @@ jobs:
           yarn install --frozen-lockfile --force
           node scripts/configure-service.cjs --origin https://ops.cashucard.org
           node scripts/configure-service.cjs --check --production
-          (cd ios && bundle exec pod install --deployment)
+          cp ios/Podfile.lock "$RUNNER_TEMP/Podfile.committed.lock"
+          (cd ios && bundle exec pod install)
+          bundle exec ruby scripts/check-pod-lock.rb "$RUNNER_TEMP/Podfile.committed.lock" ios/Podfile.lock
       - name: Import existing distribution identity and provisioning profile
         env:
           APPLE_P12_BASE64: ${{ secrets.CASHU_APPLE_DISTRIBUTION_P12_BASE64 }}

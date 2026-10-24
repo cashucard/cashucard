@@ -46,6 +46,7 @@ jobs:
         run: |
           bundle check
           bundle exec ruby scripts/check-mobile-tools.rb
+          bundle exec ruby scripts/test-pod-lock.rb
           bundle exec fastlane lanes
       - uses: actions/setup-java@v4
         with:
