@@ -433,7 +433,8 @@ test('sign-out while keys are pending cannot arm NFC under the old session', asy
     await running;
   });
   expect(withCard).not.toHaveBeenCalled();
-  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+  expect(flow.snapshot).toBeNull();
+  expect(JSON.parse(f.bytes()!).active.journal.stage).toBe('reserved');
 });
 
 test('the real screen installs and rotates, then a restart retries its frozen record without another card session', async () => {
@@ -629,7 +630,8 @@ test('sign-out cancels an armed session and blocks its next command', async () =
     await running;
   });
   expect(tx).toHaveBeenCalledTimes(1);
-  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+  expect(flow.snapshot).toBeNull();
+  expect(JSON.parse(f.bytes()!).active.journal.stage).toBe('reserved');
 });
 
 test('real installation setup exposes no holder controls and submits inert legacy settings', async () => {
@@ -771,7 +773,8 @@ test('validation pauses keep the operation busy; sign-out releases the waiter an
   });
   expect(flow.busy).toBe(false);
   expect(flow.drill?.paused).toBeNull();
-  expect(flow.snapshot?.active?.journal?.stage).toBe('reserved');
+  expect(flow.snapshot).toBeNull();
+  expect(JSON.parse(f.bytes()!).active.journal.stage).toBe('reserved');
 });
 
 test('enabling drill controls cannot bypass the independent installation gate', async () => {
