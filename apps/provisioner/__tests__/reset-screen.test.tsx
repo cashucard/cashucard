@@ -6,13 +6,19 @@ import {
   ScrollView,
   InputAccessoryView,
   Keyboard,
+  Pressable,
+  Text,
 } from 'react-native';
 import {AppStore, useApp, type AppStateShape} from '../src/store';
 import {ApiClient} from '../src/api';
 import {ProvisioningProvider, useProvisioning} from '../src/ProvisioningStore';
 import {ResetCardScreen} from '../src/screens/ResetCardScreen';
 import {readCardStatus} from '../src/cardStatus';
-import {readResetReview, type ResetReview} from '../src/cardkit';
+import {
+  readResetReview,
+  TransportError,
+  type ResetReview,
+} from '../src/cardkit';
 import type {OwnedResetService} from '../src/ownedResetWorkflow';
 import type {JournalStorage} from '../src/journal';
 
@@ -59,7 +65,20 @@ const disk = (): JournalStorage => {
 function Probe() {
   app = useApp();
   flow = useProvisioning();
-  return <ResetCardScreen onBack={leave} onInstall={() => {}} />;
+  const [showReset, setShowReset] = React.useState(true);
+  return showReset ? (
+    <ResetCardScreen
+      onBack={() => {
+        leave();
+        setShowReset(false);
+      }}
+      onInstall={() => {}}
+    />
+  ) : (
+    <Pressable testID="reopen-reset" onPress={() => setShowReset(true)}>
+      <Text>Reset a card</Text>
+    </Pressable>
+  );
 }
 async function signIn(operator = 1) {
   const client = new ApiClient({baseUrl: 'https://ops.test'});
@@ -281,5 +300,104 @@ test('cancel also stops a service-only read and ignores its late eligibility res
     expect(await pending).toBe(false);
   });
   expect(flow.cardReadout).toBeNull();
+  expect(f.service.keys).not.toHaveBeenCalled();
+});
+
+test('cancelled preparation cannot save a late reset or block checking the next card', async () => {
+  const f = await mount({spent: 0});
+  await press('reset-inspect');
+  await press('reset-consent-erase');
+  await press('reset-consent-value');
+  let finish!: (
+    value: Awaited<ReturnType<OwnedResetService['lookup']>>,
+  ) => void;
+  jest.mocked(f.service.lookup).mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+  );
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = tree.root.findByProps({testID: 'reset-prepare'}).props.onPress();
+  });
+  expect(flow.busy).toBe(true);
+  await press('reset-cancel');
+  await act(async () => {
+    finish({
+      can_reset: true,
+      lookup: {
+        status: 'found',
+        source: {
+          attemptId: uuid(3),
+          keySourceRef: `escrow:${uuid(3)}`,
+        },
+      },
+    });
+    expect(await pending).toBe(false);
+  });
+  expect(await f.resetStorage.read()).toBeNull();
+  expect(flow.resetState).toBeNull();
+  expect(flow.resetReview).toBeNull();
+  expect(flow.notice).toBe('Cancelled. You can check another card.');
+  await press('reset-leave');
+  await press('reopen-reset');
+  const nextChip = 'cplc-v1:4790d3213041093361205547';
+  jest
+    .mocked(readResetReview)
+    .mockResolvedValueOnce({...card, spent: 0, chipId: nextChip});
+  await press('reset-inspect');
+  expect(f.run).toHaveBeenCalledTimes(2);
+  expect(flow.resetReview?.card.chipId).toBe(nextChip);
+  expect(f.service.authorize).not.toHaveBeenCalled();
+  expect(f.service.keys).not.toHaveBeenCalled();
+});
+
+test('cancelling a new NFC check does not leave the previous card review actionable', async () => {
+  await mount({spent: 0});
+  await press('reset-inspect');
+  await press('reset-consent-erase');
+  await press('reset-consent-value');
+  jest
+    .mocked(readResetReview)
+    .mockRejectedValueOnce(new TransportError('Reset cancelled'));
+  await press('reset-inspect');
+  expect(flow.resetReview).toBeNull();
+  expect(tree.root.findAllByProps({testID: 'reset-prepare'})).toHaveLength(0);
+  expect(flow.resetState).toBeNull();
+});
+
+test('Stop during a durable preparation write keeps the committed reset recoverable', async () => {
+  const f = await mount({spent: 0});
+  await press('reset-inspect');
+  await press('reset-consent-erase');
+  await press('reset-consent-value');
+  const original = f.resetStorage.replace;
+  let finish!: () => void;
+  jest.spyOn(f.resetStorage, 'replace').mockImplementationOnce(async value => {
+    await new Promise<void>(resolve => {
+      finish = resolve;
+    });
+    await original(value);
+  });
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = flow.prepareReset({erase: true, valueHandled: true});
+  });
+  expect(finish).toBeDefined();
+  await press('reset-cancel');
+  await act(async () => {
+    finish();
+    expect(await pending).toBe(false);
+  });
+  expect(flow.resetState?.journal.stage).toBe('reviewed');
+  const saved = await f.resetStorage.read();
+  expect(saved).not.toBeNull();
+  await act(async () => {
+    await flow.reload();
+  });
+  expect(await f.resetStorage.read()).toBe(saved);
+  expect(flow.resetState?.journal.stage).toBe('reviewed');
+  expect(f.service.authorize).not.toHaveBeenCalled();
   expect(f.service.keys).not.toHaveBeenCalled();
 });

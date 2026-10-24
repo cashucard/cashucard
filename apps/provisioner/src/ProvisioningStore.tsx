@@ -171,10 +171,10 @@ const message = (e: unknown): string => {
     return e.sw === 0x6983
       ? 'The card PIN is blocked. Use the holder wallet to recover it before continuing.'
       : Math.floor(e.sw / 16) === 0x63c
-        ? `The PIN was incorrect. ${
-            e.sw % 16
-          } tries remain. No entries were cleared. Stop if you are unsure of the PIN.`
-        : 'The card refused PIN verification. No entries were cleared. Check the card in its holder wallet.';
+      ? `The PIN was incorrect. ${
+          e.sw % 16
+        } tries remain. No entries were cleared. Stop if you are unsure of the PIN.`
+      : 'The card refused PIN verification. No entries were cleared. Check the card in its holder wallet.';
   }
   if (e instanceof ApiUnreachableError) {
     return 'The service could not be reached. Your saved work is retained. Reconnect and retry.';
@@ -525,7 +525,11 @@ function ProvisioningSession({
           if ('failure' in result) {
             setNotice(
               cancelRequested.current
-                ? 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.'
+                ? resetOperation &&
+                  !result.snapshot.batch &&
+                  (!result.reset || result.reset.journal.stage === 'complete')
+                  ? 'Cancelled. You can check another card.'
+                  : 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.'
                 : message(result.failure),
             );
             if (
@@ -846,6 +850,7 @@ function ProvisioningSession({
         ) {
           throw new Error('Finish saved work first');
         }
+        setResetReview(null);
         const generation = actorGeneration.current;
         const card = await resetCard(readResetReview);
         const source = await resetService().lookup(
@@ -861,12 +866,20 @@ function ProvisioningSession({
         if (w.snapshot().batch || !resetReview) {
           throw new Error('Check the card first');
         }
+        const actor = latest.current,
+          generation = actorGeneration.current;
         await reset.begin(
           resetService(),
           w.snapshot().device_id,
           (settings.uuid ?? randomUuid)(),
           resetReview.card,
           consent,
+          () =>
+            mounted.current &&
+            !cancelRequested.current &&
+            actorGeneration.current === generation &&
+            latest.current.session?.token === actor.session?.token &&
+            latest.current.serviceUrl === actor.serviceUrl,
         );
         setResetReview(null);
       }, true),
