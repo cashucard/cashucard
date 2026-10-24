@@ -3280,6 +3280,15 @@ asked for the website's existing icon, and the shared provisioner serves wallets
 implementing the protocol. This is a visual asset change, with no card/protocol
 behavior or app build-number change.
 
+
+D113 follow-up: store and legacy upload paths now share the same generated
+Cashu mascot; the feature graphic uses the same background and Figtree font.
+Replace historical demo screenshots/listing claims with current native UI and
+installation-only wording. Verify storefront metadata separately from native
+launcher assets: Google rejected the mismatched old listing icon even though
+build 9 contained the new launcher image. This changes store assets, not app
+behavior, firmware or the uploaded build 10 binaries.
+
 ## D114 — Keep reset results separate from the next card check
 
 **Decided:** a completed reset receipt is history, not the starting state of the
