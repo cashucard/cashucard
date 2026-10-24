@@ -151,13 +151,11 @@ async function main() {
     assert.ok(await evaluate("document.querySelector('.button-bright').href==='https://github.com/cashucard/nut/blob/main/CCP.md'"), "Primary action opens the draft NUT");
     assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/cashucard/cashucard'"), "Secondary action opens the source repository");
     assert.equal(await evaluate("document.querySelector('#source').tagName"), "FOOTER", "Source links live in the footer");
-    assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===4 && !!g.querySelector('a[href=\"#install\"]'))"), true, "Apps, the provisioner among them, are grouped in the footer");
+    assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===1 && !!g.querySelector('a[href=\"#install\"]'))"), true, "The footer's Apps group holds the provisioner alone");
     assert.equal(await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>!!document.querySelector(a.hash))"), true, "Every page anchor exists");
-    for (const repo of [
-      "cashucard/cashucard", "lnflash/flash-mobile", "getfoxy/iOS", "lnflash/flash-pos",
-    ]) {
-      assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
-    }
+    assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes('cashucard/cashucard'))"), "Linked source cashucard/cashucard");
+    // the home page links no wallet or till; the install guide's footer still does (D116)
+    assert.equal(await evaluate("[...document.querySelectorAll('a')].filter(a=>/lnflash\\/flash-mobile|getfoxy\\/iOS|lnflash\\/flash-pos/.test(a.href)).length"), 0, "The home page links no Flash, Flash POS or Foxy app");
     // where to buy cards: two shops for blank cards, then custom printed cards whose checkout waits for launch
     assert.equal(await evaluate("document.querySelectorAll('#buy .buy-option').length"), 3, "Three ways to get cards");
     assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.amazon.com/dp/\"]')"), "Cards for testing link to an Amazon listing");

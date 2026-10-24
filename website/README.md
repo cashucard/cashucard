@@ -27,8 +27,10 @@ remains a draft. Review the source specification when changing the payment or
 ownership explanation.
 The hero describes offline terminal acceptance and later mint settlement as
 separate events; an offline tap does not guarantee final settlement.
-Footer links point to the draft NUT and the Cashu Card source, with Flash
-Mobile, Foxy iOS, Flash POS and the Cashu Card Provisioner grouped under Apps.
+Footer links point to the draft NUT and the Cashu Card source, with the Cashu
+Card Provisioner under Apps. The install guide's footer still lists Flash
+Mobile, Foxy iOS and Flash POS, since its setup step sends a new holder to the
+wallets there (D116).
 The links do not claim completed integrations.
 
 `dist/film/` holds the 48-second film ("How it works") at 1080p, a 720p copy

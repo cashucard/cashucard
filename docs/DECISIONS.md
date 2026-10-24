@@ -2512,6 +2512,9 @@ accurate place to learn the transaction flow.
 
 ## D84 — Compact grouped source footer
 
+The home page's Flash Mobile, Foxy and Flash POS links were removed by D116,
+and the install guide's footer keeps them. The grouped footer still applies.
+
 **Decided (2026-10-22):** Put the public protocol and repository links in
 the footer instead of a standalone “Protocol and code” section. Group the
 Flash Mobile, Foxy and Flash POS links under “Apps”; keep separate Protocol
@@ -3318,3 +3321,18 @@ test grow by what the section measures.
 **Rejected:** the stores' official download badges while the app is a beta, and
 a Play listing link, which a visitor who has not joined the test gets as not
 found. When the app is published, the store listings replace both beta links.
+
+## D116 — The home page's footer lists the provisioner alone under Apps
+
+**Decided (2026-10-24):** the home page's footer drops the Flash Mobile, Foxy
+and Flash POS links, so its Apps group holds the Cashu Card Provisioner alone.
+The install guide's footer keeps all four, because its step for giving a card
+away sends the new holder to the wallets listed there. The smoke test fails if
+the home page links any of the three apps. This supersedes D84's app links on
+the home page.
+
+**Why:** user review on 2026-10-24 asked for the three app links to come off
+the home page.
+
+**Rejected:** removing the Apps group with them, since the provisioner is the
+app the home page offers in its install section.
