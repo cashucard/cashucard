@@ -1,14 +1,17 @@
-# cardctl — host-side driver for the Cashu card applet, protocol 2.0
+<a id="cardctl-host-side-driver-for-the-cashu-card-applet-protocol-20"></a>
+
+<a id="cardctl--host-side-driver-for-the-cashu-card-applet-protocol-20"></a>
+
+# cardctl: host-side driver for the Cashu card applet, protocol 2.0
 
 A PC/SC command-line tool that speaks protocol 2.0 as
 [`spec/APDU.md`](../../spec/APDU.md) has it, over either a contact or a
 contactless reader: the reads, `AUTH`, the owner's commands (with a P-256
 owner key, `p256.py`), the clock, loads and the PIN.
 
-Until this existed there was **no way to talk to a card at all** — the applet
-had been exercised only under jCardSim, which cannot surface EEPROM exhaustion,
-ECDH output framing differences, or a card whose `getS` returns short. Those are
-precisely the bugs that only appear on silicon.
+Before cardctl, applet checks ran only under jCardSim. That simulator cannot
+surface EEPROM exhaustion, ECDH output framing differences, or a card whose
+`getS` returns short. Those failures require silicon testing.
 
 ## Install
 
@@ -17,7 +20,7 @@ cd tools/cardctl
 pip install -r requirements.txt
 ```
 
-- **macOS** — PC/SC ships with the OS. Do **not** install `pcsc-lite`; it
+- **macOS:** PC/SC ships with the OS. Do **not** install `pcsc-lite`; it
   conflicts with the built-in daemon.
 
   ⚠️ **Do not use the system Python** (`/usr/bin/python3`, 3.9). `pip install
@@ -27,8 +30,8 @@ pip install -r requirements.txt
   ImportError: dynamic module does not define module export function (PyInit__scard)
   ```
 
-  which looks like a broken reader or a bad install and is neither — it is an
-  ABI mismatch in the native `_scard` module. Use a Homebrew Python instead:
+  The import error comes from an ABI mismatch in the native `_scard` module.
+  Use a Homebrew Python:
 
   ```bash
   brew install python@3.13          # or any recent 3.x
@@ -37,7 +40,7 @@ pip install -r requirements.txt
   ```
 
   Verified working on Homebrew Python 3.14.
-- **Debian/Ubuntu** — `sudo apt install pcscd libpcsclite-dev` and make sure
+- **Debian/Ubuntu:** `sudo apt install pcscd libpcsclite-dev` and make sure
   `pcscd` is running.
 
 ## Quick start
@@ -49,26 +52,29 @@ python3 cardctl.py selftest     # the one that matters
 
 `selftest` is the card-arrival test. It selects the applet, reads `GET_INFO`,
 the public key and the record, asks the card to prove itself with `AUTH` over
-random bytes of ours, and **verifies each signature against BIP-340** — then
-checks that two `AUTH`s over the *same* bytes use different nonces, which is a
-real security property rather than a nicety (a nonce that is a pure function of
-`(d, msg)` lets a fault injector recover the private key from two signatures).
-`AUTH` burns nothing and needs no PIN.
+random bytes of ours, and **verifies each signature against BIP-340**. It then
+checks that two `AUTH`s over the *same* bytes use different nonces. Nonce
+freshness protects the private key: a nonce that is a pure function of `(d,
+msg)` lets a fault injector recover the private key from two signatures.
+`AUTH` needs no PIN and leaves proofs unspent.
+
+Illustrative output (detail separators simplified):
 
 ```
-PASS  SELECT applet  — version 2.1
-PASS  GET_INFO  — v2.1, 128 slots, PIN set, owner yes
-PASS  format 4 (SIG_ALL pieces)  — format 4
-PASS  Schnorr capability advertised  — caps=0xFF
-PASS  GET_PUBKEY well-formed  — 02a1b2c3d4e5f60718…  (33 bytes)
+PASS  SELECT applet: version 2.1
+PASS  GET_INFO: v2.1, 128 slots, PIN set, owner yes
+PASS  format 4 (SIG_ALL pieces): format 4
+PASS  Schnorr capability advertised: caps=0xFF
+PASS  GET_PUBKEY well-formed: 02a1b2c3d4e5f60718…  (33 bytes)
 PASS  AUTH + BIP-340 verify [1/3]
 ...
 All 13 checks passed on physical hardware.
 ```
 
-Pass `--pin` to check the PIN as well. A card that is not protocol 2.0 fails at
-`SELECT applet` (a 0.x or Foxy 1.x card does not even answer the 2.0 AID: it
-needs an update, and its balance is swept first). A card whose PIN is blocked
+Pass `--pin` to check the PIN as well. A 0.x or Foxy 1.x card answers a
+different AID and needs a balance sweep before its update. The current selftest
+requires protocol 2.1 or later; a 2.0 card must be swept and reinstalled under
+[D26](../../docs/DECISIONS.md#d26). A card whose PIN is blocked
 (`GET_INFO` byte 7 = 2) fails at `PIN state`: no payment signs until the owner's
 `change-pin` sets a new PIN, which unblocks it (no PUK on 2.0: [D18](../../docs/DECISIONS.md#d18)).
 
@@ -97,7 +103,7 @@ cd applet && ant clean cap
 # three applets, the opener first: docs/HARDWARE_DEPLOYMENT.md has the commands
 ```
 
-**The card must be JavaCard 3.0.5 or later** — the applet needs
+**The card must be JavaCard 3.0.5 or later.** The applet needs
 `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY`, which does not exist in 3.0.4. JCOP4
 works; JCOP3 / J3H145 / Feitian 3.0.4 cannot run this applet at all.
 
@@ -125,7 +131,7 @@ reader is the more reliable way to install, leaving NFC for tap testing.
 | `change-pin NEW` | the owner sets a new PIN: no old PIN, any state; unblocks a blocked card |
 | `set-card --mint URL [--refund HEX] [--pin P]` | write the record (the owner's proof on an owned card) |
 | `set-owner [--anchor HEADER] [--old-owner-key HEX]` | give the card its owner (the public half of `--owner-key`), anchored at a block header |
-| `tip [--url URL]` | print the ops service's tip header, 80 bytes hex (ENG-740) — the value `--anchor` takes |
+| `tip [--url URL]` | print the ops service's tip header, 80 bytes hex (ENG-740); this is the value `--anchor` takes |
 | `set-owner-url [--url URL] [--old-owner-key HEX]` | `set-owner` with the anchor fetched from the ops service's tip feed |
 | `set-limit --day N [--payment N --allowance N [--budget R]]` | the owner's limits; `--budget` (1–30) is the rollover budget, and needs the two before it; without it the card leaves the budget as it is ([D26](../../docs/DECISIONS.md#d26)) |
 | `set-header --header HEX` | `SET_HEADER`: show the card a block header |
@@ -143,14 +149,14 @@ till drives), `clear-pin`, `set-puk` and `unblock-pin`. Their opcodes `43`, `44`
 back; `test_apdu.py` checks the parser refuses them.
 
 Global flags: `-r/--reader N` to pick a reader, `-v/--verbose` to log every APDU
-to stderr — use `-v` when a command misbehaves, since the raw exchange usually
+to stderr. Use `-v` when a command misbehaves, since the raw exchange usually
 makes it obvious whether the card rejected the command or never saw it.
 
 ## Timing a card
 
 `--timing` goes before the command and times every APDU around the PC/SC
-transmit call, so each figure is the full reader round trip, not just the
-applet's own work. Per-APDU lines go to stderr as they happen and a per-command
+transmit call, so each figure includes the applet's work and the full reader
+round trip. Per-APDU lines go to stderr as they happen and a per-command
 table (count, min, median, max, total) follows at exit, even when the command
 fails partway.
 
@@ -169,8 +175,8 @@ discovery that none of these capture. The median is the figure to quote.
 ## A warning about `load`
 
 `load` without `--c` inserts a random placeholder in place of the mint's
-signature. That is fine for exercising storage and slot management, but such a
-proof can never be redeemed at a mint. A 2.0 card signs only format-4 `SIG_ALL`
+signature. That is fine for exercising storage and slot management, but the
+placeholder cannot be redeemed at a mint. A 2.0 card signs only format-4 `SIG_ALL`
 pieces locked to its key ([NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md#card-proofs)); `load`
 writes whatever it is given, so a real top-up is a wallet's NUT-11 swap first.
 
@@ -185,17 +191,18 @@ cashu-client's `serializeCardFile` / `parseCardFile`. `test_card_file.py` parses
 the spec and asserts this driver's parser and writer against the published field
 tables, so a rename on this side fails in CI rather than at a card reader.
 
-> **The two halves do not interoperate yet.** cashu-client (`cashucard/client#5`)
-> does not know the `spent` field and rejects any key outside its allowlist, so
-> today it refuses what `dump` writes and `load-file` refuses what it writes.
-> The spec's status note has the details; the two changes must merge together.
+> `cashucard/client#5` and `cashucard/javacard#19` merged on 2026-08-28. The
+> TypeScript parser accepts the `spent` field written by `cardctl dump`.
+> `serializeCardFile` writes `spent: false` for proofs headed to a card and
+> refuses `spent: true`, because `LOAD_PROOF` carries no spent bit. Use
+> `cardctl dump` for full card files that include spent slots.
 
 Four things the format insists on, all because a card file is bearer money:
 
-- **`spent` is required, not defaulted.** A file that omits it is not a file of
-  unspent proofs, it is a file whose state is unknown — and guessing "unspent"
-  turns settled money back into spendable balance on the next `load-file`.
-- **Unknown fields are refused, not ignored.** At document and slot level. An
+- **Every slot must include `spent`.** An omitted field leaves proof state
+  unknown. Guessing `unspent` can make the card report an already-settled proof
+  as available after `load-file`; the mint will still reject it.
+- **Unknown fields are refused.** Both document and slot parsers reject them. An
   unrecognised key means the writer added something without bumping `version`;
   dropping it silently is how the two sides drift apart in the first place.
 - **Amounts are positive powers of two below 2^32,** and keyset ids are NUT-02
@@ -205,9 +212,8 @@ Four things the format insists on, all because a card file is bearer money:
 - **`load-file` is re-runnable.** `LOAD_PROOF` commits one proof at a time with
   no transaction around the file, so a failure part-way through leaves half of
   it on the card. Re-running skips whatever is already there by nonce instead of
-  writing duplicates, and everything checkable — capacity, amounts, points — is
-  checked before the first write. A nonce the card has already *spent* is
-  reported as spent, not as "already loaded".
+  writing duplicates. It checks capacity, amounts and points before the first
+  write. A nonce the card has already *spent* is reported as spent.
 
 `dump` validates the document it assembled before writing it, so a mistake like
 `dump --mint "$UNSET_VAR"` fails loudly instead of leaving an unloadable backup.

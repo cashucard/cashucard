@@ -38,8 +38,8 @@ configuration and scoped remote directories, for example:
 }
 ```
 
-These are examples, not discovered Zion endpoints. Obtain the exact WebDAV
-endpoint from Nextcloud before any remote plan. Rclone obscured passwords are
+The JSON values are examples. Obtain the exact WebDAV endpoint from Nextcloud
+before any remote plan. Rclone obscured passwords are
 not a substitute for filesystem protection. Its child output is captured and
 never printed; provider errors can contain sensitive URLs.
 
@@ -75,10 +75,10 @@ conflicting objects, remove prior snapshots or reset old-source freshness. An
 operator must investigate an immutable conflict; do not delete copies or state
 just to turn health green. State/config corruption causes a generic failed exit.
 
-Checksums prove copy integrity, not age recipient correctness or authenticated
-restore. Complete a separate age decryption/restore drill from the independent
-copy with designated recovery operators. The service master and recovery private
-identity are not recovered from this runner's state or copy manifests.
+Checksums verify copied bytes. Validate the age recipient and authenticated
+restore through a separate drill from the independent copy with designated
+recovery operators. The service master and recovery private identity are not
+recovered from this runner's state or copy manifests.
 
 ## Local validation
 
@@ -113,8 +113,8 @@ python3 tools/backup-copy/alerts.py --health --config /data/private/alerts.json 
 ```
 
 A receiver must accept a JSON POST with `event`, `status`, `source_age_seconds`
-and `text`, returning HTTP 2xx only when accepted. This is a generic webhook
-contract, not a claim of native integration with every notification provider.
+and `text`, returning HTTP 2xx only when accepted. This generic webhook contract
+leaves provider-specific native integrations to the receiving service.
 No credentials, snapshot identities or remote paths enter the payload. The URL
 can contain a secret route token and remains private. TLS verification stays on;
 redirects are rejected and each request has a bounded timeout.
@@ -124,8 +124,8 @@ reminds hourly during failure/warning and daily while healthy. A failed delivery
 does not advance confirmation and is retried after five minutes. Delivery health
 fails when the watcher stops checking for three minutes, the latest send failed,
 or accepted evidence is over 25 hours old. Reconfiguring its generation makes
-previous route evidence inapplicable. These rules concern receiver acceptance,
-not proof a human saw the message. Host shutdown disables both local processes;
+previous route evidence inapplicable. These rules measure receiver acceptance.
+Confirm human visibility separately. Host shutdown disables both local processes;
 use an independently hosted monitor for whole-host failure. Notifications do not
 automatically stop issuance, decrypt snapshots, or establish recovery readiness.
 
@@ -147,8 +147,8 @@ pagination, identity and artifact size. Failed source access preserves receipts.
 password and must never become ordinary logs or action results. Completed browser
 authorization is journaled with `--result-file` before configuration is changed;
 keep that record private and remove it only after the credentials are committed.
-The browser flow must authorize a dedicated non-admin account, not the currently
-signed-in administrator. Accidentally authorized admin credentials are revoked.
+Authorize the browser flow with a dedicated non-admin account. Revoke any admin
+credentials authorized by mistake.
 
 Run `python3 tools/backup-copy/test_issuer.py` for focused source-scope,
 pagination/identity, pairing/authorization and admin-rejection checks.
@@ -185,11 +185,12 @@ manifest is preserved for existing exports. Local health uses the exact snapshot
 time after accepted attestation, including when it predates the filename time;
 legacy/direct-R2 mode retains its existing filename-based local health behavior.
 Only the issuer's separately enabled policy enforces issuance. This source
-implementation does not upgrade the installed StartOS package or enable the
-policy on any deployment; package configuration and a staging drill remain.
+change leaves installed StartOS packages and deployment policy unchanged.
+Update package configuration and complete a staging drill before enabling the
+policy on a deployment.
 
-Older archived exports without issuer-bound metadata are still copied and
-verified locally, but never submitted or counted as fresh evidence. An ineligible
-newest export fails health. Ineligible historical archives do not invalidate a
-newer eligible snapshot whose destination read-back and receipt succeeded.
+Older archived exports without issuer-bound metadata are copied and verified
+locally. The runner does not submit them as fresh evidence. An ineligible newest
+export fails health. Ineligible historical archives leave a newer eligible
+snapshot's successful destination read-back and receipt intact.
 Authorization failures and unsupported issuer endpoints still fail the cycle.

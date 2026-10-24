@@ -171,9 +171,9 @@ HTTP key retrieval remains paused after restore.
 The Node server and Worker currently require a configured master at startup;
 a fresh replacement master can create future batches without changing old keys.
 
-This is a supported escape to the local Node service, not an automated upload
-of SQLite into Durable Object storage. For a new hosted service, define and
-review the import procedure before cutover. Remove any leftover setup secret
+This is a supported restore path to the local Node service. Importing SQLite
+into Durable Object storage requires a separately reviewed procedure before
+cutover. Remove any leftover setup secret
 before restoring operators into a hosted object; setup markers are not exported
 and a replayed bootstrap correctly refuses a populated operator table.
 
@@ -233,7 +233,8 @@ hardware rules.
 All provisioning routes require an operator session. Sign-in now returns
 `operator_id`; use that ID for journal scoping. `device_id`, `batch_request_id`
 and `attempt_id` are canonical lowercase UUIDs supplied by a durable client.
-They are operational identifiers, not credentials. See the full
+They are operational identifiers; authorization comes from the operator session
+and scoped device reservation. See the full
 [identity and recovery contract](../docs/PROVISIONER-RECOVERY.md).
 
 | Method and path                                                  | Request and result                                                                                                                                                          |
@@ -404,8 +405,8 @@ a generic reconciliation conflict is not permission to retry card writes.
 ### Console experience and browser acceptance
 
 The console separates Operators, Installations and Activity. Search and status
-filters operate on the returned records; installation/activity views cover the
-latest 100 entries, not lifetime totals. Account details contain reset and access
+filters operate on the returned records; installation/activity views show the
+latest 100 entries and omit lifetime totals. Account details contain reset and access
 controls. Destructive access changes use a keyboard-accessible confirmation
 dialog; password creation/reset requires saving the new password to your vault
 before submission. Generated passwords use browser cryptographic randomness.

@@ -3,8 +3,11 @@
 The shipping app signs operators into the ops-service, installs the shared Cashu
 card applet, records manager-key rotation, restores interrupted work and supports
 explicit owned-card reset. Holder wallets own PIN/ownership setup, funding and
-payments. Demo mode is removed; the legacy bench described below is gated off in
-distributed builds. Bundle ID: `com.islandbitcoin.provisioner`.
+payments. Demo mode has been removed; the legacy bench described below is gated
+off in distributed builds. Bundle ID: `com.islandbitcoin.provisioner`.
+
+See the [current operator flow](../../docs/PROVISIONER-APP.md) for the shipped
+sign-in, batch, installation and recovery experience.
 
 Build `tools/cardkit` first, then install this app's dependencies. The app consumes
 `@cashu-card/cardkit` through `src/cardkit.ts`; Metro resolves the installed public
@@ -12,7 +15,9 @@ package rather than a sibling `gp/` source path. Refresh the file dependency aft
 SDK edits. See the [architecture](../../docs/ARCHITECTURE.md) and
 [independent release/signing guide](../../docs/COMPONENT-RELEASES.md).
 
-## Legacy bench reference (not a shipping route)
+<a id="legacy-bench-reference-not-a-shipping-route"></a>
+
+## Legacy bench reference (Debug builds only)
 
 The original ENG-738 spare-card bench is retained for approved laboratory Debug
 builds only. `BENCH_RUNS_ENABLED` defaults to false: Settings hides it, navigation
@@ -47,18 +52,20 @@ then loads. A card moved mid-run is fine; tap again. Once the card applet's INST
 has gone out, the next run finds the applet and removes it only with Replace on,
 so after a pull from Installing card on, the screen says to turn Replace on first.
 
-## What it will not do
+<a id="what-it-will-not-do"></a>
 
-- Send a byte when the load file's sha256 is not the build's.
-- Log in with keys the card has not proved: the card's cryptogram is checked on
-  the phone before EXTERNAL AUTHENTICATE. After wrong keys or a refused login every
-  button stays off until the app is restarted. Failed logins lock a card for good.
-- Retry anything.
-- Delete anything but the card's three instances and package, and the hello
-  applet and its package; never the card manager.
-- Remove a card applet that holds anything (an unspent or spent piece, an owner,
-  a PIN, a record), with Replace on or off.
-- Put APDU bytes in the readout: it has INS, lengths, SW and times only.
+## Bench safety boundaries
+
+- The bench sends bytes only when the load file's sha256 matches the build's.
+- The bench checks the card's cryptogram before EXTERNAL AUTHENTICATE and never
+  attempts login with unproved keys. After wrong keys or refused login, every
+  button stays off until the app restarts. Failed logins lock a card for good.
+- The bench never retries a command.
+- The bench deletes only the card's three instances and package, plus the hello
+  applet and its package. It never deletes the card manager.
+- The bench refuses to remove a card applet that holds anything (an unspent or
+  spent piece, an owner, a PIN or a record), with Replace on or off.
+- The readout never includes APDU bytes. It includes INS, lengths, SW and times.
 
 ## The readout
 
@@ -70,20 +77,19 @@ each phase with its APDU count and slowest APDU, every APDU over Android's defau
 fails, the status line says so, and the readout is selectable, so a long-press
 copies it by hand.
 
-A run that stops says why. For an NFC failure that is the NFC library's error
-class, such as `TagConnectionLost` or `SessionInvalidated`, since an iOS error
-carries nothing else; Android's errors keep their own text. A session that never
-reached the card is named on the screen the same way, for example
+A run that stops says why. For an NFC failure, iOS reports the NFC library's
+error class, such as `TagConnectionLost` or `SessionInvalidated`; Android keeps
+its own error text. A session that never reached the card is named on the screen
+the same way, for example
 `No card session: Timeout.`
 
 ## Operator app
 
 Sign-in opens real batch setup, installation/recovery, card checks and settings.
-Build 7 removes the former design-review demo mode, fake-card chooser and
-unauthenticated route into the app (D105). Device diagnostics remain explicit
-read-only actions after operator sign-in. The lab bench is still gated off in
-normal releases. Review access uses a scoped operator account and real hardware
-evidence; there is no demo substitute for that access.
+Build 7 removed the design-review demo mode, fake-card chooser and
+unauthenticated route into the app (D105). Device diagnostics are explicit read-only actions after operator sign-in. The lab bench
+remains gated off in normal releases. Review access uses a scoped operator
+account and real hardware evidence.
 
 The sign-in form scrolls on small screens; its action stays above the keyboard.
 Next focuses Password, and Go submits the form. iOS uses keyboard avoidance;
@@ -93,10 +99,10 @@ The screens are set in bundled OFL Figtree (`assets/fonts/`, linked with
 `react-native-asset`; re-run it when fonts change). Type, color and spacing
 tokens live in `src/theme.ts`; copy in `src/strings.ts`.
 
-**iPhone builds are Release, not Debug** (`-configuration Release`): a Debug
-build on a physical iPhone looks for a Metro packager at launch (`ip.txt`),
-and on a Mac where another project's Metro holds :8081 the app can hang on a
-blank screen. Release never consults a packager.
+Build iPhone apps with the Release configuration (`-configuration Release`). A
+Debug build on a physical iPhone looks for a Metro packager at launch (`ip.txt`)
+and can hang on a blank screen when another project's Metro holds :8081. Release
+starts without consulting a packager.
 
 ## Build and run (the owner, gate H1)
 
@@ -247,8 +253,8 @@ Shared screens use `react-native-safe-area-context` (pinned 5.10.1) for native
 insets, including Android edge-to-edge windows. This adds a native dependency:
 run pod install and rebuild the phones before loading this revision's bundle.
 The root provider supplies all shared screens; titles wrap in normal header
-layout. The identity diagnostic always shows “PHYSICAL CARD — read-only”, while
-other screens have no simulated-card banner. Its content can scroll at larger
+layout. The identity diagnostic labels physical-card access as read-only; other
+screens have no simulated-card banner. Its content can scroll at larger
 text sizes. These changes do not arm NFC or enable installation.
 
 ### Service origin for a release candidate

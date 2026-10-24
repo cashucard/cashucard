@@ -1,12 +1,13 @@
-# This is a fork
+<a id="this-is-a-fork"></a>
 
-> **Merged into cashu-javacard as protocol 2.0 (ENG-673, [DECISIONS D18](docs/DECISIONS.md#d18)).** This
-> document is Foxy's, as it stood at software 1.20, kept for its design and its
-> reasons. On the 2.0 wire the AID is `F0 43 41 53 48 55 43 41 52 44` (not
-> `F0 FOXYCARD`), `SELECT` answers `02 01`, every `FoxyCard/…` label is
-> `CashuCard/…`, and D20 to D26 add to it (the rollover budget and `REFRESH`, the
-> anchored owner, and the fixes). Where this and [`spec/APDU.md`](spec/APDU.md) differ, the
-> spec is the 2.0 wire.
+# Foxy fork history
+
+> **Historical design record.** Foxy's software 1.20 was merged as protocol 2.0
+> (ENG-673, [D18](docs/DECISIONS.md#d18)). The body below preserves that fork
+> at the time, including its version numbers, paths and CI state. For the current
+> protocol 2.1 wire, use [`spec/APDU.md`](spec/APDU.md); readers select the whole
+> applet AID `F043415348554341524401`, which answers `02 01`. See
+> [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the current repository layout.
 
 `getfoxy/card` is a fork of `cashucard/javacard` (applet 0.4, `c1f4580`,
 MIT). The applet here is **not compatible on the wire** with
@@ -14,7 +15,7 @@ upstream's, and has an AID of its own (`F0 46 4F 58 59 43 41 52 44`) so that
 neither can be mistaken for the other.
 
 What changed and why is in [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md),
-section 4. In short:
+section 4:
 
 - `SPEND_PROOF` takes no message. The card rebuilds the slot's own secret and
   signs its hash; nothing a reader sends reaches the signer.
@@ -49,7 +50,7 @@ section 4. In short:
   key over a label, a nonce from `GET_NONCE` and the value being set. `LOCK_CARD`
   also needs a PIN set and verified: on a card with no PIN any reader could once
   lock it for good.
-- A card is cash. It holds what is put on it. A card with an owner is its owner's,
+- The card holds the proofs loaded onto it. A card with an owner is its owner's,
   empty or not; a card with none is open while it is empty and cannot be loaded.
   Lose the card and the money is gone; a forgotten PIN or a blocked card is put
   right from the owner's phone, and if the owner loses their twelve words the PIN
@@ -70,7 +71,9 @@ first 16 did not move), `CHANGE_PIN` and `LOCK_CARD` carry an owner's proof, and
 limit, the clock and the owner. The applet has run on a real card (below), but
 only test cards, so none is expected in the field with an older shape.
 
-## What is and is not up to date
+<a id="what-is-and-is-not-up-to-date"></a>
+
+## Repository state at the fork
 
 | Part | State |
 |---|---|
@@ -99,7 +102,9 @@ applet, and compare a tracked CAP with a fresh build, and the CAP is no longer
 tracked. They would fail here. Rename it back when the host tools are ported; the
 fork's own tests are `mvn -f applet/pom.xml test`.
 
-## A card with no card
+<a id="a-card-with-no-card"></a>
+
+## Simulator
 
 `sh tools/cardsim/run.sh` runs the applet in jCardSim and listens on
 127.0.0.1:47431. Foxy's simulator build has no NFC and reaches a card there

@@ -179,7 +179,7 @@ git checkout -- applet/target/cashu-javacard-2.1.0.cap                     # res
 The README also has the tests, which CI runs in the jobs above:
 
 ```bash
-mvn -f applet/pom.xml test           # applet — jCardSim, no hardware needed
+mvn -f applet/pom.xml test           # applet: jCardSim, no hardware needed
 mvn -f tools/cardsim/pom.xml package # card simulator bridge, its suite, and the jar
 node --test 'tools/**/*.test.cjs'    # client and Cashu arithmetic (bridge and mint cases skip)
 (cd tools/cardkit && yarn install --frozen-lockfile && yarn build && node --import tsx --test 'gp/test/**/*.test.ts')  # SCP02 and the phone's install, against a fake card
@@ -215,7 +215,9 @@ node_modules/.bin/react-native bundle --platform ios --dev false --entry-file in
 node_modules/.bin/react-native bundle --platform android --dev false --entry-file index.js --bundle-output "$RUNNER_TEMP/provisioner-android.js"
 ```
 
-## Conventions that bite
+<a id="conventions-that-bite"></a>
+
+## Implementation conventions
 
 - **SELECT answers the applet's version, and a wire change moves it.** The
   card's applet answers `SELECT` with `02 01 90 00` (2.1), and `GET_INFO`

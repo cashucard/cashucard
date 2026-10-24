@@ -60,7 +60,7 @@ publish a new render under a new number.
 The film, the frames and `dist/assets/custom-cards-1.webp` are rendered with a
 private fork of the Daylight Fob film renderer (a WebGL2 scene driven by
 headless Chrome, with a synthesized score at -18 LUFS and a look-ahead limiter
-rather than clipping); the render source stays outside this repository. What
+rather than clipping); the render source lives in the private `cashucard/cashucard-film` repository. What
 they state comes from NUT-CCP and `spec/APDU.md`: the card makes its
 key on the chip and keeps it there, a wallet writes pieces into its 128
 slots, the till names the pieces, the card signs once for the payment and
@@ -83,7 +83,7 @@ needs the provider's origins (it allows no connections or form posts today).
 
 "Install the applet" (`#install`, the nav's "Install") gives the two ways to
 put the applet on a blank card. The first is the Cashu Card Provisioner
-(`apps/provisioner`, 1.0.0 build 9), for card issuers with an operator
+(`apps/provisioner`; see the linked release for the build identity), for card issuers with an operator
 account. It shows the app's icon (`dist/assets/provisioner-icon.png`, its
 180-pixel iOS icon) and links the TestFlight public beta, Google Play's
 testing opt-in for `com.islandbitcoin.provisioner` and the GitHub release
@@ -130,7 +130,7 @@ persistence. The hosting platform may set infrastructure cookies.
 
 ## Publication
 
-The site moves from Sites to a Cloudflare Worker, `cashu-card-site`
+The site runs on a Cloudflare Worker, `cashu-card-site`
 (`wrangler.jsonc`, `worker.js`), in the account that runs ops.cashucard.org.
 `dist/` is served as static assets with `_headers` applied. Only `/film/*` runs
 `worker.js`, which answers byte ranges: the asset server answers a range
