@@ -1,5 +1,12 @@
 # Safe reprovisioning gate (#92)
 
+Status: the same-service mobile reset path was implemented and physically
+validated on 2026-10-23. See [Mobile reset](OWNED-CARD-MOBILE-RESET.md) and
+its [hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md).
+The initial constraints and proposed sequence below are retained as design
+history. Cross-service reuse still requires separate provenance and
+reconciliation.
+
 The next mobile release can carry the batch-count and reconciliation fixes.
 It must not advertise a reset for a previously provisioned card yet. The
 current replacement path knows the factory manager keys but has no contract
@@ -8,10 +15,11 @@ login can permanently lock a card. Holder setup does not restore factory
 manager keys.
 
 The intended operation is **replace the Cashu applet and its card-manager key
-assignment**, not a chip-wide factory reset. It changes the applet identity
-and erases its owner binding, PIN/configuration and any proofs stored in that
-applet. A wallet's display of an empty card is not sufficient evidence that
-all owner-bound value has been safely handled.
+assignment**. Other chip applications and platform state remain outside its
+scope. It changes the applet identity and erases its owner binding,
+PIN/configuration and any proofs stored in that applet. A wallet's display of an
+empty card is not sufficient evidence that all owner-bound value has been safely
+handled.
 
 Before enabling a reset action:
 
@@ -40,8 +48,8 @@ Before enabling a reset action:
 
 The unresolved operator inputs are the authoritative locations of historical
 escrow records and the approved procedure for cards that may hold value. These
-are release gates for #92, not reasons to block the batch-count and diagnostic
-improvements in #89 and #91.
+are release gates for #92. The batch-count and diagnostic
+improvements in #89 and #91 can proceed independently.
 
 ## Three owner-held cards (2026-10-23)
 

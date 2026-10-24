@@ -6,11 +6,16 @@ it must accurately report awaiting holder setup. Holder wallet ownership/PIN
 orchestration remains separate. A demo-only app with installation disabled is
 not the completed production deliverable.
 
-The current candidate preparation record is [build 7 readiness](PROVISIONER_BUILD_7_READINESS.md).
-The audit below describes October 21; later dated reports record subsequent
-implementation, deployments and internal releases.
+Component versions and release procedures are in [Component
+releases](COMPONENT-RELEASES.md). The [build 7 preparation
+record](PROVISIONER_BUILD_7_READINESS.md) is dated evidence. The audit below
+records the October 21 configuration; later installation approval is recorded in
+[D74](DECISIONS.md#d74). The audit below describes October 21; later dated
+reports record subsequent implementation, deployments and internal releases.
 
-## Release audit — October 21
+<a id="release-audit--october-21"></a>
+
+## Release audit: October 21
 
 | Area | Evidence / required next work |
 | --- | --- |

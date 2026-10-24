@@ -1,4 +1,6 @@
-# Separate-Mac staging recovery — 2026-10-22
+<a id="separate-mac-staging-recovery--2026-10-22"></a>
+
+# Separate-Mac staging recovery: 2026-10-22
 
 The operator authorized SSH access to the second Mac for the recovery check.
 This is an actual restore from the protected offline staging copy, beyond the

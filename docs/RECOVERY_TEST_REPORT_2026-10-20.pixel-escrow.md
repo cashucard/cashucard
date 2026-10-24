@@ -1,4 +1,6 @@
-# Local encrypted escrow recovery — completed Pixel drill
+<a id="local-encrypted-escrow-recovery--completed-pixel-drill"></a>
+
+# Local encrypted escrow recovery: completed Pixel drill
 
 ENG-741, 2026-10-20. Software-only follow-up to the merged
 [Pixel hardware report](HARDWARE_TEST_REPORT_2026-10-20.d321-pixel-recovery.md).

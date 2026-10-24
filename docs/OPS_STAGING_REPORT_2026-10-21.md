@@ -1,4 +1,6 @@
-# Isolated staging deployment — initial stop and follow-up
+<a id="isolated-staging-deployment--initial-stop-and-follow-up"></a>
+
+# Isolated staging deployment: initial stop and follow-up
 
 2026-10-21. Operator explicitly approved the
 [bounded staging deployment](OPS-STAGING-DEPLOYMENT.md). Source pinned to
@@ -22,7 +24,7 @@
 Read-only HTTPS edge checks, without authentication or backend initialization,
 returned root 200 with `readiness: edge-only`, `/anchor/tip` 404 and
 `/registry/cards` 404. TLS verification remained enabled. These results establish
-the deployed route boundary, not service readiness.
+the deployed route boundary. The remaining readiness checks are recorded below.
 
 ## Stop and evidence limits
 
@@ -92,7 +94,8 @@ The D53 candidate's actual `ApiClient` signed in remotely in 10.9 seconds,
 read the expected mint metadata, revoked the smoke operator's sessions and
 verified bearer rejection. Public evidence contains no password, token,
 manager-key material, raw receipt or card identity. These few timings establish
-functional compatibility, not a production load/abuse-resistance claim.
+functional compatibility. Production load and abuse resistance require
+separate testing.
 
 An isolated staging app checkout passed public HTTPS-origin/release-gate
 preflight and generated iOS/Android release JavaScript bundles. It retains both
@@ -166,7 +169,7 @@ NTFY `2.32.0:0` was installed from Start9's primary marketplace on Zion,
 initialized and given a verified HTTPS address. A dedicated non-admin subscriber
 has read-only access to the recovery-health topic. Live checks returned HTTP 403
 for anonymous reading, 200 for subscriber reading, and 403 for subscriber writing.
-Generated credentials remain in protected operator storage, not this report.
+Generated credentials remain in protected operator storage.
 
 Atoll's Connect NTFY action succeeded without token entry, obtaining its own
 write-only publisher through the dependency action. Starting Atoll launched both

@@ -26,7 +26,7 @@ claim deployment or authorize Cloudflare access by itself.
    login only for read-only account metadata and the explicitly selected staging
    target. Do not read production Worker/DO/R2 data or secrets. If account choice
    is ambiguous, stop for account selection. Check only the exact staging resource
-   names; an existing Worker/bucket needs explicit reconciliation, not overwrite.
+   names; an existing Worker/bucket needs explicit reconciliation before further action.
 2. Create the staging bucket and deploy only the explicit staging config. If
    the account needs plan enrollment/billing activation or new permissions, stop
    for its owner; do not enable account products automatically.

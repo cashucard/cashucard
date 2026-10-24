@@ -12,13 +12,13 @@ The wire remains [APDU.md](../spec/APDU.md); no new card command is proposed.
 | Card spending key | Generated and retained inside the chip; never exported. Signs the card's payments. |
 | Card-manager keys | Existing ops-service escrow; scoped applet-management access. Not an owner-signing authority. |
 | Owner key | Holder wallet controls the P-256 private key and its backup/recovery. Administers PIN, limits and authorized loads. |
-| Operator session | Authorizes an issuer batch/attempt, not ownership of the holder's wallet or its funds. |
+| Operator session | Authorizes an issuer batch/attempt. The holder wallet controls ownership and funds. |
 
 Neither the provisioner nor ops-service generates, stores, derives or receives
 the holder's private owner key. Do not reuse the manager-key master, a temporary
 phone key, the operator's personal wallet or the published TEST owner key.
 A wallet may follow the existing per-card owner derivation in the protocol;
-this repo defines the public integration boundary, not the wallet seed store.
+this repo defines the public integration boundary. The wallet defines its seed storage.
 
 Manager-key custody remains a separate trust risk: replacing an applet can
 remove its private spending key and destroy access to funds. Holder ownership
@@ -97,8 +97,8 @@ in ordinary journals, records or recovery exports.
 
 A future holder-completion API must authenticate the holder's authority for
 that installation and fence replays/configuration changes. Card AUTH proves
-possession of the spending key, not correct mint/PIN/owner configuration or the
-human's ownership. The current wire does not sign a full configuration
+possession of the spending key. Configuration and the human's ownership
+require separate evidence. The current wire does not sign a full configuration
 attestation; document any trusted-wallet assertions rather than describing them
 as cryptographically verified card configuration. No server boolean can fill
 missing card evidence. That API is not required for issuer installation v1 and
@@ -143,8 +143,9 @@ these separate outcomes before any of those paths can certify readiness:
 | Owner unknown or signer unavailable | Stop and retain evidence; neither ops-service nor a temporary issuer key may take ownership to bypass it. |
 | Identity, funds, lock or record differs from saved context | Stop before mutation and retain the original setup record. |
 
-These are recovery requirements, not implemented reset commands or hardware
-authorization. A reply lost after a write remains an uncertain write; the next
+These requirements define the signing/PIN integration boundary. They do not
+authorize hardware actions; the separate mobile-reset contract describes the
+implemented reset flow. A reply lost after a write remains an uncertain write; the next
 layer must reconcile before another operation. No ordinary journal stores the
 PIN or a reusable PIN-derived hash. A background service retry cannot authorize
 a new PIN attempt or replace holder acknowledgement.

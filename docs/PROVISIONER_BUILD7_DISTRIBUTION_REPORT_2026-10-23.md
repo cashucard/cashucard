@@ -1,4 +1,6 @@
-# Provisioner build 7 distribution preparation — 2026-10-23 Pacific
+<a id="provisioner-build-7-distribution-preparation--2026-10-23-pacific"></a>
+
+# Provisioner build 7 distribution preparation: 2026-10-23 Pacific
 
 Source is merged main `860eba49a16dcb36b5cff651e18d13a98c90f405` (#137), including
 the reset/reuse, status, sign-in, copy, keyboard and safe-exit improvements. The

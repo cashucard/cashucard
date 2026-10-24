@@ -1,4 +1,6 @@
-# Pixel validation setup — batch restart persistence passed
+<a id="pixel-validation-setup--batch-restart-persistence-passed"></a>
+
+# Pixel validation setup: batch restart persistence passed
 
 ENG-741, 2026-10-20. The operator explicitly approved a local validation
 build/install and one-card batch persistence check, stopping before NFC.
@@ -20,11 +22,10 @@ by this setup.
   Build succeeded (154 tasks).
 - APK SHA-256:
   `d80e3904486349653bc3c14d03b4bbf006e01a63e6a36b2b50e5cbc11a6c3045`.
-- Debug JS is served separately by isolated Metro on 8085, not embedded in
-  the APK. A host-fetched Android development bundle has SHA-256
+- Debug JS is served separately by isolated Metro on 8085. A host-fetched Android development bundle has SHA-256
   `dc2a1de8e545787bf25a2808f77a3d80944ae7440050f01563a3a55cea9e0136`;
   both enabled gate assignments were checked in that bundle. This hash
-  describes the saved host fetch, not an attested capture of phone traffic.
+  identifies the saved host fetch. Phone traffic was not independently captured.
 
 The existing package was updated with `adb install -r`; no uninstall or
 clear-data operation occurred. Added the isolated Metro reverse mapping
@@ -69,8 +70,8 @@ provisioning attempts. A consistent `VACUUM INTO` snapshot and matching private
 runtime were retained in the private run directory as `before-card-write.db`
 and `before-card-write-runtime.json`, both mode 0600. Snapshot integrity is
 `ok`; metadata confirms one count-1 batch, one escrow row, zero attempts. No
-key values were printed or requested through the key API. This is local
-retention only, not an encrypted independent export/restore proof.
+key values were printed or requested through the key API. This verifies local
+retention. An independently encrypted export/restore requires a separate check.
 
 Forced app stop, then copied its AsyncStorage database to the private run
 directory. The saved schema-2 workflow contains the exact identifiers above
@@ -81,7 +82,8 @@ showed the validation panel, `No pause armed` and `0 of 1 attempts acknowledged`
 A second private copy of AsyncStorage yielded a parsed workflow exactly equal
 to the pre-restart value, with the same serialized SHA-256. Batch 1, device ID
 and batch request ID survived; active attempt remains null. This establishes
-process-restart batch persistence on the Pixel, not card-install recovery.
+process-restart batch persistence on the Pixel. Card-install recovery requires
+a separate write drill.
 
 No NFC, attempt reservation, card authentication, LOAD, DELETE, key rotation
 or proof/PIN/owner operation has been performed.

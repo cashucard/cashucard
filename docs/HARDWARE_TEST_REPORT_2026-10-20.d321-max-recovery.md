@@ -1,4 +1,6 @@
-# Max fresh-card recovery drill — in progress
+<a id="max-fresh-card-recovery-drill--in-progress"></a>
+
+# Max fresh-card recovery drill: in progress
 
 ENG-741, 2026-10-20. After merging PRs #27–#29 and completing the
 [setup checks](HARDWARE_TEST_REPORT_2026-10-20.max-validation-setup.md), the
@@ -56,8 +58,8 @@ the applet was absent. No authentication, mutation or retry occurred. An initial
 host invocation used a nonexistent venv path and exited before Python or any
 reader access; the corrected invocation made the single connection above.
 
-This is evidence of no selectable Cashu applet, not a package inventory or a
-proof that no earlier installation command ran. It cannot establish key state.
+This establishes that the Cashu applet was not selectable. Package inventory
+and earlier installation-command history remain unknown. It cannot establish key state.
 The quarantine guard deliberately rejects an absent/partial applet after a
 saved install intent; it does not authorize another install or sweep.
 

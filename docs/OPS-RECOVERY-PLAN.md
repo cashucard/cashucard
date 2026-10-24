@@ -2,13 +2,12 @@
 
 2026-10-21. Current operator selections: an organization password manager
 (Vaultwarden on Zion) with designated recovery operators, Nextcloud on the
-operator's Start9 server,
-and a maximum acceptable 24-hour loss window. This replaces the initial
-HashiCorp Vault choice: the HCP account had no cluster, and the operator chose
-the simpler custody option (D55). Vaultwarden and Nextcloud are both on Zion.
-Hostnames, accounts, paths and credentials belong in a private operator
-inventory, not this repository. These selections do not authorize production
-deployment, host access or secret transfer.
+operator's Start9 server, and a maximum acceptable 24-hour loss window. This
+replaces the initial HashiCorp Vault choice: the HCP account had no cluster, and
+the operator chose the simpler custody option (D55). Vaultwarden and Nextcloud
+are both on Zion. Hostnames, accounts, paths and credentials belong in a private
+operator inventory. Keep those details outside this repository. These selections
+do not authorize production deployment, host access or secret transfer.
 
 ## Custody
 
@@ -58,9 +57,9 @@ with named individual members and verified access permissions. See
 No credential or identity is generated or transferred by this document.
 
 No HCP cluster, subscription or Vault deployment is required by this plan.
-Existing local staging key material remains rehearsal material, not production
-custody. No identity upload, migration, new production key or password-manager
-account change occurred while recording this decision.
+Existing local staging key material remains confined to rehearsal custody. No
+identity upload, migration, new production key or password-manager account
+change occurred while recording this decision.
 
 ## Independent encrypted copy
 
@@ -113,7 +112,8 @@ copy corruption; authenticated age decryption during a restore drill is the
 integrity/recipient check. Do not mirror upstream deletions, overwrite the only
 known-good snapshot or add automated pruning before retention is reviewed.
 
-Nextcloud is online storage, not an offline drive or immutable store. Recovery
+Nextcloud provides online storage. Maintain the separate protected offline
+copy and account for mutable destination files. Recovery
 must work without Cloudflare authentication, DNS/proxy access dependencies and
 the normal laptop; establish an independent access path if needed. Filesystem
 snapshots/offline copies administered separately from the copy credential are
@@ -133,20 +133,21 @@ proposal for production preparation; the approved staging schedule remains
 `17 3 * * *` until an explicit staging change is reviewed.
 
 Measure freshness using the source snapshot time of the newest independently
-verified copy, not its download/upload time. Alert on export/copy failure and
-when that source age reaches 18 hours. At 24 hours, treat recovery health as
-failed and require issuance to stop until fresh independent evidence exists.
-The operator selected an existing Start9 marketplace notification package on
-Zion. NTFY 2.32.0:0 is installed with HTTPS and a dedicated read-only subscriber;
-Atoll beta.4 obtained its private write-only publisher through the package
-action. Its first failure alert appeared in the authenticated read-only web
-subscription. Server acceptance and web receipt are verified; phone/desktop push
-and human acknowledgement remain separate checks.
-An independent monitor is still required for loss of Zion. Implement/test the
-issuance gate before claiming the 24-hour limit is enforced. A 12-hour cadence
-provides retry margin; it cannot guarantee the objective through an unbounded
-outage. Nightly exports plus a later copy can exceed 24 hours even in routine scheduling, so cadence alone
-must not be described as satisfying the accepted maximum.
+verified copy. Transfer timestamps do not establish snapshot freshness. Alert on
+export/copy failure and when that source age reaches 18 hours. At 24 hours,
+treat recovery health as failed and require issuance to stop until fresh
+independent evidence exists. The operator selected an existing Start9
+marketplace notification package on Zion. NTFY 2.32.0:0 is installed with HTTPS
+and a dedicated read-only subscriber; Atoll beta.4 obtained its private
+write-only publisher through the package action. Its first failure alert
+appeared in the authenticated read-only web subscription. Server acceptance and
+web receipt are verified; phone/desktop push and human acknowledgement remain
+separate checks. An independent monitor is still required for loss of Zion.
+Implement/test the issuance gate before claiming the 24-hour limit is enforced.
+A 12-hour cadence provides retry margin; it cannot guarantee the objective
+through an unbounded outage. Nightly exports plus a later copy can exceed 24
+hours even in routine scheduling, so cadence alone must not be described as
+satisfying the accepted maximum.
 
 ## Issuance enforcement implementation contract
 
@@ -161,14 +162,15 @@ through migration. A recovery administrator must deliberately enroll the copier
 for this authority. It does not receive plaintext escrow or the recovery key.
 
 The exporter must publish the exact snapshot `exported_at`, ciphertext SHA-256
-and byte length plus stable issuer UUID as immutable source metadata. Atoll may submit a receipt only
-after reading the artifact and its manifest back from Nextcloud and comparing
-both against the source. The issuer validates the object identity, digest, size,
-issuer and snapshot time against its own export metadata. Future-dated evidence,
-unknown objects, invalid metadata and revoked attestors cannot advance health.
-A retried or delayed receipt cannot move freshness backward or refresh an old
-snapshot by changing its copy time. This is a trusted copier assertion, not an
-independent cryptographic proof of storage at Nextcloud.
+and byte length plus stable issuer UUID as immutable source metadata. Atoll may
+submit a receipt only after reading the artifact and its manifest back from
+Nextcloud and comparing both against the source. The issuer validates the object
+identity, digest, size, issuer and snapshot time against its own export
+metadata. Future-dated evidence, unknown objects, invalid metadata and revoked
+attestors cannot advance health. A retried or delayed receipt cannot move
+freshness backward or refresh an old snapshot by changing its copy time. This is
+a trusted copier assertion rather than an independent cryptographic proof of
+storage at Nextcloud.
 
 Evaluate the age of the latest eligible source snapshot using the service clock.
 Missing evidence or an age of **24 hours or more** blocks new issuance. Export

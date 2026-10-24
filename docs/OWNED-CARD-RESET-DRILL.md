@@ -1,4 +1,6 @@
-# Local owned-card reset drill — card 09336320
+<a id="local-owned-card-reset-drill--card-09336320"></a>
+
+# Local owned-card reset drill: card 09336320
 
 Status: **completed on 2026-10-23**. Earlier invocations stopped at the CPLC
 gate before authorization. After identifying and isolating card 09336320, the

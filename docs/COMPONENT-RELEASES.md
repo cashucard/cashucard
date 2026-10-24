@@ -1,8 +1,8 @@
 # Component releases
 
-A monorepo commit can change several components. It does not require releasing
-all of them. No workflow in this change has been deployed or uploaded to a store;
-the pipelines below require the external environment/signing setup listed here.
+Each component has its own release version and tag. A commit can affect several
+components; release the components that need delivery. The pipelines below
+require the external environment and signing setup listed here.
 Release helpers require Python 3.13 (configured explicitly in their workflows).
 Existing store identities, upload keys and Cloudflare recovery secrets remain the
 authorities. Do not generate replacement signing keys to make CI pass.
@@ -16,11 +16,12 @@ authorities. Do not generate replacement signing keys to make CI pass.
 | Ops-service | `ops/package.json`: 0.1.0                                        | `ops-v0.1.0`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 10                  | `provisioner-v1.0.0-build.10` |
 
-These examples identify current source, not a request to republish existing store
-builds. The next mobile release needs a new monotonically increasing build in
-package.json, Android Gradle and iOS Info.plist. Historical `v2.1.0` and
-`provisioner-v1.0.0-beta.1` releases remain valid historical records; do not move or
-retag them. Corrected firmware Maven metadata does not alter the CAP.
+These examples identify source versions. Existing store build numbers remain
+reserved; use a new build number for a new upload. The next mobile release needs
+a new monotonically increasing build in package.json, Android Gradle and iOS
+Info.plist. Historical `v2.1.0` and `provisioner-v1.0.0-beta.1` releases remain
+valid historical records; do not move or retag them. Corrected firmware Maven
+metadata does not alter the CAP.
 
 Firmware's protocol major/minor follows SELECT/GET_INFO. An applet behavior change
 ships its rebuilt CAP, hash and generated load-file pins together, with hardware
@@ -139,7 +140,7 @@ changes run app type/lint/tests and both Metro bundles. Native/build changes als
 run Android. Backup copier changes include the actual local WebDAV round trip.
 Protocol, firmware, cardkit, ops auth/admission/schema, phone persistence/recovery,
 recovery contract tests and workflow policy changes retain the full integration
-matrix. This includes simulated mint integration, not a production mint.
+matrix. Mint integration runs against local simulated mints.
 
 `CI gate` always runs and requires selected jobs to succeed and unselected jobs
 to be skipped. A failed detector, missing job, cancelled matrix or selected-but-

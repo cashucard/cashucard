@@ -1,4 +1,6 @@
-# Max candidate card — read-only USB discovery
+<a id="max-candidate-card--read-only-usb-discovery"></a>
+
+# Max candidate card: read-only USB discovery
 
 ENG-741, 2026-10-20. The operator supplied another factory card for the
 proposed Max run and placed it on the named ACS ACR122U PICC Interface after
@@ -15,8 +17,8 @@ No authentication, retries or writes were attempted.
 New candidate: **`cplc-v1:4790d3213041093361205547`**, serial **09336120**.
 The Cashu applet is absent. No GET_INFO, public installation key or NFC-tag
 read followed. This is not a package/memory inventory or proof of universal
-blankness. Factory manager-key provenance is operator-reported, not established
-by trial authentication. No CAP was installed or identified by this check.
+blankness. The operator reported factory manager-key provenance. Trial authentication
+was not performed. No CAP was installed or identified by this check.
 
 The completed Pixel spare is a different chip:
 `cplc-v1:4790d3213041093363205547`, serial **09336320**. Both full IDs end in

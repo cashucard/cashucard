@@ -18,7 +18,7 @@ not an independently captured screenshot or transport transcript.
   Binary hashes and OS version were not recaptured during this check.
 - Card: serial `09336320`, post-provisioning installation
   `036ba3354ef98337603ad52f429e5a67214fd064e6f1c04cd784d1b11c3aa19490`.
-  This installation identity comes from the Pixel evidence, not from CPLC.
+  The Pixel evidence supplies this installation identity. CPLC identifies the chip separately.
 
 The operator initially attempted sign-in, then was directed to the offline
 demo door: Review in demo mode → Settings → Read physical card identity.

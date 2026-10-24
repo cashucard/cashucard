@@ -1,7 +1,7 @@
 # On-silicon test report: phones install 2.1 on a J3R180 over NFC (2026-10-18)
 
 ENG-738. The card program's Phase-1 spike: decide whether a phone can be the
-GlobalPlatform transport for installing the 2.1 applet — the card side was
+GlobalPlatform transport for installing the 2.1 applet. The card side was
 already proven (the 2026-10-14 report put 20 KB on this chip through the
 ACR122U's RF interface). Here a Google Pixel 8 Pro and an Apple iPhone 13 Pro
 Max each ran the full bench sequence against the spare J3R180 with no USB:
@@ -10,12 +10,12 @@ card-manager key rotation to the spike's public test set and back, and the
 torn-run drills. After each phone's sequence, the card was cross-checked
 from a Mac on the ACR122U: `cardctl selftest` 12/12 and `gp --list`.
 
-**Verdict: both phones pass; the phone is a GP transport.** The plan's pass
+**Result: both phones completed the planned GP transport checks.** The plan's pass
 bar was iOS arm-to-done at most 45 s in 5 of 5 installs and no Android
 TagLost in 5 of 5. iOS measured 9,335–10,698 ms in five of five; Android
 completed five of five with no TagLost, its one captured install 13,065 ms.
-The CoreNFC 60 s reader-session budget — the plan's only candidate hard wall
-— was exceeded by 461 ms in a drill armed 51.8 s before the tap and the run
+The CoreNFC 60 s reader-session budget, the plan's candidate session limit,
+was exceeded by 461 ms in a drill armed 51.8 s before the tap and the run
 still completed; card-active time is ~9–11 s on both phones. Neither
 fallback (USB-only install; Android-only or a resumable load) is needed.
 
@@ -77,13 +77,13 @@ iPhone, five measured runs (the bar was 45 s in 5 of 5):
 | 4 | 1,995 ms | 10,698 ms | 49,302 ms | 5,689 ms | 102 | same |
 | 5 | 1,683 ms | 10,393 ms | 49,607 ms | 5,691 ms | 102 | same |
 
-Pixel: five of five completed, **no TagLost in any**, and each torn-run
-drill recovered (below) — the Android bar. One run's readout survives (the
-last, after the drills): tap wait 3,558 ms, arm→done **13,065 ms**, load
-7,031 ms, 101 APDUs, FF21 164,024 → 109,920. The earlier four runs'
-timings were not captured — the app keeps only its latest readout and its
-Share was failing silently (both fixed in PR #5) — so per-run Android
-numbers rest on the owner's observation alone and say so here.
+Pixel: five of five completed, **no TagLost in any**, and each torn-run drill
+recovered (below), meeting the Android acceptance criterion. One run's readout
+survives (the last, after the drills): tap wait 3,558 ms, arm→done **13,065
+ms**, load 7,031 ms, 101 APDUs, FF21 164,024 → 109,920. The earlier four runs'
+timings were not captured: the app kept only its latest readout and its Share
+action failed silently (both fixed in PR #5). The earlier Android runs are
+supported by the owner's observations.
 
 Per-phase on both phones: probe 16–37 ms, ISD select+login (SCP02)
 ~95–160 ms in 4 APDUs, the three instantiations ~220 ms, ~1.25 s and ~0.24
@@ -92,13 +92,15 @@ s (opener, card, tag; the card applet's INSTALL is the slow single APDU at
 last). The ACR122U reference for the same load is 13.4 s: the iPhone is
 faster than the bench reader, the Pixel about level with it.
 
-## The iOS 60-second budget is not a wall at 60.0 s
+<a id="the-ios-60-second-budget-is-not-a-wall-at-600-s"></a>
+
+## iOS reader-session timing
 
 Drill 4 on iOS: the NFC session armed, the card tapped ~50 s later:
 
 | tap wait | arm → done | 60 s headroom | card-active time | Result |
 |---|---|---|---|---|
-| 51,762 ms | 60,461 ms | −461 ms | ~8.7 s (the run's own work above the wait) | **done — completed after the nominal budget** |
+| 51,762 ms | 60,461 ms | −461 ms | ~8.7 s (the run's own work above the wait) | **done; completed after the nominal budget** |
 
 CoreNFC on iOS 26.5.2 did not kill the session at 60.0 s. With every normal
 run's card-active window at 9–11 s, the 60 s concern behind the plan's
@@ -121,23 +123,25 @@ not captured (same app limitation; attested).
 | lift the card mid-LOAD | next tap recovered (probe → sweep → install) | recovered |
 | lift at "Installing card" | recovered; the screen required Replace on first (by design) | recovered, same |
 | force-quit the app mid-load | recovered after relaunch | recovered after relaunch |
-| background mid-load (Android) | recovered | — |
-| armed ~50 s before the tap (iOS) | — | completed (above) |
+| background mid-load (Android) | recovered | not run |
+| armed ~50 s before the tap (iOS) | not run | completed (above) |
 
 FF21 across the day: 164,024 bytes free on the swept card; 109,920 free
-with the 2.1 set on — the install's footprint is 54,104 bytes. Every
+with the 2.1 set on. The install's footprint is 54,104 bytes. Every
 Replace run nets 0, and the card ended every drill-plus-install cycle at
 the same 109,920: the sweep path reclaims fully and no torn run leaked
 EEPROM. The card was never bricked and never needed a bench intervention;
 the end state is the applet installed, empty, on factory keys.
 
-## Not covered here
+<a id="not-covered-here"></a>
+
+## Coverage limits
 
 - Pixel install timings for runs 1–4, and all smoke and rotation timings on
-  both phones: attested, not captured (the app keeps only its latest
+  both phones: reported without captured timings (the app keeps only its latest
   readout and its Share failed silently during the Pixel session; fixed in
   PR #5).
-- A Release-build iOS run — the plan's remedy if Debug timing were
+- A Release-build iOS run, the plan's remedy if Debug timing were
   marginal. It was not marginal (≥4.2× under the bar), so none was run.
 - SCP03: the card offers SCP02 only (`gp -i -v`, 2026-10-17); D27 stands.
 - Any card but the spare; any transport but the two phones and the ACR122U.
@@ -150,4 +154,4 @@ the end state is the applet installed, empty, on factory keys.
   build fails under Xcode 26) and the Share-failure message.
 - The program's next steps per the plan: Phase 2 (cardkit's `apdu/` +
   `personalize/` extraction, flash-mobile first) and the Phase-3
-  ops-service design — after the Foxy governance conversation.
+  ops-service design, after the Foxy governance conversation.

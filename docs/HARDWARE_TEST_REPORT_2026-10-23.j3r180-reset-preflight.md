@@ -1,4 +1,6 @@
-# Read-only reset preflight — J3R180, 2026-10-23
+<a id="read-only-reset-preflight--j3r180-2026-10-23"></a>
+
+# Read-only reset preflight: J3R180, 2026-10-23
 
 ## Scope and environment
 
@@ -46,9 +48,9 @@ or print key bytes. It did not inspect production or staging service state.
 ## Boundaries
 
 No GlobalPlatform authentication, DELETE, LOAD, PUT KEY, owner command, write
-or retry was attempted. Zero occupied proof slots are evidence about this
-card's current applet state, not a mint reconciliation or proof that historical
-manager keys remain active. Before an owned-card reset, the service must
+or retry was attempted. Zero occupied proof slots describe this
+card's current applet state. Mint reconciliation and the active manager keys
+require separate evidence. Before an owned-card reset, the service must
 reconcile any later attempt on this chip across origins, verify exact escrow
 provenance, persist a card-specific intent and handle interruption. No reset
 was authorized or performed in this run.

@@ -1,4 +1,6 @@
-# Physical card end-to-end plan — 09336320
+<a id="physical-card-end-to-end-plan--09336320"></a>
+
+# Physical card end-to-end plan: 09336320
 
 Status: operator approved on 2026-10-23, including the named devices, normal
 production app traffic and the 100-sat funding/fees cap. The production block

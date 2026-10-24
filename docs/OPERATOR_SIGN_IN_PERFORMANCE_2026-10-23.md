@@ -1,4 +1,6 @@
-# Operator sign-in performance — 2026-10-23
+<a id="operator-sign-in-performance--2026-10-23"></a>
+
+# Operator sign-in performance: 2026-10-23
 
 Issue #121 recorded production operator sign-in requests taking 8,847 and
 8,719 ms, versus 75–262 ms for subsequent authenticated admin reads. This
@@ -54,8 +56,8 @@ the operator reported an initial successful sign-in taking **about four seconds*
 then signed out and back in repeatedly; every repeat was **almost instant**.
 The Cards screen showed NEW BATCH. This matches the expected one-time legacy
 verification/upgrade followed by native verification, but no stored hash was
-inspected. These are user-observed phone timings, not browser instrumentation
-or an exact numeric before/after comparison with the earlier Chrome baseline.
+inspected. These timings are user observations. An instrumented before/after comparison
+with the earlier Chrome baseline remains pending.
 
 The operator also confirmed Sign In remains visible while typing with the
 keyboard open and the removed demo entry is absent. Compatibility, revocation,

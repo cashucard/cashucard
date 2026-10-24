@@ -1,4 +1,6 @@
-# Pixel replacement and interrupted-install recovery — three boundaries passed
+<a id="pixel-replacement-and-interrupted-install-recovery--three-boundaries-passed"></a>
+
+# Pixel replacement and interrupted-install recovery: three boundaries passed
 
 ENG-741, 2026-10-20. The operator explicitly approved the bounded Pixel
 write/recovery drill and requested merging #22, #23 and #24 first.
@@ -145,13 +147,13 @@ loss. No further card-control tap was issued. The UI restored
 is retained at
 [the final Pixel screen](hardware/2026-10-20/pixel-recovery-recorded.png).
 
-A final private AsyncStorage copy confirms active null, batch 1 next ordinal
-1, and exactly one recorded history entry for the original attempt. Its
+A final private AsyncStorage copy confirms active null, batch 1 next ordinal 1,
+and exactly one recorded history entry for the original attempt. Its
 frozen_record string is byte-identical to the pre-kill saved string. The local
-service contains exactly one attempt and one installation record. Parsed
-service body equals the frozen record; service receipt equals the phone's
-stored receipt. This verifies persisted contents, not a captured HTTP wire
-transcript. The receipt is:
+service contains exactly one attempt and one installation record. Parsed service
+body equals the frozen record; service receipt equals the phone's stored
+receipt. This verifies persisted contents. An HTTP wire transcript was not
+captured. The receipt is:
 
 - Attempt `ac3575ad-6be4-4595-b213-97f89afabda6`, revision 2.
 - Installation
@@ -182,13 +184,14 @@ in the local escrow/database/master state; they are not printed here.
 
 ## Limits and remaining work
 
-This is one composite successful run, not a full release validation. The
+This records one composite successful run. The remaining release checks are
+listed below. The
 initial USB interruption occurred before the first recorded binding and is
 not counted as a planned post-write boundary. No actual mid-LOAD tear, lost
 PUT KEY reply, wrong-card substitution, failed authentication or permanent
 lock scenario was injected. No raw APDU transcript was captured, so precise
 command counts/no-replay claims rely on the tested source paths plus observed
-state, not an independent transport trace.
+state. An independent transport trace was not captured.
 
 Max's optional post-install CPLC comparison and full iPhone write/recovery
 drills were not run. No Worker deployment or production service/mint was
