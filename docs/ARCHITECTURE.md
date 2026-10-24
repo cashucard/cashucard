@@ -144,6 +144,6 @@ settlement loop. The [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r18
 records reset/reinstall evidence. These are bounded observations, not blanket
 compatibility or production-safety claims for all devices/cards.
 
-For wire and data layouts, use [NUT-XX](../spec/NUT-XX.md) and
+For wire and data layouts, use [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md) and
 [APDU](../spec/APDU.md). For zero-allocation and hardware rules, use
 [CONTRIBUTING](../CONTRIBUTING.md) and [AGENTS](../AGENTS.md).

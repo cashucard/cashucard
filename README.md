@@ -7,11 +7,11 @@ account, and no internet at the point of sale.
 
 This is the **shared Cashu card protocol, version 2.1**: one wire for Flash and
 for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
-of **NUT-XX: Cashu NFC Card Protocol** ([`spec/NUT-XX.md`](spec/NUT-XX.md)).
+of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
 
 The card is developed here. [cashucard/javacard](https://github.com/cashucard/javacard),
-where it began, stays the protocol reference: a read-only mirror of [`spec/`](spec/),
-copied there after each spec change merges here ([`AGENTS.md`](AGENTS.md)).
+where it began, keeps a read-only mirror of [`spec/`](spec/), copied there after
+each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 
 > ### Credit
 >
@@ -43,7 +43,7 @@ copied there after each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 |---|---|
 | **Curious what this is** | [`docs/VISION.md`](docs/VISION.md) |
 | **A developer joining the project** | [`VISION`](docs/VISION.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`CONTRIBUTING`](CONTRIBUTING.md) |
-| **Implementing a reader or wallet** | [`spec/NUT-XX.md`](spec/NUT-XX.md) → [`spec/APDU.md`](spec/APDU.md) → [`spec/vectors/`](spec/vectors/) |
+| **Implementing a reader or wallet** | [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md) → [`spec/APDU.md`](spec/APDU.md) → [`spec/vectors/`](spec/vectors/) |
 | **Reading the design in full** | [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) |
 | **An AI agent working in this repo** | [`AGENTS`](AGENTS.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`GLOSSARY`](docs/GLOSSARY.md). The decisions file exists so settled calls are not re-litigated. |
 | **Auditing security** | [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md); the ops service's is [`docs/OPS-THREAT-MODEL.md`](docs/OPS-THREAT-MODEL.md) |
@@ -164,16 +164,19 @@ tools/cardctl/          PC/SC host driver (2.0) + its own tests
 tools/cardsim/          jCardSim card over localhost HTTP for app e2e, its client and e2e
 tools/chip/             Foxy's bench scripts for a card on a reader
 tools/cardkit/          GlobalPlatform for the phone: SCP02, the install, a fake card (D27)
-apps/provisioner/       bench spike: installs the card's applet from a phone over NFC (ENG-738)
-spec/                   NUT-XX.md (protocol), APDU.md (wire format), vectors/,
+apps/provisioner/       the operator app: installs the card's applet from a phone over NFC
+spec/                   APDU.md (wire format and profiles), vectors/,
                         CARD-FILE.md (0.x host↔mint interchange format)
 docs/                   vision, architecture, decisions, security, glossary, Foxy's design
 ```
 
 ## Spec
 
-[`spec/NUT-XX.md`](spec/NUT-XX.md) is a draft, intended for submission to
-[cashubtc/nuts](https://github.com/cashubtc/nuts) once 2.0 has run on hardware.
+The protocol's core is NUT-CCP, a draft NUT in [cashucard/nut](https://github.com/cashucard/nut),
+written to be proposed to [cashubtc/nuts](https://github.com/cashubtc/nuts). A
+change to the core starts there. [`spec/APDU.md`](spec/APDU.md) gives every
+command byte for byte, with the profiles NUT-CCP leaves to implementations: the
+owner, the clock and the limits, and the NFC tag.
 
 ## Related
 

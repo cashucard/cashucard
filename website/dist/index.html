@@ -26,18 +26,18 @@
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
       <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu.png" alt="" width="32" height="37" /><span>cashu<span>card</span></span></a>
-      <nav aria-label="Main navigation"><a href="#film">Film</a><a href="#tap">One tap</a><a href="#buy">Get cards</a><a href="/guide">Install guide</a><a href="#source">Protocol and code</a></nav>
+      <nav aria-label="Main navigation"><a href="#film">Film</a><a href="#tap">One tap</a><a href="#buy">Get cards</a><a href="#install">Install</a><a href="#source">Protocol and code</a></nav>
       <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
     </header>
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-copy">
-          <div class="eyebrow"><span class="status-dot"></span> OPEN NFC PROTOCOL <span class="eyebrow-divider">/</span> DRAFT 2.1</div>
+          <div class="eyebrow"><span class="status-dot"></span> OPEN NFC PROTOCOL <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
           <h1 id="hero-title">Cashu,<br /><em>now on a card.</em></h1>
           <p>Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.</p>
           <div class="hero-actions">
-            <a class="button button-bright" href="https://github.com/cashucard/cashucard/blob/main/spec/NUT-XX.md">Read the draft <span aria-hidden="true">↗</span></a>
+            <a class="button button-bright" href="https://github.com/cashucard/nut/blob/main/CCP.md">Read the draft <span aria-hidden="true">↗</span></a>
             <a class="button button-outline" href="https://github.com/cashucard/cashucard">Browse the code <span aria-hidden="true">↗</span></a>
           </div>
         </div>
@@ -129,7 +129,7 @@
         <div class="buy-head">
           <div class="eyebrow"><span class="status-dot"></span> CARDS <span class="eyebrow-divider">/</span> NXP J3R180</div>
           <h2 id="buy-title">Where to get cards</h2>
-          <p>The Cashu Card applet runs on NXP J3R180 cards (JCOP 4, Java Card 3.0.5) with contact and contactless interfaces. Buy them unfused and initialized, with the default GlobalPlatform keys, and the <a href="/guide">install guide</a> takes you through installing the applet.</p>
+          <p>The Cashu Card applet runs on NXP J3R180 cards (JCOP 4, Java Card 3.0.5) with contact and contactless interfaces. Buy them unfused and initialized, with the default GlobalPlatform keys, then <a href="#install">install the applet</a> from a phone or a computer.</p>
         </div>
         <div class="buy-grid">
           <article class="buy-option" aria-labelledby="buy-test-title">
@@ -164,12 +164,38 @@
           </article>
         </div>
       </section>
+      <section class="buy-section install-section" id="install" aria-labelledby="install-title">
+        <div class="buy-head">
+          <div class="eyebrow"><span class="status-dot"></span> SETUP <span class="eyebrow-divider">/</span> CASHU CARD APPLET</div>
+          <h2 id="install-title">Install the applet</h2>
+          <p>A blank card needs the Cashu Card applet before it can hold ecash. Install it from a phone or from a computer.</p>
+        </div>
+        <div class="install-grid">
+          <article class="buy-option install-app" aria-labelledby="install-app-title">
+            <span class="buy-kicker">01 / WITH A PHONE</span>
+            <div class="app-id"><img src="/assets/provisioner-icon.png" width="60" height="60" alt="" /><div><h3 id="install-app-title">Cashu Card Provisioner</h3><span>1.0.0 beta for iPhone and Android</span></div></div>
+            <p>The app installs the applet on blank cards over the phone's NFC. Card issuers sign in with an operator account.</p>
+            <div class="app-stores">
+              <a class="button button-bright" href="https://testflight.apple.com/join/M3JucFNy">iPhone beta on TestFlight <span aria-hidden="true">↗</span></a>
+              <a class="button button-outline" href="https://play.google.com/apps/testing/com.islandbitcoin.provisioner">Android beta on Google Play <span aria-hidden="true">↗</span></a>
+            </div>
+            <a class="app-release" href="https://github.com/cashucard/cashucard/releases/tag/provisioner-v1.0.0-build.9">Release files and checksums <span aria-hidden="true">↗</span></a>
+          </article>
+          <article class="buy-option" aria-labelledby="install-guide-title">
+            <span class="buy-kicker">02 / WITH A COMPUTER</span>
+            <h3 id="install-guide-title">The install guide</h3>
+            <p>A USB card reader and GlobalPlatformPro install the applet, with the answer to expect from each command. A prompt hands the steps to an AI agent.</p>
+            <ul class="buy-facts"><li>macOS or Linux</li><li>Any PC/SC reader</li></ul>
+            <a class="button button-outline" href="/guide">Open the install guide <span aria-hidden="true">→</span></a>
+          </article>
+        </div>
+      </section>
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/spec/NUT-XX.md">Draft specification ↗</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/guide">Install guide</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="https://github.com/lnflash/flash-mobile">Flash Mobile ↗</a><a href="https://github.com/getfoxy/iOS">Foxy ↗</a><a href="https://github.com/lnflash/flash-pos">Flash POS ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="https://github.com/lnflash/flash-mobile">Flash Mobile ↗</a><a href="https://github.com/getfoxy/iOS">Foxy ↗</a><a href="https://github.com/lnflash/flash-pos">Flash POS ↗</a><a href="#install">Cashu Card Provisioner</a></div>
       </div>
       <div class="footer-bottom"><span>© CASHU CARD · OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>

@@ -1,6 +1,6 @@
 # Contributing to cashu-card
 
-An open-source implementation of [NUT-XX: Cashu NFC Card Protocol](spec/NUT-XX.md).
+An open-source implementation of [NUT-CCP: Cashu Card Protocol](https://github.com/cashucard/nut).
 Contributions are welcome — including from people who have never touched a
 smartcard before.
 
@@ -137,8 +137,8 @@ for actual device/card behavior, not a passing simulator suite.
 1. **Security first.** The card's private key must never leave the chip.
 2. **Spend protection is irreversible.** A slot marked spent must never be
    unmarked. No APDU may exist that does so.
-3. **Spec alignment.** Commands must match NUT-XX. If the spec is ambiguous,
-   raise it before implementing.
+3. **Spec alignment.** Commands must match NUT-CCP and `spec/APDU.md`. If the
+   spec is ambiguous, raise it before implementing.
 4. **Portability.** Any JavaCard 3.0.5+ chip with secp256k1. Avoid
    chip-specific APIs.
 5. **No allocation after install.** JavaCard Classic allocates `new` in
@@ -165,11 +165,11 @@ for actual device/card behavior, not a passing simulator suite.
 2. All PRs must pass CI.
 3. Security-sensitive changes (key handling, spend logic, anything in
    `SchnorrHW`) require two reviewers.
-4. Spec changes should be discussed in
-   [cashubtc/nuts](https://github.com/cashubtc/nuts) before implementation.
-   They are made here: [cashucard/javacard](https://github.com/cashucard/javacard),
-   the protocol reference, mirrors this repo's `spec/` after each merge and
-   takes no spec PRs of its own.
+4. A change to the protocol's core starts as a pull request in
+   [cashucard/nut](https://github.com/cashucard/nut), before any implementation
+   changes. Changes to `spec/` (the command reference, its profiles and the
+   vectors) are made here; [cashucard/javacard](https://github.com/cashucard/javacard)
+   mirrors this repo's `spec/` after each merge and takes no spec PRs of its own.
 5. **Do not claim testing you did not perform.** In a repo handling bearer
    funds, reviewers have to take those statements at face value.
 
