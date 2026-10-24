@@ -1,7 +1,7 @@
 # Mobile reset and reuse — J3R180 09336320, 2026-10-23
 
-Status: **on-phone cleanup, reset and fresh installation passed**. The optional
-independent USB post-check is awaiting card placement. This run validates the
+Status: **on-phone cleanup, reset, fresh installation and independent USB
+post-check passed**. This run validates the
 mobile lifecycle added for [issue #92](https://github.com/lnflash/cashu-card/issues/92),
 under the operator-approved [device/card plan](OWNED-CARD-MOBILE-RESET.md).
 
@@ -69,16 +69,35 @@ under the operator-approved [device/card plan](OWNED-CARD-MOBILE-RESET.md).
 
 The exports are phone-produced public evidence of the service acknowledgement,
 not a separately downloaded server receipt. Screenshots and exports were retained
-locally in the protected validation directory; no keys, PINs, passwords, proof
+locally in the protected validation directory; no private keys, PINs, passwords, proof
 secrets or authentication transcripts are included in this report.
 
 ## Independent USB post-check
 
-Pending the operator placing this same card alone on the ACS ACR122U PICC
-Interface. The approved check is one connection with SELECT ISD, CPLC, SELECT
-the full Cashu applet AID, GET_INFO, GET_PUBKEY and SELECT tag. It must match
-the exact chip and new full key before recording a fresh empty state. No
-authentication, write, automatic retry or additional command is authorized.
+At **2026-10-24T00:16:32Z** (October 23, 17:16 Pacific), one connection to the
+**ACS ACR122U PICC Interface** sent exactly six commands: SELECT ISD, GET CPLC,
+SELECT full Cashu applet AID, GET_INFO (30-byte form), GET_PUBKEY and SELECT tag.
+Full CPLC matched before applet inspection. The complete public key matched the
+acknowledged batch 6 export above and differed from the removed installation.
+
+| Observation | Result |
+| --- | --- |
+| SELECT and GET_INFO version | 2.1 |
+| Proof slots | 0 unspent, 0 spent, 128 empty |
+| Owner / PIN / card record | None / none / unset |
+| Locked | No |
+| NFC tag | SELECT succeeded |
+| Authentication / writes / retries | None / none / none |
+
+Before this successful invocation, two reader-discovery attempts found no PC/SC
+reader and made **zero connections and zero card commands**. The operator
+reconnected the reader and requested another invocation. Those readiness stops
+were not authentication failures or automatic card-command retries.
+
+The check independently confirms the installed public identity and fresh state.
+It does not authenticate manager keys, extract CAP bytes or read NDEF contents.
+Only its public summary was retained; no APDU transcript or proof material was
+captured. The card remains awaiting holder-wallet setup before funding/spending.
 
 ## Coverage limits
 

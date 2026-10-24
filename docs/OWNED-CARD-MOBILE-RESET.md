@@ -31,7 +31,7 @@ API origin, erase app storage or guess manager keys to get past it. Follow
 [reset reconciliation](RESET-RECONCILIATION.md) for a historical foreign reset.
 Malformed remnants after interrupted cleanup require administrator review.
 
-## Approved hardware validation — completed on phone
+## Approved hardware validation — completed
 
 - Phone: **SuperMax, iPhone 17 Pro (`iPhone18,1`)**, CoreDevice
   `FCA5FD0D-FFE0-551B-A6F4-D7BC44EC956D`. Install the reviewed candidate
@@ -73,6 +73,8 @@ also verified that Stop for now preserves the same saved zero-slot reset review
 across navigation after the keyboard and safe-exit updates.
 
 See the [dated hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
-for evidence, source versions and coverage limits. The optional independent USB
-post-check awaits card placement. No holder setup or funding followed the fresh
-installation in this drill.
+for evidence, source versions and coverage limits. The independent ACS USB
+post-check matched the full new public key, applet 2.1, 0 unspent / 0 spent /
+128 empty slots, no owner/PIN/record, unlocked state and selectable tag. It made
+no authentication attempt or write. No holder setup or funding followed the
+fresh installation in this drill.
