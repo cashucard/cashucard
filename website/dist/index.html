@@ -15,17 +15,19 @@
     <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href="https://cashucard.org/" />
-    <link rel="icon" href="/assets/cashu.png" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
     <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
-    <script src="/seq/tap-2/anchors.js" defer></script>
+    <script src="/seq/tap-3/anchors.js" defer></script>
     <script src="/motion.js" defer></script>
     <title>Cashu Card | Open NFC ecash protocol</title>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
-      <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu.png" alt="" width="32" height="37" /><span>cashu<span>card</span></span></a>
+      <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
       <nav aria-label="Main navigation"><a href="#film">Film</a><a href="#tap">One tap</a><a href="#buy">Get cards</a><a href="#install">Install</a><a href="#source">Protocol and code</a></nav>
       <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
     </header>
@@ -49,7 +51,7 @@
             <div class="hero-card-sheen"></div>
             <div class="hero-card-top"><span>cashu<span>card</span></span><svg class="card-nfc" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M9 8a6 6 0 0 1 0 8m4-11a10 10 0 0 1 0 14m4-17a14 14 0 0 1 0 20"/></svg></div>
             <div class="hero-chip"><i></i><i></i><i></i></div>
-            <img class="hero-mascot" src="/assets/cashu.png" alt="" width="150" height="172" />
+            <img class="hero-mark" src="/assets/cashu-card-mark-green.svg" alt="" width="160" height="160" />
             <div class="hero-card-bottom"><span>CASHU ECASH CARD</span><span>↗</span></div>
           </div>
           <span class="visual-cross cross-a">+</span><span class="visual-cross cross-b">+</span>
@@ -63,9 +65,9 @@
         </div>
         <figure class="film">
           <div class="film-screen" id="film-screen">
-            <video id="reel" controls playsinline muted preload="metadata" poster="/film/poster-2.jpg" aria-label="Cashu Card film, 48 seconds. A wallet loads the card, an offline till takes a tap, and the till settles with the mint later." aria-describedby="film-text">
-              <source src="/film/cashu-card-film-2-720.mp4" type="video/mp4" media="(max-width: 800px)" />
-              <source src="/film/cashu-card-film-2.mp4" type="video/mp4" />
+            <video id="reel" controls playsinline muted preload="metadata" poster="/film/poster-3.jpg" aria-label="Cashu Card film, 48 seconds. A wallet loads the card, an offline till takes a tap, and the till settles with the mint later." aria-describedby="film-text">
+              <source src="/film/cashu-card-film-3-720.mp4" type="video/mp4" media="(max-width: 800px)" />
+              <source src="/film/cashu-card-film-3.mp4" type="video/mp4" />
             </video>
             <button class="film-play" id="film-play" type="button" hidden>Play the film <span aria-hidden="true">▶</span></button>
           </div>
@@ -112,7 +114,7 @@
               </div>
               <figure class="seq-stage">
                 <div class="seq-screen" id="seq-screen">
-                  <img class="seq-poster" id="seq-poster" src="/seq/tap-2/tap_053.webp" width="1600" height="1000" alt="A Cashu Card held to the back of a merchant's phone, its chip lit as it signs the payment." />
+                  <img class="seq-poster" id="seq-poster" src="/seq/tap-3/tap_053.webp" width="1600" height="1000" alt="A Cashu Card held to the back of a merchant's phone, its chip lit as it signs the payment." />
                   <canvas id="seq-canvas" aria-hidden="true"></canvas>
                   <svg class="seq-leaders" id="seq-leaders" aria-hidden="true"></svg>
                   <div class="seq-callouts" id="seq-callouts" aria-hidden="true"></div>

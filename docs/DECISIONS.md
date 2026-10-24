@@ -3398,3 +3398,27 @@ links.
 marketing pages instead of their GitHub pages.
 
 **Rejected:** separate Flash Mobile and Flash POS links to the same page.
+
+## <a id="d120"></a>D120: cashucard.org, the film and the social kit carry the Cashu Card mark
+
+**Decided (2026-10-24):** the D119 mark replaces the Cashu mascot everywhere
+the public sees Cashu Card. On cashucard.org, the header is the brand's
+outlined lockup, the tab icons are the brand's favicon set, the hero card wears
+the deep green mark where the mascot sat (36% wide, 7% from the right, 17% from
+the top), and the install section shows the provisioner's new icon. The film's
+card face (`cardart.js` in cashucard-film) paints the same mark in the same
+place, so the card in the film, its steps, its screens and the share image all
+match; they are rendered again as `film-3`, `poster-3`, `seq/tap-3` and
+`og.jpg`. The social kit's clips and stills are rendered again from the new
+face. The smoke test holds the header, the tab icons and the hero card to the
+mark, and fails if the home page shows the mascot.
+
+**Why:** the user asked on 2026-10-24 for the mark on the site's tab icon and
+header, the film's card face and the social kit, right after choosing it.
+
+**Rejected:** the live-text wordmark in the header, because the site's font
+files stop at semibold and the mark's wordmark is drawn at 800; switching the
+site to Figtree's variable font would have made every headline heavier.
+Redrawing `concepts.html`'s finish studies, which stay as the record of the
+card before the mark.
+

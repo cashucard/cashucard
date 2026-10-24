@@ -131,7 +131,7 @@
   const prev = byId("seq-prev"), next = byId("seq-next"), count = byId("seq-count"), slotsCount = byId("slots-count");
   const steps = [...root.querySelectorAll("#steps li")], cells = [...root.querySelectorAll("#slots i")];
   const A = window.TAP_ANCHORS, N = A.length;
-  const frameUrl = (i) => "/seq/tap-2/tap_" + String(i).padStart(3, "0") + ".webp";
+  const frameUrl = (i) => "/seq/tap-3/tap_" + String(i).padStart(3, "0") + ".webp";
   const reduce = matchMedia("(prefers-reduced-motion: reduce)"), narrow = matchMedia("(max-width: 900px)");
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x)), lerp = (a, b, t) => a + (b - a) * t;
   // steps 1 to 5 take 0.15 of the frames each and step 6 the last 0.25 (the steps' data-a and data-b)

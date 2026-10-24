@@ -124,7 +124,7 @@ async function main() {
       source: "window.__csp=[];document.addEventListener('securitypolicyviolation',e=>__csp.push(e.violatedDirective+' '+e.blockedURI))",
     });
     // the host must answer byte ranges (Safari plays the film only then) and apply dist/_headers
-    const media = await fetch(origin + "/film/cashu-card-film-2.mp4", { headers: { Range: "bytes=0-1" } });
+    const media = await fetch(origin + "/film/cashu-card-film-3.mp4", { headers: { Range: "bytes=0-1" } });
     assert.equal(media.status, 206, "Host answers byte-range requests for the film");
     await media.arrayBuffer();
     const home = await fetch(origin + "/");
@@ -140,7 +140,14 @@ async function main() {
     assert.equal(await evaluate("document.querySelectorAll('h1').length"), 1, "One page heading");
     assert.equal(await evaluate("document.querySelector('#hero-title').innerText.replace(/\\s+/g,' ').trim()"), "Cashu, now on a card.", "Hero names the card innovation");
     assert.equal(await evaluate("document.querySelector('.hero-copy p').innerText.trim()"), "Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.", "Hero distinguishes offline acceptance from mint settlement");
-    assert.equal(await evaluate("[...document.querySelectorAll('script[src]')].map(s=>new URL(s.src).pathname).join()"), "/seq/tap-2/anchors.js,/motion.js", "Two scripts: the sequence anchors and the controls");
+    assert.equal(await evaluate("[...document.querySelectorAll('script[src]')].map(s=>new URL(s.src).pathname).join()"), "/seq/tap-3/anchors.js,/motion.js", "Two scripts: the sequence anchors and the controls");
+    // the Cashu Card mark (D120): the header's lockup, the tab icons and the hero card; the mascot stays only in /concepts' studies
+    await until("[...document.querySelectorAll('.wordmark img, .hero-mark')].every(i=>i.complete&&i.naturalWidth>0)", "the lockup and the hero card's mark loaded");
+    assert.equal(await evaluate("document.querySelector('.wordmark img').getAttribute('src')"), "/assets/cashu-card-lockup.svg", "The header shows the Cashu Card lockup");
+    assert.equal(await evaluate("document.querySelector('.hero-card .hero-mark').getAttribute('src')"), "/assets/cashu-card-mark-green.svg", "The hero card carries the mark");
+    assert.equal(await evaluate("[...document.querySelectorAll('link[rel~=\"icon\"]')].map(l=>l.getAttribute('href')).join()"), "/favicon.ico,/assets/favicon.svg", "Tab icons are the Cashu Card mark");
+    assert.equal(await evaluate("document.querySelectorAll('img[src*=\"cashu.png\"]').length"), 0, "The home page shows no mascot");
+    for (const path of ["/favicon.ico", "/assets/favicon.svg", "/assets/apple-touch-icon.png"]) assert.equal((await fetch(origin + path)).status, 200, "Serves " + path);
     const words = await evaluate("document.body.innerText.trim().split(/\\s+/).length");   // \\s survives the string literal
     console.log("words " + words);
     assert.ok(words < 630, "Copy stays concise");   // about half of it is where to get cards and how to install the applet
@@ -278,6 +285,7 @@ async function main() {
     await send("Page.navigate", { url: origin + "/guide.html" });
     // wait for its stylesheets too: unstyled, its long commands would widen the page
     await until("document.readyState==='complete'&&document.querySelectorAll('.guide-doc h2').length===10", "Install guide loads with its ten sections");
+    assert.equal(await evaluate("document.querySelector('.wordmark img').getAttribute('src')"), "/assets/cashu-card-lockup.svg", "The guide's header shows the lockup");
     await evaluate("document.fonts.ready");
     assert.ok(await evaluate("document.body.textContent.includes('f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5')"), "Guide publishes the CAP's sha256");
     assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Install guide fits desktop");
