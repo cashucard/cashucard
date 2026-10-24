@@ -3259,3 +3259,19 @@ Ruby 3.3 workflows explicitly use Bundler 2.6.9. The locked CFPropertyList
 changes from 3.0.9 (Ruby <3.2) to compatible 3.0.8, and macOS/Linux platform
 variants are recorded without moving Fastlane/CocoaPods. Unprivileged native CI
 loads the locked release toolchain and round-trips a property list before signing.
+
+## D113 — Website Cashu mascot as the provisioner app icon
+
+**Decided:** use the exact sunglasses-wearing Cashu mascot served by
+`cashucard.org/assets/cashu.png` (SHA-256
+`fffab936aede92ad75b199c60ccfa547fee4a2b5bafce525925a0069ff42430b`)
+on the website's `#10271E` background. Keep a local source copy and a deterministic
+macOS generator for all iOS catalog sizes, Android launcher variants and the
+store images. Square iOS/store outputs are opaque; Android adaptive icons use
+separate background/foreground layers with the mascot inside the safe circle.
+Pixel edges use nearest-neighbor scaling.
+
+**Rejected:** redrawing the mascot or adding wallet-specific branding. The user
+asked for the website's existing icon, and the shared provisioner serves wallets
+implementing the protocol. This is a visual asset change, with no card/protocol
+behavior or app build-number change.
