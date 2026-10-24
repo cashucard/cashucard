@@ -391,6 +391,9 @@ test('Stop during a durable preparation write keeps the committed reset recovera
     expect(await pending).toBe(false);
   });
   expect(flow.resetState?.journal.stage).toBe('reviewed');
+  expect(flow.notice).toBe(
+    'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
+  );
   const saved = await f.resetStorage.read();
   expect(saved).not.toBeNull();
   await act(async () => {

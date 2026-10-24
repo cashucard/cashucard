@@ -3284,7 +3284,9 @@ behavior or app build-number change.
 looking up eligibility, after that reply and immediately before its first durable
 write. A late eligibility reply cannot create a saved reset after Stop or after
 leaving the account. Starting another read expires the previous card review and
-its consents, including when the new NFC read is cancelled.
+its consents, including when the new NFC read is cancelled. When a stopped
+operation finishes, replace its temporary Stopping notice with the final stopped
+or cancelled outcome.
 
 Once a storage write starts, its outcome can be uncertain: retain any committed
 reset and recover it with the original card, account and service. Existing saved

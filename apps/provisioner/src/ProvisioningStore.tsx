@@ -522,16 +522,19 @@ function ProvisioningSession({
           if ('reset' in result) {
             setResetState(result.reset!);
           }
-          if ('failure' in result) {
+          if (cancelRequested.current) {
             setNotice(
-              cancelRequested.current
-                ? resetOperation &&
-                  !result.snapshot.batch &&
-                  (!result.reset || result.reset.journal.stage === 'complete')
-                  ? 'Cancelled. You can check another card.'
-                  : 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.'
-                : message(result.failure),
+              resetOperation &&
+                'reset' in result &&
+                !result.snapshot.batch &&
+                (!result.reset || result.reset.journal.stage === 'complete')
+                ? 'Cancelled. You can check another card.'
+                : 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
             );
+          } else if ('failure' in result) {
+            setNotice(message(result.failure));
+          }
+          if ('failure' in result) {
             if (
               result.failure instanceof ApiServiceError &&
               result.failure.status === 401 &&
