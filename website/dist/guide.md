@@ -48,8 +48,8 @@ chmod +x /usr/local/bin/gp
 The applet ships as one CAP file, `applet/target/cashu-javacard-2.1.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
 
 ```sh
-git clone https://github.com/lnflash/cashu-card
-cd cashu-card/applet
+git clone https://github.com/cashucard/cashucard
+cd cashucard/applet
 sha256sum target/cashu-javacard-2.1.0.cap
 ```
 
@@ -92,7 +92,7 @@ If gp reports that the login failed, stop and tell the person to put that card a
 
 ## 4. Install the applet
 
-The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. From `cashu-card/applet`:
+The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. From `cashucard/applet`:
 
 ```sh
 gp --install target/cashu-javacard-2.1.0.cap --applet F04341534855434152444D

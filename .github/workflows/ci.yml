@@ -234,7 +234,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # tools/mirror-spec.sh copies spec/ into a cashu-javacard checkout and
+      # tools/mirror-spec.sh copies spec/ into a javacard checkout and
       # deletes what is no longer here, so its test drives it against two
       # throwaway git checkouts: the exit codes, the refusal of a target with
       # uncommitted changes under spec/, and nothing outside spec/ touched.

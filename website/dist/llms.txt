@@ -9,6 +9,6 @@
 
 ## Protocol and code
 
-- [Draft specification](https://github.com/lnflash/cashu-card/blob/main/spec/NUT-XX.md): what the bytes mean to a wallet and a mint.
-- [APDU reference](https://github.com/lnflash/cashu-card/blob/main/spec/APDU.md): the card's wire, byte for byte.
-- [Source](https://github.com/lnflash/cashu-card): the applet, its host tools and simulator, and the provisioning app.
+- [Draft specification](https://github.com/cashucard/cashucard/blob/main/spec/NUT-XX.md): what the bytes mean to a wallet and a mint.
+- [APDU reference](https://github.com/cashucard/cashucard/blob/main/spec/APDU.md): the card's wire, byte for byte.
+- [Source](https://github.com/cashucard/cashucard): the applet, its host tools and simulator, and the provisioning app.

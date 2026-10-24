@@ -148,7 +148,7 @@ CAP (JDK 17, `jc305u4_kit`) and its new hash in that guide.
    `SchnorrHW`) require two reviewers.
 4. Spec changes should be discussed in
    [cashubtc/nuts](https://github.com/cashubtc/nuts) before implementation.
-   They are made here: [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard),
+   They are made here: [cashucard/javacard](https://github.com/cashucard/javacard),
    the protocol reference, mirrors this repo's `spec/` after each merge and
    takes no spec PRs of its own.
 5. **Do not claim testing you did not perform.** In a repo handling bearer

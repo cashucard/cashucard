@@ -8,27 +8,27 @@ reasons in [`docs/DECISIONS.md`](docs/DECISIONS.md), and the words in
 [`docs/GLOSSARY.md`](docs/GLOSSARY.md). Read the first two before a change to
 how the card behaves.
 
-## What this repo is, and what cashu-javacard is now
+## What this repo is, and what cashucard/javacard is now
 
-`lnflash/cashu-card` is the working repository of the shared Cashu card
+`cashucard/cashucard` is the working repository of the shared Cashu card
 (protocol 2.1, one wire for Flash and for Foxy's wallet): the JavaCard applet,
 its host tools and simulator, the protocol in `spec/`, the TypeScript card
 library with the bench-spike app that installs the card from a phone, and the
 provisioning app still to come. It began as a copy of
-`lnflash/cashu-javacard` main with its whole history. `lnflash/cashu-javacard`
+`cashucard/javacard` main with its whole history. `cashucard/javacard`
 stays the protocol reference, and from now on it is a read-only mirror of this
 repo's `spec/`: every PR that touches `spec/` here is mirrored there with
-`tools/mirror-spec.sh` after it merges, and cashu-javacard takes no direct spec
+`tools/mirror-spec.sh` after it merges, and cashucard/javacard takes no direct spec
 edits, so a spec change is always a PR here.
 
 ```bash
-tools/mirror-spec.sh <path-to-cashu-javacard-checkout>          # dry run: the diff; exit 0 identical, 1 differs
-tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as committed at HEAD, then git status there
+tools/mirror-spec.sh <path-to-javacard-checkout>          # dry run: the diff; exit 0 identical, 1 differs
+tools/mirror-spec.sh <path-to-javacard-checkout> --apply  # copy spec/ as committed at HEAD, then git status there
 # Either exits 2, changing nothing, while that checkout's spec/ or this one's has uncommitted changes.
 # --apply also exits 2 unless HEAD is in origin/main (as last fetched) and its spec/ is origin/main's,
 # and its history has the spec/ that checkout has committed: run it from main after the merge and a
 # pull, never from a ticket's worktree. The dry run says when --apply would refuse.
-# Nothing outside spec/ is touched. The commit and the push in cashu-javacard are the operator's.
+# Nothing outside spec/ is touched. The commit and the push in cashucard/javacard are the operator's.
 ```
 
 ## Layout
@@ -41,7 +41,7 @@ tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply  # copy spec/ as 
 | `tools/cardsim/` | The real applet in jCardSim on `http://127.0.0.1:9876`, for the apps' end-to-end runs: the HTTP bridge, its Node client `client.cjs`, the Cashu arithmetic `cashu-crypto.cjs` and the mint e2e `e2e-swap.test.cjs`. flash-pos and flash-mobile pin it by `CASHU_JAVACARD_REF`, so its routes, fixtures and client are a contract with both apps ([`tools/cardsim/README.md`](tools/cardsim/README.md)). `run.sh` and `ctl.sh` are Foxy's line-protocol simulator on port 47431. |
 | `tools/chip/` | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below). |
 | `tools/` | Also: `stripcap.py` and `refcheck.py`, which the CAP build runs; `e2e-melt.cjs` and `e2e-redeem.cjs`, 0.x tools that drive a 0.x card and a mint, kept for the sweep of 0.x field cards; `mirror-spec.sh` and its test `mirror-spec.test.sh`. |
-| `spec/` | The protocol, mirrored to cashu-javacard: `NUT-XX.md` (what the bytes mean to a wallet and a mint), `APDU.md` (the wire, byte for byte), `CARD-FILE.md` (the 0.x interchange format) and `vectors/` (`headers.json`, `owner.json`, `secret.json`, `transcript.json`). |
+| `spec/` | The protocol, mirrored to cashucard/javacard: `NUT-XX.md` (what the bytes mean to a wallet and a mint), `APDU.md` (the wire, byte for byte), `CARD-FILE.md` (the 0.x interchange format) and `vectors/` (`headers.json`, `owner.json`, `secret.json`, `transcript.json`). |
 | `docs/` | `ARCHITECTURE.md`, `DECISIONS.md` (D1 to D27), `SECURITY-MODEL.md`, `HARDWARE_DEPLOYMENT.md` (build, install, reinstall, the AIDs), Foxy's design (`FOXY-CARD-*.md`), the provisioner's (`PROVISIONER-APP.md`), and one hardware report for each silicon milestone, named `HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md` (`HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md` is the newest). |
 | `tools/cardkit/` | Installs the card's applet and rotates the card manager's keys over GlobalPlatform SCP02, as environment-agnostic TypeScript (ENG-738, [D27](docs/DECISIONS.md#d27)): a vendored DES, the session, the commands and the recovering install, with no NFC, HTTP or platform import. The transport is injected as `type Transceiver = (apdu: number[]) => Promise<number[]>`, so the phone and Node run the same code and `gp/test/` runs it against a fake card. Also here: `make-assets.py`, which writes the provisioner's load files from the CAPs, and `hello/`, the smoke test's one-applet package (not the card's: `ant -f applet/build.xml hello-cap` builds it, `HelloTest` runs it in jCardSim). |
 | `apps/provisioner/` | The card's provisioning app (ENG-739): the designed flow from [`docs/PROVISIONER-APP.md`](docs/PROVISIONER-APP.md) (sign-in, batch setup, the loop, summary, settings), with demo mode driving a fake card (`src/demo/`) for the design review on a phone, and ENG-738's bench spike kept at Settings → Bench runs. Bare React Native (yarn classic, bundle id `com.flash.provisioner`); it installs the 2.1 applet on the spare J3R180 over NFC through `tools/cardkit`, which Metro bundles from `tools/` (`src/cardkit.ts` is its one way in), and reads out the timings. Its [`README.md`](apps/provisioner/README.md) says what it does and will not do; `src/assets/` is generated, `assets/` carries the OFL Figtree fonts. |
@@ -290,8 +290,8 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
 - **Every behaviour change ships with a test that fails before the change.**
   Run it both ways, and say in the PR what you ran; do not claim testing you
   did not do.
-- **Spec changes are made here, never in cashu-javacard.** Do not push to
-  `lnflash/cashu-javacard`: the mirror's commit and push there are the
+- **Spec changes are made here, never in cashucard/javacard.** Do not push to
+  `cashucard/javacard`: the mirror's commit and push there are the
   operator's.
 - **ENG-738's hardware steps are all the owner's,** gates H0 to H3: the `gp`
   captures of the spare card (H0), the native builds and runs on the phones

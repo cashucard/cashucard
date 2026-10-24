@@ -45,7 +45,7 @@ git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 ```
 
 ```bash
-cd cashu-card/applet
+cd cashucard/applet
 
 # Build. jc.sdk defaults to ~/.javacard/sdks/jc305u4_kit; override if you
 # cloned elsewhere. It must be a 3.0.5 (or later) kit — see below.

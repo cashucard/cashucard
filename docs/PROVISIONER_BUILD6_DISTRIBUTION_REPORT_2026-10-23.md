@@ -4,7 +4,7 @@ Source is main `be60adf30e49183dee849446bb5c683c8a2ea86e` (PR #108), including P
 
 ## GitHub applet release
 
-[`v2.1.0`](https://github.com/lnflash/cashu-card/releases/tag/v2.1.0) targets the merged source and contains `cashu-javacard-2.1.0.cap` and its `.sha256` file. The tracked CAP, deployment guide, and downloaded release asset agree on SHA-256 `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`. The CAP is 95,167 bytes. This is the card protocol release; the signed phone apps remain store artifacts.
+[`v2.1.0`](https://github.com/cashucard/cashucard/releases/tag/v2.1.0) targets the merged source and contains `cashu-javacard-2.1.0.cap` and its `.sha256` file. The tracked CAP, deployment guide, and downloaded release asset agree on SHA-256 `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`. The CAP is 95,167 bytes. This is the card protocol release; the signed phone apps remain store artifacts.
 
 ## Signed phone candidates
 

@@ -149,12 +149,12 @@ async function main() {
     assert.ok(screens <= 5.0, "Desktop page stays within its budget");
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
     assert.ok(await evaluate("document.querySelector('.button-bright').href.includes('/spec/NUT-XX.md')"), "Primary action opens the draft");
-    assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/lnflash/cashu-card'"), "Secondary action opens the source repository");
+    assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/cashucard/cashucard'"), "Secondary action opens the source repository");
     assert.equal(await evaluate("document.querySelector('#source').tagName"), "FOOTER", "Source links live in the footer");
     assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===3)"), true, "Apps are grouped in the footer");
     assert.equal(await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>!!document.querySelector(a.hash))"), true, "Every page anchor exists");
     for (const repo of [
-      "lnflash/cashu-card", "lnflash/flash-mobile", "getfoxy/iOS", "lnflash/flash-pos",
+      "cashucard/cashucard", "lnflash/flash-mobile", "getfoxy/iOS", "lnflash/flash-pos",
     ]) {
       assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
     }

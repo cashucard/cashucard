@@ -21,7 +21,7 @@ preview origin if needed.
 
 ## Content and assets
 
-Protocol facts come from lnflash/cashu-card's specification, APDU reference,
+Protocol facts come from cashucard/cashucard's specification, APDU reference,
 security model and license. The NUT-XX proposal remains a draft. Review the
 source specification when changing the payment or ownership explanation.
 The hero describes offline terminal acceptance and later mint settlement as

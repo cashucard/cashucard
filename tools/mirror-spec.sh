@@ -1,10 +1,10 @@
 #!/bin/sh
-# Mirror this repo's spec/ into a checkout of lnflash/cashu-javacard, the
+# Mirror this repo's spec/ into a checkout of cashucard/javacard, the
 # protocol reference, which takes no spec edits of its own (AGENTS.md). Run it
 # from main once a PR that touches spec/ has merged here, after a pull:
 #
-#   tools/mirror-spec.sh <path-to-cashu-javacard-checkout>           dry run
-#   tools/mirror-spec.sh <path-to-cashu-javacard-checkout> --apply   copy
+#   tools/mirror-spec.sh <path-to-javacard-checkout>           dry run
+#   tools/mirror-spec.sh <path-to-javacard-checkout> --apply   copy
 #
 # The dry run prints a unified diff of spec/, the target's (a/) against this
 # repo's (b/), and exits 0 when they are identical and 1 when they differ. A
@@ -42,7 +42,7 @@ unset CDPATH GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 me=$(basename "$0")
 
 usage() {
-	echo "usage: $me <path-to-cashu-javacard-checkout> [--apply]"
+	echo "usage: $me <path-to-javacard-checkout> [--apply]"
 }
 
 die() {

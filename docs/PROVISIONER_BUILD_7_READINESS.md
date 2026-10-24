@@ -16,10 +16,10 @@ signing identities. The tracked protocol 2.1 CAP is unchanged:
 
 | Change | Review | Result |
 | --- | --- | --- |
-| Deliberate reset/reuse from the phone | [#128](https://github.com/lnflash/cashu-card/pull/128), D101 | Review exact identity and authorized key provenance; reject value; check retained spent entries at the recorded mint before separate PIN-protected cleanup; recover reset completion without replaying card writes. |
-| Actionable card status | [#129](https://github.com/lnflash/cashu-card/pull/129), D102 | A read-only check directs operators to wallet setup/use, saved work, administrator review or an eligible reset review. |
-| Sign-in password processing | [#130](https://github.com/lnflash/cashu-card/pull/130), D103 | Upgrade only after a valid legacy sign-in; retain existing credentials and sessions. Local KDF median approximately 75 ms versus 2.1 s; first legacy sign-in and live end-to-end timing remain separate. |
-| Completion and recovery messages | [#131](https://github.com/lnflash/cashu-card/pull/131), D104 | Separate installation saved, wallet setup, stopped attempts, card recovery and service-only retries. App and console use bounded, actionable reasons. |
+| Deliberate reset/reuse from the phone | [#128](https://github.com/cashucard/cashucard/pull/128), D101 | Review exact identity and authorized key provenance; reject value; check retained spent entries at the recorded mint before separate PIN-protected cleanup; recover reset completion without replaying card writes. |
+| Actionable card status | [#129](https://github.com/cashucard/cashucard/pull/129), D102 | A read-only check directs operators to wallet setup/use, saved work, administrator review or an eligible reset review. |
+| Sign-in password processing | [#130](https://github.com/cashucard/cashucard/pull/130), D103 | Upgrade only after a valid legacy sign-in; retain existing credentials and sessions. Local KDF median approximately 75 ms versus 2.1 s; first legacy sign-in and live end-to-end timing remain separate. |
+| Completion and recovery messages | [#131](https://github.com/cashucard/cashucard/pull/131), D104 | Separate installation saved, wallet setup, stopped attempts, card recovery and service-only retries. App and console use bounded, actionable reasons. |
 
 The sign-in follow-up (D105) keeps the action above the keyboard, adds Next/Go
 keyboard actions and removes demo entry points, fake-card flows and demo state.
@@ -85,7 +85,7 @@ See [performance evidence](OPERATOR_SIGN_IN_PERFORMANCE_2026-10-23.md).
    tracks before a public submission.
 
 The GitHub release must include the **tracked CAP and its SHA-256 file**. The
-existing [protocol v2.1.0 release](https://github.com/lnflash/cashu-card/releases/tag/v2.1.0)
+existing [protocol v2.1.0 release](https://github.com/cashucard/cashucard/releases/tag/v2.1.0)
 contains that unchanged CAP. Do not move its tag or label it a new applet build.
 A build 7 phone release should reference the protocol version and attach those
 same verified files. Signed phone binaries remain store artifacts.

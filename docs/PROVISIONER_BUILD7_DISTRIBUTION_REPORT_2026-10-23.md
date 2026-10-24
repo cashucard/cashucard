@@ -52,5 +52,5 @@ A **draft**, unpublished phone release `provisioner-v1.0.0-build.7` targets the
 tested source and has the tracked `cashu-javacard-2.1.0.cap` plus its `.sha256`
 attached. Its SHA-256 is
 `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`.
-This is the unchanged [protocol v2.1.0 applet](https://github.com/lnflash/cashu-card/releases/tag/v2.1.0),
+This is the unchanged [protocol v2.1.0 applet](https://github.com/cashucard/cashucard/releases/tag/v2.1.0),
 not a new firmware version. The existing protocol tag was not moved.

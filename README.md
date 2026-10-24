@@ -9,7 +9,7 @@ This is the **shared Cashu card protocol, version 2.1**: one wire for Flash and
 for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
 of **NUT-XX: Cashu NFC Card Protocol** ([`spec/NUT-XX.md`](spec/NUT-XX.md)).
 
-The card is developed here. [lnflash/cashu-javacard](https://github.com/lnflash/cashu-javacard),
+The card is developed here. [cashucard/javacard](https://github.com/cashucard/javacard),
 where it began, stays the protocol reference: a read-only mirror of [`spec/`](spec/),
 copied there after each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 
