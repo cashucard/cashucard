@@ -11,6 +11,7 @@ legacy/lab screens. See [D109](DECISIONS.md#d109).
 | New batch, unsubmitted | Cancel setup → Cards. | No batch is silently created by leaving the form. |
 | Batch review, idle | Back/Edit batch, or Cancel setup → Cards. | Unsaved form values may be discarded. |
 | Batch creation waiting | Stop and keep saved work; Settings requests Stop before leaving. | The original request ID/body remain for reconciliation if the service already committed. |
+| Cards home, batch end/close/retry waiting | Stop, including hardware Back. | Pending closure intent and the original request remain for service reconciliation. |
 | Installation, ready or paused | Stop for now → Cards. Existing End batch handles safe closure through the service. | Attempts, stopped chips and service acknowledgements remain. |
 | Installation, active NFC | Cancel tap / Stop, including hardware Back. | The last durable intent remains; transmitted commands may already have changed the card. |
 | Installation record submission/retry | Stop and keep saved work. | The immutable record stays queued. Explicit Stop suppresses in-session timer/foreground retries until manual work resumes. |

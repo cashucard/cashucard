@@ -33,6 +33,7 @@ export function CardsHomeScreen({
   return (
     <Screen
       title="Cards"
+      onStop={flow.busy ? flow.cancel : undefined}
       headerRight={<GearButton testID="settings" onPress={onSettings} />}>
       <ScrollView contentContainerStyle={s.scroll}>
         {flow.status !== 'ready' ? (
