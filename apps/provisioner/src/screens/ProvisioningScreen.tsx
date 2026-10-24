@@ -117,10 +117,12 @@ export function BatchHistory({
 }
 export function ProvisioningScreen({
   onSettings,
+  onHome,
   onReset,
   onCheck,
 }: {
   onSettings: () => void;
+  onHome?: () => void;
   onReset?: () => void;
   onCheck?: () => void;
 }) {
@@ -167,7 +169,7 @@ export function ProvisioningScreen({
   };
   const pauseAndLeave = () => {
     flow.cancel();
-    onSettings();
+    (onHome ?? onSettings)();
   };
   const shell = (content: React.ReactNode) => (
     <Screen
@@ -176,6 +178,7 @@ export function ProvisioningScreen({
           ? 'Saved card reset'
           : 'Card installation'
       }
+      onBack={onHome}
       onStop={flow.busy ? flow.cancel : undefined}
       headerRight={<GearButton testID="settings" onPress={leave} />}>
       <ScrollView contentContainerStyle={s.scroll}>{content}</ScrollView>
@@ -280,6 +283,7 @@ export function ProvisioningScreen({
           </Text>
         ) : null}
         <BatchSetupScreen
+          onCancel={onHome}
           onStart={() => undefined}
           onSettings={leave}
           onStop={flow.cancel}
@@ -318,12 +322,12 @@ export function ProvisioningScreen({
   const figureState = flow.busy
     ? 'running'
     : stage === 'quarantined'
-    ? 'danger'
-    : recentlyRecorded || stage === 'recorded'
-    ? 'done'
-    : snapshot.active && (flow.notice || stage !== 'reserved')
-    ? 'stop'
-    : 'idle';
+      ? 'danger'
+      : recentlyRecorded || stage === 'recorded'
+        ? 'done'
+        : snapshot.active && (flow.notice || stage !== 'reserved')
+          ? 'stop'
+          : 'idle';
   const canQuarantine =
     !!stage && !['record_pending', 'recorded', 'quarantined'].includes(stage);
   const share =
@@ -337,7 +341,7 @@ export function ProvisioningScreen({
           }: ` +
           (j.stage === 'recorded'
             ? 'installation saved'
-            : j.disposition_intent?.kind ?? 'stopped'),
+            : (j.disposition_intent?.kind ?? 'stopped')),
       )
       .join('\n');
   return shell(
@@ -415,7 +419,7 @@ export function ProvisioningScreen({
           <Text style={s.phase} testID="recovery-busy">
             {flow.phase === 'load'
               ? `Writing ${loadPercent}%`
-              : PHASES[flow.phase] ?? 'Confirming saved work…'}
+              : (PHASES[flow.phase] ?? 'Confirming saved work…')}
           </Text>
         ) : null}
       </View>

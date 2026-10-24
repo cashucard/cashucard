@@ -29,6 +29,7 @@ import {
 import {mintSettlementJson, MintSettlementError} from './mintSettlement';
 import {readCardStatus, type CardReadout} from './cardStatus';
 import type {JournalStorage} from './journal';
+import type {WorkspaceStorage, WorkspaceDisks} from './workspaceStorage';
 import {
   ProvisioningWorkflow,
   type CardProvisioningService,
@@ -89,6 +90,7 @@ function exclusive<T>(
 
 export interface ProvisioningProviderOptions {
   storage?: JournalStorage;
+  workspaces?: WorkspaceStorage;
   resetStorage?: JournalStorage;
   resetServiceFor?: (session: AppSession, origin: string) => OwnedResetService;
   resetWithCard?: OwnedResetRun['withCard'];
@@ -169,15 +171,18 @@ const message = (e: unknown): string => {
     return e.sw === 0x6983
       ? 'The card PIN is blocked. Use the holder wallet to recover it before continuing.'
       : Math.floor(e.sw / 16) === 0x63c
-      ? `The PIN was incorrect. ${
-          e.sw % 16
-        } tries remain. No entries were cleared. Stop if you are unsure of the PIN.`
-      : 'The card refused PIN verification. No entries were cleared. Check the card in its holder wallet.';
+        ? `The PIN was incorrect. ${
+            e.sw % 16
+          } tries remain. No entries were cleared. Stop if you are unsure of the PIN.`
+        : 'The card refused PIN verification. No entries were cleared. Check the card in its holder wallet.';
   }
   if (e instanceof ApiUnreachableError) {
     return 'The service could not be reached. Your saved work is retained. Reconnect and retry.';
   }
   if (e instanceof ApiServiceError) {
+    if (e.reason === 'device-active') {
+      return 'This phone has an unfinished card attempt. Sign in with the operator and service that started it, then finish the attempt or save its stop before installing another card.';
+    }
     if (e.reason === 'reset-unresolved') {
       return 'Finish the saved card reset before starting another installation. Open Reset a card in Settings.';
     }
@@ -251,7 +256,22 @@ function sameActor(
   );
 }
 
-export function ProvisioningProvider({
+export function ProvisioningProvider(props: {
+  children: React.ReactNode;
+  options?: ProvisioningProviderOptions;
+}) {
+  const app = useApp();
+  // A new actor gets fresh transient state and owned cancellation. The fixed
+  // disk registry retains every actor; it is not remounted or cleared here.
+  const actor = JSON.stringify([
+    app.serviceUrl,
+    app.session?.operator_id,
+    app.session?.env,
+  ]);
+  return <ProvisioningSession key={actor} {...props} />;
+}
+
+function ProvisioningSession({
   children,
   options = {},
 }: {
@@ -282,6 +302,7 @@ export function ProvisioningProvider({
   const [replacement, setReplacement] = useState<ReplacementReview | null>(
     null,
   );
+  const workspaceDisks = useRef<WorkspaceDisks>();
   const storage = useRef(options.storage);
   const resetDisk = useRef(options.resetStorage);
   const settings = useRef(options).current;
@@ -333,20 +354,36 @@ export function ProvisioningProvider({
   }, [app.session?.token, app.serviceUrl, invalidateCard]);
   const latest = useRef(app);
   latest.current = app;
+  const getWorkspace = useCallback(() => {
+    if (!workspaceDisks.current) {
+      if (!app.session) {
+        throw new Error('Sign in before loading operator work');
+      }
+      const registry =
+        settings.workspaces ??
+        (require('./journalStorage') as typeof import('./journalStorage'))
+          .workspaceStorage;
+      workspaceDisks.current = registry.forActor({
+        service_origin: app.serviceUrl,
+        operator_id: app.session.operator_id,
+        key_env: app.session.env,
+      });
+    }
+    return workspaceDisks.current;
+    // The component is keyed by actor; these bindings never retarget a writer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const getStorage = useCallback(() => {
-    // Older installed binaries may lack the newly added native module. Keep
-    // sign-in usable and stop real work, rather than failing at import.
-    storage.current ??= (
-      require('./journalStorage') as typeof import('./journalStorage')
-    ).journalStorage;
+    storage.current ??= getWorkspace().storage;
     return storage.current;
-  }, []);
+  }, [getWorkspace]);
   const getResetStorage = useCallback(() => {
-    resetDisk.current ??= (
-      require('./journalStorage') as typeof import('./journalStorage')
-    ).resetStorage;
+    resetDisk.current ??= settings.storage
+      ? (require('./journalStorage') as typeof import('./journalStorage'))
+          .resetStorage
+      : getWorkspace().resetStorage;
     return resetDisk.current;
-  }, []);
+  }, [getWorkspace, settings]);
 
   const reload = useCallback(async () => {
     if (busyRef.current) {
@@ -357,7 +394,11 @@ export function ProvisioningProvider({
     setReplacement(null);
     setLoadProgress(null);
     setStatus('loading');
+    let loaded = false;
     try {
+      if (!latest.current.session) {
+        return;
+      }
       const value = await exclusive(
         getStorage(),
         settings.uuid ?? randomUuid,
@@ -369,7 +410,7 @@ export function ProvisioningProvider({
       if (mounted.current) {
         setSnapshot(value.workflow);
         setResetState(value.reset);
-        setStatus('ready');
+        loaded = true;
         setNotice(null);
       }
     } catch {
@@ -383,6 +424,9 @@ export function ProvisioningProvider({
       busyRef.current = false;
       if (mounted.current) {
         setBusy(false);
+        if (loaded) {
+          setStatus('ready');
+        }
       }
     }
   }, [getStorage, getResetStorage, settings]);

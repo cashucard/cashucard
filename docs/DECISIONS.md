@@ -3168,3 +3168,42 @@ provisioner and its words to be readable; and for "Where to get cards" with
 an Alibaba option, custom printed cards marked "Coming soon", and the
 hardware deployment guide as an easy page on the site, with a reader to buy
 and a ready handoff for people whose AI agent installs the applet.
+
+
+## D111 — Saved work belongs to an operator workspace, not a navigation lock
+
+**Decided:** signing in lands on Cards. Stop for now and Cancel setup return
+there; Settings Back does not reopen an installation. Cards shows a saved batch
+or reset, an explicit Continue action, and safe End batch / Close finished batch
+actions. Ending still requires confirmation and the existing service receipt;
+an unresolved attempt must be finished or its stop acknowledged first.
+
+The original `cashu.provisioning.attempt.v1` key advances to an atomic schema 3
+envelope retaining workspaces by exact service origin, operator ID and key
+environment. Each workspace contains the existing strictly validated schema 2
+batch and schema 1 reset journals. All workspaces share the original device ID.
+Legacy journals are validated together and migrated in one replacement; their
+original bytes remain in the envelope and the old reset key remains unchanged.
+Malformed, unknown-schema, mismatched-device, foreign-bound or unreadable data
+blocks card work without clearing evidence. Older binaries reject schema 3;
+downgrading requires reconciliation rather than a fresh empty namespace.
+
+Storage adapters bind permanently to one workspace and serialize all envelope
+writes. Changing account/service remounts transient workflow state, cancels its
+owned session and suppresses late UI results. A late durable reply can update
+only its original workspace. Returning to that operator restores the same
+request IDs. No session tokens, PINs or manager keys are stored. This does not
+relax service device/chip holds: another operator may prepare a separate batch,
+but cannot install around an unresolved attempt/reset on the same device.
+
+**Rejected:** clearing saved work, signing another operator into the old batch,
+per-account keys that hide pre-upgrade evidence, assigning another device ID to
+bypass service holds, and treating Settings as the only exit from installation.
+
+**Why:** #142 reported that Stop for now → Settings → Back reopened saved work,
+and changing operator stranded the phone at a foreign-account warning. Shared
+phones need independent retained work and a useful landing page, with the same
+recovery and account boundaries as before. This changes host workflow/storage,
+not the protocol, applet or CAP. Hardware-free tests cover navigation, atomic
+migration, reset retention, corrupt data, lost acknowledgements, cross-account
+writes and a late old-account reply after another operator has started work.

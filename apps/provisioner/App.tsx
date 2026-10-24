@@ -1,11 +1,12 @@
 /** Authenticated operator routes; saved provisioning work owns installation navigation. */
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Text, View} from 'react-native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
 } from 'react-native-safe-area-context';
 
+import {CardsHomeScreen} from './src/screens/CardsHomeScreen';
 import {LoadTestScreen} from './src/screens/LoadTestScreen';
 import {SettingsScreen} from './src/screens/SettingsScreen';
 import {SignInScreen} from './src/screens/SignInScreen';
@@ -21,7 +22,8 @@ import {CardStatusScreen} from './src/screens/CardStatusScreen';
 import {ProvisioningScreen} from './src/screens/ProvisioningScreen';
 import {BENCH_RUNS_ENABLED} from './src/releaseGates';
 
-type Route = 'setup' | 'settings' | 'bench' | 'identity' | 'reset' | 'status';
+type Route =
+  'home' | 'setup' | 'settings' | 'bench' | 'identity' | 'reset' | 'status';
 
 const benchStyles = {
   benchWrap: {flex: 1} as const,
@@ -31,14 +33,32 @@ const benchStyles = {
 function Navigator(): React.JSX.Element {
   const app = useApp();
   const recovery = useProvisioning();
-  const [route, setRoute] = useState<Route>('setup');
+  const [route, setRoute] = useState<Route>('home');
+  useEffect(() => {
+    setRoute('home');
+  }, [
+    app.session?.operator_id,
+    app.session?.env,
+    app.serviceUrl,
+    app.signedIn,
+  ]);
 
   if (!app.signedIn || !app.session) {
     return <SignInScreen />;
   }
-  if (!['settings', 'bench', 'identity', 'reset', 'status'].includes(route)) {
+  if (route === 'home') {
+    return (
+      <CardsHomeScreen
+        onInstall={() => setRoute('setup')}
+        onReset={() => setRoute('reset')}
+        onSettings={() => setRoute('settings')}
+      />
+    );
+  }
+  if (route === 'setup') {
     return (
       <ProvisioningScreen
+        onHome={() => setRoute('home')}
         onSettings={() => setRoute('settings')}
         onReset={() => setRoute('reset')}
         onCheck={() => setRoute('status')}
@@ -51,7 +71,7 @@ function Navigator(): React.JSX.Element {
     case 'settings':
       return (
         <SettingsScreen
-          onBack={() => setRoute('setup')}
+          onBack={() => setRoute('home')}
           onBench={() => {
             if (BENCH_RUNS_ENABLED && !recovery.busy) {
               setRoute('bench');
@@ -125,6 +145,7 @@ function Navigator(): React.JSX.Element {
     default:
       return (
         <ProvisioningScreen
+          onHome={() => setRoute('home')}
           onSettings={() => setRoute('settings')}
           onReset={() => setRoute('reset')}
           onCheck={() => setRoute('status')}

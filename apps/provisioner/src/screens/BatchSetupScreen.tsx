@@ -207,6 +207,7 @@ const local = (t: Theme) =>
 export function BatchSetupScreen({
   onStart,
   onSettings,
+  onCancel,
   onStop,
   onCreate,
   canStart = true,
@@ -215,6 +216,7 @@ export function BatchSetupScreen({
 }: {
   onStart: () => void;
   onSettings: () => void;
+  onCancel?: () => void;
   onStop?: () => void;
   onCreate?: (config: BatchConfig) => Promise<boolean>;
   canStart?: boolean;
@@ -369,7 +371,7 @@ export function BatchSetupScreen({
             if (creating) {
               onStop?.();
             }
-            onSettings();
+            (onCancel ?? onSettings)();
           }}
         />
       </Screen>
@@ -379,7 +381,7 @@ export function BatchSetupScreen({
   return (
     <Screen
       title={SETUP.title}
-      onBack={undefined}
+      onBack={onCancel}
       onStop={creating ? onStop : undefined}
       headerRight={
         <GearButton
@@ -660,7 +662,7 @@ export function BatchSetupScreen({
           if (creating) {
             onStop?.();
           }
-          onSettings();
+          (onCancel ?? onSettings)();
         }}
       />
     </Screen>
