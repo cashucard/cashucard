@@ -3,6 +3,7 @@
 import Foundation
 import CoreGraphics
 import ImageIO
+import CoreText
 
 let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
 let sourceURL = app.appendingPathComponent("assets/app-icon/cashu.png")
@@ -59,6 +60,40 @@ for catalog in ["Images.xcassets", "Assets.xcassets"] {
 }
 try render(1024, to: "assets/app-icon/icon-1024.png")
 try render(512, to: "assets/play-assets/icon-512-generic.png", alphaChannel: true)
+// Legacy upload paths must never reintroduce the previous NFC-card icon.
+try render(512, to: "assets/cardart/icon-512.png", alphaChannel: true)
+
+let fontURL = app.appendingPathComponent("assets/fonts/Figtree-SemiBold.ttf")
+CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+guard let iconSource = CGImageSourceCreateWithURL(app.appendingPathComponent("assets/app-icon/icon-1024.png") as CFURL, nil),
+      let icon = CGImageSourceCreateImageAtIndex(iconSource, 0, nil),
+      let banner = CGContext(data: nil, width: 1024, height: 500, bitsPerComponent: 8,
+                             bytesPerRow: 4096, space: colorSpace,
+                             bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+    fatalError("Cannot create store feature graphic")
+}
+banner.setFillColor(green)
+banner.fill(CGRect(x: 0, y: 0, width: 1024, height: 500))
+banner.interpolationQuality = .none
+banner.draw(icon, in: CGRect(x: 48, y: 90, width: 320, height: 320))
+func line(_ text: String, size: CGFloat, y: CGFloat, color: CGColor) {
+    let attributes = [kCTFontAttributeName as String: CTFontCreateWithName("Figtree-SemiBold" as CFString, size, nil),
+                      kCTForegroundColorAttributeName as String: color] as CFDictionary
+    let value = CFAttributedStringCreate(nil, text as CFString, attributes)!
+    banner.textPosition = CGPoint(x: 410, y: y)
+    CTLineDraw(CTLineCreateWithAttributedString(value), banner)
+}
+let pale = CGColor(colorSpace: colorSpace, components: [0.84, 0.91, 0.84, 1])!
+line("Cashu", size: 64, y: 300, color: pale)
+line("Provisioner", size: 64, y: 224, color: pale)
+line("Install card software over NFC.", size: 24, y: 155, color: pale)
+for relative in ["assets/play-assets/feature-graphic-generic.png", "assets/cardart/feature-graphic.png"] {
+    let target = app.appendingPathComponent(relative)
+    let destination = CGImageDestinationCreateWithURL(target as CFURL, "public.png" as CFString, 1, nil)!
+    CGImageDestinationAddImage(destination, banner.makeImage()!, nil)
+    guard CGImageDestinationFinalize(destination) else { fatalError("Cannot save feature graphic") }
+    written += 1
+}
 
 for (density, scale) in [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0), ("xxhdpi", 3.0), ("xxxhdpi", 4.0)] {
     let size = Int(48 * scale)
@@ -70,4 +105,4 @@ for (density, scale) in [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0), ("xxhdpi"
     try render(Int(108 * scale), to: "\(resources)/drawable-\(density)/cashu_icon_foreground.png",
                fraction: 54.0 / 108, foreground: true)
 }
-print("Generated \(written) Cashu icons from the website mascot.")
+print("Generated \(written) Cashu brand assets from the website mascot.")
