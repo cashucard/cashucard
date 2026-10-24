@@ -90,6 +90,7 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
+          bundler: "2.6.9"
           bundler-cache: true
           working-directory: apps/provisioner
       - uses: ./.github/actions/setup-cardkit

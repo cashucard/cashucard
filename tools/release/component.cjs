@@ -28,16 +28,30 @@ function identity(root, tag) {
       throw Error("Component tag does not match committed release identity");
   };
   if (result.component === "firmware") {
-    equal(
-      /<artifactId>cashu-javacard<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(
-        read("applet/pom.xml"),
-      )?.[1],
-      result.version,
+    const firmware = JSON.parse(
+      execFileSync(
+        "python3",
+        [
+          "-c",
+          `
+import json, sys, xml.etree.ElementTree as ET
+from pathlib import Path
+root=Path(sys.argv[1])
+pom=ET.parse(root/'applet/pom.xml').getroot()
+properties=[p.attrib.get('value') for p in ET.parse(root/'applet/build.xml').iter('property') if p.attrib.get('name')=='cap.file']
+assert len(properties)==1, 'Exactly one active CAP property is required'
+print(json.dumps({'version':pom.find('{*}version').text,'cap':properties[0]}))
+`,
+          root,
+        ],
+        { encoding: "utf8" },
+      ),
     );
-    if (
-      !read("applet/build.xml").includes(`cashu-javacard-${result.version}.cap`)
-    )
-      throw Error("Firmware CAP path/version mismatch");
+    equal(firmware.version, result.version);
+    equal(
+      firmware.cap,
+      "${target.dir}/cashu-javacard-" + result.version + ".cap",
+    );
   } else {
     const path = {
       cardkit: "tools/cardkit",

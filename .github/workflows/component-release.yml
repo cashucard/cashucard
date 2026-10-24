@@ -104,6 +104,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.identity.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -118,11 +124,4 @@ jobs:
           RELEASE_TAG: ${{ needs.identity.outputs.tag }}
         run: |
           tar -czf "$RUNNER_TEMP/$RELEASE_TAG.tar.gz" -C release .
-          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
-            assets=("$RUNNER_TEMP/$RELEASE_TAG.tar.gz" release/SHA256SUMS release/release.json)
-            while IFS= read -r -d '' file; do assets+=("$file"); done < <(find release -maxdepth 1 -type f \( -name '*.cap' -o -name '*.tgz' \) -print0)
-            gh release create "$RELEASE_TAG" --verify-tag --draft --generate-notes --latest=false "${assets[@]}"
-            gh release edit "$RELEASE_TAG" --draft=false --latest=false
-          else
-            echo 'Release already exists; its immutable candidate artifacts are retained.'
-          fi
+          node tools/release/publish.cjs "$RUNNER_TEMP/$RELEASE_TAG.tar.gz" release

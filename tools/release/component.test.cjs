@@ -132,3 +132,22 @@ test("a release must be the exact tag on main, not another checkout or an unmerg
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("firmware identity compares the active CAP property rather than old comments", () => {
+  const root = mkdtempSync(join(tmpdir(), "cashu-firmware-identity-"));
+  try {
+    mkdirSync(join(root, "applet"));
+    writeFileSync(
+      join(root, "applet/pom.xml"),
+      "<project><artifactId>cashu-javacard</artifactId><version>2.1.0</version></project>",
+    );
+    const build = (version) =>
+      `<!-- historical cashu-javacard-2.1.0.cap -->\n<project><property name="cap.file" value="\${target.dir}/cashu-javacard-${version}.cap"/></project>`;
+    writeFileSync(join(root, "applet/build.xml"), build("2.2.0"));
+    assert.throws(() => identity(root, "firmware-v2.1.0"));
+    writeFileSync(join(root, "applet/build.xml"), build("2.1.0"));
+    assert.equal(identity(root, "firmware-v2.1.0").version, "2.1.0");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

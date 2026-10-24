@@ -141,3 +141,18 @@ test("recovery contract tests select full integration even without a source chan
     assert.deepEqual(classify([path]).selected, JOBS);
   }
 });
+
+test("screens initiating durable card/reset/recovery work retain full integration", () => {
+  for (const screen of [
+    "ResetCardScreen",
+    "ProvisioningScreen",
+    "CardsHomeScreen",
+    "CardStatusScreen",
+  ]) {
+    assert.deepEqual(
+      classify([`apps/provisioner/src/screens/${screen}.tsx`]).selected,
+      JOBS,
+      screen,
+    );
+  }
+});

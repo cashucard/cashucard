@@ -9,12 +9,12 @@ authorities. Do not generate replacement signing keys to make CI pass.
 
 ## Identity and compatibility
 
-| Component | Current manifest identity | New release tag |
-| --- | --- | --- |
-| Firmware | `applet/pom.xml`: 2.1.0; tracked CAP and APDU version remain 2.1 | `firmware-v2.1.0` |
-| cardkit | `tools/cardkit/package.json`: 0.2.0 | `cardkit-v0.2.0` |
-| Ops-service | `ops/package.json`: 0.1.0 | `ops-v0.1.0` |
-| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 8 | `provisioner-v1.0.0-build.8` |
+| Component   | Current manifest identity                                        | New release tag              |
+| ----------- | ---------------------------------------------------------------- | ---------------------------- |
+| Firmware    | `applet/pom.xml`: 2.1.0; tracked CAP and APDU version remain 2.1 | `firmware-v2.1.0`            |
+| cardkit     | `tools/cardkit/package.json`: 0.2.0                              | `cardkit-v0.2.0`             |
+| Ops-service | `ops/package.json`: 0.1.0                                        | `ops-v0.1.0`                 |
+| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 8                  | `provisioner-v1.0.0-build.8` |
 
 These examples identify current source, not a request to republish existing store
 builds. The next mobile release needs a new monotonically increasing build in
@@ -52,8 +52,9 @@ building artifacts. The source checkout is fixed to the verified commit.
   occurs. TestFlight's internal-only export flag is explicitly false.
 
 Component tag releases are serialized and never overwritten on a rerun. An
-already published artifact remains authoritative; investigate a partial release
-rather than replacing artifacts under a released tag. A failed candidate build
+already published artifact remains authoritative; an existing unfinished draft fails with an explicit recovery instruction.
+Inspect and finish or remove that abandoned draft before retrying; artifacts are
+never silently replaced under a released tag. A failed candidate build
 can be retried before publication with the same committed identity.
 
 ## Ops deploy
@@ -82,10 +83,18 @@ prove that the deployed service's live backup/custody state is ready.
 Configure GitHub environment `provisioner-release`, protected for release tags.
 Store existing signing material as environment secrets; never commit it:
 
-| Platform | Secret inputs / public pin |
-| --- | --- |
-| Android | `CASHU_ANDROID_KEYSTORE_BASE64`, `CASHU_ANDROID_UPLOAD_STORE_PASSWORD`, `CASHU_ANDROID_UPLOAD_KEY_ALIAS`, `CASHU_ANDROID_UPLOAD_KEY_PASSWORD`; variable `CASHU_ANDROID_UPLOAD_CERT_SHA256` pins the existing registered upload certificate. |
-| Apple | `CASHU_APPLE_DISTRIBUTION_P12_BASE64`, `CASHU_APPLE_DISTRIBUTION_P12_PASSWORD`, `CASHU_APPLE_PROFILE_BASE64`; existing team `H7UAM79QQP`, bundle `com.islandbitcoin.provisioner`, App Store profile including NFC TAG entitlement. |
+| Platform | Secret inputs / public pin                                                                                                                                                                                                                  |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Android  | `CASHU_ANDROID_KEYSTORE_BASE64`, `CASHU_ANDROID_UPLOAD_STORE_PASSWORD`, `CASHU_ANDROID_UPLOAD_KEY_ALIAS`, `CASHU_ANDROID_UPLOAD_KEY_PASSWORD`; variable `CASHU_ANDROID_UPLOAD_CERT_SHA256` pins the existing registered upload certificate. |
+| Apple    | `CASHU_APPLE_DISTRIBUTION_P12_BASE64`, `CASHU_APPLE_DISTRIBUTION_P12_PASSWORD`, `CASHU_APPLE_PROFILE_BASE64`; existing team `H7UAM79QQP`, bundle `com.islandbitcoin.provisioner`, App Store profile including NFC TAG entitlement.          |
+
+Mobile workflows use Ruby 3.3 with Bundler 2.6.9, matching the lockfile. The
+unprivileged native CI job loads locked Fastlane and lists lanes without
+credentials and round-trips a property list before any signed release/upload is
+attempted. The lock uses CFPropertyList 3.0.8 because the later 3.0.9 release
+[requires Ruby <3.2](https://rubygems.org/api/v2/rubygems/CFPropertyList/versions/3.0.9.json);
+Fastlane/CocoaPods stay at their existing versions, with explicit macOS/Linux
+platform variants.
 
 The runners install locked dependencies and build against `https://ops.cashucard.org`.
 The iOS runner must have Xcode/iOS SDK 26+; an older runner fails before building.
@@ -106,7 +115,9 @@ Configure environment `provisioner-store` with protected manual uploads:
 Dispatch **Upload versioned provisioner candidate**, select TestFlight or Play,
 choose Play `internal` or `beta` explicitly, and repeat the exact tag. The workflow
 checks source provenance and checksums and uploads the existing signed artifact;
-it does not rebuild. TestFlight uploads remain eligible for external review but
+it does not rebuild. The verifier requires both native artifacts and the CAP,
+checks every payload against the manifest, and requires complete checksum
+coverage including the manifest itself. TestFlight uploads remain eligible for external review but
 do not automatically assign external groups or bypass Beta App Review. Play
 uploads use the chosen testing track and preserve listing metadata, images,
 screenshots and country configuration. App Store production submission, review
@@ -136,7 +147,6 @@ skipped job fails the gate. Configure branch protection to require **CI gate**,
 replacing old individually required checks that now legitimately skip. The
 workflow PR does not change branch protection by itself. Manual CI dispatch and
 all release verification run the complete matrix.
-
 
 The reusable-workflow token permissions follow
 [GitHub’s permission inheritance rules](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations).

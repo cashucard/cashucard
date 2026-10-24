@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sys
 import tarfile
@@ -19,18 +20,33 @@ def write(root):
     (root / 'SHA256SUMS').write_text(''.join(f'{digest(p)}  {p.relative_to(root)}\n' for p in sorted(root.rglob('*')) if p.is_file() and p.name != 'SHA256SUMS'))
 
 
-def verify(root, tag, commit):
+def verify(root, tag, commit, component='ops'):
     data = json.loads((root / 'release.json').read_text())
     assert data['schema'] == 1 and data['tag'] == tag and data['commit'] == commit
-    assert data['component'] == 'ops'
-    assert set(data['files']) == {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()} - {'release.json', 'SHA256SUMS'}
+    assert component in ('ops', 'provisioner') and data['component'] == component
+    paths = list(root.rglob('*'))
+    assert not any(p.is_symlink() for p in paths)
+    actual = {str(p.relative_to(root)) for p in paths if p.is_file()}
+    assert set(data['files']) == actual - {'release.json', 'SHA256SUMS'}
     for name, expected in data['files'].items():
         path = root / name
-        assert not path.is_symlink() and path.resolve().is_relative_to(root.resolve())
+        assert path.resolve().is_relative_to(root.resolve()) and re.fullmatch('[0-9a-f]{64}', expected)
         assert digest(path) == expected
-    for target in ('staging', 'production'):
-        assert (root / target / 'worker.js').is_file()
-        assert (root / target / 'wrangler.toml').is_file()
+    if component == 'provisioner':
+        caps = {name for name in data['files'] if re.fullmatch(r'cashu-javacard-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.cap', name)}
+        assert len(caps) == 1
+        assert set(data['files']) == {'app-release.aab', 'CashuProvisioner.ipa'} | caps
+    else:
+        for target in ('staging', 'production'):
+            assert (root / target / 'worker.js').is_file()
+            assert (root / target / 'wrangler.toml').is_file()
+    # Require full checksum coverage, including the identity manifest itself.
+    checksums = {}
+    for line in (root / 'SHA256SUMS').read_text().splitlines():
+        checksum, name = line.split('  ', 1)
+        assert name not in checksums and name in actual - {'SHA256SUMS'}
+        checksums[name] = checksum
+    assert checksums == {name: digest(root / name) for name in actual - {'SHA256SUMS'}}
 
 
 def normalize(root):
@@ -62,6 +78,6 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'extract':
         extract(root, Path(sys.argv[3]))
     elif sys.argv[1] == 'verify':
-        verify(root, os.environ['RELEASE_TAG'], os.environ['RELEASE_COMMIT'])
+        verify(root, os.environ['RELEASE_TAG'], os.environ['RELEASE_COMMIT'], os.environ.get('RELEASE_COMPONENT', 'ops'))
     else:
         raise SystemExit('Unknown release operation')

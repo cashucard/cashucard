@@ -3210,3 +3210,14 @@ hardware evidence from simulation. API boundary, diff/gate, version identity,
 archive integrity and signing-identity regressions are hardware-free. No protocol,
 applet behavior, production data, device or signing-custody change is authorized
 by this refactor.
+
+
+The Simon review follow-up tightens D112: active XML CAP properties, rather than
+comments, determine firmware identity; reset/installation/status/home controls
+retain full integration coverage; and mobile upload verifies the complete native
+artifact set and checksums through the same manifest verifier as ops. Publication
+retries reject unfinished drafts instead of reporting a published release.
+Ruby 3.3 workflows explicitly use Bundler 2.6.9. The locked CFPropertyList
+changes from 3.0.9 (Ruby <3.2) to compatible 3.0.8, and macOS/Linux platform
+variants are recorded without moving Fastlane/CocoaPods. Unprivileged native CI
+loads the locked release toolchain and round-trips a property list before signing.

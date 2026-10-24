@@ -95,6 +95,14 @@ function classify(files) {
       else full = true; // Auth, escrow, admission, schema and recovery are shared contracts.
       continue;
     }
+    if (
+      /^apps\/provisioner\/src\/screens\/(ResetCardScreen|ProvisioningScreen|CardsHomeScreen|CardStatusScreen)\.tsx$/.test(
+        file,
+      )
+    ) {
+      full = true;
+      continue;
+    }
     if (file.startsWith("apps/provisioner/")) {
       selected.add("provisioner");
       if (
