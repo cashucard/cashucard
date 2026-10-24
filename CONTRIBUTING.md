@@ -21,7 +21,7 @@ JavaCard knowledge to help.
 Genuinely useful without hardware:
 - **Documentation that is true.** See the warning below first.
 - **`cardctl`** (`tools/cardctl/`) is plain Python with tests that run anywhere.
-- **`cashu-client`** ([separate repo](https://github.com/lnflash/cashu-client))
+- **`cashu-client`** ([separate repo](https://github.com/cashucard/client))
   is TypeScript, and the mint protocol is well specified by the NUTs.
 - **Reading the spec against the code** and reporting where they disagree. This
   has already caught real bugs.
@@ -52,7 +52,7 @@ Then pick a layer:
 | Applet (`applet/`) | JavaCard | No — jCardSim |
 | Host driver (`tools/cardctl/`) | Python | Only for `selftest` |
 | Phone-side install (`tools/cardkit/`, `apps/provisioner/`) | TypeScript, React Native | No for the suites; the spare card and two phones for the bench run |
-| Mint protocol ([cashu-client](https://github.com/lnflash/cashu-client)) | TypeScript | No |
+| Mint protocol ([cashu-client](https://github.com/cashucard/client)) | TypeScript | No |
 | **Merchant terminal** | — | **Nobody is building this. It is the biggest gap.** |
 
 ### AI agent
