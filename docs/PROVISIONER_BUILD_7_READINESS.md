@@ -65,12 +65,14 @@ See [performance evidence](OPERATOR_SIGN_IN_PERFORMANCE_2026-10-23.md).
    is not a store artifact.
 2. The approved SuperMax drill completed fresh settlement/PIN cleanup, reset and
    fresh installation. Batch 6 is acknowledged with a new key ending `72fe` and
-   no pending record. The optional independent read-only USB post-check awaits
-   card placement. See the [hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+   no pending record. The independent read-only USB post-check matched the full
+   new key and empty, unowned state. See the [hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
    before treating this as evidence for scenarios outside the successful path.
-3. Produce signed candidates with the reviewed origin. Check actual bundled
-   origin/gates, build numbers, NFC entitlement, production signature/certificate
-   continuity and Android SDK/16 KB native alignment. Retain artifact hashes.
+3. Signed build 7 candidates passed actual bundled origin/gate and build-number
+   checks. The iOS archive passed strict deep signature verification with NFC
+   TAG and debugging disabled. Android matched the enrolled upload certificate,
+   targeted SDK 36 and passed 16 KB alignment for all 24 64-bit libraries. Local
+   artifact hashes are retained; store upload/processing is a separate step.
 4. Retain the completed SuperMax drill and its dated hardware report.
    The [build 6 end-to-end report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
    already covers holder setup, loading and online/offline payments; it does not
