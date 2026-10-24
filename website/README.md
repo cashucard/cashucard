@@ -21,14 +21,17 @@ preview origin if needed.
 
 ## Content and assets
 
-Protocol facts come from cashucard/cashucard's specification, APDU reference,
-security model and license. The NUT-XX proposal remains a draft. Review the
-source specification when changing the payment or ownership explanation.
+Protocol facts come from NUT-CCP (`CCP.md` in cashucard/nut), and from
+cashucard/cashucard's APDU reference, security model and license. NUT-CCP
+remains a draft. Review the source specification when changing the payment or
+ownership explanation.
 The hero describes offline terminal acceptance and later mint settlement as
 separate events; an offline tap does not guarantee final settlement.
-Footer links point to the draft and the Cashu Card source, with Flash Mobile,
-Foxy iOS and Flash POS grouped under Apps. The links do not claim completed
-integrations.
+Footer links point to the draft NUT and the Cashu Card source, with the Cashu
+Card Provisioner under Apps. The install guide's footer still lists Flash
+Mobile, Foxy iOS and Flash POS, since its setup step sends a new holder to the
+wallets there (D117).
+The links do not claim completed integrations.
 
 `dist/film/` holds the 48-second film ("How it works") at 1080p, a 720p copy
 that narrow screens load, and its poster; `dist/assets/og.jpg` is the share
@@ -58,7 +61,7 @@ The film, the frames and `dist/assets/custom-cards-1.webp` are rendered with a
 private fork of the Daylight Fob film renderer (a WebGL2 scene driven by
 headless Chrome, with a synthesized score at -18 LUFS and a look-ahead limiter
 rather than clipping); the render source stays outside this repository. What
-they state comes from `spec/NUT-XX.md` and `spec/APDU.md`: the card makes its
+they state comes from NUT-CCP and `spec/APDU.md`: the card makes its
 key on the chip and keeps it there, a wallet writes pieces into its 128
 slots, the till names the pieces, the card signs once for the payment and
 burns them, and an offline till accepts the payment and settles with the mint
@@ -77,6 +80,18 @@ shows three made-up designs under a "Coming soon" stamp. Its quantities and
 its Lightning and Stripe checkouts are placeholders that are not connected to
 anything yet. When a checkout goes live, `_headers`' content security policy
 needs the provider's origins (it allows no connections or form posts today).
+
+"Install the applet" (`#install`, the nav's "Install") gives the two ways to
+put the applet on a blank card. The first is the Cashu Card Provisioner
+(`apps/provisioner`, 1.0.0 build 9), for card issuers with an operator
+account. It shows the app's icon (`dist/assets/provisioner-icon.png`, its
+180-pixel iOS icon) and links the TestFlight public beta, Google Play's
+testing opt-in for `com.islandbitcoin.provisioner` and the GitHub release
+with the build's files and checksums. A Play visitor who has not joined the
+test gets no store listing, so the opt-in page is the Android link; it lets
+anyone join once Google approves open testing. Replace both beta links with
+the store listings when the app is published. The second way is the install
+guide, for a computer with a card reader.
 
 `dist/guide.html` (with `guide.css` and `guide.js`) is the install guide at
 `/guide`: the steps of `docs/HARDWARE_DEPLOYMENT.md` for someone with a blank

@@ -2512,6 +2512,9 @@ accurate place to learn the transaction flow.
 
 ## D84 — Compact grouped source footer
 
+The home page's Flash Mobile, Foxy and Flash POS links were removed by D117,
+and the install guide's footer keeps them. The grouped footer still applies.
+
 **Decided (2026-10-22):** Put the public protocol and repository links in
 the footer instead of a standalone “Protocol and code” section. Group the
 Flash Mobile, Foxy and Flash POS links under “Apps”; keep separate Protocol
@@ -3277,7 +3280,6 @@ asked for the website's existing icon, and the shared provisioner serves wallets
 implementing the protocol. This is a visual asset change, with no card/protocol
 behavior or app build-number change.
 
-
 ## D114 — Keep reset results separate from the next card check
 
 **Decided:** a completed reset receipt is history, not the starting state of the
@@ -3308,3 +3310,60 @@ consents actionable after a cancelled new check.
 next card check. Regressions reproduce that race, a cancelled second NFC check,
 Stop during a durable write, and completed-result re-entry/cancel/retry. This is a host lifecycle fix; no protocol,
 firmware, CAP, production data or physical device is changed.
+
+## D115 — The protocol's core lives in cashucard/nut as NUT-CCP
+
+**Decided:** the core every card and reader share (selecting the card, card
+proofs, reading, paying, the card's own change, loading, card policy and offline
+acceptance) is NUT-CCP: `CCP.md`, with its test vectors, in the public
+repository [cashucard/nut](https://github.com/cashucard/nut), written to be
+proposed to cashubtc/nuts. It keeps that name until the Cashu maintainers assign
+a number. `spec/NUT-XX.md` is removed. Its core is CCP.md, and its profiles were
+already in `spec/APDU.md`, which now also carries what only NUT-XX.md said: the
+owner key's counter byte and recovery from the seed, the one-tap set-up order,
+the work a forged header costs, and what a terminal handed the PIN can take.
+`spec/APDU.md` stays the reference implementation's command reference and the
+home of the owner, clock and limits, and NFC tag profiles until each is written
+in cashucard/nut. Links in the docs, the tools, the applet's comments and
+cashucard.org point at CCP.md. `test_spec_consistency.py` holds the applet to
+NUT-CCP's two card proof secrets, quoted from CCP.md, and SchnorrHWMathTest's
+guard against a document claiming branch-free arithmetic reads `spec/APDU.md`.
+A change to the core starts as a pull request in cashucard/nut, before any
+implementation changes. cashucard/javacard keeps mirroring `spec/`, so its
+next mirror drops NUT-XX.md.
+
+**Rejected:** keeping NUT-XX.md as a second copy, which had already drifted
+from CCP.md in its version labels, terms and layout; and vendoring cashucard/nut
+as a submodule for the tests, which would make every checkout and CI job fetch
+the spec when the check needs only the two secret forms.
+
+## D116 — cashucard.org offers the provisioner beside the install guide
+
+**Decided:** the home page's "Install the applet" section (`#install`, the
+nav's "Install") gives two ways to install the applet. The Cashu Card
+Provisioner, 1.0.0 build 9, is for card issuers with an operator account. It
+links the TestFlight public beta, Google Play's testing opt-in for
+`com.islandbitcoin.provisioner` and the GitHub release
+`provisioner-v1.0.0-build.9` for its files and checksums. The install guide
+covers a computer with a card reader. The guide's "What you need" and the
+footer's Apps link the section. The page's word and height budgets in the smoke
+test grow by what the section measures.
+
+**Rejected:** the stores' official download badges while the app is a beta, and
+a Play listing link, which a visitor who has not joined the test gets as not
+found. When the app is published, the store listings replace both beta links.
+
+## D117 — The home page's footer lists the provisioner alone under Apps
+
+**Decided (2026-10-24):** the home page's footer drops the Flash Mobile, Foxy
+and Flash POS links, so its Apps group holds the Cashu Card Provisioner alone.
+The install guide's footer keeps all four, because its step for giving a card
+away sends the new holder to the wallets listed there. The smoke test fails if
+the home page links any of the three apps. This supersedes D84's app links on
+the home page.
+
+**Why:** user review on 2026-10-24 asked for the three app links to come off
+the home page.
+
+**Rejected:** removing the Apps group with them, since the provisioner is the
+app the home page offers in its install section.

@@ -118,6 +118,7 @@
               <li><b>A card reader</b> Any PC/SC reader for ISO 7816-4 cards works, contact or contactless. The project tests with the ACS ACR122U, a USB reader for about $40 to $50, sold on <a href="https://www.amazon.com/dp/B07KRKPWYC">Amazon</a> and by <a href="https://store.gototags.com/acs-acr122u-nfc-usb-reader/">GoToTags</a>.</li>
               <li><b>A computer</b> You need a terminal, Git, Java 11 or later and GlobalPlatformPro 20.01.23 or later. Step 1 installs Java and GlobalPlatformPro.</li>
             </ul>
+            <p>Card issuers can install from a phone instead, with the <a href="/#install">Cashu Card Provisioner</a> app, which installs the applet over the phone's NFC.</p>
           </section>
 
           <section id="tools" aria-labelledby="tools-title">
@@ -359,7 +360,7 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
             <ul class="links">
               <li><a href="https://github.com/cashucard/cashucard/blob/main/docs/HARDWARE_DEPLOYMENT.md">Hardware deployment guide, in full <span aria-hidden="true">↗</span></a></li>
               <li><a href="https://github.com/cashucard/cashucard/blob/main/spec/APDU.md">The card's commands, byte for byte <span aria-hidden="true">↗</span></a></li>
-              <li><a href="https://github.com/cashucard/cashucard/blob/main/spec/NUT-XX.md">Draft specification <span aria-hidden="true">↗</span></a></li>
+              <li><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <span aria-hidden="true">↗</span></a></li>
             </ul>
           </section>
         </article>
@@ -367,9 +368,9 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/spec/NUT-XX.md">Draft specification ↗</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="https://github.com/lnflash/flash-mobile">Flash Mobile ↗</a><a href="https://github.com/getfoxy/iOS">Foxy ↗</a><a href="https://github.com/lnflash/flash-pos">Flash POS ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="https://github.com/lnflash/flash-mobile">Flash Mobile ↗</a><a href="https://github.com/getfoxy/iOS">Foxy ↗</a><a href="https://github.com/lnflash/flash-pos">Flash POS ↗</a><a href="/#install">Cashu Card Provisioner</a></div>
       </div>
       <div class="footer-bottom"><span>© CASHU CARD · OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>

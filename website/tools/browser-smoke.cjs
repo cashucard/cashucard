@@ -143,27 +143,31 @@ async function main() {
     assert.equal(await evaluate("[...document.querySelectorAll('script[src]')].map(s=>new URL(s.src).pathname).join()"), "/seq/tap-2/anchors.js,/motion.js", "Two scripts: the sequence anchors and the controls");
     const words = await evaluate("document.body.innerText.trim().split(/\\s+/).length");   // \\s survives the string literal
     console.log("words " + words);
-    assert.ok(words < 500, "Copy stays concise");   // about half of it is the section on where to buy cards
+    assert.ok(words < 630, "Copy stays concise");   // about half of it is where to get cards and how to install the applet
     const screens = await evaluate("document.documentElement.scrollHeight / innerHeight");
     console.log("screens at 1440x900, reduced motion " + screens.toFixed(2));
-    assert.ok(screens <= 5.0, "Desktop page stays within its budget");
+    assert.ok(screens <= 5.8, "Desktop page stays within its budget");
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
-    assert.ok(await evaluate("document.querySelector('.button-bright').href.includes('/spec/NUT-XX.md')"), "Primary action opens the draft");
+    assert.ok(await evaluate("document.querySelector('.button-bright').href==='https://github.com/cashucard/nut/blob/main/CCP.md'"), "Primary action opens the draft NUT");
     assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/cashucard/cashucard'"), "Secondary action opens the source repository");
     assert.equal(await evaluate("document.querySelector('#source').tagName"), "FOOTER", "Source links live in the footer");
-    assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===3)"), true, "Apps are grouped in the footer");
+    assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===1 && !!g.querySelector('a[href=\"#install\"]'))"), true, "The footer's Apps group holds the provisioner alone");
     assert.equal(await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>!!document.querySelector(a.hash))"), true, "Every page anchor exists");
-    for (const repo of [
-      "cashucard/cashucard", "lnflash/flash-mobile", "getfoxy/iOS", "lnflash/flash-pos",
-    ]) {
-      assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes(" + JSON.stringify(repo) + "))"), "Linked source " + repo);
-    }
+    assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes('cashucard/cashucard'))"), "Linked source cashucard/cashucard");
+    // the home page links no wallet or till; the install guide's footer still does (D117)
+    assert.equal(await evaluate("[...document.querySelectorAll('a')].filter(a=>/lnflash\\/flash-mobile|getfoxy\\/iOS|lnflash\\/flash-pos/.test(a.href)).length"), 0, "The home page links no Flash, Flash POS or Foxy app");
     // where to buy cards: two shops for blank cards, then custom printed cards whose checkout waits for launch
     assert.equal(await evaluate("document.querySelectorAll('#buy .buy-option').length"), 3, "Three ways to get cards");
     assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.amazon.com/dp/\"]')"), "Cards for testing link to an Amazon listing");
     assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.cardlogix.com/\"]')"), "Cards in bulk link to CardLogix");
     assert.equal(await evaluate("document.querySelectorAll('#buy input[name=\"buy-qty\"]').length"), 4, "Custom cards come in four quantities");
     assert.equal(await evaluate("[...document.querySelectorAll('#buy .pay')].map(b=>b.getAttribute('aria-disabled')).join()"), "true,true", "Lightning and Stripe checkouts wait for launch");
+    // installing the applet: the provisioner's two betas, then the install guide
+    assert.equal(await evaluate("document.querySelectorAll('#install .buy-option').length"), 2, "Two ways to install the applet");
+    assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://testflight.apple.com/join/M3JucFNy\"]')"), "The provisioner links its TestFlight beta");
+    assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://play.google.com/apps/testing/com.islandbitcoin.provisioner\"]')"), "The provisioner links its Google Play beta");
+    assert.ok(await evaluate("!!document.querySelector('#install a[href=\"/guide\"]')"), "The install section opens the install guide");
+    assert.ok(await evaluate("!!document.querySelector('.header nav a[href=\"#install\"]')"), "The nav opens the install section");
     // the till in the steps is a phone, with the card held to its back
     assert.ok(await evaluate("document.querySelector('#steps li p').textContent.includes(\"to the back of the merchant's phone\")"), "The steps show a phone as the till");
     // the film: custom controls over the native video; with reduced motion it waits for a press
@@ -249,7 +253,7 @@ async function main() {
     await evaluate("document.querySelector('#source').scrollIntoView()");
     await screenshot("02-source-desktop");
     for (const [width, height, maxScreens] of [
-      [1024, 768, 5.0], [768, 900, 5.3], [390, 844, 5.6], [320, 740, 6.5],
+      [1024, 768, 5.8], [768, 900, 6.3], [390, 844, 6.7], [320, 740, 7.9],
     ]) {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
@@ -278,12 +282,15 @@ async function main() {
     assert.ok(await evaluate("document.body.textContent.includes('f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5')"), "Guide publishes the CAP's sha256");
     assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Install guide fits desktop");
     assert.ok(await evaluate("!!document.querySelector('#need a[href^=\"https://www.amazon.com/dp/\"]')"), "The guide links a card reader to buy");
+    assert.ok(await evaluate("!!document.querySelector('#need a[href=\"/#install\"]')"), "The guide points card issuers at the provisioner");
     assert.ok(await evaluate("document.querySelector('.agent pre code').textContent.includes('https://cashucard.org/guide.md')"), "The guide hands the install to an AI agent");
     const agentGuide = await fetch(origin + "/guide.md").then(async (r) => ({ status: r.status, type: r.headers.get("content-type") || "", text: await r.text() }));
     assert.equal(agentGuide.status, 200, "The agent's guide is served");
     assert.match(agentGuide.type, /^text\/markdown/, "The agent's guide is Markdown");
     assert.ok(agentGuide.text.includes("f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5"), "The agent's guide publishes the CAP's sha256");
-    assert.ok((await fetch(origin + "/llms.txt").then((r) => r.text())).includes("https://cashucard.org/guide.md"), "llms.txt points agents at the guide");
+    const llms = await fetch(origin + "/llms.txt").then((r) => r.text());
+    assert.ok(llms.includes("https://cashucard.org/guide.md"), "llms.txt points agents at the guide");
+    assert.ok(llms.includes("https://github.com/cashucard/nut/blob/main/CCP.md"), "llms.txt points agents at the draft NUT");
     await screenshot("09-install-guide");
     for (const width of [390, 320]) {
       await viewport(width, 844);
