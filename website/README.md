@@ -28,9 +28,9 @@ ownership explanation.
 The hero describes offline terminal acceptance and later mint settlement as
 separate events; an offline tap does not guarantee final settlement.
 Footer links point to the draft NUT and the Cashu Card source, with the Cashu
-Card Provisioner under Apps. The install guide's footer still lists Flash
-Mobile, Foxy iOS and Flash POS, since its setup step sends a new holder to the
-wallets there (D117).
+Card Provisioner under Apps. The install guide's Apps also link Flash and Foxy
+at their own sites, getflash.io and getfoxy.io, since its setup step sends a
+new holder to the wallets there (D118).
 The links do not claim completed integrations.
 
 `dist/film/` holds the 48-second film ("How it works") at 1080p, a 720p copy

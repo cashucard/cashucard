@@ -2513,7 +2513,8 @@ accurate place to learn the transaction flow.
 ## D84 — Compact grouped source footer
 
 The home page's Flash Mobile, Foxy and Flash POS links were removed by D117,
-and the install guide's footer keeps them. The grouped footer still applies.
+and the install guide links Flash and Foxy at their own sites (D118). The
+grouped footer still applies.
 
 **Decided (2026-10-22):** Put the public protocol and repository links in
 the footer instead of a standalone “Protocol and code” section. Group the
@@ -3364,6 +3365,9 @@ found. When the app is published, the store listings replace both beta links.
 
 ## D117 — The home page's footer lists the provisioner alone under Apps
 
+The install guide's app links were changed by D118, which links Flash and Foxy
+at their own sites. The home page's footer still applies.
+
 **Decided (2026-10-24):** the home page's footer drops the Flash Mobile, Foxy
 and Flash POS links, so its Apps group holds the Cashu Card Provisioner alone.
 The install guide's footer keeps all four, because its step for giving a card
@@ -3376,3 +3380,18 @@ the home page.
 
 **Rejected:** removing the Apps group with them, since the provisioner is the
 app the home page offers in its install section.
+
+## D118 — The install guide links Flash and Foxy at their own sites
+
+**Decided (2026-10-24):** the install guide's footer links the wallets at
+their own sites, Flash at getflash.io and Foxy at getfoxy.io, in place of the
+apps' GitHub repositories. getflash.io sends its wallet and its POS to the
+same download page, so one Flash link replaces Flash Mobile and Flash POS. The
+smoke test holds the guide's Apps to those two sites and the provisioner, and
+fails if the home page links either site. This supersedes D117's four guide
+links.
+
+**Why:** user review on 2026-10-24 asked for the guide to link the apps'
+marketing pages instead of their GitHub pages.
+
+**Rejected:** separate Flash Mobile and Flash POS links to the same page.
