@@ -1,8 +1,8 @@
 # @cashu-card/cardkit
 
 Versioned TypeScript/JavaScript API for Cashu Card installation and recovery over
-an injected `Transceiver`. The core opens no NFC session, network connection or
-platform cipher. It does not decide whether an operator may reset a card.
+an injected `Transceiver`. Callers supply NFC, network or other transport and
+decide whether an operator may reset a card.
 
 ```ts
 import {provision, type Transceiver} from '@cashu-card/cardkit';

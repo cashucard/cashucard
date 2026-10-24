@@ -170,10 +170,10 @@ A card fresh from the install is empty and unowned, and any reader in range can 
 ## Troubleshooting
 
 - `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the size of the load file next.
-- SELECT answers `6A82`: the card has an earlier applet, 0.x or 1.x, and needs an update. Ask the person.
+- SELECT answers `6A82`: the requested applet was not found. An earlier 0.x or 1.x applet is one possible cause. Stop and ask the person.
 - SELECT answers `9000` with no version: that SELECT named the package AID alone, `F0434153485543415244`, which reaches the opener. Select the whole AID, `F043415348554341524401`, as in step 5.
 - The card refuses gp's keys: stop, as step 3 says.
-- The CAP will not load: the card is Java Card 3.0.4 or earlier, which lacks `ALG_EC_SVDP_DH_PLAIN_XY`. It needs a J3R180.
+- The CAP will not load: confirm the card model and Java Card version. Java Card 3.0.4 and earlier lack `ALG_EC_SVDP_DH_PLAIN_XY`; this guide targets the J3R180. Stop if the card differs.
 
 ## Reference
 

@@ -2,21 +2,20 @@
 
 ## `card-file-v1.json`
 
-A v1 card file, regenerated through the `cashucard/client#5` toolchain and
-verified **accepted by that branch's `parseCardFile`** — parseCardFile-accepts,
-not serializeCardFile-wrote: `serializeCardFile` refuses `spent: true` by
-design (that direction ends at LOAD_PROOF, which has no spent bit), so no
-serializer on either side can emit a full dump with a spent slot. Full dumps
-with spent slots are `cardctl dump`'s side of the format.
+A v1 card file, generated with the `cashucard/client#5` toolchain and verified
+as accepted by `parseCardFile`. That PR merged to `main` on 2026-08-28. Its
+`serializeCardFile` emits `spent: false` for proofs headed to a card and refuses
+`spent: true`, because `LOAD_PROOF` carries no spent bit. Full dumps with spent
+slots come from `cardctl dump`.
 
-Keeping the fixture TypeScript-verified is the point of keeping it here: it
-cannot drift into agreement with a wrong Python parser. Note that agreement is
-with the #5 branch, not `main` — until #5 lands, `main`'s `parseCardFile`
-still rejects `spent`, which is why the two PRs must merge together (see the
-status note in `spec/CARD-FILE.md`).
+Keeping the fixture TypeScript-verified prevents it from drifting into agreement
+with an incorrect Python parser. The TypeScript check uses the client
+implementation merged from PR #5. The paired cardctl implementation merged in
+`cashucard/javacard#19` on 2026-08-28. The status block in
+`spec/CARD-FILE.md` records the merge and implementation status.
 
-A fixture only ever proves that one file parsed once. The contract both
-implementations are held to is `spec/CARD-FILE.md`, which
-`test_card_file.py` parses and asserts the parser and writer against — that is
-the check a rename fails. Note that only the Python side reads that document
-today; making cashu-client assert the same tables is the other half of the job.
+A fixture proves that one file parsed once. `test_card_file.py` parses
+`spec/CARD-FILE.md` and checks the Python parser and writer against its field
+tables, so a contract-breaking rename fails. The Python suite reads the
+document directly. The client suite still needs equivalent checks against the
+same tables.

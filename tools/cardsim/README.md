@@ -1,6 +1,8 @@
-# cardsim: the 2.0 card over loopback HTTP
+<a id="cardsim-the-20-card-over-loopback-http"></a>
 
-The real `CashuApplet` (protocol 2.0, AID `F0 43 41 53 48 55 43 41 52 44 01`) in
+# cardsim: the 2.1 card over loopback HTTP
+
+The real `CashuApplet` (protocol 2.1, AID `F0 43 41 53 48 55 43 41 52 44 01`) in
 jCardSim, behind a small HTTP API. flash-pos and flash-mobile run it in their e2e
 jobs, pinned by `CASHU_JAVACARD_REF`. **This file is that contract**: the four
 routes, the `/fixture` schema, the `/state` fields and the Node client. A change to
