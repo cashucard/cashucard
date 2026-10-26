@@ -1,6 +1,66 @@
 import React from 'react';
 import {Alert, Linking, Pressable, StyleSheet, Text, View} from 'react-native';
 import {FONT, useTheme} from './theme';
+import {useApp} from './store';
+
+export const OPS_DASHBOARD_URL = 'https://ops.cashucard.org';
+
+/** This display alias leaves API requests and saved-work origins intact. */
+export function opsDashboardUrl(
+  serviceOrigin: string | undefined,
+): string | null {
+  if (serviceOrigin === 'https://cashu-card-ops.old-cell-30e7.workers.dev') {
+    return OPS_DASHBOARD_URL;
+  }
+  return typeof serviceOrigin === 'string' &&
+    /^https?:\/\/[^\s/?#@]+\/?$/.test(serviceOrigin)
+    ? serviceOrigin.replace(/\/$/, '')
+    : null;
+}
+
+export function OpsDashboardLink({
+  testID,
+  textTestID,
+}: {
+  testID: string;
+  textTestID?: string;
+}) {
+  const t = useTheme();
+  const url = opsDashboardUrl(useApp().serviceUrl);
+  const s = StyleSheet.create({
+    link: {minHeight: 44, justifyContent: 'center', flexShrink: 1},
+    label: {
+      color: t.dim,
+      fontFamily: FONT.regular,
+      fontSize: 14,
+      textDecorationLine: 'underline',
+    },
+  });
+  if (!url) {
+    return null;
+  }
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="link"
+      accessibilityLabel="Open ops dashboard"
+      style={s.link}
+      onPress={async () => {
+        try {
+          await Linking.openURL(url);
+        } catch {
+          Alert.alert(
+            'Unable to open dashboard',
+            `Open ${url} in your browser.`,
+          );
+        }
+      }}>
+      <Text testID={textTestID} style={s.label}>
+        {url}
+      </Text>
+    </Pressable>
+  );
+}
 
 const links = [
   {

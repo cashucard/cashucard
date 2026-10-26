@@ -45,7 +45,7 @@ reinstall. Reject malformed responses and zero/all-FF serials; missing CPLC or
 an identity mismatch prevents authentication and mutation in the automated loop.
 Do not substitute NFC UID or SCP02 diversification data.
 
-A subsequent [USB-reader check](HARDWARE_TEST_REPORT_2026-10-20.d321-cplc.md)
+A subsequent [USB-reader check](reports/HARDWARE_TEST_REPORT_2026-10-20.d321-cplc.md)
 read another card three times across PC/SC reconnections, consistently yielding
 `cplc-v1:4790d3213180072976207515`. That provides a second distinct observed
 composite and repeat-read evidence on the ACR122U. It does not cover physical
@@ -70,7 +70,7 @@ or a saved-identity mismatch without authentication or retries. The library
 uses its existing SELECT builder, including Le `00`; the separate USB check used
 GlobalPlatformPro's raw SELECT without Le. Parser replay and fake transports
 validate this implementation. The TypeScript reader now also has
-[read-only phone evidence](HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md):
+[read-only phone evidence](reports/HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md):
 three documented reads on the Pixel 8 Pro and Max (iPhone 13 Pro Max) match the
 same card's USB baseline. Identity stability through install/rotation, a distinct
 card sample and termination/recovery behavior remain unverified. The gated real
@@ -366,6 +366,6 @@ disabled by `apps/provisioner/src/releaseGates.ts`. Frozen-record retries and
 explicit stop acknowledgement remain available without NFC. Installation receipts
 never certify holder readiness; that requires the separate personalization contract.
 
-The proposed [owner-run device validation checklist](PROVISIONER-DEVICE-VALIDATION.md)
+The proposed [owner-run device validation checklist](reports/PROVISIONER-DEVICE-VALIDATION.md)
 names the candidate devices, preparation gaps, bounded checks and required
 evidence. It does not authorize hardware actions or mark any check as passed.

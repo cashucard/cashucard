@@ -1,0 +1,20 @@
+/* Cashu Card colors (brand/tokens.json; written by brand/generate.swift) */
+:root {
+  --cc-ground: #10271E;
+  --cc-ground-raised: #15332A;
+  --cc-ink: #EDF3E7;
+  --cc-sage: #BECFC0;
+  --cc-mute: #92A998;
+  --cc-wordmark-soft: #AABDB0;
+  --cc-lime: #D3F39A;
+  --cc-dot: #B7EA7C;
+  --cc-chip-light: #ECF9BD;
+  --cc-chip-mid: #CFE98F;
+  --cc-chip-deep: #A6CC6A;
+  --cc-paper: #F3F7EE;
+  --cc-paper-soft: #557A62;
+  --cc-glow: #2B4C31;
+  --cc-glow-mid: #173526;
+  --cc-chip: linear-gradient(135deg, #ECF9BD 0%, #CFE98F 55%, #A6CC6A 100%);
+  --cc-font: "Figtree", "Helvetica Neue", Arial, sans-serif;
+}

@@ -140,10 +140,10 @@ skipped selected jobs. Branch protection should require that gate.
 jCardSim and fake transports prove protocol/workflow logic; they cannot prove
 EEPROM behavior, RF stability, torn writes or silicon cryptographic framing. The
 [23 October physical E2E
-report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) records the
+report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) records the
 particular card/phones and tested online/offline payment and settlement loop.
 The [mobile reset
-report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md) records
+report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md) records
 reset/reinstall evidence. Their coverage is limited to the recorded devices,
 cards and actions.
 

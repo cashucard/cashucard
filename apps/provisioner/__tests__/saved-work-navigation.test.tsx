@@ -3,6 +3,7 @@ import Renderer, {act} from 'react-test-renderer';
 import App from '../App';
 import {ApiClient} from '../src/api';
 import {DEFAULT_SERVICE_URL} from '../src/store';
+import {opsDashboardUrl} from '../src/LegalLinks';
 import {useProvisioning} from '../src/ProvisioningStore';
 jest.mock('../src/ProvisioningStore', () => ({
   ProvisioningProvider: ({children}: {children: React.ReactNode}) => children,
@@ -150,7 +151,7 @@ test('Cards names the signed-in operator and service and offers everyday tools w
   );
   expect(
     tree.root.findByProps({testID: 'home-service'}).props.children,
-  ).toContain(DEFAULT_SERVICE_URL.replace(/^https?:\/\//, ''));
+  ).toBe(opsDashboardUrl(DEFAULT_SERVICE_URL));
   expect(tree.root.findByProps({testID: 'home-new'})).toBeDefined();
   expect(tree.root.findByProps({testID: 'home-check'}).props.disabled).toBe(
     false,

@@ -5,6 +5,11 @@ for **NFC bearer payments**. A physical card holds Bitcoin-denominated ecash
 on its chip. Its holder pays by tapping the card; a merchant can accept the
 payment offline and settle with the mint when online.
 
+> **Experimental.** Cashu Card is an experimental open source project. It is
+> built on NUT-CCP, a draft NUT proposal that has had little outside review, and
+> its testing so far is limited to the dated reports in this repository. Keep
+> only small amounts on a card.
+
 This is the **shared Cashu card protocol, version 2.1**: one wire for Flash and
 for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
 of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
@@ -27,10 +32,10 @@ each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 
 > ### Status: protocol 2.1 tested on J3R180 and real phones
 >
-> The [23 October physical E2E report](docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+> The [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records installation, holder setup, funding, online/offline payments, change and
 > eventual mint settlement on the named card/phones. The
-> [mobile reset report](docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+> [mobile reset report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 > records reset and reinstall. These bounded tests do not establish compatibility
 > with every device or failure mode. The repository also includes the operator
 > provisioner and Cloudflare-capable ops-service. Read the

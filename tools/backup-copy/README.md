@@ -6,7 +6,7 @@ It reads encrypted exports through a paired backup-only issuer reader or scoped
 R2 access, and uses rclone for Nextcloud WebDAV writes. It never decrypts an
 export or needs an age private identity. The package adds browser setup and the
 separate notification watcher below; neither component enforces issuance.
-See the [staging report](../../docs/OPS_STAGING_REPORT_2026-10-21.md) for observed
+See the [staging report](../../docs/reports/OPS_STAGING_REPORT_2026-10-21.md) for observed
 Zion behavior and remaining recovery gates.
 
 Requires Python 3.9+ on Linux/macOS and rclone 1.75.2 (the locally validated

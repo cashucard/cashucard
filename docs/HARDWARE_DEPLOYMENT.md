@@ -63,7 +63,7 @@ been seen to install (`tools/refcheck.py`, from
 by refcheck's measure (100 past a multiple of 256). It installed on a J3R180 with
 the opener first, in the three steps below, on 2026-10-14, and refcheck's table has
 it as a size that installs ([D26](DECISIONS.md#d26),
-[the report](HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)). The 2.0 build was 20,060 bytes;
+[the report](reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)). The 2.0 build was 20,060 bytes;
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
@@ -236,7 +236,7 @@ asks for a shareable interface at each selection and keeps nothing of it).
 There is no in-place upgrade: 2.0 is a new AID and a new wire, and a reinstall
 makes a new card key. **Every piece on a card is P2PK-locked to its key, so a
 card is swept before it is deleted.** The v0.2 reinstall on the J3R180 stranded
-5 sat this way (see the [hardware test report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)).
+5 sat this way (see the [hardware test report](reports/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)).
 
 The 0.x applet is sunset ([D18](DECISIONS.md#d18)). Both apps drop it: a card
 on the 0.x AID (`D2 76 00 00 85 01 02`, `SELECT` answers `00 0X`) or on Foxy's

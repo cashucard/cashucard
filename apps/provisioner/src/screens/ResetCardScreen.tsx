@@ -17,7 +17,7 @@ import {resetRecoveryDetails} from '../ownedResetWorkflow';
 
 import {CardFigure} from '../CardFigure';
 import {FONT, useTheme} from '../theme';
-import {Dim, PrimaryButton, Screen, SecondaryButton} from '../ui';
+import {Dim, InfoButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
 
 const BLOCKED: Record<string, string> = {
   'operator-mismatch':
@@ -150,17 +150,24 @@ export function ResetCardScreen({
     <Screen
       title="Reset a card"
       onBack={leave}
+      headerRight={
+        <InfoButton title="Resetting a card" testID="reset-help">
+          {
+            'Reset removes the wallet link, PIN, settings and applet. It is available for eligible cards installed by this service. First recover all value and finish pending payments and change in the holder wallet. A fresh installation creates a new card identity.'
+          }
+        </InfoButton>
+      }
       onStop={flow.busy ? flow.cancel : undefined}>
       <ScrollView
         contentContainerStyle={s.scroll}
         automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled">
-        <Dim>
-          Reuse a card previously installed by this service. Reset removes its
-          wallet link, PIN, settings and applet. A fresh installation creates a
-          new card identity.
-        </Dim>
+        {pending && visible.journal.stage !== 'factory_verified' ? (
+          <Dim>
+            Reset removes this card’s wallet link, PIN, settings and applet.
+          </Dim>
+        ) : null}
         {flow.status !== 'ready' ? (
           <>
             <Dim>{flow.notice ?? 'Loading saved work…'}</Dim>
@@ -352,9 +359,8 @@ export function ResetCardScreen({
               <>
                 <Text style={s.title}>Reset complete</Text>
                 <Dim>
-                  The old applet is removed and the service saved the result.
-                  This card is ready for a fresh installation, followed by
-                  holder-wallet setup.
+                  Reset saved. Install this card again, then set it up in a
+                  holder wallet.
                 </Dim>
                 <PrimaryButton
                   title="SET UP A NEW BATCH"

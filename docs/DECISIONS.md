@@ -2774,7 +2774,7 @@ when the operator explicitly runs the approved command again.
 **Rejected:** passing escrow keys to a command line, making a generic APDU
 bridge, silently using the local runner for production, or recording completion
 without durable verification evidence. The first physical run remains gated by
-the [named-card drill](OWNED-CARD-RESET-DRILL.md).
+the [named-card drill](reports/OWNED-CARD-RESET-DRILL.md).
 
 ## <a id="d98"></a>D98: Report bounded reset failure phases without printing native errors
 
@@ -3268,6 +3268,9 @@ loads the locked release toolchain and round-trips a property list before signin
 
 ## <a id="d113"></a>D113: Website Cashu mascot as the provisioner app icon
 
+The mascot icon was superseded by [D119](#d119), the Cashu Card mark. Opaque iOS
+squares, the separate Android foreground and the store-listing checks still apply.
+
 **Decided:** use the exact sunglasses-wearing Cashu mascot served by
 `cashucard.org/assets/cashu.png` (SHA-256
 `fffab936aede92ad75b199c60ccfa547fee4a2b5bafce525925a0069ff42430b`)
@@ -3399,6 +3402,35 @@ marketing pages instead of their GitHub pages.
 
 **Rejected:** separate Flash Mobile and Flash POS links to the same page.
 
+## <a id="d119"></a>D119: The Cashu Card mark is the cashew drawn as a chip
+
+**Decided (2026-10-24):** Cashu Card has its own mark: the Cashu cashew, redrawn
+as one smooth shape and turned 14 degrees to the left, cut with a card chip's
+center pad and contact lines, in a lime-gold gradient. At 40 px and below it
+drops the lines and is the plain cashew, because the lines would be under a
+pixel wide. `brand/generate.swift` holds the shapes and colors once and draws
+the library in `brand/` from them: SVG and PNG masters in color, deep green and
+white, the app icon, a social avatar, favicons, the wordmark lockups and the
+color tokens. It also draws the provisioner's iOS, Android and store icons and
+the Play feature graphic, which now sets its text in Figtree 600. The wordmark
+is "cashu" in Figtree 800 and "card" in Figtree 400, from Figtree's variable
+font in `brand/fonts/`. The generator replaces
+`apps/provisioner/scripts/generate-app-icons.swift`, and the mascot source
+`apps/provisioner/assets/app-icon/cashu.png` goes with it. This supersedes
+D113's mascot icon.
+
+**Why:** the user asked on 2026-10-24 for a cleaner, modern logo built from the
+Cashu cashew and made for Cashu Card, to start a consistent asset library. From
+five directions, then three, they chose the chip.
+
+**Rejected:**
+- The mascot's sunglasses, which lean on Cashu's community mascot.
+- Contactless waves from the cashew, which resemble EMVCo's registered
+  contactless indicator.
+- A card with a cashew window, alone or with the chip set into it, which reads
+  as a card first and Cashu second.
+- The cashew as a "c" with the status dot, which says least about cards.
+
 ## <a id="d120"></a>D120: cashucard.org, the film and the social kit carry the Cashu Card mark
 
 **Decided (2026-10-24):** the D119 mark replaces the Cashu mascot everywhere
@@ -3448,3 +3480,33 @@ path back to the batch or card check that opened it.
 
 **Rejected:** skipping batch review or reset consent, starting NFC on screen
 entry, and a shared return destination that could trap nested tools in a loop.
+
+## <a id="d122"></a>D122: Routine app help opens from information icons
+
+**Decided (2026-10-25):** routine explanations move into shared tap-to-read
+panels on the shipping sign-in, Cards, setup, installation, card status,
+identity, reset and Settings screens. Information icons have labeled 44-point
+targets. Panels support scrolling, screen-reader focus, an explicit Close
+action, outside-tap dismissal and Android Back. Opening help starts no card
+operation or service request.
+
+Cards labels and announces the operator name with “Signed in as”. Dashboard
+links follow the configured service. Only the existing production Worker
+origin has a display alias to `https://ops.cashucard.org`; other service
+origins link to their own dashboard. Cards' account help shows the actual API
+origin separately. Changing this display leaves API requests and saved-work
+origin/actor bindings intact (D49, D111). Selecting another service remains
+build-time configuration. Setup controls accept taps while the keyboard is open.
+
+Errors, disabled-action reasons, live progress, required card-holding
+instructions, destructive consent, pending-reset erasure consequences and
+recovery steps stay visible. Setup retains its batch review; reset retains its
+existing approvals. This change reduces explanatory text on the daily screens.
+It does not reduce the number of batch-creation or card-write steps.
+
+**Why:** operator review found the account name unlabeled, the technical API
+address confusing and repeated explanations distracting from routine actions.
+
+**Rejected:** hover-only help on phones, moving required consent into a tooltip,
+silently switching the API origin, and removing review steps as part of a copy
+change.
