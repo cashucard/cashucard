@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#10271e" />
+    <meta name="description" content="Build a wallet or till for Cashu Card, an experimental NFC ecash protocol: the NUT-CCP draft, the card's commands byte for byte, test vectors, the applet, the client library and the tools." />
+    <meta property="og:title" content="Developers | Cashu Card" />
+    <meta property="og:description" content="The NUT-CCP draft, the card's commands, test vectors, the applet and the tools, for wallets and tills that read and pay from a Cashu Card." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cashucard.org/developers" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://cashucard.org/developers" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/guide.css" />
+    <script src="/guide.js" defer></script>
+    <title>Developers | Cashu Card</title>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
+      <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers" aria-current="page">Developers</a></nav>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main" class="guide">
+      <section class="guide-hero" aria-labelledby="dev-title">
+        <div class="guide-hero-inner">
+          <div class="guide-hero-top">
+            <div class="guide-hero-copy">
+              <div class="eyebrow"><span class="status-dot"></span> DEVELOPERS <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
+              <h1 id="dev-title">Build on <em>Cashu Card</em></h1>
+              <p class="guide-lead">A wallet that loads cards and a till that takes a tap both speak NUT-CCP, a draft Cashu NUT for NFC cards. This page links the draft, the card's commands, test vectors and the code. The protocol is experimental, and parts of it may change.</p>
+              <ul class="guide-facts" aria-label="At a glance">
+                <li>Experimental</li>
+                <li>Applet 2.1</li>
+                <li>Java Card 3.0.5</li>
+                <li>MIT license</li>
+              </ul>
+            </div>
+            <figure class="hero-term" aria-hidden="true">
+              <div class="hero-term-bar"><i></i><i></i><i></i><span>Select the card</span></div>
+              <pre><code><span class="prompt">&gt;</span> 00 A4 04 00 0B F0 43 41 53 48 55 43 41 52 44 01
+<span class="out">&lt; 02 01 90 00</span>
+<span class="prompt">&gt;</span> B0 16 00 00 00
+<span class="out">&lt; the card's mint and unit</span></code></pre>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <div class="guide-layout">
+        <nav class="guide-rail" aria-label="Developer contents">
+          <span class="rail-label">On this page</span>
+          <ol>
+            <li><a href="#status">Status</a></li>
+            <li><a href="#spec">The specification</a></li>
+            <li><a href="#code">The code</a></li>
+            <li><a href="#reader">Building a reader</a></li>
+            <li><a href="#hardware">Testing on a card</a></li>
+            <li><a href="#report">Issues and security</a></li>
+            <li><a href="#contribute">Questions and contributions</a></li>
+          </ol>
+        </nav>
+
+        <article class="guide-doc">
+          <details class="guide-toc">
+            <summary>Contents</summary>
+            <ol>
+              <li><a href="#status">Status</a></li>
+              <li><a href="#spec">The specification</a></li>
+              <li><a href="#code">The code</a></li>
+              <li><a href="#reader">Building a reader</a></li>
+              <li><a href="#hardware">Testing on a card</a></li>
+              <li><a href="#report">Issues and security</a></li>
+              <li><a href="#contribute">Questions and contributions</a></li>
+            </ol>
+          </details>
+
+          <section id="status" aria-labelledby="status-title">
+            <h2 id="status-title">Status</h2>
+            <p>Cashu Card is an experimental open source project. NUT-CCP is a draft written by this project for proposal to <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>, where it is still to be proposed, numbered or merged, and it has had little testing or review outside the project. The applet's current release is <a href="https://github.com/cashucard/cashucard/releases/tag/v2.1.0">2.1.0</a>, tested on NXP J3R180 cards with a few named phones. An independent security review is still to come.</p>
+            <p>Build against it to learn, test and give feedback. Read the <a href="/#risks">risks</a> before your users hold real value on a card.</p>
+          </section>
+
+          <section id="spec" aria-labelledby="spec-title">
+            <h2 id="spec-title">The specification</h2>
+            <ul class="dev-cards">
+              <li><b><a href="https://github.com/cashucard/nut/blob/main/CCP.md">NUT-CCP</a></b><span>The core every card and reader share: selecting the card, card proofs, reading, paying with one signature, the card's change and loading.</span></li>
+              <li><b><a href="https://github.com/cashucard/nut/blob/main/tests/CCP-tests.md">NUT-CCP test vectors</a></b><span>Card proof secrets, payments with and without change, and <code>AUTH</code>, worked through.</span></li>
+              <li><b><a href="https://github.com/cashucard/cashucard/blob/main/spec/APDU.md">The APDU reference</a></b><span>This applet's commands byte for byte, with the profiles for the owner key, the clock and limits, and the NFC tag.</span></li>
+              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/spec/vectors">Applet vectors</a></b><span>JSON vectors for secrets, the owner's proofs, block headers and a full transcript.</span></li>
+            </ul>
+          </section>
+
+          <section id="code" aria-labelledby="code-title">
+            <h2 id="code-title">The code</h2>
+            <ul class="dev-cards">
+              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/applet">The applet</a></b><span>The Java Card applet, the reference implementation of NUT-CCP and its profiles.</span></li>
+              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/tools/cardsim">cardsim</a></b><span>The real applet in jCardSim behind a small HTTP API, for a wallet's or till's tests without a card.</span></li>
+              <li><b><a href="https://github.com/cashucard/client">cashucard/client</a></b><span>A TypeScript library with the Cashu primitives a reader needs and a client for the mint's HTTP API.</span></li>
+              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/tools/cardctl">cardctl</a></b><span>A Python command-line driver for the card over any PC/SC reader, contact or contactless.</span></li>
+              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/tools/cardkit">cardkit</a></b><span>A TypeScript API for installing the applet and resetting cards, over a transport you supply.</span></li>
+              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/apps/provisioner">Cashu Card Provisioner</a></b><span>The app card issuers use to install the applet from a phone.</span></li>
+            </ul>
+            <p>The repository's <a href="https://github.com/cashucard/cashucard/blob/main/docs/ARCHITECTURE.md">architecture</a> shows how the parts fit, and its <a href="https://github.com/cashucard/cashucard/blob/main/docs/DECISIONS.md">decisions</a> record why the card works as it does.</p>
+          </section>
+
+          <section id="reader" aria-labelledby="reader-title">
+            <h2 id="reader-title">Building a reader</h2>
+            <p>A reader is anything that talks to the card: a wallet that loads it, or a till that takes its payments. NUT-CCP sets what a reader must do. The points that protect money most:</p>
+            <ul>
+              <li>Select the card by its full AID, <code>F0 43 41 53 48 55 43 41 52 44 01</code>.</li>
+              <li>Take every proof on the card as issued by the mint and unit that <code>GET_CARD</code> names, and check each input's keyset against that mint.</li>
+              <li>Check each piece's DLEQ proof, from the mint's keys, before accepting it offline.</li>
+              <li>When online, ask the mint whether the pieces are unspent before accepting.</li>
+              <li>When offline, keep the payment and its change, swap at the mint as soon as you can, and report the payment settled only once the mint accepts the swap.</li>
+              <li>Handle the card's answers for a PIN, a limit and a locked card, listed in the draft's status words.</li>
+            </ul>
+            <p>The <a href="https://github.com/cashucard/cashucard/blob/main/docs/SECURITY-MODEL.md">security model</a> explains the risks each rule answers.</p>
+          </section>
+
+          <section id="hardware" aria-labelledby="hardware-title">
+            <h2 id="hardware-title">Testing on a card</h2>
+            <p>cardsim runs the applet without a card. To test on a real one, the <a href="/guide">install guide</a> puts the applet on a card from a computer and lists the cards it runs on.</p>
+            <p>The tests on silicon are recorded as dated reports, among them the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">end-to-end payment run</a> of 23 October 2026, on Android and iOS.</p>
+          </section>
+
+          <section id="report" aria-labelledby="report-title">
+            <h2 id="report-title">Issues and security</h2>
+            <p>Report a bug or a place where the spec and the code disagree as a <a href="https://github.com/cashucard/cashucard/issues">GitHub issue</a>. Report anything that could affect funds privately, through a <a href="https://github.com/cashucard/cashucard/security/advisories/new">security advisory</a>, as the <a href="https://github.com/cashucard/cashucard/blob/main/SECURITY.md">security policy</a> asks. A flaw in the draft NUT itself goes there too.</p>
+          </section>
+
+          <section id="contribute" aria-labelledby="contribute-title">
+            <h2 id="contribute-title">Questions and contributions</h2>
+            <p>Ask in <a href="https://github.com/cashucard/cashucard/discussions">GitHub Discussions</a> on the main repository, the one place for questions about the draft NUT, the applet and the client library. Show what you build in its Show and tell category.</p>
+            <p>The <a href="https://github.com/cashucard/cashucard/blob/main/CONTRIBUTING.md">contributing guide</a> lists where help is needed. Much of it, from the documentation to the client library, needs no card or reader.</p>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
+  </body>
+</html>

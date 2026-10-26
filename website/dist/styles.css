@@ -12,8 +12,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .skip:focus{top:1rem}
 .header{height:74px;padding:0 clamp(24px,5vw,86px);display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:1px solid #b8d1b320;background:#10271e;position:relative;z-index:10}
 .wordmark{display:inline-flex;align-items:center;gap:10px;font-size:27px;font-weight:800;letter-spacing:-.075em;white-space:nowrap}
-.wordmark img{width:30px;height:auto}
-.wordmark span span{color:#aabdb0;font-weight:400}
+.wordmark img{display:block;width:auto;height:34px}
 .header nav{display:flex;gap:34px;margin-left:auto;margin-right:4vw}
 .header nav a,.header-link{font-size:13px;font-weight:600;transition:color .2s}
 .header nav a{color:#afc1b5}
@@ -30,6 +29,9 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero h1{font-size:clamp(66px,7.7vw,126px);line-height:.91;letter-spacing:-.087em;margin:36px 0 28px;font-weight:800}
 .hero h1 em{font-style:normal;color:#d3f39a}
 .hero-copy p{font-size:clamp(17px,1.55vw,23px);line-height:1.35;max-width:430px;color:#becfc0;margin:0}
+.hero-copy .hero-status{margin-top:16px;font-size:14px;line-height:1.45;max-width:430px;color:#9eb4a2}
+.hero-status a{color:#d3f39a;text-decoration:underline;text-underline-offset:3px}
+.hero-status a:hover{color:#e7ffb7}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:35px}
 .button{min-height:52px;padding:0 20px;display:inline-flex;align-items:center;justify-content:space-between;gap:30px;font-size:14px;font-weight:800;border-radius:3px;transition:transform .24s,background .24s,color .24s}
 .button:hover{transform:translateY(-3px)}
@@ -55,7 +57,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero-card-top span span{font-weight:400}
 .hero-chip{position:relative;z-index:2;width:52px;height:39px;border:2px solid #417947;border-radius:7px;background:linear-gradient(120deg,#c1d588,#f2e9ac,#a0c17d);box-shadow:inset 0 0 0 2px #bcd49c;display:flex;align-items:center;justify-content:center;gap:6px}
 .hero-chip i{display:block;width:1px;height:100%;background:#6b9567}
-.hero-mascot{position:absolute;z-index:1;width:35%;height:auto;right:13%;top:31%;filter:drop-shadow(0 12px 14px #29542b46);transform:rotate(8deg)}
+.hero-mark{position:absolute;z-index:1;width:36%;height:auto;right:7%;top:17%;opacity:.9}
 .hero-card-bottom{font-size:11px;letter-spacing:.12em;font-weight:800}
 .visual-cross{position:absolute;font-size:26px;color:#86a98a;font-weight:400}
 .cross-a{top:11%;left:15%}
@@ -66,7 +68,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero-footer a:hover{color:#d3f39a}
 .hero-footer a span{font-size:15px;margin-left:12px}
 .site-footer{background:#e5ebdf;color:#173227;border-top:1px solid #c8d4c8;padding:30px clamp(24px,5vw,86px) 18px;scroll-margin-top:12px}
-.footer-groups{display:grid;grid-template-columns:1fr 1fr 2fr;gap:28px;padding-bottom:28px}
+.footer-groups{display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:28px;padding-bottom:28px}
 .footer-group{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 .footer-label{color:#607a6c;font-size:9px;font-weight:800;letter-spacing:.15em;margin-bottom:5px}
 .footer-group a{font-size:14px;font-weight:700;line-height:1.3}
@@ -83,8 +85,9 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 }
 @media(max-width:720px){
 .header{height:64px;padding:0 20px}
-.header nav{display:none}
-.header-link{font-size:12px}
+.header nav{gap:16px;margin-left:auto}
+.header nav a{font-size:12.5px}
+.header-link{display:none}
 .hero{min-height:calc(100svh - 64px);max-height:none;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:35px 22px 50px}
 .hero-copy{padding-top:0}
 .hero h1{font-size:clamp(55px,11.7vw,84px);margin:22px 0 18px}
@@ -112,7 +115,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 }
 @media(max-width:350px){
 .wordmark{font-size:22px}
-.wordmark img{width:24px}
+.wordmark img{height:28px}
 .hero h1{font-size:51px}
 .hero-actions{gap:7px}
 .button{font-size:11px}
@@ -127,7 +130,6 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero-card.product-card .hero-chip{width:46px;height:35px;border:1px solid #6879558c;background:linear-gradient(135deg,#e0d5ad,#c1bd98);box-shadow:none;gap:0;overflow:hidden}
 .hero-card.product-card .hero-chip i{width:33.3%;border-right:1px solid #68795580;background:transparent}
 .hero-card.product-card .hero-chip::after{content:"";position:absolute;inset:11px 0;border-block:1px solid #68795580}
-.hero-card.product-card .hero-mascot{width:31%;right:11%;top:22%;transform:rotate(0);filter:drop-shadow(0 12px 14px #213a2433)}
 .hero-card.product-card .hero-card-bottom{font-size:10px;letter-spacing:.14em}
 @keyframes card-enter-sage{from{opacity:0;transform:translate(55px,36px) rotate(-22deg) scale(.85)}to{opacity:1;transform:rotate(-12deg)}}
 @media(max-width:480px){
@@ -357,4 +359,19 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 @media(max-width:480px){
 .buy-section{padding:48px 22px}
 .buy-pay,.buy-steps,.buy-sources,.app-stores{grid-template-columns:1fr}
+}
+
+/* the risks, said once, before where to get cards */
+.risk-section{background:#10271e}
+.risk-list{max-width:1280px;margin:clamp(28px,3.4vw,48px) auto 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px clamp(12px,1.6vw,18px)}
+.risk-list li{padding:18px 20px;border:1px solid #b8d1b324;border-left:3px solid #e6c46a;border-radius:4px;background:#0c2018;color:#becfc0;font-size:15px;line-height:1.45}
+.risk-list b{display:block;margin-bottom:4px;color:#edf3e7;font-size:16px}
+.risk-list a{color:#d3f39a;text-decoration:underline;text-underline-offset:3px}
+.risk-list a:hover{color:#e7ffb7}
+.risk-list .risk-wide{grid-column:1/-1}
+@media(max-width:1050px){.risk-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.risk-list{grid-template-columns:1fr}}
+@media(max-width:360px){
+.wordmark img{height:28px}
+.header nav{gap:13px}
 }

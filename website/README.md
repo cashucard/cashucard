@@ -27,6 +27,14 @@ remains a draft. Review the source specification when changing the payment or
 ownership explanation.
 The hero describes offline terminal acceptance and later mint settlement as
 separate events; an offline tap does not guarantee final settlement.
+The site calls Cashu Card experimental on every page: the hero, the install
+guide's facts, and each footer. The home page states the risks once, in
+`#risks`, before where to get cards; `/faq` (`dist/faq.html`) answers holders',
+merchants' and developers' questions from the security model, the decisions and
+the dated reports, and `/developers` (`dist/developers.html`) links the draft,
+the APDU reference, the vectors and the code. Both use the install guide's
+layout and `guide.js`. When a doc they link moves, update its link here. There
+is no page for merchants yet, by choice: it waits for more wallets and tills.
 Footer links point to the draft NUT and the Cashu Card source, with the Cashu
 Card Provisioner under Apps. The install guide's Apps also link Flash and Foxy
 at their own sites, getflash.io and getfoxy.io, since its setup step sends a
@@ -43,7 +51,7 @@ Cashu Card's face in place of its branded card art) installs the applet on a
 blank card while the chip makes its key; its tap and settle chapters use the
 same Android till as the steps.
 
-`dist/seq/tap-2/` holds the 96 rendered frames of the "One tap, step by step"
+`dist/seq/tap-3/` holds the 96 rendered frames of the "One tap, step by step"
 section and `anchors.js`, the points its callouts follow. In it the till is an
 Android phone running an unbranded point-of-sale app: the customer holds the
 card to the phone's back while the camera watches the screen, whose flow
@@ -106,7 +114,15 @@ agent" box gives a one-line prompt that points an agent at it, and
 `guide.md` for the CAP's sha256 too. The guide's reader is the ACS ACR122U,
 the reader the project's hardware reports were run with.
 
-The original Cashu mascot is from https://cashu.space/cashu-no-bg.png.
+The site carries the Cashu Card mark (D119, D120). The header's lockup
+(`dist/assets/cashu-card-lockup.svg`), the tab icons (`dist/favicon.ico`,
+`dist/assets/favicon.svg`, `dist/assets/apple-touch-icon.png`) and the hero
+card's mark (`dist/assets/cashu-card-mark-green.svg`) are copies of files in
+`brand/`; after `swift brand/generate.swift`, copy them here again. The film's
+card face paints the same mark, and `dist/assets/provisioner-icon.png` is the
+provisioner's new icon. The Cashu mascot (`dist/assets/cashu.png`, from
+https://cashu.space/cashu-no-bg.png) stays only in the finish studies of
+`dist/concepts.html`, which record the card before the mark.
 Physical card artwork is native HTML/CSS/SVG. `dist/concepts.html` is an
 unindexed comparison of Ops Sage, Forest Emboss and Ivory Signal; Ops Sage is
 on the homepage. Figtree fonts are bundled from the provisioner app under
