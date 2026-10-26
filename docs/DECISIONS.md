@@ -3268,6 +3268,9 @@ loads the locked release toolchain and round-trips a property list before signin
 
 ## <a id="d113"></a>D113: Website Cashu mascot as the provisioner app icon
 
+The mascot icon was superseded by [D119](#d119), the Cashu Card mark. Opaque iOS
+squares, the separate Android foreground and the store-listing checks still apply.
+
 **Decided:** use the exact sunglasses-wearing Cashu mascot served by
 `cashucard.org/assets/cashu.png` (SHA-256
 `fffab936aede92ad75b199c60ccfa547fee4a2b5bafce525925a0069ff42430b`)
@@ -3399,6 +3402,34 @@ marketing pages instead of their GitHub pages.
 
 **Rejected:** separate Flash Mobile and Flash POS links to the same page.
 
+## <a id="d119"></a>D119: The Cashu Card mark is the cashew drawn as a chip
+
+**Decided (2026-10-24):** Cashu Card has its own mark: the Cashu cashew, redrawn
+as one smooth shape and turned 14 degrees to the left, cut with a card chip's
+center pad and contact lines, in a lime-gold gradient. At 40 px and below it
+drops the lines and is the plain cashew, because the lines would be under a
+pixel wide. `brand/generate.swift` holds the shapes and colors once and draws
+the library in `brand/` from them: SVG and PNG masters in color, deep green and
+white, the app icon, a social avatar, favicons, the wordmark lockups and the
+color tokens. It also draws the provisioner's iOS, Android and store icons and
+the Play feature graphic, which now sets its text in Figtree 600. The wordmark
+is "cashu" in Figtree 800 and "card" in Figtree 400, from Figtree's variable
+font in `brand/fonts/`. The generator replaces
+`apps/provisioner/scripts/generate-app-icons.swift`, and the mascot source
+`apps/provisioner/assets/app-icon/cashu.png` goes with it. This supersedes
+D113's mascot icon.
+
+**Why:** the user asked on 2026-10-24 for a cleaner, modern logo built from the
+Cashu cashew and made for Cashu Card, to start a consistent asset library. From
+five directions, then three, they chose the chip.
+
+**Rejected:**
+- The mascot's sunglasses, which lean on Cashu's community mascot.
+- Contactless waves from the cashew, which resemble EMVCo's registered
+  contactless indicator.
+- A card with a cashew window, alone or with the chip set into it, which reads
+  as a card first and Cashu second.
+- The cashew as a "c" with the status dot, which says least about cards.
 ## <a id="d121"></a>D121: Cards home offers daily tools and tools return to their launch screen
 
 **Decided (2026-10-25):** Cards shows the signed-in operator's name and service,
