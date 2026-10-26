@@ -1,5 +1,5 @@
 import React from 'react';
-import {Button} from 'react-native';
+import {SecondaryButton} from '../src/ui';
 import ReactTestRenderer from 'react-test-renderer';
 import {LoadTestScreen} from '../src/screens/LoadTestScreen';
 import {cancelCard, withCard} from '../src/session';
@@ -17,7 +17,8 @@ test('disabled bench handlers never open NFC even if invoked directly', async ()
     tree = ReactTestRenderer.create(<LoadTestScreen />);
   });
   try {
-    const buttons = tree!.root.findAllByType(Button);
+    const buttons = tree!.root.findAllByType(SecondaryButton);
+    expect(buttons).toHaveLength(4);
     // Exercise install-hello, install-Cashu and key-rotation handlers directly,
     // bypassing the native button's disabled attribute and all navigation.
     for (const button of buttons.slice(0, 3)) {
