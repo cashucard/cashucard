@@ -174,7 +174,7 @@ async function main() {
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://testflight.apple.com/join/M3JucFNy\"]')"), "The provisioner links its TestFlight beta");
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://play.google.com/apps/testing/com.islandbitcoin.provisioner\"]')"), "The provisioner links its Google Play beta");
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"/guide\"]')"), "The install section opens the install guide");
-    assert.ok(await evaluate("!!document.querySelector('.header nav a[href=\"#install\"]')"), "The nav opens the install section");
+    assert.equal(await evaluate("[...document.querySelectorAll('.header nav a')].map(a=>a.textContent).join('|')"), "Get cards|Developers", "The nav holds Get cards and Developers only");
     // the till in the steps is a phone, with the card held to its back
     assert.ok(await evaluate("document.querySelector('#steps li p').textContent.includes(\"to the back of the merchant's phone\")"), "The steps show a phone as the till");
     // the film: custom controls over the native video; with reduced motion it waits for a press
