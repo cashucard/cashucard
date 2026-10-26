@@ -72,7 +72,11 @@ const local = (t: Theme) =>
     serviceLabel: {color: t.dim, fontFamily: FONT.regular, fontSize: 12},
     serviceHost: {color: t.ink, fontFamily: FONT.medium, fontSize: 15},
     serviceAction: {flexDirection: 'row', alignItems: 'center', gap: 6},
-    serviceChange: {color: t.accent, fontFamily: FONT.medium, fontSize: 14},
+    serviceChange: {
+      color: t.dark ? t.accent : '#216B2B',
+      fontFamily: FONT.medium,
+      fontSize: 14,
+    },
     serviceChevron: {color: t.dim, fontSize: 22},
     input: {
       color: t.ink,
