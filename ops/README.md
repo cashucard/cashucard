@@ -1,7 +1,8 @@
 # Ops service
 
-ENG-740 ports the provisioning service to one Worker and one SQLite-backed
-Durable Object. [The rollout plan](../docs/OPS-WORKERS-PLAN.md) lists the release
+Run the standalone Node/SQLite service using the [container runbook](docker/README.md).
+The same provisioning domain also runs in one Worker and one SQLite-backed
+Durable Object. [The Workers rollout plan](../docs/OPS-WORKERS-PLAN.md) lists the release
 gates. Passing local checks does not authorize deployment or card operations.
 Consumer/holder provisioning is disabled until verified identity and card
 ownership authorization exist.

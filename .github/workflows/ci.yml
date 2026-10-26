@@ -41,6 +41,7 @@ jobs:
       cap: ${{ steps.select.outputs.cap }}
       cardkit: ${{ steps.select.outputs.cardkit }}
       ops: ${{ steps.select.outputs.ops }}
+      ops_container: ${{ steps.select.outputs.ops_container }}
       provisioner: ${{ steps.select.outputs.provisioner }}
       backup_copy: ${{ steps.select.outputs.backup_copy }}
       website: ${{ steps.select.outputs.website }}
@@ -525,6 +526,39 @@ jobs:
       - name: Format
         run: yarn format:check
 
+  ops-container:
+    needs: changes
+    if: needs.changes.outputs.ops_container == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    name: ops container (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ops/Dockerfile
+          load: true
+          tags: cashu-card-ops:test
+          build-args: REVISION=${{ inputs.ref || github.sha }}
+          cache-from: type=gha,scope=ops-${{ matrix.arch }}
+          cache-to: type=gha,scope=ops-${{ matrix.arch }},mode=max
+      - name: Exercise the built image
+        run: node ops/docker/smoke.cjs
+
   provisioner:
     needs: changes
     if: needs.changes.outputs.provisioner == 'true'
@@ -634,6 +668,7 @@ jobs:
         cap,
         cardkit,
         ops,
+        ops-container,
         provisioner,
         backup-copy,
         backup-roundtrip,

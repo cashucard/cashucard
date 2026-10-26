@@ -60,6 +60,18 @@ test("backup and simulator changes follow their actual dependencies", () => {
   ]);
 });
 
+test("standalone packaging and its acceptance tests require the built container", () => {
+  for (const path of [
+    "ops/Dockerfile",
+    "ops/Dockerfile.dockerignore",
+    "ops/compose.yaml",
+    "ops/docker/smoke.cjs",
+    "ops/test/standalone.test.ts",
+  ])
+    assert.deepEqual(classify([path]).selected, ["ops", "ops-container"]);
+  assert.deepEqual(classify(["ops/docker/README.md"]).selected, []);
+});
+
 test("unknown or unusual source paths fail closed to full verification", () => {
   for (const path of [
     "new-service/auth.ts",

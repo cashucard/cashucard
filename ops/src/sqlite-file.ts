@@ -1,9 +1,9 @@
 /**
- * The better-sqlite3 backend of the DB seam — the Node dev/ops-cli side. The
+ * The better-sqlite3 backend for the standalone Node service and ops CLI. The
  * file lives where the deploy runbook points; ':memory:' for tests.
  */
 import Database from 'better-sqlite3';
-import {mkdirSync} from 'node:fs';
+import {chmodSync, mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
 
 import type {SqlHandle, SqlStatement} from './sql';
@@ -13,6 +13,7 @@ export function openSqliteFile(path: string): SqlHandle {
     mkdirSync(dirname(path), {recursive: true, mode: 0o700});
   }
   const db = new Database(path);
+  if (path !== ':memory:') chmodSync(path, 0o600);
   // One-writer discipline, like the session DBs; foreign keys so a stray
   // batch_id is an error at the INSERT, not silent.
   db.pragma('journal_mode = DELETE');

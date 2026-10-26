@@ -10,6 +10,7 @@ const JOBS = [
   "cap",
   "cardkit",
   "ops",
+  "ops-container",
   "provisioner",
   "backup-copy",
   "backup-roundtrip",
@@ -30,7 +31,11 @@ function classify(files) {
       full = true;
       continue;
     }
-    if (/^(tools\/cardkit|apps\/provisioner|ops)\/README\.md$/.test(file))
+    if (
+      /^(tools\/cardkit|apps\/provisioner|ops|ops\/docker)\/README\.md$/.test(
+        file,
+      )
+    )
       continue;
     if (
       /^(spec\/|applet\/|tools\/cardkit\/|tools\/ci\/|tools\/release\/|\.github\/)/.test(
@@ -84,6 +89,15 @@ function classify(files) {
       )
     ) {
       full = true;
+      continue;
+    }
+    if (
+      /^ops\/(Dockerfile(?:\.dockerignore)?$|compose\.yaml$|docker\/|test\/standalone)/.test(
+        file,
+      )
+    ) {
+      selected.add("ops");
+      selected.add("ops-container");
       continue;
     }
     if (file.startsWith("ops/")) {

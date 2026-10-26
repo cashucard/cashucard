@@ -6,6 +6,8 @@
   "license": "MIT",
   "main": "src/index.ts",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/standalone.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "node --import tsx --test 'test/*.test.ts'",
     "format:check": "prettier --check .",
