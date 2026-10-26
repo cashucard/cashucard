@@ -31,7 +31,7 @@ test('sign-in is required for batch setup; Settings retains themes but has no de
       .findAll(n => typeof n.props.children === 'string')
       .map(n => n.props.children as string)
       .join('\n');
-  expect(text()).toContain('SIGN IN');
+  expect(tree!.root.findByProps({testID: 'sign-in'}).props.accessibilityRole).toBe('button');
   expect(text()).toContain('Privacy Policy');
   expect(text()).toContain('Terms');
   expect(text()).toContain('Support');
