@@ -248,7 +248,9 @@ test.each([
 
 test('leaving a screen after dismissing help cancels its pending focus callback', async () => {
   jest.spyOn(global, 'requestAnimationFrame').mockReturnValue(47);
-  const cancel = jest.spyOn(global, 'cancelAnimationFrame').mockImplementation(() => {});
+  const cancel = jest
+    .spyOn(global, 'cancelAnimationFrame')
+    .mockImplementation(() => {});
   await render(
     <InfoButton title="Batch setup" testID="focus-help">
       Explanation
@@ -267,14 +269,12 @@ test('service choices expose the actual API address when the dashboard uses an a
     ServiceSelectorScreen,
   } = require('../src/screens/ServiceSelectorScreen');
   const origin = 'https://cashu-card-ops.old-cell-30e7.workers.dev';
-  jest
-    .mocked(useApp)
-    .mockReturnValue({
-      ...useApp(),
-      serviceUrl: origin,
-      serviceProfiles: [origin],
-      serviceStatus: 'ready',
-    });
+  jest.mocked(useApp).mockReturnValue({
+    ...useApp(),
+    serviceUrl: origin,
+    serviceProfiles: [origin],
+    serviceStatus: 'ready',
+  });
   await render(<ServiceSelectorScreen onDone={noop} />);
   const row = tree.root.findByProps({testID: `service-choice-${origin}`});
   const words = row
@@ -284,3 +284,30 @@ test('service choices expose the actual API address when the dashboard uses an a
   expect(words).toContain('https://ops.cashucard.org');
   expect(words).toContain(origin);
 });
+
+test.each([
+  ['https://cashu-card-ops.old-cell-30e7.workers.dev', 'ops.cashucard.org'],
+  ['https://cards.example.com:8443', 'cards.example.com:8443'],
+])(
+  'sign-in labels the current service and offers a clear Change action for %s',
+  async (origin, host) => {
+    jest
+      .mocked(useApp)
+      .mockReturnValue({
+        ...useApp(),
+        serviceUrl: origin,
+        serviceStatus: 'ready',
+      });
+    const choose = jest.fn();
+    await render(<SignInScreen onServices={choose} />);
+    expect(tree.root.findByProps({testID: 'sign-in-service-label'}).props.children).toBe('Ops service');
+    expect(tree.root.findByProps({testID: 'sign-in-service-host'}).props.children).toBe(host);
+    expect(tree.root.findByProps({testID: 'sign-in-service-change'}).props.children).toBe('Change');
+    expect(action('sign-in-service').props.accessibilityLabel).toContain(
+      `Current service: https://${host}`,
+    );
+    expect(choose).not.toHaveBeenCalled();
+    await act(async () => action('sign-in-service').props.onPress());
+    expect(choose).toHaveBeenCalledTimes(1);
+  },
+);
