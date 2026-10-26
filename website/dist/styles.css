@@ -12,8 +12,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .skip:focus{top:1rem}
 .header{height:74px;padding:0 clamp(24px,5vw,86px);display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:1px solid #b8d1b320;background:#10271e;position:relative;z-index:10}
 .wordmark{display:inline-flex;align-items:center;gap:10px;font-size:27px;font-weight:800;letter-spacing:-.075em;white-space:nowrap}
-.wordmark img{width:30px;height:auto}
-.wordmark span span{color:#aabdb0;font-weight:400}
+.wordmark img{display:block;width:auto;height:34px}
 .header nav{display:flex;gap:34px;margin-left:auto;margin-right:4vw}
 .header nav a,.header-link{font-size:13px;font-weight:600;transition:color .2s}
 .header nav a{color:#afc1b5}
@@ -55,7 +54,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero-card-top span span{font-weight:400}
 .hero-chip{position:relative;z-index:2;width:52px;height:39px;border:2px solid #417947;border-radius:7px;background:linear-gradient(120deg,#c1d588,#f2e9ac,#a0c17d);box-shadow:inset 0 0 0 2px #bcd49c;display:flex;align-items:center;justify-content:center;gap:6px}
 .hero-chip i{display:block;width:1px;height:100%;background:#6b9567}
-.hero-mascot{position:absolute;z-index:1;width:35%;height:auto;right:13%;top:31%;filter:drop-shadow(0 12px 14px #29542b46);transform:rotate(8deg)}
+.hero-mark{position:absolute;z-index:1;width:36%;height:auto;right:7%;top:17%;opacity:.9}
 .hero-card-bottom{font-size:11px;letter-spacing:.12em;font-weight:800}
 .visual-cross{position:absolute;font-size:26px;color:#86a98a;font-weight:400}
 .cross-a{top:11%;left:15%}
@@ -112,7 +111,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 }
 @media(max-width:350px){
 .wordmark{font-size:22px}
-.wordmark img{width:24px}
+.wordmark img{height:28px}
 .hero h1{font-size:51px}
 .hero-actions{gap:7px}
 .button{font-size:11px}
@@ -127,7 +126,6 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero-card.product-card .hero-chip{width:46px;height:35px;border:1px solid #6879558c;background:linear-gradient(135deg,#e0d5ad,#c1bd98);box-shadow:none;gap:0;overflow:hidden}
 .hero-card.product-card .hero-chip i{width:33.3%;border-right:1px solid #68795580;background:transparent}
 .hero-card.product-card .hero-chip::after{content:"";position:absolute;inset:11px 0;border-block:1px solid #68795580}
-.hero-card.product-card .hero-mascot{width:31%;right:11%;top:22%;transform:rotate(0);filter:drop-shadow(0 12px 14px #213a2433)}
 .hero-card.product-card .hero-card-bottom{font-size:10px;letter-spacing:.14em}
 @keyframes card-enter-sage{from{opacity:0;transform:translate(55px,36px) rotate(-22deg) scale(.85)}to{opacity:1;transform:rotate(-12deg)}}
 @media(max-width:480px){
