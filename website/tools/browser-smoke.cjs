@@ -318,7 +318,7 @@ async function main() {
     assert.ok(await evaluate("!!document.querySelector('.hero-status a[href=\"#risks\"]')"), "The hero points to the risks");
     assert.equal(await evaluate("document.querySelectorAll('#risks .risk-list li').length"), 7, "The risks are stated once, in seven points");
     assert.equal(await evaluate("[...document.querySelectorAll('section h2')].filter(h=>/risk/i.test(h.textContent)).length"), 1, "One risks section");
-    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 9, 0], ["/ops-service.html", 9, 0]]) {
+    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 9, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 8, 0], ["/terms.html", 8, 0]]) {
       // the host serves /faq for /faq.html, as it does /guide; the local preview serves the file name
       await send("Page.navigate", { url: origin + page });
       await until("location.pathname.replace(/\\.html$/,'')===" + JSON.stringify(page.replace(".html", "")) + "&&document.readyState==='complete'&&!!document.querySelector('.guide-doc')", page + " loads");
@@ -334,11 +334,18 @@ async function main() {
       await viewport(1440, 900);
       await screenshot("10" + page.replace(/\W/g, "-"));
     }
+    // privacy, terms and support: footer links on every page, Island Bitcoin LLC named, @cashucard.org contacts (site/legal-support)
+    assert.equal(await evaluate("[...document.querySelectorAll('.footer-bottom a')].map(a=>a.getAttribute('href')).filter(h=>h==='/privacy'||h==='/terms').length"), 2, "The footer links privacy and terms");
+    for (const path of ["/privacy.html", "/terms.html"]) {
+      assert.ok((await fetch(origin + path).then((r) => r.text())).includes("Island Bitcoin LLC"), path + " names Island Bitcoin LLC");
+    }
+    assert.ok((await fetch(origin + "/support.html").then((r) => r.text())).includes("mailto:support@cashucard.org"), "Support gives the support address");
     for (const path of ["/faq.html", "/developers.html"]) {
       const r = await fetch(origin + path);
       assert.equal(r.status, 200, "Serves " + path);
     }
     assert.ok((await fetch(origin + "/sitemap.xml").then((r) => r.text())).includes("https://cashucard.org/faq"), "The sitemap lists the FAQ");
+    for (const r of ["support", "privacy", "terms"]) assert.ok((await fetch(origin + "/sitemap.xml").then((x) => x.text())).includes("https://cashucard.org/" + r), "The sitemap lists " + r);
     assert.deepEqual(errors, [], "No browser exceptions");
     console.log("PASS: landing page, film and steps, direct source links, responsive artwork options, reduced motion, no JavaScript");
     console.log("Screenshots: " + output);

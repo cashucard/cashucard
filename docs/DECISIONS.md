@@ -3757,3 +3757,27 @@ as that issuer's app. On Android the check button drew over the status bar.
 **Rejected:** registering a new design code for the figure (the provisioner
 writes no design), dropping the Flash mint from the list, and removing the
 check button from setup (it returns to the form, per D121).
+
+## <a id="d134"></a>D134: cashucard.org carries its own privacy, terms and support pages
+
+**Decided (2026-10-26):** cashucard.org publishes `/privacy`, `/terms` and
+`/support`, linked from every page's footer. Island Bitcoin LLC is named as the
+party responsible for cashucard.org, ops.cashucard.org and the Cashu Card
+Provisioner app, the three things it runs and publishes. Contacts are
+@cashucard.org addresses: support, privacy, security, conduct and hello.
+`/support` points to the questions and answers, GitHub Discussions and issues,
+and the support address.
+
+The privacy policy states what is collected: Cloudflare request logs for the
+site; the operator's sign-in and the batch and card records the app sends to
+the ops service it chooses; operator accounts, card records, issued keys and
+an audit log on ops.cashucard.org. The app carries no analytics, advertising
+or tracking code.
+
+**Why:** the provisioner's store listings and its sign-in screen linked to
+Flash's privacy policy, terms and support address. A shared open source project
+needs its own, and a privacy policy needs a named legal entity; "The Cashu Card
+authors" is a license holder, not one.
+
+**Rejected:** naming "The Cashu Card authors" as the responsible party, and
+publishing the pages before the @cashucard.org mailboxes receive mail.
