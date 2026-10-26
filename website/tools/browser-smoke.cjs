@@ -314,7 +314,9 @@ async function main() {
     assert.equal(await evaluate("document.querySelectorAll('#risks .risk-list li').length"), 7, "The risks are stated once, in seven points");
     assert.equal(await evaluate("[...document.querySelectorAll('section h2')].filter(h=>/risk/i.test(h.textContent)).length"), 1, "One risks section");
     for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 7, 0]]) {
-      await load(origin + page, page + " loads");
+      // the host serves /faq for /faq.html, as it does /guide; the local preview serves the file name
+      await send("Page.navigate", { url: origin + page });
+      await until("location.pathname.replace(/\\.html$/,'')===" + JSON.stringify(page.replace(".html", "")) + "&&document.readyState==='complete'&&!!document.querySelector('.guide-doc')", page + " loads");
       assert.equal(await evaluate("document.querySelectorAll('.guide-doc > section').length"), sections, page + " has its sections");
       assert.ok(await evaluate("document.querySelectorAll('.faq details').length") >= minItems, page + " answers its questions");
       assert.ok(await evaluate("document.querySelector('.footer-bottom span').textContent.includes('EXPERIMENTAL')"), page + " footer says experimental");
