@@ -4,8 +4,8 @@
  * the account scope as a read-only row, and signed-in card tools.
  *
  * The batch-setup revamp's rules hold here too: tabular figures for every
- * number, the accent only where a thing is live (the theme pill's active segment), and nothing that pretends to be a button
- * that is not.
+ * number, the accent for the theme pill's active segment, and button semantics
+ * for interactive rows.
  */
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
@@ -14,10 +14,10 @@ import {SETTINGS} from '../strings';
 import appInfo from '../../package.json';
 import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {useApp} from '../store';
-import {LegalLinks} from '../LegalLinks';
+import {LegalLinks, OpsDashboardLink} from '../LegalLinks';
 import {BENCH_RUNS_ENABLED} from '../releaseGates';
 import {FONT, useTheme, type Theme} from '../theme';
-import {Screen, SecondaryButton} from '../ui';
+import {HelpHeading, Screen, SecondaryButton} from '../ui';
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -57,30 +57,6 @@ const local = (t: Theme) =>
       fontVariant: ['tabular-nums'],
       fontSize: 15,
     },
-    sectionHeading: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    scopeHelp: {
-      minWidth: 44,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    question: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: t.dim,
-      color: t.dim,
-      textAlign: 'center',
-      lineHeight: 22,
-      fontFamily: FONT.medium,
-      fontSize: 17,
-    },
-    scopeDetails: {paddingHorizontal: 18, paddingBottom: 16, gap: 10},
     pill: {
       flexDirection: 'row',
       backgroundColor: t.bg,
@@ -104,7 +80,7 @@ const local = (t: Theme) =>
     },
     chevron: {color: t.dim, fontFamily: FONT.regular, fontSize: 22},
     // The identity block: wordmark-size version, the load sha as the small print
-    // under it, both centered — the same "which build am I holding" posture the
+    // under it, both centered: the same "which build am I holding" posture the
     // batch screen's footer line keeps.
     identity: {
       alignItems: 'center',
@@ -147,7 +123,6 @@ export function SettingsScreen({
 }) {
   const app = useApp();
   const [confirmSignOut, setConfirmSignOut] = React.useState(false);
-  const [scopeHelp, setScopeHelp] = React.useState(false);
   const t = useTheme();
   const s = local(t);
   const env = app.session?.env;
@@ -161,37 +136,20 @@ export function SettingsScreen({
     <Screen title={SETTINGS.title} onBack={onBack}>
       <ScrollView contentContainerStyle={s.scroll}>
         <View style={s.section}>
-          <View style={s.sectionHeading}>
-            <Text style={s.header}>{SETTINGS.provisioningScope}</Text>
-            <Pressable
-              style={s.scopeHelp}
-              accessibilityRole="button"
-              accessibilityLabel={SETTINGS.scopeHelpLabel}
-              accessibilityState={{expanded: scopeHelp}}
-              testID="provisioning-scope-help"
-              onPress={() => setScopeHelp(value => !value)}>
-              <Text style={s.question} accessible={false}>
-                ?
-              </Text>
-            </Pressable>
-          </View>
+          <HelpHeading
+            title={SETTINGS.provisioningScope}
+            titleStyle={s.header}
+            testID="provisioning-scope-help"
+            accessibilityLabel={SETTINGS.scopeHelpLabel}
+            bodyTestID="provisioning-scope-explanation">
+            {`${SETTINGS.scopeAssigned} ${SETTINGS.scopeExplanation}`}
+          </HelpHeading>
           <View style={s.card}>
             <View style={s.row}>
               <Text style={s.rowLabel}>{SETTINGS.accountScope}</Text>
               <Text style={s.rowValue} testID="provisioning-scope-value">
                 {scopeLabel}
               </Text>
-            </View>
-            <View style={s.scopeDetails}>
-              <Text style={s.note}>{SETTINGS.scopeAssigned}</Text>
-              {scopeHelp ? (
-                <Text
-                  style={s.note}
-                  testID="provisioning-scope-explanation"
-                  accessibilityLiveRegion="polite">
-                  {SETTINGS.scopeExplanation}
-                </Text>
-              ) : null}
             </View>
           </View>
         </View>
@@ -225,7 +183,14 @@ export function SettingsScreen({
         </View>
 
         <View style={s.section}>
-          <Text style={s.header}>{'Card tools'}</Text>
+          <HelpHeading
+            title="Card tools"
+            titleStyle={s.header}
+            testID="settings-tools-help">
+            {
+              'Check reads public card status. Identity reads the chip’s CPLC identifier. Reset checks value, settlement and manager-key records before asking for erasure approval.'
+            }
+          </HelpHeading>
           <View style={s.card}>
             {onStatus ? (
               <Pressable
@@ -236,10 +201,6 @@ export function SettingsScreen({
                 style={s.row}>
                 <View style={s.rowLabelCol}>
                   <Text style={s.rowLabel}>Check a card</Text>
-                  <Text style={s.rowSub}>
-                    Read its state and see the next step. No changes to the
-                    card.
-                  </Text>
                 </View>
                 <Text style={s.chevron}>›</Text>
               </Pressable>
@@ -253,9 +214,6 @@ export function SettingsScreen({
                   style={s.row}>
                   <View style={s.rowLabelCol}>
                     <Text style={s.rowLabel}>Read physical card identity</Text>
-                    <Text style={s.rowSub}>
-                      Read-only CPLC check. No installation or authentication.
-                    </Text>
                   </View>
                   <Text style={s.chevron}>›</Text>
                 </Pressable>
@@ -271,10 +229,6 @@ export function SettingsScreen({
                 style={s.row}>
                 <View style={s.rowLabelCol}>
                   <Text style={s.rowLabel}>Reset a card for reuse</Text>
-                  <Text style={s.rowSub}>
-                    Check value, settlement and the saved manager keys before
-                    resetting.
-                  </Text>
                 </View>
                 <Text style={s.chevron}>›</Text>
               </Pressable>
@@ -298,7 +252,12 @@ export function SettingsScreen({
         </View>
 
         <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.session}</Text>
+          <HelpHeading
+            title={SETTINGS.session}
+            titleStyle={s.header}
+            testID="settings-session-help">
+            {SETTINGS.signOutSub}
+          </HelpHeading>
           <View style={s.card}>
             <Pressable
               testID="sign-out"
@@ -312,7 +271,6 @@ export function SettingsScreen({
               style={s.row}>
               <View style={s.rowLabelCol}>
                 <Text style={s.rowLabel}>{SETTINGS.signOut}</Text>
-                <Text style={s.rowSub}>{SETTINGS.signOutSub}</Text>
               </View>
             </Pressable>
             {confirmSignOut ? (
@@ -338,7 +296,12 @@ export function SettingsScreen({
         </View>
 
         <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.about}</Text>
+          <HelpHeading
+            title={SETTINGS.about}
+            titleStyle={s.header}
+            testID="settings-build-help">
+            {`Load file: ${CASHU_LOAD_FILE.sha256}\n\nCAP: ${CASHU_LOAD_FILE.capSha256}\n\nThese fingerprints identify the card software included in this build.`}
+          </HelpHeading>
           <View style={s.card}>
             <View style={s.identity}>
               <Text style={s.version}>
@@ -349,10 +312,7 @@ export function SettingsScreen({
               <Text style={s.loadSha}>
                 {SETTINGS.loadSha(CASHU_LOAD_FILE.sha256.slice(0, 8))}
               </Text>
-              <Text style={s.loadSha}>https://ops.cashucard.org</Text>
-              <Text style={s.loadSha}>
-                {SETTINGS.capPin(CASHU_LOAD_FILE.capSha256.slice(0, 8))}
-              </Text>
+              <OpsDashboardLink testID="settings-dashboard" />
             </View>
           </View>
         </View>

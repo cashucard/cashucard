@@ -4,7 +4,7 @@ import {useProvisioning} from '../ProvisioningStore';
 import {cardStatus} from '../cardStatus';
 import {CardFigure} from '../CardFigure';
 import {FONT, useTheme} from '../theme';
-import {Dim, PrimaryButton, Screen, SecondaryButton} from '../ui';
+import {Dim, InfoButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
 
 export function CardStatusScreen({
   onBack,
@@ -43,12 +43,15 @@ export function CardStatusScreen({
       title="Check a card"
       onBack={onBack}
       onStop={flow.busy ? flow.cancel : undefined}
+      headerRight={
+        <InfoButton title="Card status" testID="card-status-help">
+          {
+            'Reads public card identity, installation and state, then checks this service for the next step. Card reads leave keys, stored entries and value unchanged.'
+          }
+        </InfoButton>
+      }
       physicalReadOnly>
       <ScrollView contentContainerStyle={s.scroll}>
-        <Dim>
-          Read identity, installation and public card state. This check does not
-          authenticate, change keys, clear entries or spend value.
-        </Dim>
         {!flow.scopeMatches ? (
           <Dim>
             Saved work belongs to another account or service. Sign in with its

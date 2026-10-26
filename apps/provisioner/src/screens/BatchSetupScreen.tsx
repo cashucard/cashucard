@@ -21,10 +21,17 @@ import {ApiClient} from '../api';
 import {SETUP} from '../strings';
 import {useApp, type BatchConfig} from '../store';
 import {FONT, useTheme, type Theme} from '../theme';
-import {GearButton, Screen, PrimaryButton, SecondaryButton} from '../ui';
+import {
+  GearButton,
+  HelpHeading,
+  InfoButton,
+  Screen,
+  PrimaryButton,
+  SecondaryButton,
+} from '../ui';
 
 /** The design code this build's card art draws (docs/CARD-DESIGNS.md). */
-const CARD_DESIGN = 'FL1 — Flash, black, the bolt';
+const CARD_DESIGN = 'FL1: Flash, black, the bolt';
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -325,6 +332,13 @@ export function BatchSetupScreen({
     return (
       <Screen
         title="Review batch"
+        headerRight={
+          <InfoButton title="Batch review" testID="setup-review-help">
+            {
+              'Review the card count and mint reference before creating the batch. The reference belongs to the operator record. Holders configure each card’s mint, PIN and limits in their wallet.'
+            }
+          </InfoButton>
+        }
         onBack={creating ? undefined : () => setReview(null)}
         onStop={creating ? onStop : undefined}>
         <View style={s.grow}>
@@ -342,9 +356,7 @@ export function BatchSetupScreen({
               </View>
             </View>
             <Text style={s.buildLine}>
-              Creating this batch assigns manager keys for every slot. The mint
-              reference is for the operator record; no mint, PIN or limits are
-              written to the card.
+              Creating this batch assigns manager keys for {review.count} cards.
             </Text>
           </View>
           <View style={s.footer}>
@@ -414,9 +426,16 @@ export function BatchSetupScreen({
           ) : null}
 
           <View style={s.section}>
-            <Text style={s.sectionHeader}>
-              {installationOnly ? 'Batch mint reference' : SETUP.mint}
-            </Text>
+            <HelpHeading
+              title={installationOnly ? 'Batch mint reference' : SETUP.mint}
+              titleStyle={s.sectionHeader}
+              testID="setup-mint-help">
+              {`The mint reference is for the batch record. The holder wallet sets the PIN, mint and limits when setting up each card.${
+                loadSha256
+                  ? `\n\n${SETUP.buildLine(loadSha256.slice(0, 8))}`
+                  : ''
+              }`}
+            </HelpHeading>
             <View style={s.card}>
               <View style={s.mintGrid}>
                 {mints.map((m, i) => {
@@ -637,22 +656,12 @@ export function BatchSetupScreen({
         </ScrollView>
 
         <View style={s.footer} testID="setup-footer">
-          {installationOnly ? (
-            <Text style={s.buildLine}>
-              Installation and key rotation only. The holder wallet sets the
-              PIN, mint and limits. The batch mint reference is not written to
-              the card.
-            </Text>
-          ) : null}
           <PrimaryButton
             title={SETUP.start}
             disabled={!ready}
             onPress={start}
             testID="start-batch"
           />
-          <Text style={s.buildLine}>
-            {SETUP.buildLine(loadSha256?.slice(0, 8) ?? 'fe7d8ac3')}
-          </Text>
         </View>
       </View>
       <SecondaryButton

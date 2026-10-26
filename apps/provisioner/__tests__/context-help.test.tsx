@@ -1,0 +1,215 @@
+import React from 'react';
+import Renderer, {act} from 'react-test-renderer';
+import {Linking, Modal, StyleSheet} from 'react-native';
+import NfcManager from 'react-native-nfc-manager';
+import {InfoButton} from '../src/ui';
+import {CardsHomeScreen} from '../src/screens/CardsHomeScreen';
+import {SignInScreen} from '../src/screens/SignInScreen';
+import {BatchSetupScreen} from '../src/screens/BatchSetupScreen';
+import {ProvisioningScreen} from '../src/screens/ProvisioningScreen';
+import {CardStatusScreen} from '../src/screens/CardStatusScreen';
+import {CardIdentityScreen} from '../src/screens/CardIdentityScreen';
+import {ResetCardScreen} from '../src/screens/ResetCardScreen';
+import {useApp} from '../src/store';
+import {useProvisioning} from '../src/ProvisioningStore';
+jest.mock('../src/store', () => ({useApp: jest.fn()}));
+jest.mock('../src/ProvisioningStore', () => ({useProvisioning: jest.fn()}));
+const noop = () => {};
+let tree: Renderer.ReactTestRenderer;
+let inspect: jest.Mock;
+beforeEach(() => {
+  jest.clearAllMocks();
+  inspect = jest.fn();
+  jest.mocked(useApp).mockReturnValue({
+    operatorName: 'dread',
+    session: null,
+    serviceUrl: 'https://old-worker.example.workers.dev',
+    theme: 'dark',
+    signOut: jest.fn(),
+    setTheme: jest.fn(),
+  } as unknown as ReturnType<typeof useApp>);
+  jest.mocked(useProvisioning).mockReturnValue({
+    status: 'ready',
+    scopeMatches: true,
+    busy: false,
+    hardwareValidated: true,
+    snapshot: {batch: null, active: null, history: []},
+    resetState: null,
+    resetReview: null,
+    cardReadout: null,
+    inspectStatus: inspect,
+    inspectReset: inspect,
+    dismissResetReview: jest.fn(),
+    dismissCardReadout: jest.fn(),
+  } as unknown as ReturnType<typeof useProvisioning>);
+});
+afterEach(async () => {
+  await act(async () => tree?.unmount());
+  jest.restoreAllMocks();
+});
+const action = (id: string) =>
+  tree.root
+    .findAllByProps({testID: id})
+    .find(
+      node =>
+        node.props.accessibilityRole === 'button' ||
+        node.props.accessibilityRole === 'link',
+    )!;
+const text = () => JSON.stringify(tree.toJSON());
+const render = async (node: React.ReactElement) => {
+  await act(async () => {
+    tree = Renderer.create(node);
+  });
+};
+test('info uses a labeled 44-point target and closes by button or system Back', async () => {
+  await render(
+    <InfoButton title="Batch setup" testID="help">
+      Optional explanation
+    </InfoButton>,
+  );
+  const button = () => action('help');
+  expect(button().props.accessibilityLabel).toBe('About Batch setup');
+  expect(StyleSheet.flatten(button().props.style)).toMatchObject({
+    minWidth: 44,
+    minHeight: 44,
+  });
+  expect(text()).not.toContain('Optional explanation');
+  await act(async () => button().props.onPress());
+  expect(text()).toContain('Optional explanation');
+  await act(async () => tree.root.findByType(Modal).props.onRequestClose());
+  expect(text()).not.toContain('Optional explanation');
+  await act(async () => button().props.onPress());
+  await act(async () =>
+    tree.root.findByProps({testID: 'help-close'}).props.onPress(),
+  );
+  expect(text()).not.toContain('Optional explanation');
+});
+test('Cards labels the login and links the dashboard while connection details retain the true API origin', async () => {
+  const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  await render(
+    <CardsHomeScreen
+      onInstall={noop}
+      onCheck={noop}
+      onReset={noop}
+      onSettings={noop}
+    />,
+  );
+  expect(text()).toContain('Signed in as');
+  expect(text()).toContain('dread');
+  expect(text()).toContain('https://ops.cashucard.org');
+  expect(text()).not.toContain('old-worker.example.workers.dev');
+  expect(text()).not.toContain('Install card software here');
+  expect(open).not.toHaveBeenCalled();
+  await act(async () => action('home-dashboard').props.onPress());
+  expect(open).toHaveBeenCalledWith('https://ops.cashucard.org');
+  await act(async () => action('home-account-help').props.onPress());
+  expect(text()).toContain('https://old-worker.example.workers.dev');
+  expect(inspect).not.toHaveBeenCalled();
+});
+test('batch review keeps the key-assignment consequence visible and help cannot create the batch', async () => {
+  const create = jest.fn();
+  await render(
+    <BatchSetupScreen
+      installationOnly
+      onCreate={create}
+      onStart={noop}
+      onSettings={noop}
+    />,
+  );
+  await act(async () =>
+    tree.root
+      .findByProps({testID: 'mint-custom-input'})
+      .props.onChangeText('https://mint.test'),
+  );
+  await act(async () =>
+    tree.root.findByProps({testID: 'start-batch'}).props.onPress(),
+  );
+  expect(text()).toContain('Creating this batch assigns manager keys');
+  expect(text()).not.toContain('Holders configure each card');
+  await act(async () => action('setup-review-help').props.onPress());
+  expect(text()).toContain('Holders configure each card');
+  await act(async () => tree.root.findByType(Modal).props.onRequestClose());
+  expect(
+    tree.root.findByProps({testID: 'confirm-start-batch'}).props.disabled,
+  ).toBe(false);
+  expect(create).not.toHaveBeenCalled();
+});
+
+const cases = [
+  [
+    'Cards',
+    'home-batch-help',
+    'Card holders finish ownership',
+    () => (
+      <CardsHomeScreen
+        onInstall={noop}
+        onCheck={noop}
+        onReset={noop}
+        onSettings={noop}
+      />
+    ),
+  ],
+  [
+    'Sign-in',
+    'sign-in-help',
+    'Use the operator account',
+    () => <SignInScreen />,
+  ],
+  [
+    'Batch setup',
+    'setup-mint-help',
+    'The mint reference is',
+    () => (
+      <BatchSetupScreen installationOnly onStart={noop} onSettings={noop} />
+    ),
+  ],
+  [
+    'Installation',
+    'installation-help',
+    'Set up ownership and a PIN',
+    () => <ProvisioningScreen onHome={noop} onSettings={noop} />,
+  ],
+  [
+    'Card status',
+    'card-status-help',
+    'Reads public card identity',
+    () => <CardStatusScreen onBack={noop} onInstall={noop} onReset={noop} />,
+  ],
+  [
+    'Card identity',
+    'identity-help',
+    'CPLC is a public chip identifier',
+    () => <CardIdentityScreen onBack={noop} />,
+  ],
+  [
+    'Reset',
+    'reset-help',
+    'Reset removes',
+    () => <ResetCardScreen onBack={noop} onInstall={noop} />,
+  ],
+] as const;
+test.each(cases)(
+  '%s keeps routine explanations behind a tap without starting card work',
+  async (name, id, explanation, screen) => {
+    if (name === 'Installation') {
+      const flow = useProvisioning();
+      jest.mocked(useProvisioning).mockReturnValue({
+        ...flow,
+        snapshot: {
+          ...flow.snapshot!,
+          batch: {
+            batch_id: 7,
+            next_ordinal: 0,
+            request: {count: 1, mint_url: 'https://mint.test'},
+          },
+        },
+      } as unknown as ReturnType<typeof useProvisioning>);
+    }
+    await render(screen());
+    expect(text()).not.toContain(explanation);
+    await act(async () => action(id).props.onPress());
+    expect(text()).toContain(explanation);
+    expect(inspect).not.toHaveBeenCalled();
+    expect(NfcManager.requestTechnology).not.toHaveBeenCalled();
+  },
+);

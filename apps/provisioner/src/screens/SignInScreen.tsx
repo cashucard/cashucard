@@ -17,7 +17,7 @@ import {APP_NAME, SIGNIN} from '../strings';
 import {useApp} from '../store';
 import {LegalLinks} from '../LegalLinks';
 import {FONT, useTheme, type Theme} from '../theme';
-import {PrimaryButton, Screen} from '../ui';
+import {InfoButton, PrimaryButton, Screen} from '../ui';
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -46,21 +46,6 @@ const local = (t: Theme) =>
       fontFamily: FONT.semibold,
       fontSize: 34,
       textAlign: 'center',
-    },
-    loadSha: {
-      color: t.dim,
-      fontFamily: FONT.tabular,
-      fontVariant: ['tabular-nums'],
-      fontSize: 12,
-      letterSpacing: 0.4,
-    },
-    tagline: {
-      color: t.dim,
-      fontFamily: FONT.regular,
-      fontSize: 15,
-      lineHeight: 21,
-      textAlign: 'center',
-      maxWidth: 280,
     },
     form: {
       alignSelf: 'stretch',
@@ -134,9 +119,8 @@ export function SignInScreen() {
     setStopped(false);
     setFailed(null);
     try {
-      // The operator's name and password are typed here and held in memory
-      // only: the password is the operator's one secret, never stored by the
-      // app (the service keeps its scrypt hash).
+      // The operator's name and password stay in memory for this sign-in.
+      // The service stores its scrypt password hash.
       await app.signIn(name.trim(), password, {signal: controller.signal});
     } catch (e) {
       if (request.current !== controller || e instanceof ApiCancelledError) {
@@ -172,8 +156,9 @@ export function SignInScreen() {
             <Text style={s.markBolt}>⚡</Text>
           </View>
           <Text style={s.wordmark}>{APP_NAME}</Text>
-          <Text style={s.loadSha}>{SIGNIN_BUILD}</Text>
-          <Text style={s.tagline}>{SIGNIN.tagline}</Text>
+          <InfoButton title="Operator sign-in" testID="sign-in-help">
+            {`${SIGNIN.note}\n\nInstall compatible Cashu cards with your assigned account. Holders set up ownership and funding in their wallet.\n\n${SIGNIN_BUILD}`}
+          </InfoButton>
           <View style={s.form}>
             <TextInput
               value={name}
@@ -224,15 +209,13 @@ export function SignInScreen() {
             <Text style={s.failed} testID="sign-in-failed">
               {failed}
             </Text>
-          ) : (
+          ) : stopped || busy ? (
             <Text style={s.note} accessibilityLiveRegion="polite">
               {stopped
                 ? 'Sign-in stopped.'
-                : busy
-                ? 'Checking your account… Keep this screen open.'
-                : SIGNIN.note}
+                : 'Checking your account… Keep this screen open.'}
             </Text>
-          )}
+          ) : null}
         </View>
       </Screen>
     </KeyboardAvoidingView>
