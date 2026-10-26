@@ -3781,3 +3781,21 @@ authors" is a license holder, not one.
 
 **Rejected:** naming "The Cashu Card authors" as the responsible party, and
 publishing the pages before the @cashucard.org mailboxes receive mail.
+
+## <a id="d135"></a>D135: The provisioner and the repository use the @cashucard.org contacts
+
+**Decided (2026-10-26):** the @cashucard.org mailboxes receive mail on Proton,
+so the project points to them. The provisioner's Privacy Policy, Terms and
+Support links open cashucard.org/privacy, cashucard.org/terms and
+support@cashucard.org (replacing the Flash pages from D58). The Play listing's
+support line names cashucard.org/support and support@cashucard.org.
+SECURITY.md adds security@cashucard.org beside private advisories, the code of
+conduct takes reports at conduct@cashucard.org, and SUPPORT.md names the
+support and conduct addresses. The FAQ and the developers page give the
+security address too.
+
+**Why:** D134 published the pages and the addresses but held the switch until
+the mailboxes received mail. Test mail to all five arrived on 2026-10-26.
+
+**Rejected:** keeping GitHub advisories as the only security channel. A
+reporter without a GitHub account needs a private route too.

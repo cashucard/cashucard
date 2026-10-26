@@ -5,9 +5,9 @@ service. Use it when completing store privacy declarations and obtaining legal
 review. Review the final deployed service and included SDKs again before
 submission.
 
-The operator supplied [Privacy Policy](https://getflash.io/legal/privacy.html)
-and [Terms](https://getflash.io/legal/terms.html). The app exposes both before
-sign-in and in Settings. The operator confirmed public support at `support@getflash.io`; the app
+The app links the cashucard.org [Privacy Policy](https://cashucard.org/privacy)
+and [Terms](https://cashucard.org/terms) (D134, D135). The app exposes both before
+sign-in and in Settings. Public support is `support@cashucard.org`; the app
 provides a Support mail link with a readable address if no mail app opens. Confirm that the policy covers this application and these flows;
 the existing consumer-wallet wording alone is not evidence of coverage.
 
