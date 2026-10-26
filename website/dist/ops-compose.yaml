@@ -1,0 +1,36 @@
+# Cashu Card ops-service 0.1.0: the public multi-platform release, pinned by digest.
+# Run each issuer in its own directory and keep its Compose project name stable.
+x-ops-image: &ops-image ghcr.io/cashucard/ops-service:0.1.0@sha256:84b90af1120785af721630882a97aa9fe488bd24e386fc5a1272bea7235dc3fa
+services:
+  ops:
+    image: *ops-image
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 20s
+    ports: ['127.0.0.1:${OPS_HTTP_PORT:-8821}:8821']
+    environment:
+      OPS_MASTER_KEY_FILE: /secrets/master-key
+      # Remove this line after saving the credentials and verifying sign-in.
+      OPS_OPERATOR_SETUP_FILE: /secrets/operator-setup.json
+      OPS_OPERATOR_ADMINS: '["issuer-admin"]'
+      OPS_BACKUP_RECIPIENT: ${OPS_BACKUP_RECIPIENT:-}
+    volumes:
+      - ops-data:/data
+      - ops-backups:/backups
+      - ops-secrets:/secrets:ro
+    tmpfs: [/tmp]
+  setup:
+    image: *ops-image
+    profiles: [tools]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ops-secrets:/secrets
+volumes:
+  ops-data:
+  ops-backups:
+  ops-secrets:

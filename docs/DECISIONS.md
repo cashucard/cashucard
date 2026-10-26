@@ -3694,8 +3694,28 @@ registry credentials remain outside the build context and image layers.
 
 **Why:** independent operators need a pullable image with the same tested
 runtime on their CPU architecture. Source builds remain available, and hosting
-packages can pin the same digest. The public website guide remains deferred.
+packages can pin the same digest. The public website guide was deferred here; D131 adds it after release validation.
 
 **Rejected:** a moving `latest` deployment tag, replacing an existing published
 image version, publishing a one-architecture index as a portable release, and
 announcing anonymous availability before checking package visibility.
+
+
+## <a id="d131"></a>D131: Developer docs separate card use, issuance and hosting
+
+**Decided (2026-10-26):** the public Developers page starts with the payment and
+issuance flows, identifies who operates each component, and offers separate paths
+for reader development, installation and service hosting. Optional storage,
+notification and recovery companions sit in expandable sections. A dedicated
+ops-service guide explains manager-key authority before Docker setup and links a
+release-pinned Compose file. It distinguishes standalone filesystem exports from
+the Workers pairing and receipt adapters.
+
+**Why:** a wallet developer needs the card/mint contract; a card issuer also needs
+operator authorization, persistent manager keys and installation history. A new
+reader should be able to identify that responsibility before encountering the
+host's recovery tools or deployment commands.
+
+**Rejected:** making the service a requirement of the payment protocol, presenting
+Nextcloud or ntfy as required server dependencies, and putting the full hosting
+runbook ahead of the component overview.

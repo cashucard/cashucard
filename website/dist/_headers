@@ -21,3 +21,9 @@ https://:worker.:subdomain.workers.dev/*
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 /developers
   Cache-Control: public, max-age=0, must-revalidate, no-transform
+/ops-service
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+/ops-compose.yaml
+  Content-Type: application/yaml; charset=utf-8
+  Content-Disposition: attachment; filename="compose.yaml"
+  Cache-Control: public, max-age=0, must-revalidate, no-transform

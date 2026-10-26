@@ -144,6 +144,16 @@ controls appear and all content and links work. "The film as text" carries
 each chapter's words. The site uses no analytics, forms or browser
 persistence. The hosting platform may set infrastructure cookies.
 
+## Ops-service documentation
+
+`/developers#overview` separates card use from issuance, names each component's
+operator and folds optional recovery infrastructure into a disclosure. `/ops-service`
+explains manager-key custody and provides the standalone Docker setup, HTTPS,
+CCP service selection and backup/recovery procedures. The manual card guide links
+both paths. The downloadable `dist/ops-compose.yaml` uses the public release
+image pinned by digest, with no source build or platform-specific hosting dependency.
+Update its image pin and the guide together after testing a new ops release.
+
 ## Publication
 
 The site runs on a Cloudflare Worker, `cashu-card-site`
