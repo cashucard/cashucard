@@ -23,7 +23,26 @@ import {ProvisioningScreen} from './src/screens/ProvisioningScreen';
 import {BENCH_RUNS_ENABLED} from './src/releaseGates';
 
 type Route =
-  'home' | 'setup' | 'settings' | 'bench' | 'identity' | 'reset' | 'status';
+  | 'home'
+  | 'setup'
+  | 'settings'
+  | 'bench'
+  | 'identity'
+  | 'reset'
+  | 'status';
+type Tool = 'identity' | 'reset' | 'status';
+type ToolOrigin = 'home' | 'setup' | 'settings' | 'status';
+const initialOrigins: Record<Tool, ToolOrigin> = {
+  identity: 'settings',
+  reset: 'home',
+  status: 'home',
+};
+const resetBackLabels: Record<ToolOrigin, string> = {
+  home: 'BACK TO CARDS',
+  setup: 'RETURN TO BATCH',
+  settings: 'BACK TO SETTINGS',
+  status: 'BACK TO CARD CHECK',
+};
 
 const benchStyles = {
   benchWrap: {flex: 1} as const,
@@ -34,8 +53,17 @@ function Navigator(): React.JSX.Element {
   const app = useApp();
   const recovery = useProvisioning();
   const [route, setRoute] = useState<Route>('home');
+  const [origins, setOrigins] = useState(initialOrigins);
+  const openTool = (tool: Tool, origin: ToolOrigin) => {
+    if (recovery.busy) {
+      return;
+    }
+    setOrigins(previous => ({...previous, [tool]: origin}));
+    setRoute(tool);
+  };
   useEffect(() => {
     setRoute('home');
+    setOrigins(initialOrigins);
   }, [
     app.session?.operator_id,
     app.session?.env,
@@ -50,7 +78,8 @@ function Navigator(): React.JSX.Element {
     return (
       <CardsHomeScreen
         onInstall={() => setRoute('setup')}
-        onReset={() => setRoute('reset')}
+        onReset={() => openTool('reset', 'home')}
+        onCheck={() => openTool('status', 'home')}
         onSettings={() => setRoute('settings')}
       />
     );
@@ -60,8 +89,8 @@ function Navigator(): React.JSX.Element {
       <ProvisioningScreen
         onHome={() => setRoute('home')}
         onSettings={() => setRoute('settings')}
-        onReset={() => setRoute('reset')}
-        onCheck={() => setRoute('status')}
+        onReset={() => openTool('reset', 'setup')}
+        onCheck={() => openTool('status', 'setup')}
       />
     );
   }
@@ -77,29 +106,9 @@ function Navigator(): React.JSX.Element {
               setRoute('bench');
             }
           }}
-          onIdentity={() => {
-            if (!recovery.busy) {
-              setRoute('identity');
-            }
-          }}
-          onReset={
-            app.session
-              ? () => {
-                  if (!recovery.busy) {
-                    setRoute('reset');
-                  }
-                }
-              : undefined
-          }
-          onStatus={
-            app.session
-              ? () => {
-                  if (!recovery.busy) {
-                    setRoute('status');
-                  }
-                }
-              : undefined
-          }
+          onIdentity={() => openTool('identity', 'settings')}
+          onReset={() => openTool('reset', 'settings')}
+          onStatus={() => openTool('status', 'settings')}
           hardwareBusy={recovery.busy}
           hasSavedBatch={
             !!recovery.snapshot?.batch ||
@@ -111,23 +120,24 @@ function Navigator(): React.JSX.Element {
     case 'identity':
       return (
         <CardIdentityScreen
-          onBack={() => setRoute('settings')}
+          onBack={() => setRoute(origins.identity)}
           disabled={recovery.busy}
         />
       );
     case 'reset':
       return (
         <ResetCardScreen
-          onBack={() => setRoute('settings')}
+          onBack={() => setRoute(origins.reset)}
+          backLabel={resetBackLabels[origins.reset]}
           onInstall={() => setRoute('setup')}
         />
       );
     case 'status':
       return (
         <CardStatusScreen
-          onBack={() => setRoute('settings')}
+          onBack={() => setRoute(origins.status)}
           onInstall={() => setRoute('setup')}
-          onReset={() => setRoute('reset')}
+          onReset={() => openTool('reset', 'status')}
         />
       );
     case 'bench':
@@ -147,8 +157,8 @@ function Navigator(): React.JSX.Element {
         <ProvisioningScreen
           onHome={() => setRoute('home')}
           onSettings={() => setRoute('settings')}
-          onReset={() => setRoute('reset')}
-          onCheck={() => setRoute('status')}
+          onReset={() => openTool('reset', 'setup')}
+          onCheck={() => openTool('status', 'setup')}
         />
       );
   }
