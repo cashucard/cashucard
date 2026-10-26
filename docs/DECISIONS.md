@@ -3430,3 +3430,29 @@ five directions, then three, they chose the chip.
 - A card with a cashew window, alone or with the chip set into it, which reads
   as a card first and Cashu second.
 - The cashew as a "c" with the status dot, which says least about cards.
+## <a id="d121"></a>D121: Cards home offers daily tools and tools return to their launch screen
+
+**Decided (2026-10-25):** Cards shows the signed-in operator's name and service,
+the saved batch's mint reference and completion count, and direct entries for
+card status and reset. The operator name is a memory-only display value;
+authorization and saved-work ownership continue to use the verified operator
+ID, service and key environment. A saved reset keeps the primary Continue
+action. A saved batch or pending reset disables the separate reset entry.
+
+Card checks remain available with saved work. Tool entries are disabled during
+an operation, loading or a workspace mismatch. Reset and installation retain
+their build gates. Opening a tool leaves NFC idle until an explicit read;
+reset retains its inspection, authorization, erasure confirmation and recovery
+boundaries.
+
+Each tool remembers its own launch screen. Reset opened from a card check
+returns to that check, which returns to its original screen. Settings Back
+still returns to Cards (D111). Reset's idle exit names the destination; leaving
+a review dismisses transient evidence while preserving durable work (D114).
+
+**Why:** operators use Cards for everyday work. Routing card checks and resets
+through Settings adds taps, while returning every tool to Settings breaks the
+path back to the batch or card check that opened it.
+
+**Rejected:** skipping batch review or reset consent, starting NFC on screen
+entry, and a shared return destination that could trap nested tools in a loop.
