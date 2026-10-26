@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#10271e" />
+    <meta name="description" content="Why Cashu Card Provisioner uses an ops-service, and how to run your own with Docker, HTTPS, operator accounts and encrypted backups." />
+    <meta property="og:title" content="Host an ops-service | Cashu Card" />
+    <meta property="og:description" content="Run the operator console and provisioning API on your own server. Understand its keys, records and recovery responsibilities." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cashucard.org/ops-service" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://cashucard.org/ops-service" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/guide.css" />
+    <script src="/guide.js" defer></script>
+    <title>Host an ops-service | Cashu Card</title>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
+      <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main" class="guide">
+      <section class="guide-hero" aria-labelledby="ops-title">
+        <div class="guide-hero-inner">
+          <div class="eyebrow"><span class="status-dot"></span> SELF-HOSTING <span class="eyebrow-divider">/</span> OPS-SERVICE 0.1.0</div>
+          <h1 id="ops-title">Host an <em>ops-service</em></h1>
+          <p class="guide-lead">Run the operator console and provisioning API for your own cards. One Docker image provides the service and its SQLite storage tools. Your domain connects it to Cashu Card Provisioner.</p>
+          <ul class="guide-facts" aria-label="At a glance"><li>Experimental</li><li>Linux AMD64 + ARM64</li><li>Docker Compose</li><li>Your HTTPS domain</li></ul>
+          <p class="guide-back"><a href="/developers#overview">See how all the parts fit together ↗</a></p>
+        </div>
+      </section>
+      <div class="guide-layout">
+        <nav class="guide-rail" aria-label="Ops-service contents">
+          <span class="rail-label">On this page</span>
+          <ol>
+            <li><a href="#why">Why a service is needed</a></li>
+            <li><a href="#need">What you need</a></li>
+            <li><a href="#install">Start the container</a></li>
+            <li><a href="#custody">Save your credentials</a></li>
+            <li><a href="#domain">Connect your domain</a></li>
+            <li><a href="#phone">Connect the CCP app</a></li>
+            <li><a href="#backups">Backups and recovery</a></li>
+            <li><a href="#maintain">Updates and configuration</a></li>
+            <li><a href="#help">Troubleshooting</a></li>
+          </ol>
+        </nav>
+        <article class="guide-doc">
+          <details class="guide-toc"><summary>Contents</summary><ol>
+            <li><a href="#why">Why a service is needed</a></li><li><a href="#need">What you need</a></li><li><a href="#install">Start the container</a></li><li><a href="#custody">Save your credentials</a></li><li><a href="#domain">Connect your domain</a></li><li><a href="#phone">Connect the CCP app</a></li><li><a href="#backups">Backups and recovery</a></li><li><a href="#maintain">Updates and configuration</a></li><li><a href="#help">Troubleshooting</a></li>
+          </ol></details>
+
+          <section id="why" aria-labelledby="why-title">
+            <h2 id="why-title">Why a service is needed</h2>
+            <p><b>The phone installs the card software. The ops-service keeps the authority and records needed to manage that installation over time.</b></p>
+            <p>A blank card arrives with known factory manager keys. CCP replaces them with a set assigned to that card. The service retains those keys, binds the installation to the physical chip and records each attempt. After an interrupted tap or a lost phone, an authorized operator can retrieve the same assigned keys and reconcile the saved work.</p>
+            <ul>
+              <li><b>Access:</b> named operator accounts and device-scoped reservations control who can install or reset a card.</li>
+              <li><b>Continuity:</b> saved installation and reset records help distinguish completed work from an unresolved attempt.</li>
+              <li><b>Reuse:</b> a reset can use the recorded manager keys after checking the card's identity, owner authorization and empty state.</li>
+            </ul>
+            <p>The CCP app needs an ops-service for this issuance workflow. Wallets and tills use the card and mint for payments; an installed card can keep operating while its ops-service is down. You can use an issuer's existing service or host your own.</p>
+            <details class="more"><summary>The three kinds of card keys</summary><div class="more-body">
+              <dl class="faults">
+                <div><dt>Manager keys: the ops-service</dt><dd>Authorize installing and removing the applet. The issuer keeps them in its operational database and encrypted backups.</dd></div>
+                <div><dt>Owner key: the holder wallet</dt><dd>Controls ownership, PIN changes and card settings. The holder wallet establishes this authority after installation.</dd></div>
+                <div><dt>Spending key: the card chip</dt><dd>Generated on the card at installation. Cashu proofs are locked to it; the applet signs payments with it.</dd></div>
+              </dl>
+              <p>A reset deletes the applet and its spending key. Empty and reconcile the card first; the service's manager-key backup cannot restore deleted card value. See the <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/docs/OPS-THREAT-MODEL.md">service threat model</a>.</p>
+            </div></details>
+          </section>
+
+          <section id="need" aria-labelledby="need-title">
+            <h2 id="need-title">What you need</h2>
+            <ul class="need">
+              <li><b>A server with Docker Engine and Compose</b>Linux AMD64 or ARM64, persistent local storage and a stable Compose project name. Run one service process per SQLite database.</li>
+              <li><b>A hostname and HTTPS reverse proxy</b>For example, <code>ops.example.com</code>. This guide uses Caddy on the same host; an existing trusted proxy also works.</li>
+              <li><b>Protected credentials and an independent backup destination</b>Keep a password manager, a separate recovery-key copy and storage outside the service host available.</li>
+            </ul>
+            <p>The downloadable Compose file pins <a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">release 0.1.0</a> by its immutable image digest. SQLite is included. Nextcloud and a notification server are optional choices for your backup and alert tooling.</p>
+          </section>
+
+          <section id="install" aria-labelledby="install-title">
+            <h2 id="install-title">Start the container</h2>
+            <p>Run these commands on your server, in a new directory for this issuer. Keep its directory name stable: Compose uses it to name the persistent volumes.</p>
+            <figure class="cmd" data-command="start"><figcaption class="cmd-head">Server terminal</figcaption><pre><code>mkdir cashu-ops
+cd cashu-ops
+curl -fL https://cashucard.org/ops-compose.yaml -o compose.yaml
+docker compose pull ops setup
+docker compose run --rm setup init issuer-admin
+docker compose up -d ops
+curl -fsS http://127.0.0.1:8821/readyz</code></pre><div class="cmd-expect"><p>Initialization reports that private files were created. Readiness returns HTTP 200. The service is listening on host loopback, ready for your HTTPS proxy.</p></div></figure>
+            <p>Initialization creates the issuer master and first administrator's credentials in the <code>ops-secrets</code> volume. It refuses an existing secrets directory. Keep <code>ops-data</code>, <code>ops-secrets</code> and <code>ops-backups</code> when replacing containers.</p>
+          </section>
+
+          <section id="custody" aria-labelledby="custody-title">
+            <h2 id="custody-title">Save your credentials</h2>
+            <figure class="cmd" data-command="credentials"><figcaption class="cmd-head">Server terminal, same directory</figcaption><pre><code>umask 077
+mkdir -p private
+chmod 700 private
+docker compose cp ops:/secrets/operator-setup.json private/operator-setup.json
+docker compose cp ops:/secrets/master-key private/master-key
+chmod 600 private/operator-setup.json private/master-key</code></pre></figure>
+            <p>Privately import the generated <code>issuer-admin</code> password into your password manager. Save the master with your recovery material, then remove the temporary host copies through your private credential procedure. The console sign-in follows the HTTPS step below.</p>
+            <p class="note"><b>Issuer custody</b>The running SQLite database holds manager keys in plaintext at the application layer. Anyone with database or host access can obtain card-management authority. Restrict host access and protect its disk and volumes; encrypted exports protect the separate backup copies. The holder's owner key and the chip's spending key have the separate roles described above.</p>
+          </section>
+
+          <section id="domain" aria-labelledby="domain-title">
+            <h2 id="domain-title">Connect your domain</h2>
+            <p>Point your hostname's DNS to this server. Install <a href="https://caddyserver.com/docs/install">Caddy</a>, allow inbound ports 80 and 443 to it, and add this block to its Caddyfile, replacing <code>ops.example.com</code> with your hostname. Validate and reload your Caddy service.</p>
+            <figure class="cmd"><figcaption class="cmd-head">Caddyfile, proxy running on the host</figcaption><pre><code>ops.example.com {
+    reverse_proxy 127.0.0.1:8821
+}</code></pre></figure>
+            <p>Caddy obtains a trusted certificate for the hostname. The app's API and console share the same origin; preserve the <code>Authorization</code> header. A proxy in another container needs its own private networking arrangement, since <code>127.0.0.1</code> there refers to that container. See <a href="https://caddyserver.com/docs/quick-starts/reverse-proxy">Caddy's reverse proxy guide</a>.</p>
+            <p>Open <code>https://ops.example.com/ops/operators</code>, sign in as <code>issuer-admin</code>, then create named accounts for everyday operators. Administrator access is configured by <code>OPS_OPERATOR_ADMINS</code>; include every intended administrator's existing name in that JSON array.</p>
+            <details class="more"><summary>Remove the one-time setup file</summary><div class="more-body">
+              <p>After saving the credentials and confirming sign-in, remove the <code>OPS_OPERATOR_SETUP_FILE</code> line from <code>compose.yaml</code>, then run:</p>
+              <figure class="cmd" data-command="cleanup"><figcaption class="cmd-head">Server terminal, same directory</figcaption><pre><code>docker compose up -d ops
+docker compose run --rm --entrypoint node setup -e 'require("node:fs").unlinkSync("/secrets/operator-setup.json")'</code></pre></figure>
+              <p>Keep the master and its protected recovery copy. Future password recovery uses an explicit new setup command through a private file; see <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/README.md#recover-operator-access">operator access recovery</a>.</p>
+            </div></details>
+          </section>
+
+          <section id="phone" aria-labelledby="phone-title">
+            <h2 id="phone-title">Connect the CCP app</h2>
+            <ol>
+              <li>Open <a href="/#install">Cashu Card Provisioner</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
+              <li>Add your HTTPS origin, for example <code>https://ops.example.com</code>, and confirm the service selection. Use the origin without <code>/ops/operators</code>.</li>
+              <li>Sign in with an operator account created on this service. Confirm the displayed hostname before creating a batch.</li>
+            </ol>
+            <p>Each service has its own accounts, card records and manager keys. Saved batches and resets remain bound to their original service address and operator. Use the same canonical hostname on every operator phone.</p>
+          </section>
+
+          <section id="backups" aria-labelledby="backups-title">
+            <h2 id="backups-title">Backups and recovery</h2>
+            <p>Complete a backup and restore drill before issuing cards you need to support. Choose the maximum work you can afford to lose, then schedule both exports and verified independent copies within that window.</p>
+            <ol>
+              <li>On a separate recovery computer, create an <a href="https://github.com/FiloSottile/age#usage">age identity</a>. Store the private identity in your restricted vault and protected offline copy.</li>
+              <li>Put only its public <code>age1…</code> recipient in <code>OPS_BACKUP_RECIPIENT</code> in a <code>.env</code> file beside <code>compose.yaml</code>.</li>
+              <li>Recreate the service, run an export, then copy the encrypted files to independent storage.</li>
+            </ol>
+            <figure class="cmd" data-command="backup"><figcaption class="cmd-head">Server terminal, after setting the public recipient</figcaption><pre><code>docker compose up -d ops
+docker compose exec -T ops node dist/standalone.js backup
+docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-expect"><p>The export command reports a unique <code>.age</code> filename. Move the encrypted copies from this host to your chosen independent storage and verify their hashes.</p></div></figure>
+            <p>Use cron, a systemd timer or your platform's scheduler for the export and copy jobs. Alert on job failure and stale verified copies. For a 24-hour loss window, a 12-hour export and copy cadence leaves time to detect a failed run and recover.</p>
+            <details class="more"><summary>Nextcloud, ntfy and Atoll Recovery</summary><div class="more-body">
+              <p>Nextcloud can hold encrypted copies on a separate server. ntfy can deliver alerts from your scheduler or monitoring system. Keep the private age identity separate from both the service and backup storage.</p>
+              <p><a href="https://github.com/islandbitcoin/atoll-recovery-startos">Atoll Recovery</a> is an optional StartOS companion that copies encrypted Workers exports, reports freshness and can send alerts through ntfy. The Docker service provides filesystem exports; its R2 scheduler, pairing and independent-copy receipt HTTP adapters remain separate work. For this container, arrange your own scheduled copy and alert jobs.</p>
+            </div></details>
+            <p>Restore an encrypted export into a fresh database on a recovery host with the private age identity. Restoration disables operator passwords and pauses issuance behind a recovery fence. Recover operator access and reconcile outstanding card work before resuming. Follow the <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/docker/README.md#backups-and-restoration">versioned restore procedure</a>.</p>
+          </section>
+
+          <section id="maintain" aria-labelledby="maintain-title">
+            <h2 id="maintain-title">Updates and configuration</h2>
+            <p>Keep the Compose file, issuer master and persistent volumes together. Before an update, verify a recent independent backup, read the new release notes, and change both services' image pin to that release's digest. Pull and recreate the service, then check readiness and sign-in. Starting with new empty volumes creates a different issuer.</p>
+            <p>The <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/docker/README.md#configuration">configuration reference</a> covers administrator names, mint references, mounted secrets, ports and storage. Offering a mint URL in CCP is installation metadata; the holder wallet later configures the card and funds it.</p>
+          </section>
+
+          <section id="help" aria-labelledby="help-title">
+            <h2 id="help-title">Troubleshooting</h2>
+            <dl class="faults">
+              <div><dt>The phone cannot reach the service</dt><dd>Check the HTTPS origin from the phone's browser, its trusted certificate and the proxy's upstream. Use the hostname, with port 8821 kept on host loopback.</dd></div>
+              <div><dt>Initialization refuses to run</dt><dd>Check whether this issuer already has secrets. Preserve its volumes and recover access through the existing configuration.</dd></div>
+              <div><dt>Readiness returns 503</dt><dd>Health checks the database; readiness also checks admission fences. Review setup, restored state and any configured backup fence. Restored work needs reconciliation before issuance.</dd></div>
+              <div><dt>A card belongs to another service or has unresolved work</dt><dd>Return to its original service and operator. Retain the attempt record and reconcile its history before reset or installation.</dd></div>
+            </dl>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">Ops-service release ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
+  </body>
+</html>
