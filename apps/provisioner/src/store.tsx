@@ -59,6 +59,8 @@ export const DEFAULT_SERVICE_URL = serviceConfig.serviceOrigin;
 export interface AppStateShape {
   signedIn: boolean;
   session: AppSession | null;
+  /** Display only; authorization continues to use the verified operator_id. */
+  operatorName: string | null;
   theme: 'system' | 'dark' | 'light';
   batch: (BatchConfig & {done: RecordRow[]}) | null;
   serviceUrl: string;
@@ -92,6 +94,7 @@ export function AppStore({
 }) {
   const [signedIn, setSignedIn] = useState(false);
   const [session, setSession] = useState<AppSession | null>(null);
+  const [operatorName, setOperatorName] = useState<string | null>(null);
   const [theme, setTheme] = useState<'system' | 'dark' | 'light'>('system');
   const [batch, setBatch] = useState<
     (BatchConfig & {done: RecordRow[]}) | null
@@ -196,6 +199,7 @@ export function AppStore({
   const expireSession = useCallback(() => {
     clientRef.current = null;
     setSession(null);
+    setOperatorName(null);
     setSignedIn(false);
   }, []);
   const expireSessionRef = useRef<() => void>(() => undefined);
@@ -210,6 +214,7 @@ export function AppStore({
       outboxRef.current = null;
     }
     setSession(null);
+    setOperatorName(null);
     setSignedIn(false);
   }, []);
 
@@ -217,6 +222,7 @@ export function AppStore({
     () => ({
       signedIn,
       session,
+      operatorName,
       theme,
       batch,
       serviceUrl: clientOptions?.baseUrl ?? DEFAULT_SERVICE_URL,
@@ -240,6 +246,7 @@ export function AppStore({
             outboxRef.current = new RegistryOutbox(client);
           }
           setSession({operator_id: s.operator_id, env: s.env, token: s.token});
+          setOperatorName(name.trim());
           setSignedIn(true);
         } catch (e) {
           // The screen renders SIGNIN.failed(reason): the service's reason,
@@ -296,6 +303,7 @@ export function AppStore({
     [
       signedIn,
       session,
+      operatorName,
       theme,
       batch,
       clientOptions,
