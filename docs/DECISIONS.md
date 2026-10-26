@@ -3647,3 +3647,32 @@ path to the same tasks.
 
 **Rejected:** removing identity diagnostics, moving everyday tools back into
 Settings, and changing card operations or recovery rules for a navigation edit.
+
+## <a id="d129"></a>D129: A standalone container hosts the Node ops-service
+
+**Decided (2026-10-26):** package the existing Node/SQLite provisioning domain
+as one multi-stage OCI image, with native AMD64 and ARM64 acceptance in CI.
+Runtime carries compiled JavaScript and production dependencies. It runs as
+an unprivileged user with persistent SQLite, separate mounted secrets and
+filesystem exports. StartOS packaging can consume the same image later.
+
+The standalone process validates listener, mint and administrator configuration,
+accepts bounded regular secret files, applies the existing nonce-based operator
+setup before listening, and drains HTTP before closing SQLite. Separate live
+and ready endpoints distinguish a running database from a recovery-fenced
+issuer. Initialization creates private random credentials once. Encrypted export
+and restore reuse the existing v7 artifact format and recovery fence. The image
+changes no card protocol, manager-key derivation or deployed Cloudflare state.
+
+The existing Workers adapter continues to own R2 scheduling and companion
+enrollment/receipt HTTP APIs. The first container uses filesystem export with
+an external scheduler and independent copy procedure. Source documentation
+states that boundary; the public website guide remains deferred by the operator.
+
+**Why:** independent issuers need a portable deployment with private setup and
+durable state. A StartOS-specific runtime would tie the service to one host.
+
+**Rejected:** a TypeScript development runtime in the final image, embedded
+credentials or live databases, an automatically replaced issuer master, sharing
+one SQLite volume across replicas, and presenting container startup as backup
+or restore acceptance.

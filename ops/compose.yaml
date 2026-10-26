@@ -1,0 +1,36 @@
+services:
+  ops:
+    image: ${OPS_IMAGE:-cashu-card-ops:local}
+    build:
+      context: ..
+      dockerfile: ops/Dockerfile
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 20s
+    ports: ['127.0.0.1:${OPS_HTTP_PORT:-8821}:8821']
+    environment:
+      OPS_MASTER_KEY_FILE: /secrets/master-key
+      OPS_OPERATOR_SETUP_FILE: /secrets/operator-setup.json
+      OPS_OPERATOR_ADMINS: '["issuer-admin"]'
+      # Set an age public recipient to use the backup command.
+      OPS_BACKUP_RECIPIENT: ${OPS_BACKUP_RECIPIENT:-}
+    volumes:
+      - ops-data:/data
+      - ops-backups:/backups
+      - ops-secrets:/secrets:ro
+    tmpfs: [/tmp]
+  setup:
+    image: ${OPS_IMAGE:-cashu-card-ops:local}
+    profiles: [tools]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ops-secrets:/secrets
+volumes:
+  ops-data:
+  ops-backups:
+  ops-secrets:
