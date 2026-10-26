@@ -9,8 +9,8 @@ export const APP_NAME = 'Cashu card provisioner';
 
 export const SIGNIN = {
   tagline: 'Programs blank cards into Cashu cards. Operators only.',
-  button: 'SIGN IN',
-  signingIn: 'SIGNING IN…',
+  button: 'Sign in',
+  signingIn: 'Signing in…',
   failed: (reason: string) =>
     reason === 'bad-credentials'
       ? 'Check your operator name and password, then try again.'

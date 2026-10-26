@@ -3580,3 +3580,27 @@ addresses. The row distinguishes the current destination from its action.
 
 **Rejected:** a connectivity indicator without a service check, extra steps to
 switch services, and changing API origins or saved-work bindings for display.
+
+
+## <a id="d126"></a>D126: Provisioner sign-in shares the Cashu Card identity
+
+**Decided (2026-10-26):** use the canonical Cashu Card lockup on the app's
+sign-in screen in place of the lightning-bolt placeholder. Bundle exact dark
+and light SVG copies from the brand library, with a regression check against
+the originals. Use the site's forest, lime and paper colors in a sign-in-only
+theme, explicit field labels, and the ops console's left-aligned form hierarchy.
+The submit action stays outside the scrolling fields and above the keyboard.
+
+The rest of the app retains its selected theme. Service choice, credential
+clearing, cancellable sign-in and recovery ownership retain their existing
+behavior. Sign-in adds no network assets or service requests. Build 12 carries
+this update because build 11 already has a signed published release; its
+artifacts and tag stay unchanged while its store rollout is held.
+
+**Why:** the placeholder icon and black form did not match the Cashu Card site
+or the provisioning console. A shared identity makes the product recognizable
+while keeping the service destination visible before credentials are entered.
+
+**Rejected:** redrawing the logo, a marketing introduction before the form,
+a fixed hero that covers fields when the keyboard opens, and replacing build
+11's published artifacts.
