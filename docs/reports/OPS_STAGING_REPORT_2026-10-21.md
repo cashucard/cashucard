@@ -3,7 +3,7 @@
 # Isolated staging deployment: initial stop and follow-up
 
 2026-10-21. Operator explicitly approved the
-[bounded staging deployment](OPS-STAGING-DEPLOYMENT.md). Source pinned to
+[bounded staging deployment](../OPS-STAGING-DEPLOYMENT.md). Source pinned to
 `0b0bd505810213d2413bd0c751b3703e4f46262f` in an isolated checkout.
 
 ## Executed scope

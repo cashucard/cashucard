@@ -76,7 +76,7 @@ Restore fencing still takes precedence over a replay.
     "cashu_package": "absent"
   },
   "observed_absent_at": 0,
-  "evidence_ref": "docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md",
+  "evidence_ref": "docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md",
   "reviewed": true
 }
 ```

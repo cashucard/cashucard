@@ -8,7 +8,7 @@ not the completed production deliverable.
 
 Component versions and release procedures are in [Component
 releases](COMPONENT-RELEASES.md). The [build 7 preparation
-record](PROVISIONER_BUILD_7_READINESS.md) is dated evidence. The audit below
+record](reports/PROVISIONER_BUILD_7_READINESS.md) is dated evidence. The audit below
 records the October 21 configuration; later installation approval is recorded in
 [D74](DECISIONS.md#d74). The audit below describes October 21; later dated
 reports record subsequent implementation, deployments and internal releases.
@@ -27,8 +27,8 @@ reports record subsequent implementation, deployments and internal releases.
 | App capability | Installation and recovery-drill gates remain false. Enable only a reviewed platform capability after its exact evidence; never enable recovery drills for distribution. Preserve quarantined chips/journals. |
 | Privacy/support | The operator supplied the Flash privacy and terms URLs; both are accessible before sign-in and in Settings (D58). Public support is `support@getflash.io`, exposed through a Support mail link. Review the [data inventory](PROVISIONER-DATA-INVENTORY.md), policy coverage, app/SDK manifests and store declarations before submission. |
 | Reviewer access | Prepare scoped reviewer access, instructions and hardware evidence without giving app-store reviewers production manager keys or access to operational batches. Public demo UI does not by itself fulfill review access. |
-| Operational recovery | Scheduled staging export, Atoll Nextcloud read-back, NTFY web receipt and isolated restoration from the copied artifact passed. The [separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md) also passed. Production custody, whole-host monitoring, production activation of freshness enforcement and reopening/reconciliation remain unfinished. See the dated recovery report. |
-| Distribution | The operator confirmed app records already exist in both stores. The [2026-10-22 read-only store audit](PROVISIONER_STORE_AUDIT_2026-10-22.md) confirms both records and existing build 2. Candidate build numbers advance to 3. Private signing-key continuity, store declarations and review notes remain to be confirmed. No upload or submission is authorized merely by this plan. |
+| Operational recovery | Scheduled staging export, Atoll Nextcloud read-back, NTFY web receipt and isolated restoration from the copied artifact passed. The [separate-Mac staging restore](reports/OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md) also passed. Production custody, whole-host monitoring, production activation of freshness enforcement and reopening/reconciliation remain unfinished. See the dated recovery report. |
+| Distribution | The operator confirmed app records already exist in both stores. The [2026-10-22 read-only store audit](reports/PROVISIONER_STORE_AUDIT_2026-10-22.md) confirms both records and existing build 2. Candidate build numbers advance to 3. Private signing-key continuity, store declarations and review notes remain to be confirmed. No upload or submission is authorized merely by this plan. |
 
 ## Requirements verified from official sources
 
@@ -78,10 +78,10 @@ Recheck these at submission time; dated requirements are not evergreen policy.
 
 The [production-readiness plan](PROVISIONER-PRODUCTION-READINESS.md),
 [recovery implementation plan](OPS-RECOVERY-PLAN.md) and
-[staging evidence](OPS_STAGING_REPORT_2026-10-21.md) remain the detailed sources.
+[staging evidence](reports/OPS_STAGING_REPORT_2026-10-21.md) remain the detailed sources.
 No phone/card operation, production access, store connection or upload occurred
 in this audit. No stage in this document constitutes store approval.
 
-Native evidence: [Android build report](PROVISIONER_ANDROID_BUILD_REPORT_2026-10-21.md).
+Native evidence: [Android build report](reports/PROVISIONER_ANDROID_BUILD_REPORT_2026-10-21.md).
 
-Resource preparation: [iOS resource report](PROVISIONER_IOS_RESOURCE_REPORT_2026-10-21.md).
+Resource preparation: [iOS resource report](reports/PROVISIONER_IOS_RESOURCE_REPORT_2026-10-21.md).

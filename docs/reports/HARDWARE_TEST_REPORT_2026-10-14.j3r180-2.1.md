@@ -34,7 +34,7 @@ same card with the owner's go-ahead, is the lock, a locked card's `REFRESH` and
 
 ## The install
 
-The three steps of [HARDWARE_DEPLOYMENT.md](HARDWARE_DEPLOYMENT.md#install), the
+The three steps of [HARDWARE_DEPLOYMENT.md](../HARDWARE_DEPLOYMENT.md#install), the
 opener first: `gp --install` of the file with the opener
 (`F04341534855434152444D`), then `gp --create` of the card's applet
 (`F043415348554341524401`) and of the NFC tag (`D2760000850101`). Each succeeded.
@@ -237,7 +237,7 @@ APDU, after a `GET_NONCE` of about 22 ms.
 | 2b | `AUTH`, checked under the key `GET_PUBKEY` now gives | BIP-340 valid | `9000`, valid | 831.6 ms | | PASS |
 | 2c | `GET_NONCE` | `6A90` (no owner) | `6A90` | 14.2 ms | | PASS |
 
-What the reset cleared, against [RESET_CARD](../spec/APDU.md#reset_card-0x51)
+What the reset cleared, against [RESET_CARD](../../spec/APDU.md#reset_card-0x51)
 ("the card as out of its packet, with a new key, keeping its clock"):
 
 | Item | Before | After 2a | Spec |

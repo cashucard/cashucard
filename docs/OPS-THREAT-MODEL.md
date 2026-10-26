@@ -78,7 +78,7 @@ not been validated by the local tests.
 
 Claims about silicon (the ~12 s factory window's real length; how CoreNFC
 behaves past 60 s) come from
-[`HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md`](HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md)
+[`HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md`](reports/HARDWARE_TEST_REPORT_2026-10-18.j3r180-gp-nfc.md)
 and apply to that measured run. Encryption-at-rest and recovery coverage are
 described in the preceding section.
 

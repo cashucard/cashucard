@@ -27,7 +27,7 @@ signing identities. The tracked protocol 2.1 CAP is unchanged:
 The sign-in follow-up (D105) keeps the action above the keyboard, adds Next/Go
 keyboard actions and removes demo entry points, fake-card flows and demo state.
 SuperMax acceptance confirmed the keyboard action is visible and demo entry is gone.
-D108 adds native PIN-field keyboard scrolling and Done. The [safe-exit audit](PROVISIONER-SAFE-EXITS.md)
+D108 adds native PIN-field keyboard scrolling and Done. The [safe-exit audit](../PROVISIONER-SAFE-EXITS.md)
 (D109) adds consistent exits while preserving durable work and service holds.
 
 No new applet wire behavior, manager-key guessing, proof/value deletion shortcut,

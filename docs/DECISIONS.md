@@ -2774,7 +2774,7 @@ when the operator explicitly runs the approved command again.
 **Rejected:** passing escrow keys to a command line, making a generic APDU
 bridge, silently using the local runner for production, or recording completion
 without durable verification evidence. The first physical run remains gated by
-the [named-card drill](OWNED-CARD-RESET-DRILL.md).
+the [named-card drill](reports/OWNED-CARD-RESET-DRILL.md).
 
 ## <a id="d98"></a>D98: Report bounded reset failure phases without printing native errors
 

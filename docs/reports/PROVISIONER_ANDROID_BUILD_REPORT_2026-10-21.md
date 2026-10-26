@@ -62,4 +62,4 @@ python3 scripts/check-android-bundle.py android/app/build/outputs/bundle/release
 Run from `apps/provisioner`; bundletool must be on PATH, or supply its pinned
 jar through `BUNDLETOOL_JAR`. Native signing uses D56's private environment
 inputs; do not generate a new production upload identity from these test steps.
-See [D57](DECISIONS.md#d57) and the [store release plan](PROVISIONER-STORE-RELEASE.md).
+See [D57](../DECISIONS.md#d57) and the [store release plan](../PROVISIONER-STORE-RELEASE.md).

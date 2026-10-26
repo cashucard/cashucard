@@ -5,7 +5,7 @@
 Status: **on-phone cleanup, reset, fresh installation and independent USB
 post-check passed**. This run validates the
 mobile lifecycle added for [issue #92](https://github.com/cashucard/cashucard/issues/92),
-under the operator-approved [device/card plan](OWNED-CARD-MOBILE-RESET.md).
+under the operator-approved [device/card plan](../OWNED-CARD-MOBILE-RESET.md).
 
 ## Environment and identities
 

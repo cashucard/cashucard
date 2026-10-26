@@ -42,7 +42,7 @@ identifiers, generated device/chip identifiers, batch settings and attempt
 activity leave the device and persist in the service. An actioned declaration
 is not evidence that the answer describes the current candidate.
 
-Prepare corrected answers from [the data inventory](PROVISIONER-DATA-INVENTORY.md):
+Prepare corrected answers from [the data inventory](../PROVISIONER-DATA-INVENTORY.md):
 
 - Apple: review linked User ID, Device ID, Other User Content and Other Usage
   Data for app functionality, without tracking, against the final archive.

@@ -4,7 +4,7 @@
 
 Historical validation plan from 2026-10-20. Gate values and proposed actions
 below describe that stage. Current operator behavior is documented in
-[Provisioner screens](PROVISIONER-APP.md); execution results belong to
+[Provisioner screens](../PROVISIONER-APP.md); execution results belong to
 the dated hardware reports. Repeating a hardware drill requires its
 own approved device/card scope.
 
@@ -29,13 +29,13 @@ does not establish phone behavior or authorize installing on Card A. An existing
 installation is not a blank test card. If the app reports an existing installation,
 stop unless a separately approved plan permits replacement. The real flow now
 requires an installation-specific review and a second identity/empty-state
-inspection before replacement ([D41](DECISIONS.md#d41)); partial-install repair
+inspection before replacement ([D41](../DECISIONS.md#d41)); partial-install repair
 is still not implemented. Never erase a card outside its approved scope or
 attempt authentication with guessed keys. A different blank
 card needs its own recorded identity and approval.
 
 The owner runs native builds, iOS pods/signing and phone actions, as required by
-[AGENTS.md](../AGENTS.md). No credential or nonpublic manager key belongs in this
+[AGENTS.md](../../AGENTS.md). No credential or nonpublic manager key belongs in this
 checklist, a screenshot, transcript, shell history or shared test artifact.
 
 <a id="authorized-read-only-phone-run--2026-10-20"></a>
@@ -83,11 +83,11 @@ three matching reads per phone, without authentication or card writes.
 2. Provide a read-only phone identity probe that invokes `readChipIdentity`
    through the native NFC adapter, with no service reservation, key fetch,
    authentication or mutation. Settings → Read physical card identity now provides this probe
-   ([D37](DECISIONS.md#d37)). It is available through the demo door without a
+   ([D37](../DECISIONS.md#d37)). It is available through the demo door without a
    service session and clearly labels its physical-card action. Opening it does
    not arm NFC; tap READ PHYSICAL CARD IDENTITY for each deliberate read. Do not use a programming attempt as a read-only probe.
 3. The local validation build now has one-shot boundary pause controls
-   ([D38](DECISIONS.md#d38)). In an isolated validation worktree only, enable
+   ([D38](../DECISIONS.md#d38)). In an isolated validation worktree only, enable
    `RECOVERY_DRILLS_ENABLED` as well as the separately approved installation
    build gate in `apps/provisioner/src/releaseGates.ts`. Neither change belongs
    in a production commit or distributed binary. The explicit build flag also

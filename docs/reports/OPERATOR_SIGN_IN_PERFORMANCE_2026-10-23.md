@@ -41,7 +41,7 @@ not change credentials; administrator recovery during verification/rehashing
 must win. The durable rate budget, revocation and key-environment checks stay
 in place. Old PBKDF2 and scrypt hashes remain readable. The new profile also fits the previous deployment’s default scrypt memory limit, so its verifier can read migrated credentials during a rollback. An edge cost refusal
 retains the legacy hash without doubling its PBKDF2 cost; unrelated crypto
-errors fail closed. See [D103](DECISIONS.md#d103).
+errors fail closed. See [D103](../DECISIONS.md#d103).
 
 ## Production rollout and operator acceptance
 

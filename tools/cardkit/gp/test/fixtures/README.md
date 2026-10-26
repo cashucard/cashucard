@@ -22,7 +22,7 @@ on the Mac. No agent runs any of this.
   public test set (`10` to `3F`). Nothing in them is secret.
 
 The spare was left with the 2.1 applet installed, empty and with no owner
-(`docs/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md`), so the deletes come before
+(`docs/reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md`), so the deletes come before
 the install, and the card ends as it started: installed, on its factory keys.
 
 ## The captures

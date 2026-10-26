@@ -27,10 +27,10 @@ each spec change merges here ([`AGENTS.md`](AGENTS.md)).
 
 > ### Status: protocol 2.1 tested on J3R180 and real phones
 >
-> The [23 October physical E2E report](docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+> The [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records installation, holder setup, funding, online/offline payments, change and
 > eventual mint settlement on the named card/phones. The
-> [mobile reset report](docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+> [mobile reset report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 > records reset and reinstall. These bounded tests do not establish compatibility
 > with every device or failure mode. The repository also includes the operator
 > provisioner and Cloudflare-capable ops-service. Read the

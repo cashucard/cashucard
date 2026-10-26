@@ -68,14 +68,14 @@ remain untested.
 ## Contract comparison
 
 Using the fields selected by
-[`PROVISIONER-RECOVERY.md`](PROVISIONER-RECOVERY.md):
+[`PROVISIONER-RECOVERY.md`](../PROVISIONER-RECOVERY.md):
 
 ```text
 4790 || D321 || 3180 || 07297620 || 7515
 -> cplc-v1:4790d3213180072976207515
 ```
 
-The existing owner [gp-info capture](../tools/cardkit/gp/test/fixtures/gp-info.txt)
+The existing owner [gp-info capture](../../tools/cardkit/gp/test/fixtures/gp-info.txt)
 names another card, serial `09336320`, and yields
 `cplc-v1:4790d3213041093363205547`. The two observed composites differ. Neither
 that two-card observation nor repeat reads prove global uniqueness or prevent

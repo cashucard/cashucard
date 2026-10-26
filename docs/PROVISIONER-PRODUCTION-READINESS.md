@@ -49,14 +49,14 @@ proceed independently.
 - A dedicated staging Worker/DO/R2 deployment now passes authenticated synthetic
   reservation/replay, device scope and key issuance checks. The actual app API
   client works with its bounded sign-in deadline. See the
-  [staging report](OPS_STAGING_REPORT_2026-10-21.md) for exact evidence/limits.
+  [staging report](reports/OPS_STAGING_REPORT_2026-10-21.md) for exact evidence/limits.
 - An isolated app candidate has the staging HTTPS origin, disabled physical/
   recovery gates, release preflight and both JavaScript bundles. It is not an
   installed native release or a production artifact.
 - Scheduled staging export, independently verified Nextcloud transfer, NTFY
   failure/healthy web receipt and isolated restoration from that artifact now
-  passed. See the [recovery report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
-  The [separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
+  passed. See the [recovery report](reports/OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+  The [separate-Mac staging restore](reports/OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
   also passed from the protected offline copy. Production custody, whole-host monitoring,
   production activation of the tested 24-hour issuance gate and reviewed reconciliation/fencing before
   reopening remain open. The rehearsal used the original Mac's staging identity.
@@ -109,19 +109,19 @@ inventory. No signed candidate or store upload has been produced.
   Its offline backup subsequently passed second-Mac unlock/certificate
   verification; see the custody report below. This is not a signed build.
 
-The [production custody report](OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md)
+The [production custody report](reports/OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md)
 records the separate production age identity, verified restricted Vaultwarden
 retrieval and encrypted-drive copy, and the Android upload-key backup check.
 The drive is unmounted and locked. `ops/wrangler.production.toml` now defines
 the explicit production recipient, issuer, isolated bucket, 12-hour export cron
 and independent-copy policy. The subsequent
-[production deployment report](OPS_PRODUCTION_DEPLOYMENT_REPORT_2026-10-22.md)
+[production deployment report](reports/OPS_PRODUCTION_DEPLOYMENT_REPORT_2026-10-22.md)
 records the deployed service, private bootstrap/master injection, removed
 one-shot setup secret and initial refusal checks. Both staging and production
 are scheduled after the operator freed `meridian-jabari`'s slot. Production export, independent Nextcloud copy and temporary-database restore
 acceptance have now passed. The additive Atoll capability in D73 keeps staging
 and production histories separate. See the
-[signed candidate and recovery acceptance report](PROVISIONER_RELEASE_CANDIDATE_REPORT_2026-10-22.md)
+[signed candidate and recovery acceptance report](reports/PROVISIONER_RELEASE_CANDIDATE_REPORT_2026-10-22.md)
 for the evidence and remaining release gates.
 
 The separate-Mac staging restore is complete. Remaining operational acceptance

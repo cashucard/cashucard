@@ -263,8 +263,8 @@ burn, so an unverified session learns nothing and consumes nothing.
 > blocked, so they hold for that case; the blocked case was not exercised.
 > **Do not install the 939cf24a CAP.** The fix is applet version 0.3, verified
 > in jCardSim and not yet run on this card. Install the tracked CAP, whose
-> sha256 [HARDWARE_DEPLOYMENT.md](HARDWARE_DEPLOYMENT.md#install) publishes:
-> since the ENG-620 fix ([D14](DECISIONS.md#d14)) it is applet 0.4, and
+> sha256 [HARDWARE_DEPLOYMENT.md](../HARDWARE_DEPLOYMENT.md#install) publishes:
+> since the ENG-620 fix ([D14](../DECISIONS.md#d14)) it is applet 0.4, and
 > `SELECT` answers `00 04`. A card answering anything below `00 04` (`00 01`,
 > `00 02` or `00 03`) runs a vulnerable build: sweep it, then reinstall. That
 > includes the version 0.1 CAP this report opens with (`c529006f…`), which
