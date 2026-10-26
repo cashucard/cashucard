@@ -246,7 +246,7 @@ say *no*.
 
 `hwtest_65byte_pubkey.py` is the one script here that *does* need a card. It is
 the check behind section 8 of
-[`docs/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md`](../../docs/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md):
+[`docs/reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md`](../../docs/reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md):
 on a card whose `GET_PUBKEY` returns a 65-byte uncompressed point (the applet
 before #23) it normalises the key on the host, confirms the point is on
 secp256k1, and then runs the same sign/verify and nonce-freshness rounds as
@@ -266,7 +266,7 @@ and applet key, and requires every retained proof to be SPENT at the explicitly
 matched HTTPS mint. It prints only counts, denomination totals and an evidence
 digest, never raw proof data. It has no PIN, manager login, clear or reset
 operation. The named-card approval and invocation are documented in
-[`SPENT-SETTLEMENT-AUDIT-PLAN.md`](../../docs/SPENT-SETTLEMENT-AUDIT-PLAN.md).
+[`SPENT-SETTLEMENT-AUDIT-PLAN.md`](../../docs/reports/SPENT-SETTLEMENT-AUDIT-PLAN.md).
 Its tests need neither PC/SC nor a network:
 
 ```bash
@@ -278,7 +278,7 @@ python3 test_spent_audit.py                  # from tools/cardctl
 2.1 applet's public state. It never authenticates or retries. It stops on an
 absent applet, unknown version, malformed response or identity mismatch.
 Physical execution requires approval for the named reader/card and the APDU
-sequence in [the first-write drill plan](../../docs/PROVISIONER-FIRST-WRITE-DRILL.md).
+sequence in [the first-write drill plan](../../docs/reports/PROVISIONER-FIRST-WRITE-DRILL.md).
 This is separate from `cardctl info` and `selftest`, which send more commands.
 
 After that approval, run in this directory with the documented Homebrew venv:
@@ -293,4 +293,4 @@ Reader-free regression checks: `python3 test_read_only_preflight.py`.
 general cardctl command. It permits only the reset plan's APDUs, never retries,
 and imports PC/SC only on explicit execution. Its reader-free checks are
 `python3 test_reset_bridge.py`. Physical execution follows the separately
-approved [owned-card reset drill](../../docs/OWNED-CARD-RESET-DRILL.md).
+approved [owned-card reset drill](../../docs/reports/OWNED-CARD-RESET-DRILL.md).

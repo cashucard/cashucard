@@ -141,7 +141,7 @@ fork's names in place of upstream's:
 `gp` is GlobalPlatformPro. A card locks itself for good after a run of failed
 key attempts, so a login with the card's default keys is tried once, and not
 again if it fails. Upstream's report for the same chip is
-`docs/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md`: its 6F00 on install came from
+`docs/reports/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md`: its 6F00 on install came from
 a probe in the constructor, which is the first thing to suspect if an install
 fails here. On the J3R180 used here the applet installed the first time.
 

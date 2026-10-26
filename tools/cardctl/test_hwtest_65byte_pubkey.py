@@ -22,7 +22,7 @@ import bip340
 import hwtest_65byte_pubkey as hw
 
 # GET_PUBKEY response recorded in section 6.1 of
-# docs/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md.
+# docs/reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md.
 J3R452_PUBKEY_65 = bytes.fromhex(
     "042f3253009b4481805ae7b87e46fcc0b1a469b9e510fd1d9767bf146fb61abec8"
     "987303f74519a22b0c75d9cccee43ae61025d018c28fb5be47a1de35cfdad628"
@@ -130,8 +130,8 @@ def test_run_passes_against_65_byte_card():
 
 
 REPORTS = (
-    "../../docs/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md",
-    "../../docs/HARDWARE_TEST_REPORT_2026-09-01.j3r452.zh-CN.md",
+    "../../docs/reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md",
+    "../../docs/reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.zh-CN.md",
 )
 
 

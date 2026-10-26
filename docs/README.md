@@ -28,15 +28,16 @@ runs. Historical proposals retain the assumptions and gates of their date.
 - [Ops-service threat model](OPS-THREAT-MODEL.md).
 - [Partner governance proposal](OPS-GOVERNANCE.md).
 - [Recovery custody and independent copies](OPS-RECOVERY-PLAN.md).
+- [Console custom domain](OPS_CUSTOM_DOMAIN.md), with its rollback.
 - [Component releases](COMPONENT-RELEASES.md) and [provenance](PROVENANCE.md).
 - [Local service and recovery commands](../ops/README.md).
 
 ## Evidence and design history
 
-The `HARDWARE_TEST_REPORT_*`, `RECOVERY_TEST_REPORT_*`, `OPS_*_REPORT_*` and
-`PROVISIONER_*_REPORT_*` files are dated evidence. Start with the
-[physical payment E2E report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
-and [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+Dated reports, and the approved plans for named hardware runs, are in
+[`reports/`](reports/README.md). Start with the
+[physical payment E2E report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+and [mobile reset report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 for the tested card lifecycle.
 
 `FOXY-CARD-*` and `FOR-LNFLASH.md` retain the Foxy design history. The current

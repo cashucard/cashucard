@@ -4,7 +4,7 @@
 
 Historical validation plan from 2026-10-20. Gate values and proposed actions
 below describe that stage. Current operator behavior is documented in
-[Provisioner screens](PROVISIONER-APP.md); execution results belong to
+[Provisioner screens](../PROVISIONER-APP.md); execution results belong to
 the dated hardware reports. Repeating a hardware drill requires its
 own approved device/card scope.
 

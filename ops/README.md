@@ -190,7 +190,7 @@ The explicit production configuration is `wrangler.production.toml`; the default
 recipient/issuer and bucket, a 12-hour export schedule and required independent
 copy evidence. No initial receipt means issuance is blocked. The private age
 identity is never a Worker binding. See the
-[custody evidence](../docs/OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md) and
+[custody evidence](../docs/reports/OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md) and
 [release plan](../docs/PROVISIONER-PRODUCTION-READINESS.md) for outstanding gates.
 Validate the explicit configuration locally before deploying it:
 
@@ -274,7 +274,7 @@ backend access. Do not use the default production-named config to discover a
 URL or import phone-validation databases into staging.
 
 The approved staging rehearsal now has successful remote operator and synthetic
-provisioning checks; see the [dated evidence](../docs/OPS_STAGING_REPORT_2026-10-21.md).
+provisioning checks; see the [dated evidence](../docs/reports/OPS_STAGING_REPORT_2026-10-21.md).
 Deployed native PBKDF2 has a 100k cap, so D52 preserves the 600k work factor
 through the pinned fallback. Sign-in is correspondingly expensive: the app
 allows 30 seconds only for that call (D53); other requests remain bounded at
@@ -392,7 +392,7 @@ For an owned test card whose keys remain in a historical local source DB,
 `src/local-reset.ts` previews metadata by default. Execution uses explicit
 consent, a protected DB snapshot, a durable journal and the restricted PC/SC
 bridge. It accepts only the historical loopback service scope. Follow the
-[named-card recovery drill](../docs/OWNED-CARD-RESET-DRILL.md); approval is
+[named-card recovery drill](../docs/reports/OWNED-CARD-RESET-DRILL.md); approval is
 required before its card-changing command. It does not clear a production
 quarantine or transfer keys to another service.
 
