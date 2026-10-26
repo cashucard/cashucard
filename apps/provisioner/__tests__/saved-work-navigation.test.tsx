@@ -149,9 +149,9 @@ test('Cards names the signed-in operator and service and offers everyday tools w
   expect(tree.root.findByProps({testID: 'home-operator'}).props.children).toBe(
     'operator',
   );
-  expect(
-    tree.root.findByProps({testID: 'home-service'}).props.children,
-  ).toBe(opsDashboardUrl(DEFAULT_SERVICE_URL));
+  expect(tree.root.findByProps({testID: 'home-service'}).props.children).toBe(
+    opsDashboardUrl(DEFAULT_SERVICE_URL),
+  );
   expect(tree.root.findByProps({testID: 'home-new'})).toBeDefined();
   expect(tree.root.findByProps({testID: 'home-check'}).props.disabled).toBe(
     false,
@@ -193,15 +193,12 @@ test.each([
     await act(async () =>
       tree.root.findByProps({testID: 'settings'}).props.onPress(),
     );
-    await act(async () =>
-      tree.root.findByProps({testID: settingsId}).props.onPress(),
-    );
+    expect(tree.root.findAllByProps({testID: settingsId})).toHaveLength(0);
+    expect(tree.root.findByProps({testID: 'identity-entry'})).toBeDefined();
     await act(async () =>
       tree.root.findByProps({testID: 'back'}).props.onPress(),
     );
-    expect(
-      tree.root.findByProps({testID: 'provisioning-scope-value'}),
-    ).toBeDefined();
+    expect(tree.root.findByProps({testID: `home-${tool}`})).toBeDefined();
     expect(state.inspectStatus).not.toHaveBeenCalled();
     expect(state.inspectReset).not.toHaveBeenCalled();
   },
@@ -385,4 +382,30 @@ test('switching accounts replaces the displayed operator and resets tool navigat
     tree.root.findByProps({testID: 'back'}).props.onPress(),
   );
   expect(tree.root.findByProps({testID: 'home-new'})).toBeDefined();
+});
+
+test('Settings retains identity diagnostics and their Back path without duplicating daily card tools', async () => {
+  const state = idle();
+  jest.mocked(useProvisioning).mockReturnValue(state);
+  const tree = await signedIn();
+  await act(async () =>
+    tree.root.findByProps({testID: 'settings'}).props.onPress(),
+  );
+  for (const id of ['card-status-entry', 'reset-entry']) {
+    expect(tree.root.findAllByProps({testID: id})).toHaveLength(0);
+  }
+  await act(async () =>
+    tree.root.findByProps({testID: 'identity-entry'}).props.onPress(),
+  );
+  expect(tree.root.findByProps({testID: 'identity-read'})).toBeDefined();
+  await act(async () =>
+    tree.root.findByProps({testID: 'back'}).props.onPress(),
+  );
+  expect(tree.root.findByProps({testID: 'identity-entry'})).toBeDefined();
+  await act(async () =>
+    tree.root.findByProps({testID: 'back'}).props.onPress(),
+  );
+  expect(tree.root.findByProps({testID: 'home-new'})).toBeDefined();
+  expect(state.inspectStatus).not.toHaveBeenCalled();
+  expect(state.inspectReset).not.toHaveBeenCalled();
 });

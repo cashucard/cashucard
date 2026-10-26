@@ -3627,3 +3627,23 @@ D126's sign-in-only theme scope is superseded by this decision.
 **Rejected:** changing only the page background while retaining unreadable
 button labels, keeping appearance controls that switch away from the chosen
 palette, and separate copies of the same theme for each screen.
+
+
+## <a id="d128"></a>D128: Daily card tools live on Cards home
+
+**Decided (2026-10-26):** remove Check a card and Reset a card for reuse from
+Settings. Their daily entry points remain on Cards home, with the existing
+saved-work, hardware-busy and reset guards. Contextual actions in card status
+and installation retain their current navigation and consent paths.
+
+Settings retains physical chip identity under Diagnostics, and the bench
+entry in approved laboratory builds. Identity returns to Settings, whose Back
+action returns to Cards. An empty diagnostics group is hidden. Build 12
+includes this cleanup before store distribution.
+
+**Why:** Cards home already gives direct access to checking and resetting a
+card. Duplicating those actions in Settings adds clutter and another entry
+path to the same tasks.
+
+**Rejected:** removing identity diagnostics, moving everyday tools back into
+Settings, and changing card operations or recovery rules for a navigation edit.

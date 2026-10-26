@@ -1,7 +1,7 @@
 /**
  * S5. Settings, grouped the way a 2026 settings screen is grouped: section
  * headers, one card per group, hairline dividers,
- * the account scope as a read-only row, and signed-in card tools.
+ * the account scope as a read-only row, and identity diagnostics.
  *
  * The batch-setup revamp's rules hold here too: tabular figures for every
  * number and button semantics
@@ -92,8 +92,6 @@ export function SettingsScreen({
   onBack,
   onBench,
   onIdentity,
-  onReset,
-  onStatus,
   onChangeService,
   hardwareBusy = false,
   hasSavedBatch = false,
@@ -101,8 +99,6 @@ export function SettingsScreen({
   onBack: () => void;
   onBench: () => void;
   onIdentity?: () => void;
-  onReset?: () => void;
-  onStatus?: () => void;
   onChangeService?: () => void;
   hardwareBusy?: boolean;
   hasSavedBatch?: boolean;
@@ -142,74 +138,52 @@ export function SettingsScreen({
           </View>
         </View>
 
-        <View style={s.section}>
-          <HelpHeading
-            title="Card tools"
-            titleStyle={s.header}
-            testID="settings-tools-help">
-            {
-              'Check reads public card status. Identity reads the chip’s CPLC identifier. Reset checks value, settlement and manager-key records before asking for erasure approval.'
-            }
-          </HelpHeading>
-          <View style={s.card}>
-            {onStatus ? (
-              <Pressable
-                testID="card-status-entry"
-                accessibilityRole="button"
-                onPress={onStatus}
-                disabled={hardwareBusy}
-                style={s.row}>
-                <View style={s.rowLabelCol}>
-                  <Text style={s.rowLabel}>Check a card</Text>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </Pressable>
-            ) : null}
-            {onIdentity ? (
-              <>
+        {onIdentity || BENCH_RUNS_ENABLED ? (
+          <View style={s.section}>
+            <HelpHeading
+              title="Diagnostics"
+              titleStyle={s.header}
+              testID="settings-tools-help">
+              {BENCH_RUNS_ENABLED
+                ? 'Identity reads the chip’s CPLC identifier. Bench tools are for approved laboratory runs.'
+                : 'Identity reads the chip’s CPLC identifier.'}
+            </HelpHeading>
+            <View style={s.card}>
+              {onIdentity ? (
                 <Pressable
                   testID="identity-entry"
+                  accessibilityRole="button"
                   onPress={onIdentity}
                   disabled={hardwareBusy}
+                  accessibilityState={{disabled: hardwareBusy}}
                   style={s.row}>
                   <View style={s.rowLabelCol}>
                     <Text style={s.rowLabel}>Read physical card identity</Text>
                   </View>
                   <Text style={s.chevron}>›</Text>
                 </Pressable>
-                <View style={s.divider} />
-              </>
-            ) : null}
-            {onReset ? (
-              <Pressable
-                testID="reset-entry"
-                accessibilityRole="button"
-                onPress={onReset}
-                disabled={hardwareBusy}
-                style={s.row}>
-                <View style={s.rowLabelCol}>
-                  <Text style={s.rowLabel}>Reset a card for reuse</Text>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </Pressable>
-            ) : null}
-            {BENCH_RUNS_ENABLED ? (
-              <Pressable
-                testID="bench-entry"
-                onPress={onBench}
-                disabled={hardwareBusy}
-                style={s.row}>
-                <View style={s.rowLabelCol}>
-                  <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
-                  <Text style={s.rowSub}>
-                    {'Load test against the spare card. Bench only.'}
-                  </Text>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </Pressable>
-            ) : null}
+              ) : null}
+              {BENCH_RUNS_ENABLED ? (
+                <>
+                  {onIdentity ? <View style={s.divider} /> : null}
+                  <Pressable
+                    testID="bench-entry"
+                    onPress={onBench}
+                    disabled={hardwareBusy}
+                    style={s.row}>
+                    <View style={s.rowLabelCol}>
+                      <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
+                      <Text style={s.rowSub}>
+                        {'Load test against the spare card. Bench only.'}
+                      </Text>
+                    </View>
+                    <Text style={s.chevron}>›</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <View style={s.section}>
           <HelpHeading
