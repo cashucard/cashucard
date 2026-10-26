@@ -20,6 +20,13 @@ docker compose -p my-issuer -f ops/compose.yaml up -d ops
 `OPS_HTTP_PORT` changes the published loopback port. Preserve an exact image
 version or digest in deployment configuration when distributing a release.
 
+Ops component releases also publish `ghcr.io/cashucard/ops-service:VERSION`
+for Linux AMD64 and ARM64. To use a published release, set `OPS_IMAGE` to
+its exact version or digest, run `docker compose pull ops setup` with the same
+project/file options, then use the initialization and startup commands above
+with `up -d --no-build ops`. The release's `ops-container.json` records its
+source commit, platforms and immutable registry digest.
+
 Initialization creates a random master and an issued-environment operator
 password in the private `ops-secrets` volume. It refuses a nonempty secrets
 directory. Save the master in your secrets vault and independent recovery

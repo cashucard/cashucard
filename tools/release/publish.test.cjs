@@ -4,6 +4,29 @@ const { mkdtempSync, writeFileSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { publish } = require("./publish.cjs");
+test("an ops release attaches its immutable image descriptor", () => {
+  const root = mkdtempSync(join(tmpdir(), "cashu-ops-publish-"));
+  try {
+    for (const name of ["SHA256SUMS", "release.json", "ops-container.json"])
+      writeFileSync(join(root, name), "fixture");
+    const calls = [];
+    publish(
+      { tag: "ops-v0.1.0", archive: join(root, "ops.tar.gz"), root },
+      (args) => {
+        calls.push(args);
+        if (args[1] === "view") throw Error("HTTP 404");
+        return "";
+      },
+    );
+    assert.ok(
+      calls
+        .find((args) => args[1] === "create")
+        .includes(join(root, "ops-container.json")),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 test("an interrupted draft cannot produce a successful published release on retry", () => {
   const calls = [],
     root = mkdtempSync(join(tmpdir(), "cashu-publish-"));
