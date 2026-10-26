@@ -3676,3 +3676,26 @@ durable state. A StartOS-specific runtime would tie the service to one host.
 credentials or live databases, an automatically replaced issuer master, sharing
 one SQLite volume across replicas, and presenting container startup as backup
 or restore acceptance.
+
+## <a id="d130"></a>D130: Ops tags publish an immutable multi-platform image
+
+**Decided (2026-10-26):** an `ops-vX.Y.Z` component release publishes
+`ghcr.io/cashucard/ops-service:X.Y.Z` after full CI, using the exact tagged
+source and the existing container build. The index must contain Linux AMD64
+and ARM64 payloads. OCI provenance and an SBOM accompany the image. Release
+metadata records its digest, platforms and source commit; the GitHub release
+waits for both the Worker artifacts and the image before publication.
+
+The version-availability guard reads every registry version page, refuses an
+existing tag, and stops on ambiguous permission/network errors. The first
+package can be created after a confirmed API 404. Release jobs remain serialized
+by component tag. The workflow's repository token supplies registry access;
+registry credentials remain outside the build context and image layers.
+
+**Why:** independent operators need a pullable image with the same tested
+runtime on their CPU architecture. Source builds remain available, and hosting
+packages can pin the same digest. The public website guide remains deferred.
+
+**Rejected:** a moving `latest` deployment tag, replacing an existing published
+image version, publishing a one-architecture index as a portable release, and
+announcing anonymous availability before checking package visibility.

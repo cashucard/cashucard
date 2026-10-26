@@ -47,6 +47,11 @@ building artifacts. The source checkout is fixed to the verified commit.
   React Native source and declared public exports. There is no npm-registry push.
 - Ops publishes a tarball containing separate staging and production bundles,
   their tagged Wrangler configurations and a file hash/provenance manifest.
+  It also publishes `ghcr.io/cashucard/ops-service:X.Y.Z` for Linux AMD64 and
+  ARM64, with OCI build provenance and an SBOM. `ops-container.json` records
+  the immutable registry digest and source commit in the signed release
+  provenance. Existing image versions are refused before publishing; the
+  GitHub release waits for successful image publication and platform checks.
 - Provisioner builds signed AAB/IPA candidates into a **draft** GitHub release,
   with the unchanged pinned applet CAP attached.
   No automatic build-number increments, certificate creation or store submission
@@ -59,6 +64,13 @@ never silently replaced under a released tag. A failed candidate build
 can be retried before publication with the same committed identity.
 
 ## Ops deploy
+
+For standalone hosting, use the [container runbook](../ops/docker/README.md).
+The first GHCR package may require a package administrator to set its visibility
+to Public in GitHub Package settings. Verify anonymous access before announcing
+availability. The workflow uses its repository token with `packages: write`;
+it needs no registry password stored as a repository secret. GitHub documents
+[container package visibility and repository linkage](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 
 Configure GitHub environments `ops-staging` and `ops-production` with appropriate
 reviewers/deployment branch rules, a narrowly scoped `CLOUDFLARE_API_TOKEN` secret

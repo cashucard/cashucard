@@ -33,7 +33,9 @@ function publish({ tag, archive, root }, run = gh) {
     join(root, "SHA256SUMS"),
     join(root, "release.json"),
     ...readdirSync(root)
-      .filter((name) => /\.(cap|tgz)$/.test(name))
+      .filter(
+        (name) => /\.(cap|tgz)$/.test(name) || name === "ops-container.json",
+      )
       .map((name) => join(root, name)),
   ];
   run([

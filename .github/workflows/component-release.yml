@@ -100,8 +100,69 @@ jobs:
       tag: ${{ needs.identity.outputs.tag }}
       commit: ${{ needs.identity.outputs.commit }}
     secrets: inherit
+  ops-image:
+    needs: [identity, verify]
+    if: needs.identity.outputs.component == 'ops'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RELEASE_OWNER: ${{ github.repository_owner }}
+      RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+      RELEASE_COMMIT: ${{ needs.identity.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.identity.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - id: registry
+        name: Refuse replacement of an existing image version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/release/container.cjs
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ops/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.registry.outputs.image }}:${{ steps.registry.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.registry.outputs.version }}
+            REVISION=${{ needs.identity.outputs.commit }}
+          provenance: mode=max
+          sbom: true
+          cache-from: |
+            type=gha,scope=ops-amd64
+            type=gha,scope=ops-arm64
+      - name: Verify platforms and record the immutable digest
+        env:
+          IMAGE: ${{ steps.registry.outputs.image }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          mkdir -p container
+          docker buildx imagetools inspect "$IMAGE@$IMAGE_DIGEST" --raw > "$RUNNER_TEMP/ops-index.json"
+          node tools/release/container.cjs record "$RUNNER_TEMP/ops-index.json" container/ops-container.json
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ops-container
+          path: container/ops-container.json
+          if-no-files-found: error
+
   publish:
-    needs: [identity, package]
+    needs: [identity, package, ops-image]
+    if: always() && needs.package.result == 'success' && (needs.identity.outputs.component != 'ops' || needs.ops-image.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -121,6 +182,18 @@ jobs:
         with:
           name: component-release
           path: release
+      - uses: actions/download-artifact@v5
+        if: needs.identity.outputs.component == 'ops'
+        with:
+          name: ops-container
+          path: release
+      - name: Include container provenance in the ops release manifest
+        if: needs.identity.outputs.component == 'ops'
+        env:
+          RELEASE_COMPONENT: ops
+          RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.identity.outputs.commit }}
+        run: python3 tools/release/manifest.py write release
       # Sigstore-signed build provenance for every published file:
       # `gh attestation verify <file> --repo cashucard/cashucard` names the
       # commit and workflow run that made it (docs/PROVENANCE.md).
