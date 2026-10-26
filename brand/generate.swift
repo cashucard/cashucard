@@ -384,4 +384,211 @@ for (density, scale) in [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0), ("xxhdpi"
     try write(iconPNG(Int(108 * scale), inset: iconInset * 72 / 108, ground: false), "\(res)/drawable-\(density)/cashu_icon_foreground.png")
 }
 
+// MARK: - Print: the "accepted here" sticker and the counter card
+//
+// Laid out once in millimetres (y down) and drawn three ways: SVG, a 300 dpi PNG and a vector PDF whose TrimBox and
+// BleedBox tell the printer where to cut. Words are outlined, so no file needs the font.
+
+enum Paint { case solid(String), chip, glow }
+enum Align { case left, center, right }
+indirect enum Shape {
+    case rect(CGRect, radius: CGFloat, Paint)
+    case ellipse(CGRect, Paint)
+    case outline(CGRect, radius: CGFloat, width: CGFloat, String)
+    case mark(CGRect, Fill)
+    case text(String, size: CGFloat, weight: Int, color: String, x: CGFloat, baseline: CGFloat, Align)
+    case lockup(x: CGFloat, y: CGFloat, height: CGFloat, mark: Fill, ink: String, soft: String)
+    case turned(CGFloat, around: CGPoint, [Shape])
+}
+struct Piece { var name: String; var size: CGSize; var trim: CGRect; var shapes: [Shape] }
+
+// Outlined text, y down from the baseline, with its advance width (no tracking after the last letter).
+func setText(_ s: String, size: CGFloat, weight: Int) -> ([CGPath], CGFloat) {
+    let track = -0.02 * size
+    let line = CTLineCreateWithAttributedString(NSAttributedString(string: s, attributes: [
+        kCTFontAttributeName as NSAttributedString.Key: figtreeFont(size, weight: weight),
+        kCTKernAttributeName as NSAttributedString.Key: track]))
+    var paths: [CGPath] = []
+    for run in CTLineGetGlyphRuns(line) as! [CTRun] {
+        let font = (CTRunGetAttributes(run) as NSDictionary)[kCTFontAttributeName as String] as! CTFont
+        let n = CTRunGetGlyphCount(run)
+        var ids = [CGGlyph](repeating: 0, count: n), at = [CGPoint](repeating: .zero, count: n)
+        CTRunGetGlyphs(run, CFRange(location: 0, length: 0), &ids)
+        CTRunGetPositions(run, CFRange(location: 0, length: 0), &at)
+        for i in 0..<n {
+            var flip = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: at[i].x, ty: -at[i].y)
+            if let p = CTFontCreatePathForGlyph(font, ids[i], &flip) { paths.append(p) }
+        }
+    }
+    return (paths, CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)) - track)
+}
+func startX(_ x: CGFloat, _ width: CGFloat, _ a: Align) -> CGFloat { a == .left ? x : a == .center ? x - width / 2 : x - width }
+let printLockup = lockup()
+
+func draw(_ c: CGContext, _ shapes: [Shape]) {
+    func fill(_ path: CGPath, _ paint: Paint, _ box: CGRect) {
+        c.saveGState(); c.addPath(path); c.clip()
+        switch paint {
+        case .solid(let h): c.setFillColor(cgColor(h)); c.fill(box)
+        case .chip: c.drawLinearGradient(gradient(chipStops), start: box.origin, end: CGPoint(x: box.maxX, y: box.maxY),
+                                         options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        case .glow:
+            let k = box.width / 100, at = CGPoint(x: box.minX + glowCenter.x * k, y: box.minY + glowCenter.y * k)
+            c.drawRadialGradient(gradient(glowStops), startCenter: at, startRadius: 0, endCenter: at, endRadius: glowRadius * k, options: [.drawsAfterEndLocation])
+        }
+        c.restoreGState()
+    }
+    for s in shapes {
+        switch s {
+        case .rect(let r, let radius, let p): fill(CGPath(roundedRect: r, cornerWidth: radius, cornerHeight: radius, transform: nil), p, r)
+        case .ellipse(let r, let p): fill(CGPath(ellipseIn: r, transform: nil), p, r)
+        case .outline(let r, let radius, let w, let h):
+            c.saveGState(); c.setStrokeColor(cgColor(h)); c.setLineWidth(w)
+            c.addPath(CGPath(roundedRect: r, cornerWidth: radius, cornerHeight: radius, transform: nil)); c.strokePath(); c.restoreGState()
+        case .mark(let r, let f): drawMark(c, in: r, fill: f, small: false)
+        case .text(let str, let size, let weight, let color, let x, let baseline, let a):
+            let (paths, w) = setText(str, size: size, weight: weight)
+            c.saveGState(); c.translateBy(x: startX(x, w, a), y: baseline); c.setFillColor(cgColor(color))
+            paths.forEach { c.addPath($0) }; c.fillPath(); c.restoreGState()
+        case .lockup(let x, let y, let h, let m, let ink, let soft):
+            let k = h / printLockup.h
+            c.saveGState(); c.translateBy(x: x, y: y); c.scaleBy(x: k, y: k)
+            drawMark(c, in: printLockup.mark, fill: m, small: false)
+            for (p, role) in printLockup.words.glyphs {
+                c.saveGState(); c.translateBy(x: printLockup.textX, y: printLockup.baseline)
+                c.addPath(p); c.setFillColor(cgColor(role == "ink" ? ink : soft)); c.fillPath(); c.restoreGState()
+            }
+            c.restoreGState()
+        case .turned(let deg, let at, let inner):
+            c.saveGState(); c.translateBy(x: at.x, y: at.y); c.rotate(by: deg * .pi / 180); c.translateBy(x: -at.x, y: -at.y)
+            draw(c, inner); c.restoreGState()
+        }
+    }
+}
+
+func printSVG(_ piece: Piece) -> String {
+    var defs = groundDefs.replacingOccurrences(of: "id=\"cc-glow\"", with: "id=\"cc-glow-unit\"") + markDefs("cc", small: false)
+    var n = 0
+    func next() -> String { n += 1; return "p\(n)" }
+    func paintRef(_ p: Paint, _ box: CGRect) -> String {
+        switch p {
+        case .solid(let h): return h
+        case .chip:
+            let id = next()
+            defs += "<linearGradient id=\"\(id)\" gradientUnits=\"userSpaceOnUse\" x1=\"\(num(box.minX))\" y1=\"\(num(box.minY))\" x2=\"\(num(box.maxX))\" y2=\"\(num(box.maxY))\">\(stopsSVG(chipStops))</linearGradient>"
+            return "url(#\(id))"
+        case .glow:
+            let id = next(), k = box.width / 100
+            defs += "<radialGradient id=\"\(id)\" gradientUnits=\"userSpaceOnUse\" cx=\"\(num(box.minX + glowCenter.x * k))\" cy=\"\(num(box.minY + glowCenter.y * k))\" r=\"\(num(glowRadius * k))\">\(stopsSVG(glowStops))</radialGradient>"
+            return "url(#\(id))"
+        }
+    }
+    func body(_ shapes: [Shape]) -> String {
+        shapes.map { s -> String in
+            switch s {
+            case .rect(let r, let radius, let p):
+                return "<rect x=\"\(num(r.minX))\" y=\"\(num(r.minY))\" width=\"\(num(r.width))\" height=\"\(num(r.height))\"" + (radius > 0 ? " rx=\"\(num(radius))\"" : "") + " fill=\"\(paintRef(p, r))\"/>"
+            case .ellipse(let r, let p):
+                return "<ellipse cx=\"\(num(r.midX))\" cy=\"\(num(r.midY))\" rx=\"\(num(r.width / 2))\" ry=\"\(num(r.height / 2))\" fill=\"\(paintRef(p, r))\"/>"
+            case .outline(let r, let radius, let w, let h):
+                return "<rect x=\"\(num(r.minX))\" y=\"\(num(r.minY))\" width=\"\(num(r.width))\" height=\"\(num(r.height))\" rx=\"\(num(radius))\" fill=\"none\" stroke=\"\(h)\" stroke-width=\"\(num(w))\"/>"
+            case .mark(let r, let f):
+                return "<g transform=\"translate(\(num(r.minX)) \(num(r.minY))) scale(\(num(r.width / 100)))\">\(markBody("cc", fill: f))</g>"
+            case .text(let str, let size, let weight, let color, let x, let baseline, let a):
+                let (paths, w) = setText(str, size: size, weight: weight)
+                return "<path fill=\"\(color)\" d=\"\(paths.map { pathD($0, dx: startX(x, w, a), dy: baseline) }.joined())\"/>"
+            case .lockup(let x, let y, let h, let m, let ink, let soft):
+                let L = printLockup, k = h / L.h
+                var g = "<g transform=\"translate(\(num(x)) \(num(y))) scale(\(String(format: "%.5g", Double(k))))\"><g transform=\"scale(\(num(L.mark.width / 100)))\">\(markBody("cc", fill: m))</g>"
+                for role in ["ink", "soft"] {
+                    g += "<path fill=\"\(role == "ink" ? ink : soft)\" d=\"\(L.words.glyphs.filter { $0.1 == role }.map { pathD($0.0, dx: L.textX, dy: L.baseline) }.joined())\"/>"
+                }
+                return g + "</g>"
+            case .turned(let deg, let at, let inner):
+                return "<g transform=\"rotate(\(num(deg)) \(num(at.x)) \(num(at.y)))\">\(body(inner))</g>"
+            }
+        }.joined()
+    }
+    let b = body(piece.shapes)
+    return "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 \(num(piece.size.width)) \(num(piece.size.height))\" width=\"\(num(piece.size.width))mm\" height=\"\(num(piece.size.height))mm\">"
+        + "<title>Cashu Card</title><defs>\(defs)</defs>\(b)</svg>\n"
+}
+func printPNG(_ piece: Piece, dpi: CGFloat = 300) -> Data {
+    let k = dpi / 25.4
+    let c = canvas(Int((piece.size.width * k).rounded()), Int((piece.size.height * k).rounded()), opaque: false)
+    c.scaleBy(x: k, y: k); draw(c, piece.shapes)
+    let data = NSMutableData()
+    let d = CGImageDestinationCreateWithData(data as CFMutableData, "public.png" as CFString, 1, nil)!
+    CGImageDestinationAddImage(d, c.makeImage()!, [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary)
+    guard CGImageDestinationFinalize(d) else { fatalError("Cannot encode PNG") }
+    return data as Data
+}
+// A one-page PDF in points. Core Graphics stamps the time in the PDF, so the dates are set to a fixed one, keeping
+// the file the same on every run.
+func printPDF(_ piece: Piece) -> Data {
+    let k: CGFloat = 72 / 25.4
+    func pt(_ r: CGRect) -> CGRect { CGRect(x: r.minX * k, y: (piece.size.height - r.maxY) * k, width: r.width * k, height: r.height * k) }
+    var media = CGRect(x: 0, y: 0, width: piece.size.width * k, height: piece.size.height * k)
+    let data = NSMutableData()
+    let c = CGContext(consumer: CGDataConsumer(data: data as CFMutableData)!, mediaBox: &media,
+                      [kCGPDFContextTitle: "Cashu Card \(piece.name)", kCGPDFContextCreator: "brand/generate.swift"] as CFDictionary)!
+    func box(_ r: CGRect) -> CFData { var r = pt(r); return Data(bytes: &r, count: MemoryLayout<CGRect>.size) as CFData }
+    c.beginPDFPage([kCGPDFContextMediaBox: box(CGRect(origin: .zero, size: piece.size)), kCGPDFContextBleedBox: box(CGRect(origin: .zero, size: piece.size)),
+                    kCGPDFContextTrimBox: box(piece.trim)] as CFDictionary)
+    c.translateBy(x: 0, y: media.height); c.scaleBy(x: k, y: -k)
+    draw(c, piece.shapes)
+    c.endPDFPage(); c.closePDF()
+    var text = String(data: data as Data, encoding: .isoLatin1)!   // one character per byte
+    // Same-length replacements keep the cross-reference offsets valid.
+    for pattern in ["/CreationDate\\s*\\(D:[0-9Z'+-]+\\)", "/ModDate\\s*\\(D:[0-9Z'+-]+\\)", "/ID \\[\\s*<[0-9a-fA-F]+>\\s*<[0-9a-fA-F]+>\\s*\\]"] {
+        let re = try! NSRegularExpression(pattern: pattern)
+        for m in re.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            let r = Range(m.range, in: text)!, old = String(text[r])
+            var fixed = old
+            if old.hasPrefix("/ID") { fixed = String(old.map { $0.isHexDigit ? Character("0") : $0 }) }
+            else { let keep = String(old.prefix(while: { $0 != "(" })), date = "(D:20261025000000Z"; fixed = keep + date + String(repeating: " ", count: max(0, old.count - keep.count - date.count - 1)) + ")" }
+            text.replaceSubrange(r, with: fixed)
+        }
+    }
+    return text.data(using: .isoLatin1)!
+}
+
+// The sticker: a 100 mm circle for a door or window, with 2 mm of bleed past the cut.
+func sticker(dark: Bool) -> Piece {
+    let ink = dark ? hex("ink") : hex("ground"), quiet = dark ? hex("sage") : hex("paper-soft")
+    return Piece(name: "accepted-here sticker", size: CGSize(width: 104, height: 104), trim: CGRect(x: 2, y: 2, width: 100, height: 100), shapes: [
+        .ellipse(CGRect(x: 0, y: 0, width: 104, height: 104), dark ? .glow : .solid(hex("paper"))),
+        .mark(CGRect(x: 37, y: 15, width: 30, height: 30), dark ? .chip : .solid(hex("ground"))),
+        .text("Cashu Card", size: 11, weight: 800, color: ink, x: 52, baseline: 61, .center),
+        .text("accepted here", size: 8, weight: 400, color: ink, x: 52, baseline: 71, .center),
+        .text("cashucard.org", size: 4.2, weight: 600, color: quiet, x: 52, baseline: 84, .center)])
+}
+// The counter card: A6 portrait (105 x 148 mm) with 3 mm of bleed; keep words 6 mm inside the trim.
+func counterCard(dark: Bool) -> Piece {
+    let ink = dark ? hex("ink") : hex("ground"), quiet = dark ? hex("sage") : hex("paper-soft")
+    let card = CGRect(x: 47, y: 62, width: 50, height: 31.5)
+    return Piece(name: "counter card", size: CGSize(width: 111, height: 154), trim: CGRect(x: 3, y: 3, width: 105, height: 148), shapes: [
+        .rect(CGRect(x: 0, y: 0, width: 111, height: 154), radius: 0, dark ? .glow : .solid(hex("paper"))),
+        .lockup(x: 9, y: 10, height: 9, mark: dark ? .chip : .solid(hex("ground")), ink: ink, soft: dark ? hex("wordmark-soft") : hex("paper-soft")),
+        // The tap: a phone, and the card laid on it.
+        .turned(-8, around: CGPoint(x: 46, y: 60), [
+            .rect(CGRect(x: 26, y: 28, width: 36, height: 66), radius: 7, .solid(dark ? hex("ground-raised") : "#FFFFFF")),
+            .outline(CGRect(x: 26, y: 28, width: 36, height: 66), radius: 7, width: 1.3, ink),
+            .rect(CGRect(x: 39, y: 31.5, width: 10, height: 1.6), radius: 0.8, .solid(ink))]),
+        .turned(10, around: CGPoint(x: card.midX, y: card.midY), [
+            .rect(card, radius: 3.2, .chip),
+            .mark(CGRect(x: card.minX + 5, y: card.minY + 9.5, width: 13, height: 13), .solid(hex("ground")))]),
+        .text("Pay with", size: 12, weight: 800, color: ink, x: 9, baseline: 115, .left),
+        .text("Cashu Card", size: 12, weight: 800, color: dark ? hex("lime") : hex("ground"), x: 9, baseline: 128, .left),
+        .text("Tap your card on the phone to pay.", size: 4.6, weight: 400, color: ink, x: 9, baseline: 137, .left),
+        .text("cashucard.org", size: 3.6, weight: 600, color: quiet, x: 9, baseline: 145, .left),
+        .text("Cashu Card is experimental.", size: 3, weight: 400, color: quiet, x: 102, baseline: 145, .right)])
+}
+for (piece, file) in [(sticker(dark: true), "sticker/cashu-card-accepted-here-dark"), (sticker(dark: false), "sticker/cashu-card-accepted-here-light"),
+                      (counterCard(dark: true), "counter-card/cashu-card-counter-card-dark"), (counterCard(dark: false), "counter-card/cashu-card-counter-card-light")] {
+    try write(printSVG(piece), "brand/print/\(file).svg")
+    try write(printPNG(piece), "brand/print/\(file)-300dpi.png")
+    try write(printPDF(piece), "brand/print/\(file).pdf")
+}
+
 print("Wrote \(written) files from the Cashu Card mark.")

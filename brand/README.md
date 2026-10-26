@@ -52,6 +52,17 @@ Figtree is the typeface for every word in the brand. `fonts/Figtree-Variable.ttf
 - Put the color mark on the deep green or another dark ground, the green mark on light grounds, and the white mark on photos.
 - Keep the mark's shape, angle and gradient as drawn. Stretching, turning, outlining or recoloring it makes a different mark.
 
+## Print: merchant materials
+
+These are ready for when merchant materials are wanted. Cashu Card is experimental and is not asking merchants to sign up yet, so nothing is printed or sent out today. `generate.swift` draws each piece three ways: an SVG in millimetres, a 300 dpi PNG and a vector PDF. Send the PDF to a printer. Its TrimBox marks the cut and its BleedBox the edge of the artwork, and every word is outlined, so no font is needed.
+
+| File | Size | Use |
+| --- | --- | --- |
+| `print/sticker/cashu-card-accepted-here-dark` and `-light` | 100 mm circle, plus 2 mm bleed (104 mm artwork) | A door or window sticker: the mark, "Cashu Card accepted here" and cashucard.org. Die-cut on the 100 mm circle. The dark one suits glass; the light one suits dark doors and walls. |
+| `print/counter-card/cashu-card-counter-card-dark` and `-light` | A6 portrait, 105 x 148 mm, plus 3 mm bleed (111 x 154 mm artwork) | A card for the counter or an A6 stand: "Pay with Cashu Card", a phone with a card laid on it, "Tap your card on the phone to pay.", cashucard.org and "Cashu Card is experimental." |
+
+Keep words 4 mm inside the sticker's cut and 6 mm inside the counter card's trim. The tap is shown as a card on a phone, without the contactless symbol, which is EMVCo's mark.
+
 ## What uses it
 
 `generate.swift` writes the provisioner's app and store icons in `apps/provisioner/` (iOS catalogs, Android launcher and adaptive icons, the Play icon and the feature graphic). cashucard.org's favicon and header, the card face in the film and the social kit move to the mark next.
