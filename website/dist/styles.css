@@ -85,8 +85,9 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 }
 @media(max-width:720px){
 .header{height:64px;padding:0 20px}
-.header nav{display:none}
-.header-link{font-size:12px}
+.header nav{gap:16px;margin-left:auto}
+.header nav a{font-size:12.5px}
+.header-link{display:none}
 .hero{min-height:calc(100svh - 64px);max-height:none;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:35px 22px 50px}
 .hero-copy{padding-top:0}
 .hero h1{font-size:clamp(55px,11.7vw,84px);margin:22px 0 18px}
@@ -370,3 +371,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .risk-list .risk-wide{grid-column:1/-1}
 @media(max-width:1050px){.risk-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.risk-list{grid-template-columns:1fr}}
+@media(max-width:360px){
+.wordmark img{height:28px}
+.header nav{gap:13px}
+}

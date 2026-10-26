@@ -265,6 +265,11 @@ async function main() {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
       assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "No overflow at " + width);
+      // the two-item menu shows at every width, clear of the wordmark and the screen edge
+      const nav = await evaluate("(()=>{const a=[...document.querySelectorAll('.header nav a')].map(e=>e.getBoundingClientRect());const w=document.querySelector('.wordmark').getBoundingClientRect();return {n:a.length,shown:a.every(r=>r.width>0),right:Math.max(...a.map(r=>r.right)),left:Math.min(...a.map(r=>r.left)),mark:w.right}})()");
+      console.log("menu at " + width + ": " + JSON.stringify(nav));
+      assert.ok(nav.n === 2 && nav.shown, "The menu shows at " + width);
+      assert.ok(nav.right <= width - 12 && nav.left >= nav.mark + 12, "The menu fits the header at " + width);
       const ratio = await evaluate("document.documentElement.scrollHeight/innerHeight");
       console.log("screens at " + width + "x" + height + " " + ratio.toFixed(2));
       assert.ok(ratio <= maxScreens, "Page within its budget at " + width);
