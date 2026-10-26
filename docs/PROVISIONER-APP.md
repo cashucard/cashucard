@@ -42,14 +42,15 @@ Check a Card and Reset a Card for Reuse open directly from Cards. Opening
 either screen leaves NFC idle until the operator chooses a read. Check remains
 available while a batch is saved. A pending batch or reset prevents a second
 reset; the saved reset has its own Continue action. Settings remains available
-from the gear or account details.
+from the gear or account details. It keeps identity diagnostics and account
+configuration; daily check and reset entries live on Cards home.
 
 Stop for now returns here while retaining the journal. End batch asks for
 confirmation and obtains a service receipt. An active attempt must be resolved
 before ending its batch. A finished batch can be closed from Cards.
 
 Card tools return to the screen that opened them. For example, Cards → Check
-a Card → Reset returns through the card check to Cards. Tools opened from
+a Card → Reset returns through the card check to Cards. Identity diagnostics opened from
 Settings return there, and Settings Back returns to Cards. See
 [D121](DECISIONS.md#d121).
 
@@ -161,9 +162,8 @@ installation creates a new spending key, followed by holder-wallet setup.
 
 ## Settings and identity
 
-Settings provides provisioning scope and its explanation, card tools, version,
-pinned load-file identity and the public
-ops dashboard URL. Signing out preserves work and asks for confirmation when
+Settings provides provisioning scope and its explanation, identity diagnostics,
+version, pinned load-file identity and the public ops dashboard URL. Signing out preserves work and asks for confirmation when
 durable work exists.
 
 Change Ops Service signs out before opening the service selector and confirms

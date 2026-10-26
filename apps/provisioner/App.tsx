@@ -119,8 +119,6 @@ function Navigator(): React.JSX.Element {
             }
           }}
           onIdentity={() => openTool('identity', 'settings')}
-          onReset={() => openTool('reset', 'settings')}
-          onStatus={() => openTool('status', 'settings')}
           hardwareBusy={recovery.busy}
           hasSavedBatch={
             !!recovery.snapshot?.batch ||
