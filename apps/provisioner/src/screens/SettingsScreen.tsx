@@ -110,6 +110,7 @@ export function SettingsScreen({
   onIdentity,
   onReset,
   onStatus,
+  onChangeService,
   hardwareBusy = false,
   hasSavedBatch = false,
 }: {
@@ -118,11 +119,14 @@ export function SettingsScreen({
   onIdentity?: () => void;
   onReset?: () => void;
   onStatus?: () => void;
+  onChangeService?: () => void;
   hardwareBusy?: boolean;
   hasSavedBatch?: boolean;
 }) {
   const app = useApp();
-  const [confirmSignOut, setConfirmSignOut] = React.useState(false);
+  const [confirmSignOut, setConfirmSignOut] = React.useState<
+    'sign-out' | 'service' | null
+  >(null);
   const t = useTheme();
   const s = local(t);
   const env = app.session?.env;
@@ -259,11 +263,30 @@ export function SettingsScreen({
             {SETTINGS.signOutSub}
           </HelpHeading>
           <View style={s.card}>
+            {onChangeService ? (
+              <>
+                <Pressable
+                  testID="settings-change-service"
+                  style={s.row}
+                  accessibilityRole="button"
+                  disabled={hardwareBusy}
+                  accessibilityState={{disabled: hardwareBusy}}
+                  onPress={() =>
+                    hasSavedBatch
+                      ? setConfirmSignOut('service')
+                      : onChangeService()
+                  }>
+                  <Text style={s.rowLabel}>Change ops service</Text>
+                  <Text style={s.chevron}>›</Text>
+                </Pressable>
+                <View style={s.divider} />
+              </>
+            ) : null}
             <Pressable
               testID="sign-out"
               onPress={() => {
                 if (hasSavedBatch) {
-                  setConfirmSignOut(true);
+                  setConfirmSignOut('sign-out');
                 } else {
                   app.signOut();
                 }
@@ -281,14 +304,22 @@ export function SettingsScreen({
                   same operator and service to continue saved work.
                 </Text>
                 <SecondaryButton
-                  title="SIGN OUT AND KEEP SAVED WORK"
+                  title={
+                    confirmSignOut === 'service'
+                      ? 'SIGN OUT AND CHOOSE SERVICE'
+                      : 'SIGN OUT AND KEEP SAVED WORK'
+                  }
                   testID="confirm-sign-out"
-                  onPress={app.signOut}
+                  onPress={() =>
+                    confirmSignOut === 'service'
+                      ? onChangeService?.()
+                      : app.signOut()
+                  }
                 />
                 <SecondaryButton
                   title="KEEP SESSION"
                   testID="keep-session"
-                  onPress={() => setConfirmSignOut(false)}
+                  onPress={() => setConfirmSignOut(null)}
                 />
               </View>
             ) : null}

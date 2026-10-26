@@ -245,3 +245,18 @@ test.each([
     expect(inspect).not.toHaveBeenCalled();
   },
 );
+
+test('leaving a screen after dismissing help cancels its pending focus callback', async () => {
+  const cancel = jest.spyOn(global, 'cancelAnimationFrame');
+  await render(
+    <InfoButton title="Batch setup" testID="focus-help">
+      Explanation
+    </InfoButton>,
+  );
+  await act(async () => action('focus-help').props.onPress());
+  await act(async () =>
+    tree.root.findByProps({testID: 'focus-help-close'}).props.onPress(),
+  );
+  await act(async () => tree.unmount());
+  expect(cancel).toHaveBeenCalled();
+});

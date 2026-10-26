@@ -27,6 +27,13 @@ import {
 } from './api';
 import serviceConfig from './serviceOrigin.json';
 import {resolveTheme, ThemeProvider} from './theme';
+import {
+  decodeServiceProfiles,
+  encodeServiceProfiles,
+  normalizeServiceOrigin,
+  serviceProfileStorage,
+  type ServiceProfileStorage,
+} from './serviceProfiles';
 
 export interface BatchConfig {
   mint: string;
@@ -64,6 +71,11 @@ export interface AppStateShape {
   theme: 'system' | 'dark' | 'light';
   batch: (BatchConfig & {done: RecordRow[]}) | null;
   serviceUrl: string;
+  serviceProfiles: readonly string[];
+  serviceStatus: 'loading' | 'ready' | 'blocked';
+  serviceError: string | null;
+  selectService(origin: string): Promise<void>;
+  reloadServices(): Promise<void>;
   signIn(
     name: string,
     password: string,
@@ -87,11 +99,29 @@ const RETRY_INTERVAL_MS = 30_000;
 export function AppStore({
   children,
   clientOptions,
+  serviceStorage = serviceProfileStorage,
 }: {
   children: React.ReactNode;
   /** Injectable for tests; the real client in the app. */
   clientOptions?: ApiClientOptions;
+  serviceStorage?: ServiceProfileStorage;
 }) {
+  const defaultOrigin = useRef(
+    clientOptions?.baseUrl ?? DEFAULT_SERVICE_URL,
+  ).current;
+  const [serviceUrl, setServiceUrl] = useState(defaultOrigin);
+  const [serviceProfiles, setServiceProfiles] = useState<string[]>([
+    defaultOrigin,
+  ]);
+  const [serviceStatus, setServiceStatus] =
+    useState<AppStateShape['serviceStatus']>('loading');
+  const [serviceError, setServiceError] = useState<string | null>(null);
+  const destination = useRef(defaultOrigin),
+    connectionReady = useRef(false),
+    connectionBusy = useRef(false);
+  const authGeneration = useRef(0),
+    activeSession = useRef<AppSession | null>(null);
+  const authPending = useRef<{signal?: AbortSignal} | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [session, setSession] = useState<AppSession | null>(null);
   const [operatorName, setOperatorName] = useState<string | null>(null);
@@ -105,8 +135,105 @@ export function AppStore({
   const outboxRef = useRef<RegistryOutbox | null>(null);
   const makeClient = useCallback(
     (): ApiClient =>
-      new ApiClient(clientOptions ?? {baseUrl: DEFAULT_SERVICE_URL}),
+      new ApiClient({...clientOptions, baseUrl: destination.current}),
     [clientOptions],
+  );
+
+  const reloadServices = useCallback(async () => {
+    if (connectionBusy.current || activeSession.current) {
+      return;
+    }
+    connectionBusy.current = true;
+    connectionReady.current = false;
+    setServiceStatus('loading');
+    setServiceError(null);
+    try {
+      const value = decodeServiceProfiles(
+        await serviceStorage.read(),
+        defaultOrigin,
+      );
+      if (
+        outboxRef.current?.pendingRows.length &&
+        value.selected !== destination.current
+      ) {
+        throw new Error('Pending records belong to the current service.');
+      }
+      destination.current = value.selected;
+      setServiceUrl(value.selected);
+      setServiceProfiles(value.origins);
+      connectionReady.current = true;
+      setServiceStatus('ready');
+    } catch {
+      setServiceStatus('blocked');
+      setServiceError(
+        'Service settings could not be loaded. Retry or choose a service before signing in. Saved card work is retained.',
+      );
+    } finally {
+      connectionBusy.current = false;
+    }
+  }, [defaultOrigin, serviceStorage]);
+  useEffect(() => {
+    reloadServices().catch(() => undefined);
+  }, [reloadServices]);
+
+  const selectService = useCallback(
+    async (input: string) => {
+      if (activeSession.current) {
+        throw new Error('Sign out before changing service.');
+      }
+      if (
+        connectionBusy.current ||
+        (authPending.current && !authPending.current.signal?.aborted)
+      ) {
+        throw new Error('Stop the current request before changing service.');
+      }
+      const origin =
+        input === defaultOrigin ? defaultOrigin : normalizeServiceOrigin(input);
+      if (outboxRef.current?.pendingRows.length) {
+        if (origin === destination.current) {
+          connectionReady.current = true;
+          setServiceStatus('ready');
+          setServiceError(null);
+          return;
+        }
+        throw new Error(
+          'Sign in to the original service and finish saving pending records before changing service.',
+        );
+      }
+      const origins = [...new Set([...serviceProfiles, origin])];
+      if (origins.length > 32) {
+        throw new Error('The saved service list is full.');
+      }
+      connectionBusy.current = true;
+      const previouslyReady = connectionReady.current;
+      connectionReady.current = false;
+      authGeneration.current++;
+      setServiceStatus('loading');
+      setServiceError(null);
+      try {
+        await serviceStorage.write(
+          encodeServiceProfiles({selected: origin, origins}),
+        );
+        clientRef.current = null;
+        outboxRef.current = null;
+        setBatch(null);
+        destination.current = origin;
+        setServiceUrl(origin);
+        setServiceProfiles(origins);
+        connectionReady.current = true;
+        setServiceStatus('ready');
+      } catch {
+        connectionReady.current = previouslyReady;
+        setServiceStatus(previouslyReady ? 'ready' : 'blocked');
+        const note =
+          'The service choice could not be saved. The current connection is unchanged.';
+        setServiceError(note);
+        throw new Error(note);
+      } finally {
+        connectionBusy.current = false;
+      }
+    },
+    [defaultOrigin, serviceProfiles, serviceStorage],
   );
 
   /**
@@ -197,6 +324,8 @@ export function AppStore({
    * them. The outbox's client is the signed-in one; signIn reuses it rather
    * than building a fresh one over pending rows. */
   const expireSession = useCallback(() => {
+    authGeneration.current++;
+    activeSession.current = null;
     clientRef.current = null;
     setSession(null);
     setOperatorName(null);
@@ -206,6 +335,8 @@ export function AppStore({
   expireSessionRef.current = expireSession;
 
   const signOut = useCallback(() => {
+    authGeneration.current++;
+    activeSession.current = null;
     clientRef.current = null;
     // Keep an outbox that still holds rows (the 401 path keeps it for the
     // same reason): its frozen bodies outlive the session and re-post on
@@ -225,17 +356,37 @@ export function AppStore({
       operatorName,
       theme,
       batch,
-      serviceUrl: clientOptions?.baseUrl ?? DEFAULT_SERVICE_URL,
+      serviceUrl,
+      serviceProfiles,
+      serviceStatus,
+      serviceError,
+      selectService,
+      reloadServices,
       signIn: async (name, password, options) => {
+        if (!connectionReady.current) {
+          throw new Error('Choose or reload the service before signing in.');
+        }
+        const generation = ++authGeneration.current;
+        const origin = destination.current;
+        const pending = {signal: options?.signal};
+        authPending.current = pending;
         const client = options?.client ?? makeClient();
         try {
-          if (options?.signal?.aborted) {
+          if (
+            options?.signal?.aborted ||
+            generation !== authGeneration.current ||
+            origin !== destination.current
+          ) {
             throw new ApiCancelledError();
           }
           const s = options?.signal
             ? await client.operatorSession(name, password, options.signal)
             : await client.operatorSession(name, password);
-          if (options?.signal?.aborted) {
+          if (
+            options?.signal?.aborted ||
+            generation !== authGeneration.current ||
+            origin !== destination.current
+          ) {
             throw new ApiCancelledError();
           }
           clientRef.current = client;
@@ -245,7 +396,13 @@ export function AppStore({
           if (!outboxRef.current) {
             outboxRef.current = new RegistryOutbox(client);
           }
-          setSession({operator_id: s.operator_id, env: s.env, token: s.token});
+          const verified = {
+            operator_id: s.operator_id,
+            env: s.env,
+            token: s.token,
+          };
+          activeSession.current = verified;
+          setSession(verified);
           setOperatorName(name.trim());
           setSignedIn(true);
         } catch (e) {
@@ -256,6 +413,10 @@ export function AppStore({
             : e instanceof Error
             ? e
             : new Error('sign-in failed');
+        } finally {
+          if (authPending.current === pending) {
+            authPending.current = null;
+          }
         }
       },
       signOut,
@@ -303,10 +464,15 @@ export function AppStore({
     [
       signedIn,
       session,
+      serviceUrl,
+      serviceProfiles,
+      serviceStatus,
+      serviceError,
+      selectService,
+      reloadServices,
       operatorName,
       theme,
       batch,
-      clientOptions,
       makeClient,
       retryPending,
       reflectAnswered,

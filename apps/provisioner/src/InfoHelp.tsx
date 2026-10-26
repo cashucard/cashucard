@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -33,6 +33,15 @@ export function InfoButton({
   const [open, setOpen] = useState(false);
   const trigger = useRef<View>(null),
     heading = useRef<Text>(null);
+  const focusFrame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (focusFrame.current !== null) {
+        cancelAnimationFrame(focusFrame.current);
+      }
+    },
+    [],
+  );
   const focus = (target: View | Text | null) => {
     const handle = target && findNodeHandle(target);
     if (handle) {
@@ -41,7 +50,13 @@ export function InfoButton({
   };
   const close = () => {
     setOpen(false);
-    requestAnimationFrame(() => focus(trigger.current));
+    if (focusFrame.current !== null) {
+      cancelAnimationFrame(focusFrame.current);
+    }
+    focusFrame.current = requestAnimationFrame(() => {
+      focusFrame.current = null;
+      focus(trigger.current);
+    });
   };
   const s = StyleSheet.create({
     trigger: {

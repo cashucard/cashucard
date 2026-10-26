@@ -3455,3 +3455,57 @@ address confusing and repeated explanations distracting from routine actions.
 **Rejected:** hover-only help on phones, moving required consent into a tooltip,
 silently switching the API origin, and removing review steps as part of a copy
 change.
+
+## <a id="d123"></a>D123: Operators select a service before signing in
+
+**Decided (2026-10-26):** sign-in offers saved service addresses and an explicit
+review of a new HTTPS DNS origin. Settings offers sign-out and service selection,
+with the existing saved-work confirmation. The build's default service remains
+available. Addresses are canonicalized without React Native's incomplete URL
+parser; credentials, paths, query strings and fragments are rejected.
+
+Only public service addresses and the selected address are saved in a separate
+preferences key. Unreadable preferences block authentication until reloaded or
+an explicit selection is saved. A failed selection retains the old destination.
+Credential fields are cleared when leaving sign-in; generation and origin
+checks reject late replies after cancellation or service changes. HTTP requests
+omit ambient credentials, request redirect rejection and refuse redirected or
+wrong-URL replies. A service's operator credentials are entered after selection.
+
+Switching requires sign-out and remains blocked by unconfirmed legacy registry
+rows. The existing workspace envelope retains each service/operator/environment's
+card work with the original device ID. Returning to that service and account
+restores its work; addresses and tokens are not reassigned to another service.
+Dashboard links continue to follow the selected service (D122).
+
+**Rejected:** retargeting a signed-in session, copying passwords or tokens between
+services, clearing journals on a switch, and accepting a redirected reply as
+evidence from the chosen service. D122's build-time-only service choice is
+superseded; the release preflight still validates the build's default origin.
+
+## <a id="d124"></a>D124: Batch setup reviews and starts the first card in two presses
+
+**Decided (2026-10-26):** Cards → New batch opens one editable mint/count review.
+Start & Read First Card creates the batch and starts its first card run. Create
+Batch Only saves the same reviewed configuration for later. Both paths take two
+presses from Cards with the shown defaults; editing mint/count adds the chosen
+input interactions. A fresh form defaults to one card and the service's first
+listed mint reference. Approved choices are remembered per service, verified
+operator and key environment, then checked against the fresh mint list. A removed
+mint requires an explicit replacement; late defaults cannot overwrite edits.
+
+Creation and the first run share one cancellable coordinator operation. The
+original request is saved before HTTP, the acknowledged batch is displayed
+before the first card run, and actor/generation/cancellation checks run between
+creation and reservation. Stop, sign-out and uncertain replies retain the
+original work and cannot arm a late read. Reopening or resuming a batch still
+requires an explicit card action. Existing chip checks, key gates, readout,
+recovery and reset consent remain in force.
+
+The optional count/mint defaults contain public form data in a separate key;
+card recovery does not depend on them. Build 11 includes this flow and D123's
+service selector, with no firmware, cardkit API or ops-service migration.
+
+**Rejected:** an extra review page for the shipping flow, opening NFC on screen
+entry or restart, and chaining two independent operations that could clear a
+Stop request between batch creation and card reservation.

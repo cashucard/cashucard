@@ -17,7 +17,10 @@ and the [recovery contract](PROVISIONER-RECOVERY.md).
 
 ## Sign-in
 
-The operator enters the account name and password for the configured service.
+The operator chooses an ops-service, then enters that service's account name
+and password. The service button offers saved addresses and a reviewed custom
+HTTPS address. Changing services clears the credential fields. Only public
+addresses are saved; unreadable preferences pause sign-in until resolved.
 Sign In stays visible above the keyboard. Waiting state shows progress and a
 Stop action; late responses after cancellation cannot sign the operator in.
 Known failures provide a bounded message and an action.
@@ -74,20 +77,33 @@ a card count. The count supports minus/plus buttons and replacement by typing;
 the installation batch range is 1 to 500. Invalid input shows the allowed
 range and prevents submission.
 
-The review screen shows the count and mint reference before Create Batch.
-Creating the batch assigns manager keys for its slots. The mint reference is
-operator metadata. Holder-wallet setup applies the card's mint, PIN and limits.
+Cards → New batch opens the editable review. Start & Read First Card creates
+the shown batch and starts its first card run. Create Batch Only saves it for
+later. Either action takes two presses from Cards with the displayed defaults.
+Operators can change the mint and count before confirming.
+
+A fresh form starts at one card and the service's first mint reference. Approved
+choices are remembered per service, operator and provisioning scope. A remembered
+mint removed from the service list requires a new choice. The full selected mint
+and count remain visible above the final actions. Creating the batch assigns
+manager keys for its slots. The mint reference is operator metadata;
+holder-wallet setup applies the card's mint, PIN and limits.
 
 Cancel Setup leaves an unsubmitted form. Once batch creation starts, Stop and
 Keep Saved Work retains the request ID and body so a lost response can be
 reconciled against the service.
+
+Stop during creation also prevents a late first-card read. Lost replies and
+restarts return to the saved batch; the app waits for a new explicit card action.
+See [D124](DECISIONS.md#d124).
 
 <a id="rules-the-screens-keep-to"></a>
 <a id="s3-the-loop"></a>
 
 ## Card installation
 
-Install Next Card starts an explicit NFC session. The operator holds one card
+Start & Read First Card starts the first session after batch confirmation.
+Install Next Card starts later sessions. The operator holds one card
 still until the run ends. On iOS, the native NFC sheet displays the current
 phase; the screen behind it shows the same workflow progress.
 
@@ -149,6 +165,13 @@ Settings provides provisioning scope and its explanation, System/Dark/Light
 theme selection, card tools, version, pinned load-file identity and the public
 ops dashboard URL. Signing out preserves work and asks for confirmation when
 durable work exists.
+
+Change Ops Service signs out before opening the service selector and confirms
+when saved work exists. Each service uses its own operator accounts and records.
+Returning to the original service/account restores its saved work. Changing a
+service leaves those journals and their original device/chip bindings intact.
+Unconfirmed legacy registry rows must be saved through their original service
+before switching. See [D123](DECISIONS.md#d123).
 
 The app uses the approved Cashu cashew icon, bundled Figtree type and the theme
 tokens in `apps/provisioner/src/theme.ts`. The installation screen retains the
