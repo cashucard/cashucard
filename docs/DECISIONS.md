@@ -3738,3 +3738,22 @@ while keeping deployment detail in the hosting guide.
 **Rejected:** treating the ops-service as a payment intermediary, implying Atoll
 pairs with the standalone Docker service, and shrinking a desktop graph until
 its labels become unreadable on a phone.
+
+## <a id="d133"></a>D133: The provisioner draws a neutral Cashu Card face
+
+**Decided (2026-10-26):** the provisioner's card figure and batch-setup design
+row show the Cashu Card face: the brand's lime gradient, the lockup, the gold
+cashew-contacts chip and the mark. It is a generic face, not a design code in
+[CARD-DESIGNS.md](CARD-DESIGNS.md); holder wallets keep choosing and writing
+design codes. The ops-service default mint list now starts with
+`mint.minibits.cash`; `forge.flashapp.me` stays in the list, last. The
+installation screen's card-check button, hardware gate and recovery notice now
+sit inside the setup form's safe area.
+
+**Why:** the provisioner is a shared open source tool and its store listings
+show these screens. Drawing one issuer's card and preselecting its mint reads
+as that issuer's app. On Android the check button drew over the status bar.
+
+**Rejected:** registering a new design code for the figure (the provisioner
+writes no design), dropping the Flash mint from the list, and removing the
+check button from setup (it returns to the form, per D121).

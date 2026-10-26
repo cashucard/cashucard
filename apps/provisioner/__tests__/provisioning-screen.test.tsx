@@ -648,7 +648,7 @@ test('real installation setup exposes no holder controls and submits inert legac
     expect(tree.root.findAllByProps({testID})).toHaveLength(0);
   }
   expect(text(tree)).not.toContain('The holder wallet sets the PIN, mint and limits.');
-  expect(text(tree)).not.toContain('FL1 — Flash, black, the bolt');
+  expect(text(tree)).not.toContain('Cashu Card, the cashew chip');
   const countInput = () => tree.root.findByProps({testID: 'batch-count'});
   expect(countInput().props.selectTextOnFocus).toBe(true);
   const initialCount = Number(countInput().props.value);

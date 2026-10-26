@@ -9,6 +9,7 @@
  */
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  Image,
   Pressable,
   Keyboard,
   KeyboardAvoidingView,
@@ -34,8 +35,9 @@ import {
   SecondaryButton,
 } from '../ui';
 
-/** The design code this build's card art draws (docs/CARD-DESIGNS.md). */
-const CARD_DESIGN = 'FL1: Flash, black, the bolt';
+/** The card face this build draws (CardFigure); holder wallets choose a design code. */
+const CARD_DESIGN = 'Cashu Card, the cashew chip';
+const CARD_FACE = require('../../assets/cardart/cashu-card-front.png');
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -202,17 +204,7 @@ const local = (t: Theme) =>
       paddingHorizontal: 16,
       paddingVertical: 13,
     },
-    designChip: {
-      width: 28,
-      height: 40,
-      borderRadius: 6,
-      borderWidth: 2,
-      borderColor: t.ink,
-      backgroundColor: t.bg,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    designChipBolt: {color: t.ink, fontFamily: FONT.semibold, fontSize: 13},
+    designChip: {width: 48, height: 30, borderRadius: 4},
   });
 
 export function BatchSetupScreen({
@@ -225,6 +217,7 @@ export function BatchSetupScreen({
   canStart = true,
   installationOnly = false,
   loadSha256,
+  lead,
 }: {
   onStart: () => void;
   onSettings: () => void;
@@ -235,6 +228,8 @@ export function BatchSetupScreen({
   canStart?: boolean;
   installationOnly?: boolean;
   loadSha256?: string;
+  /** Shown first inside the form's scroll, within the screen's safe area. */
+  lead?: React.ReactNode;
 }) {
   const app = useApp();
   const t = useTheme();
@@ -466,6 +461,7 @@ export function BatchSetupScreen({
             testID="setup-scroll"
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag">
+            {lead}
             {previousMintMissing ? (
               <Text style={s.note}>
                 Choose a mint reference. Your previous choice is no longer
@@ -717,9 +713,11 @@ export function BatchSetupScreen({
               <View style={s.section}>
                 <View style={s.card}>
                   <View style={s.designRow}>
-                    <View style={s.designChip}>
-                      <Text style={s.designChipBolt}>⚡</Text>
-                    </View>
+                    <Image
+                      source={CARD_FACE}
+                      style={s.designChip}
+                      resizeMode="cover"
+                    />
                     <View style={s.grow}>
                       <Text style={s.mintName}>Card design</Text>
                       <Text style={s.cardSub}>{CARD_DESIGN}</Text>

@@ -176,8 +176,8 @@ before switching. See [D123](DECISIONS.md#d123).
 The app uses the approved Cashu cashew icon, bundled Figtree type and the theme
 tokens in `apps/provisioner/src/theme.ts`. Every screen uses the approved
 forest-green appearance, including when the phone is in light mode. The
-installation screen retains the
-approved printed-card artwork and confirmed-progress reveal.
+installation screen draws the Cashu Card face (the cashew-contacts chip on the
+brand gradient, [D133](DECISIONS.md#d133)) with the confirmed-progress reveal.
 
 Distributed builds require operator sign-in. Bench tools and recovery-drill
 controls remain disabled by release configuration. Hardware test evidence is
