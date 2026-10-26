@@ -247,7 +247,8 @@ test.each([
 );
 
 test('leaving a screen after dismissing help cancels its pending focus callback', async () => {
-  const cancel = jest.spyOn(global, 'cancelAnimationFrame');
+  jest.spyOn(global, 'requestAnimationFrame').mockReturnValue(47);
+  const cancel = jest.spyOn(global, 'cancelAnimationFrame').mockImplementation(() => {});
   await render(
     <InfoButton title="Batch setup" testID="focus-help">
       Explanation
@@ -258,7 +259,7 @@ test('leaving a screen after dismissing help cancels its pending focus callback'
     tree.root.findByProps({testID: 'focus-help-close'}).props.onPress(),
   );
   await act(async () => tree.unmount());
-  expect(cancel).toHaveBeenCalled();
+  expect(cancel).toHaveBeenCalledWith(47);
 });
 
 test('service choices expose the actual API address when the dashboard uses an alias', async () => {
