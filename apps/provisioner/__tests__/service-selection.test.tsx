@@ -250,3 +250,80 @@ test('redirected service replies cannot establish an operator session', async ()
   });
   expect(app.signedIn).toBe(false);
 });
+
+test('an old service retry callback cannot send its token through the new service outbox', async () => {
+  await mount(disk().storage);
+  const auth = jest.spyOn(ApiClient.prototype, 'operatorSession');
+  auth.mockResolvedValue({operator_id: 1, env: 'issued', token: 'token-a'});
+  await act(async () => app.signIn('operator', 'fixture'));
+  const oldRetry = app.retryPending;
+  await act(async () => app.signOut());
+  await act(async () => app.selectService('https://issuer.example.com'));
+  auth.mockResolvedValue({operator_id: 1, env: 'issued', token: 'token-b'});
+  await act(async () => app.signIn('operator', 'fixture'));
+  const post = jest
+    .spyOn(ApiClient.prototype, 'postCard')
+    .mockRejectedValue(new Error('fixture offline'));
+  await act(async () =>
+    app.postRegistryCard({
+      short_id: 'bb',
+      batch_id: 2,
+      key_id: 2,
+      ordinal: 0,
+      installed_at: 1,
+      installer: 'fixture',
+      load_sha256: 'b'.repeat(64),
+    }),
+  );
+  post.mockClear();
+  await act(async () => oldRetry());
+  expect(post).not.toHaveBeenCalled();
+  expect(app.session?.token).toBe('token-b');
+});
+
+test('a late old-service 401 cannot expire the new service session after another retry confirmed the record', async () => {
+  await mount(disk().storage);
+  const auth = jest
+    .spyOn(ApiClient.prototype, 'operatorSession')
+    .mockResolvedValue({operator_id: 1, env: 'issued', token: 'token-a'});
+  await act(async () => app.signIn('operator', 'fixture'));
+  const post = jest
+    .spyOn(ApiClient.prototype, 'postCard')
+    .mockRejectedValue(new Error('fixture offline'));
+  await act(async () =>
+    app.postRegistryCard({
+      short_id: 'aa',
+      batch_id: 1,
+      key_id: 1,
+      ordinal: 0,
+      installed_at: 1,
+      installer: 'fixture',
+      load_sha256: 'a'.repeat(64),
+    }),
+  );
+  let reject!: (reason: Error) => void;
+  post.mockImplementationOnce(
+    () =>
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+  );
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = app.retryPending();
+  });
+  post.mockResolvedValue(undefined);
+  await act(async () => app.retryPending());
+  await act(async () => app.signOut());
+  await act(async () => app.selectService('https://issuer.example.com'));
+  auth.mockResolvedValue({operator_id: 1, env: 'issued', token: 'token-b'});
+  await act(async () => app.signIn('operator', 'fixture'));
+  const {ApiServiceError} = require('../src/api');
+  await act(async () => {
+    reject(new ApiServiceError('expired', 401));
+    await pending;
+  });
+  expect(app.signedIn).toBe(true);
+  expect(app.serviceUrl).toBe('https://issuer.example.com');
+  expect(app.session?.token).toBe('token-b');
+});

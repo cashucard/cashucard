@@ -267,9 +267,20 @@ export function AppStore({
   }, []);
 
   const retryPending = useCallback(async (): Promise<void> => {
-    const outbox = outboxRef.current;
     const sess = session;
-    if (!outbox || !sess) {
+    const isCurrentSession = (): boolean =>
+      !!sess &&
+      destination.current === serviceUrl &&
+      activeSession.current?.token === sess.token &&
+      activeSession.current?.operator_id === sess.operator_id &&
+      activeSession.current?.env === sess.env;
+    // Foreground/interval callbacks can already be queued when sign-out
+    // removes them. Never combine their old token with a new service's box.
+    if (!sess || !isCurrentSession()) {
+      return;
+    }
+    const outbox = outboxRef.current;
+    if (!outbox) {
       return;
     }
     // No pendingRows short-circuit here: the reflection below is the point —
@@ -290,13 +301,18 @@ export function AppStore({
         throw e;
       }
     }
+    // An old request can finish after a different sign-in. Its reply belongs
+    // to the captured outbox, and must not alter or expire the new session.
+    if (!isCurrentSession()) {
+      return;
+    }
     reflectAnswered();
     if (expired) {
       // expireSession is a stable closure over the setters; the ref carries
       // it so retryPending (declared before it) can call it without a cycle.
       expireSessionRef.current();
     }
-  }, [session, reflectAnswered]);
+  }, [session, serviceUrl, reflectAnswered]);
 
   // The retry cadence: on an interval, and when the app returns to the
   // foreground (the plan's "re-post on interval and app-foreground").
