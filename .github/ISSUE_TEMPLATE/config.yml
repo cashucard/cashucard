@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/cashucard/cashucard/discussions
+    about: Questions, ideas and help go to Discussions.
+  - name: Report a vulnerability
+    url: https://github.com/cashucard/cashucard/security/advisories/new
+    about: Report security issues privately, as SECURITY.md describes.
+  - name: Propose a protocol change
+    url: https://github.com/cashucard/nut
+    about: Changes to NUT-CCP itself belong in cashucard/nut.

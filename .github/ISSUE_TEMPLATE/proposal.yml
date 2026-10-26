@@ -1,0 +1,11 @@
+name: Proposal
+description: Suggest a change or a new feature.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The problem and the change you suggest. Link any decision in docs/DECISIONS.md it touches.
+    validations:
+      required: true

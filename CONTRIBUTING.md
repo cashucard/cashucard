@@ -173,3 +173,9 @@ for actual device/card behavior.
 
 See [`SECURITY.md`](SECURITY.md). Do not open a public issue for anything
 affecting funds.
+
+## Code of conduct
+
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+Questions go to [Discussions](https://github.com/cashucard/cashucard/discussions);
+[`SUPPORT.md`](SUPPORT.md) lists where everything else goes.

@@ -5,6 +5,11 @@ for **NFC bearer payments**. A physical card holds Bitcoin-denominated ecash
 on its chip. Its holder pays by tapping the card; a merchant can accept the
 payment offline and settle with the mint when online.
 
+> **Experimental.** Cashu Card is an experimental open source project. It is
+> built on NUT-CCP, a draft NUT proposal that has had little outside review, and
+> its testing so far is limited to the dated reports in this repository. Keep
+> only small amounts on a card.
+
 This is the **shared Cashu card protocol, version 2.1**: one wire for Flash and
 for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
 of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
