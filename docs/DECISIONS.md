@@ -3694,13 +3694,52 @@ registry credentials remain outside the build context and image layers.
 
 **Why:** independent operators need a pullable image with the same tested
 runtime on their CPU architecture. Source builds remain available, and hosting
-packages can pin the same digest. The public website guide remains deferred.
+packages can pin the same digest. The public website guide was deferred here; D131 adds it after release validation.
 
 **Rejected:** a moving `latest` deployment tag, replacing an existing published
 image version, publishing a one-architecture index as a portable release, and
 announcing anonymous availability before checking package visibility.
 
-## <a id="d131"></a>D131: The provisioner draws a neutral Cashu Card face
+
+## <a id="d131"></a>D131: Developer docs separate card use, issuance and hosting
+
+**Decided (2026-10-26):** the public Developers page starts with the payment and
+issuance flows, identifies who operates each component, and offers separate paths
+for reader development, installation and service hosting. Optional storage,
+notification and recovery companions sit in expandable sections. A dedicated
+ops-service guide explains manager-key authority before Docker setup and links a
+release-pinned Compose file. It distinguishes standalone filesystem exports from
+the Workers pairing and receipt adapters.
+
+**Why:** a wallet developer needs the card/mint contract; a card issuer also needs
+operator authorization, persistent manager keys and installation history. A new
+reader should be able to identify that responsibility before encountering the
+host's recovery tools or deployment commands.
+
+**Rejected:** making the service a requirement of the payment protocol, presenting
+Nextcloud or ntfy as required server dependencies, and putting the full hosting
+runbook ahead of the component overview.
+
+
+## <a id="d132"></a>D132: Ecosystem map shares one physical card across flows
+
+**Decided (2026-10-26):** the developer overview uses a native SVG architecture
+map with separate desktop and phone compositions. Wallet, till and CCP connect
+to the same physical card running the applet. The mint serves payment flows;
+the ops-service authorizes installation and keeps manager keys and records.
+The supporting layer names the copy job, independent backup storage, alerts and
+separate backup-key custody. Captions distinguish Workers/Atoll from standalone
+filesystem exports. A text explanation remains available below the image.
+
+**Why:** two linear flow cards duplicated the card and combined till and mint,
+which obscured the actual relationships. One map makes the boundaries visible
+while keeping deployment detail in the hosting guide.
+
+**Rejected:** treating the ops-service as a payment intermediary, implying Atoll
+pairs with the standalone Docker service, and shrinking a desktop graph until
+its labels become unreadable on a phone.
+
+## <a id="d133"></a>D133: The provisioner draws a neutral Cashu Card face
 
 **Decided (2026-10-26):** the provisioner's card figure and batch-setup design
 row show the Cashu Card face: the brand's lime gradient, the lockup, the gold
