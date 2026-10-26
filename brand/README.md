@@ -54,7 +54,7 @@ Figtree is the typeface for every word in the brand. `fonts/Figtree-Variable.ttf
 
 ## Print: merchant materials
 
-These are ready for when merchant materials are wanted. Cashu Card is experimental and is not asking merchants to sign up yet, so nothing is printed or sent out today. `generate.swift` draws each piece three ways: an SVG in millimetres, a 300 dpi PNG and a vector PDF. Send the PDF to a printer. Its TrimBox marks the cut and its BleedBox the edge of the artwork, and every word is outlined, so no font is needed.
+These are ready for when merchant materials are wanted. While Cashu Card is experimental, they stay here in the library. `generate.swift` draws each piece three ways: an SVG in millimetres, a 300 dpi PNG and a vector PDF. Send the PDF to a printer. Its TrimBox marks the cut and its BleedBox the edge of the artwork, and every word is outlined, so no font is needed.
 
 | File | Size | Use |
 | --- | --- | --- |
