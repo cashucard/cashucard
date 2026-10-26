@@ -10,6 +10,7 @@ import {CardsHomeScreen} from './src/screens/CardsHomeScreen';
 import {LoadTestScreen} from './src/screens/LoadTestScreen';
 import {SettingsScreen} from './src/screens/SettingsScreen';
 import {SignInScreen} from './src/screens/SignInScreen';
+import {ServiceSelectorScreen} from './src/screens/ServiceSelectorScreen';
 import {AppStore, useApp} from './src/store';
 import {
   ProvisioningProvider,
@@ -53,6 +54,7 @@ function Navigator(): React.JSX.Element {
   const app = useApp();
   const recovery = useProvisioning();
   const [route, setRoute] = useState<Route>('home');
+  const [choosingService, setChoosingService] = useState(false);
   const [origins, setOrigins] = useState(initialOrigins);
   const openTool = (tool: Tool, origin: ToolOrigin) => {
     if (recovery.busy) {
@@ -72,7 +74,11 @@ function Navigator(): React.JSX.Element {
   ]);
 
   if (!app.signedIn || !app.session) {
-    return <SignInScreen />;
+    return choosingService ? (
+      <ServiceSelectorScreen onDone={() => setChoosingService(false)} />
+    ) : (
+      <SignInScreen onServices={() => setChoosingService(true)} />
+    );
   }
   if (route === 'home') {
     return (
@@ -100,6 +106,12 @@ function Navigator(): React.JSX.Element {
     case 'settings':
       return (
         <SettingsScreen
+          onChangeService={() => {
+            if (!recovery.busy) {
+              setChoosingService(true);
+              app.signOut();
+            }
+          }}
           onBack={() => setRoute('home')}
           onBench={() => {
             if (BENCH_RUNS_ENABLED && !recovery.busy) {

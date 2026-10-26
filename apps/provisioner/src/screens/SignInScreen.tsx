@@ -17,7 +17,8 @@ import {APP_NAME, SIGNIN} from '../strings';
 import {useApp} from '../store';
 import {LegalLinks} from '../LegalLinks';
 import {FONT, useTheme, type Theme} from '../theme';
-import {InfoButton, PrimaryButton, Screen} from '../ui';
+import {InfoButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
+import {opsDashboardUrl} from '../LegalLinks';
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -81,7 +82,7 @@ const local = (t: Theme) =>
     },
   });
 
-export function SignInScreen() {
+export function SignInScreen({onServices}: {onServices?: () => void} = {}) {
   const app = useApp();
   const t = useTheme();
   const s = local(t);
@@ -92,6 +93,16 @@ export function SignInScreen() {
   const [stopped, setStopped] = useState(false);
   const passwordInput = useRef<TextInput>(null);
   const request = useRef<AbortController | null>(null);
+  const serviceReady =
+    app.serviceStatus !== 'loading' && app.serviceStatus !== 'blocked';
+  useEffect(() => {
+    request.current?.abort();
+    request.current = null;
+    setName('');
+    setPassword('');
+    setFailed(null);
+    setBusy(false);
+  }, [app.serviceUrl]);
   useEffect(
     () => () => {
       request.current?.abort();
@@ -109,7 +120,7 @@ export function SignInScreen() {
   };
 
   const attempt = async () => {
-    if (busy || name.trim() === '' || password === '') {
+    if (busy || !serviceReady || name.trim() === '' || password === '') {
       return;
     }
     Keyboard.dismiss();
@@ -160,6 +171,20 @@ export function SignInScreen() {
             {`${SIGNIN.note}\n\nInstall compatible Cashu cards with your assigned account. Holders set up ownership and funding in their wallet.\n\n${SIGNIN_BUILD}`}
           </InfoButton>
           <View style={s.form}>
+            {onServices ? (
+              <SecondaryButton
+                title={
+                  app.serviceStatus === 'loading'
+                    ? 'LOADING SERVICE…'
+                    : `SERVICE: ${
+                        opsDashboardUrl(app.serviceUrl) ?? app.serviceUrl
+                      }`
+                }
+                testID="sign-in-service"
+                disabled={busy || app.serviceStatus === 'loading'}
+                onPress={onServices}
+              />
+            ) : null}
             <TextInput
               value={name}
               onChangeText={setName}
@@ -167,7 +192,7 @@ export function SignInScreen() {
               placeholderTextColor={t.dim}
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!busy}
+              editable={!busy && serviceReady}
               style={s.input}
               returnKeyType="next"
               blurOnSubmit={false}
@@ -186,7 +211,7 @@ export function SignInScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
-              editable={!busy}
+              editable={!busy && serviceReady}
               style={s.input}
               returnKeyType="go"
               onSubmitEditing={attempt}
@@ -202,9 +227,23 @@ export function SignInScreen() {
           <PrimaryButton
             title={busy ? SIGNIN.signingIn : SIGNIN.button}
             onPress={() => attempt()}
-            disabled={busy || name.trim() === '' || password === ''}
+            disabled={
+              busy || !serviceReady || name.trim() === '' || password === ''
+            }
             testID="sign-in"
           />
+          {app.serviceError ? (
+            <Text style={s.failed} accessibilityLiveRegion="polite">
+              {app.serviceError}
+            </Text>
+          ) : null}
+          {app.serviceStatus === 'blocked' ? (
+            <SecondaryButton
+              title="RELOAD SERVICE SETTINGS"
+              testID="sign-in-service-reload"
+              onPress={app.reloadServices}
+            />
+          ) : null}
           {failed ? (
             <Text style={s.failed} testID="sign-in-failed">
               {failed}

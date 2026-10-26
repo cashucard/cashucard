@@ -38,6 +38,7 @@ import {
 import {runReservedAttempt, type AttemptRunOptions} from './provisioningTap';
 import {randomBytes, randomUuid} from './random';
 import {PHASES} from './strings';
+import {rememberBatchDefaults} from './batchDefaults';
 import {
   CARD_INSTALLATION_VALIDATED,
   RECOVERY_DRILLS_ENABLED,
@@ -128,6 +129,7 @@ interface RealProvisioning {
   };
   reload(): Promise<void>;
   create(config: BatchConfig): Promise<boolean>;
+  startAndRead(config: BatchConfig): Promise<boolean>;
   recover(): Promise<boolean>;
   replacement: ReplacementReview | null;
   program(): Promise<boolean>;
@@ -681,144 +683,138 @@ function ProvisioningSession({
     };
   }, [app.session?.token, app.serviceUrl, status]);
 
-  const program = (): Promise<boolean> => {
-    if (!hardwareValidated) {
-      return Promise.resolve(false);
+  const programWork = async (
+    w: ProvisioningWorkflow,
+    service: CardProvisioningService,
+  ): Promise<void> => {
+    setInterruption(null);
+    setLoadProgress(null);
+    let lastPhase: string | undefined;
+    const actor = latest.current;
+    const generation = actorGeneration.current;
+    let inspection: {chipId: string; installationId: string} | undefined;
+    const allowed = () =>
+      mounted.current &&
+      !cancelRequested.current &&
+      actorGeneration.current === generation &&
+      latest.current.session?.token === actor.session?.token &&
+      latest.current.serviceUrl === actor.serviceUrl;
+    if (!allowed()) {
+      return;
     }
-    return operate(async (w, service) => {
-      cancelRequested.current = false;
-      setInterruption(null);
-      setLoadProgress(null);
-      let lastPhase: string | undefined;
-      const actor = latest.current;
-      const generation = actorGeneration.current;
-      let inspection: {chipId: string; installationId: string} | undefined;
-      const allowed = () =>
-        mounted.current &&
-        !cancelRequested.current &&
-        actorGeneration.current === generation &&
-        latest.current.session?.token === actor.session?.token &&
-        latest.current.serviceUrl === actor.serviceUrl;
-      if (!w.snapshot().active) {
-        await w.reserveNext(service);
+    if (!w.snapshot().active) {
+      await w.reserveNext(service);
+    }
+    if (mounted.current) {
+      setCardActive(true);
+    }
+    const withCard: AttemptRunOptions['withCard'] = async run => {
+      if (!allowed()) {
+        return 'interrupted';
       }
-      if (mounted.current) {
-        setCardActive(true);
-      }
-      const withCard: AttemptRunOptions['withCard'] = async run => {
-        if (!allowed()) {
-          return 'interrupted';
+      const guardedRun: typeof run = tx =>
+        run(async apdu => {
+          if (!allowed()) {
+            throw new TransportError('Card session cancelled');
+          }
+          return tx(apdu);
+        });
+      const native = settings.withCard
+        ? undefined
+        : (require('./session') as typeof import('./session'));
+      armedCancel.current =
+        settings.cancelCard ??
+        (native ? () => native.cancelCard() : async () => undefined);
+      armedMessage.current =
+        settings.cardMessage ?? native?.setCardMessage ?? null;
+      try {
+        if (settings.withCard) {
+          return await settings.withCard(guardedRun);
         }
-        const guardedRun: typeof run = tx =>
-          run(async apdu => {
+        return (
+          await native!.withCard(
+            'Hold the card still until installation finishes.',
+            guardedRun,
+          )
+        ).value;
+      } finally {
+        armedCancel.current = null;
+        armedMessage.current = null;
+        if (mounted.current) {
+          setCardActive(false);
+        }
+      }
+    };
+    const outcome = await (settings.runCard ?? runReservedAttempt)(w, service, {
+      withCard,
+      onReplacementRequired: value => {
+        inspection = value;
+      },
+      checkpoint: drillsEnabled
+        ? async boundary => {
             if (!allowed()) {
               throw new TransportError('Card session cancelled');
             }
-            return tx(apdu);
-          });
-        const native = settings.withCard
-          ? undefined
-          : (require('./session') as typeof import('./session'));
-        armedCancel.current =
-          settings.cancelCard ??
-          (native ? () => native.cancelCard() : async () => undefined);
-        armedMessage.current =
-          settings.cardMessage ?? native?.setCardMessage ?? null;
-        try {
-          if (settings.withCard) {
-            return await settings.withCard(guardedRun);
-          }
-          return (
-            await native!.withCard(
-              'Hold the card still until installation finishes.',
-              guardedRun,
-            )
-          ).value;
-        } finally {
-          armedCancel.current = null;
-          armedMessage.current = null;
-          if (mounted.current) {
-            setCardActive(false);
-          }
-        }
-      };
-      const outcome = await (settings.runCard ?? runReservedAttempt)(
-        w,
-        service,
-        {
-          withCard,
-          onReplacementRequired: value => {
-            inspection = value;
-          },
-          checkpoint: drillsEnabled
-            ? async boundary => {
-                if (!allowed()) {
-                  throw new TransportError('Card session cancelled');
-                }
-                const saved = w.snapshot();
-                setSnapshot(saved);
-                pauseStage.current =
-                  saved.active?.journal?.stage ?? 'unconfirmed';
-                await drill.current!.checkpoint(boundary);
-                if (!allowed()) {
-                  throw new TransportError('Card session cancelled');
-                }
-              }
-            : undefined,
-          random: randomBytes,
-          now: Date.now,
-          verifiedAt: () => Math.floor(Date.now() / 1000),
-          onEvent: event => {
+            const saved = w.snapshot();
+            setSnapshot(saved);
+            pauseStage.current = saved.active?.journal?.stage ?? 'unconfirmed';
+            await drill.current!.checkpoint(boundary);
             if (!allowed()) {
-              return;
+              throw new TransportError('Card session cancelled');
             }
-            if (event.type === 'phase') {
-              lastPhase = Object.prototype.hasOwnProperty.call(
-                PHASES,
-                event.phase,
-              )
-                ? PHASES[event.phase]
-                : undefined;
-              setPhase(event.phase);
-            } else if (
-              event.type === 'block' &&
-              Number.isInteger(event.index) &&
-              Number.isInteger(event.of) &&
-              event.of > 0 &&
-              event.index >= 1 &&
-              event.index <= event.of
-            ) {
-              setLoadProgress({index: event.index, of: event.of});
-            }
-          },
-        },
-      );
-      if (allowed() && outcome === 'interrupted') {
-        setInterruption(
-          `Card connection lost. Last step: ${
-            lastPhase ?? 'Not reported'
-          }. Keep this card with this phone. Choose Continue with the same card to check what finished. If it stops again, share support details with your administrator.`,
-        );
-      }
-      if (allowed() && outcome === 'reset-required' && inspection) {
-        const current = w.snapshot().active;
-        if (
-          current?.journal?.stage === 'reserved' &&
-          (!current.journal.chip_id ||
-            current.journal.chip_id === inspection.chipId)
-        ) {
-          setReplacement({
-            ...inspection,
-            attemptId: current.attempt_id,
-            generation,
-          });
+          }
+        : undefined,
+      random: randomBytes,
+      now: Date.now,
+      verifiedAt: () => Math.floor(Date.now() / 1000),
+      onEvent: event => {
+        if (!allowed()) {
+          return;
         }
-        setNotice(
-          'This card is already installed. Stop the unused attempt and close this batch, then open Settings → Reset a card.',
-        );
-      }
+        if (event.type === 'phase') {
+          lastPhase = Object.prototype.hasOwnProperty.call(PHASES, event.phase)
+            ? PHASES[event.phase]
+            : undefined;
+          setPhase(event.phase);
+        } else if (
+          event.type === 'block' &&
+          Number.isInteger(event.index) &&
+          Number.isInteger(event.of) &&
+          event.of > 0 &&
+          event.index >= 1 &&
+          event.index <= event.of
+        ) {
+          setLoadProgress({index: event.index, of: event.of});
+        }
+      },
     });
+    if (allowed() && outcome === 'interrupted') {
+      setInterruption(
+        `Card connection lost. Last step: ${
+          lastPhase ?? 'Not reported'
+        }. Keep this card with this phone. Choose Continue with the same card to check what finished. If it stops again, share support details with your administrator.`,
+      );
+    }
+    if (allowed() && outcome === 'reset-required' && inspection) {
+      const current = w.snapshot().active;
+      if (
+        current?.journal?.stage === 'reserved' &&
+        (!current.journal.chip_id ||
+          current.journal.chip_id === inspection.chipId)
+      ) {
+        setReplacement({
+          ...inspection,
+          attemptId: current.attempt_id,
+          generation,
+        });
+      }
+      setNotice(
+        'This card is already installed. Stop the unused attempt and close this batch, then open Settings → Reset a card.',
+      );
+    }
   };
+  const program = (): Promise<boolean> =>
+    hardwareValidated ? operate(programWork) : Promise.resolve(false);
 
   const value: RealProvisioning = {
     cardReadout,
@@ -976,16 +972,57 @@ function ProvisioningSession({
       if (!hardwareValidated) {
         return Promise.resolve(false);
       }
-      return operate((w, service) =>
-        w.start(service, {
+      return operate(async (w, service) => {
+        await w.start(service, {
           count: config.count,
           mint_url: config.mint,
           pin_policy: config.pinPolicy,
           daily_usd: config.dailyUsd,
           no_pin_usd: config.noPinUsd,
           load_sha256: CASHU_PLAN.loadFile.sha256,
-        }),
-      );
+        });
+        rememberBatchDefaults(service.scope, {
+          count: config.count,
+          mint: config.mint,
+        }).catch(() => undefined);
+      });
+    },
+    startAndRead: config => {
+      if (
+        !hardwareValidated ||
+        !Number.isInteger(config.count) ||
+        config.count < 1 ||
+        config.count > 500
+      ) {
+        return Promise.resolve(false);
+      }
+      return operate(async (w, service) => {
+        const actor = latest.current,
+          generation = actorGeneration.current;
+        await w.start(service, {
+          count: config.count,
+          mint_url: config.mint,
+          pin_policy: 'perCard',
+          daily_usd: 0,
+          no_pin_usd: 0,
+          load_sha256: CASHU_PLAN.loadFile.sha256,
+        });
+        if (
+          !mounted.current ||
+          cancelRequested.current ||
+          generation !== actorGeneration.current ||
+          latest.current.session?.token !== actor.session?.token ||
+          latest.current.serviceUrl !== actor.serviceUrl
+        ) {
+          return;
+        }
+        setSnapshot(w.snapshot());
+        rememberBatchDefaults(service.scope, {
+          count: config.count,
+          mint: config.mint,
+        }).catch(() => undefined);
+        await programWork(w, service);
+      });
     },
     replacement,
     program: () => program(),

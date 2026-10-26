@@ -172,6 +172,8 @@ export class ApiClient {
       const request = (async () => {
         const res = await this.fetcher(this.options.baseUrl + path, {
           method,
+          redirect: 'error',
+          credentials: 'omit',
           headers: {
             ...(token ? {Authorization: `Bearer ${token}`} : {}),
             ...(body !== undefined ? {'Content-Type': 'application/json'} : {}),
@@ -179,6 +181,14 @@ export class ApiClient {
           body: body !== undefined ? JSON.stringify(body) : undefined,
           signal: controller.signal,
         } as RequestInit);
+        if (
+          res.redirected ||
+          (res.url && res.url !== this.options.baseUrl + path)
+        ) {
+          throw new ApiServiceError(
+            'The service redirected this request. Check the service address.',
+          );
+        }
         let json: Record<string, unknown>;
         try {
           json = (await res.json()) as Record<string, unknown>;

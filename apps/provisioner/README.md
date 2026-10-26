@@ -288,9 +288,26 @@ For an explicitly local validation checkout, use `--local` with configure;
 `node scripts/configure-service.cjs --check --local` checks that format without
 requiring production gates. Local HTTP is restricted to loopback/emulator
 addresses; LAN validation must use HTTPS. TLS trust still needs a separately
-approved device setup. Do not modify the app endpoint during an active batch:
-its saved origin is part of the recovery scope. Keep the original build/origin
-available to reconcile saved work rather than clearing storage.
+approved device setup.
+
+Build 11 also provides an ops-service selector at sign-in. Custom services use
+an HTTPS DNS origin with direct API responses. Settings → Change ops service
+signs out first and confirms when work is saved. Only public addresses are
+persisted; credential fields clear and sessions remain in memory. The selected
+service's account is required to sign in. Release preflight still checks the
+build's default origin.
+
+Existing card work remains in its original service/operator/environment
+workspace. Return to that service and account to continue it. An active card
+operation blocks service changes, and pending legacy registry rows must be
+saved through their original service before switching. No journal is cleared
+by the selector. See [D123](../../docs/DECISIONS.md#d123).
+
+From Cards, New batch → Start & Read First Card reviews the editable mint/count
+and begins the first run in two presses. Create Batch Only saves the same
+configuration for later. The default count is one; approved defaults are scoped
+to the service and operator. Stop during creation preserves the original request
+and prevents a late card read. See [D124](../../docs/DECISIONS.md#d124).
 
 ### Android upload signing
 

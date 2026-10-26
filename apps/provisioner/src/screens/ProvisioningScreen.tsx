@@ -305,6 +305,7 @@ export function ProvisioningScreen({
           onSettings={leave}
           onStop={flow.cancel}
           onCreate={flow.create}
+          onStartAndRead={flow.startAndRead}
           canStart={flow.hardwareValidated && !flow.busy}
           installationOnly
           loadSha256={CASHU_PLAN.loadFile.sha256}

@@ -1,6 +1,6 @@
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
-import {Linking, Modal, StyleSheet} from 'react-native';
+import {Linking, Modal, StyleSheet, Text} from 'react-native';
 import NfcManager from 'react-native-nfc-manager';
 import {InfoButton} from '../src/ui';
 import {CardsHomeScreen} from '../src/screens/CardsHomeScreen';
@@ -245,3 +245,42 @@ test.each([
     expect(inspect).not.toHaveBeenCalled();
   },
 );
+
+test('leaving a screen after dismissing help cancels its pending focus callback', async () => {
+  jest.spyOn(global, 'requestAnimationFrame').mockReturnValue(47);
+  const cancel = jest.spyOn(global, 'cancelAnimationFrame').mockImplementation(() => {});
+  await render(
+    <InfoButton title="Batch setup" testID="focus-help">
+      Explanation
+    </InfoButton>,
+  );
+  await act(async () => action('focus-help').props.onPress());
+  await act(async () =>
+    tree.root.findByProps({testID: 'focus-help-close'}).props.onPress(),
+  );
+  await act(async () => tree.unmount());
+  expect(cancel).toHaveBeenCalledWith(47);
+});
+
+test('service choices expose the actual API address when the dashboard uses an alias', async () => {
+  const {
+    ServiceSelectorScreen,
+  } = require('../src/screens/ServiceSelectorScreen');
+  const origin = 'https://cashu-card-ops.old-cell-30e7.workers.dev';
+  jest
+    .mocked(useApp)
+    .mockReturnValue({
+      ...useApp(),
+      serviceUrl: origin,
+      serviceProfiles: [origin],
+      serviceStatus: 'ready',
+    });
+  await render(<ServiceSelectorScreen onDone={noop} />);
+  const row = tree.root.findByProps({testID: `service-choice-${origin}`});
+  const words = row
+    .findAllByType(Text)
+    .map(node => node.props.children)
+    .join(' ');
+  expect(words).toContain('https://ops.cashucard.org');
+  expect(words).toContain(origin);
+});
