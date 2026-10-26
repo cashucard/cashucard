@@ -28,7 +28,7 @@
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
       <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/#film">Film</a><a href="/#tap">One tap</a><a href="/#buy">Get cards</a><a href="/guide" aria-current="page">Install guide</a></nav>
+      <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
       <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
     </header>
     <main id="main" class="guide">
@@ -38,8 +38,9 @@
           <div class="guide-hero-copy">
           <div class="eyebrow"><span class="status-dot"></span> INSTALL GUIDE <span class="eyebrow-divider">/</span> APPLET 2.1</div>
           <h1 id="guide-title">Install the <em>Cashu Card applet</em></h1>
-          <p class="guide-lead">This guide puts the Cashu Card applet on a blank NXP J3R180 card from a computer with a card reader, then checks that the card answers. The first card takes about 20 minutes, most of it spent installing tools, and each card after that takes a few minutes.</p>
+          <p class="guide-lead">This guide puts the Cashu Card applet on a blank NXP J3R180 card from a computer with a card reader, then checks that the card answers. The first card takes about 20 minutes, most of it spent installing tools, and each card after that takes a few minutes. Cashu Card is experimental: read the <a href="/#risks">risks</a> before a card holds value.</p>
           <ul class="guide-facts" aria-label="At a glance">
+            <li>Experimental</li>
             <li>Applet 2.1</li>
             <li>NXP J3R180 cards</li>
             <li>GlobalPlatformPro</li>
@@ -361,20 +362,20 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
             <h3>More detail</h3>
             <ul class="links">
               <li><a href="https://github.com/cashucard/cashucard/blob/main/docs/HARDWARE_DEPLOYMENT.md">Hardware deployment guide, in full <span aria-hidden="true">↗</span></a></li>
-              <li><a href="https://github.com/cashucard/cashucard/blob/main/spec/APDU.md">The card's commands, byte for byte <span aria-hidden="true">↗</span></a></li>
-              <li><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <span aria-hidden="true">↗</span></a></li>
             </ul>
+            <p>Building a wallet or till that talks to the card? The <a href="/developers">developer page</a> has the draft specification, the card's commands and the code.</p>
           </section>
         </article>
       </div>
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
         <div class="footer-group"><span class="footer-label">APPS</span><a href="https://getflash.io/">Flash ↗</a><a href="https://getfoxy.io/">Foxy ↗</a><a href="/#install">Cashu Card Provisioner</a></div>
       </div>
-      <div class="footer-bottom"><span>© CASHU CARD · OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>
   </body>
 </html>

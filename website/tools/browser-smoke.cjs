@@ -150,10 +150,10 @@ async function main() {
     for (const path of ["/favicon.ico", "/assets/favicon.svg", "/assets/apple-touch-icon.png"]) assert.equal((await fetch(origin + path)).status, 200, "Serves " + path);
     const words = await evaluate("document.body.innerText.trim().split(/\\s+/).length");   // \\s survives the string literal
     console.log("words " + words);
-    assert.ok(words < 630, "Copy stays concise");   // about half of it is where to get cards and how to install the applet
+    assert.ok(words < 900, "Copy stays concise");   // about half of it is where to get cards and how to install the applet; the risks take about 190
     const screens = await evaluate("document.documentElement.scrollHeight / innerHeight");
     console.log("screens at 1440x900, reduced motion " + screens.toFixed(2));
-    assert.ok(screens <= 5.8, "Desktop page stays within its budget");
+    assert.ok(screens <= 6.6, "Desktop page stays within its budget");   // the risks section adds about 0.7
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
     assert.ok(await evaluate("document.querySelector('.button-bright').href==='https://github.com/cashucard/nut/blob/main/CCP.md'"), "Primary action opens the draft NUT");
     assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/cashucard/cashucard'"), "Secondary action opens the source repository");
@@ -174,7 +174,7 @@ async function main() {
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://testflight.apple.com/join/M3JucFNy\"]')"), "The provisioner links its TestFlight beta");
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://play.google.com/apps/testing/com.islandbitcoin.provisioner\"]')"), "The provisioner links its Google Play beta");
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"/guide\"]')"), "The install section opens the install guide");
-    assert.ok(await evaluate("!!document.querySelector('.header nav a[href=\"#install\"]')"), "The nav opens the install section");
+    assert.equal(await evaluate("[...document.querySelectorAll('.header nav a')].map(a=>a.textContent).join('|')"), "Get cards|Developers", "The nav holds Get cards and Developers only");
     // the till in the steps is a phone, with the card held to its back
     assert.ok(await evaluate("document.querySelector('#steps li p').textContent.includes(\"to the back of the merchant's phone\")"), "The steps show a phone as the till");
     // the film: custom controls over the native video; with reduced motion it waits for a press
@@ -260,11 +260,16 @@ async function main() {
     await evaluate("document.querySelector('#source').scrollIntoView()");
     await screenshot("02-source-desktop");
     for (const [width, height, maxScreens] of [
-      [1024, 768, 5.8], [768, 900, 6.3], [390, 844, 6.7], [320, 740, 7.9],
+      [1024, 768, 6.8], [768, 900, 7.2], [390, 844, 8.3], [320, 740, 10.1],   // the risks section adds 0.7 to 2.0
     ]) {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
       assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "No overflow at " + width);
+      // the two-item menu shows at every width, clear of the wordmark and the screen edge
+      const nav = await evaluate("(()=>{const a=[...document.querySelectorAll('.header nav a')].map(e=>e.getBoundingClientRect());const w=document.querySelector('.wordmark').getBoundingClientRect();return {n:a.length,shown:a.every(r=>r.width>0),right:Math.max(...a.map(r=>r.right)),left:Math.min(...a.map(r=>r.left)),mark:w.right}})()");
+      console.log("menu at " + width + ": " + JSON.stringify(nav));
+      assert.ok(nav.n === 2 && nav.shown, "The menu shows at " + width);
+      assert.ok(nav.right <= width - 12 && nav.left >= nav.mark + 12, "The menu fits the header at " + width);
       const ratio = await evaluate("document.documentElement.scrollHeight/innerHeight");
       console.log("screens at " + width + "x" + height + " " + ratio.toFixed(2));
       assert.ok(ratio <= maxScreens, "Page within its budget at " + width);
@@ -306,6 +311,34 @@ async function main() {
       await viewport(width, 844);
       assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Install guide fits " + width);
     }
+    // experimental, said on every page, with the risks once on the home page (site/experimental-faq-developers)
+    await viewport(1440, 900);
+    await load(origin + "/", "home page for the risks");
+    assert.equal(await evaluate("document.querySelector('.hero-copy .eyebrow').textContent.replace(/\\s+/g,' ').trim()"), "EXPERIMENTAL / NUT-CCP DRAFT", "The hero calls the project experimental");
+    assert.ok(await evaluate("!!document.querySelector('.hero-status a[href=\"#risks\"]')"), "The hero points to the risks");
+    assert.equal(await evaluate("document.querySelectorAll('#risks .risk-list li').length"), 7, "The risks are stated once, in seven points");
+    assert.equal(await evaluate("[...document.querySelectorAll('section h2')].filter(h=>/risk/i.test(h.textContent)).length"), 1, "One risks section");
+    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 7, 0]]) {
+      // the host serves /faq for /faq.html, as it does /guide; the local preview serves the file name
+      await send("Page.navigate", { url: origin + page });
+      await until("location.pathname.replace(/\\.html$/,'')===" + JSON.stringify(page.replace(".html", "")) + "&&document.readyState==='complete'&&!!document.querySelector('.guide-doc')", page + " loads");
+      assert.equal(await evaluate("document.querySelectorAll('.guide-doc > section').length"), sections, page + " has its sections");
+      assert.ok(await evaluate("document.querySelectorAll('.faq details').length") >= minItems, page + " answers its questions");
+      assert.ok(await evaluate("document.querySelector('.footer-bottom span').textContent.includes('EXPERIMENTAL')"), page + " footer says experimental");
+      assert.equal(await evaluate("[...document.querySelectorAll('.guide-rail a')].every(a=>!!document.querySelector(a.hash))"), true, page + " contents links resolve");
+      assert.equal(await evaluate("[...document.querySelectorAll('a')].filter(a=>/getflash\\.io|getfoxy\\.io|lnflash|getfoxy\\//.test(a.href)).length"), 0, page + " names no wallet app");
+      for (const [width, height] of [[1440, 900], [390, 844], [320, 740]]) {
+        await viewport(width, height);
+        assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, page + " fits " + width);
+      }
+      await viewport(1440, 900);
+      await screenshot("10" + page.replace(/\W/g, "-"));
+    }
+    for (const path of ["/faq.html", "/developers.html"]) {
+      const r = await fetch(origin + path);
+      assert.equal(r.status, 200, "Serves " + path);
+    }
+    assert.ok((await fetch(origin + "/sitemap.xml").then((r) => r.text())).includes("https://cashucard.org/faq"), "The sitemap lists the FAQ");
     assert.deepEqual(errors, [], "No browser exceptions");
     console.log("PASS: landing page, film and steps, direct source links, responsive artwork options, reduced motion, no JavaScript");
     console.log("Screenshots: " + output);

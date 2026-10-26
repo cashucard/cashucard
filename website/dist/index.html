@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Cashu, now on a card. Wallets load ecash; terminals can accept a tap offline and settle with the mint when connected. Explore the draft NFC protocol." />
-    <meta property="og:title" content="Cashu Card | Open NFC ecash protocol" />
+    <meta name="description" content="Cashu, now on a card. An experimental open source NFC ecash protocol: wallets load ecash, and terminals can accept a tap offline and settle with the mint when connected." />
+    <meta property="og:title" content="Cashu Card | Experimental NFC ecash protocol" />
     <meta property="og:description" content="Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://cashucard.org/" />
@@ -22,22 +22,23 @@
     <link rel="stylesheet" href="/styles.css" />
     <script src="/seq/tap-3/anchors.js" defer></script>
     <script src="/motion.js" defer></script>
-    <title>Cashu Card | Open NFC ecash protocol</title>
+    <title>Cashu Card | Experimental NFC ecash protocol</title>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
       <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="#film">Film</a><a href="#tap">One tap</a><a href="#buy">Get cards</a><a href="#install">Install</a><a href="#source">Protocol and code</a></nav>
+      <nav aria-label="Main navigation"><a href="#buy">Get cards</a><a href="/developers">Developers</a></nav>
       <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
     </header>
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-copy">
-          <div class="eyebrow"><span class="status-dot"></span> OPEN NFC PROTOCOL <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
+          <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
           <h1 id="hero-title">Cashu,<br /><em>now on a card.</em></h1>
           <p>Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.</p>
+          <p class="hero-status">An experimental open source project, built on a draft NUT with little outside testing or review. <a href="#risks">Read the risks</a> before you load a card.</p>
           <div class="hero-actions">
             <a class="button button-bright" href="https://github.com/cashucard/nut/blob/main/CCP.md">Read the draft <span aria-hidden="true">↗</span></a>
             <a class="button button-outline" href="https://github.com/cashucard/cashucard">Browse the code <span aria-hidden="true">↗</span></a>
@@ -127,6 +128,22 @@
           </div>
         </div>
       </section>
+      <section class="buy-section risk-section" id="risks" aria-labelledby="risks-title">
+        <div class="buy-head">
+          <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> BEFORE YOU LOAD A CARD</div>
+          <h2 id="risks-title">Risks to know</h2>
+          <p>Cashu Card is an experimental open source project. It runs NUT-CCP, a draft NUT with little testing or review outside this project. Keep only small amounts on a card, amounts you can afford to lose.</p>
+        </div>
+        <ul class="risk-list">
+          <li><b>A lost card loses its balance.</b> The key that spends the card's ecash lives only on its chip, and a backup cannot recreate it.</li>
+          <li><b>The mint backs the ecash.</b> A card's ecash is a claim on one mint. If that mint fails, the ecash loses its value.</li>
+          <li><b>The owner key needs a backup.</b> The wallet that set the card up holds its owner key. Without it, a blocked PIN stays blocked and a large balance can be stranded.</li>
+          <li><b>Three wrong PINs block the card.</b> Any reader in range can send them. The owner's wallet sets a new PIN.</li>
+          <li><b>Any reader can read the card.</b> Its balance and history are readable without the PIN. Spending takes the chip's signature, within the owner's limits.</li>
+          <li><b>Offline payments carry risk for the merchant.</b> Until a till settles with the mint, the merchant carries the risk that a piece was spent elsewhere first.</li>
+          <li class="risk-wide"><b>Testing is limited.</b> The applet has run end to end on NXP J3R180 cards with a few named phones, as the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">23 October report</a> records. Tests on silicon for a card pulled mid-write and for timing attacks, and an independent security review, are still to come. The <a href="https://github.com/cashucard/cashucard/blob/main/docs/SECURITY-MODEL.md">security model</a> lists every open item.</li>
+        </ul>
+      </section>
       <section class="buy-section" id="buy" aria-labelledby="buy-title">
         <div class="buy-head">
           <div class="eyebrow"><span class="status-dot"></span> CARDS <span class="eyebrow-divider">/</span> NXP J3R180</div>
@@ -195,11 +212,12 @@
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="#risks">Risks</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
         <div class="footer-group"><span class="footer-label">APPS</span><a href="#install">Cashu Card Provisioner</a></div>
       </div>
-      <div class="footer-bottom"><span>© CASHU CARD · OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>
   </body>
 </html>
