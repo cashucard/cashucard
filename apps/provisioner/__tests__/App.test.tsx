@@ -175,16 +175,20 @@ test('settings shows the public dashboard and confirms sign-out while a saved ba
     tree.root.findByProps({testID: 'keep-session'}).props.onPress();
   });
   expect(tree.root.findByProps({testID: 'sign-out'})).toBeTruthy();
-  const words = tree.root
-    .findAll(n => typeof n.props.children === 'string')
-    .map(n => n.props.children)
-    .join(' ');
+  const words = JSON.stringify(tree.toJSON());
   expect(words).toContain(
     `Version ${appInfo.version} (${appInfo.provisionerBuild})`,
   );
-  expect(words).toContain('https://ops.cashucard.org');
-  expect(words).not.toContain('https://api.example.test');
-  expect(words).toContain('CAP pin f27d92ba');
+  expect(words).toContain('https://api.example.test');
+  expect(words).not.toContain('https://ops.cashucard.org');
+  expect(words).not.toContain('CAP:');
+  await ReactTestRenderer.act(() => {
+    tree.root
+      .findAllByProps({testID: 'settings-build-help'})
+      .find(node => node.props.accessibilityRole === 'button')!
+      .props.onPress();
+  });
+  expect(JSON.stringify(tree.toJSON())).toContain('CAP: f27d92ba');
   tree.unmount();
 });
 

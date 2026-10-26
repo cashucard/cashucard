@@ -4,8 +4,17 @@ import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import Svg, {Path, Rect} from 'react-native-svg';
 import {useProvisioning} from '../ProvisioningStore';
 import {useApp} from '../store';
+import {OpsDashboardLink} from '../LegalLinks';
 import {FONT, useTheme} from '../theme';
-import {Dim, GearButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
+import {
+  Dim,
+  GearButton,
+  HelpHeading,
+  InfoButton,
+  PrimaryButton,
+  Screen,
+  SecondaryButton,
+} from '../ui';
 
 function CardTool({
   kind,
@@ -16,7 +25,7 @@ function CardTool({
 }: {
   kind: 'check' | 'reset';
   title: string;
-  detail: string;
+  detail?: string;
   disabled: boolean;
   onPress(): void;
 }) {
@@ -80,7 +89,7 @@ function CardTool({
       </Svg>
       <View style={s.text}>
         <Text style={s.title}>{title}</Text>
-        <Text style={s.detail}>{detail}</Text>
+        {detail ? <Text style={s.detail}>{detail}</Text> : null}
       </View>
       <Text accessible={false} style={s.arrow}>
         ›
@@ -118,11 +127,12 @@ export function CardsHomeScreen({
     ? 'Continue the saved reset above.'
     : !flow.hardwareValidated
     ? 'Reset is unavailable in this build.'
-    : 'Check an empty card, then review its reset.';
-  // Show only the configured authority, without URL credentials or path data.
-  const service =
-    /^https?:\/\/([^\s/?#@]+)\/?$/.exec(app.serviceUrl)?.[1] ??
-    'Configured service';
+    : undefined;
+  const connectionOrigin = /^https?:\/\/[^\s/?#@]+\/?$/.test(app.serviceUrl)
+    ? app.serviceUrl
+    : 'Configured service';
+  const operatorName =
+    app.operatorName || `Operator #${app.session?.operator_id}`;
   React.useEffect(() => {
     setConfirmEnd(false);
   }, [batch?.request.batch_request_id, batch?.next_ordinal]);
@@ -131,7 +141,14 @@ export function CardsHomeScreen({
     card: {backgroundColor: t.card, borderRadius: 16, padding: 20, gap: 16},
     heading: {fontFamily: FONT.semibold, fontSize: 25, color: t.ink},
     account: {paddingVertical: 8, minHeight: 52, gap: 4},
-    operator: {fontFamily: FONT.medium, fontSize: 17, color: t.ink},
+    accountRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+    accountAction: {minHeight: 44},
+    operator: {
+      fontFamily: FONT.medium,
+      fontSize: 17,
+      color: t.ink,
+      flexShrink: 1,
+    },
     service: {fontFamily: FONT.regular, fontSize: 14, color: t.dim},
     tools: {gap: 12},
     label: {fontFamily: FONT.medium, fontSize: 17, color: t.dim},
@@ -142,19 +159,28 @@ export function CardsHomeScreen({
       onStop={flow.busy ? flow.cancel : undefined}
       headerRight={<GearButton testID="settings" onPress={onSettings} />}>
       <ScrollView contentContainerStyle={s.scroll}>
-        <Pressable
-          testID="home-settings"
-          accessibilityRole="button"
-          accessibilityLabel="Account and settings"
-          onPress={onSettings}
-          style={s.account}>
-          <Text testID="home-operator" style={s.operator}>
-            {app.operatorName || `Operator #${app.session?.operator_id}`}
-          </Text>
-          <Text testID="home-service" style={s.service}>
-            {service}
-          </Text>
-        </Pressable>
+        <View style={s.account}>
+          <Pressable
+            testID="home-settings"
+            accessibilityRole="button"
+            accessibilityLabel={`Signed in as ${operatorName}. Account and settings`}
+            onPress={onSettings}
+            style={[s.accountRow, s.accountAction]}>
+            <Text style={s.service}>Signed in as</Text>
+            <Text testID="home-operator" style={s.operator}>
+              {operatorName}
+            </Text>
+          </Pressable>
+          <View style={s.accountRow}>
+            <OpsDashboardLink
+              testID="home-dashboard"
+              textTestID="home-service"
+            />
+            <InfoButton title="Account and service" testID="home-account-help">
+              {`The name above is your signed-in operator account. Manage operators, batches and card records in the ops dashboard.\n\nAPI connection: ${connectionOrigin}\n\nSaved work stays bound to its original API connection and operator account.`}
+            </InfoButton>
+          </View>
+        </View>
         {flow.status !== 'ready' ? (
           <View style={s.card}>
             <Text style={s.heading}>
@@ -283,11 +309,14 @@ export function CardsHomeScreen({
           </View>
         ) : (
           <View style={s.card}>
-            <Text style={s.heading}>Ready for a new batch</Text>
-            <Dim>
-              Install card software here. Card holders finish ownership and PIN
-              setup in their wallet.
-            </Dim>
+            <HelpHeading
+              title="New batch"
+              titleStyle={s.heading}
+              testID="home-batch-help">
+              {
+                'Install card software and save the result. Card holders finish ownership and PIN setup in their wallet.'
+              }
+            </HelpHeading>
             <PrimaryButton
               title="NEW BATCH"
               testID="home-new"
@@ -303,11 +332,17 @@ export function CardsHomeScreen({
           <Dim>{flow.notice}</Dim>
         ) : null}
         <View style={s.tools}>
-          <Text style={s.label}>Card tools</Text>
+          <HelpHeading
+            title="Card tools"
+            titleStyle={s.label}
+            testID="home-tools-help">
+            {
+              'Check reads public card status and offers the next step. Reset checks an empty card and asks for approval before removing its old installation. Each tool waits for an explicit read.'
+            }
+          </HelpHeading>
           <CardTool
             kind="check"
             title="Check a card"
-            detail="Read its status and see the next step."
             disabled={toolsDisabled}
             onPress={onCheck}
           />

@@ -29,7 +29,9 @@ test.each([
           .children,
       ).toBe(label);
       const help = () =>
-        tree.root.findByProps({testID: 'provisioning-scope-help'});
+        tree.root
+          .findAllByProps({testID: 'provisioning-scope-help'})
+          .find(node => node.props.accessibilityRole === 'button')!;
       expect(help().props.accessibilityRole).toBe('button');
       expect(help().props.accessibilityState.expanded).toBe(false);
       expect(

@@ -1,6 +1,6 @@
 /**
  * The small shared pieces of the designed screens. Built on the theme tokens
- * only (src/theme.ts); nothing here draws its own color.
+ * in src/theme.ts.
  */
 import React from 'react';
 import {
@@ -16,6 +16,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {FONT, type Theme, useTheme} from './theme';
 import GearSvg from './assets/gear.svg';
+export {InfoButton, HelpHeading} from './InfoHelp';
 import {PHYSICAL_READ_BANNER} from './strings';
 
 export function Screen({
@@ -127,7 +128,7 @@ export function PrimaryButton({
   );
 }
 
-/** The quiet action beside the loud one: bordered, never accent. */
+/** Secondary actions use a border. */
 export function SecondaryButton({
   title,
   onPress,

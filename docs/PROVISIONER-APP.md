@@ -29,8 +29,9 @@ unfinished attempt.
 
 ## Cards home
 
-Cards is the landing page after sign-in. It shows the operator name, service
-and saved work. An unfinished batch shows its mint reference and finished
+Cards is the landing page after sign-in. It labels the operator name with
+"Signed in as", links the configured service's ops dashboard and shows
+saved work. An unfinished batch shows its mint reference and finished
 attempt count. Operators can continue it, view a finished batch's results or
 start a new batch when permitted.
 
@@ -51,6 +52,18 @@ Settings return there, and Settings Back returns to Cards. See
 
 See [safe exits](PROVISIONER-SAFE-EXITS.md) for each screen's cancellation and
 retention behavior.
+
+## Information icons
+
+Tap an information icon to read a routine explanation, then Close or use
+Android Back to return to the same screen. Help panels scroll at larger text
+sizes and support screen readers. Sign-in, batch setup, installation, card
+checks, reset and Settings use this shared control.
+
+Errors, live progress, disabled-action reasons, card-holding instructions,
+destructive confirmations and recovery steps remain visible. Cards' account
+help lists the actual API connection separately from the dashboard link;
+existing saved work keeps its original connection. See [D122](DECISIONS.md#d122).
 
 <a id="s2-batch-setup"></a>
 

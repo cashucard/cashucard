@@ -3425,3 +3425,33 @@ path back to the batch or card check that opened it.
 
 **Rejected:** skipping batch review or reset consent, starting NFC on screen
 entry, and a shared return destination that could trap nested tools in a loop.
+
+## <a id="d122"></a>D122: Routine app help opens from information icons
+
+**Decided (2026-10-25):** routine explanations move into shared tap-to-read
+panels on the shipping sign-in, Cards, setup, installation, card status,
+identity, reset and Settings screens. Information icons have labeled 44-point
+targets. Panels support scrolling, screen-reader focus, an explicit Close
+action, outside-tap dismissal and Android Back. Opening help starts no card
+operation or service request.
+
+Cards labels and announces the operator name with “Signed in as”. Dashboard
+links follow the configured service. Only the existing production Worker
+origin has a display alias to `https://ops.cashucard.org`; other service
+origins link to their own dashboard. Cards' account help shows the actual API
+origin separately. Changing this display leaves API requests and saved-work
+origin/actor bindings intact (D49, D111). Selecting another service remains
+build-time configuration. Setup controls accept taps while the keyboard is open.
+
+Errors, disabled-action reasons, live progress, required card-holding
+instructions, destructive consent, pending-reset erasure consequences and
+recovery steps stay visible. Setup retains its batch review; reset retains its
+existing approvals. This change reduces explanatory text on the daily screens.
+It does not reduce the number of batch-creation or card-write steps.
+
+**Why:** operator review found the account name unlabeled, the technical API
+address confusing and repeated explanations distracting from routine actions.
+
+**Rejected:** hover-only help on phones, moving required consent into a tooltip,
+silently switching the API origin, and removing review steps as part of a copy
+change.
