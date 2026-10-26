@@ -31,7 +31,7 @@
       <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers" aria-current="page">Developers</a></nav>
       <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
     </header>
-    <main id="main" class="guide">
+    <main id="main" class="guide developer-guide">
       <section class="guide-hero" aria-labelledby="dev-title">
         <div class="guide-hero-inner">
           <div class="guide-hero-top">
@@ -91,25 +91,17 @@
 
           <section id="overview" aria-labelledby="overview-title">
             <h2 id="overview-title">How the parts fit</h2>
-            <p>Start with two flows: using a card, and preparing one for use. Choose the part you are building or operating.</p>
-            <div class="system-flow" role="group" aria-labelledby="payment-flow-title">
-              <h3 id="payment-flow-title">Using a card</h3>
-              <ol class="flow-nodes">
-                <li><b>Holder wallet</b><span>Sets ownership and a PIN. Loads ecash onto the card.</span></li>
-                <li><b>Card + applet</b><span>The chip runs the applet, stores proofs and signs a payment when tapped.</span></li>
-                <li><b>Till + mint</b><span>The till accepts the tap. The mint settles the payment when online.</span></li>
-              </ol>
-              <p>An offline till can accept a payment and retain it for later mint settlement. Acceptance and settlement are separate steps.</p>
-            </div>
-            <div class="system-flow" role="group" aria-labelledby="issuance-flow-title">
-              <h3 id="issuance-flow-title">Preparing a card</h3>
-              <ol class="flow-nodes">
-                <li><b>Ops-service</b><span>Authorizes the work and keeps manager keys, card records and recovery history.</span></li>
-                <li><b>CCP app</b><span>The operator signs in. The phone installs the applet on the card over NFC.</span></li>
-                <li><b>Installed card</b><span>Ready for its holder to set ownership and a PIN in a wallet, then load ecash.</span></li>
-              </ol>
-              <p>Cashu Card Provisioner (CCP) exchanges records and assigned keys with the service. Holder-wallet setup follows installation.</p>
-            </div>
+            <p>One card connects the holder, merchant and issuer. Payments, installation and recovery have separate paths.</p>
+            <figure class="ecosystem" aria-labelledby="ecosystem-caption">
+              <picture>
+                <source media="(max-width:900px)" srcset="/assets/ecosystem-mobile.svg" />
+                <img src="/assets/ecosystem.svg" width="1000" height="824" alt="Wallet and till connect to the mint and tap the same physical card. Ops-service authorizes CCP to install the applet. Encrypted exports flow through a backup job to independent storage and alerts; the backup key has separate custody." decoding="async" />
+              </picture>
+              <figcaption id="ecosystem-caption">
+                <div class="ecosystem-legend" aria-label="Connection types"><span class="legend-nfc">NFC</span><span class="legend-online">Online API</span><span class="legend-recovery">Backup + alerts</span><a href="/assets/ecosystem.svg" download="cashu-card-ecosystem.svg">Download SVG ↗</a></div>
+                <p>* Atoll Recovery pairs with Workers/R2. The Docker service uses filesystem exports with your scheduled copy and alert jobs. <a href="/ops-service#backups">Backup setup ↗</a></p>
+              </figcaption>
+            </figure>
             <details class="more"><summary>Who runs each part?</summary><div class="more-body">
               <dl class="faults">
                 <div><dt>Card hardware and applet firmware</dt><dd>A compatible secure chip is the physical card. The open source applet is the software installed on it. Together they hold ecash and answer NFC commands.</dd></div>
@@ -126,7 +118,7 @@
                 <li><b>ntfy</b> is one way to deliver failure and freshness alerts.</li>
                 <li><b><a href="https://github.com/islandbitcoin/atoll-recovery-startos">Atoll Recovery</a></b> is an optional StartOS companion that copies encrypted Workers exports to backup storage, reports freshness and can send alerts.</li>
               </ul>
-              <p>The standalone Docker service exports encrypted files. Its operator supplies scheduling, independent copying and alerts; the Workers pairing and receipt adapters have a separate implementation. See the <a href="/ops-service#backups">hosting guide's backup section</a>.</p>
+              <p>The <a href="/ops-service#backups">hosting guide</a> covers encrypted exports, independent copying, alerts and recovery-key custody.</p>
             </div></details>
             <ul class="dev-cards dev-paths" aria-label="Choose your guide">
               <li><b><a href="#reader">Build a wallet or till</a></b><span>Protocol, commands and test vectors.</span></li>

@@ -3719,3 +3719,22 @@ host's recovery tools or deployment commands.
 **Rejected:** making the service a requirement of the payment protocol, presenting
 Nextcloud or ntfy as required server dependencies, and putting the full hosting
 runbook ahead of the component overview.
+
+
+## <a id="d132"></a>D132: Ecosystem map shares one physical card across flows
+
+**Decided (2026-10-26):** the developer overview uses a native SVG architecture
+map with separate desktop and phone compositions. Wallet, till and CCP connect
+to the same physical card running the applet. The mint serves payment flows;
+the ops-service authorizes installation and keeps manager keys and records.
+The supporting layer names the copy job, independent backup storage, alerts and
+separate backup-key custody. Captions distinguish Workers/Atoll from standalone
+filesystem exports. A text explanation remains available below the image.
+
+**Why:** two linear flow cards duplicated the card and combined till and mint,
+which obscured the actual relationships. One map makes the boundaries visible
+while keeping deployment detail in the hosting guide.
+
+**Rejected:** treating the ops-service as a payment intermediary, implying Atoll
+pairs with the standalone Docker service, and shrinking a desktop graph until
+its labels become unreadable on a phone.
