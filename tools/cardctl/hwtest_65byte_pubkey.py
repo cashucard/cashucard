@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 hwtest_65byte_pubkey.py — the hardware check behind section 8 of
-docs/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md.
+docs/reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md.
 
 At commit afe1081 the applet sent `ECPublicKey.getW()` straight to the host,
 and on an NXP JCOP4.5 J3R452 that is a 65-byte uncompressed point. `cardctl

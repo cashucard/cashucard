@@ -217,20 +217,20 @@ The gated real screen uses these functions through native `withCard`.
 Software tests use the existing GP card and injected transports. Under explicit
 operator authorization, native rebuilds and three documented read-only CPLC reads
 on both the Pixel and Max passed on 2026-10-20; see the
-[hardware report](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md).
+[hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md).
 A separately approved Pixel replacement run passed three saved-boundary
 restarts (install result, rotation result, frozen record); see the
-[Pixel recovery report](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-pixel-recovery.md).
+[Pixel recovery report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-20.d321-pixel-recovery.md).
 The spare's post-write CPLC also matched on Max in an
-[operator-confirmed read-only post-check](../../docs/HARDWARE_TEST_REPORT_2026-10-20.d321-max-postcheck.md).
+[operator-confirmed read-only post-check](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-20.d321-max-postcheck.md).
 The completed run's escrow also passed a
-[local encrypted-export/CLI restore check](../../docs/RECOVERY_TEST_REPORT_2026-10-20.pixel-escrow.md).
+[local encrypted-export/CLI restore check](../../docs/reports/RECOVERY_TEST_REPORT_2026-10-20.pixel-escrow.md).
 iPhone write/recovery, partial LOAD, actual lost replies and the other
 checklist cases remain outstanding. Personalization is unvalidated, and both
 committed release gates remain false.
 
 The next native validation steps are in the
-[proposed owner-run checklist](../../docs/PROVISIONER-DEVICE-VALIDATION.md).
+[proposed owner-run checklist](../../docs/reports/PROVISIONER-DEVICE-VALIDATION.md).
 Settings → Read physical card identity supplies the read-only phone probe:
 entering the screen does not arm NFC; the explicit read issues SELECT ISD and
 GET DATA CPLC only. Its signed-in screen labels physical-card access; the read

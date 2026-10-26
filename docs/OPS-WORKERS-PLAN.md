@@ -25,7 +25,7 @@ and version 2 recovery exports. Restores pause provisioning until reconciliation
 and stale-client fencing; no unlock workflow is implemented. The durable journal, batch coordinator and injected orchestration are implemented.
 Real screens now use them behind a disabled installation gate. Read-only CPLC
 reads on Pixel and Max match the USB baseline on one card
-([report](HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md)); identity through
+([report](reports/HARDWARE_TEST_REPORT_2026-10-20.d321-phone-cplc.md)); identity through
 install/rotation, distinct-card sampling, termination and personalization remain
 outstanding. This increment passes 63 Node
 tests, 11 Workers tests, both typechecks, formatting and a deployment dry run.
@@ -154,7 +154,7 @@ equivalent explicit operator reconciliation contract. Applet public keys only
 exist after install and change on reinstall. The CPLC reader is implemented and wired into the gated loop, but its phone
 stability has scoped hardware evidence: three original-card reads per phone,
 then the replacement spare's USB/Pixel identity and an operator-confirmed Max
-post-write match. See the [validation coverage checkpoint](PROVISIONER-DEVICE-VALIDATION.md#evidence-checkpoint-after-the-first-pixel-write-drill).
+post-write match. See the [validation coverage checkpoint](reports/PROVISIONER-DEVICE-VALIDATION.md#evidence-checkpoint-after-the-first-pixel-write-drill).
 This does not prove fleet-wide uniqueness or complete the device/recovery gate.
 Neither NFC UID nor SCP02 diversification data
 is a substitute for that evidence. If the card cannot be matched
@@ -185,7 +185,7 @@ Acceptance includes an interrupted run and an app restart with a pending record,
 followed by reconciliation without duplicate assignments or lost registry rows.
 Automated checks use fake cards; any phone or silicon drill needs the device and
 actions named in an approved hardware plan under AGENTS.md.
-The [proposed device validation checklist](PROVISIONER-DEVICE-VALIDATION.md) records
+The [proposed device validation checklist](reports/PROVISIONER-DEVICE-VALIDATION.md) records
 the candidate devices, missing validation tooling and the evidence required.
 
 ## Consumer provisioning gate

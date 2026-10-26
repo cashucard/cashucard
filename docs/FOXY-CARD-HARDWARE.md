@@ -110,7 +110,7 @@ passed 12 of 12, and `AUTH` took 833 to 854 ms a signature on an ACR122U.
 2.1 (ENG-699, DECISIONS D26) is 20,068 bytes by refcheck's measure (100 past a
 multiple of 256), eight more than 2.0. It installed on a J3R180 with the opener
 first on 2026-10-14, and `cardctl selftest` passed 12 of 12
-(HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md).
+([report](reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)).
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build

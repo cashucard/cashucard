@@ -602,8 +602,8 @@ jobs:
           node-version: "22"
       - run: node --check website/tools/browser-smoke.cjs && node --check website/tools/preview.cjs && node --check website/dist/motion.js && node --check website/dist/guide.js
       - run: test -f website/dist/index.html && test ! -e website/dist/site.js && test -f website/dist/guide.md && test -f website/dist/llms.txt
-      - run: test -f website/dist/film/cashu-card-film-2.mp4 && test -f website/dist/film/cashu-card-film-2-720.mp4 && test -f website/dist/film/poster-2.jpg
-      - run: test -f website/dist/seq/tap-2/anchors.js && test "$(find website/dist/seq/tap-2 -maxdepth 1 -name 'tap_*.webp' -type f | wc -l)" -eq 96 && node --check website/worker.js
+      - run: test -f website/dist/film/cashu-card-film-3.mp4 && test -f website/dist/film/cashu-card-film-3-720.mp4 && test -f website/dist/film/poster-3.jpg
+      - run: test -f website/dist/seq/tap-3/anchors.js && test "$(find website/dist/seq/tap-3 -maxdepth 1 -name 'tap_*.webp' -type f | wc -l)" -eq 96 && node --check website/worker.js
 
   android:
     needs: changes

@@ -41,9 +41,9 @@ location are recorded privately. The drive is prepared and a staging identity
 copy restored successfully on the original Mac. A restricted organization
 Vaultwarden staging copy also passed fresh-unlock exact retrieval with
 authenticator MFA enabled. The subsequent
-[separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
+[separate-Mac staging restore](reports/OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
 passed from that offline copy. The separate
-[production custody check](OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md)
+[production custody check](reports/OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md)
 now records a new production identity, verified offline copy and fresh-unlock
 Vaultwarden retrieval; an actual production export/restore remains pending.
 Do not depend on
@@ -94,7 +94,7 @@ The beta.5 rehearsal copied the export into Nextcloud, read-back
 matched the source, and isolated restoration verified all escrow keys and the
 recovery fence. Beta.6 subsequently added the verified independent-copy receipt
 flow. Separate-Mac staging restoration also passed as linked above. See the
-[controlled recovery check](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+[controlled recovery check](reports/OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
 
 Use an established transfer client such as rclone for
 [R2](https://developers.cloudflare.com/r2/examples/rclone/) and
@@ -152,7 +152,7 @@ satisfying the accepted maximum.
 ## Issuance enforcement implementation contract
 
 The source implementation is merged in PRs #68–77. The bounded staging
-receipt/refusal/recovery drill passed; see the [staging recovery report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+receipt/refusal/recovery drill passed; see the [staging recovery report](reports/OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
 Policy remains opt-in and production activation still requires release review.
 Authenticated status can observe the configured recovery issuer before policy
 activation, so verifying copy health never requires enabling issuance enforcement.
@@ -237,15 +237,15 @@ that result in its PR. No hardware or live production service is needed.
    alerts, custody and release approval. Staging success never enables physical
    installation or establishes holder readiness.
 
-Current evidence includes the [staging report](OPS_STAGING_REPORT_2026-10-21.md)
-and [actual export/copy/restore report](OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
+Current evidence includes the [staging report](reports/OPS_STAGING_REPORT_2026-10-21.md)
+and [actual export/copy/restore report](reports/OPS_STAGING_RECOVERY_REPORT_2026-10-21.md).
 Scheduled staging export, independent Nextcloud read-back, NTFY web receipt and
 isolated restoration from the copied artifact passed. Staging Vaultwarden custody
 and the operator-held encrypted-drive copy also passed their documented checks.
-The [separate-Mac staging restore](OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
+The [separate-Mac staging restore](reports/OPS_SECOND_MAC_RESTORE_REPORT_2026-10-22.md)
 now passed from the encrypted offline copy, including exact escrow comparison,
 credential/fence checks and plaintext-database cleanup. Production identity custody
-subsequently passed the [documented check](OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md).
+subsequently passed the [documented check](reports/OPS_PRODUCTION_CUSTODY_REPORT_2026-10-22.md).
 Actual production export/copy/restore acceptance, reviewed
 retention, whole-host monitoring, push delivery, human acknowledgement, production 24-hour
 copy acceptance and the reopening procedure remain pending. The live staging
@@ -253,7 +253,7 @@ refusal/recovery drill passed with the policy restored off afterward. The stagin
 cron remains nightly; no production deployment or recovery identity transfer
 is certified by the rehearsal.
 
-The later [production deployment](OPS_PRODUCTION_DEPLOYMENT_REPORT_2026-10-22.md)
+The later [production deployment](reports/OPS_PRODUCTION_DEPLOYMENT_REPORT_2026-10-22.md)
 has its required-copy policy enabled and initially rejects issuance for missing
 evidence. Staging remains nightly, with a separate production 12-hour cron in the
 operator-selected freed slot. D73 defines additive issuer support in Atoll so

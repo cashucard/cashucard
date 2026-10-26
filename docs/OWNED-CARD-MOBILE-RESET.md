@@ -76,7 +76,7 @@ batch 6, attempt `ba9aa33e-78a4-4d5d-913a-3e16a540aa6a`, public-key ending
 also verified that Stop for now preserves the same saved zero-slot reset review
 across navigation after the keyboard and safe-exit updates.
 
-See the [dated hardware report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+See the [dated hardware report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 for evidence, source versions and coverage limits. The independent ACS USB
 post-check matched the full new public key, applet 2.1, 0 unspent / 0 spent /
 128 empty slots, no owner/PIN/record, unlocked state and selectable tag. It made

@@ -7,7 +7,7 @@ J3R180 cards. Operators sign in to the configured ops-service, create a batch,
 install each card and save the result. Holders complete ownership, PIN,
 configuration and funding in a compatible wallet.
 
-This guide describes the shipped operator flow through build 10. The original
+This guide describes the current source. The original
 ENG-739 screen brief is retained in Git history. Its demo mode, generated batch
 PINs, automatic rearming and automatic repair text are superseded by
 [D44](DECISIONS.md#d44), [D47](DECISIONS.md#d47), [D105](DECISIONS.md#d105)
@@ -29,16 +29,41 @@ unfinished attempt.
 
 ## Cards home
 
-Cards is the landing page after sign-in. It shows saved batches and resets
-without automatically reopening them. Operators can continue saved work,
-start a new batch when permitted, or open Settings and card tools.
+Cards is the landing page after sign-in. It labels the operator name with
+"Signed in as", links the configured service's ops dashboard and shows
+saved work. An unfinished batch shows its mint reference and finished
+attempt count. Operators can continue it, view a finished batch's results or
+start a new batch when permitted.
+
+Check a Card and Reset a Card for Reuse open directly from Cards. Opening
+either screen leaves NFC idle until the operator chooses a read. Check remains
+available while a batch is saved. A pending batch or reset prevents a second
+reset; the saved reset has its own Continue action. Settings remains available
+from the gear or account details.
 
 Stop for now returns here while retaining the journal. End batch asks for
 confirmation and obtains a service receipt. An active attempt must be resolved
 before ending its batch. A finished batch can be closed from Cards.
 
+Card tools return to the screen that opened them. For example, Cards → Check
+a Card → Reset returns through the card check to Cards. Tools opened from
+Settings return there, and Settings Back returns to Cards. See
+[D121](DECISIONS.md#d121).
+
 See [safe exits](PROVISIONER-SAFE-EXITS.md) for each screen's cancellation and
 retention behavior.
+
+## Information icons
+
+Tap an information icon to read a routine explanation, then Close or use
+Android Back to return to the same screen. Help panels scroll at larger text
+sizes and support screen readers. Sign-in, batch setup, installation, card
+checks, reset and Settings use this shared control.
+
+Errors, live progress, disabled-action reasons, card-holding instructions,
+destructive confirmations and recovery steps remain visible. Cards' account
+help lists the actual API connection separately from the dashboard link;
+existing saved work keeps its original connection. See [D122](DECISIONS.md#d122).
 
 <a id="s2-batch-setup"></a>
 

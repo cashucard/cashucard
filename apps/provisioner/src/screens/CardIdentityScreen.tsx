@@ -4,7 +4,7 @@ import {ScrollView, StyleSheet, Text} from 'react-native';
 import {readChipIdentity} from '../cardkit';
 import {createCardSession, type SessionMeta} from '../session';
 import {FONT, useTheme} from '../theme';
-import {Dim, PrimaryButton, Screen, SecondaryButton} from '../ui';
+import {InfoButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
 
 export function CardIdentityScreen({
   onBack,
@@ -76,12 +76,15 @@ export function CardIdentityScreen({
       title="Card identity check"
       onBack={onBack}
       onStop={busy ? cancelRead : undefined}
+      headerRight={
+        <InfoButton title="Chip identity" testID="identity-help">
+          {
+            'CPLC is a public chip identifier read directly from the card. Reading it leaves the card unchanged and makes no service request. It helps match a physical chip to saved records; ownership and installation status require separate checks.'
+          }
+        </InfoButton>
+      }
       physicalReadOnly>
       <ScrollView contentContainerStyle={s.content}>
-        <Dim>
-          This reads a physical card’s public CPLC identity only: no
-          authentication, installation or service request.
-        </Dim>
         <PrimaryButton
           title={
             busy ? 'WAITING FOR CARD IDENTITY…' : 'READ PHYSICAL CARD IDENTITY'
@@ -110,10 +113,6 @@ export function CardIdentityScreen({
             <Text selectable style={s.text}>
               {result.meta.platform} · {result.meta.os}
             </Text>
-            <Dim>
-              Public CPLC is not proof of ownership or global uniqueness. This
-              result does not enable installation or certify holder readiness.
-            </Dim>
           </>
         ) : null}
       </ScrollView>

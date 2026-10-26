@@ -18,11 +18,11 @@ legacy/lab screens. See [D109](DECISIONS.md#d109).
 | Installation, active NFC | Cancel tap / Stop, including hardware Back. | The last durable intent remains; transmitted commands may already have changed the card. |
 | Installation record submission/retry | Stop and keep saved work. | The immutable record stays queued. Explicit Stop suppresses in-session timer/foreground retries until manual work resumes. |
 | Saved-reset landing page | Continue or Stop for now → Cards. | The exact reset and account/service binding remain; new installations stay guarded until it is resolved. |
-| Reset inspection before preparation | Cancel review / Back → Settings. | The transient read is dismissed; no reset intent is discarded. |
-| Prepared reset, including completed cleanup | Stop and save for later / Back → Settings. | The review, settlement digest and completed cleanup remain. Keep the card aside. |
+| Reset inspection before preparation | Cancel review / Back → the screen that opened Reset. | The transient read is dismissed; no reset intent is discarded. |
+| Prepared reset, including completed cleanup | Stop and save for later / Back → the screen that opened Reset. | The review, settlement digest and completed cleanup remain. Keep the card aside. |
 | Reset, active NFC or service wait | Cancel tap / Stop and keep saved work. | Saved deletion/rotation/verification boundaries and service holds remain for recovery. |
-| Reset completion | Set up a new batch, or Back to Settings. | The completion receipt is retained. |
-| Read-only card status | Back; Cancel read during NFC **and** later service lookup. | Canceled late results cannot publish reset eligibility. No writes are started by leaving. |
+| Reset completion | Set up a new batch, or Back → the screen that opened Reset. | The completion receipt is retained. |
+| Read-only card status | Back → the screen that opened Check; Cancel read during NFC **and** later service lookup. | Canceled late results cannot publish reset eligibility. No writes are started by leaving. |
 | Read-only CPLC identity | Back/Cancel read, including hardware Back. | Its owned session ends and late identity replies are suppressed. |
 | Settings | Back → Cards; Sign out confirms when durable work exists. | Signing out preserves batches/resets. Help can be expanded and collapsed. |
 | Lab bench | Gated off in distributed builds; its existing Cancel/unmount path ends its session. | No lab tool is enabled by this change. |

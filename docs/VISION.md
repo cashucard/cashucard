@@ -93,12 +93,12 @@ analysis and tested mitigations.
 
 ## Hardware evidence
 
-The [September J3R180 report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)
+The [September J3R180 report](reports/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)
 records early installation, signing and payment tests. The
-[October full E2E report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+[October full E2E report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 records provisioning, holder setup, loading, online and offline payments,
 reconnection settlement and an empty final balance. The
-[mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
+[mobile reset report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 records authorized reset and fresh installation of the same test chip.
 
 Each report identifies its card, devices, software and coverage. Fleet-scale

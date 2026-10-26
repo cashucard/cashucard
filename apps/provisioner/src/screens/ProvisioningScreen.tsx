@@ -10,7 +10,14 @@ import {PHASES} from '../strings';
 import {recoveryDetails} from '../recoveryExport';
 import type {AttemptJournal} from '../journal';
 import {FONT, useTheme} from '../theme';
-import {Dim, GearButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
+import {
+  Dim,
+  GearButton,
+  InfoButton,
+  PrimaryButton,
+  Screen,
+  SecondaryButton,
+} from '../ui';
 
 const GATE =
   'Installation is unavailable in this build. Ask your administrator for an installation-enabled release.';
@@ -140,6 +147,7 @@ export function ProvisioningScreen({
   const [exportFailed, setExportFailed] = React.useState(false);
   const s = StyleSheet.create({
     grow: {flex: 1},
+    headerTools: {flexDirection: 'row', alignItems: 'center'},
     scroll: {gap: 18, paddingBottom: 24},
     title: {color: t.ink, fontFamily: FONT.semibold, fontSize: 24},
     line: {color: t.ink, fontFamily: FONT.regular, fontSize: 16},
@@ -180,7 +188,16 @@ export function ProvisioningScreen({
       }
       onBack={onHome}
       onStop={flow.busy ? flow.cancel : undefined}
-      headerRight={<GearButton testID="settings" onPress={leave} />}>
+      headerRight={
+        <View style={s.headerTools}>
+          <InfoButton title="Card installation" testID="installation-help">
+            {
+              'Set up ownership and a PIN in a holder wallet before loading or spending. Hold one card still until the installation finishes. Stop for now keeps this batch saved. Support details share public card and attempt identifiers; keys, PINs and credentials stay in their designated storage.'
+            }
+          </InfoButton>
+          <GearButton testID="settings" onPress={leave} />
+        </View>
+      }>
       <ScrollView contentContainerStyle={s.scroll}>{content}</ScrollView>
       {flow.busy ? (
         <View style={s.stickyAction} testID="sticky-card-action">
@@ -322,16 +339,16 @@ export function ProvisioningScreen({
   const figureState = flow.busy
     ? 'running'
     : stage === 'quarantined'
-      ? 'danger'
-      : recentlyRecorded || stage === 'recorded'
-        ? 'done'
-        : snapshot.active && (flow.notice || stage !== 'reserved')
-          ? 'stop'
-          : 'idle';
+    ? 'danger'
+    : recentlyRecorded || stage === 'recorded'
+    ? 'done'
+    : snapshot.active && (flow.notice || stage !== 'reserved')
+    ? 'stop'
+    : 'idle';
   const canQuarantine =
     !!stage && !['record_pending', 'recorded', 'quarantined'].includes(stage);
   const share =
-    `Installation record — ${recorded.length} installed, ${stopped} stopped\n` +
+    `Installation record: ${recorded.length} installed, ${stopped} stopped\n` +
     'Holder-wallet setup is a separate step.\n' +
     snapshot.history
       .map(
@@ -341,14 +358,14 @@ export function ProvisioningScreen({
           }: ` +
           (j.stage === 'recorded'
             ? 'installation saved'
-            : (j.disposition_intent?.kind ?? 'stopped')),
+            : j.disposition_intent?.kind ?? 'stopped'),
       )
       .join('\n');
   return shell(
     <>
       {flow.drill ? (
         <View style={s.card} testID="recovery-drill-panel">
-          <Text style={s.line}>LOCAL VALIDATION BUILD — recovery drill</Text>
+          <Text style={s.line}>LOCAL VALIDATION BUILD: recovery drill</Text>
           <Dim>
             Pauses are held in memory only. Record the boundary and saved stage
             before terminating the app. Holder-wallet setup is a separate step.
@@ -409,17 +426,13 @@ export function ProvisioningScreen({
       <Dim>
         {recorded.length} installed · {stopped} stopped
       </Dim>
-      <Dim>
-        Install cards here. Set up ownership and a PIN in a holder wallet before
-        loading or spending.
-      </Dim>
       <View style={s.figure} testID="real-card-visual">
         <CardFigure fill={figureFill} state={figureState} />
         {flow.busy ? (
           <Text style={s.phase} testID="recovery-busy">
             {flow.phase === 'load'
               ? `Writing ${loadPercent}%`
-              : (PHASES[flow.phase] ?? 'Confirming saved work…')}
+              : PHASES[flow.phase] ?? 'Confirming saved work…'}
           </Text>
         ) : null}
       </View>
@@ -569,10 +582,6 @@ export function ProvisioningScreen({
           }).catch(() => setExportFailed(true));
         }}
       />
-      <Dim>
-        Shares public card and attempt identifiers. No keys, PINs or
-        credentials.
-      </Dim>
       {exportFailed ? (
         <Dim>
           Recovery details could not be shared. Saved work is unchanged.

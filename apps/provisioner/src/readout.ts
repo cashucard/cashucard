@@ -1,5 +1,5 @@
 /**
- * What a run measured, for the bench report (docs/HARDWARE_TEST_REPORT_*):
+ * What a run measured, for the bench report (docs/reports/HARDWARE_TEST_REPORT_*):
  * the tap wait, the total against iOS's 60-second session, the critical path,
  * each phase, every APDU over Android's default 618 ms, and the free memory
  * before and after. Built from cardkit's records, which hold an APDU's INS,

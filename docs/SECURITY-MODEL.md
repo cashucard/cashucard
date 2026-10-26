@@ -241,7 +241,7 @@ leaves an empty place with a record beside it, which nothing serves.
 - NUT-11 witness checks: wrong key, wrong proof, corrupted signature, `n_sigs`
 
 **Run on silicon** (NXP JCOP4 J3R180, 2026-09-22/23, recorded in the
-[hardware report](HARDWARE_TEST_REPORT_2026-09-22.j3r180.md); applet 0.1, then
+[hardware report](reports/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md); applet 0.1, then
 0.2 for the D13 probes):
 - `cardctl selftest`: card signatures verify under BIP-340, and two signatures
   over the same message use different nonces
@@ -262,7 +262,7 @@ leaves an empty place with a record beside it, which nothing serves.
   load with a proof, and the time a phone takes to load one piece a command
 
 An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
-2026-09-01 ([its report](HARDWARE_TEST_REPORT_2026-09-01.j3r452.md)).
+2026-09-01 ([its report](reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md)).
 
 **Not yet run on silicon:**
 - The tag's switch (1.19): `SET_TAG` on a card, and with it the shareable lookup
@@ -289,10 +289,10 @@ a few hundred taps. Treat simulator results accordingly, see
 
 ## Open items
 
-1. **Hardware coverage:** the [October 14 report](HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)
+1. **Hardware coverage:** the [October 14 report](reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)
    records 2.1 installation, administration and signature timing. The
-   [October 23 payment](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) and
-   [mobile reset](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md) reports
+   [October 23 payment](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) and
+   [mobile reset](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md) reports
    record the tested lifecycle. Future releases require evidence for changed
    paths and the remaining cases listed in those reports.
 2. **Tear-off on silicon** (#11): the write orders are analysed and enforced
