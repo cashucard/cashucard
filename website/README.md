@@ -27,6 +27,14 @@ remains a draft. Review the source specification when changing the payment or
 ownership explanation.
 The hero describes offline terminal acceptance and later mint settlement as
 separate events; an offline tap does not guarantee final settlement.
+The site calls Cashu Card experimental on every page: the hero, the install
+guide's facts, and each footer. The home page states the risks once, in
+`#risks`, before where to get cards; `/faq` (`dist/faq.html`) answers holders',
+merchants' and developers' questions from the security model, the decisions and
+the dated reports, and `/developers` (`dist/developers.html`) links the draft,
+the APDU reference, the vectors and the code. Both use the install guide's
+layout and `guide.js`. When a doc they link moves, update its link here. There
+is no page for merchants yet, by choice: it waits for more wallets and tills.
 Footer links point to the draft NUT and the Cashu Card source, with the Cashu
 Card Provisioner under Apps. The install guide's Apps also link Flash and Foxy
 at their own sites, getflash.io and getfoxy.io, since its setup step sends a

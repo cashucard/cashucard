@@ -139,3 +139,16 @@
 .cmd pre{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.guide-steps a,.guide-rail a{transition:none}.guide-steps a:hover{transform:none}}
+
+/* the questions and answers at /faq, and the developer page at /developers, on the guide's layout */
+.guide-lead a{color:#d3f39a;text-decoration:underline;text-underline-offset:3px}
+.guide-lead a:hover{color:#e7ffb7}
+.faq{display:grid;gap:10px}
+.faq .more{margin-top:0;scroll-margin-top:24px}
+.faq .more summary{line-height:1.35}
+.faq .more summary::before{flex:none}
+.dev-cards{margin:18px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.dev-cards li{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border:1px solid #b8d1b324;border-radius:4px;background:#0c2018}
+.dev-cards li b{font-size:16px}
+.dev-cards li span{color:#9eb4a2;font-size:14px;line-height:1.45}
+@media(max-width:600px){.dev-cards{grid-template-columns:1fr}}

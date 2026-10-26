@@ -2,6 +2,8 @@
 
 This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 2.1, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
+Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
+
 ## Rules
 
 1. Run the commands in this file one at a time, exactly as written, and compare each output with the expected output before you run the next one.

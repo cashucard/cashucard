@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#10271e" />
+    <meta name="description" content="Questions and answers about Cashu Card, an experimental open source project that puts Cashu ecash on an NFC card: what it is, what it costs, what happens if a card is lost, and how to build on it." />
+    <meta property="og:title" content="Questions and answers | Cashu Card" />
+    <meta property="og:description" content="What Cashu Card is, how a card holds and pays ecash, the risks of an experimental project, and how to build on it." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cashucard.org/faq" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://cashucard.org/faq" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/guide.css" />
+    <script src="/guide.js" defer></script>
+    <title>Questions and answers | Cashu Card</title>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
+      <nav aria-label="Main navigation"><a href="/#film">Film</a><a href="/#risks">Risks</a><a href="/#buy">Get cards</a><a href="/guide">Install guide</a><a href="/faq" aria-current="page">FAQ</a><a href="/developers">Developers</a></nav>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main" class="guide">
+      <section class="guide-hero" aria-labelledby="faq-title">
+        <div class="guide-hero-inner">
+          <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> QUESTIONS AND ANSWERS</div>
+          <h1 id="faq-title">Questions <em>and answers</em></h1>
+          <p class="guide-lead">Cashu Card is an experimental open source project. These answers come from its specification, its security model and its dated test reports, and they say so where something is untested or still open. Read the <a href="/#risks">risks</a> before you load a card.</p>
+          <ul class="guide-facts" aria-label="At a glance">
+            <li>Experimental</li>
+            <li>NUT-CCP draft</li>
+            <li>MIT license</li>
+            <li>27 questions</li>
+          </ul>
+        </div>
+      </section>
+
+      <div class="guide-layout">
+        <nav class="guide-rail" aria-label="Questions by topic">
+          <span class="rail-label">On this page</span>
+          <ol>
+            <li><a href="#basics">The basics</a></li>
+            <li><a href="#holding">Holding a card</a></li>
+            <li><a href="#safety">Safety</a></li>
+            <li><a href="#paying">Paying with a card</a></li>
+            <li><a href="#building">Building and contributing</a></li>
+          </ol>
+        </nav>
+
+        <article class="guide-doc">
+          <details class="guide-toc">
+            <summary>Contents</summary>
+            <ol>
+              <li><a href="#basics">The basics</a></li>
+              <li><a href="#holding">Holding a card</a></li>
+              <li><a href="#safety">Safety</a></li>
+              <li><a href="#paying">Paying with a card</a></li>
+              <li><a href="#building">Building and contributing</a></li>
+            </ol>
+          </details>
+
+          <section id="basics" aria-labelledby="basics-title">
+            <h2 id="basics-title">The basics</h2>
+            <div class="faq">
+              <details class="more" id="what">
+                <summary>What is Cashu Card?</summary>
+                <div class="more-body"><p>An open protocol and a Java Card applet that put Cashu ecash on an NFC smart card. A wallet loads ecash onto the card, and its holder pays by tapping the card on a merchant's phone or till. The till can accept the tap while offline and settle with the mint once it is connected again.</p></div>
+              </details>
+              <details class="more" id="cashu">
+                <summary>What is Cashu?</summary>
+                <div class="more-body"><p>Cashu is an ecash protocol for Bitcoin. A mint issues ecash backed by the bitcoin it holds, and wallets pass that ecash between people privately. Its specifications are called NUTs and live in <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>. <a href="https://cashu.space">cashu.space</a> introduces it.</p></div>
+              </details>
+              <details class="more" id="nut-ccp">
+                <summary>What is NUT-CCP, and is it part of Cashu?</summary>
+                <div class="more-body"><p>NUT-CCP, the Cashu Card Protocol, is a draft NUT written by this project and kept in <a href="https://github.com/cashucard/nut">cashucard/nut</a>. It is written for proposal to cashubtc/nuts, where it is still to be proposed, numbered or merged. Until the Cashu maintainers assign it a number, it is called NUT-CCP. It has had little testing or review outside this project.</p></div>
+              </details>
+              <details class="more" id="experimental">
+                <summary>Why is it called experimental?</summary>
+                <div class="more-body"><p>The protocol is a draft, the applet has run end to end on one card model with a few phones, and an independent security review is still to come. Expect changes. The move from the 0.x applet to 2.0 changed the card's commands, and cards on 0.x had to be emptied and reinstalled; a later change could need the same.</p></div>
+              </details>
+              <details class="more" id="who">
+                <summary>Who makes Cashu Card?</summary>
+                <div class="more-body"><p>Its contributors, in the open, in the <a href="https://github.com/cashucard">cashucard organization on GitHub</a>. The code is under the MIT license, so anyone can read, use, change and ship it.</p></div>
+              </details>
+              <details class="more" id="cost">
+                <summary>What does it cost?</summary>
+                <div class="more-body"><p>The software is free. Blank cards cost money: <a href="/#buy">Where to get cards</a> lists sellers, from about $6 to $12 a card. A mint can charge a fee on the swaps a payment makes, and a wallet or card issuer can charge for its own service. Those fees are theirs to set.</p></div>
+              </details>
+            </div>
+          </section>
+
+          <section id="holding" aria-labelledby="holding-title">
+            <h2 id="holding-title">Holding a card</h2>
+            <div class="faq">
+              <details class="more" id="get-card">
+                <summary>How do I get a card?</summary>
+                <div class="more-body"><p>Buy blank NXP J3R180 cards (<a href="/#buy">Where to get cards</a>), install the applet with the Cashu Card Provisioner app or the <a href="/guide">install guide</a>, then set the card up in a wallet that supports Cashu Card. Custom printed cards with the applet installed are coming soon.</p></div>
+              </details>
+              <details class="more" id="wallets">
+                <summary>Which wallets support it?</summary>
+                <div class="more-body"><p>Wallets that implement NUT-CCP and the card's profiles. The <a href="/guide#setup">install guide's setup step</a> lists the wallets it uses, under Apps at the foot of that page. Support is early, and the <a href="/developers">developer page</a> is the place to start for a wallet that wants to add it.</p></div>
+              </details>
+              <details class="more" id="load">
+                <summary>How does money get onto the card?</summary>
+                <div class="more-body"><p>A wallet that supports Cashu Card names the card's mint, then writes ecash onto it, each piece locked to a key the card made on its own chip. A card holds up to 128 pieces, all from one mint, in sats.</p></div>
+              </details>
+              <details class="more" id="how-much">
+                <summary>How much should I keep on a card?</summary>
+                <div class="more-body"><p>Only small amounts you can afford to lose. A lost or broken card loses its balance, and the project is experimental. The <a href="/#risks">risks</a> explain why.</p></div>
+              </details>
+              <details class="more" id="mint">
+                <summary>Who holds the money behind the card?</summary>
+                <div class="more-body"><p>The mint. The card's ecash is a claim on one mint, named on the card when it is set up, and that mint holds the bitcoin that backs it. You trust the mint to honor its ecash. A reader can check that each piece was signed by the mint; whether the mint stays solvent is a matter of trust in its operator.</p></div>
+              </details>
+              <details class="more" id="lost">
+                <summary>What happens if I lose the card or it breaks?</summary>
+                <div class="more-body"><p>Its balance is lost. The key that spends the card's ecash is made on the chip and stays there, so a backup of your wallet cannot recreate it. This is a deliberate design choice, recorded as <a href="https://github.com/cashucard/cashucard/blob/main/docs/DECISIONS.md#d5">decision D5</a>. The applet has a dated refund path for a lost card, and the apps keep it switched off for now.</p></div>
+              </details>
+              <details class="more" id="phones">
+                <summary>Which phones work?</summary>
+                <div class="more-body"><p>The October 2026 tests used named Android phones and iPhones with NFC, recorded in the <a href="https://github.com/cashucard/cashucard/blob/main/docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">end-to-end report</a> and the <a href="https://github.com/cashucard/cashucard/blob/main/docs/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md">reset report</a>. Other phones with NFC may work and are untested.</p></div>
+              </details>
+              <details class="more" id="terminals">
+                <summary>Can I pay at an ordinary card terminal?</summary>
+                <div class="more-body"><p>A Cashu Card pays readers that speak its protocol, such as a merchant's phone running a till app that supports it. Bank card terminals use EMV, a different system, and they cannot read a Cashu Card's ecash.</p></div>
+              </details>
+              <details class="more" id="reuse">
+                <summary>Can a card be reset and used again?</summary>
+                <div class="more-body"><p>Yes. The card issuer that installed it can reset it from the Cashu Card Provisioner, once the holder has moved its value off and pending payments have settled. The card is then installed again with a new key and set up again in a wallet.</p></div>
+              </details>
+            </div>
+          </section>
+
+          <section id="safety" aria-labelledby="safety-title">
+            <h2 id="safety-title">Safety</h2>
+            <div class="faq">
+              <details class="more" id="found">
+                <summary>Can someone who finds my card spend it?</summary>
+                <div class="more-body"><p>Up to the limits the card's owner set. On a card with a PIN, a payment needs the PIN unless it fits the no-PIN allowance the owner chose. A card with no PIN pays whoever holds it, like cash, up to its daily limit and its limit on one payment.</p></div>
+              </details>
+              <details class="more" id="pin">
+                <summary>What if I forget the PIN, or someone blocks it?</summary>
+                <div class="more-body"><p>Three wrong PINs block the card, and any reader in range can send them. The owner's wallet sets a new PIN with the card's owner key, which unblocks it. If the owner key is lost as well, a blocked card's balance is stranded.</p></div>
+              </details>
+              <details class="more" id="owner-key">
+                <summary>What is the owner key, and what if I lose my phone?</summary>
+                <div class="more-body"><p>When you set a card up, your wallet makes an owner key that administers the card: its PIN, its limits and its reset. Keep your wallet's backup. If the owner key is gone, you can still pay with the PIN, but a blocked PIN stays blocked, and the daily limit renews only a set number of times (7 by default) before the card stops paying. A balance above about eight daily limits is then stranded.</p></div>
+              </details>
+              <details class="more" id="read">
+                <summary>Can someone read my card?</summary>
+                <div class="more-body"><p>Yes. Any reader can read the card's balance, its pieces and its payment history without the PIN. Spending takes a signature that only the card's chip can make, and the card makes it only within the limits above.</p></div>
+              </details>
+              <details class="more" id="skim">
+                <summary>Can a card be skimmed in my pocket or bag?</summary>
+                <div class="more-body"><p>A reader has to be within NFC range, and it can spend only up to the card's limits described above. The project has yet to measure the card's range or test whether draining a card at a distance is practical.</p></div>
+              </details>
+              <details class="more" id="audit">
+                <summary>Has it been audited?</summary>
+                <div class="more-body"><p>An independent security review is still to come. The project's <a href="https://github.com/cashucard/cashucard/blob/main/docs/SECURITY-MODEL.md">security model</a> lists each threat, its control and the open items, among them pulling a card mid-write and timing attacks, which are still untested on silicon.</p></div>
+              </details>
+            </div>
+          </section>
+
+          <section id="paying" aria-labelledby="paying-title">
+            <h2 id="paying-title">Paying with a card</h2>
+            <div class="faq">
+              <details class="more" id="offline">
+                <summary>How does an offline payment work?</summary>
+                <div class="more-body"><p>The till reads the card's pieces and names the ones it wants. The card signs once for the whole payment and marks those pieces spent. The till checks the mint's signature on each piece without going online and accepts the payment. Back online, it swaps the pieces at the mint, and the payment settles. <a href="/#tap">One tap, step by step</a> shows it.</p></div>
+              </details>
+              <details class="more" id="merchant-risk">
+                <summary>What risk does a merchant take on an offline payment?</summary>
+                <div class="more-body"><p>Until the till settles, the merchant carries the risk that a piece was spent elsewhere first, and that the mint fails. Settling promptly shortens that window, and a till that is online checks with the mint before it accepts. The card's limits and small balances keep the amount at stake small.</p></div>
+              </details>
+            </div>
+          </section>
+
+          <section id="building" aria-labelledby="building-title">
+            <h2 id="building-title">Building and contributing</h2>
+            <div class="faq">
+              <details class="more" id="build">
+                <summary>Can I build a wallet or till that supports Cashu Card?</summary>
+                <div class="more-body"><p>Yes. The protocol is open, and the <a href="/developers">developer page</a> links the draft, the card's commands byte for byte, test vectors, a client library and the applet's source.</p></div>
+              </details>
+              <details class="more" id="report">
+                <summary>How do I report a bug or a security problem?</summary>
+                <div class="more-body"><p>Report a bug as a <a href="https://github.com/cashucard/cashucard/issues">GitHub issue</a>. Report a security problem privately through a <a href="https://github.com/cashucard/cashucard/security/advisories/new">security advisory</a>, as the <a href="https://github.com/cashucard/cashucard/blob/main/SECURITY.md">security policy</a> asks, so it can be fixed before it is public.</p></div>
+              </details>
+              <details class="more" id="contribute">
+                <summary>How can I contribute?</summary>
+                <div class="more-body"><p>Start with the <a href="https://github.com/cashucard/cashucard/blob/main/CONTRIBUTING.md">contributing guide</a>. Documentation, the command-line tools, the client library and reading the spec against the code all need help, and none of them needs a card or a reader.</p></div>
+              </details>
+              <details class="more" id="ask">
+                <summary>Where can I ask a question?</summary>
+                <div class="more-body"><p>In <a href="https://github.com/cashucard/cashucard/discussions/categories/q-a">GitHub Discussions</a>, on the main repository. Questions about the draft NUT, the applet and the client library all go there.</p></div>
+              </details>
+            </div>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
+  </body>
+</html>

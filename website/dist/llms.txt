@@ -1,15 +1,18 @@
 # Cashu Card
 
-> Cashu Card is an open NFC ecash protocol. Its core is NUT-CCP, a draft Cashu NUT. Wallets load Cashu ecash onto an NFC smart card, and a till can accept a tap offline and settle with the mint when it is connected. The applet runs on NXP J3R180 cards (Java Card 3.0.5).
+> Cashu Card is an experimental open source NFC ecash protocol. Its core is NUT-CCP, a draft Cashu NUT with little testing or review outside the project. Wallets load Cashu ecash onto an NFC smart card, and a till can accept a tap offline and settle with the mint when it is connected. The applet runs on NXP J3R180 cards (Java Card 3.0.5).
 
 ## Guides
 
 - [Install the Cashu Card applet, for AI agents](https://cashucard.org/guide.md): installs the applet on a blank J3R180 card from a computer with a card reader, with every command, its expected answer and the points where the agent stops and asks its person.
 - [Install guide](https://cashucard.org/guide): the same steps as a page for people.
+- [Questions and answers](https://cashucard.org/faq): what the card is, what it costs, what happens if one is lost, and the risks of an experimental project.
+- [Risks](https://cashucard.org/#risks): what a holder and a merchant should know before a card holds value.
 - [Cashu Card Provisioner](https://cashucard.org/#install): an app for card issuers that installs the applet on blank cards over a phone's NFC, in beta on [TestFlight](https://testflight.apple.com/join/M3JucFNy) and [Google Play](https://play.google.com/apps/testing/com.islandbitcoin.provisioner).
 
 ## Protocol and code
 
+- [Developers](https://cashucard.org/developers): the draft, the card's commands, test vectors, the applet, the client library and the tools, with what a reader must check.
 - [Draft specification](https://github.com/cashucard/nut/blob/main/CCP.md): NUT-CCP, the core every card and reader share: selecting the card, card proofs, reading, paying, the card's change and loading.
 - [Test vectors](https://github.com/cashucard/nut/blob/main/tests/CCP-tests.md): NUT-CCP's card proof secrets, payments with and without change, and AUTH, worked through.
 - [APDU reference](https://github.com/cashucard/cashucard/blob/main/spec/APDU.md): the card's wire, byte for byte, with the profiles for the owner, the clock and the limits, and the NFC tag.
