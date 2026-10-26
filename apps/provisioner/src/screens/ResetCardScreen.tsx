@@ -33,9 +33,11 @@ const BLOCKED: Record<string, string> = {
 export function ResetCardScreen({
   onBack,
   onInstall,
+  backLabel = 'BACK TO SETTINGS',
 }: {
   onBack: () => void;
   onInstall: () => void;
+  backLabel?: string;
 }) {
   const flow = useProvisioning(),
     app = useApp(),
@@ -442,7 +444,7 @@ export function ResetCardScreen({
               ? 'STOP AND SAVE FOR LATER'
               : card
               ? 'CANCEL REVIEW'
-              : 'BACK TO SETTINGS'
+              : backLabel
           }
           testID="reset-leave"
           onPress={leave}

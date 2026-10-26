@@ -47,6 +47,7 @@ test('Home Stop cancels the owned wait and retains a pending batch closure for r
     return app.session ? (
       <CardsHomeScreen
         onInstall={() => {}}
+        onCheck={() => {}}
         onReset={() => {}}
         onSettings={() => {}}
       />
