@@ -151,7 +151,7 @@ test('Cards names the signed-in operator and service and offers everyday tools w
   );
   expect(
     tree.root.findByProps({testID: 'home-service'}).props.children,
-  ).toContain('https://ops.cashucard.org');
+  ).toBe(opsDashboardUrl(DEFAULT_SERVICE_URL));
   expect(tree.root.findByProps({testID: 'home-new'})).toBeDefined();
   expect(tree.root.findByProps({testID: 'home-check'}).props.disabled).toBe(
     false,
