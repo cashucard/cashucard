@@ -156,17 +156,33 @@
 /* Component overview and the self-hosting guide. */
 .guide-back{margin:24px 0 0;font-size:14px}
 .guide-back a{color:#d3f39a;text-decoration:underline;text-underline-offset:3px}
-.system-flow{margin:22px 0;padding:20px;border:1px solid #b8d1b329;border-radius:6px;background:#0c2018}
-.system-flow h3{margin:0 0 16px;color:#edf3e7}
-.flow-nodes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;list-style:none;margin:0;padding:0}
-.flow-nodes li{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
-.flow-nodes li+li::before{content:"→";position:absolute;left:-20px;top:0;color:#d3f39a}
-.flow-nodes b{font-size:15px}
-.flow-nodes span,.guide-doc .system-flow p{font-size:14px;line-height:1.45;color:#9eb4a2}
-.guide-doc .system-flow p{margin-top:18px;padding-top:14px;border-top:1px solid #b8d1b31f}
 .dev-paths{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:600px){
-.flow-nodes,.dev-paths{grid-template-columns:1fr}
-.flow-nodes{gap:30px}
-.flow-nodes li+li::before{content:"↓";left:0;top:-26px}
+.dev-paths{grid-template-columns:1fr}
+}
+
+/* The ecosystem map has a full-width canvas and a separate phone composition. */
+.developer-guide .guide-layout{max-width:1480px;grid-template-columns:190px minmax(0,1fr);gap:clamp(32px,4vw,64px);padding-left:clamp(24px,5vw,72px);padding-right:clamp(24px,5vw,72px)}
+.developer-guide .guide-doc{max-width:none}
+.developer-guide .guide-doc>section:not(#overview){max-width:800px}
+.ecosystem{margin:24px 0 0;border:1px solid #b8d1b32e;border-radius:16px;background:#0a1d15;overflow:hidden;box-shadow:0 20px 60px #03100930}
+.ecosystem picture{display:block}
+.ecosystem img{display:block;width:100%;height:auto}
+.ecosystem figcaption{padding:16px 24px 20px;border-top:1px solid #b8d1b324}
+.ecosystem-legend{display:flex;align-items:center;flex-wrap:wrap;gap:12px 22px;color:#a6c0ac;font-size:12px}
+.ecosystem-legend span{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.ecosystem-legend span::before{content:"";width:22px;border-top:2px solid #83a99d}
+.ecosystem-legend .legend-nfc::before{border-color:#cceaa2}
+.ecosystem-legend .legend-recovery::before{border-color:#b9ab85;border-top-style:dashed}
+.ecosystem-legend a{margin-left:auto;font-size:12px}
+.guide-doc .ecosystem figcaption p{margin:12px 0 0;color:#8eaa99;font-size:12px;line-height:1.5}
+@media(max-width:1100px){
+.developer-guide .guide-layout{grid-template-columns:1fr}
+.developer-guide .guide-rail{display:none}
+.developer-guide .guide-toc{display:block}
+}
+@media(max-width:900px){
+.ecosystem picture{max-width:440px;margin:0 auto}
+.ecosystem figcaption{padding:16px}
+.ecosystem-legend a{margin-left:0}
 }
