@@ -149,7 +149,9 @@ persistence. The hosting platform may set infrastructure cookies.
 `/developers#overview` separates card use from issuance, names each component's
 operator and folds optional recovery infrastructure into a disclosure. Its ecosystem
 diagram has desktop and phone compositions generated from the same component roles
-by `python3 website/tools/ecosystem.py` (`--check` verifies the SVGs). The diagrams
+by `python3 website/tools/ecosystem.py` (`--check` verifies the SVGs). The generator
+writes the [Cashu Card asset library](../brand/diagrams/README.md) and the website
+copies together. The diagrams
 show the same physical card on the payment and installation paths, distinguish
 NFC, online APIs and recovery links, and retain a text explanation in the page. `/ops-service`
 explains manager-key custody and provides the standalone Docker setup, HTTPS,

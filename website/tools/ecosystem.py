@@ -3,7 +3,9 @@ from pathlib import Path
 from html import escape
 import sys
 
-ROOT = Path(__file__).resolve().parents[1] / 'dist' / 'assets'
+REPO = Path(__file__).resolve().parents[2]
+LIBRARY = REPO / 'brand' / 'diagrams'
+WEBSITE = REPO / 'website' / 'dist' / 'assets'
 ICONS = {
     'mint': '<circle cx="12" cy="12" r="9"/><path d="M9 8h5a2 2 0 0 1 0 4H9m0 0h5a2 2 0 0 1 0 4H9m2-10v12"/>',
     'wallet': '<path d="M4 6h14v4M4 6V4h13v2M4 6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16V8H4m16 4h-6v5h6"/><circle cx="16.5" cy="14.5" r=".5"/>',
@@ -143,11 +145,14 @@ def render(mobile=False):
 '''
 
 for mobile in (False, True):
-    file=ROOT / ('ecosystem-mobile.svg' if mobile else 'ecosystem.svg')
-    rendered=render(mobile)
-    if '--check' in sys.argv:
-        if not file.exists() or file.read_text()!=rendered:
-            raise SystemExit(f'Regenerate {file.name} with python3 website/tools/ecosystem.py')
-    else:
-        file.write_text(rendered)
+    name = 'ecosystem-mobile.svg' if mobile else 'ecosystem.svg'
+    rendered = render(mobile)
+    for directory in (LIBRARY, WEBSITE):
+        file = directory / name
+        if '--check' in sys.argv:
+            if not file.exists() or file.read_text() != rendered:
+                raise SystemExit(f'Regenerate {file} with python3 website/tools/ecosystem.py')
+        else:
+            directory.mkdir(parents=True, exist_ok=True)
+            file.write_text(rendered)
 print('Ecosystem SVGs verified.' if '--check' in sys.argv else 'Ecosystem SVGs generated.')
