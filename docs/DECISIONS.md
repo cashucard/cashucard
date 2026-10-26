@@ -3564,3 +3564,19 @@ service selector, with no firmware, cardkit API or ops-service migration.
 **Rejected:** an extra review page for the shipping flow, opening NFC on screen
 entry or restart, and chaining two independent operations that could clear a
 Stop request between batch creation and card reservation.
+
+
+## <a id="d125"></a>D125: Sign-in shows the service as a compact connection row
+
+**Decided (2026-10-26):** replace the full-width URL action on sign-in with
+an “Ops service” label, a single-line hostname and a separate “Change” cue in
+one accessible button. Long hosts shorten in the middle; the full display
+address is announced to screen readers and remains available in the selector.
+The existing production display alias remains. The row uses the input surface
+and a quiet border, with an accent for Change and pressed feedback.
+
+**Why:** the uppercase URL button competed with sign-in and wrapped long
+addresses. The row distinguishes the current destination from its action.
+
+**Rejected:** a connectivity indicator without a service check, extra steps to
+switch services, and changing API origins or saved-work bindings for display.

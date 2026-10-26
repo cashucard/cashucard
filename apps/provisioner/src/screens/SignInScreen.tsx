@@ -4,6 +4,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,10 +16,9 @@ import {ApiCancelledError, ApiUnreachableError} from '../api';
 import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {APP_NAME, SIGNIN} from '../strings';
 import {useApp} from '../store';
-import {LegalLinks} from '../LegalLinks';
+import {LegalLinks, opsDashboardUrl} from '../LegalLinks';
 import {FONT, useTheme, type Theme} from '../theme';
 import {InfoButton, PrimaryButton, Screen, SecondaryButton} from '../ui';
-import {opsDashboardUrl} from '../LegalLinks';
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -53,6 +53,27 @@ const local = (t: Theme) =>
       gap: 10,
       paddingHorizontal: 8,
     },
+    serviceChoice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      minHeight: 68,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 4,
+      backgroundColor: t.card,
+      borderWidth: 1,
+      borderColor: t.line,
+      borderRadius: 12,
+    },
+    servicePressed: {borderColor: t.accent},
+    serviceDisabled: {opacity: 0.5},
+    serviceIdentity: {flex: 1, gap: 4},
+    serviceLabel: {color: t.dim, fontFamily: FONT.regular, fontSize: 12},
+    serviceHost: {color: t.ink, fontFamily: FONT.medium, fontSize: 15},
+    serviceAction: {flexDirection: 'row', alignItems: 'center', gap: 6},
+    serviceChange: {color: t.accent, fontFamily: FONT.medium, fontSize: 14},
+    serviceChevron: {color: t.dim, fontSize: 22},
     input: {
       color: t.ink,
       fontFamily: FONT.regular,
@@ -95,6 +116,10 @@ export function SignInScreen({onServices}: {onServices?: () => void} = {}) {
   const request = useRef<AbortController | null>(null);
   const serviceReady =
     app.serviceStatus !== 'loading' && app.serviceStatus !== 'blocked';
+  const serviceAddress = opsDashboardUrl(app.serviceUrl) ?? app.serviceUrl;
+  const serviceHost = serviceAddress.replace(/^https?:\/\//, '');
+  const serviceLoading = app.serviceStatus === 'loading';
+  const serviceChoiceDisabled = busy || serviceLoading;
   useEffect(() => {
     request.current?.abort();
     request.current = null;
@@ -172,18 +197,48 @@ export function SignInScreen({onServices}: {onServices?: () => void} = {}) {
           </InfoButton>
           <View style={s.form}>
             {onServices ? (
-              <SecondaryButton
-                title={
-                  app.serviceStatus === 'loading'
-                    ? 'LOADING SERVICE…'
-                    : `SERVICE: ${
-                        opsDashboardUrl(app.serviceUrl) ?? app.serviceUrl
-                      }`
-                }
+              <Pressable
                 testID="sign-in-service"
-                disabled={busy || app.serviceStatus === 'loading'}
-                onPress={onServices}
-              />
+                accessibilityRole="button"
+                accessibilityLabel={
+                  serviceLoading
+                    ? 'Loading ops service'
+                    : `Change ops service. Current service: ${serviceAddress}`
+                }
+                accessibilityHint="Choose a saved service or add an address."
+                accessibilityState={{
+                  disabled: serviceChoiceDisabled,
+                  busy: serviceLoading,
+                }}
+                disabled={serviceChoiceDisabled}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  onServices();
+                }}
+                style={({pressed}) => [
+                  s.serviceChoice,
+                  pressed && s.servicePressed,
+                  serviceChoiceDisabled && s.serviceDisabled,
+                ]}>
+                <View style={s.serviceIdentity}>
+                  <Text style={s.serviceLabel} testID="sign-in-service-label">
+                    Ops service
+                  </Text>
+                  <Text
+                    style={s.serviceHost}
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                    testID="sign-in-service-host">
+                    {serviceLoading ? 'Loading…' : serviceHost}
+                  </Text>
+                </View>
+                <View style={s.serviceAction}>
+                  <Text style={s.serviceChange} testID="sign-in-service-change">
+                    Change
+                  </Text>
+                  <Text style={s.serviceChevron}>›</Text>
+                </View>
+              </Pressable>
             ) : null}
             <TextInput
               value={name}

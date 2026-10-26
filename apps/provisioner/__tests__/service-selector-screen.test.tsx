@@ -68,7 +68,7 @@ test('service review sends no credentials and returning to sign-in clears the ol
     '',
   );
   expect(
-    tree.root.findByProps({testID: 'sign-in-service'}).props.title,
+    tree.root.findByProps({testID: 'sign-in-service'}).props.accessibilityLabel,
   ).toContain('issuer.example.com');
   expect(auth).not.toHaveBeenCalled();
   await act(async () => {
@@ -116,6 +116,6 @@ test('canceling a service review preserves the current destination', async () =>
   expect(tree.root.findByProps({testID: 'sign-in'})).toBeDefined();
   expect(await AsyncStorage.getItem(SERVICE_PROFILES_KEY)).toBeNull();
   expect(
-    tree.root.findByProps({testID: 'sign-in-service'}).props.title,
+    tree.root.findByProps({testID: 'sign-in-service'}).props.accessibilityLabel,
   ).toContain(opsDashboardUrl(DEFAULT_SERVICE_URL));
 });
