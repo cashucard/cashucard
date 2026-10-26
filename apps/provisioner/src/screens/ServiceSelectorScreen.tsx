@@ -56,7 +56,7 @@ export function ServiceSelectorScreen({onDone}: {onDone(): void}) {
       headerRight={
         <InfoButton title="Choosing a service" testID="services-help">
           {
-            'Use the ops-service provided by your card issuer. Each service has its own operator accounts and card records. Signing in sends your operator credentials to the selected address. Saved batches and resets stay on this phone, bound to their original service and account.'
+            'Use the ops-service provided by your card issuer. Each service has its own operator accounts and card records. Signing in sends your operator credentials to the selected address. Saved batches and resets stay on this phone, bound to that exact API address and account. Different addresses for the same server can have separate saved work.'
           }
         </InfoButton>
       }>
@@ -124,6 +124,9 @@ export function ServiceSelectorScreen({onDone}: {onDone(): void}) {
                     : review(origin, true)
                 }>
                 <Text style={s.text}>{opsDashboardUrl(origin) ?? origin}</Text>
+                {opsDashboardUrl(origin) !== origin ? (
+                  <Dim>{`API: ${origin}`}</Dim>
+                ) : null}
                 {origin === app.serviceUrl ? <Dim>Current service</Dim> : null}
               </Pressable>
             ))}
