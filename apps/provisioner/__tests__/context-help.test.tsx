@@ -24,9 +24,7 @@ beforeEach(() => {
     operatorName: 'dread',
     session: null,
     serviceUrl: 'https://cashu-card-ops.old-cell-30e7.workers.dev',
-    theme: 'dark',
     signOut: jest.fn(),
-    setTheme: jest.fn(),
   } as unknown as ReturnType<typeof useApp>);
   jest.mocked(useProvisioning).mockReturnValue({
     status: 'ready',
@@ -291,18 +289,22 @@ test.each([
 ])(
   'sign-in labels the current service and offers a clear Change action for %s',
   async (origin, host) => {
-    jest
-      .mocked(useApp)
-      .mockReturnValue({
-        ...useApp(),
-        serviceUrl: origin,
-        serviceStatus: 'ready',
-      });
+    jest.mocked(useApp).mockReturnValue({
+      ...useApp(),
+      serviceUrl: origin,
+      serviceStatus: 'ready',
+    });
     const choose = jest.fn();
     await render(<SignInScreen onServices={choose} />);
-    expect(tree.root.findByProps({testID: 'sign-in-service-label'}).props.children).toBe('Ops service');
-    expect(tree.root.findByProps({testID: 'sign-in-service-host'}).props.children).toBe(host);
-    expect(tree.root.findByProps({testID: 'sign-in-service-change'}).props.children).toBe('Change');
+    expect(
+      tree.root.findByProps({testID: 'sign-in-service-label'}).props.children,
+    ).toBe('Ops service');
+    expect(
+      tree.root.findByProps({testID: 'sign-in-service-host'}).props.children,
+    ).toBe(host);
+    expect(
+      tree.root.findByProps({testID: 'sign-in-service-change'}).props.children,
+    ).toBe('Change');
     expect(action('sign-in-service').props.accessibilityLabel).toContain(
       `Current service: https://${host}`,
     );

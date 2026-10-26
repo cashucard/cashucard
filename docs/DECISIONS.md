@@ -3604,3 +3604,26 @@ while keeping the service destination visible before credentials are entered.
 **Rejected:** redrawing the logo, a marketing introduction before the form,
 a fixed hero that covers fields when the keyboard opens, and replacing build
 11's published artifacts.
+
+
+## <a id="d127"></a>D127: Every provisioner screen uses the forest palette
+
+**Decided (2026-10-26):** use the approved sign-in forest background throughout
+the app, including when the phone is in light mode. One shared theme supplies
+forest surfaces, pale text, sage secondary text, lime accents and coral danger
+states. Filled controls have explicit foreground colors for readable labels.
+Sign-in inherits this theme; its separate light palette is removed. The old
+System/Dark/Light selector and its unused state are removed from Settings.
+
+Card tools, service selection, setup, installation, recovery, results, help
+panels and the gated bench screen share the palette. The bench's release gate
+and hardware handlers retain their existing checks. Card artwork and progress
+meaning remain the same. Build 12 includes this refinement before distribution.
+
+**Why:** the operator approved the sign-in background and asked for it on all
+pages. OS appearance and per-screen overrides would make the app inconsistent.
+D126's sign-in-only theme scope is superseded by this decision.
+
+**Rejected:** changing only the page background while retaining unreadable
+button labels, keeping appearance controls that switch away from the chosen
+palette, and separate copies of the same theme for each screen.

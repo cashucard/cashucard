@@ -17,10 +17,8 @@ import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {SIGNIN} from '../strings';
 import {useApp} from '../store';
 import {LegalLinks, opsDashboardUrl} from '../LegalLinks';
-import {FONT, ThemeProvider, useTheme, type Theme} from '../theme';
-import {SIGN_IN_DARK, SIGN_IN_LIGHT} from '../signInTheme';
+import {FONT, useTheme, type Theme} from '../theme';
 import LogoDark from '../assets/brand/cashu-card-lockup-on-dark.svg';
-import LogoLight from '../assets/brand/cashu-card-lockup-on-light.svg';
 import {InfoButton, Screen, SecondaryButton} from '../ui';
 
 const local = (t: Theme) =>
@@ -95,7 +93,7 @@ const local = (t: Theme) =>
     },
     inputFocused: {
       borderColor: t.accent,
-      backgroundColor: t.dark ? '#1B3B30' : '#FFFFFF',
+      backgroundColor: '#1B3B30',
     },
     footer: {
       width: '100%',
@@ -118,19 +116,19 @@ const local = (t: Theme) =>
     },
     submitPressed: {opacity: 0.85},
     submitText: {
-      color: t.dark ? '#10271E' : '#EDF3E7',
+      color: t.onAccent,
       fontFamily: FONT.semibold,
       fontSize: 17,
     },
-    submitArrow: {color: t.dark ? '#10271E' : '#EDF3E7', fontSize: 24},
+    submitArrow: {color: t.onAccent, fontSize: 24},
     note: {color: t.dim, fontFamily: FONT.regular, fontSize: 13},
     failed: {color: t.danger, fontFamily: FONT.regular, fontSize: 13},
   });
 
 export function SignInScreen({onServices}: {onServices?: () => void} = {}) {
   const app = useApp();
-  const t = useTheme().dark ? SIGN_IN_DARK : SIGN_IN_LIGHT;
-  const Logo = t.dark ? LogoDark : LogoLight;
+  const t = useTheme();
+  const Logo = LogoDark;
   const s = local(t);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -206,178 +204,174 @@ export function SignInScreen({onServices}: {onServices?: () => void} = {}) {
   const disabled =
     busy || !serviceReady || name.trim() === '' || password === '';
   return (
-    <ThemeProvider value={t}>
-      <KeyboardAvoidingView
-        style={s.grow}
-        enabled={Platform.OS === 'ios'}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Screen onStop={busy ? stop : undefined}>
-          <ScrollView
-            style={s.grow}
-            contentContainerStyle={s.center}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag">
-            <View style={s.brand}>
-              <Logo
-                width="100%"
-                height="100%"
-                accessible
-                accessibilityRole="image"
-                accessibilityLabel="Cashu Card"
-                testID="sign-in-brand"
-              />
-            </View>
-            <View style={s.intro}>
-              <Text style={s.eyebrow}>Card provisioner</Text>
-              <View style={s.headingRow}>
-                <Text style={s.heading} accessibilityRole="header">
-                  Sign in
-                </Text>
-                <InfoButton title="Operator sign-in" testID="sign-in-help">
-                  {`${SIGNIN.note}\n\nInstall compatible Cashu cards with your assigned account. Holders set up ownership and funding in their wallet.\n\n${SIGNIN_BUILD}`}
-                </InfoButton>
-              </View>
-            </View>
-            <View style={s.form}>
-              {onServices ? (
-                <Pressable
-                  testID="sign-in-service"
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    serviceLoading
-                      ? 'Loading ops service'
-                      : `Change ops service. Current service: ${serviceAddress}`
-                  }
-                  accessibilityHint="Choose a saved service or add an address."
-                  accessibilityState={{
-                    disabled: serviceChoiceDisabled,
-                    busy: serviceLoading,
-                  }}
-                  disabled={serviceChoiceDisabled}
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    onServices();
-                  }}
-                  style={({pressed}) => [
-                    s.serviceChoice,
-                    pressed && s.servicePressed,
-                    serviceChoiceDisabled && s.disabled,
-                  ]}>
-                  <View style={s.serviceIdentity}>
-                    <Text style={s.serviceLabel} testID="sign-in-service-label">
-                      Ops service
-                    </Text>
-                    <Text
-                      style={s.serviceHost}
-                      numberOfLines={1}
-                      ellipsizeMode="middle"
-                      testID="sign-in-service-host">
-                      {serviceLoading ? 'Loading…' : serviceHost}
-                    </Text>
-                  </View>
-                  <View style={s.serviceAction}>
-                    <Text
-                      style={s.serviceChange}
-                      testID="sign-in-service-change">
-                      Change
-                    </Text>
-                    <Text style={s.serviceChevron}>›</Text>
-                  </View>
-                </Pressable>
-              ) : null}
-              <View style={s.field}>
-                <Text style={s.label}>Operator name</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Your operator name"
-                  placeholderTextColor={t.dim}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!busy && serviceReady}
-                  style={[s.input, focused === 'name' && s.inputFocused]}
-                  onFocus={() => setFocused('name')}
-                  onBlur={() => setFocused(null)}
-                  returnKeyType="next"
-                  blurOnSubmit={false}
-                  onSubmitEditing={() => passwordInput.current?.focus()}
-                  autoComplete="username"
-                  textContentType="username"
-                  accessibilityLabel="Operator name"
-                  testID="sign-in-name"
-                />
-              </View>
-              <View style={s.field}>
-                <Text style={s.label}>Password</Text>
-                <TextInput
-                  ref={passwordInput}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter your password"
-                  placeholderTextColor={t.dim}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  secureTextEntry
-                  editable={!busy && serviceReady}
-                  style={[s.input, focused === 'password' && s.inputFocused]}
-                  onFocus={() => setFocused('password')}
-                  onBlur={() => setFocused(null)}
-                  returnKeyType="go"
-                  onSubmitEditing={attempt}
-                  autoComplete="current-password"
-                  textContentType="password"
-                  accessibilityLabel="Password"
-                  testID="sign-in-password"
-                />
-              </View>
-            </View>
-            <LegalLinks />
-          </ScrollView>
-          <View style={s.footer}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={busy ? SIGNIN.signingIn : SIGNIN.button}
-              accessibilityState={{disabled, busy}}
-              disabled={disabled}
-              onPress={() => attempt()}
-              style={({pressed}) => [
-                s.submit,
-                pressed && !disabled && s.submitPressed,
-                disabled && s.disabled,
-              ]}
-              testID="sign-in">
-              <Text style={s.submitText}>
-                {busy ? SIGNIN.signingIn : SIGNIN.button}
-              </Text>
-              <Text style={s.submitArrow}>→</Text>
-            </Pressable>
-            {app.serviceError ? (
-              <Text style={s.failed} accessibilityLiveRegion="polite">
-                {app.serviceError}
-              </Text>
-            ) : null}
-            {app.serviceStatus === 'blocked' ? (
-              <SecondaryButton
-                title="RELOAD SERVICE SETTINGS"
-                testID="sign-in-service-reload"
-                onPress={app.reloadServices}
-              />
-            ) : null}
-            {failed ? (
-              <Text style={s.failed} testID="sign-in-failed">
-                {failed}
-              </Text>
-            ) : stopped || busy ? (
-              <Text style={s.note} accessibilityLiveRegion="polite">
-                {stopped
-                  ? 'Sign-in stopped.'
-                  : 'Checking your account… Keep this screen open.'}
-              </Text>
-            ) : null}
+    <KeyboardAvoidingView
+      style={s.grow}
+      enabled={Platform.OS === 'ios'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen onStop={busy ? stop : undefined}>
+        <ScrollView
+          style={s.grow}
+          contentContainerStyle={s.center}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag">
+          <View style={s.brand}>
+            <Logo
+              width="100%"
+              height="100%"
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel="Cashu Card"
+              testID="sign-in-brand"
+            />
           </View>
-        </Screen>
-      </KeyboardAvoidingView>
-    </ThemeProvider>
+          <View style={s.intro}>
+            <Text style={s.eyebrow}>Card provisioner</Text>
+            <View style={s.headingRow}>
+              <Text style={s.heading} accessibilityRole="header">
+                Sign in
+              </Text>
+              <InfoButton title="Operator sign-in" testID="sign-in-help">
+                {`${SIGNIN.note}\n\nInstall compatible Cashu cards with your assigned account. Holders set up ownership and funding in their wallet.\n\n${SIGNIN_BUILD}`}
+              </InfoButton>
+            </View>
+          </View>
+          <View style={s.form}>
+            {onServices ? (
+              <Pressable
+                testID="sign-in-service"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  serviceLoading
+                    ? 'Loading ops service'
+                    : `Change ops service. Current service: ${serviceAddress}`
+                }
+                accessibilityHint="Choose a saved service or add an address."
+                accessibilityState={{
+                  disabled: serviceChoiceDisabled,
+                  busy: serviceLoading,
+                }}
+                disabled={serviceChoiceDisabled}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  onServices();
+                }}
+                style={({pressed}) => [
+                  s.serviceChoice,
+                  pressed && s.servicePressed,
+                  serviceChoiceDisabled && s.disabled,
+                ]}>
+                <View style={s.serviceIdentity}>
+                  <Text style={s.serviceLabel} testID="sign-in-service-label">
+                    Ops service
+                  </Text>
+                  <Text
+                    style={s.serviceHost}
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                    testID="sign-in-service-host">
+                    {serviceLoading ? 'Loading…' : serviceHost}
+                  </Text>
+                </View>
+                <View style={s.serviceAction}>
+                  <Text style={s.serviceChange} testID="sign-in-service-change">
+                    Change
+                  </Text>
+                  <Text style={s.serviceChevron}>›</Text>
+                </View>
+              </Pressable>
+            ) : null}
+            <View style={s.field}>
+              <Text style={s.label}>Operator name</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Your operator name"
+                placeholderTextColor={t.dim}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!busy && serviceReady}
+                style={[s.input, focused === 'name' && s.inputFocused]}
+                onFocus={() => setFocused('name')}
+                onBlur={() => setFocused(null)}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => passwordInput.current?.focus()}
+                autoComplete="username"
+                textContentType="username"
+                accessibilityLabel="Operator name"
+                testID="sign-in-name"
+              />
+            </View>
+            <View style={s.field}>
+              <Text style={s.label}>Password</Text>
+              <TextInput
+                ref={passwordInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={t.dim}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                editable={!busy && serviceReady}
+                style={[s.input, focused === 'password' && s.inputFocused]}
+                onFocus={() => setFocused('password')}
+                onBlur={() => setFocused(null)}
+                returnKeyType="go"
+                onSubmitEditing={attempt}
+                autoComplete="current-password"
+                textContentType="password"
+                accessibilityLabel="Password"
+                testID="sign-in-password"
+              />
+            </View>
+          </View>
+          <LegalLinks />
+        </ScrollView>
+        <View style={s.footer}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={busy ? SIGNIN.signingIn : SIGNIN.button}
+            accessibilityState={{disabled, busy}}
+            disabled={disabled}
+            onPress={() => attempt()}
+            style={({pressed}) => [
+              s.submit,
+              pressed && !disabled && s.submitPressed,
+              disabled && s.disabled,
+            ]}
+            testID="sign-in">
+            <Text style={s.submitText}>
+              {busy ? SIGNIN.signingIn : SIGNIN.button}
+            </Text>
+            <Text style={s.submitArrow}>→</Text>
+          </Pressable>
+          {app.serviceError ? (
+            <Text style={s.failed} accessibilityLiveRegion="polite">
+              {app.serviceError}
+            </Text>
+          ) : null}
+          {app.serviceStatus === 'blocked' ? (
+            <SecondaryButton
+              title="RELOAD SERVICE SETTINGS"
+              testID="sign-in-service-reload"
+              onPress={app.reloadServices}
+            />
+          ) : null}
+          {failed ? (
+            <Text style={s.failed} testID="sign-in-failed">
+              {failed}
+            </Text>
+          ) : stopped || busy ? (
+            <Text style={s.note} accessibilityLiveRegion="polite">
+              {stopped
+                ? 'Sign-in stopped.'
+                : 'Checking your account… Keep this screen open.'}
+            </Text>
+          ) : null}
+        </View>
+      </Screen>
+    </KeyboardAvoidingView>
   );
 }
 

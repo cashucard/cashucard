@@ -161,8 +161,8 @@ installation creates a new spending key, followed by holder-wallet setup.
 
 ## Settings and identity
 
-Settings provides provisioning scope and its explanation, System/Dark/Light
-theme selection, card tools, version, pinned load-file identity and the public
+Settings provides provisioning scope and its explanation, card tools, version,
+pinned load-file identity and the public
 ops dashboard URL. Signing out preserves work and asks for confirmation when
 durable work exists.
 
@@ -174,7 +174,9 @@ Unconfirmed legacy registry rows must be saved through their original service
 before switching. See [D123](DECISIONS.md#d123).
 
 The app uses the approved Cashu cashew icon, bundled Figtree type and the theme
-tokens in `apps/provisioner/src/theme.ts`. The installation screen retains the
+tokens in `apps/provisioner/src/theme.ts`. Every screen uses the approved
+forest-green appearance, including when the phone is in light mode. The
+installation screen retains the
 approved printed-card artwork and confirmed-progress reveal.
 
 Distributed builds require operator sign-in. Bench tools and recovery-drill

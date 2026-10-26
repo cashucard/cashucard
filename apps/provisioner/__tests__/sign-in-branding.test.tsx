@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {Text} from 'react-native';
 import {SignInScreen} from '../src/screens/SignInScreen';
-import {DARK, LIGHT, ThemeProvider} from '../src/theme';
+import {DARK, ThemeProvider} from '../src/theme';
 import {useApp} from '../src/store';
 
 jest.mock('../src/store', () => ({useApp: jest.fn()}));
@@ -19,42 +19,36 @@ afterEach(async () => {
   await act(async () => tree?.unmount());
 });
 
-test.each([
-  ['dark', DARK],
-  ['light', LIGHT],
-] as const)(
-  '%s sign-in uses the Cashu Card identity and explicit field labels',
-  async (_mode, theme) => {
-    await act(async () => {
-      tree = Renderer.create(
-        <ThemeProvider value={theme}>
-          <SignInScreen onServices={() => {}} />
-        </ThemeProvider>,
-      );
-    });
-    const logo = tree.root.findByProps({testID: 'sign-in-brand'});
-    expect(logo.props.accessibilityLabel).toBe('Cashu Card');
-    expect(logo.props.accessibilityRole).toBe('image');
-    const text = tree.root.findAllByType(Text).map(node => node.props.children);
-    expect(text).toEqual(
-      expect.arrayContaining([
-        'Card provisioner',
-        'Sign in',
-        'Operator name',
-        'Password',
-      ]),
+test('sign-in uses the shared forest Cashu Card identity and explicit field labels', async () => {
+  await act(async () => {
+    tree = Renderer.create(
+      <ThemeProvider value={DARK}>
+        <SignInScreen onServices={() => {}} />
+      </ThemeProvider>,
     );
-    expect(text).not.toContain('⚡');
-    expect(
-      tree.root.findByProps({testID: 'sign-in-password'}).props.secureTextEntry,
-    ).toBe(true);
-    expect(
-      tree.root.findByProps({testID: 'sign-in-service-host'}).props.children,
-    ).toBe('ops.cashucard.org');
-  },
-);
+  });
+  const logo = tree.root.findByProps({testID: 'sign-in-brand'});
+  expect(logo.props.accessibilityLabel).toBe('Cashu Card');
+  expect(logo.props.accessibilityRole).toBe('image');
+  const text = tree.root.findAllByType(Text).map(node => node.props.children);
+  expect(text).toEqual(
+    expect.arrayContaining([
+      'Card provisioner',
+      'Sign in',
+      'Operator name',
+      'Password',
+    ]),
+  );
+  expect(text).not.toContain('⚡');
+  expect(
+    tree.root.findByProps({testID: 'sign-in-password'}).props.secureTextEntry,
+  ).toBe(true);
+  expect(
+    tree.root.findByProps({testID: 'sign-in-service-host'}).props.children,
+  ).toBe('ops.cashucard.org');
+});
 
-test.each(['dark', 'light'])(
+test.each(['dark'])(
   'the bundled %s logo matches the canonical brand artwork',
   mode => {
     const filename = `cashu-card-lockup-on-${mode}.svg`;

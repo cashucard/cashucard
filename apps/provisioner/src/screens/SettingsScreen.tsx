@@ -1,10 +1,10 @@
 /**
  * S5. Settings, grouped the way a 2026 settings screen is grouped: section
- * headers, one card per group, hairline dividers, a segmented theme pill,
+ * headers, one card per group, hairline dividers,
  * the account scope as a read-only row, and signed-in card tools.
  *
  * The batch-setup revamp's rules hold here too: tabular figures for every
- * number, the accent for the theme pill's active segment, and button semantics
+ * number and button semantics
  * for interactive rows.
  */
 import React from 'react';
@@ -57,21 +57,6 @@ const local = (t: Theme) =>
       fontVariant: ['tabular-nums'],
       fontSize: 15,
     },
-    pill: {
-      flexDirection: 'row',
-      backgroundColor: t.bg,
-      borderRadius: 12,
-      padding: 3,
-      gap: 2,
-    },
-    pillItem: {
-      paddingHorizontal: 16,
-      paddingVertical: 7,
-      borderRadius: 10,
-    },
-    pillItemOn: {backgroundColor: t.ink},
-    pillText: {color: t.dim, fontFamily: FONT.medium, fontSize: 14},
-    pillTextOn: {color: t.bg, fontFamily: FONT.semibold, fontSize: 14},
     note: {
       color: t.dim,
       fontFamily: FONT.regular,
@@ -99,7 +84,6 @@ const local = (t: Theme) =>
       fontSize: 12,
       fontVariant: ['tabular-nums'],
     },
-    rowCenter: {justifyContent: 'center'},
     rowLabelCol: {flex: 1},
     confirmBlock: {padding: 18, gap: 10},
   });
@@ -154,34 +138,6 @@ export function SettingsScreen({
               <Text style={s.rowValue} testID="provisioning-scope-value">
                 {scopeLabel}
               </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.theme}</Text>
-          <View style={s.card}>
-            <View style={[s.row, s.rowCenter]}>
-              <View style={s.pill}>
-                {(['system', 'dark', 'light'] as const).map(opt => {
-                  const on = app.theme === opt;
-                  return (
-                    <Pressable
-                      key={opt}
-                      testID={`theme-${opt}`}
-                      onPress={() => app.setTheme(opt)}
-                      style={[s.pillItem, on && s.pillItemOn]}>
-                      <Text style={on ? s.pillTextOn : s.pillText}>
-                        {opt === 'system'
-                          ? SETTINGS.themeSystem
-                          : opt === 'dark'
-                          ? SETTINGS.themeDark
-                          : SETTINGS.themeLight}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
             </View>
           </View>
         </View>

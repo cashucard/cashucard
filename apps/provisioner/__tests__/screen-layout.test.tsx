@@ -5,7 +5,7 @@ import App from '../App';
 import {CardIdentityScreen} from '../src/screens/CardIdentityScreen';
 import {AppStore} from '../src/store';
 import {Screen, styles} from '../src/ui';
-import {LIGHT} from '../src/theme';
+import {DARK} from '../src/theme';
 
 const trees: Renderer.ReactTestRenderer[] = [];
 afterEach(async () => {
@@ -35,7 +35,7 @@ test('the app root supplies native safe areas and shared screens consume them', 
 });
 
 test('titles participate in header layout so Back has its own space', () => {
-  const layout = styles(LIGHT);
+  const layout = styles(DARK);
   expect(layout.titleWrap).not.toMatchObject({position: 'absolute'});
   expect(layout.titleWrap).toMatchObject({flex: 1, minWidth: 0});
 });

@@ -14,7 +14,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {AppState, useColorScheme, type AppStateStatus} from 'react-native';
+import {AppState, type AppStateStatus} from 'react-native';
 
 import {
   ApiClient,
@@ -26,7 +26,7 @@ import {
   type CardRegistryRow,
 } from './api';
 import serviceConfig from './serviceOrigin.json';
-import {resolveTheme, ThemeProvider} from './theme';
+import {DARK, ThemeProvider} from './theme';
 import {
   decodeServiceProfiles,
   encodeServiceProfiles,
@@ -68,7 +68,6 @@ export interface AppStateShape {
   session: AppSession | null;
   /** Display only; authorization continues to use the verified operator_id. */
   operatorName: string | null;
-  theme: 'system' | 'dark' | 'light';
   batch: (BatchConfig & {done: RecordRow[]}) | null;
   serviceUrl: string;
   serviceProfiles: readonly string[];
@@ -82,7 +81,6 @@ export interface AppStateShape {
     options?: {client?: ApiClient; signal?: AbortSignal},
   ): Promise<void>;
   signOut(): void;
-  setTheme(t: 'system' | 'dark' | 'light'): void;
   startBatch(config: BatchConfig): void;
   endBatch(): void;
   addRecord(row: RecordRow): void;
@@ -125,11 +123,9 @@ export function AppStore({
   const [signedIn, setSignedIn] = useState(false);
   const [session, setSession] = useState<AppSession | null>(null);
   const [operatorName, setOperatorName] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'system' | 'dark' | 'light'>('system');
   const [batch, setBatch] = useState<
     (BatchConfig & {done: RecordRow[]}) | null
   >(null);
-  const system = useColorScheme();
 
   const clientRef = useRef<ApiClient | null>(null);
   const outboxRef = useRef<RegistryOutbox | null>(null);
@@ -370,7 +366,6 @@ export function AppStore({
       signedIn,
       session,
       operatorName,
-      theme,
       batch,
       serviceUrl,
       serviceProfiles,
@@ -436,7 +431,6 @@ export function AppStore({
         }
       },
       signOut,
-      setTheme,
       startBatch: config => setBatch({...config, done: []}),
       endBatch: () => setBatch(null),
       addRecord: row => setBatch(b => (b ? {...b, done: [...b.done, row]} : b)),
@@ -487,7 +481,6 @@ export function AppStore({
       selectService,
       reloadServices,
       operatorName,
-      theme,
       batch,
       makeClient,
       retryPending,
@@ -496,7 +489,7 @@ export function AppStore({
     ],
   );
   return (
-    <ThemeProvider value={resolveTheme(theme, system)}>
+    <ThemeProvider value={DARK}>
       <Ctx.Provider value={value}>{children}</Ctx.Provider>
     </ThemeProvider>
   );

@@ -14,7 +14,7 @@ import {SettingsScreen} from '../src/screens/SettingsScreen';
 import {GearButton} from '../src/ui';
 import {DARK, ThemeProvider} from '../src/theme';
 
-test('sign-in is required for batch setup; Settings retains themes but has no demo mode', async () => {
+test('sign-in is required for batch setup; Settings keeps the shared forest appearance and has no demo mode', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(() => {
     tree = ReactTestRenderer.create(
@@ -31,7 +31,9 @@ test('sign-in is required for batch setup; Settings retains themes but has no de
       .findAll(n => typeof n.props.children === 'string')
       .map(n => n.props.children as string)
       .join('\n');
-  expect(tree!.root.findByProps({testID: 'sign-in'}).props.accessibilityRole).toBe('button');
+  expect(
+    tree!.root.findByProps({testID: 'sign-in'}).props.accessibilityRole,
+  ).toBe('button');
   expect(text()).toContain('Privacy Policy');
   expect(text()).toContain('Terms');
   expect(text()).toContain('Support');
@@ -97,29 +99,19 @@ test('sign-in is required for batch setup; Settings retains themes but has no de
   expect(tree!.root.findByProps({testID: 'legal-support'})).toBeDefined();
   expect(tree!.root.findAllByProps({testID: 'demo-switch'})).toHaveLength(0);
 
-  // the theme pill changes what the screens draw: dark then light
-  const bg = () =>
+  for (const option of ['system', 'dark', 'light']) {
+    expect(tree!.root.findAllByProps({testID: `theme-${option}`})).toHaveLength(
+      0,
+    );
+  }
+  expect(
     tree!.root.findByType(
       require('react-native-safe-area-context').SafeAreaView,
-    ).props.style;
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByProps({testID: 'theme-dark'}).props.onPress();
-  });
-  expect(bg().backgroundColor).toBe('#050505');
+    ).props.style.backgroundColor,
+  ).toBe('#10271E');
   expect(
     tree!.root.findByType(require('react-native').StatusBar).props.barStyle,
   ).toBe('light-content');
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByProps({testID: 'theme-light'}).props.onPress();
-  });
-  expect(bg().backgroundColor).toBe('#FAFAF8');
-  expect(
-    tree!.root.findByType(require('react-native').StatusBar).props.barStyle,
-  ).toBe('dark-content');
-  await ReactTestRenderer.act(() => {
-    tree!.root.findByProps({testID: 'theme-system'}).props.onPress();
-  });
-  expect(['#050505', '#FAFAF8']).toContain(bg().backgroundColor);
 
   // Unmount so the store's retry interval (a signed-in session arms it) does
   // not hold the test process open.
