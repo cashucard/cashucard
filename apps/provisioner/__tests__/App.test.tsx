@@ -179,8 +179,8 @@ test('settings shows the public dashboard and confirms sign-out while a saved ba
   expect(words).toContain(
     `Version ${appInfo.version} (${appInfo.provisionerBuild})`,
   );
-  expect(words).toContain('https://ops.cashucard.org');
-  expect(words).not.toContain('https://api.example.test');
+  expect(words).toContain('https://api.example.test');
+  expect(words).not.toContain('https://ops.cashucard.org');
   expect(words).not.toContain('CAP:');
   await ReactTestRenderer.act(() => {
     tree.root

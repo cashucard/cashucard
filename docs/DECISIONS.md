@@ -3435,10 +3435,13 @@ targets. Panels support scrolling, screen-reader focus, an explicit Close
 action, outside-tap dismissal and Android Back. Opening help starts no card
 operation or service request.
 
-Cards labels the operator name with “Signed in as”. Cards and Settings link
-the public ops dashboard at `https://ops.cashucard.org`. Cards' account help
-shows the configured API origin separately. Changing this display leaves API
-requests and saved-work origin/actor bindings intact (D49, D111).
+Cards labels and announces the operator name with “Signed in as”. Dashboard
+links follow the configured service. Only the existing production Worker
+origin has a display alias to `https://ops.cashucard.org`; other service
+origins link to their own dashboard. Cards' account help shows the actual API
+origin separately. Changing this display leaves API requests and saved-work
+origin/actor bindings intact (D49, D111). Selecting another service remains
+build-time configuration. Setup controls accept taps while the keyboard is open.
 
 Errors, disabled-action reasons, live progress, required card-holding
 instructions, destructive consent, pending-reset erasure consequences and

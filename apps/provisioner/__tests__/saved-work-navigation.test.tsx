@@ -2,6 +2,8 @@ import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import App from '../App';
 import {ApiClient} from '../src/api';
+import {DEFAULT_SERVICE_URL} from '../src/store';
+import {opsDashboardUrl} from '../src/LegalLinks';
 import {useProvisioning} from '../src/ProvisioningStore';
 jest.mock('../src/ProvisioningStore', () => ({
   ProvisioningProvider: ({children}: {children: React.ReactNode}) => children,

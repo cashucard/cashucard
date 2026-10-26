@@ -131,6 +131,8 @@ export function CardsHomeScreen({
   const connectionOrigin = /^https?:\/\/[^\s/?#@]+\/?$/.test(app.serviceUrl)
     ? app.serviceUrl
     : 'Configured service';
+  const operatorName =
+    app.operatorName || `Operator #${app.session?.operator_id}`;
   React.useEffect(() => {
     setConfirmEnd(false);
   }, [batch?.request.batch_request_id, batch?.next_ordinal]);
@@ -161,12 +163,12 @@ export function CardsHomeScreen({
           <Pressable
             testID="home-settings"
             accessibilityRole="button"
-            accessibilityLabel="Account and settings"
+            accessibilityLabel={`Signed in as ${operatorName}. Account and settings`}
             onPress={onSettings}
             style={[s.accountRow, s.accountAction]}>
             <Text style={s.service}>Signed in as</Text>
             <Text testID="home-operator" style={s.operator}>
-              {app.operatorName || `Operator #${app.session?.operator_id}`}
+              {operatorName}
             </Text>
           </Pressable>
           <View style={s.accountRow}>

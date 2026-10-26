@@ -23,7 +23,7 @@ beforeEach(() => {
   jest.mocked(useApp).mockReturnValue({
     operatorName: 'dread',
     session: null,
-    serviceUrl: 'https://old-worker.example.workers.dev',
+    serviceUrl: 'https://cashu-card-ops.old-cell-30e7.workers.dev',
     theme: 'dark',
     signOut: jest.fn(),
     setTheme: jest.fn(),
@@ -96,14 +96,17 @@ test('Cards labels the login and links the dashboard while connection details re
   );
   expect(text()).toContain('Signed in as');
   expect(text()).toContain('dread');
+  expect(
+    tree.root.findByProps({testID: 'home-settings'}).props.accessibilityLabel,
+  ).toContain('Signed in as dread');
   expect(text()).toContain('https://ops.cashucard.org');
-  expect(text()).not.toContain('old-worker.example.workers.dev');
+  expect(text()).not.toContain('cashu-card-ops.old-cell-30e7.workers.dev');
   expect(text()).not.toContain('Install card software here');
   expect(open).not.toHaveBeenCalled();
   await act(async () => action('home-dashboard').props.onPress());
   expect(open).toHaveBeenCalledWith('https://ops.cashucard.org');
   await act(async () => action('home-account-help').props.onPress());
-  expect(text()).toContain('https://old-worker.example.workers.dev');
+  expect(text()).toContain('https://cashu-card-ops.old-cell-30e7.workers.dev');
   expect(inspect).not.toHaveBeenCalled();
 });
 test('batch review keeps the key-assignment consequence visible and help cannot create the batch', async () => {
@@ -116,6 +119,10 @@ test('batch review keeps the key-assignment consequence visible and help cannot 
       onSettings={noop}
     />,
   );
+  expect(
+    tree.root.findByProps({testID: 'setup-scroll'}).props
+      .keyboardShouldPersistTaps,
+  ).toBe('handled');
   await act(async () =>
     tree.root
       .findByProps({testID: 'mint-custom-input'})
@@ -211,5 +218,30 @@ test.each(cases)(
     expect(text()).toContain(explanation);
     expect(inspect).not.toHaveBeenCalled();
     expect(NfcManager.requestTechnology).not.toHaveBeenCalled();
+  },
+);
+
+test.each([
+  'https://ops.another-issuer.com',
+  'https://another-issuer.workers.dev',
+])(
+  'a build for %s links that service’s dashboard and preserves its API connection',
+  async origin => {
+    jest.mocked(useApp).mockReturnValue({...useApp(), serviceUrl: origin});
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await render(
+      <CardsHomeScreen
+        onInstall={noop}
+        onCheck={noop}
+        onReset={noop}
+        onSettings={noop}
+      />,
+    );
+    expect(text()).toContain(origin);
+    expect(text()).not.toContain('https://ops.cashucard.org');
+    await act(async () => action('home-dashboard').props.onPress());
+    expect(open).toHaveBeenCalledWith(origin);
+    expect(useApp().serviceUrl).toBe(origin);
+    expect(inspect).not.toHaveBeenCalled();
   },
 );

@@ -30,7 +30,7 @@ unfinished attempt.
 ## Cards home
 
 Cards is the landing page after sign-in. It labels the operator name with
-“Signed in as”, links the ops dashboard at `https://ops.cashucard.org` and shows
+"Signed in as", links the configured service's ops dashboard and shows
 saved work. An unfinished batch shows its mint reference and finished
 attempt count. Operators can continue it, view a finished batch's results or
 start a new batch when permitted.

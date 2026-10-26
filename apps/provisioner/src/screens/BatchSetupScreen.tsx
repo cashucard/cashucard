@@ -407,7 +407,11 @@ export function BatchSetupScreen({
         />
       }>
       <View style={s.grow}>
-        <ScrollView contentContainerStyle={s.scroll} testID="setup-scroll">
+        <ScrollView
+          contentContainerStyle={s.scroll}
+          testID="setup-scroll"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag">
           {mintsFailed ? (
             <View>
               <Text style={s.note}>{SETUP.mintsFailed}</Text>
