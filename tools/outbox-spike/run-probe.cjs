@@ -15,6 +15,69 @@ class ProbeFailure extends Error {
   }
 }
 
+// Exact public load-file TLVs from the approved 09336320 inspection. They also
+// occur in the owner's pre-existing gp-install-opener.txt GET STATUS capture.
+const PLATFORM_FILES = [
+  "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000",
+  "e31b4f07a00000006202049f700101ce020100cc08a000000151000000",
+  "e31b4f07a00000006202029f700101ce020103cc08a000000151000000",
+];
+function registryFrames(hex) {
+  const data = Buffer.from(hex, "hex"),
+    frames = [];
+  let at = 0;
+  while (at < data.length) {
+    const start = at;
+    if (data[at++] !== 0xe3) throw new ProbeFailure("platform-registry");
+    let size = data[at++];
+    if (size === 0x81) {
+      size = data[at++];
+      if (size < 128) throw new ProbeFailure("platform-registry");
+    } else if (size === 0x82) {
+      const high = data[at++],
+        low = data[at++];
+      if (!high || low === undefined)
+        throw new ProbeFailure("platform-registry");
+      size = high * 256 + low;
+    } else if (size >= 0x80) throw new ProbeFailure("platform-registry");
+    if (size === undefined || at + size > data.length)
+      throw new ProbeFailure("platform-registry");
+    at += size;
+    frames.push(data.subarray(start, at).toString("hex"));
+  }
+  return frames;
+}
+function verifyPlatformRegistry(registry, allowed) {
+  const seen = new Set();
+  for (const kind of ["applications", "load-files"]) {
+    const frames = registryFrames(
+      registry.pages
+        .filter((page) => page.kind === kind)
+        .map((page) => page.data)
+        .join(""),
+    );
+    const entries = registry.entries.filter((entry) => entry.kind === kind);
+    if (frames.length !== entries.length)
+      throw new ProbeFailure("platform-registry");
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i],
+        aid = entries[i].aid.toUpperCase();
+      if (kind === "load-files" && PLATFORM_FILES.includes(frame)) {
+        if (seen.has(frame)) throw new ProbeFailure("platform-registry");
+        seen.add(frame);
+      } else if (
+        !PROBE.includes(aid) ||
+        !allowed.includes(aid) ||
+        kind !== (aid === PACKAGE ? "load-files" : "applications")
+      ) {
+        throw new ProbeFailure("platform-registry");
+      }
+    }
+  }
+  if (seen.size !== PLATFORM_FILES.length)
+    throw new ProbeFailure("platform-registry");
+}
+
 function artifact(filename, expected) {
   const rawManifest = fs.readFileSync(filename);
   if (!/^[0-9a-f]{64}$/.test(expected) || hash(rawManifest) !== expected) {
@@ -189,6 +252,12 @@ async function runProbe(options, dependencies = {}) {
   ) {
     throw new Error("explicit approved chip and reader required");
   }
+  if (
+    options.platformBaseline &&
+    options.chip !== "cplc-v1:4790d3213041093363205547"
+  ) {
+    throw new Error("platform baseline is approved only for 09336320");
+  }
   if (options.execute && options.inspectRegistry) {
     throw new Error("choose inspection or execution, never both");
   }
@@ -199,6 +268,7 @@ async function runProbe(options, dependencies = {}) {
     capSha256: manifest.capSha256,
     manifestSha256: options.manifestHash,
     poolBytes: manifest.poolBytes,
+    platformBaseline: options.platformBaseline ? "j3r180-09336320-v1" : "empty",
   };
   if (!options.execute && !options.inspectRegistry) {
     return { ...summary, mode: "preview", cardAccessed: false };
@@ -334,7 +404,11 @@ async function runProbe(options, dependencies = {}) {
     }
     async function requireRegistry(allowed) {
       const entries = await registry();
-      if (entries.some((entry) => !allowed.includes(entry.aid.toUpperCase()))) {
+      if (options.platformBaseline) {
+        verifyPlatformRegistry(state.registry, allowed);
+      } else if (
+        entries.some((entry) => !allowed.includes(entry.aid.toUpperCase()))
+      ) {
         throw new ProbeFailure("registry-objects");
       }
       return entries;
@@ -461,7 +535,13 @@ async function runProbe(options, dependencies = {}) {
   }
 }
 
-module.exports = { artifact, probeDelete, measurements, runProbe };
+module.exports = {
+  artifact,
+  probeDelete,
+  measurements,
+  runProbe,
+  verifyPlatformRegistry,
+};
 if (require.main === module) {
   Promise.resolve()
     .then(async () => {
@@ -475,6 +555,7 @@ if (require.main === module) {
           journal: { type: "string" },
           execute: { type: "boolean", default: false },
           "inspect-registry": { type: "boolean", default: false },
+          "platform-baseline": { type: "boolean", default: false },
           "factory-reset-confirmed": { type: "boolean", default: false },
         },
       });
@@ -487,6 +568,7 @@ if (require.main === module) {
         journal: values.journal,
         execute: values.execute,
         inspectRegistry: values["inspect-registry"],
+        platformBaseline: values["platform-baseline"],
         factoryResetConfirmed: values["factory-reset-confirmed"],
       });
       console.log(JSON.stringify(result));

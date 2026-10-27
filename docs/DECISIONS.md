@@ -3899,3 +3899,26 @@ without rerunning a mutation workflow.
 or secure channel, deleting unknown objects, and recording APDU/authentication
 transcripts. The original stopped invocation remains preserved. Inspection needs
 its own named-device approval and does not authorize resuming the write drill.
+
+
+## <a id="d140"></a>D140: Preserve the exact observed platform packages during the resource drill
+
+**Decided (2026-10-27):** the named 09336320 probe profile accepts the three
+pre-existing platform load files observed by the approved registry inspection.
+It pins their full public GET STATUS entries, requires every one before and
+after the drill, and permits only the private probe package/instances alongside
+them during cleanup. Different versions, metadata, missing entries, duplicates
+or extra objects stop the run. The profile requires an explicit flag and the
+matching CPLC. The default remains empty-registry-only.
+
+**Why:** the original D138 empty-registry assumption rejected this card's platform
+packages after a successful CCP reset. The same three entries appear in the
+owner's earlier captures. They are the SSD creation package and the JavaCard
+biometry libraries, not an installation left behind by CCP. The exact baseline
+is a preservation check; AID recognition alone is insufficient.
+
+**Rejected:** removing platform packages to satisfy an empty-registry check,
+accepting arbitrary installed packages, matching only AIDs, and accepting a
+missing baseline after cleanup. The bridge continues to allow deletion only of
+the private probe AIDs. The stopped invocation and diagnostic evidence remain
+retained, and the revised write plan needs separate approval before execution.

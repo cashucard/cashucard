@@ -9,6 +9,7 @@ const {
   artifact,
   probeDelete,
   measurements,
+  verifyPlatformRegistry,
 } = require("./run-probe.cjs");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
 function fixture(t) {
@@ -57,6 +58,7 @@ function simulated({
     loads: 0,
     dummy: 0,
     registry: 0,
+    deletes: 0,
   };
   let marker = 0,
     installed = false;
@@ -74,7 +76,11 @@ function simulated({
     }
     if (ins === 0xf2) {
       calls.registry++;
-      return [...registryData, registrySw >> 8, registrySw & 0xff];
+      const data =
+        typeof registryData === "function"
+          ? registryData(apdu[2], calls)
+          : registryData;
+      return [...data, registrySw >> 8, registrySw & 0xff];
     }
     if (ins === 0x7d) {
       const data = Buffer.alloc(24);
@@ -97,6 +103,7 @@ function simulated({
     }
     if (ins === 0xe8 || ins === 0xe4) {
       calls.mutations++;
+      if (ins === 0xe4) calls.deletes++;
     }
     return [0x90, 0];
   };
@@ -126,11 +133,22 @@ function simulated({
       }
       return { send: (transport, command) => sdk.transmit(transport, command) };
     },
-    registryCommand: () => [0x80, 0xf2, 0x20, 2, 2, 0x4f, 0, 0],
-    parseRegistryEntries: () => {
+    registryCommand: (kind) => [
+      0x80,
+      0xf2,
+      kind === "applications" ? 0x40 : 0x20,
+      2,
+      2,
+      0x4f,
+      0,
+      0,
+    ],
+    parseRegistryEntries: (data) => {
       if (registryParseFailure)
         throw new Error("untrusted error with secret text");
-      return registryEntries;
+      return typeof registryEntries === "function"
+        ? registryEntries(data)
+        : registryEntries;
     },
     installForLoad: () => [0x80, 0xe6, 2],
     splitLoad: () => [[0x80, 0xe8, 0x80, 0]],
@@ -156,6 +174,17 @@ test("preview and invalid consent/hash/load bytes never open a reader", async (t
     fake = simulated();
   const preview = await runProbe({ ...options, execute: false }, fake);
   assert.equal(preview.cardAccessed, false);
+  await assert.rejects(runProbe({ ...options, inspectRegistry: true }, fake));
+  await assert.rejects(
+    runProbe(
+      {
+        ...options,
+        platformBaseline: true,
+        chip: "cplc-v1:4790d3213180072976207515",
+      },
+      fake,
+    ),
+  );
   await assert.rejects(
     runProbe({ ...options, factoryResetConfirmed: false }, fake),
   );
@@ -292,6 +321,96 @@ test("registry status, parse and unexpected-object failures preserve bounded evi
     assert.equal(raw.includes("secret text"), false);
     assert.equal(fake.calls.authentications, 1);
     assert.equal(fake.calls.mutations, 0);
+    assert.equal(fake.calls.closes, 1);
+  }
+});
+
+// Public load-file response from the separately approved 09336320 inspection.
+const PLATFORM_HEX = [
+  "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000",
+  "e31b4f07a00000006202049f700101ce020100cc08a000000151000000",
+  "e31b4f07a00000006202029f700101ce020103cc08a000000151000000",
+];
+const platformRegistry = (frames = PLATFORM_HEX) => ({
+  pages: [
+    { kind: "applications", page: 0, sw: "6a88", data: "" },
+    { kind: "load-files", page: 0, sw: "9000", data: frames.join("") },
+  ],
+  entries: frames.map((frame) => ({
+    kind: "load-files",
+    aid: frame.slice(8, 22).toUpperCase(),
+  })),
+});
+
+test("observed platform baseline is exact, required and never authorizes other objects", () => {
+  assert.doesNotThrow(() => verifyPlatformRegistry(platformRegistry(), []));
+  // Pagination and order are not package identity, but every full entry is pinned.
+  const reordered = platformRegistry([...PLATFORM_HEX].reverse());
+  const hex = reordered.pages[1].data;
+  reordered.pages.splice(
+    1,
+    1,
+    { kind: "load-files", page: 0, sw: "6310", data: hex.slice(0, 30) },
+    { kind: "load-files", page: 1, sw: "9000", data: hex.slice(30) },
+  );
+  assert.doesNotThrow(() => verifyPlatformRegistry(reordered, []));
+  for (const frames of [
+    PLATFORM_HEX.slice(1),
+    [...PLATFORM_HEX, PLATFORM_HEX[0]],
+    [PLATFORM_HEX[0].replace("ce02ffff", "ce020000"), ...PLATFORM_HEX.slice(1)],
+    [PLATFORM_HEX[0].slice(0, -2) + "01", ...PLATFORM_HEX.slice(1)],
+    [...PLATFORM_HEX, "e3094f07a0000001519999"],
+  ])
+    assert.throws(() => verifyPlatformRegistry(platformRegistry(frames), []));
+  const aid = Buffer.from("F0434153485550524F4245", "hex");
+  const privateFrame = Buffer.from([
+    0xe3,
+    aid.length + 2,
+    0x4f,
+    aid.length,
+    ...aid,
+  ]).toString("hex");
+  const installed = platformRegistry([...PLATFORM_HEX, privateFrame]);
+  installed.entries[3].aid = "F0434153485550524F4245";
+  assert.throws(() => verifyPlatformRegistry(installed, []));
+  assert.doesNotThrow(() =>
+    verifyPlatformRegistry(installed, ["F0434153485550524F4245"]),
+  );
+  installed.entries[3].kind = "applications";
+  assert.throws(() =>
+    verifyPlatformRegistry(installed, ["F0434153485550524F4245"]),
+  );
+});
+
+test("explicit platform profile reaches the drill but stops before cleanup if baseline changes", async (t) => {
+  for (const losePlatform of [false, true]) {
+    const options = fixture(t);
+    const fake = simulated({
+      registryData: (p1, calls) =>
+        p1 === 0x40 || (losePlatform && calls.dummy)
+          ? []
+          : [...Buffer.from(PLATFORM_HEX.join(""), "hex")],
+      registryEntries: (data) =>
+        data.length ? platformRegistry().entries : [],
+    });
+    if (losePlatform) {
+      await assert.rejects(
+        runProbe({ ...options, platformBaseline: true }, fake),
+      );
+      assert.equal(fake.calls.deletes, 0);
+      assert.equal(
+        JSON.parse(fs.readFileSync(options.journal)).failure.code,
+        "platform-registry",
+      );
+    } else {
+      const result = await runProbe(
+        { ...options, platformBaseline: true },
+        fake,
+      );
+      assert.equal(result.status, "complete");
+      assert.equal(fake.calls.deletes, 3);
+    }
+    assert.equal(fake.calls.dummy, 1);
     assert.equal(fake.calls.closes, 1);
   }
 });
