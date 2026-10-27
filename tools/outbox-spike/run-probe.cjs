@@ -8,6 +8,12 @@ const { parseArgs } = require("node:util");
 const PACKAGE = "F0434153485550524F4245";
 const PROBE = [PACKAGE + "01", PACKAGE + "4D", PACKAGE];
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+class ProbeFailure extends Error {
+  constructor(code) {
+    super(code);
+    this.code = code;
+  }
+}
 
 function artifact(filename, expected) {
   const rawManifest = fs.readFileSync(filename);
@@ -80,10 +86,16 @@ function journalFile(filename, value) {
     fs.closeSync(dir);
   }
 }
-async function openBridge(python, reader) {
+async function openBridge(python, reader, registryOnly = false) {
   const child = spawn(
     python,
-    ["-u", path.join(__dirname, "probe_bridge.py"), "--reader", reader],
+    [
+      "-u",
+      path.join(__dirname, "probe_bridge.py"),
+      "--reader",
+      reader,
+      ...(registryOnly ? ["--registry-only"] : []),
+    ],
     { stdio: ["pipe", "pipe", "ignore"] },
   );
   const lines = createInterface({ input: child.stdout });
@@ -177,6 +189,9 @@ async function runProbe(options, dependencies = {}) {
   ) {
     throw new Error("explicit approved chip and reader required");
   }
+  if (options.execute && options.inspectRegistry) {
+    throw new Error("choose inspection or execution, never both");
+  }
   const { manifest, load } = artifact(options.manifest, options.manifestHash);
   const summary = {
     chip: options.chip,
@@ -185,7 +200,7 @@ async function runProbe(options, dependencies = {}) {
     manifestSha256: options.manifestHash,
     poolBytes: manifest.poolBytes,
   };
-  if (!options.execute) {
+  if (!options.execute && !options.inspectRegistry) {
     return { ...summary, mode: "preview", cardAccessed: false };
   }
   if (
@@ -244,6 +259,7 @@ async function runProbe(options, dependencies = {}) {
     bridge = await (dependencies.openBridge ?? openBridge)(
       options.python,
       options.reader,
+      options.inspectRegistry === true,
     );
     const tx = bridge.tx;
     await step("match-chip", () => sdk.readChipIdentity(tx, options.chip));
@@ -263,6 +279,8 @@ async function runProbe(options, dependencies = {}) {
     );
     async function registry() {
       const entries = [];
+      state.registry = { pages: [], entries: [] };
+      save();
       for (const kind of ["applications", "load-files"]) {
         let data = [],
           complete = false;
@@ -271,26 +289,45 @@ async function runProbe(options, dependencies = {}) {
             tx,
             sdk.registryCommand(kind, page > 0),
           );
+          state.registry.pages.push({
+            kind,
+            page,
+            sw: reply.sw.toString(16).padStart(4, "0"),
+            data: Buffer.from(reply.data).toString("hex"),
+          });
+          save();
           if (reply.sw === 0x6a88 && page === 0 && reply.data.length === 0) {
             complete = true;
             break;
           }
-          expect(reply, [0x9000, 0x6310]);
+          if (![0x9000, 0x6310].includes(reply.sw)) {
+            throw new ProbeFailure("registry-status");
+          }
           if (
             data.length + reply.data.length > 65535 ||
             (reply.sw === 0x6310 && !reply.data.length)
           ) {
-            throw new Error("registry incomplete");
+            throw new ProbeFailure("registry-incomplete");
           }
           data.push(...reply.data);
           if (reply.sw === 0x9000) {
-            entries.push(...sdk.parseRegistryEntries(data));
+            let parsed;
+            try {
+              parsed = sdk.parseRegistryEntries(data);
+            } catch {
+              throw new ProbeFailure("registry-format");
+            }
+            entries.push(...parsed);
+            state.registry.entries.push(
+              ...parsed.map((entry) => ({ kind, ...entry })),
+            );
+            save();
             complete = true;
             break;
           }
         }
         if (!complete) {
-          throw new Error("registry incomplete");
+          throw new ProbeFailure("registry-incomplete");
         }
       }
       return entries;
@@ -298,11 +335,23 @@ async function runProbe(options, dependencies = {}) {
     async function requireRegistry(allowed) {
       const entries = await registry();
       if (entries.some((entry) => !allowed.includes(entry.aid.toUpperCase()))) {
-        throw new Error("unexpected registry objects");
+        throw new ProbeFailure("registry-objects");
       }
       return entries;
     }
     const domain = sdk.toHex(sdk.ISD_AID).toUpperCase();
+    if (options.inspectRegistry) {
+      await step("inspect-registry", registry);
+      state.status = "inspected";
+      state.stage = "registry-inspection-complete";
+      save();
+      return {
+        ...summary,
+        status: state.status,
+        registry: state.registry,
+        journal: options.journal,
+      };
+    }
     await step("require-empty-registry", () => requireRegistry([domain]));
     await step("install-for-load", async () =>
       expect(await session.send(tx, sdk.installForLoad(bytes(PACKAGE)))),
@@ -384,16 +433,22 @@ async function runProbe(options, dependencies = {}) {
     };
   } catch (error) {
     state.status = "stopped";
+    state.failure = {
+      code: error instanceof ProbeFailure ? error.code : "operation-failed",
+    };
     if (journalStarted) {
       try {
         save();
       } catch {}
     }
-    throw new Error(
+    const stopped = new Error(
       "probe stopped at " +
         state.stage +
         "; retain its journal; no retry performed",
     );
+    stopped.probeStage = state.stage;
+    stopped.probeFailure = state.failure.code;
+    throw stopped;
   } finally {
     try {
       if (bridge) {
@@ -419,6 +474,7 @@ if (require.main === module) {
           python: { type: "string" },
           journal: { type: "string" },
           execute: { type: "boolean", default: false },
+          "inspect-registry": { type: "boolean", default: false },
           "factory-reset-confirmed": { type: "boolean", default: false },
         },
       });
@@ -430,13 +486,20 @@ if (require.main === module) {
         python: values.python,
         journal: values.journal,
         execute: values.execute,
+        inspectRegistry: values["inspect-registry"],
         factoryResetConfirmed: values["factory-reset-confirmed"],
       });
       console.log(JSON.stringify(result));
     })
-    .catch(() => {
+    .catch((error) => {
       console.error(
-        "Resource probe stopped. Preserve its journal and review before another action.",
+        JSON.stringify({
+          status: "stopped",
+          stage: error.probeStage ?? "before-reader",
+          failure: error.probeFailure ?? "preflight-failed",
+          message:
+            "Preserve the journal and review before another action; no retry.",
+        }),
       );
       process.exitCode = 1;
     });

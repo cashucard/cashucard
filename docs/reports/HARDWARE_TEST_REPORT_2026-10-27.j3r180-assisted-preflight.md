@@ -44,3 +44,23 @@ probe runner must then match this chip, prove the known factory keys, install th
 pinned private test package, measure once and verify its removal. A fresh CCP
 installation restores a service-recorded released applet afterward. Each write
 stage requires the operator's separate device/action-specific approval.
+
+## Approved resource invocation: stopped before installation
+
+After the operator reported CCP's reset complete and returned the same isolated
+card to the ACS reader, the approved pinned runner executed once. The source
+runner is the implementation merged in #190 (`f7db9ab`); the private probe CAP
+SHA-256 is `c9947a692ccd97f65a6343ab5b0bb0e321a34c0eabe9f8b2ed99ec17a0c2aedd`,
+manifest SHA-256 `417ca3b71f17dfca0935b4b8b68d3b46da1cc3f075065d8778bccccb67f65222`.
+
+The journal records `status: stopped`, `stage: require-empty-registry`.
+Reaching that gate establishes that CPLC matched, the known production/probe
+SELECTs returned absent, and the factory-version-1 SCP02 channel authenticated.
+The original journal contains no registry reply details, so it cannot distinguish
+a status refusal, parser refusal or unexpected object. No INSTALL, LOAD, DELETE,
+dummy publication or key rotation was reached. The connection closed; there was
+no retry or automatic cleanup.
+
+No memory or transaction measurement was obtained. Preserve the original private
+journal. A registry-only diagnostic requires separate approval; the blank-registry
+gate remains enforced and any unknown objects must be retained.

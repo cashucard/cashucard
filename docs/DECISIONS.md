@@ -3877,3 +3877,25 @@ issued-key export.
 production delete whitelist, writing an unrecorded production installation over
 USB, and retrying after an uncertain LOAD or INSTALL. Physical execution remains
 behind a separate approved action list and a complete protected journal.
+
+
+## <a id="d139"></a>D139: Diagnose resource-probe registry failures without repeating the write drill
+
+**Decided (2026-10-27):** the resource runner records public GET STATUS replies
+and parsed registry fields in its protected journal, with fixed status, format,
+incomplete-response and unexpected-object failure codes. It excludes arbitrary
+exception text and all authentication payloads. A separate registry-only mode
+shares the pinned artifact, identity and known-factory-key checks, but returns
+before installation or cleanup. Its PC/SC bridge independently refuses every
+probe mutation. Both modes refuse journal reuse and stop without retries.
+
+**Why:** the approved first physical invocation stopped at the blank-registry
+gate before loading the probe. Its original stage-only journal cannot determine
+whether the cause was a registry status, parser refusal or unexpected object.
+Bounded public evidence makes the next separately approved diagnostic useful
+without rerunning a mutation workflow.
+
+**Rejected:** accepting an unparsed registry, automatically trying another format
+or secure channel, deleting unknown objects, and recording APDU/authentication
+transcripts. The original stopped invocation remains preserved. Inspection needs
+its own named-device approval and does not authorize resuming the write drill.

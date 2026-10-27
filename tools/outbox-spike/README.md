@@ -94,6 +94,22 @@ a separately reviewed cleanup plan; it cannot be restarted automatically.
 `probe_bridge.py` permits only public inspection, factory-version SCP02, private
 probe install/load/delete, registry reads and the probe's dummy command.
 
+### Diagnosing a registry stop
+
+With separate approval, `--inspect-registry` opens one factory-key channel after
+CPLC and known-object absence checks, reads the bounded applications/load-files
+registry, then closes the connection. It requires the same artifact pins,
+confirmed reset, Python and a fresh private journal. It is mutually exclusive
+with `--execute`; the bridge also refuses installation, LOAD, deletion and dummy
+writes in this mode. No fallback registry format or extra authentication is tried.
+
+Only GET STATUS reply bytes, status words and parsed public object fields enter
+the registry evidence. Authentication commands, cryptograms and arbitrary error
+messages stay out of the journal. A stopped run reports its stage and a fixed
+failure code. Preserve the original stopped journal before any diagnostic run.
+Unexpected objects remain a blocker to installation; diagnosis does not permit
+their deletion or relax the blank-registry rule.
+
 This is a resource floor: it measures a candidate pool and a contiguous dummy
 transaction. The real outbox's record layout, descriptor signature, publication
 transaction, NFC latency, power-loss behavior and wear require their own measured

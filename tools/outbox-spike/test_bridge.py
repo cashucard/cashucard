@@ -21,6 +21,20 @@ class BridgeTest(unittest.TestCase):
         b.validate_command(wrapped(0xe6, 2, 0, b.field(b.PACKAGE) + b.field(b.ISD) + b'\0\0\0'))
         b.validate_command(wrapped(0xe8, 0x80, 0, b'\xc4\x01\0'))
 
+    def test_registry_only_mode_refuses_every_private_mutation(self):
+        reads = [list(b.select(b.ISD)), list(bytes.fromhex('80CA9F7F00')),
+                 list(bytes.fromhex('8050010008') + bytes(9)),
+                 wrapped(0x82, 1, 0, bytes(8)),
+                 wrapped(0xf2, 0x40, 2, b'\x4f\0')]
+        for command in reads:
+            self.assertEqual(b.validate_command(command, registry_only=True), bytes(command))
+        writes = [list(b.COMMIT), wrapped(0xe8, 0x80, 0, b'\xc4\x01\0'),
+                  wrapped(0xe4, 0, 0, b'\x4f' + b.field(b.PACKAGE)),
+                  wrapped(0xe6, 2, 0, b.field(b.PACKAGE) + b.field(b.ISD) + b'\0\0\0')]
+        for command in writes:
+            with self.assertRaises(ValueError):
+                b.validate_command(command, registry_only=True)
+
     def test_manager_keys_production_deletes_and_malformed_commands_refused(self):
         bad = [wrapped(0xd8, 1, 0x81, bytes(67)), [True], [0, 1],
                wrapped(0xe8, 5, 0, b'payload'),
