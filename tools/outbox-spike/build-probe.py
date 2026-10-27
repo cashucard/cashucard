@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 
@@ -92,7 +93,22 @@ def prepare(output, size):
         (destination / file.name).write_text(text)
     build = ET.parse(ROOT / 'applet/build.xml')
     project = build.getroot()
-    project.set('basedir', str(ROOT / 'applet'))
+    project.set('basedir', str(output))
+    for name, value in {'src.dir': output / 'src', 'target.dir': output / 'target',
+                        'cap.file': output / 'resource-probe.cap'}.items():
+        project.find("property[@name='" + name + "']").set('value', str(value))
+    safe = {'-check-plugin', 'download-plugin', '-checksum-plugin', '-plugin-mismatch',
+            'verify-plugin', 'setup', 'cap'}
+    for target in list(project.findall('target')):
+        if target.get('name') not in safe:
+            project.remove(target)
+    version = project.find("property[@name='ant.javacard.version']").get('value')
+    cached = ROOT / 'applet/target' / ('ant-javacard-' + version + '.jar')
+    if cached.is_file():
+        (output / 'target').mkdir()
+        shutil.copyfile(cached, output / 'target' / cached.name)
+    # The copied converter is still checked against the inherited SHA-256 pin.
+
     cap_target = project.find("target[@name='cap']")
     cap = cap_target.find('javacard/cap')
     cap.set('aid', PACKAGE)
@@ -106,9 +122,14 @@ def prepare(output, size):
         args = command.findall('arg')
         if any(a.get('value') == 'tools/refcheck.py' for a in args):
             cap_target.remove(command)
+        command.set('dir', str(output))
         for arg in args:
+            if arg.get('value') == 'tools/stripcap.py':
+                arg.set('value', str(ROOT / 'tools/stripcap.py'))
             if arg.get('value') == 'applet/${cap.file}':
                 arg.set('value', '${cap.file}')
+    for echo in cap_target.findall('echo'):
+        echo.set('message', 'Isolated resource probe: ${cap.file}')
     build.write(output / 'build.xml', encoding='unicode')
     return hashes
 

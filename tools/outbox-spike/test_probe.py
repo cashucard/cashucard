@@ -37,6 +37,10 @@ class ProbeTest(unittest.TestCase):
             cap = build.find("target[@name='cap']/javacard/cap")
             self.assertEqual(cap.get('aid'), m.PACKAGE)
             self.assertEqual(cap.get('version'), '0.0')
+            self.assertEqual(build.getroot().get('basedir'), str(output))
+            self.assertEqual(build.find("property[@name='cap.file']").get('value'), str(output / 'resource-probe.cap'))
+            for name in ['install', 'delete', 'list', 'cap-debug', 'hello-cap', 'clean']:
+                self.assertIsNone(build.find("target[@name='" + name + "']"))
             for applet in cap.findall('applet'):
                 self.assertTrue(applet.get('aid').startswith(m.PACKAGE + ':'))
             with self.assertRaises(FileExistsError):
