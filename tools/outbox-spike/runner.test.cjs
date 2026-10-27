@@ -49,6 +49,8 @@ function simulated({
   registryData = [],
   registryEntries = [],
   registryParseFailure = false,
+  probePresent = false,
+  installProbeSw = 0x9000,
 } = {}) {
   const calls = {
     opens: 0,
@@ -59,9 +61,10 @@ function simulated({
     dummy: 0,
     registry: 0,
     deletes: 0,
+    creates: 0,
   };
   let marker = 0,
-    installed = false;
+    installed = probePresent;
   const tx = async (apdu) => {
     if (transportFailure) {
       throw new Error("lost reader");
@@ -97,6 +100,13 @@ function simulated({
     if (ins === 0xe6) {
       calls.mutations++;
       installed = true;
+      if (
+        apdu[2] === 0x0c &&
+        ++calls.creates === 2 &&
+        installProbeSw !== 0x9000
+      ) {
+        return [installProbeSw >> 8, installProbeSw & 0xff];
+      }
     }
     if (ins === 0xe8) {
       calls.loads++;
@@ -413,4 +423,36 @@ test("explicit platform profile reaches the drill but stops before cleanup if ba
     assert.equal(fake.calls.dummy, 1);
     assert.equal(fake.calls.closes, 1);
   }
+});
+
+test("explicit cleanup removes only the private probe without entering the install or measurement path", async (t) => {
+  const options = fixture(t),
+    fake = simulated({ probePresent: true });
+  const result = await runProbe(
+    { ...options, execute: false, cleanupOnly: true },
+    fake,
+  );
+  assert.equal(result.status, "cleaned");
+  assert.equal(fake.calls.authentications, 1);
+  assert.equal(fake.calls.loads, 0);
+  assert.equal(fake.calls.creates, 0);
+  assert.equal(fake.calls.dummy, 0);
+  assert.equal(fake.calls.deletes, 3);
+  assert.equal(fake.calls.closes, 1);
+  assert.equal(
+    JSON.parse(fs.readFileSync(options.journal)).stage,
+    "factory-blank-ready-for-ccp",
+  );
+});
+
+test("INSTALL rejection retains its public status word and stops without automatic cleanup", async (t) => {
+  const options = fixture(t),
+    fake = simulated({ installProbeSw: 0x6a84 });
+  await assert.rejects(runProbe(options, fake));
+  const stored = JSON.parse(fs.readFileSync(options.journal));
+  assert.equal(stored.stage, "install-01");
+  assert.equal(stored.failure.code, "card-status-6a84");
+  assert.equal(fake.calls.deletes, 0);
+  assert.equal(fake.calls.dummy, 0);
+  assert.equal(fake.calls.closes, 1);
 });

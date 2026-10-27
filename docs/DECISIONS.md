@@ -3922,3 +3922,27 @@ accepting arbitrary installed packages, matching only AIDs, and accepting a
 missing baseline after cleanup. The bridge continues to allow deletion only of
 the private probe AIDs. The stopped invocation and diagnostic evidence remain
 retained, and the revised write plan needs separate approval before execution.
+
+
+## <a id="d141"></a>D141: Separate cleanup of a stopped resource drill from another install attempt
+
+**Decided (2026-10-27):** the resource runner has an explicitly selected cleanup
+mode for a separately approved named-card plan. It matches CPLC, requires known
+production objects absent, proves the factory channel once, checks the selected
+exact registry baseline, deletes only the private probe objects in dependency
+order and verifies the baseline afterward. An absent probe object is acceptable;
+unexpected state or any other command failure stops without retry. The bridge
+independently refuses loading, creation and dummy writes in cleanup mode.
+
+**Why:** the approved platform-profile drill loaded its package and created the
+opener, then stopped while creating the probe applet. It obtained no resource
+measurement. Restoring the released applet requires removing these private test
+objects first, without repeating their creation or assuming the final instance
+exists. The old host discarded status details for non-registry refusals, so the
+cause remains unresolved; future fixed failure codes include the public status
+word when available.
+
+**Rejected:** automatic rollback after an uncertain mutation, retrying INSTALL
+to discover the old failure, deleting platform or production objects, and
+recording arbitrary errors or authentication transcripts. Prior journals remain
+unchanged. Cleanup approval does not authorize another resource-probe attempt.

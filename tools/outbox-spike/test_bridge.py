@@ -35,6 +35,18 @@ class BridgeTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 b.validate_command(command, registry_only=True)
 
+    def test_cleanup_only_mode_allows_only_private_deletion(self):
+        for aid in b.PROBE:
+            command = wrapped(0xe4, 0, 0, b'\x4f' + b.field(aid))
+            self.assertEqual(b.validate_command(command, cleanup_only=True), bytes(command))
+        forbidden = [list(b.COMMIT), wrapped(0xe8, 0x80, 0, b'\xc4\x01\0'),
+                     wrapped(0xe6, 2, 0, b.field(b.PACKAGE) + b.field(b.ISD) + b'\0\0\0')]
+        for aid in [b.ISD] + b.PRODUCTION + [bytes.fromhex('A0000001515350')]:
+            forbidden.append(wrapped(0xe4, 0, 0, b'\x4f' + b.field(aid)))
+        for command in forbidden:
+            with self.assertRaises(ValueError):
+                b.validate_command(command, cleanup_only=True)
+
     def test_manager_keys_production_deletes_and_malformed_commands_refused(self):
         bad = [wrapped(0xd8, 1, 0x81, bytes(67)), [True], [0, 1],
                wrapped(0xe8, 5, 0, b'payload'),
