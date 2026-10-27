@@ -149,7 +149,12 @@ function journalFile(filename, value) {
     fs.closeSync(dir);
   }
 }
-async function openBridge(python, reader, registryOnly = false) {
+async function openBridge(
+  python,
+  reader,
+  registryOnly = false,
+  cleanupOnly = false,
+) {
   const child = spawn(
     python,
     [
@@ -158,6 +163,7 @@ async function openBridge(python, reader, registryOnly = false) {
       "--reader",
       reader,
       ...(registryOnly ? ["--registry-only"] : []),
+      ...(cleanupOnly ? ["--cleanup-only"] : []),
     ],
     { stdio: ["pipe", "pipe", "ignore"] },
   );
@@ -258,8 +264,12 @@ async function runProbe(options, dependencies = {}) {
   ) {
     throw new Error("platform baseline is approved only for 09336320");
   }
-  if (options.execute && options.inspectRegistry) {
-    throw new Error("choose inspection or execution, never both");
+  if (
+    [options.execute, options.inspectRegistry, options.cleanupOnly].filter(
+      Boolean,
+    ).length > 1
+  ) {
+    throw new Error("choose one explicit reader mode");
   }
   const { manifest, load } = artifact(options.manifest, options.manifestHash);
   const summary = {
@@ -270,7 +280,7 @@ async function runProbe(options, dependencies = {}) {
     poolBytes: manifest.poolBytes,
     platformBaseline: options.platformBaseline ? "j3r180-09336320-v1" : "empty",
   };
-  if (!options.execute && !options.inspectRegistry) {
+  if (!options.execute && !options.inspectRegistry && !options.cleanupOnly) {
     return { ...summary, mode: "preview", cardAccessed: false };
   }
   if (
@@ -313,7 +323,9 @@ async function runProbe(options, dependencies = {}) {
   }
   const expect = (reply, codes = [0x9000]) => {
     if (!codes.includes(reply.sw)) {
-      throw new Error("card command refused");
+      throw new ProbeFailure(
+        "card-status-" + reply.sw.toString(16).padStart(4, "0"),
+      );
     }
     return reply;
   };
@@ -330,6 +342,7 @@ async function runProbe(options, dependencies = {}) {
       options.python,
       options.reader,
       options.inspectRegistry === true,
+      options.cleanupOnly === true,
     );
     const tx = bridge.tx;
     await step("match-chip", () => sdk.readChipIdentity(tx, options.chip));
@@ -338,7 +351,7 @@ async function runProbe(options, dependencies = {}) {
       sdk.TAG_AID,
       sdk.OPENER_AID,
       sdk.CASHU_PACKAGE_AID,
-      ...PROBE.map(bytes),
+      ...(options.cleanupOnly ? [] : PROBE.map(bytes)),
     ]) {
       await step("require-blank-card", async () =>
         expect(await sdk.transmit(tx, sdk.selectAid(aid)), [0x6a82]),
@@ -414,6 +427,27 @@ async function runProbe(options, dependencies = {}) {
       return entries;
     }
     const domain = sdk.toHex(sdk.ISD_AID).toUpperCase();
+    async function removePrivateProbe() {
+      await step("cleanup-registry", () => requireRegistry([domain, ...PROBE]));
+      for (const aid of PROBE) {
+        await step("delete-" + aid, async () =>
+          expect(await session.send(tx, probeDelete(aid)), [0x9000, 0x6a88]),
+        );
+      }
+      await step("verify-cleanup", () => requireRegistry([domain]));
+      state.stage = "factory-blank-ready-for-ccp";
+    }
+    if (options.cleanupOnly) {
+      await removePrivateProbe();
+      state.status = "cleaned";
+      save();
+      return {
+        ...summary,
+        status: state.status,
+        registry: state.registry,
+        journal: options.journal,
+      };
+    }
     if (options.inspectRegistry) {
       await step("inspect-registry", registry);
       state.status = "inspected";
@@ -489,15 +523,8 @@ async function runProbe(options, dependencies = {}) {
     session = await step("cleanup-factory-authentication", () =>
       sdk.openSession(tx, sdk.FACTORY_KEYS, randomBytes, { kvn: 1 }),
     );
-    await step("cleanup-registry", () => requireRegistry([domain, ...PROBE]));
-    for (const aid of PROBE) {
-      await step("delete-" + aid, async () =>
-        expect(await session.send(tx, probeDelete(aid)), [0x9000, 0x6a88]),
-      );
-    }
-    await step("verify-cleanup", () => requireRegistry([domain]));
+    await removePrivateProbe();
     state.status = "complete";
-    state.stage = "factory-blank-ready-for-ccp";
     save();
     return {
       ...summary,
@@ -508,7 +535,12 @@ async function runProbe(options, dependencies = {}) {
   } catch (error) {
     state.status = "stopped";
     state.failure = {
-      code: error instanceof ProbeFailure ? error.code : "operation-failed",
+      code:
+        error instanceof ProbeFailure
+          ? error.code
+          : Number.isInteger(error?.sw) && error.sw >= 0 && error.sw <= 0xffff
+            ? "card-status-" + error.sw.toString(16).padStart(4, "0")
+            : "operation-failed",
     };
     if (journalStarted) {
       try {
@@ -555,6 +587,7 @@ if (require.main === module) {
           journal: { type: "string" },
           execute: { type: "boolean", default: false },
           "inspect-registry": { type: "boolean", default: false },
+          "cleanup-only": { type: "boolean", default: false },
           "platform-baseline": { type: "boolean", default: false },
           "factory-reset-confirmed": { type: "boolean", default: false },
         },
@@ -568,6 +601,7 @@ if (require.main === module) {
         journal: values.journal,
         execute: values.execute,
         inspectRegistry: values["inspect-registry"],
+        cleanupOnly: values["cleanup-only"],
         platformBaseline: values["platform-baseline"],
         factoryResetConfirmed: values["factory-reset-confirmed"],
       });

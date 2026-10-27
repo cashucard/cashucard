@@ -92,3 +92,22 @@ D140 pins their full entries for the explicitly selected 09336320 profile.
 The corrected drill must preserve all three, install/remove only the private
 probe, and stop on any baseline difference. The diagnostic approval does not
 authorize that write invocation; its revised plan is a separate gate.
+
+## Approved platform-profile drill: stopped at applet creation
+
+The operator separately approved the corrected platform-profile drill. Runner
+source `dc65b71` used the original pinned CAP and manifest. It matched CPLC and
+the exact platform baseline, loaded the private package and confirmed opener
+creation. The invocation then stopped at `install-01`, `operation-failed`.
+
+The original host did not retain the status word for this non-registry failure.
+It therefore cannot distinguish a card refusal from another command-path
+failure or establish whether the final applet instance exists. No SELECT of the
+probe, memory read, dummy transaction or cleanup was reached. The connection
+closed without retry. Do not infer a 16 KiB capacity limit from this result.
+
+Retain this stopped journal with the earlier journals. The package and opener
+were confirmed created, so the card needs the separately approved cleanup-only
+plan before a normal CCP installation. D141 restricts that cleanup to the
+private probe AIDs while preserving the three exact platform entries. The
+underlying applet-creation failure remains an open resource-prototype gate.

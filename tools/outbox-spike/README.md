@@ -127,6 +127,22 @@ any platform file. This corrects the original empty-registry assumption. Resumin
 the stopped write drill requires review of the corrected profile and the named
 action plan; the registry-only approval covers inspection alone.
 
+### Explicit cleanup after a stopped installation
+
+With a separately reviewed action plan, `--cleanup-only` matches CPLC, requires
+the production objects absent, opens one known-factory-key channel and checks
+the selected registry baseline. It removes only the private probe applet,
+opener and package, accepting an already-absent object, then verifies the
+original baseline remains. It performs no LOAD, INSTALL, measurement or dummy
+publication. The bridge independently refuses those commands in cleanup mode.
+Use a new private journal and retain every prior stopped journal.
+
+Cleanup is an explicit mode, mutually exclusive with execution and inspection.
+It never runs automatically after failure. A completed cleanup leaves the card
+ready for a fresh service-recorded CCP installation. Future command refusals
+retain the public status word as `card-status-XXXX`; authentication payloads and
+arbitrary error messages remain excluded.
+
 This is a resource floor: it measures a candidate pool and a contiguous dummy
 transaction. The real outbox's record layout, descriptor signature, publication
 transaction, NFC latency, power-loss behavior and wear require their own measured
