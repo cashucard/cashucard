@@ -3848,3 +3848,32 @@ floor. Descriptor signing latency, the final transaction layout, power loss,
 record limits and wear still require the subsequent approved prototype drills.
 Physical installation and restoration need a named disposable card, confirmed
 empty/reconciled state, known key provenance and an approved action list.
+
+
+## <a id="d138"></a>D138: Run the resource probe only after a service-recorded factory reset
+
+**Decided (2026-10-27):** the USB resource runner accepts only the private 16 KiB
+probe profile, a pinned manifest hash, a named chip/ACS reader, confirmed factory
+reset and a fresh private journal. It uses cardkit 0.2.0's public API and factory
+keys only. It rejects an installed production applet or unexpected registry
+objects before loading. One known-key secure channel loads the probe; selection
+ends that channel, so one new known-key channel performs verified cleanup.
+Every failed operation stops without a retry or automatic cleanup.
+
+The bridge opens the reader exclusively, restricts mutation to the private
+probe's package/instances and refuses PUT KEY and production deletes. The
+runner verifies CPLC before each authentication, persists the next stage before
+mutation, measures one dummy publication and verifies registry absence after
+cleanup. It finishes factory-blank; the operator restores a recorded released
+applet through CCP's ordinary batch flow.
+
+**Why:** a disposable empty card may still have assigned manager keys. Using
+CCP's reset first preserves its service history and proves the documented
+factory transition while keeping issued keys inside the existing protected
+phone/service flow. The standalone probe needs no production credential or
+issued-key export.
+
+**Rejected:** guessing factory keys on an assigned-key card, widening the
+production delete whitelist, writing an unrecorded production installation over
+USB, and retrying after an uncertain LOAD or INSTALL. Physical execution remains
+behind a separate approved action list and a complete protected journal.

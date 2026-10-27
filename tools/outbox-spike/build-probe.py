@@ -2,6 +2,7 @@
 """Build an isolated resource probe from the current applet's install path."""
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -150,10 +151,16 @@ def main():
     subprocess.run(['ant', '-f', str(output / 'build.xml'), 'cap',
         '-Dsrc.dir=' + str(output / 'src'), '-Dcap.file=' + str(cap),
         '-Djc.sdk=' + str(args.sdk.resolve())], check=True)
+    spec = importlib.util.spec_from_file_location('cardkit_assets', ROOT / 'tools/cardkit/make-assets.py')
+    assets = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(assets)
+    load_file = assets.load_file(str(cap))
+    (output / 'load-file.bin').write_bytes(load_file)
     manifest = {'sourceCommit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
         'toolSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'kind': 'resource-probe-only', 'poolBytes': args.pool_bytes,
         'packageAid': PACKAGE.replace(':', ''), 'sources': hashes,
-        'capSha256': hashlib.sha256(cap.read_bytes()).hexdigest()}
+        'capSha256': hashlib.sha256(cap.read_bytes()).hexdigest(),
+        'loadFileSize': len(load_file), 'loadFileSha256': hashlib.sha256(load_file).hexdigest()}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('Probe built; no reader or card operation was performed.')
 

@@ -1,0 +1,443 @@
+/* Factory-key-only, bounded resource drill. Preview opens no reader. */
+const { createHash, randomBytes, randomUUID } = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+const { createInterface } = require("node:readline");
+const { parseArgs } = require("node:util");
+const PACKAGE = "F0434153485550524F4245";
+const PROBE = [PACKAGE + "01", PACKAGE + "4D", PACKAGE];
+const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+function artifact(filename, expected) {
+  const rawManifest = fs.readFileSync(filename);
+  if (!/^[0-9a-f]{64}$/.test(expected) || hash(rawManifest) !== expected) {
+    throw new Error("artifact hash mismatch");
+  }
+  const manifest = JSON.parse(rawManifest.toString("utf8"));
+  if (
+    manifest.kind !== "resource-probe-only" ||
+    manifest.packageAid !== PACKAGE ||
+    manifest.poolBytes !== 16384
+  ) {
+    throw new Error("unsupported probe profile");
+  }
+  const directory = path.dirname(filename);
+  const cap = fs.readFileSync(path.join(directory, "resource-probe.cap"));
+  const load = fs.readFileSync(path.join(directory, "load-file.bin"));
+  if (
+    hash(cap) !== manifest.capSha256 ||
+    hash(load) !== manifest.loadFileSha256 ||
+    load.length !== manifest.loadFileSize ||
+    load.length === 0 ||
+    load.length > 63232
+  ) {
+    throw new Error("probe load bytes mismatch");
+  }
+  return { manifest, load };
+}
+function probeDelete(hex) {
+  if (!PROBE.includes(hex)) {
+    throw new Error("private probe AID required");
+  }
+  const aid = Array.from(Buffer.from(hex, "hex"));
+  return [0x80, 0xe4, 0, 0, aid.length + 2, 0x4f, aid.length, ...aid, 0];
+}
+function measurements(data) {
+  const bytes = Buffer.from(data);
+  if (
+    bytes.length !== 24 ||
+    bytes[23] !== 1 ||
+    bytes.readUInt16BE(20) !== 16384
+  ) {
+    throw new Error("probe response mismatch");
+  }
+  return {
+    persistentBefore: bytes.readUInt32BE(0),
+    persistentAfter: bytes.readUInt32BE(4),
+    transientReset: bytes.readUInt32BE(8),
+    transientDeselect: bytes.readUInt32BE(12),
+    maxCommit: bytes.readUInt16BE(16),
+    unusedCommit: bytes.readUInt16BE(18),
+    poolBytes: bytes.readUInt16BE(20),
+    publicationByte: bytes[22],
+  };
+}
+function journalFile(filename, value) {
+  const temporary = filename + "." + randomUUID();
+  const fd = fs.openSync(temporary, "wx", 0o600);
+  try {
+    fs.writeFileSync(fd, JSON.stringify(value, null, 2) + "\n");
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(temporary, filename);
+  const dir = fs.openSync(path.dirname(filename), "r");
+  try {
+    fs.fsyncSync(dir);
+  } finally {
+    fs.closeSync(dir);
+  }
+}
+async function openBridge(python, reader) {
+  const child = spawn(
+    python,
+    ["-u", path.join(__dirname, "probe_bridge.py"), "--reader", reader],
+    { stdio: ["pipe", "pipe", "ignore"] },
+  );
+  const lines = createInterface({ input: child.stdout });
+  const iterator = lines[Symbol.asyncIterator]();
+  child.on("error", () => lines.close());
+  child.stdin.on("error", () => lines.close());
+  let busy = false,
+    closed = false;
+  async function next() {
+    let timer;
+    try {
+      const result = await Promise.race([
+        iterator.next(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            child.kill();
+            reject(new Error("reader response timeout"));
+          }, 10000);
+        }),
+      ]);
+      if (result.done || result.value.length > 4096) {
+        throw new Error("reader stopped");
+      }
+      const message = JSON.parse(result.value);
+      if (!message || message.error) {
+        throw new Error("reader stopped");
+      }
+      return message;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  async function close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    child.stdin.end('{"close":true}\n');
+    await new Promise((resolve) => {
+      if (child.exitCode !== null) {
+        resolve();
+        return;
+      }
+      const timer = setTimeout(() => {
+        child.kill();
+        resolve();
+      }, 1000);
+      child.once("close", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    lines.close();
+  }
+  try {
+    if ((await next()).ready !== true) {
+      throw new Error("reader unavailable");
+    }
+  } catch (error) {
+    await close();
+    throw error;
+  }
+  return {
+    close,
+    tx: async (apdu) => {
+      if (closed || busy) {
+        throw new Error("reader unavailable");
+      }
+      busy = true;
+      try {
+        child.stdin.write(JSON.stringify({ apdu }) + "\n");
+        const { reply } = await next();
+        if (
+          !Array.isArray(reply) ||
+          reply.length < 2 ||
+          reply.some((v) => !Number.isInteger(v) || v < 0 || v > 255)
+        ) {
+          throw new Error("invalid reader reply");
+        }
+        return reply;
+      } finally {
+        busy = false;
+      }
+    },
+  };
+}
+async function runProbe(options, dependencies = {}) {
+  if (
+    !/^cplc-v1:[0-9a-f]{24}$/.test(options.chip) ||
+    options.reader !== "ACS ACR122U PICC Interface"
+  ) {
+    throw new Error("explicit approved chip and reader required");
+  }
+  const { manifest, load } = artifact(options.manifest, options.manifestHash);
+  const summary = {
+    chip: options.chip,
+    reader: options.reader,
+    capSha256: manifest.capSha256,
+    manifestSha256: options.manifestHash,
+    poolBytes: manifest.poolBytes,
+  };
+  if (!options.execute) {
+    return { ...summary, mode: "preview", cardAccessed: false };
+  }
+  if (
+    !options.factoryResetConfirmed ||
+    !options.journal ||
+    fs.existsSync(options.journal)
+  ) {
+    throw new Error(
+      "confirmed factory reset and a new journal are required; no automatic retry",
+    );
+  }
+  if (
+    !dependencies.sdk &&
+    require("../cardkit/package.json").version !== "0.2.0"
+  ) {
+    throw new Error("resource probe requires reviewed cardkit 0.2.0");
+  }
+  const sdk = dependencies.sdk ?? require("../cardkit"); // Public package entry only.
+  if (!path.isAbsolute(options.journal)) {
+    throw new Error("absolute private journal path required");
+  }
+  fs.mkdirSync(path.dirname(options.journal), { recursive: true, mode: 0o700 });
+  const parent = fs.lstatSync(path.dirname(options.journal));
+  if (
+    !parent.isDirectory() ||
+    (parent.mode & 0o077) !== 0 ||
+    parent.uid !== process.getuid()
+  ) {
+    throw new Error("private operator-owned journal directory required");
+  }
+  const lock = fs.openSync(options.journal + ".lock", "wx", 0o600);
+  const state = { ...summary, status: "prepared", stage: "before-reader" };
+  const save = () => journalFile(options.journal, state);
+  let bridge,
+    journalStarted = false;
+  async function step(name, operation) {
+    state.stage = name;
+    save();
+    return operation();
+  }
+  const expect = (reply, codes = [0x9000]) => {
+    if (!codes.includes(reply.sw)) {
+      throw new Error("card command refused");
+    }
+    return reply;
+  };
+  const bytes = (hex) => sdk.fromHex(hex);
+  try {
+    if (fs.existsSync(options.journal)) {
+      throw new Error("journal already exists");
+    }
+    const reserved = fs.openSync(options.journal, "wx", 0o600);
+    fs.closeSync(reserved);
+    journalStarted = true;
+    save();
+    bridge = await (dependencies.openBridge ?? openBridge)(
+      options.python,
+      options.reader,
+    );
+    const tx = bridge.tx;
+    await step("match-chip", () => sdk.readChipIdentity(tx, options.chip));
+    for (const aid of [
+      sdk.CARD_AID,
+      sdk.TAG_AID,
+      sdk.OPENER_AID,
+      sdk.CASHU_PACKAGE_AID,
+      ...PROBE.map(bytes),
+    ]) {
+      await step("require-blank-card", async () =>
+        expect(await sdk.transmit(tx, sdk.selectAid(aid)), [0x6a82]),
+      );
+    }
+    let session = await step("factory-authentication", () =>
+      sdk.openSession(tx, sdk.FACTORY_KEYS, randomBytes, { kvn: 1 }),
+    );
+    async function registry() {
+      const entries = [];
+      for (const kind of ["applications", "load-files"]) {
+        let data = [],
+          complete = false;
+        for (let page = 0; page < 16; page++) {
+          const reply = await session.send(
+            tx,
+            sdk.registryCommand(kind, page > 0),
+          );
+          if (reply.sw === 0x6a88 && page === 0 && reply.data.length === 0) {
+            complete = true;
+            break;
+          }
+          expect(reply, [0x9000, 0x6310]);
+          if (
+            data.length + reply.data.length > 65535 ||
+            (reply.sw === 0x6310 && !reply.data.length)
+          ) {
+            throw new Error("registry incomplete");
+          }
+          data.push(...reply.data);
+          if (reply.sw === 0x9000) {
+            entries.push(...sdk.parseRegistryEntries(data));
+            complete = true;
+            break;
+          }
+        }
+        if (!complete) {
+          throw new Error("registry incomplete");
+        }
+      }
+      return entries;
+    }
+    async function requireRegistry(allowed) {
+      const entries = await registry();
+      if (entries.some((entry) => !allowed.includes(entry.aid.toUpperCase()))) {
+        throw new Error("unexpected registry objects");
+      }
+      return entries;
+    }
+    const domain = sdk.toHex(sdk.ISD_AID).toUpperCase();
+    await step("require-empty-registry", () => requireRegistry([domain]));
+    await step("install-for-load", async () =>
+      expect(await session.send(tx, sdk.installForLoad(bytes(PACKAGE)))),
+    );
+    const blocks = sdk.splitLoad(load);
+    for (let i = 0; i < blocks.length; i++) {
+      await step("load-block-" + i, async () =>
+        expect(await session.send(tx, blocks[i])),
+      );
+    }
+    for (const suffix of ["4D", "01"]) {
+      await step("install-" + suffix, async () =>
+        expect(
+          await session.send(
+            tx,
+            sdk.installAndSelectable(
+              bytes(PACKAGE),
+              bytes(PACKAGE + suffix),
+              bytes(PACKAGE + suffix),
+            ),
+          ),
+        ),
+      );
+    }
+    await step("select-probe", async () => {
+      const reply = expect(
+        await sdk.transmit(tx, sdk.selectAid(bytes(PACKAGE + "01"))),
+      );
+      if (Buffer.from(reply.data).toString("hex") !== "50524f4245014000") {
+        throw new Error("probe selection mismatch");
+      }
+    });
+    const before = await step("read-measurements", async () =>
+      measurements(expect(await sdk.transmit(tx, [0xb0, 0x7d, 0, 0, 24])).data),
+    );
+    if (before.publicationByte !== 0) {
+      throw new Error("probe was already used");
+    }
+    let dummyCommandMs;
+    await step("dummy-publication", async () => {
+      const started = process.hrtime.bigint();
+      const reply = expect(await sdk.transmit(tx, [0xb0, 0x7e, 0, 0, 1]));
+      dummyCommandMs = Number(process.hrtime.bigint() - started) / 1e6;
+      if (reply.data.length !== 1 || reply.data[0] !== 1) {
+        throw new Error("publication not confirmed");
+      }
+    });
+    const after = await step("read-publication", async () =>
+      measurements(expect(await sdk.transmit(tx, [0xb0, 0x7d, 0, 0, 24])).data),
+    );
+    if (after.publicationByte !== 1) {
+      throw new Error("publication not retained");
+    }
+    state.measurements = { before, after, dummyCommandMs };
+    save();
+    // SELECT of the probe ended the old secure channel. Match identity again,
+    // then open exactly one new, known-factory-key session for cleanup.
+    await step("cleanup-match-chip", () =>
+      sdk.readChipIdentity(tx, options.chip),
+    );
+    session = await step("cleanup-factory-authentication", () =>
+      sdk.openSession(tx, sdk.FACTORY_KEYS, randomBytes, { kvn: 1 }),
+    );
+    await step("cleanup-registry", () => requireRegistry([domain, ...PROBE]));
+    for (const aid of PROBE) {
+      await step("delete-" + aid, async () =>
+        expect(await session.send(tx, probeDelete(aid)), [0x9000, 0x6a88]),
+      );
+    }
+    await step("verify-cleanup", () => requireRegistry([domain]));
+    state.status = "complete";
+    state.stage = "factory-blank-ready-for-ccp";
+    save();
+    return {
+      ...summary,
+      ...state.measurements,
+      status: state.status,
+      journal: options.journal,
+    };
+  } catch (error) {
+    state.status = "stopped";
+    if (journalStarted) {
+      try {
+        save();
+      } catch {}
+    }
+    throw new Error(
+      "probe stopped at " +
+        state.stage +
+        "; retain its journal; no retry performed",
+    );
+  } finally {
+    try {
+      if (bridge) {
+        await bridge.close();
+      }
+    } finally {
+      fs.closeSync(lock);
+      fs.unlinkSync(options.journal + ".lock");
+    }
+  }
+}
+
+module.exports = { artifact, probeDelete, measurements, runProbe };
+if (require.main === module) {
+  Promise.resolve()
+    .then(async () => {
+      const { values } = parseArgs({
+        options: {
+          manifest: { type: "string" },
+          "expect-manifest-sha256": { type: "string" },
+          chip: { type: "string" },
+          reader: { type: "string" },
+          python: { type: "string" },
+          journal: { type: "string" },
+          execute: { type: "boolean", default: false },
+          "factory-reset-confirmed": { type: "boolean", default: false },
+        },
+      });
+      const result = await runProbe({
+        manifest: values.manifest,
+        manifestHash: values["expect-manifest-sha256"],
+        chip: values.chip,
+        reader: values.reader,
+        python: values.python,
+        journal: values.journal,
+        execute: values.execute,
+        factoryResetConfirmed: values["factory-reset-confirmed"],
+      });
+      console.log(JSON.stringify(result));
+    })
+    .catch(() => {
+      console.error(
+        "Resource probe stopped. Preserve its journal and review before another action.",
+      );
+      process.exitCode = 1;
+    });
+}
