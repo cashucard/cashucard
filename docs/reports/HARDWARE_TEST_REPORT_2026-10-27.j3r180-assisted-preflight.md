@@ -64,3 +64,31 @@ no retry or automatic cleanup.
 No memory or transaction measurement was obtained. Preserve the original private
 journal. A registry-only diagnostic requires separate approval; the blank-registry
 gate remains enforced and any unknown objects must be retained.
+
+## Separately approved registry-only diagnostic
+
+The registry-only runner at `0bb410d` executed once against the same CPLC using
+one verified factory-version-1 channel. It completed inspection and closed the
+connection. No probe installation, deletion, dummy command, key change, fallback
+or retry occurred.
+
+Applications returned `6A88` with no data. Load files returned `9000`, with these
+three entries under domain `A000000151000000`, lifecycle `01`:
+
+| AID | Version | Identified package |
+| --- | --- | --- |
+| `A0000001515350` | 255.255 | SSD creation package |
+| `A0000000620204` | 1.0 | `javacardx.biometry1toN` |
+| `A0000000620202` | 1.3 | `javacardx.biometry` |
+
+Their complete public load-file TLVs match the owner's existing
+`tools/cardkit/gp/test/fixtures/gp-install-opener.txt` GET STATUS response.
+[GlobalPlatformPro's documentation](https://github.com/martinpaljak/GlobalPlatformPro#readme)
+also identifies these packages. The original gate failed because its empty
+registry assumption excluded these pre-existing platform load files. The
+diagnostic obtained no resource measurements.
+
+D140 pins their full entries for the explicitly selected 09336320 profile.
+The corrected drill must preserve all three, install/remove only the private
+probe, and stop on any baseline difference. The diagnostic approval does not
+authorize that write invocation; its revised plan is a separate gate.

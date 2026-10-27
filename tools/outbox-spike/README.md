@@ -110,6 +110,23 @@ failure code. Preserve the original stopped journal before any diagnostic run.
 Unexpected objects remain a blocker to installation; diagnosis does not permit
 their deletion or relax the blank-registry rule.
 
+### Preserving the observed platform baseline
+
+The separately approved inspection of 09336320 found three platform load files,
+with no application instances. Their complete GET STATUS entries match the
+owner's existing `gp-install-opener.txt` capture. An explicit `--platform-baseline`
+profile is restricted to this CPLC and pins those full entries, including
+versions, lifecycle and domain. It requires all three before installation,
+before cleanup and after cleanup. Ordering and reply pagination may vary.
+Unknown, missing, duplicated or modified entries stop the run. The default
+without this flag still requires an empty registry.
+
+The profile permits only the three private probe AIDs alongside that baseline
+during cleanup. The bridge's deletion restriction is unchanged; it cannot delete
+any platform file. This corrects the original empty-registry assumption. Resuming
+the stopped write drill requires review of the corrected profile and the named
+action plan; the registry-only approval covers inspection alone.
+
 This is a resource floor: it measures a candidate pool and a contiguous dummy
 transaction. The real outbox's record layout, descriptor signature, publication
 transaction, NFC latency, power-loss behavior and wear require their own measured
