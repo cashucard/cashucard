@@ -111,3 +111,25 @@ were confirmed created, so the card needs the separately approved cleanup-only
 plan before a normal CCP installation. D141 restricts that cleanup to the
 private probe AIDs while preserving the three exact platform entries. The
 underlying applet-creation failure remains an open resource-prototype gate.
+
+
+## Separately approved cleanup: complete
+
+The operator approved cleanup only. Runner source `3f96ea0` executed once with
+`--cleanup-only --platform-baseline` against the same CPLC and ACS reader. It
+matched identity, required production objects absent, opened one verified
+factory-version-1 channel, validated the platform baseline, and deleted only
+the private probe applet, opener and package (an absent object was acceptable).
+The protected journal finished `status: cleaned`,
+`stage: factory-blank-ready-for-ccp`. The reader connection closed.
+
+Final applications: `6A88`, no data. Final load files: `9000`, exactly the same
+three complete platform entries recorded above. No private probe objects remain.
+The cleanup performed no LOAD, INSTALL, memory measurement, dummy transaction,
+key change or retry. The card has no Cashu applet and is ready for an ordinary
+service-recorded CCP installation.
+
+All earlier journals remain unchanged. The cleanup establishes removal and
+platform preservation, not resource feasibility. The applet-creation failure
+remains unresolved; a revised diagnostic artifact and its named action plan
+require review before any future physical probe.
