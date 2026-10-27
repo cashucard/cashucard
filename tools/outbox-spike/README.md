@@ -39,9 +39,9 @@ probe applet (`...01`), as with the normal package. Package version: 0.0.
 Selection answers ASCII `PROBE`, format byte 1 and the pool size as uint16 big
 endian. Commands use CLA `B0`, P1/P2 zero:
 
-| INS | Operation | Response |
-| --- | --- | --- |
-| `7D` | Read measurements | 24 bytes, layout below |
+| INS  | Operation                                            | Response                                |
+| ---- | ---------------------------------------------------- | --------------------------------------- |
+| `7D` | Read measurements                                    | 24 bytes, layout below                  |
 | `7E` | Toggle 128 dummy persistent bytes in one transaction | One byte: first dummy byte after commit |
 
 Measurement response: four uint32 values (persistent memory before and after
@@ -53,15 +53,46 @@ The [JavaCard memory API](https://docs.oracle.com/cd/E59935_01/api/javacard/fram
 reports an upper bound; fragmentation and transaction overhead affect usable
 capacity. The builder compiles against the 3.0.5 API.
 
-## Physical test gate
+## USB runner and physical test gate
 
-Physical use requires a separately approved action list naming the reader and
-disposable card. First establish its identity, empty/reconciled value and change
-state, and manager-key provenance. Installing this replacement removes the old
-applet and its identity. Use the approved protected installer, with one known-key
-authentication attempt and no guessed keys or retries. Read measurements, perform
-one dummy transaction and read its result, then remove the probe and restore the
-approved released applet. Preserve the manifest and results in a hardware report.
+Build cardkit's public package with `yarn --cwd tools/cardkit install
+--frozen-lockfile` and `yarn --cwd tools/cardkit build`. The runner requires the
+reviewed 0.2.0 API. A newly generated manifest now also pins `load-file.bin`.
+The runner's default preview validates both artifacts and opens no reader:
+
+```sh
+node tools/outbox-spike/run-probe.cjs \
+  --manifest /tmp/outbox-probe-16k/manifest.json \
+  --expect-manifest-sha256 <reviewed-manifest-sha256> \
+  --chip cplc-v1:4790d3213041093363205547 \
+  --reader 'ACS ACR122U PICC Interface'
+```
+
+Execution additionally requires `--execute --factory-reset-confirmed`, an
+explicit Python with pyscard and a new absolute journal path inside a private
+operator-owned directory. Review the complete action list before enabling it.
+
+1. The operator completes CCP's ordinary reset for the empty disposable card.
+   Its service records the reset and returns manager keys to the known factory
+   state. Keep the same card isolated from the others.
+2. The USB runner matches CPLC and requires the production and probe objects to
+   be absent. It verifies the factory cryptogram before external authentication,
+   then checks the registry before loading the pinned probe package. The opener
+   is instantiated first; the probe follows. The tag instance is omitted.
+3. Select the private probe, read memory, perform one dummy 128-byte transaction
+   and read the retained result. Save the measurements and command timing.
+4. Match CPLC again, open one new known-factory-key channel, delete only the
+   probe/card instance, opener and package, and verify registry absence. The
+   runner ends with the card factory-blank.
+5. The operator creates a fresh CCP batch to restore the released applet and
+   its service record. Any holder-wallet setup follows afterward.
+
+The runner journals every next stage before mutation, refuses journal reuse and
+stops on every unexpected identity, state, cryptogram, status or transport
+failure. It performs no key rotation. An interrupted run retains its journal for
+a separately reviewed cleanup plan; it cannot be restarted automatically.
+`probe_bridge.py` permits only public inspection, factory-version SCP02, private
+probe install/load/delete, registry reads and the probe's dummy command.
 
 This is a resource floor: it measures a candidate pool and a contiguous dummy
 transaction. The real outbox's record layout, descriptor signature, publication
