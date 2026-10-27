@@ -66,10 +66,10 @@ const links = [
   {
     id: 'privacy',
     label: 'Privacy Policy',
-    url: 'https://getflash.io/legal/privacy.html',
+    url: 'https://cashucard.org/privacy',
   },
-  {id: 'terms', label: 'Terms', url: 'https://getflash.io/legal/terms.html'},
-  {id: 'support', label: 'Support', url: 'mailto:support@getflash.io'},
+  {id: 'terms', label: 'Terms', url: 'https://cashucard.org/terms'},
+  {id: 'support', label: 'Support', url: 'mailto:support@cashucard.org'},
 ] as const;
 
 export function LegalLinks() {
@@ -89,7 +89,7 @@ export function LegalLinks() {
               Alert.alert(
                 'Unable to open link',
                 link.id === 'support'
-                  ? 'Email support@getflash.io from your preferred email app.'
+                  ? 'Email support@cashucard.org from your preferred email app.'
                   : 'Please try again later.',
               );
             }

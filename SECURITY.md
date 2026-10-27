@@ -10,7 +10,8 @@ seriously.
 Report it privately through this repository's security advisories:
 <https://github.com/cashucard/cashucard/security/advisories/new> (the **Security** tab,
 then **Report a vulnerability**). That makes a private advisory that only the
-maintainers can see.
+maintainers can see. You can also email
+[security@cashucard.org](mailto:security@cashucard.org).
 
 Please do **not** open a public GitHub issue, pull request or discussion for a
 vulnerability.

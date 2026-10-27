@@ -45,9 +45,9 @@ test('sign-in is required for batch setup; Settings keeps the shared forest appe
     await tree!.root.findByProps({testID: 'legal-support'}).props.onPress();
   });
   expect(openURL.mock.calls).toEqual([
-    ['https://getflash.io/legal/privacy.html'],
-    ['https://getflash.io/legal/terms.html'],
-    ['mailto:support@getflash.io'],
+    ['https://cashucard.org/privacy'],
+    ['https://cashucard.org/terms'],
+    ['mailto:support@cashucard.org'],
   ]);
 
   const {Alert} = require('react-native');
@@ -67,7 +67,7 @@ test('sign-in is required for batch setup; Settings keeps the shared forest appe
   });
   expect(alert).toHaveBeenLastCalledWith(
     'Unable to open link',
-    'Email support@getflash.io from your preferred email app.',
+    'Email support@cashucard.org from your preferred email app.',
   );
 
   // Sign in through the mocked api module (jest.mock at the bottom of the file
