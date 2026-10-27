@@ -12,7 +12,7 @@ const {
   verifyPlatformRegistry,
 } = require("./run-probe.cjs");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
-function fixture(t) {
+function fixture(t, { format = 1, poolBytes = 16384 } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "resource-runner-"));
   fs.chmodSync(directory, 0o700);
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
@@ -21,7 +21,13 @@ function fixture(t) {
   const manifest = {
     kind: "resource-probe-only",
     packageAid: "F0434153485550524F4245",
-    poolBytes: 16384,
+    poolBytes,
+    ...(format === 2
+      ? {
+          probeFormat: 2,
+          probeProfile: poolBytes ? "pool-allocation" : "constructor-control",
+        }
+      : {}),
     capSha256: hash(cap),
     loadFileSha256: hash(load),
     loadFileSize: load.length,
@@ -51,6 +57,11 @@ function simulated({
   registryParseFailure = false,
   probePresent = false,
   installProbeSw = 0x9000,
+  probeFormat = 1,
+  poolBytes = 16384,
+  measurementSw = 0x9000,
+  measurementData = [],
+  commitCapacity = 512,
 } = {}) {
   const calls = {
     opens: 0,
@@ -73,7 +84,14 @@ function simulated({
     if (ins === 0xa4) {
       const aid = Buffer.from(apdu.slice(5, 5 + apdu[4])).toString("hex");
       if (installed && aid === "f0434153485550524f424501") {
-        return [...Buffer.from("50524f4245014000", "hex"), 0x90, 0];
+        return [
+          ...Buffer.from("PROBE"),
+          probeFormat,
+          poolBytes >> 8,
+          poolBytes & 0xff,
+          0x90,
+          0,
+        ];
       }
       return present ? [0x90, 0] : [0x6a, 0x82];
     }
@@ -86,6 +104,20 @@ function simulated({
       return [...data, registrySw >> 8, registrySw & 0xff];
     }
     if (ins === 0x7d) {
+      if (measurementSw !== 0x9000)
+        return [...measurementData, measurementSw >> 8, measurementSw & 0xff];
+      if (probeFormat === 2) {
+        const data = Buffer.alloc(16);
+        data.writeUInt16BE(1000, 0);
+        data.writeUInt16BE(100, 2);
+        data.writeUInt16BE(200, 4);
+        data.writeUInt16BE(commitCapacity, 6);
+        data.writeUInt16BE(commitCapacity, 8);
+        data.writeUInt16BE(poolBytes, 10);
+        data[12] = marker;
+        data[13] = 2;
+        return [...data, 0x90, 0];
+      }
       const data = Buffer.alloc(24);
       data.writeUInt16BE(16384, 20);
       data[22] = marker;
@@ -455,4 +487,85 @@ test("INSTALL rejection retains its public status word and stops without automat
   assert.equal(fake.calls.deletes, 0);
   assert.equal(fake.calls.dummy, 0);
   assert.equal(fake.calls.closes, 1);
+});
+
+test("format-2 control proves installation and queries without a dummy publication", async (t) => {
+  const options = fixture(t, { format: 2, poolBytes: 0 });
+  const fake = simulated({ probeFormat: 2, poolBytes: 0 });
+  const result = await runProbe(options, fake);
+  assert.equal(result.status, "complete");
+  assert.equal(result.before.poolBytes, 0);
+  assert.equal(result.before.reportedAvailability.persistent, 1000);
+  assert.equal(fake.calls.dummy, 0);
+  assert.equal(fake.calls.deletes, 3);
+});
+
+test("format-2 pool publishes once only with available diagnostics and capacity", async (t) => {
+  for (const scenario of ["normal", "unavailable", "small-commit"]) {
+    const options = fixture(t, { format: 2 });
+    const fake = simulated({
+      probeFormat: 2,
+      measurementSw: scenario === "unavailable" ? 0x6f00 : 0x9000,
+      commitCapacity: scenario === "small-commit" ? 64 : 512,
+    });
+    const result = await runProbe(options, fake);
+    assert.equal(result.status, "complete");
+    assert.equal(fake.calls.dummy, scenario === "normal" ? 1 : 0);
+    assert.equal(fake.calls.deletes, 3);
+    if (scenario === "unavailable")
+      assert.equal(result.before.status, "unavailable");
+    if (scenario === "small-commit")
+      assert.equal(result.dummySkipped, "reported-commit-capacity-below-128");
+  }
+});
+
+test("format-2 saturation is explicit and impossible commit counters are rejected", () => {
+  const data = Buffer.alloc(16);
+  data.writeUInt16BE(32767, 0);
+  data.writeUInt16BE(512, 6);
+  data.writeUInt16BE(512, 8);
+  data[13] = 2;
+  data[14] = 1;
+  const result = measurements(data, 2, 0);
+  assert.equal(result.saturatedMask, 1);
+  assert.equal(result.reportedAvailability.persistent, 32767);
+  for (const mutate of [
+    (b) => {
+      b[14] = 0;
+    },
+    (b) => {
+      b[13] = 1;
+    },
+    (b) => {
+      b[15] = 1;
+    },
+    (b) => {
+      b.writeUInt16BE(513, 8);
+    },
+    (b) => {
+      b.writeUInt16BE(65535, 6);
+    },
+  ]) {
+    const broken = Buffer.from(data);
+    mutate(broken);
+    assert.throws(() => measurements(broken, 2, 0));
+  }
+});
+
+test("unexpected measurement refusals or refusal data stop without automatic cleanup", async (t) => {
+  for (const config of [
+    { measurementSw: 0x6982 },
+    { measurementSw: 0x6f00, measurementData: [1] },
+  ]) {
+    const options = fixture(t, { format: 2 });
+    const fake = simulated({ probeFormat: 2, ...config });
+    await assert.rejects(runProbe(options, fake));
+    assert.equal(fake.calls.deletes, 0);
+    assert.equal(fake.calls.dummy, 0);
+    assert.equal(fake.calls.closes, 1);
+    assert.equal(
+      JSON.parse(fs.readFileSync(options.journal)).stage,
+      "read-measurements",
+    );
+  }
 });

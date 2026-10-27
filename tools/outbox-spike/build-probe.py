@@ -13,36 +13,9 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = 'F0:43:41:53:48:55:50:52:4F:42:45'
 
-PROCESS = '''    public void process(APDU apdu) {
-        byte[] b = apdu.getBuffer();
-        if (selectingApplet()) {
-            b[0] = 0x50; b[1] = 0x52; b[2] = 0x4F; b[3] = 0x42; b[4] = 0x45;
-            b[5] = 1;
-            Util.setShort(b, (short) 6, (short) probePool.length);
-            apdu.setOutgoingAndSend((short) 0, (short) 8);
-            return;
-        }
-        if (b[ISO7816.OFFSET_CLA] != (byte) 0xB0 || b[ISO7816.OFFSET_P1] != 0 ||
-            b[ISO7816.OFFSET_P2] != 0) {
-            ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
-        }
-        if (b[ISO7816.OFFSET_INS] == (byte) 0x7D) {
-            // Counts are 32-bit, two shorts per memory pool (JC 3.0.4+).
-            for (short i = 0; i < 8; i++) {
-                Util.setShort(b, (short) (i * 2), probeStats[i]);
-            }
-            Util.setShort(b, (short) 16, JCSystem.getMaxCommitCapacity());
-            Util.setShort(b, (short) 18, JCSystem.getUnusedCommitCapacity());
-            Util.setShort(b, (short) 20, (short) probePool.length);
-            b[22] = probePool[0];
-            b[23] = 1;
-            apdu.setOutgoingAndSend((short) 0, (short) 24);
-            return;
-        }
-        if (b[ISO7816.OFFSET_INS] == (byte) 0x7E) {
+DUMMY = """        if (b[ISO7816.OFFSET_INS] == (byte) 0x7E) {
             JCSystem.beginTransaction();
             try {
-                // A conservative dummy publication footprint. No proof is used.
                 for (short i = 0; i < 128; i++) {
                     probePool[i] = (byte) (probePool[i] ^ 1);
                 }
@@ -55,26 +28,61 @@ PROCESS = '''    public void process(APDU apdu) {
             apdu.setOutgoingAndSend((short) 0, (short) 1);
             return;
         }
-        // Every production payment, setup, PIN and load command is disabled.
-        ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
-    }'''
+"""
+
+PROCESS = """    public void process(APDU apdu) {
+        byte[] b = apdu.getBuffer();
+        if (selectingApplet()) {
+            b[0] = 0x50; b[1] = 0x52; b[2] = 0x4F; b[3] = 0x42; b[4] = 0x45;
+            b[5] = 2;
+            Util.setShort(b, (short) 6, (short) __SIZE__);
+            apdu.setOutgoingAndSend((short) 0, (short) 8);
+            return;
+        }
+        if (b[ISO7816.OFFSET_CLA] != (byte) 0xB0 || b[ISO7816.OFFSET_P1] != 0 ||
+            b[ISO7816.OFFSET_P2] != 0) {
+            ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+        }
+        if (b[ISO7816.OFFSET_INS] == (byte) 0x7D) {
+            // Optional diagnostics run after install. These counters cap at 32767.
+            short persistent = JCSystem.getAvailableMemory(JCSystem.MEMORY_TYPE_PERSISTENT);
+            short reset = JCSystem.getAvailableMemory(JCSystem.MEMORY_TYPE_TRANSIENT_RESET);
+            short deselect = JCSystem.getAvailableMemory(JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT);
+            Util.setShort(b, (short) 0, persistent);
+            Util.setShort(b, (short) 2, reset);
+            Util.setShort(b, (short) 4, deselect);
+            Util.setShort(b, (short) 6, JCSystem.getMaxCommitCapacity());
+            Util.setShort(b, (short) 8, JCSystem.getUnusedCommitCapacity());
+            Util.setShort(b, (short) 10, (short) __SIZE__);
+            b[12] = __MARKER__;
+            b[13] = 2;
+            b[14] = (byte) ((persistent == 32767 ? 1 : 0) |
+                (reset == 32767 ? 2 : 0) | (deselect == 32767 ? 4 : 0));
+            b[15] = 0;
+            apdu.setOutgoingAndSend((short) 0, (short) 16);
+            return;
+        }
+__DUMMY__        ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
+    }"""
+
+
+def process_probe(size):
+    return PROCESS.replace('__SIZE__', str(size)).replace(
+        '__MARKER__', 'probePool[0]' if size else '0').replace('__DUMMY__', DUMMY if size else '')
 
 
 def source_probe(source, size):
-    if size < 256 or size > 24576 or size % 256:
-        raise ValueError('pool size must be a multiple of 256, from 256 to 24576')
+    if size != 0 and (size < 256 or size > 24576 or size % 256):
+        raise ValueError('pool size must be zero (control) or a multiple of 256, from 256 to 24576')
     anchor = 'public class CashuApplet extends Applet implements TagSwitch {'
     if source.count(anchor) != 1 or source.count('        schnorrHW.init();') != 1:
         raise ValueError('applet install anchors changed; review the probe generator')
-    source = source.replace(anchor, anchor + '\n    private final byte[] probePool;\n    private final short[] probeStats;')
-    source = source.replace('        schnorrHW.init();', f'''        schnorrHW.init();
-        probeStats = new short[8];
-        JCSystem.getAvailableMemory(probeStats, (short) 0, JCSystem.MEMORY_TYPE_PERSISTENT);
-        probePool = new byte[(short) {size}];
-        JCSystem.getAvailableMemory(probeStats, (short) 2, JCSystem.MEMORY_TYPE_PERSISTENT);
-        JCSystem.getAvailableMemory(probeStats, (short) 4, JCSystem.MEMORY_TYPE_TRANSIENT_RESET);
-        JCSystem.getAvailableMemory(probeStats, (short) 6, JCSystem.MEMORY_TYPE_TRANSIENT_DESELECT);''')
-    source, count = re.subn(r'    public void process\(APDU apdu\) \{.*?\n    }', lambda _: PROCESS, source, flags=re.S)
+    if size:
+        source = source.replace(anchor, anchor + '\n    private final byte[] probePool;')
+        source = source.replace('        schnorrHW.init();', '        schnorrHW.init();\n' +
+            f'        probePool = new byte[(short) {size}];')
+    source, count = re.subn(r'    public void process\(APDU apdu\) \{.*?\n    }',
+        lambda _: process_probe(size), source, flags=re.S)
     if count != 1:
         raise ValueError('applet process anchor changed; review the probe generator')
     return source
@@ -159,6 +167,7 @@ def main():
     manifest = {'sourceCommit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
         'toolSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'kind': 'resource-probe-only', 'poolBytes': args.pool_bytes,
         'packageAid': PACKAGE.replace(':', ''), 'sources': hashes,
+        'probeFormat': 2, 'probeProfile': 'constructor-control' if args.pool_bytes == 0 else 'pool-allocation',
         'capSha256': hashlib.sha256(cap.read_bytes()).hexdigest(),
         'loadFileSize': len(load_file), 'loadFileSha256': hashlib.sha256(load_file).hexdigest()}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

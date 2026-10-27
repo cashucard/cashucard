@@ -16,7 +16,7 @@ def select(aid):
 
 
 READ_ONLY = {select(aid) for aid in [ISD] + PRODUCTION + PROBE}
-READ_ONLY.update([bytes.fromhex('80CA9F7F00'), bytes.fromhex('B07D000018')])
+READ_ONLY.update([bytes.fromhex('80CA9F7F00'), bytes.fromhex('B07D000018'), bytes.fromhex('B07D000010')])
 COMMIT = bytes.fromhex('B07E000001')
 
 
@@ -65,6 +65,11 @@ def emit(value):
     print(json.dumps(value), flush=True)
 
 
+def pool_probe_selected(data, sw1, sw2):
+    return (sw1 == 0x90 and sw2 == 0 and len(data) == 8 and bytes(data[:5]) == b'PROBE' and
+            data[5] in (1, 2) and bytes(data[6:8]) == b'\x40\0')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--reader', required=True)
@@ -100,8 +105,7 @@ def main():
                 raise ValueError('probe selection required')
             data, sw1, sw2 = connection.transmit(list(command))
             if command[:2] == b'\0\xa4':
-                selected_probe = (command == select(PROBE[2]) and sw1 == 0x90 and sw2 == 0 and
-                                  bytes(data[:6]) == b'PROBE\x01' and len(data) == 8)
+                selected_probe = (command == select(PROBE[2]) and pool_probe_selected(data, sw1, sw2))
             emit({'reply': data + [sw1, sw2]})
     finally:
         if connected:

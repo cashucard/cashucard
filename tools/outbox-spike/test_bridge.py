@@ -35,6 +35,13 @@ class BridgeTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 b.validate_command(command, registry_only=True)
 
+    def test_control_selection_cannot_enable_dummy_publication(self):
+        b.validate_command(list(bytes.fromhex('B07D000010')))
+        for version in [1, 2]:
+            self.assertTrue(b.pool_probe_selected(list(b'PROBE') + [version, 0x40, 0], 0x90, 0))
+        for data in [list(b'PROBE') + [2, 0, 0], list(b'PROBE') + [3, 0x40, 0], list(b'WRONG') + [2, 0x40, 0]]:
+            self.assertFalse(b.pool_probe_selected(data, 0x90, 0))
+
     def test_cleanup_only_mode_allows_only_private_deletion(self):
         for aid in b.PROBE:
             command = wrapped(0xe4, 0, 0, b'\x4f' + b.field(aid))
