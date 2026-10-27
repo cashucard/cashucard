@@ -84,10 +84,20 @@ function artifact(filename, expected) {
     throw new Error("artifact hash mismatch");
   }
   const manifest = JSON.parse(rawManifest.toString("utf8"));
+  const format = manifest.probeFormat ?? 1;
+  const profileOK =
+    (format === 1 &&
+      manifest.poolBytes === 16384 &&
+      manifest.probeProfile === undefined) ||
+    (format === 2 &&
+      ((manifest.poolBytes === 0 &&
+        manifest.probeProfile === "constructor-control") ||
+        (manifest.poolBytes === 16384 &&
+          manifest.probeProfile === "pool-allocation")));
   if (
     manifest.kind !== "resource-probe-only" ||
     manifest.packageAid !== PACKAGE ||
-    manifest.poolBytes !== 16384
+    !profileOK
   ) {
     throw new Error("unsupported probe profile");
   }
@@ -112,9 +122,48 @@ function probeDelete(hex) {
   const aid = Array.from(Buffer.from(hex, "hex"));
   return [0x80, 0xe4, 0, 0, aid.length + 2, 0x4f, aid.length, ...aid, 0];
 }
-function measurements(data) {
+function measurements(data, format = 1, poolBytes = 16384) {
   const bytes = Buffer.from(data);
+  if (format === 2) {
+    if (
+      bytes.length !== 16 ||
+      bytes[13] !== 2 ||
+      bytes[15] !== 0 ||
+      bytes.readUInt16BE(10) !== poolBytes ||
+      bytes[12] > 1 ||
+      (!poolBytes && bytes[12] !== 0)
+    ) {
+      throw new Error("probe response mismatch");
+    }
+    const counters = [0, 2, 4].map((offset) => bytes.readUInt16BE(offset));
+    const saturated = counters.reduce(
+      (mask, value, index) => mask | (value === 32767 ? 1 << index : 0),
+      0,
+    );
+    if (
+      counters.some((value) => value > 32767) ||
+      bytes[14] !== saturated ||
+      bytes.readUInt16BE(6) > 32767 ||
+      bytes.readUInt16BE(8) > bytes.readUInt16BE(6)
+    )
+      throw new Error("invalid availability counter");
+    return {
+      probeFormat: 2,
+      reportedAvailability: {
+        persistent: counters[0],
+        transientReset: counters[1],
+        transientDeselect: counters[2],
+      },
+      availabilityReporting: "upper-bound counters capped at 32767",
+      saturatedMask: saturated,
+      maxCommit: bytes.readUInt16BE(6),
+      unusedCommit: bytes.readUInt16BE(8),
+      poolBytes,
+      publicationByte: bytes[12],
+    };
+  }
   if (
+    format !== 1 ||
     bytes.length !== 24 ||
     bytes[23] !== 1 ||
     bytes.readUInt16BE(20) !== 16384
@@ -278,6 +327,8 @@ async function runProbe(options, dependencies = {}) {
     capSha256: manifest.capSha256,
     manifestSha256: options.manifestHash,
     poolBytes: manifest.poolBytes,
+    probeFormat: manifest.probeFormat ?? 1,
+    probeProfile: manifest.probeProfile ?? "legacy-constructor-stats",
     platformBaseline: options.platformBaseline ? "j3r180-09336320-v1" : "empty",
   };
   if (!options.execute && !options.inspectRegistry && !options.cleanupOnly) {
@@ -488,32 +539,67 @@ async function runProbe(options, dependencies = {}) {
       const reply = expect(
         await sdk.transmit(tx, sdk.selectAid(bytes(PACKAGE + "01"))),
       );
-      if (Buffer.from(reply.data).toString("hex") !== "50524f4245014000") {
+      const expected = Buffer.from([
+        ...Buffer.from("PROBE"),
+        summary.probeFormat,
+        manifest.poolBytes >> 8,
+        manifest.poolBytes & 0xff,
+      ]).toString("hex");
+      if (Buffer.from(reply.data).toString("hex") !== expected) {
         throw new Error("probe selection mismatch");
       }
     });
-    const before = await step("read-measurements", async () =>
-      measurements(expect(await sdk.transmit(tx, [0xb0, 0x7d, 0, 0, 24])).data),
-    );
-    if (before.publicationByte !== 0) {
+    async function readMeasurements() {
+      const length = summary.probeFormat === 2 ? 16 : 24;
+      const reply = await sdk.transmit(tx, [0xb0, 0x7d, 0, 0, length]);
+      if (
+        summary.probeFormat === 2 &&
+        [0x6f00, 0x6a81, 0x6d00].includes(reply.sw) &&
+        reply.data.length === 0
+      ) {
+        return {
+          status: "unavailable",
+          sw: reply.sw.toString(16).padStart(4, "0"),
+        };
+      }
+      return measurements(
+        expect(reply).data,
+        summary.probeFormat,
+        manifest.poolBytes,
+      );
+    }
+    const before = await step("read-measurements", readMeasurements);
+    state.measurements = { before };
+    save();
+    if (before.status !== "unavailable" && before.publicationByte !== 0) {
       throw new Error("probe was already used");
     }
-    let dummyCommandMs;
-    await step("dummy-publication", async () => {
-      const started = process.hrtime.bigint();
-      const reply = expect(await sdk.transmit(tx, [0xb0, 0x7e, 0, 0, 1]));
-      dummyCommandMs = Number(process.hrtime.bigint() - started) / 1e6;
-      if (reply.data.length !== 1 || reply.data[0] !== 1) {
-        throw new Error("publication not confirmed");
-      }
-    });
-    const after = await step("read-publication", async () =>
-      measurements(expect(await sdk.transmit(tx, [0xb0, 0x7d, 0, 0, 24])).data),
-    );
-    if (after.publicationByte !== 1) {
-      throw new Error("publication not retained");
+    if (manifest.poolBytes === 0) {
+      state.measurements.dummySkipped = "control-profile";
+    } else if (before.status === "unavailable") {
+      state.measurements.dummySkipped = "measurements-unavailable";
+    } else if (
+      summary.probeFormat === 2 &&
+      Math.min(before.maxCommit, before.unusedCommit) < 128
+    ) {
+      state.measurements.dummySkipped = "reported-commit-capacity-below-128";
+    } else {
+      await step("dummy-publication", async () => {
+        const started = process.hrtime.bigint();
+        const reply = expect(await sdk.transmit(tx, [0xb0, 0x7e, 0, 0, 1]));
+        state.measurements.dummyCommandMs =
+          Number(process.hrtime.bigint() - started) / 1e6;
+        if (reply.data.length !== 1 || reply.data[0] !== 1)
+          throw new Error("publication not confirmed");
+        state.measurements.dummyPublicationConfirmed = true;
+      });
+      const after = await step("read-publication", readMeasurements);
+      if (after.status !== "unavailable" && after.publicationByte !== 1)
+        throw new Error("publication not retained");
+      state.measurements.after = after;
+      state.measurements.publicationRetainedByRead =
+        after.status !== "unavailable";
     }
-    state.measurements = { before, after, dummyCommandMs };
     save();
     // SELECT of the probe ended the old secure channel. Match identity again,
     // then open exactly one new, known-factory-key session for cleanup.

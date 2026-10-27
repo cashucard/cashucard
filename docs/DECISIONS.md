@@ -3946,3 +3946,33 @@ word when available.
 to discover the old failure, deleting platform or production objects, and
 recording arbitrary errors or authentication transcripts. Prior journals remain
 unchanged. Cleanup approval does not authorize another resource-probe attempt.
+
+
+## <a id="d142"></a>D142: Separate the resource probe's constructor, allocation and optional diagnostics
+
+**Decided (2026-10-27):** private format-2 probes have a zero-pool control with
+the original constructor unchanged and a pool profile adding only its persistent
+byte array. Both query the legacy capped memory counters after installation.
+The control refuses dummy publication; the pool publishes once only after
+available diagnostics and reported commit capacity permit it. The host and
+bridge bind selection to the pinned format/pool size. CI converts and exercises
+both generated profiles.
+
+**Why:** the format-1 probe combined extra installation-time memory queries,
+stats allocation and a 16 KiB pool, then stopped before measurements. Its result
+cannot identify the failing addition or establish a capacity limit. Separating
+these steps provides a control and keeps optional diagnostics out of creation.
+The legacy counter's 32767 cap is explicit, and successful allocation supplies
+its own evidence independently of exact free-memory estimates.
+
+An empty-body `6F00`, `6A81` or `6D00` from the private read-only measurement
+command is a declared diagnostic outcome: record unavailable, skip pending dummy
+publication and perform the planned cleanup. Other errors, malformed data and
+transport failures retain the stop-with-journal policy. The physical plan must
+include these outcomes. Counter unavailability supplies no memory measurement.
+
+**Rejected:** repeating the failed mixed probe to infer its old error, guessing
+an EEPROM limit, querying optional APIs inside the control constructor, runtime
+allocation, and interpreting capped counters as exact space. Existing format-1
+artifacts retain their original interpretation. Revised hardware actions require
+their own pinned profile plan and approval; production firmware is unchanged.

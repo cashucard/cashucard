@@ -11,22 +11,35 @@ s.loader.exec_module(m)
 
 
 class ProbeTest(unittest.TestCase):
-    def test_install_path_and_runtime_boundary(self):
+    def test_control_constructor_unchanged_and_pool_is_the_only_install_addition(self):
         original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
-        generated = m.source_probe(original, 16384)
-        self.assertIn('probePool = new byte[(short) 16384]', generated)
-        # Existing install-time allocations and transient demand are preserved.
-        self.assertEqual(original.count('JCSystem.makeTransient'), generated.count('JCSystem.makeTransient'))
-        process = generated[generated.index(m.PROCESS):][:len(m.PROCESS)]
-        self.assertNotIn('new ', process)
-        for handler in ['handleSpend', 'handleLoad', 'handleVerifyPin', 'handleReset']:
-            self.assertNotIn(handler, process)
-        self.assertIn('JCSystem.abortTransaction()', process)
-        for size in [0, 255, 257, 32768]:
+        def constructor(source):
+            start = source.index('    private CashuApplet() {')
+            return source[start:source.index('\n    /**', start)]
+        control = m.source_probe(original, 0)
+        pool = m.source_probe(original, 16384)
+        self.assertEqual(constructor(original), constructor(control))
+        self.assertEqual(constructor(original), constructor(pool).replace(
+            '\n        probePool = new byte[(short) 16384];', ''))
+        for generated in [control, pool]:
+            self.assertNotIn('getAvailableMemory', constructor(generated))
+            self.assertNotIn('new short[', generated)
+            self.assertEqual(original.count('JCSystem.makeTransient'), generated.count('JCSystem.makeTransient'))
+        for size in [-1, 255, 257, 32768]:
             with self.assertRaises(ValueError):
                 m.source_probe(original, size)
         with self.assertRaises(ValueError):
             m.source_probe(original.replace('schnorrHW.init();', 'changed();'), 16384)
+
+    def test_queries_are_post_install_and_control_has_no_dummy_mutation(self):
+        for size in [0, 16384]:
+            process = m.process_probe(size)
+            self.assertNotIn('new ', process)
+            self.assertIn('JCSystem.getAvailableMemory(JCSystem.MEMORY_TYPE_PERSISTENT)', process)
+            for handler in ['handleSpend', 'handleLoad', 'handleVerifyPin', 'handleReset']:
+                self.assertNotIn(handler, process)
+            self.assertEqual('JCSystem.beginTransaction()' in process, size != 0)
+            self.assertEqual('JCSystem.abortTransaction()' in process, size != 0)
 
     def test_build_paths_and_aids_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:

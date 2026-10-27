@@ -433,8 +433,23 @@ jobs:
       # through the same pinned converter here, and both files must be exactly
       # what tools/cardkit/make-assets.py makes of the two CAPs (the tracked one
       # was set aside above, before the build wrote over its path).
-      - name: Build isolated outbox resource probe
-        run: python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+      - name: Build isolated outbox control and pool probes
+        run: |
+          for pool in 0 16384; do
+            python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool" \
+              --pool-bytes "$pool" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+          done
+
+      - name: Check private probe dispatch in jCardSim
+        run: |
+          mvn -B -q -f tools/cardsim/pom.xml package -DskipTests
+          for pool in 0 16384; do
+            probe="$RUNNER_TEMP/outbox-resource-probe-$pool"
+            mkdir "$probe/classes"
+            javac --release 11 -cp tools/cardsim/target/cardsim.jar -d "$probe/classes" \
+              "$probe"/src/me/flashapp/cashu/*.java tools/outbox-spike/ProbeSmoke.java
+            java -cp "$probe/classes:tools/cardsim/target/cardsim.jar" ProbeSmoke "$pool"
+          done
 
       - name: Hello CAP, and the provisioner's load files match the CAPs
         run: |
