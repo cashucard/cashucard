@@ -24,10 +24,12 @@ def field(value):
     return bytes([len(value)]) + value
 
 
-def validate_command(value):
+def validate_command(value, *, registry_only=False):
     if not isinstance(value, list) or any(type(v) is not int or not 0 <= v <= 255 for v in value):
         raise ValueError('invalid command')
     apdu = bytes(value)
+    if registry_only and (len(apdu) < 2 or apdu[1] not in (0xa4, 0xca, 0x50, 0x82, 0xf2)):
+        raise ValueError('registry inspection only')
     if apdu in READ_ONLY or apdu == COMMIT:
         return apdu
     if len(apdu) < 6 or len(apdu) != apdu[4] + 6 or apdu[-1] != 0:
@@ -62,6 +64,7 @@ def emit(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--reader', required=True)
+    parser.add_argument('--registry-only', action='store_true')
     args = parser.parse_args()
     from smartcard.System import readers
     from smartcard.scard import SCARD_LEAVE_CARD, SCARD_SHARE_EXCLUSIVE
@@ -86,7 +89,7 @@ def main():
                 return
             if not isinstance(message, dict) or set(message) != {'apdu'}:
                 raise ValueError('invalid message')
-            command = validate_command(message['apdu'])
+            command = validate_command(message['apdu'], registry_only=args.registry_only)
             if command == COMMIT and not selected_probe:
                 raise ValueError('probe selection required')
             data, sw1, sw2 = connection.transmit(list(command))

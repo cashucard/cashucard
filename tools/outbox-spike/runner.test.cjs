@@ -44,6 +44,10 @@ function simulated({
   present = false,
   authFailure = false,
   transportFailure = false,
+  registrySw = 0x9000,
+  registryData = [],
+  registryEntries = [],
+  registryParseFailure = false,
 } = {}) {
   const calls = {
     opens: 0,
@@ -52,6 +56,7 @@ function simulated({
     mutations: 0,
     loads: 0,
     dummy: 0,
+    registry: 0,
   };
   let marker = 0,
     installed = false;
@@ -66,6 +71,10 @@ function simulated({
         return [...Buffer.from("50524f4245014000", "hex"), 0x90, 0];
       }
       return present ? [0x90, 0] : [0x6a, 0x82];
+    }
+    if (ins === 0xf2) {
+      calls.registry++;
+      return [...registryData, registrySw >> 8, registrySw & 0xff];
     }
     if (ins === 0x7d) {
       const data = Buffer.alloc(24);
@@ -118,7 +127,11 @@ function simulated({
       return { send: (transport, command) => sdk.transmit(transport, command) };
     },
     registryCommand: () => [0x80, 0xf2, 0x20, 2, 2, 0x4f, 0, 0],
-    parseRegistryEntries: () => [],
+    parseRegistryEntries: () => {
+      if (registryParseFailure)
+        throw new Error("untrusted error with secret text");
+      return registryEntries;
+    },
     installForLoad: () => [0x80, 0xe6, 2],
     splitLoad: () => [[0x80, 0xe8, 0x80, 0]],
     installAndSelectable: () => [0x80, 0xe6, 0x0c],
@@ -227,5 +240,58 @@ test("a refused next-stage journal write prevents the next LOAD and leaves the r
     assert.equal(fake.calls.closes, 1);
   } finally {
     fs.renameSync = rename;
+  }
+});
+
+test("registry-only inspection records public evidence and cannot install or delete", async (t) => {
+  const options = fixture(t),
+    fake = simulated({
+      registryData: [0xe3, 0],
+      registryEntries: [{ aid: "A0000001515350" }],
+    });
+  const result = await runProbe(
+    { ...options, execute: false, inspectRegistry: true },
+    fake,
+  );
+  assert.equal(result.status, "inspected");
+  assert.equal(fake.calls.authentications, 1);
+  assert.equal(fake.calls.registry, 2);
+  assert.equal(fake.calls.mutations, 0);
+  assert.equal(fake.calls.dummy, 0);
+  assert.equal(fake.calls.closes, 1);
+  const stored = JSON.parse(fs.readFileSync(options.journal));
+  assert.equal(stored.stage, "registry-inspection-complete");
+  assert.equal(stored.registry.pages[0].sw, "9000");
+  assert.equal(stored.registry.pages[0].data, "e300");
+  assert.equal(stored.registry.entries[0].aid, "A0000001515350");
+  await assert.rejects(runProbe({ ...options, inspectRegistry: true }, fake));
+});
+
+test("registry status, parse and unexpected-object failures preserve bounded evidence without secrets", async (t) => {
+  const cases = [
+    [{ registrySw: 0x6a86 }, "registry-status", "6a86"],
+    [
+      { registryData: [0xde, 0xad], registryParseFailure: true },
+      "registry-format",
+      "9000",
+    ],
+    [
+      { registryEntries: [{ aid: "A0000001515350" }] },
+      "registry-objects",
+      "9000",
+    ],
+  ];
+  for (const [settings, code, sw] of cases) {
+    const options = fixture(t),
+      fake = simulated(settings);
+    await assert.rejects(runProbe(options, fake));
+    const raw = fs.readFileSync(options.journal, "utf8"),
+      stored = JSON.parse(raw);
+    assert.equal(stored.failure.code, code);
+    assert.equal(stored.registry.pages[0].sw, sw);
+    assert.equal(raw.includes("secret text"), false);
+    assert.equal(fake.calls.authentications, 1);
+    assert.equal(fake.calls.mutations, 0);
+    assert.equal(fake.calls.closes, 1);
   }
 });
