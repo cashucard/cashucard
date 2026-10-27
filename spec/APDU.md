@@ -557,6 +557,20 @@ amount and a `C` that is no longer a point. A tear that zeroed only keyset or
 nonce bytes, or part of `C` whose x still lands on the curve, passes them, and
 `dump` writes that slot as spent. The PIN if one is set, or either grant.
 
+**Reader settlement precondition:** this command clears every retained spent
+slot. Before sending it, the reader MUST reconstruct every retained spent proof
+and obtain a NUT-07 `SPENT` result for each one from its mint. Card-local spent
+status records consumption on the card; a merchant may still hold an offline
+payment awaiting settlement. `UNSPENT`, `PENDING`, unavailable state, incomplete
+coverage or an unreconstructable proof blocks clearing. An empty card balance
+or local settlement queue does not satisfy this precondition.
+
+Bind the checked snapshot to the same authenticated card and revalidate it
+before clearing. Preserve the verified scope across an interrupted clear: a
+partly zeroed slot alone supplies no settlement evidence. Merchant output and
+change-recovery records have their own retention requirements. See the shared
+[CCP reader contract](https://github.com/cashucard/nut/blob/main/CCP.md).
+
 ### SET_CARD (0x32)
 
 | Field | Value |

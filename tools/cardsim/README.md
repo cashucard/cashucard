@@ -219,3 +219,37 @@ The same in Node, minting at a real mint with a SIG_ALL swap, is
 `tools/cardsim/e2e-swap.test.cjs`. CI runs it against a Nutshell 0.20.3 with forge's
 keyset shape (an 8-byte id, no fee) and against a fresh v2 keyset (a 33-byte id, a
 fee of 100).
+
+
+## Assisted settlement rehearsal
+
+`assisted-settlement.cjs` exercises a relay and a merchant in separate processes.
+Use an isolated Nutshell 0.20.3 FakeWallet mint with persistent storage and a
+fresh cardsim bridge. Both addresses must be loopback HTTP origins. The script
+resets the simulator and mints test ecash. Create a new scratch directory name
+for each run; `capture` creates it with private file permissions.
+
+```bash
+node tools/cardsim/assisted-settlement.cjs capture /tmp/assisted-run http://127.0.0.1:4338 http://127.0.0.1:19876
+node tools/cardsim/assisted-settlement.cjs relay /tmp/assisted-run
+# Restart only the isolated mint, retaining its database.
+node tools/cardsim/assisted-settlement.cjs recover /tmp/assisted-run
+node tools/cardsim/assisted-settlement.cjs recover /tmp/assisted-run
+```
+
+Capture persists merchant output openings before the simulator signs. Relay
+reads the public signed swap, submits it unchanged, discards the swap response,
+and checks complete NUT-09 restoration with blinded DLEQ and input-state
+coverage. After the mint restart, recovery unblinds and redeems every merchant
+output. The last run demonstrates that NUT-09 still returns already-redeemed
+outputs, so issuance evidence must be combined with durable inventory and
+payout accounting.
+
+On October 27 this sequence passed against Nutshell 0.20.3 with both 33-byte
+keyset IDs and a 100-ppk input fee, and 8-byte keyset IDs with no input fee.
+Each profile included a mint restart between relay and merchant recovery.
+The cardsim CI job runs both profiles after the ordinary swap checks.
+The script covers local feasibility; the production outbox, payout ledger,
+firmware resource limits and physical interruption tests have separate gates.
+`assisted-settlement.test.cjs` checks exact coverage, reordered pairs, missing
+or substituted promises, and DLEQ refusal without a running mint.

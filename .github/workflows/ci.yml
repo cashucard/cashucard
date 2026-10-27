@@ -223,6 +223,25 @@ jobs:
           CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3339 EXPECT_KEYSET_ID_BYTES=8 EXPECT_INPUT_FEE_PPK=0 \
             node --test tools/cardsim/e2e-swap.test.cjs
 
+      - name: Assisted settlement survives lost responses and a mint restart
+        run: |
+          for profile in nutshell:3338 nutv1:3339; do
+            mint="${profile%:*}"
+            port="${profile#*:}"
+            journal="$RUNNER_TEMP/assisted-$mint"
+            node tools/cardsim/assisted-settlement.cjs capture "$journal" "http://127.0.0.1:$port" http://127.0.0.1:9876
+            node tools/cardsim/assisted-settlement.cjs relay "$journal"
+            docker restart "$mint"
+            ready=false
+            for _ in $(seq 1 120); do
+              if curl -sf "http://127.0.0.1:$port/v1/keysets" > /dev/null; then ready=true; break; fi
+              sleep 1
+            done
+            if [ "$ready" != true ]; then echo "::error::local mint did not restart"; exit 1; fi
+            node tools/cardsim/assisted-settlement.cjs recover "$journal"
+            node tools/cardsim/assisted-settlement.cjs recover "$journal"
+          done
+
       # The app repos build this repo from a pinned ref for now; the artifact
       # is for a human pulling a jar off a run (release asset later).
       - name: Upload cardsim.jar
