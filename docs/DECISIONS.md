@@ -3799,3 +3799,28 @@ the mailboxes received mail. Test mail to all five arrived on 2026-10-26.
 
 **Rejected:** keeping GitHub advisories as the only security channel. A
 reporter without a GitHub account needs a private route too.
+
+
+## <a id="d136"></a>D136: Verify settlement before clearing retained spent slots
+
+**Decided (2026-10-27):** readers must obtain complete NUT-07 `SPENT`
+coverage for the same authenticated card's retained spent-proof snapshot before
+calling the existing all-slot `CLEAR_SPENT`. Incomplete, unavailable or
+unreconstructable evidence blocks cleanup. Interrupted cleanup retains its
+previously verified scope. Merchant output and owed-change records remain
+independently recoverable. The APDU bytes and applet version stay at 2.1.
+
+**Why:** a spent slot records a card signature, while an offline till may still
+hold the only signed swap. Clearing its reconstruction data before mint
+settlement can strand that payment. The corresponding shared reader-contract
+change is reviewed in cashucard/nut#4.
+
+**Rejected:** treating a zero card balance, input consumption on the card, or an
+empty phone queue as proof of mint settlement.
+
+Assisted settlement is being developed in separate gated slices: merchant
+pre-sign durability, exact-output recovery with replay-safe accounting, then a
+reviewed card outbox and selective retirement. The local feasibility rehearsal
+in `tools/cardsim/assisted-settlement.cjs` proves the signed-swap/restore path
+against a local Nutshell mint. Resource bounds and the new wire contract still
+need partner review and separately approved silicon measurements.
