@@ -433,6 +433,9 @@ jobs:
       # through the same pinned converter here, and both files must be exactly
       # what tools/cardkit/make-assets.py makes of the two CAPs (the tracked one
       # was set aside above, before the build wrote over its path).
+      - name: Build isolated outbox resource probe
+        run: python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+
       - name: Hello CAP, and the provisioner's load files match the CAPs
         run: |
           ant -f applet/build.xml hello-cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"

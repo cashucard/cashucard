@@ -3824,3 +3824,27 @@ reviewed card outbox and selective retirement. The local feasibility rehearsal
 in `tools/cardsim/assisted-settlement.cjs` proves the signed-swap/restore path
 against a local Nutshell mint. Resource bounds and the new wire contract still
 need partner review and separately approved silicon measurements.
+
+
+## <a id="d137"></a>D137: Isolate the early outbox resource probe from released firmware
+
+**Decided (2026-10-27):** `tools/outbox-spike/build-probe.py` copies the current
+applet sources into a new scratch directory, preserves its installation path and
+adds a persistent pool (16 KiB by default) with persistent memory counters. It
+replaces command dispatch with probe-only memory reporting and a dummy 128-byte
+transaction. The package uses the private test AID `F0434153485550524F4245` and
+version 0.0. Production payment, PIN, load and reset commands are refused. The
+production CAP, protocol version and provisioner assets stay unchanged.
+
+**Why:** the outbox needs a physical-chip resource gate before choosing record
+limits. A generated probe can measure the current install demand plus a candidate
+pool without adding a full transient packet buffer or committing to production
+APDU assignments. Its manifest binds the source hashes, tool hash and CAP hash.
+
+**Rejected:** estimating the number of supported payments from nominal EEPROM,
+using simulator memory counts as chip measurements, and installing an unmeasured
+prototype through the released provisioner. This probe establishes a resource
+floor. Descriptor signing latency, the final transaction layout, power loss,
+record limits and wear still require the subsequent approved prototype drills.
+Physical installation and restoration need a named disposable card, confirmed
+empty/reconciled state, known key provenance and an approved action list.
