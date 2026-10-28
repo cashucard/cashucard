@@ -162,3 +162,89 @@ do not establish which initialization difference caused the refusal or a
 memory-capacity limit. The next private diagnostic preserves the original
 field layout and constructor, reusing state unused by its restricted dispatcher;
 its converted shape must match the known control before physical approval.
+
+
+## Approved field-preserving image comparison
+
+The operator approved the bounded plan from #200 for the same card and reader.
+Runner and artifact source was `54a9223b99deb455b5af7f4056cab6f822bc03d5`.
+The private images reuse existing state and have the control's converted
+instance shape: 50 declared 16-bit cells, first reference token 0 and
+50 reference fields. Their original constructor is unchanged. The plan
+requires a five-second physical lift/return before each distinct image;
+the operator's initial approval responded to that readiness request.
+
+### Image A at 256 bytes
+
+- CAP SHA-256: `dcde199e9a064c2fb576ab8d3d79cb2f90fdd54e421e62c16396f2a666eba1d9`.
+- Manifest SHA-256: `b06d0238588253301f00b92f1ef6c392e49f21aa5e85bb9797ce87b21e6dfdd1`.
+- Load: 20,068 bytes; SHA-256 `d377ec17451baa6f87e9d96885ecc2107c460233bd5736ba077dc1e5c637652c`.
+- Journal: `existing-a-256-09336320.json`.
+
+CPLC, the factory channel and the exact platform baseline matched. Public
+ISD counters reported 163,648 persistent bytes, 3,990 volatile bytes and
+uninterpreted tag 81 value 1 before loading. LOAD and opener creation
+completed; probe creation returned empty-body `6F00` at `install-01`.
+The approved refusal cleanup removed private objects and verified the original
+three platform entries. The journal ended `install-refused-cleaned`,
+`factory-blank-ready-for-ccp`; its lock was removed and the reader closed.
+The refusal preceded selection, measurement, reservation and publication.
+
+This initial A outcome qualified for the plan's single B-image branch.
+
+
+### Image B at 256 bytes, 4 KiB and 16 KiB
+
+The operator confirmed the second physical lift/return before B. All three
+stages used the identical pinned image, with a fresh install and journal for
+each size. Each required the preceding stage's complete reservation, publication,
+retained read and exact cleanup before advancing.
+
+- CAP SHA-256: `0f36e8b472455b4261a296b171a48e6b55c8d5ca010f01cbaaedbe0783657e2d`.
+- Manifest SHA-256: `f0ff2134575206daf5e33ff49fe598bbb3506ab9fe46226b04c14d5982298a0e`.
+- Load: 20,196 bytes; SHA-256 `029169d15f2fc9f91e2d540fdd7a39a5f07c8b750d91149e61733a68f9319faa`.
+
+| Reserved bytes | Pre-load persistent bytes | Pre-load volatile bytes | Dummy command ms | Outcome |
+| --- | --- | --- | --- | --- |
+| 256 | 163,648 | 3,990 | 51.498 | Complete, publication re-read, exact cleanup |
+| 4,096 | 164,176 | 3,990 | 52.316 | Complete, publication re-read, exact cleanup |
+| 16,384 | 164,176 | 3,990 | 50.978 | Complete, publication re-read, exact cleanup |
+
+For every stage, baseline selection reported format 3, zero pool and attempt
+marker 0. The allocation response was successful; the next query confirmed the
+requested byte count, attempt marker 1 and publication marker 0. A single
+128-byte transaction returned marker 1, which a subsequent query retained.
+The maximum and unused commit counters were both 5120 throughout. Persistent
+availability remained capped at 32767 with saturation bit 1; reset/deselect
+availability was 2574/2560. Public ISD tag 81 remained 1.
+
+The protected journals are `existing-b-256-09336320.json`,
+`existing-b-4096-09336320.json` and `existing-b-16384-09336320.json`.
+Every journal ended `complete`, `factory-blank-ready-for-ccp`, with exactly
+the original three platform TLVs, verified again offline. The connections
+closed and all locks were removed. All four installs and three reservations
+in the approved plan are complete; the separate backout was unused. There
+were no authentication retries, key changes, mint requests, funded payments
+or production operations. The final card state is blank.
+
+### Resource result and remaining gates
+
+The existing constructor plus a separate 16 KiB persistent reservation fits
+this private B image on this card. A 128-byte publication transaction also
+succeeds. These establish measured floors; neither the largest allocatable
+pool nor the maximum atomic write size was measured. The reported ~51 ms is
+one APDU's host-observed command time per stage, including transport overhead.
+It is not a throughput distribution or complete payment latency.
+
+Both field layout and image layout remain relevant variables: preserving the
+control's fields did not make A install, while B installed at every size.
+This comparison does not identify the cause of A's generic creation refusal
+or isolate field layout as the cause of earlier failures. Preserve B's exact
+artifact as the successful resource reference.
+
+The next software prototype must include record overhead, slot pinning,
+metadata authentication, bounded staging, atomic publication and resumable
+retirement in its byte budget. Capacity for many small payments and one large
+payment requires explicit tests. Full packet transfer, cryptographic latency,
+physical power-loss recovery and final firmware installation remain separate
+gates. The assisted-settlement feature remains disabled.
