@@ -3976,3 +3976,32 @@ an EEPROM limit, querying optional APIs inside the control constructor, runtime
 allocation, and interpreting capped counters as exact space. Existing format-1
 artifacts retain their original interpretation. Revised hardware actions require
 their own pinned profile plan and approval; production firmware is unchanged.
+
+## <a id="d143"></a>D143: Compare bounded allocation layouts with explicitly approved refusal cleanup
+
+**Decided (2026-10-27):** after the format-2 control succeeded and the single
+16 KiB allocation returned `6F00`, the next private comparison profiles are
+256 bytes, 4 KiB and four 4 KiB arrays. The manifest binds size and layout.
+The original constructor work and transient allocations are preserved. A dummy
+publication touches the first segment. Continue only after a prior profile's
+valid measurements, confirmed/re-read publication and verified cleanup.
+
+An opt-in plan may declare empty-body probe-creation `6F00`/`6A84` responses as
+refusals followed by cleanup. Persist the refusal, rematch identity, prove a new
+factory channel, check the exact baseline plus private probe objects, delete
+only those private objects and verify the baseline. Return a distinct
+`install-refused-cleaned` result (CLI exit 2), ending the sequence. A cleanup
+failure retains both errors. Default failure handling stays stop-with-journal.
+
+**Why:** the control gives measured constructor/commit-counter evidence, while
+the generic creation refusal leaves the allocation cause unresolved. Smaller
+and segmented candidates compare size/layout while keeping the test bounded.
+The successful cleanup path already establishes its identity, key and registry
+gates. Explicitly declaring this narrow outcome avoids a separate operator
+round trip for the same backout, while preserving prior evidence.
+
+**Rejected:** arbitrary adaptive sizing, advancing after refusal or unavailable
+measurements, inferring an EEPROM limit, changing transient allocation, and
+cleanup after ambiguous delivery, authentication failures, unexpected replies or
+registry changes. The flag requires a named approved allocation plan. Production
+firmware, CAP and protocol assignments are unchanged.

@@ -31,6 +31,16 @@ class ProbeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.source_probe(original.replace('schnorrHW.init();', 'changed();'), 16384)
 
+    def test_segmented_pool_preserves_constructor_work_and_transient_demand(self):
+        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        generated = m.source_probe(original, 16384, segments=4)
+        self.assertEqual(generated.count('new byte[(short) 4096]'), 4)
+        self.assertEqual(original.count('JCSystem.makeTransient'), generated.count('JCSystem.makeTransient'))
+        self.assertIn('private final byte[] probePool3;', generated)
+        for size, segments in [(0,4), (4096,4), (16384,2)]:
+            with self.assertRaises(ValueError):
+                m.source_probe(original,size,segments=segments)
+
     def test_queries_are_post_install_and_control_has_no_dummy_mutation(self):
         for size in [0, 16384]:
             process = m.process_probe(size)

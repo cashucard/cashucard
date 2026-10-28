@@ -9,7 +9,7 @@ import me.flashapp.cashu.CashuApplet;
 public final class ProbeSmoke {
     public static void main(String[] args) {
         int poolBytes = args.length == 0 ? 16384 : Integer.parseInt(args[0]);
-        require(poolBytes == 0 || poolBytes == 16384);
+        require(poolBytes == 0 || poolBytes == 256 || poolBytes == 4096 || poolBytes == 16384);
         CardSimulator sim = new CardSimulator();
         AID aid = AIDUtil.create("F0434153485550524F424501");
         sim.installApplet(aid, CashuApplet.class);

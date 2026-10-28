@@ -66,8 +66,10 @@ def emit(value):
 
 
 def pool_probe_selected(data, sw1, sw2):
-    return (sw1 == 0x90 and sw2 == 0 and len(data) == 8 and bytes(data[:5]) == b'PROBE' and
-            data[5] in (1, 2) and bytes(data[6:8]) == b'\x40\0')
+    if sw1 != 0x90 or sw2 != 0 or len(data) != 8 or bytes(data[:5]) != b'PROBE':
+        return False
+    size = data[6] * 256 + data[7]
+    return (data[5] == 1 and size == 16384) or (data[5] == 2 and size in (256, 4096, 16384))
 
 
 def main():
