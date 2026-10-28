@@ -125,6 +125,7 @@ class Store {
     return { inputs, packet: frame.subarray(prefix) };
   }
   recover() {
+    if (this.building) throw Error("reentrant builder");
     for (let i = 0; i < this.layout.records; i++) {
       const at = this.record(i),
         state = this.image[at];
@@ -175,7 +176,7 @@ class Store {
       this.image[PROOF_STATE + slot] = UNSPENT;
     });
   }
-  publish(slots, packet) {
+  publish(slots, packet, { packetBytes } = {}) {
     this.recover();
     if (
       !Array.isArray(slots) ||
@@ -191,10 +192,17 @@ class Store {
       )
     )
       throw Error("inputs");
+    slots = slots.slice();
+    const builder = typeof packet === "function";
+    const length = builder
+      ? packetBytes
+      : Buffer.isBuffer(packet)
+        ? packet.length
+        : 0;
     if (
-      !Buffer.isBuffer(packet) ||
-      !packet.length ||
-      packet.length + 1 + slots.length * 5 > 65535
+      !Number.isInteger(length) ||
+      length < 1 ||
+      length + 1 + slots.length * 5 > 65535
     )
       throw Error("packet");
     let index = -1;
@@ -207,17 +215,8 @@ class Store {
         break;
       }
     if (index < 0) throw Error("record capacity");
-    const frame = Buffer.alloc(1 + slots.length * 5 + packet.length);
-    frame[0] = slots.length;
-    slots.forEach((slot, i) => {
-      frame[1 + i * 5] = slot;
-      frame.writeUInt32BE(
-        this.image.readUInt32BE(PROOF_GEN + slot * 4),
-        2 + i * 5,
-      );
-    });
-    packet.copy(frame, 1 + slots.length * 5);
-    const needed = Math.ceil(frame.length / PAGE),
+    const frameLength = 1 + slots.length * 5 + length;
+    const needed = Math.ceil(frameLength / PAGE),
       pages = [];
     for (let p = 0; p < this.layout.pages && pages.length < needed; p++)
       if (!this.image[this.layout.owners + p]) pages.push(p);
@@ -226,6 +225,37 @@ class Store {
     if (id === 0xffffffff) throw Error("payment counter exhausted");
     const at = this.record(index),
       generation = this.image.readUInt32BE(at + 5) + 1;
+    const inputs = slots.map((slot) =>
+      Object.freeze({
+        slot,
+        generation: this.image.readUInt32BE(PROOF_GEN + slot * 4),
+      }),
+    );
+    if (builder) {
+      this.building = true;
+      try {
+        packet = packet(
+          Object.freeze({
+            installation: this.installation(),
+            id: id + 1,
+            index,
+            generation,
+            inputs: Object.freeze(inputs),
+          }),
+        );
+      } finally {
+        this.building = false;
+      }
+      if (!Buffer.isBuffer(packet) || packet.length !== length)
+        throw Error("packet builder length");
+    }
+    const frame = Buffer.alloc(frameLength);
+    frame[0] = inputs.length;
+    inputs.forEach((ref, i) => {
+      frame[1 + i * 5] = ref.slot;
+      frame.writeUInt32BE(ref.generation, 2 + i * 5);
+    });
+    packet.copy(frame, 1 + inputs.length * 5);
     this.atomic(() => {
       this.image.writeUInt32BE(id + 1, 0);
       this.image[at] = STAGING;

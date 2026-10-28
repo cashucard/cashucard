@@ -4163,3 +4163,41 @@ rounding, exposing staged signatures, freeing pinned inputs before retirement,
 and inferring physical tear safety from a host model. The next compact prototype
 must reconstruct inputs from pinned slots and keyset mappings while preserving
 exact canonical export bytes. Production APIs, wire bytes and assets are unchanged.
+
+## <a id="d149"></a>D149: Reconstruct the candidate packet from compact references
+
+**Decided (2026-10-28):** add a host-only compact export prototype following the
+open NUT proposal and its independently encoded signed vector. Ordered
+slot/generation references remain in the storage frame. The compact payload
+keeps outputs as amount, full-keyset registry reference and blinded point,
+followed by the original payment witness and descriptor signature. Immutable
+fixture state supplies the retained proof data and configuration.
+
+Canonical body and SIG_ALL hashes stream through fields. Export verifies both
+signatures before yielding bounded pages. Full keysets retain their exact
+8/33 bytes, ambiguous prefixes are refused, and uint64 payment identities use
+BigInt with explicit rejection of unsafe Numbers. Unsupported secret/date/refund
+profiles, duplicate inputs/outputs, overflow and trailing compact bytes fail
+closed. The canonical packet ID is distinct from the model's framing checksum.
+
+A synchronous storage builder checks record/byte capacity and fixes identity
+and input generations before invoking the test signer. Interleaved public model
+operations are refused during the builder. Signing/length failures preserve the
+unconsumed state; existing publication and recovery ordering is retained.
+
+**Why:** expanded storage could not fit the large draft-shaped payment. In the
+compact candidate, reserve 724 context/registry/mapping bytes and additional
+uint64 identity bytes inside the 16 KiB budget. With 64 candidate record headers,
+89 payload pages admit 44 small synthetic payments. The 128-input/128-output
+workload needs 5,635 frame bytes and streams a 23,163-byte signed packet for its
+fixture context. The independent mixed-keyset vector also pins a payment ID
+above JavaScript's exact Number range.
+
+**Rejected:** copying complete expanded inputs into every record, omitting
+metadata outside SIG_ALL, verifying only the payment witness, silently adapting
+unsupported secrets, and presenting software byte budgets as silicon evidence.
+The fixture assumes preverified immutable loading; owner/load provenance, fees,
+DLEQ, the physical combined setup, RAM, crypto timing and tears remain separate
+gates. The store still refuses at its internal uint32 counter limit; reserved
+uint64 bytes do not implement a new card counter. This changes no production
+APDU, protocol assignment, firmware, CAP or provisioner asset.
