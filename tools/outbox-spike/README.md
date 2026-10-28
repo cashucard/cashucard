@@ -160,6 +160,57 @@ Authentication, transport, other statuses, nonempty error replies, journal
 failures and registry discrepancies retain the stop-with-journal behavior.
 A failed cleanup keeps both the first refusal and the cleanup failure.
 
+## Fixed-image post-install reservation
+
+The [256-byte physical result](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-28.j3r180-allocation-comparison.md)
+returned `6F00` at creation and completed its approved cleanup. Its 19,751-byte
+image differed from the successful 19,635-byte control. Existing chip reports
+document both load-size sensitivity and a constructor budget, leaving those
+comparisons unable to isolate allocation capacity.
+
+Format 3 installs the original constructor and reserves a pool with one private
+command afterwards. All three requested sizes use the identical CAP and
+manifest. The process persists an attempt marker before the one guarded
+allocation, outside a transaction. Subsequent reservation attempts are refused,
+including after deselection. This private exception is described in D144.
+
+```sh
+python3 tools/outbox-spike/build-probe.py /tmp/outbox-post-install \
+  --pool-bytes 0 --post-install
+```
+
+Compile its generated source with `ProbeSmoke.java` as above, passing `post`
+to the smoke program. It checks all three sizes, invalid-size refusal, publication
+before reservation, and repeat-attempt refusal in jCardSim.
+
+Selection reports format 3 and actual reserved bytes, initially zero. The
+16-byte measurement response uses the same counters as format 2, with format
+byte 3 and byte 15 holding the persistent attempt marker (0 or 1).
+
+`B0 7C 00 00 02 <size:uint16> 03` requests exactly 256, 4096 or 16384 bytes.
+Response `00 0000` confirms allocation; `01 <reason:uint16>` reports a caught
+`SystemException`. The raw public reason is retained without inferring its
+cause. Querying actual reservation state confirms the outcome. No other
+reservation size or retry is admitted by the host, bridge or applet.
+
+The runner requires `--reserve-bytes 256` (or 4096/16384) with this artifact.
+Its execution records baseline counters with zero reservation, reserves once,
+reads actual reserved bytes and commit capacity, then conditionally publishes
+and cleans up. The same manifest hash must be used at each comparison stage.
+Advance only after valid baseline/reservation/publication measurements and
+verified cleanup. The bridge requires a fresh format-3 selection and transmits
+at most one reservation command per connection.
+
+An approved plan may include `--cleanup-on-allocation-refusal`. It persists a
+structured refusal, confirms zero reserved bytes, an attempt marker and no
+publication, then uses the existing identity/factory-channel/registry cleanup
+gates. Result `allocation-refused-cleaned` exits 2 and ends the sequence.
+The option is off by default. Uncertain delivery, unexpected results or failed
+confirmation stop with the journal. `--cleanup-on-install-refusal` separately
+covers the declared empty-body creation refusals before any reservation.
+Registry-only and cleanup-only modes require the requested size for artifact
+admission but permit no reservation command.
+
 ## Measurement boundary
 
 The generated probes and their source changes stay outside released firmware,

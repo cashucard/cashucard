@@ -18,6 +18,7 @@ def select(aid):
 READ_ONLY = {select(aid) for aid in [ISD] + PRODUCTION + PROBE}
 READ_ONLY.update([bytes.fromhex('80CA9F7F00'), bytes.fromhex('B07D000018'), bytes.fromhex('B07D000010')])
 COMMIT = bytes.fromhex('B07E000001')
+RESERVATIONS = {bytes.fromhex('B07C000002010003'), bytes.fromhex('B07C000002100003'), bytes.fromhex('B07C000002400003')}
 
 
 def field(value):
@@ -34,7 +35,7 @@ def validate_command(value, *, registry_only=False, cleanup_only=False):
         allowed = (0xa4, 0xca, 0x50, 0x82, 0xf2) + ((0xe4,) if cleanup_only else ())
         if len(apdu) < 2 or apdu[1] not in allowed:
             raise ValueError('command outside reader mode')
-    if apdu in READ_ONLY or apdu == COMMIT:
+    if apdu in READ_ONLY or apdu == COMMIT or apdu in RESERVATIONS:
         return apdu
     if len(apdu) < 6 or len(apdu) != apdu[4] + 6 or apdu[-1] != 0:
         raise ValueError('invalid framing')
@@ -69,7 +70,7 @@ def pool_probe_selected(data, sw1, sw2):
     if sw1 != 0x90 or sw2 != 0 or len(data) != 8 or bytes(data[:5]) != b'PROBE':
         return False
     size = data[6] * 256 + data[7]
-    return (data[5] == 1 and size == 16384) or (data[5] == 2 and size in (256, 4096, 16384))
+    return (data[5] == 1 and size == 16384) or (data[5] == 2 and size in (256, 4096, 16384)) or (data[5] == 3 and size in (256, 4096, 16384))
 
 
 def main():
@@ -91,6 +92,8 @@ def main():
         connected = True
         emit({'ready': True})
         selected_probe = False
+        reservation_selected = False
+        reservation_sent = False
         while True:
             line = sys.stdin.readline(4097)
             if not line:
@@ -105,9 +108,16 @@ def main():
             command = validate_command(message['apdu'], registry_only=args.registry_only, cleanup_only=args.cleanup_only)
             if command == COMMIT and not selected_probe:
                 raise ValueError('probe selection required')
+            if command in RESERVATIONS:
+                if not reservation_selected or reservation_sent:
+                    raise ValueError('single selected format-3 reservation required')
+                reservation_sent = True
             data, sw1, sw2 = connection.transmit(list(command))
             if command[:2] == b'\0\xa4':
                 selected_probe = (command == select(PROBE[2]) and pool_probe_selected(data, sw1, sw2))
+                reservation_selected = (command == select(PROBE[2]) and sw1 == 0x90 and sw2 == 0 and bytes(data) == b'PROBE\x03\x00\x00')
+            if command in RESERVATIONS and sw1 == 0x90 and sw2 == 0 and data == [0, 0, 0]:
+                selected_probe = True
             emit({'reply': data + [sw1, sw2]})
     finally:
         if connected:

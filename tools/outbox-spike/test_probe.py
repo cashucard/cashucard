@@ -51,6 +51,23 @@ class ProbeTest(unittest.TestCase):
             self.assertEqual('JCSystem.beginTransaction()' in process, size != 0)
             self.assertEqual('JCSystem.abortTransaction()' in process, size != 0)
 
+    def test_post_install_profile_preserves_constructor_and_guards_one_reservation(self):
+        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        generated = m.source_probe(original, 0, post_install=True)
+        def constructor(source):
+            start = source.index('    private CashuApplet() {')
+            return source[start:source.index('\n    /**', start)]
+        self.assertEqual(constructor(original), constructor(generated))
+        start = generated.index('    public void process(APDU apdu) {')
+        process = generated[start:generated.index('\n    }',start)]
+        self.assertEqual(process.count('new byte['), 1)
+        self.assertLess(process.index('probeAttempted = 1;'), process.index('new byte['))
+        self.assertIn('size != 256 && size != 4096 && size != 16384', process)
+        self.assertIn('catch (SystemException error)', process)
+        self.assertIn('probePool == null', process)
+        with self.assertRaises(ValueError):
+            m.source_probe(original, 256, post_install=True)
+
     def test_build_paths_and_aids_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'probe'
