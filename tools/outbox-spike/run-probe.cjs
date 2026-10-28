@@ -106,6 +106,9 @@ function artifact(filename, expected) {
     layout === "single" &&
     manifest.poolBytes === 0 &&
     manifest.probeProfile === "post-install-reservation" &&
+    ["none", "padding-a", "padding-b"].includes(
+      manifest.imagePadding ?? "none",
+    ) &&
     JSON.stringify(manifest.supportedPoolBytes) === "[256,4096,16384]";
   if (
     manifest.kind !== "resource-probe-only" ||
@@ -193,6 +196,24 @@ function measurements(data, format = 1, poolBytes = 16384) {
     unusedCommit: bytes.readUInt16BE(18),
     poolBytes: bytes.readUInt16BE(20),
     publicationByte: bytes[22],
+  };
+}
+function platformMemory(data) {
+  const bytes = Buffer.from(data);
+  if (
+    bytes.length !== 19 ||
+    bytes.subarray(0, 5).toString("hex") !== "ff21108102" ||
+    bytes[7] !== 0x82 ||
+    bytes[8] !== 4 ||
+    bytes[13] !== 0x83 ||
+    bytes[14] !== 4
+  )
+    throw new ProbeFailure("platform-memory-format");
+  return {
+    source: "isd-ff21",
+    tag81: bytes.readUInt16BE(5),
+    persistentBytes: bytes.readUInt32BE(9),
+    volatileBytes: bytes.readUInt32BE(15),
   };
 }
 function journalFile(filename, value) {
@@ -376,10 +397,19 @@ async function runProbe(options, dependencies = {}) {
     probeFormat: manifest.probeFormat ?? 1,
     probeProfile: manifest.probeProfile ?? "legacy-constructor-stats",
     poolLayout: manifest.poolLayout ?? "single",
+    imagePadding: manifest.imagePadding ?? "none",
+    readPlatformMemory: options.readPlatformMemory === true,
     cleanupOnInstallRefusal: options.cleanupOnInstallRefusal === true,
     cleanupOnAllocationRefusal: options.cleanupOnAllocationRefusal === true,
     platformBaseline: options.platformBaseline ? "j3r180-09336320-v1" : "empty",
   };
+  if (
+    options.readPlatformMemory &&
+    (!options.execute || !options.platformBaseline)
+  )
+    throw new Error(
+      "platform memory read requires an explicit named-baseline execution",
+    );
   if (
     (summary.probeFormat === 3 &&
       ![256, 4096, 16384].includes(options.reserveBytes)) ||
@@ -476,6 +506,19 @@ async function runProbe(options, dependencies = {}) {
     );
     const tx = bridge.tx;
     await step("match-chip", () => sdk.readChipIdentity(tx, options.chip));
+    if (options.readPlatformMemory) {
+      state.platformMemory = await step("read-platform-memory", async () => {
+        const reply = await sdk.transmit(tx, [0x80, 0xca, 0xff, 0x21, 0]);
+        if (
+          [0x6a88, 0x6a86, 0x6d00].includes(reply.sw) &&
+          reply.data.length === 0
+        )
+          return { status: "unavailable", sw: reply.sw.toString(16) };
+        return platformMemory(expect(reply).data);
+      });
+      summary.platformMemory = state.platformMemory;
+      save();
+    }
     for (const aid of [
       sdk.CARD_AID,
       sdk.TAG_AID,
@@ -846,6 +889,7 @@ module.exports = {
   runProbe,
   verifyPlatformRegistry,
   parseBridgeMessage,
+  platformMemory,
 };
 if (require.main === module) {
   Promise.resolve()
@@ -864,6 +908,7 @@ if (require.main === module) {
           "cleanup-on-install-refusal": { type: "boolean", default: false },
           "cleanup-on-allocation-refusal": { type: "boolean", default: false },
           "reserve-bytes": { type: "string" },
+          "read-platform-memory": { type: "boolean", default: false },
           "platform-baseline": { type: "boolean", default: false },
           "factory-reset-confirmed": { type: "boolean", default: false },
         },
@@ -878,6 +923,7 @@ if (require.main === module) {
         execute: values.execute,
         inspectRegistry: values["inspect-registry"],
         cleanupOnly: values["cleanup-only"],
+        readPlatformMemory: values["read-platform-memory"],
         cleanupOnInstallRefusal: values["cleanup-on-install-refusal"],
         cleanupOnAllocationRefusal: values["cleanup-on-allocation-refusal"],
         reserveBytes:

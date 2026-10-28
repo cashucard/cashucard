@@ -68,6 +68,19 @@ class ProbeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.source_probe(original, 256, post_install=True)
 
+    def test_fixed_padding_changes_only_the_unreachable_method(self):
+        import re
+        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        baseline = m.source_probe(original, 0, post_install=True)
+        pattern = r'    private static void sizeTheFile\(byte\[\] a\) \{.*?\n    }'
+        for name in ['padding-a', 'padding-b']:
+            generated = m.source_probe(original,0,post_install=True,image_padding=name)
+            self.assertEqual(re.sub(pattern,'PADDING',baseline,flags=re.S),re.sub(pattern,'PADDING',generated,flags=re.S))
+            self.assertNotEqual(baseline,generated)
+            self.assertEqual(generated.count('sizeTheFile('),1)
+        for options in [dict(image_padding='padding-a'),dict(post_install=True,image_padding='unbounded')]:
+            with self.assertRaises(ValueError): m.source_probe(original,0,**options)
+
     def test_build_paths_and_aids_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'probe'

@@ -4062,3 +4062,34 @@ collecting authentication transcripts.
 from a generic error, retrying a stopped write to recover its old error, and
 widening cleanup authorization through an observability change. Physical
 actions and stop conditions retain their approved scope.
+
+## <a id="d146"></a>D146: Revalidate the known control before fixed image-layout comparisons
+
+**Decided (2026-10-28):** the next resource experiment starts with the previously
+successful pinned constructor control. Only a valid control and verified
+cleanup permit trying a new image. Two fixed post-install candidates alter
+only the existing unreachable padding method; constructor, reservation and
+publication code remain identical. Each selected image stays fixed across
+256-byte, 4 KiB and 16 KiB requests. A separately approved plan can permit the
+second image only after the first image's initial creation refusal and verified
+cleanup. Other failures retain their approved stop/backout rules.
+
+**Why:** the format-3 diagnostic rerun completed LOAD, then received `6F00` at
+creation before any pool command. It has no added pool in its constructor.
+The chip's documented load-size sensitivity and possible changes to its
+initialization baseline need separate controls. The generated candidates are
+20,068 and 20,196 bytes; 20,068 matches the released image's measured size,
+without establishing that a new image of that size will install.
+
+An explicit named-baseline execution may read the public ISD `FF21` memory tag
+before authentication. Admit its documented TLV structure and retain numeric
+counters, with tag 81 left uninterpreted. Declared empty unsupported-command
+responses record unavailable. Malformed data or other errors stop before
+loading. These optional counters supplement the capped JavaCard API; they
+do not select an adaptive allocation size.
+
+**Rejected:** treating a generic creation error as a capacity limit, repeating
+the same failed image as a new comparison, changing runtime code or allocations
+to pad an image, extrapolating a universal alignment rule, and unbounded image
+search on hardware. Pinned artifacts and an approved bounded plan remain
+required; production code, CAP and protocol behavior are unchanged.

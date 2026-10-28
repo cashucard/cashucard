@@ -11,6 +11,7 @@ const {
   measurements,
   verifyPlatformRegistry,
   parseBridgeMessage,
+  platformMemory,
 } = require("./run-probe.cjs");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
 function fixture(t, { format = 1, poolBytes = 16384, layout = "single" } = {}) {
@@ -82,6 +83,10 @@ function simulated({
   reservationReply = [0, 0, 0],
   reservationTransportFailure = false,
   reservationObservedBytes,
+  platformMemoryData = [
+    ...Buffer.from("ff2110810201238204000281508304000009b6", "hex"),
+  ],
+  platformMemorySw = 0x9000,
 } = {}) {
   const calls = {
     opens: 0,
@@ -91,6 +96,7 @@ function simulated({
     loads: 0,
     dummy: 0,
     reservations: 0,
+    platformMemoryReads: 0,
     registry: 0,
     deletes: 0,
     creates: 0,
@@ -105,6 +111,14 @@ function simulated({
       throw new Error("lost reader");
     }
     const ins = apdu[1];
+    if (ins === 0xca && apdu[2] === 0xff && apdu[3] === 0x21) {
+      calls.platformMemoryReads++;
+      return [
+        ...platformMemoryData,
+        platformMemorySw >> 8,
+        platformMemorySw & 255,
+      ];
+    }
     if (ins === 0xa4) {
       const aid = Buffer.from(apdu.slice(5, 5 + apdu[4])).toString("hex");
       if (installed && aid === "f0434153485550524f424501") {
@@ -902,4 +916,89 @@ test("fixed reader diagnostics survive the protected journal and stopped result"
   assert.equal(fake.calls.authentications, 0);
   assert.equal(fake.calls.deletes, 0);
   assert.equal(fake.calls.closes, 1);
+});
+
+test("public ISD memory data admits only the exact observed tag structure", () => {
+  const data = Buffer.from("ff2110810201238204000281508304000009b6", "hex");
+  assert.deepEqual(platformMemory(data), {
+    source: "isd-ff21",
+    tag81: 291,
+    persistentBytes: 164176,
+    volatileBytes: 2486,
+  });
+  for (const hex of [
+    "",
+    data.subarray(0, -1).toString("hex"),
+    "ff2110810201238203000281508304000009b6",
+    data.toString("hex") + "00",
+  ])
+    assert.throws(() => platformMemory(Buffer.from(hex, "hex")));
+});
+
+test("unknown fixed-image padding profiles are refused before reader access", async (t) => {
+  const options = {
+    ...fixture(t, { format: 3, poolBytes: 0 }),
+    reserveBytes: 256,
+  };
+  const manifest = JSON.parse(fs.readFileSync(options.manifest));
+  manifest.imagePadding = "unbounded";
+  const raw = JSON.stringify(manifest);
+  fs.writeFileSync(options.manifest, raw);
+  options.manifestHash = hash(raw);
+  const fake = simulated({ probeFormat: 3, poolBytes: 0 });
+  await assert.rejects(runProbe(options, fake));
+  assert.equal(fake.calls.opens, 0);
+});
+
+test("named public memory read is recorded before authentication and malformed data prevents writes", async (t) => {
+  for (const mode of ["valid", "unavailable", "malformed", "wrong-chip"]) {
+    const options = {
+      ...fixture(t, { format: 2, poolBytes: 0 }),
+      platformBaseline: true,
+      readPlatformMemory: true,
+    };
+    const fake = simulated({
+      probeFormat: 2,
+      poolBytes: 0,
+      registryData: (p1) =>
+        p1 === 0x40 ? [] : [...Buffer.from(PLATFORM_HEX.join(""), "hex")],
+      registryEntries: (data) =>
+        data.length ? platformRegistry().entries : [],
+      ...(mode === "unavailable"
+        ? { platformMemorySw: 0x6a88, platformMemoryData: [] }
+        : {}),
+      ...(mode === "malformed" ? { platformMemoryData: [0] } : {}),
+      ...(mode === "wrong-chip" ? { wrongChip: true } : {}),
+    });
+    if (mode === "malformed" || mode === "wrong-chip") {
+      await assert.rejects(runProbe(options, fake));
+      assert.equal(fake.calls.authentications, 0);
+      assert.equal(fake.calls.mutations, 0);
+      assert.equal(
+        fake.calls.platformMemoryReads,
+        mode === "wrong-chip" ? 0 : 1,
+      );
+    } else {
+      const result = await runProbe(options, fake);
+      assert.equal(result.status, "complete");
+      assert.equal(fake.calls.platformMemoryReads, 1);
+      assert.equal(
+        result.platformMemory.persistentBytes,
+        mode === "valid" ? 164176 : undefined,
+      );
+      assert.equal(
+        result.platformMemory.status,
+        mode === "unavailable" ? "unavailable" : undefined,
+      );
+      assert.deepEqual(
+        JSON.parse(fs.readFileSync(options.journal)).platformMemory,
+        result.platformMemory,
+      );
+    }
+  }
+  const fake = simulated();
+  await assert.rejects(
+    runProbe({ ...fixture(t), readPlatformMemory: true }, fake),
+  );
+  assert.equal(fake.calls.opens, 0);
 });

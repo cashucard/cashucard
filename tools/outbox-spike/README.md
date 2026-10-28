@@ -218,6 +218,40 @@ covers the declared empty-body creation refusals before any reservation.
 Registry-only and cleanup-only modes require the requested size for artifact
 admission but permit no reservation command.
 
+## Known control and fixed layout variants
+
+The format-3 diagnostic rerun completed LOAD but failed creation, before its
+reservation command. It completed the approved cleanup. The next comparison
+starts with the previously successful pinned constructor control, requiring
+valid counters and verified cleanup before trying a new image.
+
+`--image-padding padding-a` and `padding-b` are fixed post-install build
+profiles. They change only the existing unreachable `sizeTheFile` method;
+constructor and runtime command code stay identical. Current load sizes are
+20,068 and 20,196 bytes. The first matches the released image's measured size;
+installation of a new image still needs physical evidence. All reservation
+sizes within a selected image use the same CAP and manifest.
+
+```sh
+python3 tools/outbox-spike/build-probe.py /tmp/outbox-padding-a \
+  --pool-bytes 0 --post-install --image-padding padding-a
+```
+
+The manifest records the fixed padding name. Unknown profiles and padding of
+legacy formats are refused. CI converts and exercises both variants. An
+approved comparison may move to the second fixed image after the first image's
+initial creation refusal and verified cleanup; that branch must be stated in
+the plan. Other failures end the sequence under its approved backout rules.
+
+`--read-platform-memory` adds one public `80 CA FF 21 00` after matching CPLC,
+before authentication. It requires an explicit execution with the named 09336320
+platform baseline. The parser admits `FF21 10 8102 <uint16> 8204 <uint32>
+8304 <uint32>`: tag 82 reports persistent bytes and tag 83 volatile bytes; tag 81
+is retained without interpretation. This is the format documented in the chip
+notes. Empty `6A88`, `6A86` or `6D00` records unavailable. Other statuses,
+malformed data or transport failures stop before loading. These counters are
+informational; the approved plan fixes every allocation size.
+
 ## Measurement boundary
 
 The generated probes and their source changes stay outside released firmware,
