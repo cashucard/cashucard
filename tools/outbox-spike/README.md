@@ -333,3 +333,50 @@ opaque packets, internal 32-bit counters and scope comparisons do not assign
 protocol bytes or implement signatures, owner
 verification or the protocol codec. Full keyset registry/DLEQ setup, JavaCard
 conversion, integrated cryptography, power cuts and latency remain later gates.
+
+## Compact candidate export
+
+`compact-export.cjs` reconstructs the open protocol draft from immutable fixture
+state and ordered slot/generation references. Its compact payload retains a
+format/count header, 38-byte outputs (amount, registry reference and blinded
+point), and the two 64-byte signatures. Existing proof slots supply amount,
+nonce, C and their full-keyset mapping. The configured context supplies the card
+key, installation nonce, mint and unit.
+
+The signed [candidate vector](fixtures/assisted-settlement-v1.json) comes from
+cashucard/nut's `proposals/vectors/assisted-settlement-v1.json` at commit
+`6e83214ef3eed97b19fc95cd8a583ee87af80553`. Its SHA-256 is
+`d1868e1d81c5784b448ee16b12360f213dfc8307bde145112d6cf6d81a96ed68`.
+An independent Python encoder and the existing reference BIP-340 test signer
+produced its bytes; `make-vector.py --check` reproduces the fixture independently
+of the Node codec. It uses the published test scalar 3 and synthetic points.
+It covers mixed 8/33-byte keysets and a payment ID above Number's exact range.
+
+```sh
+node --test tools/outbox-spike/compact-export.test.cjs
+```
+
+Export verifies SIG_ALL and the tagged descriptor before returning any page.
+Canonical body and payment hashes stream through fields, and packet pages are
+bounded to 1–255 bytes. The packet ID remains SHA-256 of the canonical body;
+the storage model's framing checksum serves its separate internal integrity
+purpose. Final owner-authorized retirement must bind the canonical packet ID.
+
+The model's synchronous builder preflights record/byte capacity and fixes the
+identity and input generations before signing. A failed builder or invalid
+signature leaves the proofs unconsumed. This is single-command admission;
+network work and a durable cross-session capacity reservation are outside it.
+
+The 16 KiB budget reserves 724 bytes for maximum context, eight full-ID registry
+entries and proof mappings, plus the extra bytes for future uint64 global/record
+IDs. With 64 candidate headers, 89 data pages remain. The small synthetic workload
+fits 44 payments. A 128-input/128-output record occupies 4,994 compact payload
+bytes plus 641 reference bytes, then exports 23,163 bytes for the test context.
+These bounds remain prototype choices.
+
+`fixtureView` represents preverified immutable load state. It checks ranges,
+points, unique prefix mappings and supported date-zero/sat metadata; actual load
+provenance, owner authorization, DLEQ, fee policy and mint settlement remain
+integration work. The host fixture/snapshot objects use Node's heap. Reserved
+field bytes do not establish JavaCard object overhead or transient-memory fit;
+combined proof/DLEQ setup, hardware signing and tear checks remain required.
