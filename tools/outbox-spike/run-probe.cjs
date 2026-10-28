@@ -281,12 +281,18 @@ async function openBridge(
   reader,
   registryOnly = false,
   cleanupOnly = false,
+  profile = "resource",
 ) {
+  if (!["resource", "compact"].includes(profile))
+    throw new Error("unknown bridge profile");
   const child = spawn(
     python,
     [
       "-u",
-      path.join(__dirname, "probe_bridge.py"),
+      path.join(
+        __dirname,
+        profile === "compact" ? "compact_bridge.py" : "probe_bridge.py",
+      ),
       "--reader",
       reader,
       ...(registryOnly ? ["--registry-only"] : []),
@@ -306,10 +312,13 @@ async function openBridge(
       const result = await Promise.race([
         iterator.next(),
         new Promise((_, reject) => {
-          timer = setTimeout(() => {
-            child.kill();
-            reject(new ProbeFailure("reader-response-timeout"));
-          }, 10000);
+          timer = setTimeout(
+            () => {
+              child.kill();
+              reject(new ProbeFailure("reader-response-timeout"));
+            },
+            profile === "compact" ? 30000 : 10000,
+          );
         }),
       ]);
       if (result.done || result.value.length > 4096) {
@@ -903,6 +912,11 @@ async function runProbe(options, dependencies = {}) {
 }
 
 module.exports = {
+  openBridge,
+  journalFile,
+  registryFrames,
+  PLATFORM_FILES,
+  ProbeFailure,
   artifact,
   probeDelete,
   measurements,

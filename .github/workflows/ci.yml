@@ -315,11 +315,16 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Build public cardkit for private runner tests
+        working-directory: tools/cardkit
+        run: yarn install --frozen-lockfile && yarn build
+
       # Argument parsing for tools/e2e-melt.cjs (a 0.x tool), the pure half of
       # tools/cardsim/client.test.cjs (encoders, parsers, no-retry) and the
       # Cashu arithmetic in tools/cardsim/cashu-crypto.test.cjs. Needs no card,
       # no cashu-client build, no bridge and no mint: the integration cases skip
       # without CARDSIM_URL / MINT_URL (the cardsim job runs them).
+      # Private runner tests use built cardkit with fake transports; no reader opens.
       # The glob is quoted so node, not the shell, expands it (Node 21+ treats
       # positional args as file paths, so a bare directory does not work).
       - name: Run tests

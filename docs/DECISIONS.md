@@ -4243,3 +4243,37 @@ hashes are retained. Existing hardware tooling rejects this package/kind.
 Physical setup, memory, signing/transfer latency and tears require a reviewed
 runner and named approved plan. Production authorization, mint/load validation,
 receipt/limit integration and the final capability remain separate gates.
+
+## <a id="d151"></a>D151: Bound the first private compact hardware drill
+
+**Decided (2026-10-28):** use a dedicated runner and PC/SC policy for the private
+compact package. Preview reads local files. Execution requires exact artifact,
+source and runner pins, the named 09336320/ACS reader, factory-reset confirmation
+and a new private journal. Existing resource artifact admission stays unchanged.
+Share the process bridge and journal transport; keep package/APDU admission
+separate. Fingerprints include the built cardkit files and dependency pins.
+
+The first workload attempts combined DLEQ/pool setup once, then signs two
+synthetic inputs into two outputs, reselects and exports the packet. Verify both
+signatures, exact canonical bytes and scope with the card-generated public key
+before unsigned bench retirement. Record memory/commit counters and timings.
+The original platform registry is exact; deletes name only the private applet,
+opener and package. CPLC and a fresh factory channel precede cleanup.
+
+Persist every stage before transmission. Single-attempt fixture commands,
+30-second response deadlines, a 120-second elapsed gate and 512-command ceiling
+bound the drill. Unknown delivery, malformed data, authentication failures and
+signature/export mismatches stop with retained evidence. A separately enabled
+declared-refusal branch permits bounded private cleanup after empty-body
+`6F00`/`6A84` from creation or setup. It ends the test; it cannot authorize a retry.
+
+**Why:** full integrated allocation and signing need physical evidence after the
+converted prototype. A small deterministic public fixture isolates those costs
+before larger capacity and power-loss workloads. Fake transports and offline
+policy tests exercise the host boundary before any physical access.
+
+**Rejected:** broadening the old resource artifact allowlist, accepting arbitrary
+proof/PIN/key input, submitting fixture data to a mint, retrying uncertain writes,
+and automatic cleanup after unknown delivery. A named approved plan remains the
+physical access gate. Production firmware, protocol assignments, assets and the
+released app stay unchanged.
