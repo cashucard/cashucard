@@ -231,17 +231,21 @@ class Store {
       this.image[at] = STAGING;
       this.image.writeUInt32BE(id + 1, at + 1);
       this.image.writeUInt32BE(generation, at + 5);
-      this.image.writeUInt16BE(frame.length, at + 9);
-      this.image[at + 11] = pages[0];
-      this.image[at + 12] = needed;
-      digest(frame).copy(this.image, at + 13);
-    });
-    for (let i = 0; i < pages.length; i++)
-      this.atomic(() => {
-        this.image[this.layout.owners + pages[i]] = index + 1;
-        this.image[this.layout.next + pages[i]] =
-          i + 1 < pages.length ? pages[i + 1] : 255;
-      });
+    }); // Only counters and the hidden-staging identity need this boundary.
+    this.write(at + 9, frame.length >> 8);
+    this.write(at + 10, frame.length & 255);
+    this.write(at + 11, pages[0]);
+    this.write(at + 12, needed);
+    const checksum = digest(frame);
+    for (let i = 0; i < checksum.length; i++)
+      this.write(at + 13 + i, checksum[i]);
+    for (let i = 0; i < pages.length; i++) {
+      this.write(this.layout.owners + pages[i], index + 1);
+      this.write(
+        this.layout.next + pages[i],
+        i + 1 < pages.length ? pages[i + 1] : 255,
+      );
+    }
     for (let i = 0; i < frame.length; i++)
       this.write(
         this.layout.data + pages[Math.floor(i / PAGE)] * PAGE + (i % PAGE),

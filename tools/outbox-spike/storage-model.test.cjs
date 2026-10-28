@@ -245,3 +245,20 @@ test("full draft packets expose a byte-budget problem before any proof is consum
   assert.equal(large.unspent(), 128);
   assert.equal(large.export().length, 0);
 });
+test("assumed atomic mutations stay within thirteen changed bytes; staging metadata may tear", () => {
+  const s = publicationFixture();
+  let before = Buffer.from(s.image),
+    transactions = 0;
+  s.onWrite = (label) => {
+    if (label === "transaction") {
+      const changed = s.image.reduce((n, b, i) => n + (b !== before[i]), 0);
+      assert.ok(changed <= 13, "large atomic mutation: " + changed);
+      transactions++;
+    }
+    before = Buffer.from(s.image);
+  };
+  const ack = s.publish([0, 1], packet);
+  s.retire(ack);
+  s.load(0);
+  assert.ok(transactions > 0);
+});

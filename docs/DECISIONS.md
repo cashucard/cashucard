@@ -4143,7 +4143,9 @@ staging is reclaimed without consuming its inputs. Counters refuse at exhaustion
 published 128 bytes on 09336320. That is a floor for the next prototype, while
 record metadata, capacity and interrupted cleanup still need design evidence.
 The model permits exhaustive cuts after byte writes and modeled transactions.
-Those transactions remain assumptions until JavaCard and silicon validation.
+The largest assumed transaction covers 13 counter/identity/state bytes; staging
+length, digest and page maps are separate tearable byte writes. Transactions
+remain assumptions until JavaCard and silicon validation.
 
 The initial complete-packet candidate budgets 676 global/proof-bookkeeping bytes,
 32 headers of 48 bytes, and 109 pages of 128 payload bytes plus two page-map

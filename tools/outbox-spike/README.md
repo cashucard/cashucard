@@ -314,7 +314,9 @@ node --test tools/outbox-spike/storage-model.test.cjs
 The model exercises hidden staging, one publication/burn-intent boundary,
 mandatory recovery before export or proof use, generation-scoped retirement,
 and resumable page release. Tests cut after every byte write and modeled atomic
-transaction in publication/retirement, then resume the retained image. Repeated
+transaction in publication/retirement, then resume the retained image. The largest
+assumed atomic mutation covers 13 bytes; staged length, digest and page maps
+are written byte by byte and may tear. Repeated
 cuts during recovery, wrong-card/stale acknowledgements, exhaustion and byte
 versus record capacity are included.
 
@@ -327,6 +329,7 @@ slot/keyset references with streamed export before choosing production limits.
 See [D148](../../docs/DECISIONS.md#d148).
 
 The model assumes each annotated transaction is all-or-nothing. Its synthetic
-opaque packets, internal 32-bit counters and scope comparisons do not assign protocol bytes or implement signatures, owner
+opaque packets, internal 32-bit counters and scope comparisons do not assign
+protocol bytes or implement signatures, owner
 verification or the protocol codec. Full keyset registry/DLEQ setup, JavaCard
 conversion, integrated cryptography, power cuts and latency remain later gates.
