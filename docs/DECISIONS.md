@@ -4123,3 +4123,41 @@ and changing production ownership, locking or proof storage for an experiment.
 Borrowed state exists only in a private disposable diagnostic. Final firmware
 storage design remains gated on actual capacity, publication and recovery
 evidence, with a named approved plan required for every physical run.
+
+## <a id="d148"></a>D148: Model publication and retirement within a bounded byte image
+
+**Decided (2026-10-28):** use a host-only storage model for the next resource
+prototype slice. Its entire candidate bookkeeping and packet page pool occupy
+one explicit byte image. A hidden STAGING record becomes COMMITTED only after
+its complete frame is written and checked. That marker also commits burn intent;
+all modeled export, load, spend admission and balance operations resume burns
+before proceeding. Pending records pin their proof generations.
+
+A matching installation/payment/record-generation/digest acknowledgement moves
+a record to CLEARING. Proof cleanup resumes before any replacement load.
+A separate internal RELEASING state follows completed proof cleanup so a cut
+while freeing payload pages needs no access to already-released pages. Abandoned
+staging is reclaimed without consuming its inputs. Counters refuse at exhaustion.
+
+**Why:** the approved field-preserving B image physically reserved 16 KiB and
+published 128 bytes on 09336320. That is a floor for the next prototype, while
+record metadata, capacity and interrupted cleanup still need design evidence.
+The model permits exhaustive cuts after byte writes and modeled transactions.
+Those transactions remain assumptions until JavaCard and silicon validation.
+
+The initial complete-packet candidate budgets 676 global/proof-bookkeeping bytes,
+32 headers of 48 bytes, and 109 pages of 128 payload bytes plus two page-map
+bytes each: 16,382 used bytes within a 16,384-byte image. The draft's fixed
+canonical fields total 89 bytes before URL, counts, entries and signatures;
+with a 24-byte URL and 33-byte full keysets, one-input/one-output packets total
+422 bytes and 128-input/one-output packets total 14,138 bytes. The model also
+stores a count plus five-byte slot/generation references. Four pages per small
+packet admit 27; the large packet cannot fit. These are candidate arithmetic
+and synthetic workload results, with no production capacity assignment.
+
+**Rejected:** treating a successful raw allocation as a final outbox size,
+storing complete expanded packets without accounting for metadata and page
+rounding, exposing staged signatures, freeing pinned inputs before retirement,
+and inferring physical tear safety from a host model. The next compact prototype
+must reconstruct inputs from pinned slots and keyset mappings while preserving
+exact canonical export bytes. Production APIs, wire bytes and assets are unchanged.
