@@ -467,6 +467,15 @@ jobs:
             java -cp "$probe/classes:tools/cardsim/target/cardsim.jar" ProbeSmoke "$smoke"
           done
 
+      - name: Convert private byte-backed compact prototype
+        run: |
+          python3 tools/outbox-spike/build-compact.py "$RUNNER_TEMP/compact-javacard" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+
+      - name: Verify private compact signing, streaming and boundary recovery in jCardSim
+        run: |
+          python3 tools/outbox-spike/compile-compact-sim.py "$RUNNER_TEMP/compact-javacard"
+          node tools/outbox-spike/compact-javacard-smoke.cjs "$RUNNER_TEMP/compact-javacard"
+
       - name: Hello CAP, and the provisioner's load files match the CAPs
         run: |
           ant -f applet/build.xml hello-cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"

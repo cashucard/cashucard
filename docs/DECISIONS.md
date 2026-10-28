@@ -4201,3 +4201,45 @@ DLEQ, the physical combined setup, RAM, crypto timing and tears remain separate
 gates. The store still refuses at its internal uint32 counter limit; reserved
 uint64 bytes do not implement a new card counter. This changes no production
 APDU, protocol assignment, firmware, CAP or provisioner asset.
+
+## <a id="d150"></a>D150: Convert a private byte-backed JavaCard fixture prototype
+
+**Decided (2026-10-28):** generate a separate private package,
+`F04341534855434D5054`, preserving the production fields, constructor, crypto
+engines, scratch and proof hex cache. Conversion requires the known instance
+shape: 50 cells, first reference 0, 50 references. The release CAP is unchanged.
+
+One guarded setup persists intent before allocating the 12,288-byte DLEQ store
+and 16,384-byte pool outside a transaction. The pool borrows `cardReceipts`;
+its old buffer stays allocated. Private dispatch replaces ordinary operations,
+including owner/PIN, receipts, limits and production payment commands. Public
+synthetic fixture loading and unsigned retirement are bench interfaces only.
+
+The pool holds a real uint64 counter, immutable context/registry mappings, slot
+generations, 64 headers of 52 bytes and 90 linked 128-byte pages. Reusing the
+existing proof status bytes removes the host model's duplicate status/nonce
+budget and admits 45 small fixtures. BEGIN fixes identity/generation and hidden
+STAGING in a 21-data-byte transaction. Both signatures and canonical packet ID
+precede COMMITTED/burn intent. Burns and retirement resume before reuse;
+CLEARING advances to RELEASING only after every selected slot is empty.
+
+Burn completion is persisted last. Completed records avoid repeated full hashes
+on unrelated commands. Export/scope validates references and packet integrity
+once per selected session using existing transient state. Mutations invalidate
+the cache; selection clears it. A fresh session rejects corrupted pinned data.
+
+**Why:** the host model could not establish JavaCard conversion or byte-backed
+state/signing. The converted prototype uses the original Schnorr implementation
+and matches independently verified host exports for mixed/full keysets, large
+input/output counts and a uint64 identity above Number precision. Source checks
+preserve constructor demand and prohibit allocation in the static state engine.
+
+**Rejected:** modifying release firmware for an experiment, adding instance
+fields/transient buffers to the working constructor, freeing payload during
+incomplete proof cleanup, and treating simulator memory or cuts as silicon
+evidence. Fixed test keys and boundary cuts live only in separately compiled
+host harness sources and never enter the CAP. Generated-source, SDK and artifact
+hashes are retained. Existing hardware tooling rejects this package/kind.
+Physical setup, memory, signing/transfer latency and tears require a reviewed
+runner and named approved plan. Production authorization, mint/load validation,
+receipt/limit integration and the final capability remain separate gates.
