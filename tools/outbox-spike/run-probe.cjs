@@ -101,10 +101,16 @@ function artifact(filename, expected) {
       layout === "4x4096" &&
       manifest.poolBytes === 16384 &&
       manifest.probeProfile === "segmented-pool-allocation");
+  const postInstall =
+    format === 3 &&
+    layout === "single" &&
+    manifest.poolBytes === 0 &&
+    manifest.probeProfile === "post-install-reservation" &&
+    JSON.stringify(manifest.supportedPoolBytes) === "[256,4096,16384]";
   if (
     manifest.kind !== "resource-probe-only" ||
     manifest.packageAid !== PACKAGE ||
-    !profileOK
+    !(profileOK || postInstall)
   ) {
     throw new Error("unsupported probe profile");
   }
@@ -131,11 +137,11 @@ function probeDelete(hex) {
 }
 function measurements(data, format = 1, poolBytes = 16384) {
   const bytes = Buffer.from(data);
-  if (format === 2) {
+  if (format === 2 || format === 3) {
     if (
       bytes.length !== 16 ||
-      bytes[13] !== 2 ||
-      bytes[15] !== 0 ||
+      bytes[13] !== format ||
+      (format === 2 ? bytes[15] !== 0 : bytes[15] > 1) ||
       bytes.readUInt16BE(10) !== poolBytes ||
       bytes[12] > 1 ||
       (!poolBytes && bytes[12] !== 0)
@@ -155,7 +161,8 @@ function measurements(data, format = 1, poolBytes = 16384) {
     )
       throw new Error("invalid availability counter");
     return {
-      probeFormat: 2,
+      probeFormat: format,
+      ...(format === 3 ? { reservationAttempted: bytes[15] === 1 } : {}),
       reportedAvailability: {
         persistent: counters[0],
         transientReset: counters[1],
@@ -333,19 +340,40 @@ async function runProbe(options, dependencies = {}) {
     reader: options.reader,
     capSha256: manifest.capSha256,
     manifestSha256: options.manifestHash,
-    poolBytes: manifest.poolBytes,
+    poolBytes:
+      manifest.probeFormat === 3 ? options.reserveBytes : manifest.poolBytes,
     probeFormat: manifest.probeFormat ?? 1,
     probeProfile: manifest.probeProfile ?? "legacy-constructor-stats",
     poolLayout: manifest.poolLayout ?? "single",
     cleanupOnInstallRefusal: options.cleanupOnInstallRefusal === true,
+    cleanupOnAllocationRefusal: options.cleanupOnAllocationRefusal === true,
     platformBaseline: options.platformBaseline ? "j3r180-09336320-v1" : "empty",
   };
   if (
-    options.cleanupOnInstallRefusal &&
-    (!options.execute || summary.probeFormat !== 2 || manifest.poolBytes === 0)
+    (summary.probeFormat === 3 &&
+      ![256, 4096, 16384].includes(options.reserveBytes)) ||
+    (summary.probeFormat !== 3 && options.reserveBytes !== undefined)
   ) {
     throw new Error(
-      "declared-refusal cleanup requires an explicit format-2 allocation run",
+      "format-3 requires an explicit bounded reserve-bytes value",
+    );
+  }
+  if (
+    options.cleanupOnAllocationRefusal &&
+    (!options.execute || summary.probeFormat !== 3)
+  ) {
+    throw new Error(
+      "allocation-refusal cleanup requires an explicit format-3 run",
+    );
+  }
+  if (
+    options.cleanupOnInstallRefusal &&
+    (!options.execute ||
+      ![2, 3].includes(summary.probeFormat) ||
+      summary.poolBytes === 0)
+  ) {
+    throw new Error(
+      "declared-refusal cleanup requires an explicit allocation run",
     );
   }
   if (!options.execute && !options.inspectRegistry && !options.cleanupOnly) {
@@ -516,12 +544,15 @@ async function runProbe(options, dependencies = {}) {
         sdk.openSession(tx, sdk.FACTORY_KEYS, randomBytes, { kvn: 1 }),
       );
       await removePrivateProbe();
-      state.status = "install-refused-cleaned";
+      state.status = state.allocationRefusal
+        ? "allocation-refused-cleaned"
+        : "install-refused-cleaned";
       save();
       return {
         ...summary,
         status: state.status,
         installRefusal: state.installRefusal,
+        allocationRefusal: state.allocationRefusal,
         journal: options.journal,
       };
     };
@@ -586,11 +617,11 @@ async function runProbe(options, dependencies = {}) {
         throw new Error("probe selection mismatch");
       }
     });
-    async function readMeasurements() {
-      const length = summary.probeFormat === 2 ? 16 : 24;
+    async function readMeasurements(poolBytes = summary.poolBytes) {
+      const length = summary.probeFormat >= 2 ? 16 : 24;
       const reply = await sdk.transmit(tx, [0xb0, 0x7d, 0, 0, length]);
       if (
-        summary.probeFormat === 2 &&
+        summary.probeFormat >= 2 &&
         [0x6f00, 0x6a81, 0x6d00].includes(reply.sw) &&
         reply.data.length === 0
       ) {
@@ -599,25 +630,79 @@ async function runProbe(options, dependencies = {}) {
           sw: reply.sw.toString(16).padStart(4, "0"),
         };
       }
-      return measurements(
-        expect(reply).data,
-        summary.probeFormat,
-        manifest.poolBytes,
-      );
+      return measurements(expect(reply).data, summary.probeFormat, poolBytes);
     }
-    const before = await step("read-measurements", readMeasurements);
+    const before = await step("read-measurements", () =>
+      readMeasurements(summary.probeFormat === 3 ? 0 : summary.poolBytes),
+    );
     state.measurements = { before };
     save();
     if (before.status !== "unavailable" && before.publicationByte !== 0) {
       throw new Error("probe was already used");
     }
-    if (manifest.poolBytes === 0) {
+    if (summary.probeFormat === 3 && before.status !== "unavailable") {
+      if (before.reservationAttempted)
+        throw new Error("probe reservation already attempted");
+      if (Math.min(before.maxCommit, before.unusedCommit) >= 128) {
+        const reply = await step("reserve-pool", async () =>
+          expect(
+            await sdk.transmit(tx, [
+              0xb0,
+              0x7c,
+              0,
+              0,
+              2,
+              summary.poolBytes >> 8,
+              summary.poolBytes & 255,
+              3,
+            ]),
+          ),
+        );
+        if (reply.data.length !== 3 || ![0, 1].includes(reply.data[0]))
+          throw new Error("reservation response mismatch");
+        const reason = reply.data[1] * 256 + reply.data[2];
+        if ((reply.data[0] === 0) !== (reason === 0))
+          throw new Error("reservation reason mismatch");
+        if (reply.data[0] === 1) {
+          state.allocationRefusal = { category: "system-exception", reason };
+          save();
+          if (!options.cleanupOnAllocationRefusal)
+            throw new Error("allocation refusal requires review");
+          const refused = await step("confirm-allocation-refusal", () =>
+            readMeasurements(0),
+          );
+          if (
+            refused.status === "unavailable" ||
+            !refused.reservationAttempted ||
+            refused.publicationByte !== 0
+          )
+            throw new Error("allocation refusal state mismatch");
+          state.measurements.refused = refused;
+          save();
+          return await refusalCleanup();
+        }
+        const reserved = await step("read-reservation", readMeasurements);
+        if (
+          reserved.status === "unavailable" ||
+          !reserved.reservationAttempted ||
+          reserved.publicationByte !== 0
+        )
+          throw new Error("reservation not confirmed");
+        state.measurements.afterReservation = reserved;
+        save();
+      }
+    }
+    const publicationCapacity = state.measurements.afterReservation ?? before;
+    if (summary.poolBytes === 0) {
       state.measurements.dummySkipped = "control-profile";
     } else if (before.status === "unavailable") {
       state.measurements.dummySkipped = "measurements-unavailable";
     } else if (
-      summary.probeFormat === 2 &&
-      Math.min(before.maxCommit, before.unusedCommit) < 128
+      summary.probeFormat >= 2 &&
+      Math.min(
+        publicationCapacity.maxCommit,
+        publicationCapacity.unusedCommit,
+      ) < 128
     ) {
       state.measurements.dummySkipped = "reported-commit-capacity-below-128";
     } else {
@@ -633,6 +718,12 @@ async function runProbe(options, dependencies = {}) {
       const after = await step("read-publication", readMeasurements);
       if (after.status !== "unavailable" && after.publicationByte !== 1)
         throw new Error("publication not retained");
+      if (
+        summary.probeFormat === 3 &&
+        after.status !== "unavailable" &&
+        !after.reservationAttempted
+      )
+        throw new Error("reservation state lost");
       state.measurements.after = after;
       state.measurements.publicationRetainedByRead =
         after.status !== "unavailable";
@@ -732,6 +823,8 @@ if (require.main === module) {
           "inspect-registry": { type: "boolean", default: false },
           "cleanup-only": { type: "boolean", default: false },
           "cleanup-on-install-refusal": { type: "boolean", default: false },
+          "cleanup-on-allocation-refusal": { type: "boolean", default: false },
+          "reserve-bytes": { type: "string" },
           "platform-baseline": { type: "boolean", default: false },
           "factory-reset-confirmed": { type: "boolean", default: false },
         },
@@ -747,11 +840,21 @@ if (require.main === module) {
         inspectRegistry: values["inspect-registry"],
         cleanupOnly: values["cleanup-only"],
         cleanupOnInstallRefusal: values["cleanup-on-install-refusal"],
+        cleanupOnAllocationRefusal: values["cleanup-on-allocation-refusal"],
+        reserveBytes:
+          values["reserve-bytes"] === undefined
+            ? undefined
+            : Number(values["reserve-bytes"]),
         platformBaseline: values["platform-baseline"],
         factoryResetConfirmed: values["factory-reset-confirmed"],
       });
       console.log(JSON.stringify(result));
-      if (result.status === "install-refused-cleaned") process.exitCode = 2;
+      if (
+        ["install-refused-cleaned", "allocation-refused-cleaned"].includes(
+          result.status,
+        )
+      )
+        process.exitCode = 2;
     })
     .catch((error) => {
       console.error(

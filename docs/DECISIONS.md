@@ -4005,3 +4005,37 @@ measurements, inferring an EEPROM limit, changing transient allocation, and
 cleanup after ambiguous delivery, authentication failures, unexpected replies or
 registry changes. The flag requires a named approved allocation plan. Production
 firmware, CAP and protocol assignments are unchanged.
+
+## <a id="d144"></a>D144: Measure a one-time reservation after installation using one fixed image
+
+**Decided (2026-10-28):** the next private resource profile uses the same CAP
+for baseline measurements and 256-byte, 4 KiB or 16 KiB reservations. Its
+original constructor remains unchanged. One private command persists an
+attempt marker, then makes one persistent array outside a transaction. It
+refuses another attempt even after deselection. Diagnostics expose actual
+reserved bytes and the attempt marker. Only a confirmed reservation can
+proceed to the existing 128-byte dummy publication.
+
+**Why:** the 256-byte constructor probe failed with the same generic `6F00`
+as the 16 KiB probe. Both images were 19,751 bytes; the successful control was
+19,635 bytes. Existing chip evidence documents load-size sensitivity and a
+separate constructor allocation budget. D142/D143's comparisons therefore
+cannot isolate capacity. Separating reservation from INSTALL and retaining one
+binary across sizes removes those changes from the reservation comparison.
+The guarded deferred proof store in D17 supplies an existing implementation
+precedent; this experiment makes no production allocation-policy change.
+
+A caught allocation `SystemException` reports its public reason. Explicit
+refusal cleanup first persists that result and confirms zero reserved bytes,
+an attempted reservation and no publication. It then rematches CPLC, proves
+one new factory channel, validates the exact registry, removes private objects
+and verifies the baseline. The distinct result exits 2 and ends the sequence.
+Ambiguous delivery, malformed responses, failed persistence, authentication or
+registry checks retain stop-with-journal handling. Each physical run needs a
+named approved plan covering reservation and the declared cleanup outcomes.
+
+**Rejected:** inferring available capacity from generic INSTALL failures,
+changing the image between sizes, unbounded allocation retries, reserving
+inside a transaction and enabling this command in released firmware. Final
+outbox initialization, publication, limits and recovery remain design and
+physical validation gates after this resource experiment.

@@ -1,6 +1,11 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import io
+import json
+import types
+import sys
 
 s = importlib.util.spec_from_file_location('bridge', Path(__file__).with_name('probe_bridge.py'))
 b = importlib.util.module_from_spec(s)
@@ -42,8 +47,33 @@ class BridgeTest(unittest.TestCase):
             self.assertTrue(b.pool_probe_selected(list(b'PROBE') + [2, size >> 8, size & 255], 0x90, 0))
         self.assertFalse(b.pool_probe_selected(list(b'PROBE') + [1, 0x10, 0], 0x90, 0))
         self.assertFalse(b.pool_probe_selected(list(b'PROBE') + [2, 0x20, 0], 0x90, 0))
-        for data in [list(b'PROBE') + [2, 0, 0], list(b'PROBE') + [3, 0x40, 0], list(b'WRONG') + [2, 0x40, 0]]:
+        for data in [list(b'PROBE') + [2, 0, 0], list(b'PROBE') + [4, 0x40, 0], list(b'WRONG') + [2, 0x40, 0]]:
             self.assertFalse(b.pool_probe_selected(data, 0x90, 0))
+
+    def test_post_install_reservation_is_bounded_and_requires_selected_fresh_probe(self):
+        for command in b.RESERVATIONS:
+            self.assertEqual(b.validate_command(list(command)), command)
+            for mode in ['registry_only', 'cleanup_only']:
+                with self.assertRaises(ValueError):
+                    b.validate_command(list(command), **{mode: True})
+        with self.assertRaises(ValueError):
+            b.validate_command(list(bytes.fromhex('B07C000002200003')))
+        reserve = list(bytes.fromhex('B07C000002010003'))
+        for commands, expected in [([reserve], 0), ([list(b.select(b.PROBE[2])), reserve, reserve], 1)]:
+            sent = []
+            class Connection:
+                def connect(self, **kwargs): pass
+                def disconnect(self): pass
+                def transmit(self, command):
+                    sent.append(bytes(command))
+                    return (list(b'PROBE') + [3,0,0] if bytes(command) == b.select(b.PROBE[2]) else [0,0,0], 0x90,0)
+            reader = types.SimpleNamespace(createConnection=lambda: Connection())
+            modules = {'smartcard.System': types.SimpleNamespace(readers=lambda: [reader]),
+                'smartcard.scard': types.SimpleNamespace(SCARD_LEAVE_CARD=0,SCARD_SHARE_EXCLUSIVE=1)}
+            text = ''.join(json.dumps({'apdu': c}) + '\n' for c in commands)
+            with patch.dict(sys.modules,modules), patch.object(sys,'argv',['bridge','--reader',str(reader)]), patch.object(sys,'stdin',io.StringIO(text)), patch.object(sys,'stdout',io.StringIO()):
+                with self.assertRaises(ValueError): b.main()
+            self.assertEqual(sum(c in b.RESERVATIONS for c in sent), expected)
 
     def test_cleanup_only_mode_allows_only_private_deletion(self):
         for aid in b.PROBE:

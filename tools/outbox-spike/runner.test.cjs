@@ -22,6 +22,14 @@ function fixture(t, { format = 1, poolBytes = 16384, layout = "single" } = {}) {
     kind: "resource-probe-only",
     packageAid: "F0434153485550524F4245",
     poolBytes,
+    ...(format === 3
+      ? {
+          probeFormat: 3,
+          probeProfile: "post-install-reservation",
+          poolLayout: "single",
+          supportedPoolBytes: [256, 4096, 16384],
+        }
+      : {}),
     ...(format === 2
       ? {
           probeFormat: 2,
@@ -70,6 +78,9 @@ function simulated({
   measurementData = [],
   commitCapacity = 512,
   loadSw = 0x9000,
+  reservationReply = [0, 0, 0],
+  reservationTransportFailure = false,
+  reservationObservedBytes,
 } = {}) {
   const calls = {
     opens: 0,
@@ -78,10 +89,14 @@ function simulated({
     mutations: 0,
     loads: 0,
     dummy: 0,
+    reservations: 0,
     registry: 0,
     deletes: 0,
     creates: 0,
   };
+  let reserved = 0,
+    attempted = 0;
+  const activePool = () => (probeFormat === 3 ? reserved : poolBytes);
   let marker = 0,
     installed = probePresent;
   const tx = async (apdu) => {
@@ -95,8 +110,8 @@ function simulated({
         return [
           ...Buffer.from("PROBE"),
           probeFormat,
-          poolBytes >> 8,
-          poolBytes & 0xff,
+          activePool() >> 8,
+          activePool() & 0xff,
           0x90,
           0,
         ];
@@ -114,16 +129,17 @@ function simulated({
     if (ins === 0x7d) {
       if (measurementSw !== 0x9000)
         return [...measurementData, measurementSw >> 8, measurementSw & 0xff];
-      if (probeFormat === 2) {
+      if (probeFormat === 2 || probeFormat === 3) {
         const data = Buffer.alloc(16);
         data.writeUInt16BE(1000, 0);
         data.writeUInt16BE(100, 2);
         data.writeUInt16BE(200, 4);
         data.writeUInt16BE(commitCapacity, 6);
         data.writeUInt16BE(commitCapacity, 8);
-        data.writeUInt16BE(poolBytes, 10);
+        data.writeUInt16BE(activePool(), 10);
         data[12] = marker;
-        data[13] = 2;
+        data[13] = probeFormat;
+        data[15] = attempted;
         return [...data, 0x90, 0];
       }
       const data = Buffer.alloc(24);
@@ -131,6 +147,16 @@ function simulated({
       data[22] = marker;
       data[23] = 1;
       return [...data, 0x90, 0];
+    }
+    if (ins === 0x7c) {
+      calls.reservations++;
+      attempted = 1;
+      if (reservationTransportFailure)
+        throw new Error("lost reservation reply");
+      if (reservationReply[0] === 0) reserved = apdu[5] * 256 + apdu[6];
+      if (reservationObservedBytes !== undefined)
+        reserved = reservationObservedBytes;
+      return [...reservationReply, 0x90, 0];
     }
     if (ins === 0x7e) {
       calls.dummy++;
@@ -705,4 +731,119 @@ test("declared cleanup rejects other modes/profiles and does not act on a LOAD r
     JSON.parse(fs.readFileSync(options.journal)).stage,
     "load-block-0",
   );
+});
+
+test("one identical post-install artifact measures baseline then a single requested reservation", async (t) => {
+  for (const reserveBytes of [256, 4096, 16384]) {
+    const options = {
+      ...fixture(t, { format: 3, poolBytes: 0 }),
+      reserveBytes,
+    };
+    const fake = simulated({ probeFormat: 3, poolBytes: 0 });
+    const result = await runProbe(options, fake);
+    assert.equal(result.status, "complete");
+    assert.equal(result.before.poolBytes, 0);
+    assert.equal(result.afterReservation.poolBytes, reserveBytes);
+    assert.equal(result.after.publicationByte, 1);
+    assert.equal(fake.calls.reservations, 1);
+    assert.equal(fake.calls.dummy, 1);
+    assert.equal(fake.calls.deletes, 3);
+  }
+});
+
+test("explicit post-install refusal cleanup retains the reason and skips dummy publication", async (t) => {
+  const options = {
+    ...fixture(t, { format: 3, poolBytes: 0 }),
+    reserveBytes: 256,
+    cleanupOnAllocationRefusal: true,
+  };
+  const fake = simulated({
+    probeFormat: 3,
+    poolBytes: 0,
+    reservationReply: [1, 0, 5],
+  });
+  const result = await runProbe(options, fake);
+  assert.equal(result.status, "allocation-refused-cleaned");
+  assert.deepEqual(result.allocationRefusal, {
+    category: "system-exception",
+    reason: 5,
+  });
+  assert.equal(fake.calls.reservations, 1);
+  assert.equal(fake.calls.dummy, 0);
+  assert.equal(fake.calls.deletes, 3);
+  assert.equal(fake.calls.authentications, 2);
+});
+
+test("ambiguous or undeclared post-install reservation results stop without cleanup", async (t) => {
+  for (const config of [
+    { reservationReply: [1, 0, 5], approved: false },
+    { reservationReply: [2, 0, 0], approved: true },
+    { reservationReply: [1, 0, 0], approved: true },
+    { reservationTransportFailure: true, approved: true },
+  ]) {
+    const options = {
+      ...fixture(t, { format: 3, poolBytes: 0 }),
+      reserveBytes: 256,
+      cleanupOnAllocationRefusal: config.approved,
+    };
+    const fake = simulated({ probeFormat: 3, poolBytes: 0, ...config });
+    await assert.rejects(runProbe(options, fake));
+    assert.equal(fake.calls.reservations, 1);
+    assert.equal(fake.calls.dummy, 0);
+    assert.equal(fake.calls.deletes, 0);
+    assert.equal(fake.calls.authentications, 1);
+  }
+});
+
+test("post-install admission rejects unbounded sizes and misplaced cleanup flags before reader access", async (t) => {
+  for (const reserveBytes of [undefined, 0, 8192]) {
+    const options = {
+      ...fixture(t, { format: 3, poolBytes: 0 }),
+      reserveBytes,
+    };
+    const fake = simulated();
+    await assert.rejects(runProbe(options, fake));
+    assert.equal(fake.calls.opens, 0);
+  }
+  const options = {
+    ...fixture(t, { format: 2, poolBytes: 256 }),
+    cleanupOnAllocationRefusal: true,
+  };
+  const fake = simulated();
+  await assert.rejects(runProbe(options, fake));
+  assert.equal(fake.calls.opens, 0);
+});
+
+test("reservation refusal cleanup requires persisted evidence and matching zero-pool state", async (t) => {
+  for (const failedJournal of [false, true]) {
+    const options = {
+      ...fixture(t, { format: 3, poolBytes: 0 }),
+      reserveBytes: 256,
+      cleanupOnAllocationRefusal: true,
+    };
+    const fake = simulated({
+      probeFormat: 3,
+      poolBytes: 0,
+      reservationReply: [1, 0, 5],
+      ...(!failedJournal ? { reservationObservedBytes: 256 } : {}),
+    });
+    const rename = fs.renameSync;
+    if (failedJournal)
+      fs.renameSync = (source, target) => {
+        if (
+          target === options.journal &&
+          JSON.parse(fs.readFileSync(source)).allocationRefusal
+        )
+          throw new Error("journal unavailable");
+        return rename(source, target);
+      };
+    try {
+      await assert.rejects(runProbe(options, fake));
+      assert.equal(fake.calls.deletes, 0);
+      assert.equal(fake.calls.authentications, 1);
+      assert.equal(fake.calls.dummy, 0);
+    } finally {
+      fs.renameSync = rename;
+    }
+  }
 });

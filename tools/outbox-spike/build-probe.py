@@ -71,7 +71,49 @@ def process_probe(size):
         '__MARKER__', 'probePool[0]' if size else '0').replace('__DUMMY__', DUMMY if size else '')
 
 
-def source_probe(source, size, segments=1):
+POST_INSTALL = """        if (b[ISO7816.OFFSET_INS] == (byte) 0x7C) {
+            if (probeAttempted != 0 || probePool != null) {
+                ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+            }
+            if (b[ISO7816.OFFSET_LC] != 2 || apdu.setIncomingAndReceive() != 2) {
+                ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+            }
+            short size = Util.getShort(b, ISO7816.OFFSET_CDATA);
+            if (size != 256 && size != 4096 && size != 16384) {
+                ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+            }
+            // Private experiment only: one guarded reservation, outside a transaction.
+            // Persist intent before allocation; an interrupted command cannot be retried.
+            probeAttempted = 1;
+            short reason = 0;
+            try {
+                probePool = new byte[size];
+            } catch (SystemException error) {
+                reason = error.getReason();
+            }
+            b[0] = (byte) (probePool == null ? 1 : 0);
+            Util.setShort(b, (short) 1, reason);
+            apdu.setOutgoingAndSend((short) 0, (short) 3);
+            return;
+        }
+"""
+
+
+def process_post_install():
+    process = process_probe(16384).replace('b[5] = 2;', 'b[5] = 3;').replace('b[13] = 2;', 'b[13] = 3;')
+    process = process.replace('(short) 16384', '(short) (probePool == null ? 0 : probePool.length)')
+    process = process.replace('b[12] = probePool[0];', 'b[12] = probePool == null ? (byte) 0 : probePool[0];')
+    process = process.replace('b[15] = 0;', 'b[15] = probeAttempted;')
+    query = '        if (b[ISO7816.OFFSET_INS] == (byte) 0x7D) {'
+    process = process.replace(query, POST_INSTALL + query)
+    publication = '        if (b[ISO7816.OFFSET_INS] == (byte) 0x7E) {'
+    process = process.replace(publication, publication + '\n            if (probePool == null) { ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED); }')
+    return process
+
+
+def source_probe(source, size, segments=1, post_install=False):
+    if post_install and (size != 0 or segments != 1):
+        raise ValueError('post-install profile requires zero initial pool and single layout')
     if size != 0 and (size < 256 or size > 24576 or size % 256):
         raise ValueError('pool size must be zero (control) or a multiple of 256, from 256 to 24576')
     if segments not in (1, 4) or (segments == 4 and size != 16384):
@@ -79,19 +121,21 @@ def source_probe(source, size, segments=1):
     anchor = 'public class CashuApplet extends Applet implements TagSwitch {'
     if source.count(anchor) != 1 or source.count('        schnorrHW.init();') != 1:
         raise ValueError('applet install anchors changed; review the probe generator')
+    if post_install:
+        source = source.replace(anchor, anchor + '\n    private byte[] probePool;\n    private byte probeAttempted;')
     if size:
         names = ['probePool'] + ['probePool' + str(i) for i in range(1, segments)]
         source = source.replace(anchor, anchor + ''.join('\n    private final byte[] ' + name + ';' for name in names))
         allocations = ''.join('\n        ' + name + f' = new byte[(short) {size // segments}];' for name in names)
         source = source.replace('        schnorrHW.init();', '        schnorrHW.init();' + allocations)
     source, count = re.subn(r'    public void process\(APDU apdu\) \{.*?\n    }',
-        lambda _: process_probe(size), source, flags=re.S)
+        lambda _: process_post_install() if post_install else process_probe(size), source, flags=re.S)
     if count != 1:
         raise ValueError('applet process anchor changed; review the probe generator')
     return source
 
 
-def prepare(output, size, segments=1):
+def prepare(output, size, segments=1, post_install=False):
     # Refuse reuse so an old CAP cannot be mistaken for this build.
     output.mkdir(parents=True, exist_ok=False)
     sources = ROOT / 'applet/src/main/java/me/flashapp/cashu'
@@ -101,7 +145,7 @@ def prepare(output, size, segments=1):
     for file in sorted(sources.glob('*.java')):
         raw = file.read_bytes()
         hashes[file.name] = hashlib.sha256(raw).hexdigest()
-        text = source_probe(raw.decode(), size, segments) if file.name == 'CashuApplet.java' else raw.decode()
+        text = source_probe(raw.decode(), size, segments, post_install) if file.name == 'CashuApplet.java' else raw.decode()
         (destination / file.name).write_text(text)
     build = ET.parse(ROOT / 'applet/build.xml')
     project = build.getroot()
@@ -150,6 +194,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path, help='new scratch directory')
     parser.add_argument('--pool-bytes', type=int, default=16384)
+    parser.add_argument('--post-install', action='store_true', help='one fixed CAP with a single guarded reservation command')
     parser.add_argument('--segments', type=int, choices=[1,4], default=1)
     parser.add_argument('--sdk', type=Path, default=Path.home() / '.javacard/sdks/jc305u4_kit')
     args = parser.parse_args()
@@ -157,8 +202,8 @@ def main():
     if not (args.sdk / 'lib/api_classic.jar').is_file():
         parser.error('JavaCard 3.0.5 SDK is missing')
     # Validate before creating files.
-    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments)
-    hashes = prepare(output, args.pool_bytes, args.segments)
+    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments, args.post_install)
+    hashes = prepare(output, args.pool_bytes, args.segments, args.post_install)
     cap = output / 'resource-probe.cap'
     subprocess.run(['ant', '-f', str(output / 'build.xml'), 'cap',
         '-Dsrc.dir=' + str(output / 'src'), '-Dcap.file=' + str(cap),
@@ -171,11 +216,13 @@ def main():
     manifest = {'sourceCommit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
         'toolSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'kind': 'resource-probe-only', 'poolBytes': args.pool_bytes,
         'packageAid': PACKAGE.replace(':', ''), 'sources': hashes,
-        'probeFormat': 2, 'probeProfile': ('constructor-control' if args.pool_bytes == 0 else
+        'probeFormat': 3 if args.post_install else 2, 'probeProfile': ('post-install-reservation' if args.post_install else 'constructor-control' if args.pool_bytes == 0 else
             'segmented-pool-allocation' if args.segments == 4 else 'pool-allocation'),
         'poolLayout': '4x4096' if args.segments == 4 else 'single',
         'capSha256': hashlib.sha256(cap.read_bytes()).hexdigest(),
         'loadFileSize': len(load_file), 'loadFileSha256': hashlib.sha256(load_file).hexdigest()}
+    if args.post_install:
+        manifest['supportedPoolBytes'] = [256, 4096, 16384]
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('Probe built; no reader or card operation was performed.')
 
