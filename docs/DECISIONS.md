@@ -4093,3 +4093,33 @@ the same failed image as a new comparison, changing runtime code or allocations
 to pad an image, extrapolating a universal alignment rule, and unbounded image
 search on hardware. Pinned artifacts and an approved bounded plan remain
 required; production code, CAP and protocol behavior are unchanged.
+
+## <a id="d147"></a>D147: Preserve the converted instance shape in the private allocation diagnostic
+
+**Decided (2026-10-28):** an `existing-fields` private profile preserves all
+original fields and the constructor. Its restricted dispatcher borrows the
+initially null `dleq` reference for its pool and persistent `cardLocked[0]` for
+the one-attempt marker. Production commands remain unreachable in this image.
+It retains format 3 and the same bounded reservation/publication interface.
+
+**Why:** the known control installed again, while both fixed layouts were
+refused before reservation. The Oracle 3.0.5 verifier reports 50 declared instance cells
+and 50 references for the control, versus 52 cells and 51 references for those
+probes. Adding diagnostic fields altered instance layout even with an unchanged
+constructor body. The new profile removes that confound; the cause of the old
+refusals remains unresolved.
+
+A host-only inspector reads the converted Class/Import components through the
+pinned SDK. Builds record its hash and the class shape in the manifest. The
+existing-fields profile must have the known control's size 50, first reference
+token 0 and reference count 50. Source tests additionally compare the full
+class outside its private dispatcher/padding method. Unknown storage modes or
+shape mismatches are refused before reader access. Fixed padding variants keep
+the image constant within each reservation sequence.
+
+**Rejected:** inferring a hard field-count limit, assuming equal source
+constructors imply equal converted layout, adding scratch state to the control,
+and changing production ownership, locking or proof storage for an experiment.
+Borrowed state exists only in a private disposable diagnostic. Final firmware
+storage design remains gated on actual capacity, publication and recovery
+evidence, with a named approved plan required for every physical run.

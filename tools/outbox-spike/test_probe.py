@@ -81,6 +81,21 @@ class ProbeTest(unittest.TestCase):
         for options in [dict(image_padding='padding-a'),dict(post_install=True,image_padding='unbounded')]:
             with self.assertRaises(ValueError): m.source_probe(original,0,**options)
 
+    def test_existing_state_profile_preserves_all_fields_and_constructor(self):
+        import re
+        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        baseline = m.source_probe(original,0)
+        generated = m.source_probe(original,0,post_install=True,state_storage='existing-fields')
+        pattern = r'    public void process\(APDU apdu\) \{.*?\n    }'
+        self.assertEqual(re.sub(pattern,'DISPATCH',baseline,flags=re.S),re.sub(pattern,'DISPATCH',generated,flags=re.S))
+        self.assertNotIn('probePool',generated)
+        self.assertNotIn('probeAttempted',generated)
+        process = re.search(pattern,generated,re.S).group()
+        self.assertIn('cardLocked[0] = 1;',process)
+        self.assertIn('dleq = new byte[size];',process)
+        with self.assertRaises(ValueError): m.source_probe(original,0,state_storage='existing-fields')
+        with self.assertRaises(ValueError): m.source_probe(original,0,post_install=True,state_storage='unknown')
+
     def test_build_paths_and_aids_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'probe'

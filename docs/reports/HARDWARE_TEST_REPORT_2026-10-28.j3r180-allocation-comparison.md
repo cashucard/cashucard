@@ -117,3 +117,48 @@ revalidate the previously successful pinned control, then hold each candidate
 image fixed while measuring its requested reservations. The public ISD memory
 tag can supplement the capped JavaCard counters if the card supports its
 documented structure. Further physical actions require their named approval.
+
+## Approved known-control and fixed-layout comparison
+
+The operator approved the pinned control/layout plan and confirmed 09336320
+ready. Host source was `f1cb5ea48d51a78cf16fa674a26ffd9aea552d08` from #199.
+Each invocation matched CPLC, read public ISD tag FF21 before authentication,
+proved the factory channel and required the exact original platform entries.
+
+| Invocation | Load bytes | Pre-load persistent bytes | Pre-load volatile bytes | Outcome | Journal persisted (UTC) |
+| --- | --- | --- | --- | --- | --- |
+| Known control | 19,635 | 163,648 | 3,990 | Complete, zero pool, no dummy publication | 2026-10-28T13:05:09.415Z |
+| Layout A, requested 256 | 20,068 | 164,176 | 3,990 | Creation `6F00`, refusal-cleaned | 2026-10-28T13:05:50.363Z |
+| Layout B, requested 256 | 20,196 | 163,648 | 3,990 | Creation `6F00`, refusal-cleaned | 2026-10-28T13:07:34.207Z |
+
+FF21 tag 81 was 1 for all three, retained without interpretation. The control
+returned the same capped counters as before: persistent 32767 (saturated),
+transient-reset 2574, transient-deselect 2560, maximum and unused commit 5120.
+Its pool and publication marker were zero. Its exact known manifest/CAP pins
+are in the previous report and were reused unchanged.
+
+Layout A CAP SHA-256:
+`883f651fa26c9a9c349bff9362bfae761702266da7ae13dd1664869d1d2c870f`;
+manifest `ee50268fec9e5848d4f2fd4aa5178ae6b107700e238942ba12f22daa5b3cecc4`.
+Layout B CAP SHA-256:
+`8dc745733c5e9a2dea3197437568a153c2f89ad48581988b0d9f5caad73cf225`;
+manifest `e0b142d2135fe02bee7cddff3295894d4f96eac4f7acae41d6af367d78b015fa`.
+Both came from `cc0df517d700b4e861dedb8ddeef0497c9dd4996`.
+
+The initial A creation refusal and verified cleanup qualified for the plan's
+single alternate-image branch. B also returned empty-body `6F00` at
+`install-01`, then completed its approved cleanup. Both failed before selection,
+measurement, reservation or publication. No 4 KiB/16 KiB stages or separate
+backout ran. The three final journals verified exactly the original platform
+baseline and `factory-blank-ready-for-ccp`; connections closed. There were no
+retries, key changes or production accesses. The card remains blank.
+
+The baseline still installs, while both modified layouts fail before pool
+allocation. Oracle's pinned 3.0.5 verifier metadata shows a remaining confound:
+the control has declared instance size 50 and 50 reference fields, while both
+failed format-3 images have size 52 and 51 reference fields. Source-level
+constructor equality did not preserve the instance-field layout. These results
+do not establish which initialization difference caused the refusal or a
+memory-capacity limit. The next private diagnostic preserves the original
+field layout and constructor, reusing state unused by its restricted dispatcher;
+its converted shape must match the known control before physical approval.
