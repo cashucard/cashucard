@@ -440,3 +440,58 @@ instrumentation. Tests cover mixed/full keysets, large paged export, a full
 and retirement cuts, and fresh-session corruption rejection. Simulator checks
 leave physical memory, transaction rollback, wear and latency unverified. See
 [D150](../../docs/DECISIONS.md#d150) for the design and remaining gates.
+
+## Private compact hardware runner
+
+`run-compact.cjs` prepares the first physical check of the converted prototype.
+Preview reads local files and returns the runner fingerprint. Execution requires
+the exact manifest hash, source commit and fingerprint, an absolute Python path,
+a new journal inside a private operator-owned directory, and explicit factory
+reset confirmation. The fingerprint includes the runner, both bridge policies,
+fixture/codec dependencies, and the built cardkit files and dependency pins.
+
+```sh
+# Preview only. Replace the two pins with those from the reviewed conversion.
+node tools/outbox-spike/run-compact.cjs \
+  --manifest /absolute/private-artifact/manifest.json \
+  --expect-manifest-sha256 MANIFEST_SHA256 \
+  --expect-source-commit SOURCE_COMMIT \
+  --chip cplc-v1:4790d3213041093363205547 \
+  --reader 'ACS ACR122U PICC Interface'
+```
+
+The fixed workload uses card 09336320 on the ACS ACR122U reader. It matches CPLC,
+requires production/previous probe objects absent, proves one factory-key
+channel and verifies the three exact platform registry entries. It loads only
+the compact package, installs opener then fixture applet, records diagnostics,
+and attempts the combined 12 KiB DLEQ/16 KiB pool setup once.
+
+With valid diagnostics and at least the previously measured 128-byte commit
+floor, it loads two public synthetic proofs and stages two merchant outputs.
+It signs once, confirms consumption, reselects, exports 559 bytes in three pages,
+and verifies both signatures, exact canonical bytes and scope against the
+card-generated public key. Only then does it retire that exact fixture record,
+confirm empty/reclaimed state and remove the private applet, opener and package.
+Cleanup rematches CPLC, proves one fresh factory-key channel and verifies the
+original platform registry. Synthetic mint metadata is used locally.
+
+The dedicated PC/SC policy permits the exact fixture commands, single attempts,
+bounded diagnostics/status reads and retirement matching the returned scope.
+It rejects manager-key changes, production mutations and unrelated deletes.
+Each response has a 30-second deadline; a 120-second elapsed gate and 512-command
+ceiling stop further transmissions. These bounds stop the drill on uncertainty.
+The journal retains public packet/state, timings and fixed failure categories.
+
+An approved plan may add `--cleanup-on-declared-refusal`. It applies only to
+empty-body `6F00`/`6A84` replies from fixture creation or setup, before fixture
+loading. The refusal is persisted before identity/authentication/registry checks
+and private cleanup. Result `declared-refusal-cleaned` exits 2 and ends the test.
+Other failures close the reader and retain the journal for a reviewed next action.
+`--cleanup-only` is a separate mode for an explicitly approved cleanup plan.
+
+Physical execution requires a new plan naming the exact artifact, runner, card
+and actions under [AGENTS.md](../../AGENTS.md#rules-for-agents). Existing hardware
+approvals are complete. This first drill measures combined allocation and one
+small signed export; capacity, physical power-loss recovery, wear, mint/owner
+authorization and release enablement remain separate gates. See
+[D151](../../docs/DECISIONS.md#d151).
