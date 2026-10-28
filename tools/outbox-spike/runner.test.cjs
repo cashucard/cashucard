@@ -12,7 +12,7 @@ const {
   verifyPlatformRegistry,
 } = require("./run-probe.cjs");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
-function fixture(t, { format = 1, poolBytes = 16384 } = {}) {
+function fixture(t, { format = 1, poolBytes = 16384, layout = "single" } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "resource-runner-"));
   fs.chmodSync(directory, 0o700);
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
@@ -25,7 +25,12 @@ function fixture(t, { format = 1, poolBytes = 16384 } = {}) {
     ...(format === 2
       ? {
           probeFormat: 2,
-          probeProfile: poolBytes ? "pool-allocation" : "constructor-control",
+          probeProfile: poolBytes
+            ? layout === "4x4096"
+              ? "segmented-pool-allocation"
+              : "pool-allocation"
+            : "constructor-control",
+          poolLayout: layout,
         }
       : {}),
     capSha256: hash(cap),
@@ -57,11 +62,14 @@ function simulated({
   registryParseFailure = false,
   probePresent = false,
   installProbeSw = 0x9000,
+  installProbeData = [],
+  installProbeTransportFailure = false,
   probeFormat = 1,
   poolBytes = 16384,
   measurementSw = 0x9000,
   measurementData = [],
   commitCapacity = 512,
+  loadSw = 0x9000,
 } = {}) {
   const calls = {
     opens: 0,
@@ -132,16 +140,19 @@ function simulated({
     if (ins === 0xe6) {
       calls.mutations++;
       installed = true;
-      if (
-        apdu[2] === 0x0c &&
-        ++calls.creates === 2 &&
-        installProbeSw !== 0x9000
-      ) {
-        return [installProbeSw >> 8, installProbeSw & 0xff];
+      if (apdu[2] === 0x0c && ++calls.creates === 2) {
+        if (installProbeTransportFailure) throw new Error("lost reader");
+        if (installProbeSw !== 0x9000)
+          return [
+            ...installProbeData,
+            installProbeSw >> 8,
+            installProbeSw & 0xff,
+          ];
       }
     }
     if (ins === 0xe8) {
       calls.loads++;
+      if (loadSw !== 0x9000) return [loadSw >> 8, loadSw & 0xff];
     }
     if (ins === 0xe8 || ins === 0xe4) {
       calls.mutations++;
@@ -568,4 +579,130 @@ test("unexpected measurement refusals or refusal data stop without automatic cle
       "read-measurements",
     );
   }
+});
+
+test("smaller and segmented allocation profiles retain the measured publication and cleanup path", async (t) => {
+  for (const [poolBytes, layout] of [
+    [256, "single"],
+    [4096, "single"],
+    [16384, "4x4096"],
+  ]) {
+    const options = fixture(t, { format: 2, poolBytes, layout });
+    const fake = simulated({ probeFormat: 2, poolBytes });
+    const result = await runProbe(options, fake);
+    assert.equal(result.status, "complete");
+    assert.equal(result.poolLayout, layout);
+    assert.equal(fake.calls.dummy, 1);
+    assert.equal(fake.calls.deletes, 3);
+  }
+});
+
+test("explicit declared INSTALL refusals are captured, cleaned and stop the allocation sequence", async (t) => {
+  for (const code of [0x6f00, 0x6a84]) {
+    const options = fixture(t, { format: 2, poolBytes: 16384 });
+    const fake = simulated({
+      probeFormat: 2,
+      poolBytes: 16384,
+      installProbeSw: code,
+    });
+    const result = await runProbe(
+      { ...options, cleanupOnInstallRefusal: true },
+      fake,
+    );
+    assert.equal(result.status, "install-refused-cleaned");
+    assert.equal(fake.calls.authentications, 2);
+    assert.equal(fake.calls.deletes, 3);
+    assert.equal(fake.calls.dummy, 0);
+    const stored = JSON.parse(fs.readFileSync(options.journal));
+    assert.equal(
+      stored.installRefusal.code,
+      "card-status-" + code.toString(16),
+    );
+    assert.equal(stored.stage, "factory-blank-ready-for-ccp");
+  }
+});
+
+test("declared-refusal cleanup stops at an unexpected registry and retains the first refusal", async (t) => {
+  const options = fixture(t, { format: 2, poolBytes: 16384 });
+  const fake = simulated({
+    probeFormat: 2,
+    poolBytes: 16384,
+    installProbeSw: 0x6f00,
+  });
+  fake.sdk.parseRegistryEntries = () =>
+    fake.calls.creates >= 2 ? [{ aid: "A0000001519999" }] : [];
+  await assert.rejects(
+    runProbe({ ...options, cleanupOnInstallRefusal: true }, fake),
+  );
+  assert.equal(fake.calls.deletes, 0);
+  const stored = JSON.parse(fs.readFileSync(options.journal));
+  assert.equal(stored.installRefusal.code, "card-status-6f00");
+  assert.equal(stored.failure.code, "registry-objects");
+  assert.equal(stored.status, "stopped");
+});
+
+test("unlisted, nonempty and ambiguous creation failures cannot trigger declared-refusal cleanup", async (t) => {
+  for (const config of [
+    { installProbeSw: 0x6982 },
+    { installProbeSw: 0x6f00, installProbeData: [1] },
+    { installProbeTransportFailure: true },
+  ]) {
+    const options = fixture(t, { format: 2, poolBytes: 16384 });
+    const fake = simulated({ probeFormat: 2, poolBytes: 16384, ...config });
+    await assert.rejects(
+      runProbe({ ...options, cleanupOnInstallRefusal: true }, fake),
+    );
+    assert.equal(fake.calls.authentications, 1);
+    assert.equal(fake.calls.deletes, 0);
+    assert.equal(fake.calls.closes, 1);
+  }
+});
+
+test("a refused refusal-journal write prevents a cleanup channel and all deletes", async (t) => {
+  const options = fixture(t, { format: 2, poolBytes: 16384 });
+  const fake = simulated({
+    probeFormat: 2,
+    poolBytes: 16384,
+    installProbeSw: 0x6f00,
+  });
+  const rename = fs.renameSync;
+  fs.renameSync = (source, target) => {
+    if (
+      target === options.journal &&
+      JSON.parse(fs.readFileSync(source)).installRefusal
+    )
+      throw new Error("journal unavailable");
+    return rename(source, target);
+  };
+  try {
+    await assert.rejects(
+      runProbe({ ...options, cleanupOnInstallRefusal: true }, fake),
+    );
+    assert.equal(fake.calls.authentications, 1);
+    assert.equal(fake.calls.deletes, 0);
+  } finally {
+    fs.renameSync = rename;
+  }
+});
+
+test("declared cleanup rejects other modes/profiles and does not act on a LOAD refusal", async (t) => {
+  for (const config of [{ format: 1 }, { format: 2, poolBytes: 0 }]) {
+    const options = fixture(t, config),
+      fake = simulated();
+    await assert.rejects(
+      runProbe({ ...options, cleanupOnInstallRefusal: true }, fake),
+    );
+    assert.equal(fake.calls.opens, 0);
+  }
+  const options = fixture(t, { format: 2, poolBytes: 256 }),
+    fake = simulated({ probeFormat: 2, poolBytes: 256, loadSw: 0x6a84 });
+  await assert.rejects(
+    runProbe({ ...options, cleanupOnInstallRefusal: true }, fake),
+  );
+  assert.equal(fake.calls.deletes, 0);
+  assert.equal(fake.calls.authentications, 1);
+  assert.equal(
+    JSON.parse(fs.readFileSync(options.journal)).stage,
+    "load-block-0",
+  );
 });

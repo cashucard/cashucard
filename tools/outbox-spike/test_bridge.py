@@ -37,8 +37,11 @@ class BridgeTest(unittest.TestCase):
 
     def test_control_selection_cannot_enable_dummy_publication(self):
         b.validate_command(list(bytes.fromhex('B07D000010')))
-        for version in [1, 2]:
-            self.assertTrue(b.pool_probe_selected(list(b'PROBE') + [version, 0x40, 0], 0x90, 0))
+        self.assertTrue(b.pool_probe_selected(list(b'PROBE') + [1, 0x40, 0], 0x90, 0))
+        for size in [256, 4096, 16384]:
+            self.assertTrue(b.pool_probe_selected(list(b'PROBE') + [2, size >> 8, size & 255], 0x90, 0))
+        self.assertFalse(b.pool_probe_selected(list(b'PROBE') + [1, 0x10, 0], 0x90, 0))
+        self.assertFalse(b.pool_probe_selected(list(b'PROBE') + [2, 0x20, 0], 0x90, 0))
         for data in [list(b'PROBE') + [2, 0, 0], list(b'PROBE') + [3, 0x40, 0], list(b'WRONG') + [2, 0x40, 0]]:
             self.assertFalse(b.pool_probe_selected(data, 0x90, 0))
 

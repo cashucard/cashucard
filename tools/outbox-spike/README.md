@@ -1,18 +1,20 @@
 # Outbox diagnostic probes
 
 These private probes separate the applet's existing installation path from a
-candidate outbox allocation. The approved format-1 attempt stopped during applet
-creation; its cleanup is recorded in the [hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-27.j3r180-assisted-preflight.md).
-The cause remains unresolved.
+candidate outbox allocation. The format-2 constructor control installed and
+returned counters; adding one 16 KiB array failed at applet creation. The cause
+remains unresolved. Both attempts and their cleanup are recorded in the
+[hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-27.j3r180-assisted-preflight.md).
 
 ## Profiles
 
-| Format-2 profile      | Pool   | Installation change                                                      | Dummy publication |
-| --------------------- | ------ | ------------------------------------------------------------------------ | ----------------- |
-| `constructor-control` | 0      | Original constructor preserved exactly                                   | Refused           |
-| `pool-allocation`     | 16 KiB | One persistent byte-array allocation after the original constructor work | Conditional, once |
+| Format-2 profile            | Pool                        | Installation change                                                      | Dummy publication                      |
+| --------------------------- | --------------------------- | ------------------------------------------------------------------------ | -------------------------------------- |
+| `constructor-control`       | 0                           | Original constructor preserved exactly                                   | Refused                                |
+| `pool-allocation`           | 256 bytes, 4 KiB or 16 KiB  | One persistent byte-array allocation after the original constructor work | Conditional, once                      |
+| `segmented-pool-allocation` | 16 KiB as four 4 KiB arrays | Four persistent arrays after the original constructor work               | Conditional, once in the first segment |
 
-Both profiles preserve the original transient allocations. Optional memory
+All profiles preserve the original transient allocations. Optional memory
 queries run after installation and selection. The control uses the same private
 package, AIDs and probe dispatcher as the pool profile, allowing installation,
 allocation and diagnostics to be evaluated separately.
@@ -37,8 +39,9 @@ for pool in 0 16384; do
 done
 ```
 
-CI converts and exercises both profiles in jCardSim. It separately verifies the
-released CAP and generated provisioner assets.
+CI converts and exercises the control, all three single-array sizes and the
+segmented profile in jCardSim. It separately verifies the released CAP and
+generated provisioner assets.
 
 ## Private format-2 interface
 
@@ -128,6 +131,34 @@ fixed status-word failure codes and public registry evidence. Authentication
 payloads and arbitrary error text stay out of logs. An unexpected failure closes
 the reader and preserves the journal for review; the host performs neither a
 retry nor automatic cleanup.
+
+## Bounded allocation comparisons
+
+The successful original-constructor control and the single-array 16 KiB refusal
+are recorded in the hardware report. A further plan can compare 256 bytes,
+4 KiB and four 4 KiB arrays. Each profile needs its own pinned artifact and fresh
+journal. The segmented build uses `--pool-bytes 16384 --segments 4`; the manifest
+binds its layout. Its dummy transaction touches the first segment only.
+
+Continue a comparison sequence only after the preceding profile has valid
+measurements, a confirmed and re-read dummy publication, and verified cleanup.
+A refused creation or unavailable measurement ends the sequence. This is a
+fixed comparison, with each permitted stage included in the approval.
+
+An explicit `--cleanup-on-install-refusal` can be included in an approved
+format-2 allocation plan. It applies only to empty-body `6F00`/`6A84` replies
+from probe creation, after package loading and opener creation. The host
+persists the refusal before any next action, rematches CPLC, proves one new
+factory channel, checks the exact registry and removes only private probe
+objects. It then verifies the original baseline and returns
+`install-refused-cleaned` with CLI exit code 2. This ends the allocation
+sequence while leaving the card blank. The retained refusal supplies no
+resource measurement.
+
+The option is off by default and requires an execution profile with a pool.
+Authentication, transport, other statuses, nonempty error replies, journal
+failures and registry discrepancies retain the stop-with-journal behavior.
+A failed cleanup keeps both the first refusal and the cleanup failure.
 
 ## Measurement boundary
 

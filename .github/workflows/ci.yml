@@ -435,16 +435,20 @@ jobs:
       # was set aside above, before the build wrote over its path).
       - name: Build isolated outbox control and pool probes
         run: |
-          for pool in 0 16384; do
-            python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool" \
-              --pool-bytes "$pool" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+          for profile in 0:1 256:1 4096:1 16384:1 16384:4; do
+            pool="${profile%:*}"
+            segments="${profile#*:}"
+            python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool-$segments" \
+              --pool-bytes "$pool" --segments "$segments" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
           done
 
       - name: Check private probe dispatch in jCardSim
         run: |
           mvn -B -q -f tools/cardsim/pom.xml package -DskipTests
-          for pool in 0 16384; do
-            probe="$RUNNER_TEMP/outbox-resource-probe-$pool"
+          for profile in 0:1 256:1 4096:1 16384:1 16384:4; do
+            pool="${profile%:*}"
+            segments="${profile#*:}"
+            probe="$RUNNER_TEMP/outbox-resource-probe-$pool-$segments"
             mkdir "$probe/classes"
             javac --release 11 -cp tools/cardsim/target/cardsim.jar -d "$probe/classes" \
               "$probe"/src/me/flashapp/cashu/*.java tools/outbox-spike/ProbeSmoke.java

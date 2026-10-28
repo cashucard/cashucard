@@ -71,16 +71,19 @@ def process_probe(size):
         '__MARKER__', 'probePool[0]' if size else '0').replace('__DUMMY__', DUMMY if size else '')
 
 
-def source_probe(source, size):
+def source_probe(source, size, segments=1):
     if size != 0 and (size < 256 or size > 24576 or size % 256):
         raise ValueError('pool size must be zero (control) or a multiple of 256, from 256 to 24576')
+    if segments not in (1, 4) or (segments == 4 and size != 16384):
+        raise ValueError('segmented profile requires four 4096-byte arrays')
     anchor = 'public class CashuApplet extends Applet implements TagSwitch {'
     if source.count(anchor) != 1 or source.count('        schnorrHW.init();') != 1:
         raise ValueError('applet install anchors changed; review the probe generator')
     if size:
-        source = source.replace(anchor, anchor + '\n    private final byte[] probePool;')
-        source = source.replace('        schnorrHW.init();', '        schnorrHW.init();\n' +
-            f'        probePool = new byte[(short) {size}];')
+        names = ['probePool'] + ['probePool' + str(i) for i in range(1, segments)]
+        source = source.replace(anchor, anchor + ''.join('\n    private final byte[] ' + name + ';' for name in names))
+        allocations = ''.join('\n        ' + name + f' = new byte[(short) {size // segments}];' for name in names)
+        source = source.replace('        schnorrHW.init();', '        schnorrHW.init();' + allocations)
     source, count = re.subn(r'    public void process\(APDU apdu\) \{.*?\n    }',
         lambda _: process_probe(size), source, flags=re.S)
     if count != 1:
@@ -88,7 +91,7 @@ def source_probe(source, size):
     return source
 
 
-def prepare(output, size):
+def prepare(output, size, segments=1):
     # Refuse reuse so an old CAP cannot be mistaken for this build.
     output.mkdir(parents=True, exist_ok=False)
     sources = ROOT / 'applet/src/main/java/me/flashapp/cashu'
@@ -98,7 +101,7 @@ def prepare(output, size):
     for file in sorted(sources.glob('*.java')):
         raw = file.read_bytes()
         hashes[file.name] = hashlib.sha256(raw).hexdigest()
-        text = source_probe(raw.decode(), size) if file.name == 'CashuApplet.java' else raw.decode()
+        text = source_probe(raw.decode(), size, segments) if file.name == 'CashuApplet.java' else raw.decode()
         (destination / file.name).write_text(text)
     build = ET.parse(ROOT / 'applet/build.xml')
     project = build.getroot()
@@ -147,14 +150,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path, help='new scratch directory')
     parser.add_argument('--pool-bytes', type=int, default=16384)
+    parser.add_argument('--segments', type=int, choices=[1,4], default=1)
     parser.add_argument('--sdk', type=Path, default=Path.home() / '.javacard/sdks/jc305u4_kit')
     args = parser.parse_args()
     output = args.output.resolve()
     if not (args.sdk / 'lib/api_classic.jar').is_file():
         parser.error('JavaCard 3.0.5 SDK is missing')
     # Validate before creating files.
-    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes)
-    hashes = prepare(output, args.pool_bytes)
+    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments)
+    hashes = prepare(output, args.pool_bytes, args.segments)
     cap = output / 'resource-probe.cap'
     subprocess.run(['ant', '-f', str(output / 'build.xml'), 'cap',
         '-Dsrc.dir=' + str(output / 'src'), '-Dcap.file=' + str(cap),
@@ -167,7 +171,9 @@ def main():
     manifest = {'sourceCommit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
         'toolSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'kind': 'resource-probe-only', 'poolBytes': args.pool_bytes,
         'packageAid': PACKAGE.replace(':', ''), 'sources': hashes,
-        'probeFormat': 2, 'probeProfile': 'constructor-control' if args.pool_bytes == 0 else 'pool-allocation',
+        'probeFormat': 2, 'probeProfile': ('constructor-control' if args.pool_bytes == 0 else
+            'segmented-pool-allocation' if args.segments == 4 else 'pool-allocation'),
+        'poolLayout': '4x4096' if args.segments == 4 else 'single',
         'capSha256': hashlib.sha256(cap.read_bytes()).hexdigest(),
         'loadFileSize': len(load_file), 'loadFileSha256': hashlib.sha256(load_file).hexdigest()}
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

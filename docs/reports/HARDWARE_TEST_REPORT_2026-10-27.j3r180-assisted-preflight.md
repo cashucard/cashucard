@@ -133,3 +133,64 @@ All earlier journals remain unchanged. The cleanup establishes removal and
 platform preservation, not resource feasibility. The applet-creation failure
 remains unresolved; a revised diagnostic artifact and its named action plan
 require review before any future physical probe.
+
+
+## Approved format-2 control and pool comparison
+
+The operator approved the pinned two-stage plan in #195, conditional on valid
+control measurements and verified cleanup before entering the pool stage.
+Both artifacts were generated from source `6d7abf0f3064cb015755bae5106cf5c5fed552d4`.
+The same named CPLC and ACS reader were used. No production service was accessed.
+
+- Control journal last persisted: `2026-10-28T01:22:34.029661+00:00`. CAP SHA-256 `57f841ed96839035cd012f6975d2f34ab86bac69dbea458889819c6b2ffacef6`; manifest SHA-256 `a1b539e559a6fb94ad9bbf63a5b31e20f14d8f89ac1bb76b42644dcf0839ba52`.
+- Pool journal last persisted: `2026-10-28T01:23:17.844400+00:00`. CAP SHA-256 `ee10e0ef67d1e16eb9e406d006816fedea078eaa044ea3b803a47dffdbce158d`; manifest SHA-256 `9ebf50e0e1e44ad508042d99ad9401daac4764b4fa28f04a1227d274a7382c13`.
+
+### Constructor control
+
+The original constructor installed and selected successfully. The post-install
+query returned format 2, zero pool bytes, publication marker zero, and:
+
+| Reported quantity | Bytes |
+| --- | --- |
+| Persistent availability counter | 32767, saturated |
+| Transient-reset availability counter | 2574 |
+| Transient-deselect availability counter | 2560 |
+| Maximum commit capacity | 5120 |
+| Unused commit capacity | 5120 |
+
+These availability counters are upper-bound reports capped at 32767. The
+persistent value supplies no exact free-space or contiguous-allocation figure.
+The control performs no dummy publication. Its final status was `complete`,
+stage `factory-blank-ready-for-ccp`; all three platform entries were preserved.
+The connection closed. The host checked this exact pinned control journal,
+valid measurement structure and final registry before entering stage two.
+
+### 16 KiB pool
+
+The second invocation matched CPLC and the same platform baseline, loaded its
+pinned package and created its opener. The probe applet's creation returned
+`6F00`. The host retained `stage: install-01`, `failure: card-status-6f00`, and
+stopped. No SELECT of the pool probe, resource query, dummy publication, retry
+or automatic cleanup followed; the connection closed.
+
+The control succeeded while the added-allocation profile failed. This narrows
+the remaining investigation to that profile's added allocation path. The
+generic status does not distinguish exhaustion, fragmentation or another
+implementation constraint. The 16 KiB reservation and 128-byte publication
+remain unproven. Both protected journals remain retained.
+
+The private package and opener require the separately approved cleanup-only
+action; the final applet instance is unconfirmed. Further allocation comparisons
+require new pinned artifacts and a reviewed hardware plan.
+
+
+### Separately approved format-2 cleanup
+
+The operator approved cleanup only after the pool creation refusal. The runner
+executed that mode once with the pinned pool manifest. It matched the same CPLC,
+verified one factory channel and the exact platform baseline, deleted only the
+private probe objects, then verified the three original platform entries. The
+journal finished `cleaned`, `factory-blank-ready-for-ccp`; the connection closed.
+No additional installation, allocation test, measurement, dummy publication,
+key change or retry ran. All prior journals remain retained. The card is blank
+and ready for a service-recorded CCP installation.

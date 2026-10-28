@@ -85,15 +85,22 @@ function artifact(filename, expected) {
   }
   const manifest = JSON.parse(rawManifest.toString("utf8"));
   const format = manifest.probeFormat ?? 1;
+  const layout = manifest.poolLayout ?? "single";
   const profileOK =
     (format === 1 &&
       manifest.poolBytes === 16384 &&
-      manifest.probeProfile === undefined) ||
+      manifest.probeProfile === undefined &&
+      manifest.poolLayout === undefined) ||
     (format === 2 &&
+      layout === "single" &&
       ((manifest.poolBytes === 0 &&
         manifest.probeProfile === "constructor-control") ||
-        (manifest.poolBytes === 16384 &&
-          manifest.probeProfile === "pool-allocation")));
+        ([256, 4096, 16384].includes(manifest.poolBytes) &&
+          manifest.probeProfile === "pool-allocation"))) ||
+    (format === 2 &&
+      layout === "4x4096" &&
+      manifest.poolBytes === 16384 &&
+      manifest.probeProfile === "segmented-pool-allocation");
   if (
     manifest.kind !== "resource-probe-only" ||
     manifest.packageAid !== PACKAGE ||
@@ -329,8 +336,18 @@ async function runProbe(options, dependencies = {}) {
     poolBytes: manifest.poolBytes,
     probeFormat: manifest.probeFormat ?? 1,
     probeProfile: manifest.probeProfile ?? "legacy-constructor-stats",
+    poolLayout: manifest.poolLayout ?? "single",
+    cleanupOnInstallRefusal: options.cleanupOnInstallRefusal === true,
     platformBaseline: options.platformBaseline ? "j3r180-09336320-v1" : "empty",
   };
+  if (
+    options.cleanupOnInstallRefusal &&
+    (!options.execute || summary.probeFormat !== 2 || manifest.poolBytes === 0)
+  ) {
+    throw new Error(
+      "declared-refusal cleanup requires an explicit format-2 allocation run",
+    );
+  }
   if (!options.execute && !options.inspectRegistry && !options.cleanupOnly) {
     return { ...summary, mode: "preview", cardAccessed: false };
   }
@@ -366,7 +383,8 @@ async function runProbe(options, dependencies = {}) {
   const state = { ...summary, status: "prepared", stage: "before-reader" };
   const save = () => journalFile(options.journal, state);
   let bridge,
-    journalStarted = false;
+    journalStarted = false,
+    refusalCleanup;
   async function step(name, operation) {
     state.stage = name;
     save();
@@ -374,9 +392,11 @@ async function runProbe(options, dependencies = {}) {
   }
   const expect = (reply, codes = [0x9000]) => {
     if (!codes.includes(reply.sw)) {
-      throw new ProbeFailure(
+      const error = new ProbeFailure(
         "card-status-" + reply.sw.toString(16).padStart(4, "0"),
       );
+      error.emptyReply = reply.data.length === 0;
+      throw error;
     }
     return reply;
   };
@@ -488,6 +508,23 @@ async function runProbe(options, dependencies = {}) {
       await step("verify-cleanup", () => requireRegistry([domain]));
       state.stage = "factory-blank-ready-for-ccp";
     }
+    refusalCleanup = async () => {
+      await step("refusal-cleanup-match-chip", () =>
+        sdk.readChipIdentity(tx, options.chip),
+      );
+      session = await step("refusal-cleanup-factory-authentication", () =>
+        sdk.openSession(tx, sdk.FACTORY_KEYS, randomBytes, { kvn: 1 }),
+      );
+      await removePrivateProbe();
+      state.status = "install-refused-cleaned";
+      save();
+      return {
+        ...summary,
+        status: state.status,
+        installRefusal: state.installRefusal,
+        journal: options.journal,
+      };
+    };
     if (options.cleanupOnly) {
       await removePrivateProbe();
       state.status = "cleaned";
@@ -619,19 +656,39 @@ async function runProbe(options, dependencies = {}) {
       journal: options.journal,
     };
   } catch (error) {
+    const codeFor = (value) =>
+      value instanceof ProbeFailure
+        ? value.code
+        : Number.isInteger(value?.sw) && value.sw >= 0 && value.sw <= 0xffff
+          ? "card-status-" + value.sw.toString(16).padStart(4, "0")
+          : "operation-failed";
+    const declared =
+      options.cleanupOnInstallRefusal &&
+      state.stage === "install-01" &&
+      error instanceof ProbeFailure &&
+      error.emptyReply === true &&
+      ["card-status-6f00", "card-status-6a84"].includes(error.code);
     state.status = "stopped";
-    state.failure = {
-      code:
-        error instanceof ProbeFailure
-          ? error.code
-          : Number.isInteger(error?.sw) && error.sw >= 0 && error.sw <= 0xffff
-            ? "card-status-" + error.sw.toString(16).padStart(4, "0")
-            : "operation-failed",
-    };
+    state.failure = { code: codeFor(error) };
+    if (declared)
+      state.installRefusal = { stage: state.stage, code: state.failure.code };
+    let persisted = false;
     if (journalStarted) {
       try {
         save();
+        persisted = true;
       } catch {}
+    }
+    if (declared && persisted && refusalCleanup) {
+      try {
+        return await refusalCleanup();
+      } catch (cleanupError) {
+        state.status = "stopped";
+        state.failure = { code: codeFor(cleanupError) };
+        try {
+          save();
+        } catch {}
+      }
     }
     const stopped = new Error(
       "probe stopped at " +
@@ -674,6 +731,7 @@ if (require.main === module) {
           execute: { type: "boolean", default: false },
           "inspect-registry": { type: "boolean", default: false },
           "cleanup-only": { type: "boolean", default: false },
+          "cleanup-on-install-refusal": { type: "boolean", default: false },
           "platform-baseline": { type: "boolean", default: false },
           "factory-reset-confirmed": { type: "boolean", default: false },
         },
@@ -688,10 +746,12 @@ if (require.main === module) {
         execute: values.execute,
         inspectRegistry: values["inspect-registry"],
         cleanupOnly: values["cleanup-only"],
+        cleanupOnInstallRefusal: values["cleanup-on-install-refusal"],
         platformBaseline: values["platform-baseline"],
         factoryResetConfirmed: values["factory-reset-confirmed"],
       });
       console.log(JSON.stringify(result));
+      if (result.status === "install-refused-cleaned") process.exitCode = 2;
     })
     .catch((error) => {
       console.error(
