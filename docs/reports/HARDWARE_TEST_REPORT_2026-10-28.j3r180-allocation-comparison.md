@@ -55,3 +55,39 @@ new constructor budget for each candidate. This follows the existing deferred
 proof-store precedent while keeping the experiment outside released firmware.
 Actual reservation, publication, final outbox fit and interruption behavior
 remain physical validation gates requiring their own approved action plan.
+
+## Approved fixed-image attempt and interrupted transfer
+
+The operator separately approved the fixed-image post-install plan from #197
+and confirmed the same card ready. Artifact source was
+`5fe9b58e7fa49ed9486db1a2204ea892a2bee723`.
+
+- CAP SHA-256: `771d3a52d960d683b86951ba1f4096d1a593038e44acc99dbf52b68f9bca1b9c`.
+- Manifest SHA-256: `57300116c98edef310daffc7d2171ff63fdf10ca6aaced21c843fdff3e37b2d4`.
+- Load file: 19,931 bytes; SHA-256 `d82cbc4f722afff13289d8a10af17c64cc67e0a21cb7ffbfb21c1b820bff7023`.
+- Journal: `post-install-v3-256-09336320.json`, last persisted
+  `2026-10-28T08:57:30.351539+00:00`.
+
+The invocation matched CPLC, proved a factory channel and the exact platform
+baseline, then began loading. It stopped at `load-block-13`, with
+`operation-failed`. The bridge closed. No applet was created; there was no
+selection, measurement, reservation or publication. Larger stages were not
+started. The error did not qualify for the approved automatic cleanup, so
+there was no cleanup or transfer retry in this invocation.
+
+macOS still listed the ACS reader after the stop. All 81 LOAD framings from the
+pinned file passed the bridge's validator offline, including block 13, using
+synthetic MAC bytes. This checks framing only. The old bridge discarded the
+exception category and PC/SC result, so the transfer cause remains unresolved.
+This result supplies no allocation-capacity evidence.
+
+### Separately approved cleanup after LOAD
+
+The operator approved one cleanup-only connection. The runner matched the same
+CPLC, proved one known-factory channel, checked the platform baseline plus only
+permitted private objects, deleted only the private probe objects and verified
+the exact original platform entries. Journal
+`post-install-v3-cleanup-09336320.json`, last persisted `2026-10-28T09:00:43.608576+00:00`,
+ended `cleaned`, `factory-blank-ready-for-ccp`. The reader closed. There was no
+LOAD retry, creation, reservation, publication, key change or production access.
+All journals remain retained. The card is blank and ready for CCP installation.

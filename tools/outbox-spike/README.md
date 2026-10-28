@@ -132,6 +132,13 @@ payloads and arbitrary error text stay out of logs. An unexpected failure closes
 the reader and preserves the journal for review; the host performs neither a
 retry nor automatic cleanup.
 
+Reader failures retain fixed enumeration, connection, validation and transmit
+categories. A supplied PC/SC HRESULT is normalized to eight hexadecimal digits.
+The host accepts only those fixed codes and that numeric shape; unknown bridge
+errors become `reader-protocol-error`. Pipe closure and response timeout have
+their own fixed codes. A later disconnect failure preserves the first error.
+These diagnostics supply no authority for a transfer retry or cleanup.
+
 ## Bounded allocation comparisons
 
 The successful original-constructor control and the single-array 16 KiB refusal

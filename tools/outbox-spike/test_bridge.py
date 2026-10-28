@@ -17,6 +17,30 @@ def wrapped(ins, p1, p2, body):
 
 
 class BridgeTest(unittest.TestCase):
+    def test_fixed_transport_error_preserves_only_public_pcsc_code(self):
+        class CardError(Exception):
+            hresult = -2146435050
+            def __str__(self): raise AssertionError('exception text must stay private')
+        def fail(): raise CardError()
+        with self.assertRaises(b.BridgeFailure) as caught:
+            b.checked('reader-transmit-failed',fail)
+        self.assertEqual(b.failure_message(caught.exception), {'error':'reader-transmit-failed','pcscCode':'80100016'})
+        self.assertEqual(b.failure_message(ValueError('secret authentication text')), {'error':'probe-bridge-stopped'})
+
+    def test_disconnect_failure_preserves_the_original_transmit_failure(self):
+        class CardError(Exception): hresult = 0x80100016
+        class Connection:
+            def connect(self, **kwargs): pass
+            def disconnect(self): raise RuntimeError('private disconnect text')
+            def transmit(self, command): raise CardError('private transmit text')
+        reader = types.SimpleNamespace(createConnection=lambda: Connection())
+        modules = {'smartcard.System': types.SimpleNamespace(readers=lambda: [reader]),
+            'smartcard.scard': types.SimpleNamespace(SCARD_LEAVE_CARD=0,SCARD_SHARE_EXCLUSIVE=1)}
+        text = json.dumps({'apdu': list(b.select(b.ISD))}) + '\n'
+        with patch.dict(sys.modules,modules), patch.object(sys,'argv',['bridge','--reader',str(reader)]), patch.object(sys,'stdin',io.StringIO(text)), patch.object(sys,'stdout',io.StringIO()):
+            with self.assertRaises(b.BridgeFailure) as caught: b.main()
+        self.assertEqual(b.failure_message(caught.exception), {'error':'reader-transmit-failed','pcscCode':'80100016'})
+
     def test_probe_commands_only(self):
         for instance in b.PROBE[1:]:
             command = wrapped(0xe6, 0x0c, 0, b.field(b.PACKAGE) + b.field(instance) + b.field(instance) + b'\x01\0\x02\xc9\0\0')
@@ -72,7 +96,7 @@ class BridgeTest(unittest.TestCase):
                 'smartcard.scard': types.SimpleNamespace(SCARD_LEAVE_CARD=0,SCARD_SHARE_EXCLUSIVE=1)}
             text = ''.join(json.dumps({'apdu': c}) + '\n' for c in commands)
             with patch.dict(sys.modules,modules), patch.object(sys,'argv',['bridge','--reader',str(reader)]), patch.object(sys,'stdin',io.StringIO(text)), patch.object(sys,'stdout',io.StringIO()):
-                with self.assertRaises(ValueError): b.main()
+                with self.assertRaises(b.BridgeFailure): b.main()
             self.assertEqual(sum(c in b.RESERVATIONS for c in sent), expected)
 
     def test_cleanup_only_mode_allows_only_private_deletion(self):

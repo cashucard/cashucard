@@ -11,6 +11,28 @@ PRODUCTION = [bytes.fromhex(value) for value in (
 PROBE = [PACKAGE, PACKAGE + b'\x4d', PACKAGE + b'\x01']
 
 
+class BridgeFailure(Exception):
+    def __init__(self, code, error=None):
+        super().__init__(code)
+        self.code = code
+        value = getattr(error, 'hresult', -1)
+        self.pcsc_code = ('%08x' % (value & 0xffffffff)
+            if type(value) is int and value != -1 and -(1 << 31) <= value < (1 << 32) else None)
+
+
+def checked(code, operation):
+    try:
+        return operation()
+    except Exception as error:
+        raise BridgeFailure(code, error) from None
+
+
+def failure_message(error):
+    if not isinstance(error, BridgeFailure):
+        return {'error': 'probe-bridge-stopped'}
+    return {'error': error.code, **({'pcscCode': error.pcsc_code} if error.pcsc_code is not None else {})}
+
+
 def select(aid):
     return bytes([0, 0xa4, 4, 0, len(aid)]) + aid + b'\0'
 
@@ -82,13 +104,13 @@ def main():
     args = parser.parse_args()
     from smartcard.System import readers
     from smartcard.scard import SCARD_LEAVE_CARD, SCARD_SHARE_EXCLUSIVE
-    matches = [r for r in readers() if str(r) == args.reader]
+    matches = [r for r in checked('reader-enumeration-failed', readers) if str(r) == args.reader]
     if len(matches) != 1:
-        raise ValueError('named reader unavailable')
-    connection = matches[0].createConnection()
+        raise BridgeFailure('reader-unavailable')
+    connection = checked('reader-connect-failed', matches[0].createConnection)
     connected = False
     try:
-        connection.connect(mode=SCARD_SHARE_EXCLUSIVE, disposition=SCARD_LEAVE_CARD)
+        checked('reader-connect-failed', lambda: connection.connect(mode=SCARD_SHARE_EXCLUSIVE, disposition=SCARD_LEAVE_CARD))
         connected = True
         emit({'ready': True})
         selected_probe = False
@@ -99,20 +121,20 @@ def main():
             if not line:
                 return
             if len(line) > 4096 or not line.endswith('\n'):
-                raise ValueError('invalid message')
-            message = json.loads(line)
+                raise BridgeFailure('bridge-input-invalid')
+            message = checked('bridge-input-invalid', lambda: json.loads(line))
             if message == {'close': True}:
                 return
             if not isinstance(message, dict) or set(message) != {'apdu'}:
-                raise ValueError('invalid message')
-            command = validate_command(message['apdu'], registry_only=args.registry_only, cleanup_only=args.cleanup_only)
+                raise BridgeFailure('bridge-input-invalid')
+            command = checked('bridge-command-refused', lambda: validate_command(message['apdu'], registry_only=args.registry_only, cleanup_only=args.cleanup_only))
             if command == COMMIT and not selected_probe:
-                raise ValueError('probe selection required')
+                raise BridgeFailure('bridge-command-refused')
             if command in RESERVATIONS:
                 if not reservation_selected or reservation_sent:
-                    raise ValueError('single selected format-3 reservation required')
+                    raise BridgeFailure('bridge-command-refused')
                 reservation_sent = True
-            data, sw1, sw2 = connection.transmit(list(command))
+            data, sw1, sw2 = checked('reader-transmit-failed', lambda: connection.transmit(list(command)))
             if command[:2] == b'\0\xa4':
                 selected_probe = (command == select(PROBE[2]) and pool_probe_selected(data, sw1, sw2))
                 reservation_selected = (command == select(PROBE[2]) and sw1 == 0x90 and sw2 == 0 and bytes(data) == b'PROBE\x03\x00\x00')
@@ -121,12 +143,17 @@ def main():
             emit({'reply': data + [sw1, sw2]})
     finally:
         if connected:
-            connection.disconnect()
+            prior_failure = sys.exc_info()[0] is not None
+            try:
+                checked('reader-close-failed', connection.disconnect)
+            except BridgeFailure:
+                if not prior_failure:
+                    raise
 
 
 if __name__ == '__main__':
     try:
         main()
-    except Exception:
-        emit({'error': 'probe-bridge-stopped'})
+    except Exception as error:
+        emit(failure_message(error))
         sys.exit(1)

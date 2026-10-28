@@ -10,6 +10,7 @@ const {
   probeDelete,
   measurements,
   verifyPlatformRegistry,
+  parseBridgeMessage,
 } = require("./run-probe.cjs");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
 function fixture(t, { format = 1, poolBytes = 16384, layout = "single" } = {}) {
@@ -846,4 +847,59 @@ test("reservation refusal cleanup requires persisted evidence and matching zero-
       fs.renameSync = rename;
     }
   }
+});
+
+test("bridge diagnostics retain fixed errors and numeric PCSC codes without arbitrary payloads", () => {
+  for (const pcscCode of ["80100016", undefined]) {
+    const message = JSON.stringify({
+      error: "reader-transmit-failed",
+      pcscCode,
+      detail: "private authentication text",
+    });
+    assert.throws(
+      () => parseBridgeMessage(message),
+      (e) =>
+        e.code === "reader-transmit-failed" &&
+        e.pcscCode === pcscCode &&
+        !JSON.stringify(e).includes("private authentication text"),
+    );
+  }
+  for (const message of [
+    "invalid JSON",
+    JSON.stringify({ error: "private authentication text" }),
+    JSON.stringify({ error: "reader-transmit-failed", pcscCode: "secret" }),
+    "null",
+  ]) {
+    assert.throws(
+      () => parseBridgeMessage(message),
+      (e) =>
+        e.code === "reader-protocol-error" &&
+        !JSON.stringify(e).includes("private authentication text"),
+    );
+  }
+  assert.deepEqual(parseBridgeMessage('{"ready":true}'), { ready: true });
+});
+
+test("fixed reader diagnostics survive the protected journal and stopped result", async (t) => {
+  const options = fixture(t);
+  const fake = simulated();
+  fake.sdk.readChipIdentity = async () =>
+    parseBridgeMessage(
+      '{"error":"reader-transmit-failed","pcscCode":"80100016","detail":"private text"}',
+    );
+  await assert.rejects(
+    runProbe(options, fake),
+    (e) =>
+      e.probeFailure === "reader-transmit-failed" &&
+      e.probePcscCode === "80100016",
+  );
+  const raw = fs.readFileSync(options.journal, "utf8");
+  assert.deepEqual(JSON.parse(raw).failure, {
+    code: "reader-transmit-failed",
+    pcscCode: "80100016",
+  });
+  assert.equal(raw.includes("private text"), false);
+  assert.equal(fake.calls.authentications, 0);
+  assert.equal(fake.calls.deletes, 0);
+  assert.equal(fake.calls.closes, 1);
 });
