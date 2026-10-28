@@ -101,7 +101,15 @@ function artifact(filename, expected) {
       layout === "4x4096" &&
       manifest.poolBytes === 16384 &&
       manifest.probeProfile === "segmented-pool-allocation");
+  const storage = manifest.stateStorage ?? "added-fields";
+  const storageOK =
+    storage === "added-fields" ||
+    (storage === "existing-fields" &&
+      manifest.classShape?.declaredInstanceSize === 50 &&
+      manifest.classShape?.firstReferenceToken === 0 &&
+      manifest.classShape?.referenceCount === 50);
   const postInstall =
+    storageOK &&
     format === 3 &&
     layout === "single" &&
     manifest.poolBytes === 0 &&
@@ -398,6 +406,9 @@ async function runProbe(options, dependencies = {}) {
     probeProfile: manifest.probeProfile ?? "legacy-constructor-stats",
     poolLayout: manifest.poolLayout ?? "single",
     imagePadding: manifest.imagePadding ?? "none",
+    stateStorage:
+      manifest.stateStorage ??
+      (manifest.probeFormat === 3 ? "added-fields" : "legacy"),
     readPlatformMemory: options.readPlatformMemory === true,
     cleanupOnInstallRefusal: options.cleanupOnInstallRefusal === true,
     cleanupOnAllocationRefusal: options.cleanupOnAllocationRefusal === true,
@@ -687,8 +698,17 @@ async function runProbe(options, dependencies = {}) {
         manifest.poolBytes >> 8,
         manifest.poolBytes & 0xff,
       ]).toString("hex");
+      state.selectedProbe =
+        reply.data.length === 8 &&
+        Buffer.from(reply.data.slice(0, 5)).toString("ascii") === "PROBE"
+          ? {
+              format: reply.data[5],
+              poolBytes: reply.data[6] * 256 + reply.data[7],
+            }
+          : { status: "unrecognized" };
+      save();
       if (Buffer.from(reply.data).toString("hex") !== expected) {
-        throw new Error("probe selection mismatch");
+        throw new ProbeFailure("probe-selection-mismatch");
       }
     });
     async function readMeasurements(poolBytes = summary.poolBytes) {

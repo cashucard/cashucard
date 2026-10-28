@@ -1002,3 +1002,55 @@ test("named public memory read is recorded before authentication and malformed d
   );
   assert.equal(fake.calls.opens, 0);
 });
+
+test("post-install state storage requires the known original converted shape", async (t) => {
+  for (const [stateStorage, classShape, accepted] of [
+    [
+      "existing-fields",
+      { declaredInstanceSize: 50, firstReferenceToken: 0, referenceCount: 50 },
+      true,
+    ],
+    [
+      "existing-fields",
+      { declaredInstanceSize: 52, firstReferenceToken: 0, referenceCount: 51 },
+      false,
+    ],
+    ["existing-fields", undefined, false],
+    ["unknown", undefined, false],
+  ]) {
+    const options = {
+      ...fixture(t, { format: 3, poolBytes: 0 }),
+      reserveBytes: 256,
+    };
+    const manifest = JSON.parse(fs.readFileSync(options.manifest));
+    Object.assign(manifest, { stateStorage, classShape });
+    const raw = JSON.stringify(manifest);
+    fs.writeFileSync(options.manifest, raw);
+    options.manifestHash = hash(raw);
+    const fake = simulated({ probeFormat: 3, poolBytes: 0 });
+    if (accepted) {
+      const result = await runProbe(options, fake);
+      assert.equal(result.stateStorage, "existing-fields");
+    } else {
+      await assert.rejects(runProbe(options, fake));
+      assert.equal(fake.calls.opens, 0);
+    }
+  }
+});
+
+test("a different selected probe format retains only its public identity and stops", async (t) => {
+  const options = {
+    ...fixture(t, { format: 3, poolBytes: 0 }),
+    reserveBytes: 256,
+  };
+  const fake = simulated({ probeFormat: 2, poolBytes: 0 });
+  await assert.rejects(
+    runProbe(options, fake),
+    (e) => e.probeFailure === "probe-selection-mismatch",
+  );
+  const stored = JSON.parse(fs.readFileSync(options.journal));
+  assert.deepEqual(stored.selectedProbe, { format: 2, poolBytes: 0 });
+  assert.equal(fake.calls.reservations, 0);
+  assert.equal(fake.calls.dummy, 0);
+  assert.equal(fake.calls.deletes, 0);
+});

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -13,6 +14,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = 'F0:43:41:53:48:55:50:52:4F:42:45'
 IMAGE_PADDING = {'none': (0, 0), 'padding-a': (17, 5), 'padding-b': (43, 1)}
+EXISTING_IMAGE_PADDING = {'none': (0, 0), 'padding-a': (22, 1), 'padding-b': (41, 3)}
 
 DUMMY = """        if (b[ISO7816.OFFSET_INS] == (byte) 0x7E) {
             JCSystem.beginTransaction();
@@ -100,7 +102,7 @@ POST_INSTALL = """        if (b[ISO7816.OFFSET_INS] == (byte) 0x7C) {
 """
 
 
-def process_post_install():
+def process_post_install(state_storage="added-fields"):
     process = process_probe(16384).replace('b[5] = 2;', 'b[5] = 3;').replace('b[13] = 2;', 'b[13] = 3;')
     process = process.replace('(short) 16384', '(short) (probePool == null ? 0 : probePool.length)')
     process = process.replace('b[12] = probePool[0];', 'b[12] = probePool == null ? (byte) 0 : probePool[0];')
@@ -109,10 +111,14 @@ def process_post_install():
     process = process.replace(query, POST_INSTALL + query)
     publication = '        if (b[ISO7816.OFFSET_INS] == (byte) 0x7E) {'
     process = process.replace(publication, publication + '\n            if (probePool == null) { ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED); }')
+    if state_storage == "existing-fields":
+        process = process.replace("probePool", "dleq").replace("probeAttempted", "cardLocked[0]")
     return process
 
 
-def source_probe(source, size, segments=1, post_install=False, image_padding="none"):
+def source_probe(source, size, segments=1, post_install=False, image_padding="none", state_storage="added-fields"):
+    if state_storage not in ("added-fields", "existing-fields") or (state_storage == "existing-fields" and not post_install):
+        raise ValueError("existing state requires the post-install profile")
     if image_padding not in IMAGE_PADDING or (image_padding != "none" and not post_install):
         raise ValueError("fixed image padding requires the post-install profile")
     if post_install and (size != 0 or segments != 1):
@@ -124,7 +130,11 @@ def source_probe(source, size, segments=1, post_install=False, image_padding="no
     anchor = 'public class CashuApplet extends Applet implements TagSwitch {'
     if source.count(anchor) != 1 or source.count('        schnorrHW.init();') != 1:
         raise ValueError('applet install anchors changed; review the probe generator')
-    if post_install:
+    if post_install and state_storage == "existing-fields":
+        constructor = source[source.index("    private CashuApplet() {"):source.index("\n    /**",source.index("    private CashuApplet() {"))]
+        if source.count("private byte[] dleq;") != 1 or "dleq =" in constructor or not re.search(r"cardLocked\s*= new byte\[1\];", constructor):
+            raise ValueError("existing private state anchors changed")
+    if post_install and state_storage == "added-fields":
         source = source.replace(anchor, anchor + '\n    private byte[] probePool;\n    private byte probeAttempted;')
     if size:
         names = ['probePool'] + ['probePool' + str(i) for i in range(1, segments)]
@@ -132,13 +142,13 @@ def source_probe(source, size, segments=1, post_install=False, image_padding="no
         allocations = ''.join('\n        ' + name + f' = new byte[(short) {size // segments}];' for name in names)
         source = source.replace('        schnorrHW.init();', '        schnorrHW.init();' + allocations)
     source, count = re.subn(r'    public void process\(APDU apdu\) \{.*?\n    }',
-        lambda _: process_post_install() if post_install else process_probe(size), source, flags=re.S)
+        lambda _: process_post_install(state_storage) if post_install else process_probe(size), source, flags=re.S)
     if count != 1:
         raise ValueError('applet process anchor changed; review the probe generator')
     if image_padding != "none":
         if source.count('sizeTheFile(') != 1:
             raise ValueError('padding method is no longer unreachable')
-        copies, indexed = IMAGE_PADDING[image_padding]
+        copies, indexed = (EXISTING_IMAGE_PADDING if state_storage == "existing-fields" else IMAGE_PADDING)[image_padding]
         filler = ('        a[0] = a[0];\n' * copies + '        a[127] = a[0];\n' * indexed)
         source, count = re.subn(r'    private static void sizeTheFile\(byte\[\] a\) \{.*?\n    }',
             lambda _: '    private static void sizeTheFile(byte[] a) {\n' + filler + '    }', source, flags=re.S)
@@ -147,7 +157,7 @@ def source_probe(source, size, segments=1, post_install=False, image_padding="no
     return source
 
 
-def prepare(output, size, segments=1, post_install=False, image_padding="none"):
+def prepare(output, size, segments=1, post_install=False, image_padding="none", state_storage="added-fields"):
     # Refuse reuse so an old CAP cannot be mistaken for this build.
     output.mkdir(parents=True, exist_ok=False)
     sources = ROOT / 'applet/src/main/java/me/flashapp/cashu'
@@ -157,7 +167,7 @@ def prepare(output, size, segments=1, post_install=False, image_padding="none"):
     for file in sorted(sources.glob('*.java')):
         raw = file.read_bytes()
         hashes[file.name] = hashlib.sha256(raw).hexdigest()
-        text = source_probe(raw.decode(), size, segments, post_install, image_padding) if file.name == 'CashuApplet.java' else raw.decode()
+        text = source_probe(raw.decode(), size, segments, post_install, image_padding, state_storage) if file.name == 'CashuApplet.java' else raw.decode()
         (destination / file.name).write_text(text)
     build = ET.parse(ROOT / 'applet/build.xml')
     project = build.getroot()
@@ -206,6 +216,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path, help='new scratch directory')
     parser.add_argument('--pool-bytes', type=int, default=16384)
+    parser.add_argument('--state-storage', choices=['added-fields','existing-fields'], default='added-fields')
     parser.add_argument('--image-padding', choices=list(IMAGE_PADDING), default='none')
     parser.add_argument('--post-install', action='store_true', help='one fixed CAP with a single guarded reservation command')
     parser.add_argument('--segments', type=int, choices=[1,4], default=1)
@@ -215,12 +226,21 @@ def main():
     if not (args.sdk / 'lib/api_classic.jar').is_file():
         parser.error('JavaCard 3.0.5 SDK is missing')
     # Validate before creating files.
-    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments, args.post_install, args.image_padding)
-    hashes = prepare(output, args.pool_bytes, args.segments, args.post_install, args.image_padding)
+    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments, args.post_install, args.image_padding, args.state_storage)
+    hashes = prepare(output, args.pool_bytes, args.segments, args.post_install, args.image_padding, args.state_storage)
     cap = output / 'resource-probe.cap'
     subprocess.run(['ant', '-f', str(output / 'build.xml'), 'cap',
         '-Dsrc.dir=' + str(output / 'src'), '-Dcap.file=' + str(cap),
         '-Djc.sdk=' + str(args.sdk.resolve())], check=True)
+    inspect_classes = output / 'inspect-classes'
+    inspect_classes.mkdir()
+    shape_tool = ROOT / 'tools/outbox-spike/CashuProbeShape.java'
+    subprocess.run(['javac', '-proc:none', '--release', '11', '-cp', str(args.sdk / 'lib/tools.jar'),
+        '-d', str(inspect_classes), str(shape_tool)], check=True)
+    shape = json.loads(subprocess.check_output(['java', '-cp', os.pathsep.join([str(inspect_classes), str(args.sdk / 'lib/tools.jar')]),
+        'com.sun.javacard.offcardverifier.CashuProbeShape', str(cap)], text=True))
+    if args.state_storage == 'existing-fields' and shape != {'declaredInstanceSize': 50, 'firstReferenceToken': 0, 'referenceCount': 50}:
+        raise ValueError('converted applet shape differs from the known control')
     spec = importlib.util.spec_from_file_location('cardkit_assets', ROOT / 'tools/cardkit/make-assets.py')
     assets = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(assets)
@@ -233,10 +253,12 @@ def main():
             'segmented-pool-allocation' if args.segments == 4 else 'pool-allocation'),
         'poolLayout': '4x4096' if args.segments == 4 else 'single',
         'capSha256': hashlib.sha256(cap.read_bytes()).hexdigest(),
+        'classShape': shape, 'shapeToolSha256': hashlib.sha256(shape_tool.read_bytes()).hexdigest(),
         'loadFileSize': len(load_file), 'loadFileSha256': hashlib.sha256(load_file).hexdigest()}
     if args.post_install:
         manifest['supportedPoolBytes'] = [256, 4096, 16384]
         manifest['imagePadding'] = args.image_padding
+        manifest['stateStorage'] = args.state_storage
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('Probe built; no reader or card operation was performed.')
 

@@ -252,6 +252,46 @@ notes. Empty `6A88`, `6A86` or `6D00` records unavailable. Other statuses,
 malformed data or transport failures stop before loading. These counters are
 informational; the approved plan fixes every allocation size.
 
+## Field-preserving diagnostic
+
+The known control installed again, while both layout candidates were refused
+before reservation. Converted metadata identified another difference: the
+control has instance size 50 and 50 references; the failed format-3 images have
+size 52 and 51 references. The cause remains unresolved.
+
+`--state-storage existing-fields` preserves all original field declarations and
+the constructor. Only its private dispatcher and unused padding method change.
+The dispatcher borrows the initially null `dleq` reference for its pool and the
+persistent `cardLocked[0]` byte for the one-attempt marker. Its command set
+continues to refuse production operations. These meanings apply only to this
+private disposable image; production locking and proof storage are unchanged.
+
+```sh
+python3 tools/outbox-spike/build-probe.py /tmp/outbox-existing-a \
+  --pool-bytes 0 --post-install --state-storage existing-fields \
+  --image-padding padding-a
+```
+
+A host-only helper uses the pinned 3.0.5 verifier to inspect the converted CAP.
+The manifest records `classShape`, its inspector hash and the storage mode.
+The existing-fields profile requires instance size 50, first reference token 0
+and reference count 50. Unknown modes or mismatches are refused before reader
+access. The helper's classes stay outside the CAP. Original added-field
+artifacts remain usable for their separately approved cleanup. Selection also
+records only the public PROBE format/size; a mismatched format has a fixed
+`probe-selection-mismatch` code and stops without automatic cleanup.
+
+Instance size describes field cells; reference count describes reference
+fields, as defined in [Oracle's VM specification, section 6.9.2.3](https://docs.oracle.com/cd/E59935_01/JCVMS.pdf#page=102).
+These values describe layout. The memory API and ISD counters separately report
+availability. Source equality and simulator checks complement the converted
+metadata check. The smoke test exercises repeat-reservation refusal within a
+session and after simulator reset.
+
+Both fixed padding profiles are available with existing state. Their current
+load sizes remain 20,068 and 20,196 bytes. Each selected image stays fixed
+across reservation sizes, under a newly approved named hardware plan.
+
 ## Measurement boundary
 
 The generated probes and their source changes stay outside released firmware,

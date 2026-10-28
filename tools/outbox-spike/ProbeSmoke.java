@@ -48,6 +48,9 @@ public final class ProbeSmoke {
             ResponseAPDU reserved = sim.transmitCommand(reserve);
             require(reserved.getSW() == 0x9000 && java.util.Arrays.equals(reserved.getData(),new byte[] {0,0,0}));
             require(sim.transmitCommand(reserve).getSW() == 0x6985);
+            sim.reset();
+            require(sim.transmitCommand(new CommandAPDU(0, 0xA4, 4, 0, aidBytes(aid))).getSW() == 0x9000);
+            require(sim.transmitCommand(reserve).getSW() == 0x6985);
             ResponseAPDU after = sim.transmitCommand(new CommandAPDU(0xB0,0x7D,0,0,16));
             require(after.getSW() == 0x9000 && after.getData()[15] == 1 && u16(after.getData(),10) == size);
             ResponseAPDU published = sim.transmitCommand(new CommandAPDU(0xB0,0x7E,0,0,1));

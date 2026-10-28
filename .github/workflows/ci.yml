@@ -435,15 +435,17 @@ jobs:
       # was set aside above, before the build wrote over its path).
       - name: Build isolated outbox control and pool probes
         run: |
-          for profile in 0:1 256:1 4096:1 16384:1 16384:4 post:1 post-a:1 post-b:1; do
+          for profile in 0:1 256:1 4096:1 16384:1 16384:4 post:1 post-a:1 post-b:1 post-existing-a:1 post-existing-b:1; do
             pool="${profile%:*}"
             segments="${profile#*:}"
             if [[ "$pool" = post* ]]; then
               padding=none
-              if [ "$pool" = post-a ]; then padding="padding-a"; fi
-              if [ "$pool" = post-b ]; then padding="padding-b"; fi
+              storage="added-fields"
+              if [[ "$pool" = *-existing-* ]]; then storage="existing-fields"; fi
+              if [[ "$pool" = *-a ]]; then padding="padding-a"; fi
+              if [[ "$pool" = *-b ]]; then padding="padding-b"; fi
               python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool-$segments" \
-                --pool-bytes 0 --post-install --image-padding "$padding" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+                --pool-bytes 0 --post-install --image-padding "$padding" --state-storage "$storage" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
             else
               python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool-$segments" \
                 --pool-bytes "$pool" --segments "$segments" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
@@ -453,7 +455,7 @@ jobs:
       - name: Check private probe dispatch in jCardSim
         run: |
           mvn -B -q -f tools/cardsim/pom.xml package -DskipTests
-          for profile in 0:1 256:1 4096:1 16384:1 16384:4 post:1 post-a:1 post-b:1; do
+          for profile in 0:1 256:1 4096:1 16384:1 16384:4 post:1 post-a:1 post-b:1 post-existing-a:1 post-existing-b:1; do
             pool="${profile%:*}"
             segments="${profile#*:}"
             probe="$RUNNER_TEMP/outbox-resource-probe-$pool-$segments"
