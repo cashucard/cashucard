@@ -380,3 +380,63 @@ provenance, owner authorization, DLEQ, fee policy and mint settlement remain
 integration work. The host fixture/snapshot objects use Node's heap. Reserved
 field bytes do not establish JavaCard object overhead or transient-memory fit;
 combined proof/DLEQ setup, hardware signing and tear checks remain required.
+
+## Private JavaCard fixture prototype
+
+`build-compact.py` converts a separate package, `F04341534855434D5054`, with
+opener `...4D` and fixture applet `...01`. It keeps the original constructor,
+instance fields, crypto engines, transient buffers and proof hex cache. One
+private setup attempt allocates the 12 KiB DLEQ store and a 16 KiB byte-backed
+pool. The pool borrows the receipt reference; its old buffer remains allocated.
+
+```sh
+# Offline only; requires JDK 17 and the pinned JavaCard 3.0.5 SDK.
+# Every output directory must be new.
+mvn -B -f tools/cardsim/pom.xml package -DskipTests
+python3 tools/outbox-spike/build-compact.py /tmp/compact-javacard
+python3 tools/outbox-spike/compile-compact-sim.py /tmp/compact-javacard
+node tools/outbox-spike/compact-javacard-smoke.cjs /tmp/compact-javacard
+```
+
+CI converts the CAP and checks its original instance shape, then tests signing,
+streaming, capacity and recovery. Existing hardware tools reject the new package
+and manifest kind. Physical access requires a separately reviewed runner and
+named approved plan. The release firmware and provisioner assets are unchanged.
+
+The private fixture ABI uses CLA `B0`, P1/P2 zero and short APDUs. Case-2 commands
+use Le=0. Selection returns ASCII `CPROT` and byte 1. Fixture loading accepts
+public synthetic proof data and structural compressed-point prefixes; holder
+permission, mint/DLEQ/fee verification and receipt/limit integration are separate
+work. Unsigned retirement is a bench command. This ABI is excluded from production.
+
+| INS | Private operation | Data | Response |
+| --- | --- | --- | --- |
+| `70` | One setup attempt | initial counter (8), nonce (32), mint length (1), ASCII HTTPS mint (up to 214) | `01` |
+| `78` | Append immutable keyset | index (1), ID length (1), ID (8 or 33) | count (1) |
+| `71` | Load fixture | slot (1), generation (4), registry index (1), amount (4), nonce (32), C (33) | slot (1) |
+| `72` | Reserve hidden staging | input count (1), output count (1), ordered slots | index (1) |
+| `73` | Stage merchant outputs | groups: amount (4), registry index (1), B_ (33) | staged count (1) |
+| `74` | Sign and publish | none | scope (45) |
+| `75` | Export committed packet | index (1), offset (2), count (1) | up to 255 bytes |
+| `7C` | Read committed scope | index (1) | scope (45) |
+| `77` | Retire fixture record | exact scope (45) | `01` |
+| `76` | Status | none | free headers/pages, unspent/spent/empty slots, active stage (6) |
+| `79` | Record states | none | 64 bytes |
+| `7A` | Public installation key | none | 33 bytes |
+| `7B` | Abandon staging | none | `01` |
+| `7D` | Diagnostics | none | memory/commit counters, pool/DLEQ lengths, setup state, format 4 (16) |
+
+Scope is index (1), payment ID (8), generation (4) and canonical packet ID (32).
+Signatures and payload stay hidden until publication. Reselection discards
+abandoned staging, resumes burns and completes retirement before slot reuse.
+Export checks immutable data once per selected session; mutations/reselection
+invalidate that transient validation cache.
+
+`CompactHarness` uses host reflection for the published scalar-3 test key.
+`CompactCut` adds selected boundary interruptions to separate simulator copies.
+Both are excluded from CAP inputs; generated-source hashes are checked before
+instrumentation. Tests cover mixed/full keysets, large paged export, a full
+45-record workload, uint64 exhaustion, stale scopes, partial loads, publication
+and retirement cuts, and fresh-session corruption rejection. Simulator checks
+leave physical memory, transaction rollback, wear and latency unverified. See
+[D150](../../docs/DECISIONS.md#d150) for the design and remaining gates.
