@@ -91,3 +91,29 @@ the exact original platform entries. Journal
 ended `cleaned`, `factory-blank-ready-for-ccp`. The reader closed. There was no
 LOAD retry, creation, reservation, publication, key change or production access.
 All journals remain retained. The card is blank and ready for CCP installation.
+
+## Approved diagnostic rerun
+
+The operator approved the bounded rerun and its reviewed private-command
+backout, with the same artifact and card. The host/bridge source was
+`8f2a6b67c3260c6caa141daf9a7ff13f7495d65c` from #198. The fresh journal
+`post-install-v3-diag-256-09336320.json` last persisted
+`2026-10-28T09:20:33.771Z`.
+
+This transfer completed. The opener was created, but probe creation returned
+empty-body `6F00`. The approved refusal cleanup succeeded and verified exactly
+the original three platform entries. The journal ended
+`install-refused-cleaned`, `factory-blank-ready-for-ccp`, and the reader closed.
+No selection, memory measurement, pool reservation or dummy publication ran.
+The 4 KiB and 16 KiB stages were not started. The separate backout was not needed.
+There was no retry, key change or production access.
+
+This confirms failure before the post-install allocation command. The private
+constructor preserves the original constructor body, so the failed image has
+no additional pool allocation during creation. Image/class layout and the
+card's current initialization baseline remain unresolved variables. It gives
+no evidence for a 256-byte allocation limit. A subsequent comparison should
+revalidate the previously successful pinned control, then hold each candidate
+image fixed while measuring its requested reservations. The public ISD memory
+tag can supplement the capped JavaCard counters if the card supports its
+documented structure. Further physical actions require their named approval.

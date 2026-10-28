@@ -42,6 +42,8 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(b.failure_message(caught.exception), {'error':'reader-transmit-failed','pcscCode':'80100016'})
 
     def test_probe_commands_only(self):
+        for mode in [{},{"registry_only":True},{"cleanup_only":True}]:
+            self.assertEqual(b.validate_command(list(bytes.fromhex("80CAFF2100")),**mode),bytes.fromhex("80CAFF2100"))
         for instance in b.PROBE[1:]:
             command = wrapped(0xe6, 0x0c, 0, b.field(b.PACKAGE) + b.field(instance) + b.field(instance) + b'\x01\0\x02\xc9\0\0')
             self.assertEqual(b.validate_command(command), bytes(command))

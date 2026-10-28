@@ -38,7 +38,7 @@ def select(aid):
 
 
 READ_ONLY = {select(aid) for aid in [ISD] + PRODUCTION + PROBE}
-READ_ONLY.update([bytes.fromhex('80CA9F7F00'), bytes.fromhex('B07D000018'), bytes.fromhex('B07D000010')])
+READ_ONLY.update([bytes.fromhex('80CA9F7F00'), bytes.fromhex('80CAFF2100'), bytes.fromhex('B07D000018'), bytes.fromhex('B07D000010')])
 COMMIT = bytes.fromhex('B07E000001')
 RESERVATIONS = {bytes.fromhex('B07C000002010003'), bytes.fromhex('B07C000002100003'), bytes.fromhex('B07C000002400003')}
 

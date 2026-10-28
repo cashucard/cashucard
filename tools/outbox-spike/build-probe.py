@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = 'F0:43:41:53:48:55:50:52:4F:42:45'
+IMAGE_PADDING = {'none': (0, 0), 'padding-a': (17, 5), 'padding-b': (43, 1)}
 
 DUMMY = """        if (b[ISO7816.OFFSET_INS] == (byte) 0x7E) {
             JCSystem.beginTransaction();
@@ -111,7 +112,9 @@ def process_post_install():
     return process
 
 
-def source_probe(source, size, segments=1, post_install=False):
+def source_probe(source, size, segments=1, post_install=False, image_padding="none"):
+    if image_padding not in IMAGE_PADDING or (image_padding != "none" and not post_install):
+        raise ValueError("fixed image padding requires the post-install profile")
     if post_install and (size != 0 or segments != 1):
         raise ValueError('post-install profile requires zero initial pool and single layout')
     if size != 0 and (size < 256 or size > 24576 or size % 256):
@@ -132,10 +135,19 @@ def source_probe(source, size, segments=1, post_install=False):
         lambda _: process_post_install() if post_install else process_probe(size), source, flags=re.S)
     if count != 1:
         raise ValueError('applet process anchor changed; review the probe generator')
+    if image_padding != "none":
+        if source.count('sizeTheFile(') != 1:
+            raise ValueError('padding method is no longer unreachable')
+        copies, indexed = IMAGE_PADDING[image_padding]
+        filler = ('        a[0] = a[0];\n' * copies + '        a[127] = a[0];\n' * indexed)
+        source, count = re.subn(r'    private static void sizeTheFile\(byte\[\] a\) \{.*?\n    }',
+            lambda _: '    private static void sizeTheFile(byte[] a) {\n' + filler + '    }', source, flags=re.S)
+        if count != 1:
+            raise ValueError('padding method anchor changed')
     return source
 
 
-def prepare(output, size, segments=1, post_install=False):
+def prepare(output, size, segments=1, post_install=False, image_padding="none"):
     # Refuse reuse so an old CAP cannot be mistaken for this build.
     output.mkdir(parents=True, exist_ok=False)
     sources = ROOT / 'applet/src/main/java/me/flashapp/cashu'
@@ -145,7 +157,7 @@ def prepare(output, size, segments=1, post_install=False):
     for file in sorted(sources.glob('*.java')):
         raw = file.read_bytes()
         hashes[file.name] = hashlib.sha256(raw).hexdigest()
-        text = source_probe(raw.decode(), size, segments, post_install) if file.name == 'CashuApplet.java' else raw.decode()
+        text = source_probe(raw.decode(), size, segments, post_install, image_padding) if file.name == 'CashuApplet.java' else raw.decode()
         (destination / file.name).write_text(text)
     build = ET.parse(ROOT / 'applet/build.xml')
     project = build.getroot()
@@ -194,6 +206,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path, help='new scratch directory')
     parser.add_argument('--pool-bytes', type=int, default=16384)
+    parser.add_argument('--image-padding', choices=list(IMAGE_PADDING), default='none')
     parser.add_argument('--post-install', action='store_true', help='one fixed CAP with a single guarded reservation command')
     parser.add_argument('--segments', type=int, choices=[1,4], default=1)
     parser.add_argument('--sdk', type=Path, default=Path.home() / '.javacard/sdks/jc305u4_kit')
@@ -202,8 +215,8 @@ def main():
     if not (args.sdk / 'lib/api_classic.jar').is_file():
         parser.error('JavaCard 3.0.5 SDK is missing')
     # Validate before creating files.
-    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments, args.post_install)
-    hashes = prepare(output, args.pool_bytes, args.segments, args.post_install)
+    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments, args.post_install, args.image_padding)
+    hashes = prepare(output, args.pool_bytes, args.segments, args.post_install, args.image_padding)
     cap = output / 'resource-probe.cap'
     subprocess.run(['ant', '-f', str(output / 'build.xml'), 'cap',
         '-Dsrc.dir=' + str(output / 'src'), '-Dcap.file=' + str(cap),
@@ -223,6 +236,7 @@ def main():
         'loadFileSize': len(load_file), 'loadFileSha256': hashlib.sha256(load_file).hexdigest()}
     if args.post_install:
         manifest['supportedPoolBytes'] = [256, 4096, 16384]
+        manifest['imagePadding'] = args.image_padding
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('Probe built; no reader or card operation was performed.')
 
