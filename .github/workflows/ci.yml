@@ -440,8 +440,8 @@ jobs:
             segments="${profile#*:}"
             if [[ "$pool" = post* ]]; then
               padding=none
-              if [ "$pool" = post-a ]; then padding=padding-a; fi
-              if [ "$pool" = post-b ]; then padding=padding-b; fi
+              if [ "$pool" = post-a ]; then padding="padding-a"; fi
+              if [ "$pool" = post-b ]; then padding="padding-b"; fi
               python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool-$segments" \
                 --pool-bytes 0 --post-install --image-padding "$padding" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
             else
