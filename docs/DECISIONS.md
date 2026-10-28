@@ -4039,3 +4039,26 @@ changing the image between sizes, unbounded allocation retries, reserving
 inside a transaction and enabling this command in released firmware. Final
 outbox initialization, publication, limits and recovery remain design and
 physical validation gates after this resource experiment.
+
+## <a id="d145"></a>D145: Retain fixed reader failure categories and public PC/SC codes
+
+**Decided (2026-10-28):** the private probe bridge labels enumeration,
+connection, command validation and transmission failures with fixed codes.
+When pyscard provides an integer HRESULT, retain only its normalized eight-digit
+hexadecimal value. The host admits only the known code set and exact numeric
+shape, retaining those fields in its journal and stopped result. Exception
+text, command bodies, authentication data and arbitrary bridge fields stay out
+of diagnostic output. A disconnect failure preserves an earlier failure.
+
+**Why:** the approved fixed-image transfer stopped at LOAD block 13 with
+`operation-failed`. The reader remained visible, and offline command framing
+validation passed. The previous bridge discarded the information needed to
+distinguish command rejection, PC/SC failure and broken transport. The cause
+of that stopped run remains unresolved; its separately approved cleanup
+succeeded. Future fixed public diagnostics can narrow a failure without
+collecting authentication transcripts.
+
+**Rejected:** dumping exception strings or APDUs, inferring a physical cause
+from a generic error, retrying a stopped write to recover its old error, and
+widening cleanup authorization through an observability change. Physical
+actions and stop conditions retain their approved scope.

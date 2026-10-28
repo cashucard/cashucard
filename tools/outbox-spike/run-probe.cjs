@@ -212,6 +212,41 @@ function journalFile(filename, value) {
     fs.closeSync(dir);
   }
 }
+const BRIDGE_FAILURES = new Set([
+  "probe-bridge-stopped",
+  "reader-enumeration-failed",
+  "reader-unavailable",
+  "reader-connect-failed",
+  "reader-transmit-failed",
+  "reader-close-failed",
+  "bridge-input-invalid",
+  "bridge-command-refused",
+]);
+function parseBridgeMessage(line) {
+  let message;
+  try {
+    message = JSON.parse(line);
+  } catch {
+    throw new ProbeFailure("reader-protocol-error");
+  }
+  if (!message || typeof message !== "object" || Array.isArray(message))
+    throw new ProbeFailure("reader-protocol-error");
+  if (message.error !== undefined) {
+    if (
+      !BRIDGE_FAILURES.has(message.error) ||
+      (message.pcscCode !== undefined &&
+        (typeof message.pcscCode !== "string" ||
+          !/^[0-9a-f]{8}$/.test(message.pcscCode)))
+    ) {
+      throw new ProbeFailure("reader-protocol-error");
+    }
+    const error = new ProbeFailure(message.error);
+    if (message.pcscCode !== undefined) error.pcscCode = message.pcscCode;
+    throw error;
+  }
+  return message;
+}
+
 async function openBridge(
   python,
   reader,
@@ -244,18 +279,14 @@ async function openBridge(
         new Promise((_, reject) => {
           timer = setTimeout(() => {
             child.kill();
-            reject(new Error("reader response timeout"));
+            reject(new ProbeFailure("reader-response-timeout"));
           }, 10000);
         }),
       ]);
       if (result.done || result.value.length > 4096) {
-        throw new Error("reader stopped");
+        throw new ProbeFailure("reader-pipe-closed");
       }
-      const message = JSON.parse(result.value);
-      if (!message || message.error) {
-        throw new Error("reader stopped");
-      }
-      return message;
+      return parseBridgeMessage(result.value);
     } finally {
       clearTimeout(timer);
     }
@@ -284,7 +315,7 @@ async function openBridge(
   }
   try {
     if ((await next()).ready !== true) {
-      throw new Error("reader unavailable");
+      throw new ProbeFailure("reader-not-ready");
     }
   } catch (error) {
     await close();
@@ -294,7 +325,7 @@ async function openBridge(
     close,
     tx: async (apdu) => {
       if (closed || busy) {
-        throw new Error("reader unavailable");
+        throw new ProbeFailure("reader-not-ready");
       }
       busy = true;
       try {
@@ -305,7 +336,7 @@ async function openBridge(
           reply.length < 2 ||
           reply.some((v) => !Number.isInteger(v) || v < 0 || v > 255)
         ) {
-          throw new Error("invalid reader reply");
+          throw new ProbeFailure("reader-protocol-error");
         }
         return reply;
       } finally {
@@ -753,6 +784,12 @@ async function runProbe(options, dependencies = {}) {
         : Number.isInteger(value?.sw) && value.sw >= 0 && value.sw <= 0xffff
           ? "card-status-" + value.sw.toString(16).padStart(4, "0")
           : "operation-failed";
+    const failureFor = (value) => ({
+      code: codeFor(value),
+      ...(value instanceof ProbeFailure && value.pcscCode
+        ? { pcscCode: value.pcscCode }
+        : {}),
+    });
     const declared =
       options.cleanupOnInstallRefusal &&
       state.stage === "install-01" &&
@@ -760,7 +797,7 @@ async function runProbe(options, dependencies = {}) {
       error.emptyReply === true &&
       ["card-status-6f00", "card-status-6a84"].includes(error.code);
     state.status = "stopped";
-    state.failure = { code: codeFor(error) };
+    state.failure = failureFor(error);
     if (declared)
       state.installRefusal = { stage: state.stage, code: state.failure.code };
     let persisted = false;
@@ -775,7 +812,7 @@ async function runProbe(options, dependencies = {}) {
         return await refusalCleanup();
       } catch (cleanupError) {
         state.status = "stopped";
-        state.failure = { code: codeFor(cleanupError) };
+        state.failure = failureFor(cleanupError);
         try {
           save();
         } catch {}
@@ -788,6 +825,7 @@ async function runProbe(options, dependencies = {}) {
     );
     stopped.probeStage = state.stage;
     stopped.probeFailure = state.failure.code;
+    stopped.probePcscCode = state.failure.pcscCode;
     throw stopped;
   } finally {
     try {
@@ -807,6 +845,7 @@ module.exports = {
   measurements,
   runProbe,
   verifyPlatformRegistry,
+  parseBridgeMessage,
 };
 if (require.main === module) {
   Promise.resolve()
@@ -862,6 +901,7 @@ if (require.main === module) {
           status: "stopped",
           stage: error.probeStage ?? "before-reader",
           failure: error.probeFailure ?? "preflight-failed",
+          ...(error.probePcscCode ? { pcscCode: error.probePcscCode } : {}),
           message:
             "Preserve the journal and review before another action; no retry.",
         }),
