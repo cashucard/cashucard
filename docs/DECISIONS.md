@@ -4177,7 +4177,7 @@ Canonical body and SIG_ALL hashes stream through fields. Export verifies both
 signatures before yielding bounded pages. Full keysets retain their exact
 8/33 bytes, ambiguous prefixes are refused, and uint64 payment identities use
 BigInt with explicit rejection of unsafe Numbers. Unsupported secret/date/refund
-profiles, duplicate inputs/outputs, overflow and trailing compact bytes fail
+profiles, change/refund output roles, duplicate inputs/outputs, overflow and trailing compact bytes fail
 closed. The canonical packet ID is distinct from the model's framing checksum.
 
 A synchronous storage builder checks record/byte capacity and fixes identity

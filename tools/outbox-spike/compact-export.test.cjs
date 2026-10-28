@@ -102,6 +102,16 @@ test("unsupported profiles and ambiguous keysets are refused instead of being re
     mutate(v);
     assert.throws(() => view(v));
   }
+  for (const role of ["change", "refund"]) {
+    const outputs = vector.outputs.map((o) => ({ ...o, role }));
+    assert.throws(
+      () =>
+        signCompact(record(vector), outputs, view(vector), () => {
+          throw Error("signer reached");
+        }),
+      /outputs/,
+    );
+  }
   const r = record(vector);
   r.packet = Buffer.concat([r.packet, Buffer.from([0])]);
   assert.throws(() => exportCompact(r, view(vector)), /compact/);

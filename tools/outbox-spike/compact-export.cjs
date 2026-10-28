@@ -162,6 +162,8 @@ function resolve(record, outputs, view) {
   });
   if (!Array.isArray(outputs) || !outputs.length || outputs.length > 255)
     throw Error("outputs");
+  if (outputs.some((o) => o.role !== undefined && o.role !== "merchant"))
+    throw Error("outputs");
   const resolved = outputs.map((o) => ({
     amount: uint(o.amount, 0xffffffff, "amount"),
     keysetRef: o.keysetRef,
