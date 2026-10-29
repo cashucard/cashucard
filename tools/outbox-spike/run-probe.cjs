@@ -251,22 +251,23 @@ const BRIDGE_FAILURES = new Set([
   "bridge-input-invalid",
   "bridge-command-refused",
 ]);
-const TRANSPORT_FAILURES = new Set([
+const WRAPPED_FAILURES = new Set([
   ...BRIDGE_FAILURES,
   "reader-response-timeout",
   "reader-pipe-closed",
   "reader-not-ready",
   "reader-protocol-error",
+  "drill-bound-exceeded",
 ]);
 function failureEvidence(error, sdk) {
-  // Unwrap only the public SDK's direct, typed transport cause. Native text and
+  // Unwrap only the public SDK's direct, typed transmission stop cause. Native text and
   // arbitrary cause chains are deliberately excluded from retained evidence.
   if (
     typeof sdk?.TransportError === "function" &&
     error instanceof sdk.TransportError
   ) {
     const cause = error.cause;
-    if (!(cause instanceof ProbeFailure) || !TRANSPORT_FAILURES.has(cause.code))
+    if (!(cause instanceof ProbeFailure) || !WRAPPED_FAILURES.has(cause.code))
       return { code: "operation-failed" };
     error = cause;
   }
@@ -316,6 +317,7 @@ async function openBridge(
   registryOnly = false,
   cleanupOnly = false,
   profile = "resource",
+  workload,
 ) {
   if (!["resource", "compact"].includes(profile))
     throw new Error("unknown bridge profile");
@@ -329,6 +331,7 @@ async function openBridge(
       ),
       "--reader",
       reader,
+      ...(profile === "compact" && workload ? ["--workload", workload] : []),
       ...(registryOnly ? ["--registry-only"] : []),
       ...(cleanupOnly ? ["--cleanup-only"] : []),
     ],

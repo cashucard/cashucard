@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const cc = require("../cardsim/cashu-crypto.cjs");
 const { fixtureView, exportCompact } = require("./compact-export.cjs");
 const original = require("./fixtures/assisted-settlement-v1.json");
+const { workload, MAX } = require("./compact-workload.cjs");
 const artifact = path.resolve(process.argv[2]);
 const root = path.resolve(__dirname, "../..");
 const manifest = JSON.parse(
@@ -146,7 +147,16 @@ function verify(v, scope, packet) {
     generation: scope.readUInt32BE(9),
   };
   const compact = Buffer.concat([
-    Buffer.from(v.expected.compact, "hex").subarray(0, -128),
+    Buffer.concat([
+      Buffer.from([1, v.outputs.length]),
+      ...v.outputs.map((o) =>
+        Buffer.concat([
+          n32(o.amount),
+          Buffer.from([o.keysetRef]),
+          Buffer.from(o.B_, "hex"),
+        ]),
+      ),
+    ]),
     packet.subarray(-128),
   ]);
   const record = {
@@ -202,53 +212,30 @@ test("converted private image preserves the control instance shape and signs bot
   assert.deepEqual([...ok(r.at(-1)).subarray(2, 5)], [0, 2, 126]);
 });
 test("large input/output counts stream across short APDUs without new transient buffers", () => {
-  const v = clone(original);
-  v.identity.id = "1";
-  v.keysets = [v.keysets[0]];
-  v.proofs = [];
-  v.outputs = [];
-  let point = cc.mul(20n);
-  for (let i = 0; i < 128; i++) {
-    v.proofs.push({
-      slot: i,
-      generation: 1,
-      amount: 1,
-      keysetRef: 0,
-      keysetPrefix: v.keysets[0].slice(0, 16),
-      nonce: cc.bytes32(BigInt(i + 1)).toString("hex"),
-      C: cc.compressed(cc.G).toString("hex"),
-      date: 0,
-    });
-    v.outputs.push({
-      amount: 1,
-      keysetRef: 0,
-      B_: cc.compressed(point).toString("hex"),
-    });
-    point = cc.add(point, cc.G);
-  }
-  v.expected.compact = Buffer.concat([
-    Buffer.from([1, 128]),
-    ...v.outputs.map((o) =>
-      Buffer.concat([
-        n32(o.amount),
-        Buffer.from([o.keysetRef]),
-        Buffer.from(o.B_, "hex"),
-      ]),
-    ),
-    Buffer.alloc(128),
-  ]).toString("hex");
-  const steps = setup(v);
-  steps.push(begin(v), ...outputs(v));
+  const w = workload(MAX),
+    v = w.vector;
+  const hex = (a) => Buffer.from(a).toString("hex");
+  const steps = [
+    "00a404000bF04341534855434D505401",
+    w.setup,
+    ...w.keysets,
+    ...w.loads,
+    w.begin,
+    ...w.outputPages,
+  ].map((a) => (typeof a === "string" ? a : hex(a)));
   const signAt = steps.length;
   steps.push(cmd(0x74));
   const pageAt = steps.length;
-  steps.push(...readSteps(23163), cmd(0x76));
+  steps.push(...w.pages.map(hex), cmd(0x76), { retire: 0 }, cmd(0x76));
   const r = run(steps);
   r.forEach(ok);
-  const packet = Buffer.concat(r.slice(pageAt, -1).map(ok));
+  const packet = Buffer.concat(
+    r.slice(pageAt, pageAt + w.pages.length).map(ok),
+  );
   assert.equal(packet.length, 23163);
   verify(v, ok(r[signAt]), packet);
-  assert.deepEqual([...ok(r.at(-1)).subarray(2, 5)], [0, 128, 0]);
+  assert.deepEqual([...ok(r.at(-3))], w.consumedStatus);
+  assert.deepEqual([...ok(r.at(-1))], [64, 90, 0, 0, 128, 0]);
 });
 test("staged signatures stay hidden and committed burn intent resumes after simulated cuts", () => {
   for (const cut of [

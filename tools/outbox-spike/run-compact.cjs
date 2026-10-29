@@ -13,6 +13,8 @@ const {
 } = require("./run-probe.cjs");
 const {
   PACKAGE,
+  SMALL,
+  MAX,
   cmd,
   workload,
   verifyPacket,
@@ -92,6 +94,7 @@ function fingerprint() {
     "probe_bridge.py",
     "compact-export.cjs",
     "fixtures/assisted-settlement-v1.json",
+    "fixtures/compact-capacity-v1.json",
     "../cardsim/cashu-crypto.cjs",
     "../cardkit/package.json",
     "../cardkit/yarn.lock",
@@ -178,6 +181,9 @@ function deletion(aid) {
   return [0x80, 0xe4, 0, 0, b.length + 2, 0x4f, b.length, ...b, 0];
 }
 async function runCompact(options, dependencies = {}) {
+  const w = workload(options.workload ?? SMALL);
+  if (w.name === MAX && options.chip !== "cplc-v1:4790d3213041093363205547")
+    throw Error("maximum workload requires the qualified 09336320 card");
   const baseline = Object.hasOwn(BASELINES, options.chip)
     ? BASELINES[options.chip]
     : undefined;
@@ -196,7 +202,7 @@ async function runCompact(options, dependencies = {}) {
     manifestSha256: options.manifestHash,
     capSha256: manifest.capSha256,
     runnerSha256: runnerHash,
-    workload: "two-input-two-output-v1",
+    workload: w.name,
   };
   if (!options.execute && !options.cleanupOnly)
     return { ...summary, mode: "preview", cardAccessed: false };
@@ -317,6 +323,7 @@ async function runCompact(options, dependencies = {}) {
       false,
       !!options.cleanupOnly,
       "compact",
+      w.name,
     );
     const tx = bridge.tx,
       began = process.hrtime.bigint();
@@ -425,7 +432,6 @@ async function runCompact(options, dependencies = {}) {
     // but physical runtime bookkeeping/rollback still needs observation.
     if (Math.min(before.maxCommit, before.unusedCommit) < 128)
       fail("commit-capacity-below-floor");
-    const w = workload();
     await command("setup-fixture", w.setup, [1]);
     const after = diagnostics(await command("diagnostics-after", cmd(0x7d)), 2);
     state.measurements.after = after;
@@ -434,7 +440,7 @@ async function runCompact(options, dependencies = {}) {
       fail("commit-capacity-below-floor");
     const key = await command("read-private-public-key", cmd(0x7a));
     // Validate the public point before loading any fixture.
-    const v = require("./fixtures/assisted-settlement-v1.json");
+    const v = w.vector;
     require("./compact-export.cjs").fixtureView(
       { ...v.context, cardKey: key },
       v.keysets,
@@ -448,11 +454,16 @@ async function runCompact(options, dependencies = {}) {
     for (let i = 0; i < w.loads.length; i++)
       await command("load-fixture-" + i, w.loads[i], [v.proofs[i].slot]);
     await command("begin-fixture", w.begin, [0]);
-    await command("stage-outputs", w.outputs, [2]);
+    for (let i = 0; i < w.outputPages.length; i++)
+      await command(
+        i === 0 ? "stage-outputs" : "stage-outputs-" + i,
+        w.outputPages[i],
+        [w.stagedCounts[i]],
+      );
     const scope = await command("sign-and-publish", cmd(0x74));
     state.scope = scope.toString("hex");
     save();
-    await command("status-consumed", cmd(0x76), [63, 88, 0, 2, 126, 0]);
+    await command("status-consumed", cmd(0x76), w.consumedStatus);
     await command(
       "reselect-private",
       sdk.selectAid(bytes(PACKAGE + "01")),
@@ -460,11 +471,17 @@ async function runCompact(options, dependencies = {}) {
     );
     await command("read-retained-scope", cmd(0x7c, Buffer.from([0])), scope);
     const pages = [];
-    for (let i = 0; i < w.pages.length; i++)
-      pages.push(await command("export-page-" + i, w.pages[i]));
+    state.exportPages = [];
+    save();
+    for (let i = 0; i < w.pages.length; i++) {
+      const page = await command("export-page-" + i, w.pages[i]);
+      pages.push(page);
+      state.exportPages.push({ offset: i * 255, data: page.toString("hex") });
+      save();
+    }
     const packet = Buffer.concat(pages);
     state.verified = await step("verify-packet", async () =>
-      verifyPacket(key, scope, packet),
+      verifyPacket(key, scope, packet, w.name),
     );
     state.packet = packet.toString("hex");
     save();
@@ -563,6 +580,7 @@ if (require.main === module)
       const { values: v } = parseArgs({
         options: {
           manifest: { type: "string" },
+          workload: { type: "string" },
           "expect-manifest-sha256": { type: "string" },
           "expect-source-commit": { type: "string" },
           "expect-runner-sha256": { type: "string" },
@@ -578,6 +596,7 @@ if (require.main === module)
       });
       const r = await runCompact({
         manifest: v.manifest,
+        workload: v.workload,
         manifestHash: v["expect-manifest-sha256"],
         sourceCommit: v["expect-source-commit"],
         runnerHash: v["expect-runner-sha256"],

@@ -1,4 +1,4 @@
-"""Bounded PC/SC policy for the private two-input/two-output fixture drill."""
+"""Bounded PC/SC policy for explicitly selected private synthetic fixtures."""
 import argparse
 import json
 from pathlib import Path
@@ -10,29 +10,35 @@ PRIVATE=[PACKAGE+b'\x01',PACKAGE+b'\x4d',PACKAGE]
 OLD=[common.PACKAGE,common.PACKAGE+b'\x4d',common.PACKAGE+b'\x01']
 SELECTS={common.select(aid) for aid in [common.ISD]+common.PRODUCTION+PRIVATE+OLD}
 DATA={bytes.fromhex('80CA9F7F00')}
+SMALL='two-input-two-output-v1'
+MAX='128-input-128-output-v1'
+FILES={SMALL:'assisted-settlement-v1.json',MAX:'compact-capacity-v1.json'}
 
 def cmd(ins,body=b''):
     return bytes([0xb0,ins,0,0])+(bytes([len(body)])+body+b'\0' if body else b'\0')
 
-def fixture_commands():
-    v=json.loads((Path(__file__).parent/'fixtures/assisted-settlement-v1.json').read_text())
+def fixture_commands(workload=SMALL):
+    if not isinstance(workload,str) or workload not in FILES:raise ValueError('unknown fixed workload')
+    v=json.loads((Path(__file__).parent/'fixtures'/FILES[workload]).read_text())
     n32=lambda n:n.to_bytes(4,'big')
     counter=(int(v['identity']['id'])-1).to_bytes(8,'big')
     setup=cmd(0x7e,counter+bytes.fromhex(v['context']['installation'])+bytes([len(v['context']['mint'].encode())])+v['context']['mint'].encode())
     keysets=[cmd(0x78,bytes([i,len(k)//2])+bytes.fromhex(k)) for i,k in enumerate(v['keysets'])]
     loads=[cmd(0x71,bytes([p['slot']])+n32(p['generation'])+bytes([p['keysetRef']])+n32(p['amount'])+bytes.fromhex(p['nonce']+p['C'])) for p in v['proofs']]
-    outputs=cmd(0x73,b''.join(n32(o['amount'])+bytes([o['keysetRef']])+bytes.fromhex(o['B_']) for o in v['outputs']))
-    begin=cmd(0x72,bytes([2,2]+[p['slot'] for p in v['proofs']]))
-    pages=[cmd(0x75,bytes([0,0,0,255])),cmd(0x75,bytes([0,0,255,255])),cmd(0x75,bytes([0,1,254,49]))]
-    return [setup]+keysets+loads+[begin,outputs,cmd(0x74),cmd(0x7c,b'\0')]+pages
+    outputs=[cmd(0x73,b''.join(n32(o['amount'])+bytes([o['keysetRef']])+bytes.fromhex(o['B_']) for o in v['outputs'][at:at+6])) for at in range(0,len(v['outputs']),6)]
+    begin=cmd(0x72,bytes([len(v['proofs']),len(v['outputs'])]+[p['slot'] for p in v['proofs']]))
+    length=7+33+32+13+3+len(v['context']['mint'].encode())+2+sum(75+len(v['keysets'][p['keysetRef']])//2 for p in v['proofs'])+1+sum(38+len(v['keysets'][o['keysetRef']])//2 for o in v['outputs'])+128
+    pages=[cmd(0x75,bytes([0,at>>8,at&255,min(255,length-at)])) for at in range(0,length,255)]
+    return [setup]+keysets+loads+[begin]+outputs+[cmd(0x74),cmd(0x7c,b'\0')]+pages
 
-FIXTURE=set(fixture_commands())
+FIXTURES={name:set(fixture_commands(name)) for name in FILES}
 
-def validate(value,cleanup_only=False):
+def validate(value,cleanup_only=False,workload=SMALL):
+    if not isinstance(workload,str) or workload not in FIXTURES:raise ValueError('unknown fixed workload')
     if not isinstance(value,list) or any(type(b) is not int or not 0<=b<=255 for b in value):raise ValueError('invalid APDU')
     a=bytes(value)
     if a in SELECTS or a in DATA:return a
-    if not cleanup_only and (a in FIXTURE or a in [cmd(0x76),cmd(0x7a),cmd(0x7d)]):return a
+    if not cleanup_only and (a in FIXTURES[workload] or a in [cmd(0x76),cmd(0x7a),cmd(0x7d)]):return a
     if not cleanup_only and len(a)==51 and a[:5]==bytes.fromhex('b07700002d') and a[-1]==0:return a
     if len(a)<6 or len(a)!=a[4]+6 or a[-1]!=0:raise ValueError('framing')
     cla,ins,p1,p2,lc=a[:5]
@@ -51,13 +57,15 @@ def validate(value,cleanup_only=False):
     raise ValueError('command refused')
 
 class Policy:
-    def __init__(self,cleanup_only=False):
+    def __init__(self,cleanup_only=False,workload=SMALL):
+        if workload not in FIXTURES:raise ValueError('unknown fixed workload')
         self.cleanup_only=cleanup_only
+        self.workload=workload
         self.selected=False
         self.sent={}
         self.scope=None
     def before(self,value):
-        a=validate(value,self.cleanup_only)
+        a=validate(value,self.cleanup_only,self.workload)
         if a[:1]==b'\xb0':
             if not self.selected:raise ValueError('private applet not selected')
             limit=3 if a==cmd(0x76) else 2 if a==cmd(0x7d) else 1
@@ -70,7 +78,7 @@ class Policy:
         if a==cmd(0x74) and (sw1,sw2)==(0x90,0) and len(data)==45:self.scope=bytes(data)
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--reader',required=True);p.add_argument('--cleanup-only',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--reader',required=True);p.add_argument('--cleanup-only',action='store_true');p.add_argument('--workload',choices=list(FILES),default=SMALL);a=p.parse_args()
     if a.reader!='ACS ACR122U PICC Interface':raise ValueError('named reader required')
     from smartcard.System import readers
     from smartcard.scard import SCARD_LEAVE_CARD, SCARD_SHARE_EXCLUSIVE
@@ -79,7 +87,7 @@ def main():
     connection=common.checked('reader-connect-failed',matches[0].createConnection);connected=False
     try:
         common.checked('reader-connect-failed',lambda:connection.connect(mode=SCARD_SHARE_EXCLUSIVE,disposition=SCARD_LEAVE_CARD));connected=True
-        common.emit({'ready':True});policy=Policy(a.cleanup_only)
+        common.emit({'ready':True});policy=Policy(a.cleanup_only,a.workload)
         while True:
             line=sys.stdin.readline(4097)
             if not line:return

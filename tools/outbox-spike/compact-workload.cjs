@@ -1,5 +1,30 @@
 /* Fixed public synthetic bench workload; no network, key or PIN input. */
-const vector = require("./fixtures/assisted-settlement-v1.json");
+const SMALL = "two-input-two-output-v1";
+const MAX = "128-input-128-output-v1";
+const VECTORS = Object.freeze({
+  [SMALL]: require("./fixtures/assisted-settlement-v1.json"),
+  [MAX]: require("./fixtures/compact-capacity-v1.json"),
+});
+function vectorFor(name) {
+  if (typeof name !== "string" || !Object.hasOwn(VECTORS, name))
+    throw Error("unknown fixed workload");
+  return structuredClone(VECTORS[name]);
+}
+function packetLength(v) {
+  return (
+    7 +
+    33 +
+    32 +
+    13 +
+    3 +
+    Buffer.byteLength(v.context.mint) +
+    2 +
+    v.proofs.reduce((n, p) => n + 75 + v.keysets[p.keysetRef].length / 2, 0) +
+    1 +
+    v.outputs.reduce((n, o) => n + 38 + v.keysets[o.keysetRef].length / 2, 0) +
+    128
+  );
+}
 const { fixtureView, exportCompact } = require("./compact-export.cjs");
 const PACKAGE = "F04341534855434D5054";
 const cmd = (ins, data = Buffer.alloc(0)) => [
@@ -15,7 +40,7 @@ const n32 = (n) => {
   b.writeUInt32BE(n);
   return b;
 };
-const outputBytes = () =>
+const outputBytes = (vector) =>
   Buffer.concat(
     vector.outputs.map((o) =>
       Buffer.concat([
@@ -25,10 +50,42 @@ const outputBytes = () =>
       ]),
     ),
   );
-function workload() {
+function workload(name = SMALL) {
+  const vector = vectorFor(name),
+    packetBytes = packetLength(vector);
+  const outputPages = [],
+    stagedCounts = [],
+    pages = [];
+  const bytes = outputBytes(vector);
+  for (let at = 0; at < vector.outputs.length; at += 6) {
+    outputPages.push(cmd(0x73, bytes.subarray(at * 38, (at + 6) * 38)));
+    stagedCounts.push(Math.min(at + 6, vector.outputs.length));
+  }
+  for (let at = 0; at < packetBytes; at += 255)
+    pages.push(
+      cmd(
+        0x75,
+        Buffer.from([0, at >> 8, at & 255, Math.min(255, packetBytes - at)]),
+      ),
+    );
+  const frameBytes =
+    131 + vector.proofs.length * 5 + vector.outputs.length * 38;
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(vector.identity.id) - 1n);
   return {
+    name,
+    vector,
+    packetBytes,
+    outputPages,
+    stagedCounts,
+    consumedStatus: [
+      63,
+      90 - Math.ceil(frameBytes / 128),
+      0,
+      vector.proofs.length,
+      128 - vector.proofs.length,
+      0,
+    ],
     setup: cmd(
       0x7e,
       Buffer.concat([
@@ -59,20 +116,24 @@ function workload() {
         ]),
       ),
     ),
-    begin: cmd(0x72, Buffer.from([2, 2, ...vector.proofs.map((p) => p.slot)])),
-    outputs: cmd(0x73, outputBytes()),
-    pages: [
-      cmd(0x75, Buffer.from([0, 0, 0, 255])),
-      cmd(0x75, Buffer.from([0, 0, 255, 255])),
-      cmd(0x75, Buffer.from([0, 1, 254, 49])),
-    ],
+    begin: cmd(
+      0x72,
+      Buffer.from([
+        vector.proofs.length,
+        vector.outputs.length,
+        ...vector.proofs.map((p) => p.slot),
+      ]),
+    ),
+    outputs: outputPages[0],
+    pages,
   };
 }
-function verifyPacket(key, scope, packet) {
+function verifyPacket(key, scope, packet, name = SMALL) {
+  const vector = vectorFor(name);
   if (
     key.length !== 33 ||
     scope.length !== 45 ||
-    packet.length !== 559 ||
+    packet.length !== packetLength(vector) ||
     scope[0] !== 0 ||
     scope.readBigUInt64BE(1) !== BigInt(vector.identity.id) ||
     scope.readUInt32BE(9) !== 1
@@ -88,8 +149,8 @@ function verifyPacket(key, scope, packet) {
       generation: p.generation,
     })),
     packet: Buffer.concat([
-      Buffer.from([1, 2]),
-      outputBytes(),
+      Buffer.from([1, vector.outputs.length]),
+      outputBytes(vector),
       packet.subarray(-128),
     ]),
   };
@@ -113,4 +174,4 @@ function verifyPacket(key, scope, packet) {
     descriptorMessage: e.descriptorMessage,
   };
 }
-module.exports = { PACKAGE, cmd, workload, verifyPacket };
+module.exports = { PACKAGE, cmd, workload, verifyPacket, SMALL, MAX };

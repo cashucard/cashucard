@@ -11,7 +11,6 @@ const {
   fingerprint,
 } = require("./run-compact.cjs");
 const { workload, verifyPacket } = require("./compact-workload.cjs");
-const original = require("./fixtures/assisted-settlement-v1.json");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
 test("private setup avoids the runtime-owned MANAGE CHANNEL instruction", () => {
   assert.equal(workload().setup[1], 0x7e);
@@ -79,6 +78,7 @@ function fixture(t) {
   };
 }
 function fake({
+  workloadName = "two-input-two-output-v1",
   chip = "cplc-v1:4790d3213041093363205547",
   cardDoc = chip === "cplc-v1:4790d3213180072976207515",
   wrongChip = false,
@@ -92,6 +92,8 @@ function fake({
   unknownRegistry = false,
   lowCommit = false,
   corruptPacket = false,
+  truncatePacket = false,
+  interruptExport = false,
 } = {}) {
   const calls = {
     opens: 0,
@@ -101,9 +103,12 @@ function fake({
     stages: [],
     chipTargets: [],
   };
-  const sdk = require("../cardkit");
+  const sdk = require("../cardkit"),
+    w = workload(workloadName),
+    original = w.vector;
   let state = "blank",
-    after = false;
+    after = false,
+    staged = 0;
   const privateAids = [
     "F04341534855434D505401",
     "F04341534855434D50544D",
@@ -264,7 +269,10 @@ function fake({
         if (apdu[1] === 0x78) return reply([apdu[5] + 1]);
         if (apdu[1] === 0x71) return reply([apdu[5]]);
         if (apdu[1] === 0x72) return reply([0]);
-        if (apdu[1] === 0x73) return reply([2]);
+        if (apdu[1] === 0x73) {
+          staged += apdu[4] / 38;
+          return reply([staged]);
+        }
         if (apdu[1] === 0x74) {
           if (signFailure) throw Error("private timeout text");
           if (wrappedSignFailure) return wrappedFailure(apdu);
@@ -275,7 +283,11 @@ function fake({
         if (apdu[1] === 0x75) {
           const off = apdu[6] * 256 + apdu[7],
             b = Buffer.from(canonical.subarray(off, off + apdu[8]));
+          if (interruptExport && off + apdu[8] >= canonical.length)
+            return wrappedFailure(apdu);
           if (corruptPacket && off === 0) b[50] ^= 1;
+          if (truncatePacket && off + apdu[8] >= canonical.length)
+            return reply(b.subarray(0, -1));
           return reply(b);
         }
         if (apdu[1] === 0x77) {
@@ -284,14 +296,13 @@ function fake({
         }
         if (apdu[1] === 0x76)
           return reply(
-            state === "signed"
-              ? [63, 88, 0, 2, 126, 0]
-              : [64, 90, 0, 0, 128, 0],
+            state === "signed" ? w.consumedStatus : [64, 90, 0, 0, 128, 0],
           );
         throw Error("unexpected synthetic APDU");
       },
     },
-    openBridge: async () => {
+    openBridge: async (...args) => {
+      calls.bridgeArgs = args;
       calls.opens++;
       return {
         tx: async () => {
@@ -427,7 +438,8 @@ test("the raw command ceiling stops a faulty host loop before authentication", a
     close: async () => {},
   });
   f.deps.sdk.readChipIdentity = async (tx) => {
-    for (let i = 0; i < 513; i++) await tx([0x80, 0xca, 0x9f, 0x7f, 0]);
+    for (let i = 0; i < 513; i++)
+      await require("../cardkit").transmit(tx, [0x80, 0xca, 0x9f, 0x7f, 0]);
   };
   await assert.rejects(
     runCompact(o, f.deps),
@@ -510,4 +522,78 @@ test("wrapped transport failures retain safe diagnostics without authorizing cle
     if (mode === "wrappedInstallFailure")
       assert.ok(!f.calls.stages.includes("setup-fixture"));
   }
+});
+
+test("maximum fixed workload verifies the complete packet before retirement and returns blank", async (t) => {
+  const name = "128-input-128-output-v1",
+    o = fixture(t),
+    f = fake({ workloadName: name });
+  const result = await runCompact({ ...o, workload: name }, f.deps);
+  assert.equal(result.workload, name);
+  assert.equal(result.packetBytes, 23163);
+  assert.equal(f.calls.bridgeArgs[5], name);
+  assert.equal(result.status, "complete");
+  assert.equal(
+    f.calls.stages.filter((s) => s.startsWith("load-fixture-")).length,
+    128,
+  );
+  assert.equal(
+    f.calls.stages.filter((s) => s.startsWith("stage-outputs")).length,
+    22,
+  );
+  assert.equal(
+    f.calls.stages.filter((s) => s.startsWith("export-page-")).length,
+    91,
+  );
+  assert.ok(
+    f.calls.stages.indexOf("verify-packet") <
+      f.calls.stages.indexOf("retire-fixture"),
+  );
+  assert.equal(f.calls.deletes.length, 3);
+  assert.equal(f.calls.closes, 1);
+});
+test("unknown or unqualified capacity requests fail before opening a reader; corrupted large exports retain state", async (t) => {
+  const name = "128-input-128-output-v1";
+  for (const change of [
+    { workload: "arbitrary" },
+    { workload: name, chip: "cplc-v1:4790d3213180072976207515" },
+  ]) {
+    const o = fixture(t),
+      f = fake();
+    await assert.rejects(runCompact({ ...o, ...change }, f.deps));
+    assert.equal(f.calls.opens, 0);
+  }
+  for (const mode of ["corruptPacket", "truncatePacket"]) {
+    const o = fixture(t),
+      f = fake({ workloadName: name, [mode]: true });
+    await assert.rejects(runCompact({ ...o, workload: name }, f.deps));
+    assert.ok(!f.calls.stages.includes("retire-fixture"));
+    assert.equal(f.calls.deletes.length, 0);
+    assert.equal(f.calls.closes, 1);
+  }
+});
+
+test("an interrupted large export retains received pages and never retires or deletes", async (t) => {
+  const name = "128-input-128-output-v1",
+    o = fixture(t),
+    f = fake({ workloadName: name, interruptExport: true });
+  await assert.rejects(
+    runCompact({ ...o, workload: name }, f.deps),
+    (e) => e.code === "reader-transmit-failed",
+  );
+  const journal = JSON.parse(fs.readFileSync(o.journal));
+  assert.equal(journal.stage, "export-page-90");
+  assert.equal(journal.exportPages.length, 90);
+  assert.equal(
+    journal.exportPages.reduce(
+      (n, p) => n + Buffer.from(p.data, "hex").length,
+      0,
+    ),
+    22950,
+  );
+  assert.equal(journal.scope.length, 90);
+  assert.equal(journal.verified, undefined);
+  assert.ok(!f.calls.stages.includes("retire-fixture"));
+  assert.equal(f.calls.deletes.length, 0);
+  assert.equal(f.calls.closes, 1);
 });
