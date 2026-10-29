@@ -84,6 +84,8 @@ function fake({
   wrongChip = false,
   authFailure = false,
   signFailure = false,
+  wrappedSignFailure = false,
+  wrappedInstallFailure = false,
   installRefusal = false,
   setupRefusal = false,
   setupUncertain = false,
@@ -170,10 +172,24 @@ function fake({
   Buffer.from(exp.packetId, "hex").copy(scope, 13);
   const canonical = Buffer.concat([...exp.pages()]);
   const reply = (data = [], sw = 0x9000) => ({ data: [...data], sw });
+  const wrappedFailure = (apdu) => {
+    const { ProbeFailure } = require("./run-probe.cjs");
+    const cause = new ProbeFailure("reader-transmit-failed");
+    cause.pcscCode = "80100016";
+    return sdk.transmit(async () => {
+      throw cause;
+    }, apdu);
+  };
   const secure = async (tx, apdu) => {
     if (apdu[1] === 0xf2) return reply(apdu[2] === 0x20 ? registry() : []);
     if (apdu[1] === 0xe6) {
       state = "installed";
+      if (
+        wrappedInstallFailure &&
+        apdu[2] === 0x0c &&
+        Buffer.from(apdu).includes(Buffer.from(privateAids[0], "hex"))
+      )
+        return wrappedFailure(apdu);
       if (
         installRefusal &&
         apdu[2] === 0x0c &&
@@ -251,6 +267,7 @@ function fake({
         if (apdu[1] === 0x73) return reply([2]);
         if (apdu[1] === 0x74) {
           if (signFailure) throw Error("private timeout text");
+          if (wrappedSignFailure) return wrappedFailure(apdu);
           state = "signed";
           return reply(scope);
         }
@@ -465,4 +482,32 @@ test("packet verification rejects altered scope and transport policy permits onl
   execFileSync("python3", [path.join(__dirname, "test_compact_bridge.py")], {
     stdio: "pipe",
   });
+});
+
+test("wrapped transport failures retain safe diagnostics without authorizing cleanup", async (t) => {
+  for (const mode of ["wrappedInstallFailure", "wrappedSignFailure"]) {
+    const o = fixture(t),
+      f = fake({ [mode]: true });
+    const stage =
+      mode === "wrappedInstallFailure" ? "install-01" : "sign-and-publish";
+    await assert.rejects(
+      runCompact({ ...o, cleanupOnDeclaredRefusal: true }, f.deps),
+      (error) =>
+        error.code === "reader-transmit-failed" &&
+        error.pcscCode === "80100016",
+    );
+    const journal = JSON.parse(fs.readFileSync(o.journal));
+    assert.deepEqual(journal.failure, {
+      code: "reader-transmit-failed",
+      pcscCode: "80100016",
+    });
+    assert.equal(journal.stage, stage);
+    assert.equal(f.calls.auth, 1);
+    assert.equal(f.calls.deletes.length, 0);
+    assert.equal(f.calls.closes, 1);
+    assert.equal(f.calls.stages.filter((x) => x === stage).length, 1);
+    assert.ok(!f.calls.stages.includes("retire-fixture"));
+    if (mode === "wrappedInstallFailure")
+      assert.ok(!f.calls.stages.includes("setup-fixture"));
+  }
 });

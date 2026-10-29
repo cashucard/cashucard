@@ -4328,3 +4328,27 @@ The fixed synthetic workload, private ABI, CAP, factory-key policy and cleanup
 order are unchanged. Tests exercise the new profile, preserve rejection under
 the old profile, reject unknown identities, and verify cleanup uses the chosen
 CPLC. Production protocol and reset behavior remain unchanged.
+
+
+## <a id="d154"></a>D154: Preserve bounded transport evidence through SDK wrappers
+
+**Decided (2026-10-28):** the private bench runners retain a validated reader
+failure code and optional eight-digit lowercase PC/SC code when cardkit wraps
+that failure in its public `TransportError`. Unwrap only a direct, typed
+`ProbeFailure` with a fixed transport code. Share classification between the
+resource and compact runners. Keep arbitrary native messages, stacks, nested
+causes and unvalidated fields out of journals and CLI results.
+
+**Why:** the 07297620 compact attempt completed package loading and opener
+creation, then stopped at unconfirmed main-instance creation with only
+`operation-failed`. Cardkit wraps transceiver failures; the runner previously
+recognized only direct failures. The original cause was discarded and remains
+unknown. Bounded error preservation improves evidence for a future invocation.
+The separate cleanup verified the four-file blank baseline.
+
+**Rejected:** printing native exceptions, walking arbitrary cause chains,
+classifying a wrapped failure as a card reply, or extending automatic cleanup.
+Declared-refusal cleanup still requires the original direct empty-body card
+response at an admitted stage. Transport uncertainty retains the journal and
+stops without retry. The CAP, private workload, production app and protocol
+remain unchanged.

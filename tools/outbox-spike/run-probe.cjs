@@ -251,6 +251,40 @@ const BRIDGE_FAILURES = new Set([
   "bridge-input-invalid",
   "bridge-command-refused",
 ]);
+const TRANSPORT_FAILURES = new Set([
+  ...BRIDGE_FAILURES,
+  "reader-response-timeout",
+  "reader-pipe-closed",
+  "reader-not-ready",
+  "reader-protocol-error",
+]);
+function failureEvidence(error, sdk) {
+  // Unwrap only the public SDK's direct, typed transport cause. Native text and
+  // arbitrary cause chains are deliberately excluded from retained evidence.
+  if (
+    typeof sdk?.TransportError === "function" &&
+    error instanceof sdk.TransportError
+  ) {
+    const cause = error.cause;
+    if (!(cause instanceof ProbeFailure) || !TRANSPORT_FAILURES.has(cause.code))
+      return { code: "operation-failed" };
+    error = cause;
+  }
+  if (error instanceof ProbeFailure)
+    return {
+      code: error.code,
+      ...(typeof error.pcscCode === "string" &&
+      /^[0-9a-f]{8}$/.test(error.pcscCode)
+        ? { pcscCode: error.pcscCode }
+        : {}),
+    };
+  return {
+    code:
+      Number.isInteger(error?.sw) && error.sw >= 0 && error.sw <= 0xffff
+        ? "card-status-" + error.sw.toString(16).padStart(4, "0")
+        : "operation-failed",
+  };
+}
 function parseBridgeMessage(line) {
   let message;
   try {
@@ -850,18 +884,7 @@ async function runProbe(options, dependencies = {}) {
       journal: options.journal,
     };
   } catch (error) {
-    const codeFor = (value) =>
-      value instanceof ProbeFailure
-        ? value.code
-        : Number.isInteger(value?.sw) && value.sw >= 0 && value.sw <= 0xffff
-          ? "card-status-" + value.sw.toString(16).padStart(4, "0")
-          : "operation-failed";
-    const failureFor = (value) => ({
-      code: codeFor(value),
-      ...(value instanceof ProbeFailure && value.pcscCode
-        ? { pcscCode: value.pcscCode }
-        : {}),
-    });
+    const failureFor = (value) => failureEvidence(value, sdk);
     const declared =
       options.cleanupOnInstallRefusal &&
       state.stage === "install-01" &&
@@ -917,6 +940,7 @@ module.exports = {
   registryFrames,
   PLATFORM_FILES,
   ProbeFailure,
+  failureEvidence,
   artifact,
   probeDelete,
   measurements,

@@ -9,6 +9,7 @@ const {
   registryFrames,
   PLATFORM_FILES,
   ProbeFailure,
+  failureEvidence,
 } = require("./run-probe.cjs");
 const {
   PACKAGE,
@@ -481,19 +482,9 @@ async function runCompact(options, dependencies = {}) {
       journal: options.journal,
     };
   } catch (error) {
-    const code =
-      error instanceof ProbeFailure
-        ? error.code
-        : Number.isInteger(error?.sw) && error.sw >= 0 && error.sw <= 0xffff
-          ? "card-status-" + error.sw.toString(16).padStart(4, "0")
-          : "operation-failed";
     state.status = "stopped";
-    state.failure = {
-      code,
-      ...(error instanceof ProbeFailure && error.pcscCode
-        ? { pcscCode: error.pcscCode }
-        : {}),
-    };
+    state.failure = failureEvidence(error, sdk);
+    const { code } = state.failure;
     let persisted = false;
     if (started)
       try {
@@ -520,12 +511,7 @@ async function runCompact(options, dependencies = {}) {
           journal: options.journal,
         };
       } catch (cleanupError) {
-        state.cleanupFailure = {
-          code:
-            cleanupError instanceof ProbeFailure
-              ? cleanupError.code
-              : "operation-failed",
-        };
+        state.cleanupFailure = failureEvidence(cleanupError, sdk);
         try {
           save();
         } catch {}
@@ -536,6 +522,7 @@ async function runCompact(options, dependencies = {}) {
     );
     stopped.stage = state.stage;
     stopped.code = code;
+    stopped.pcscCode = state.failure.pcscCode;
     throw stopped;
   } finally {
     try {
@@ -612,6 +599,7 @@ if (require.main === module)
           status: "stopped",
           stage: e.stage ?? "before-reader",
           failure: e.code ?? "preflight-failed",
+          ...(e.pcscCode ? { pcscCode: e.pcscCode } : {}),
           message: "Retain the journal for review before another action.",
         }),
       );
