@@ -4376,6 +4376,8 @@ the exact scope before fixture retirement. Retain received public pages durably
 as they arrive so interrupted export preserves its available evidence. A stopped
 or invalid export cannot authorize retirement or deletion. Original identity,
 factory-key, baseline, journal, deadline and command ceilings remain in force.
+The fixed host `drill-bound-exceeded` stop survives the SDK wrapper so a budget
+stop retains its reason without changing cleanup admission.
 
 **Why:** the small physical payment passed on 09336320 in #210, establishing
 combined allocation, signing and export for that workload. The existing private

@@ -438,7 +438,8 @@ test("the raw command ceiling stops a faulty host loop before authentication", a
     close: async () => {},
   });
   f.deps.sdk.readChipIdentity = async (tx) => {
-    for (let i = 0; i < 513; i++) await tx([0x80, 0xca, 0x9f, 0x7f, 0]);
+    for (let i = 0; i < 513; i++)
+      await require("../cardkit").transmit(tx, [0x80, 0xca, 0x9f, 0x7f, 0]);
   };
   await assert.rejects(
     runCompact(o, f.deps),

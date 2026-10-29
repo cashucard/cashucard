@@ -534,7 +534,8 @@ reselection, 91 export pages reconstruct 23,163 canonical bytes. Both signatures
 exact packet and scope must verify before retirement restores 128 empty slots,
 64 free headers and 90 free pages. Normal cleanup returns the card to its exact
 three-file blank baseline. The existing 30-second response deadline, 120-second
-elapsed gate and 512-command ceiling apply unchanged.
+elapsed gate and 512-command ceiling apply unchanged. Their host stop retains
+`drill-bound-exceeded` through the SDK transport wrapper.
 
 The simulator uses this exact catalogue/command stream for its large case,
 including full reclamation. Offline policy tests compare every Node command
