@@ -13,6 +13,16 @@ const {
 const { workload, verifyPacket } = require("./compact-workload.cjs");
 const original = require("./fixtures/assisted-settlement-v1.json");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
+test("private setup avoids the runtime-owned MANAGE CHANNEL instruction", () => {
+  assert.equal(workload().setup[1], 0x7e);
+  assert.notEqual(workload().setup[1], 0x70);
+  const dispatch = fs.readFileSync(
+    path.join(__dirname, "java/CompactDispatch.txt"),
+    "utf8",
+  );
+  assert.ok(dispatch.includes("if (ins == (byte) 0x7E)"));
+  assert.ok(!dispatch.includes("if (ins == (byte) 0x70)"));
+});
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "compact-runner-"));
   fs.chmodSync(dir, 0o700);
@@ -22,7 +32,7 @@ function fixture(t) {
   const source = "a".repeat(40);
   const manifest = {
     kind: "compact-javacard-prototype",
-    probeFormat: 4,
+    probeFormat: 5,
     sourceCommit: source,
     packageAid: "F04341534855434D5054",
     poolBytes: 16384,
@@ -194,7 +204,7 @@ function fake({
             Buffer.from(apdu.slice(5, -1)).toString("hex").toUpperCase() ===
               privateAids[0] &&
             state !== "blank"
-            ? reply(Buffer.from("CPROT\x01"))
+            ? reply(Buffer.from("CPROT\x02"))
             : reply([], 0x6a82);
         if (apdu[1] === 0x7d) {
           const b = Buffer.alloc(16);
@@ -206,12 +216,12 @@ function fake({
             b.writeUInt16BE(12288, 12);
             b[14] = 2;
           }
-          b[15] = 4;
+          b[15] = 5;
           return reply(b);
         }
         if (apdu[1] === 0x7a)
           return reply(Buffer.from(original.context.cardKey, "hex"));
-        if (apdu[1] === 0x70) {
+        if (apdu[1] === 0x7e) {
           if (setupUncertain) throw Error("private setup timeout");
           if (setupRefusal) return reply([], 0x6a84);
           after = true;

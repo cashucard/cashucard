@@ -4277,3 +4277,30 @@ proof/PIN/key input, submitting fixture data to a mint, retrying uncertain write
 and automatic cleanup after unknown delivery. A named approved plan remains the
 physical access gate. Production firmware, protocol assignments, assets and the
 released app stay unchanged.
+
+## <a id="d152"></a>D152: Separate private setup from runtime channel management
+
+**Decided (2026-10-28):** move the private compact prototype's setup instruction
+from `70` to `7E`. Bump its selection identifier to `CPROT/2` and its manifest
+and diagnostic format to 5. Update the runner, simulator and independent Python
+transport policy together; new admission rejects previous private formats.
+Production firmware, protocol versions and assignments remain unchanged.
+
+**Why:** the approved format-4 image loaded, installed both instances and
+answered diagnostics on 09336320, then setup returned `6E00`. The
+[JavaCard 3.0.5 programming notes](https://docs.oracle.com/cd/E59935_01/prognotes/isoiec_7816-42013_specific_apdu_commands_for_logical_channel_management.htm)
+and runtime specification section 4.6.1 identify `70` as MANAGE CHANNEL,
+handled by the runtime. This conflicts with an application setup instruction.
+Runtime interception is a plausible explanation for the observed status;
+the run supplied no post-setup allocation or signing evidence. The revised
+instruction still requires its own physical test.
+
+The host stopped on the unexpected status. The operator then explicitly
+requested return to blank; a separate named cleanup-only plan matched CPLC,
+proved one factory channel, removed only the private objects and verified the
+original platform baseline. Retain both journals and their original artifact.
+
+**Rejected:** retrying setup under the completed plan, treating the refusal as
+EEPROM exhaustion, admitting a changed artifact with old pins, or inferring
+silicon dispatch behavior from simulator success. The regression check forbids
+runtime-owned `70` for setup, and both host policies agree on the fixed command.

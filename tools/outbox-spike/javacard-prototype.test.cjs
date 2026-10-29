@@ -18,7 +18,7 @@ test("the compact hardware image is rejected by the existing resource runner", (
     const bytes = Buffer.from(
       JSON.stringify({
         kind: "compact-javacard-prototype",
-        probeFormat: 4,
+        probeFormat: 5,
         poolBytes: 16384,
       }),
     );

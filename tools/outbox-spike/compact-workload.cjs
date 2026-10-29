@@ -30,7 +30,7 @@ function workload() {
   counter.writeBigUInt64BE(BigInt(vector.identity.id) - 1n);
   return {
     setup: cmd(
-      0x70,
+      0x7e,
       Buffer.concat([
         counter,
         Buffer.from(vector.context.installation, "hex"),

@@ -43,7 +43,7 @@ function compactArtifact(options) {
     directory = path.dirname(options.manifest);
   if (
     m.kind !== "compact-javacard-prototype" ||
-    m.probeFormat !== 4 ||
+    m.probeFormat !== 5 ||
     m.packageAid !== PACKAGE ||
     m.poolBytes !== 16384 ||
     m.deferredDleqBytes !== 12288 ||
@@ -114,7 +114,7 @@ function diagnostics(data, ready) {
   const b = Buffer.from(data);
   if (
     b.length !== 16 ||
-    b[15] !== 4 ||
+    b[15] !== 5 ||
     b[14] !== ready ||
     b.readUInt16BE(10) !== (ready === 2 ? 16384 : 0) ||
     b.readUInt16BE(12) !== (ready === 2 ? 12288 : 0) ||
@@ -400,7 +400,7 @@ async function runCompact(options, dependencies = {}) {
     await command(
       "select-private",
       sdk.selectAid(bytes(PACKAGE + "01")),
-      Buffer.from("CPROT\x01"),
+      Buffer.from("CPROT\x02"),
     );
     const before = diagnostics(
       await command("diagnostics-before", cmd(0x7d)),
@@ -443,7 +443,7 @@ async function runCompact(options, dependencies = {}) {
     await command(
       "reselect-private",
       sdk.selectAid(bytes(PACKAGE + "01")),
-      Buffer.from("CPROT\x01"),
+      Buffer.from("CPROT\x02"),
     );
     await command("read-retained-scope", cmd(0x7c, Buffer.from([0])), scope);
     const pages = [];

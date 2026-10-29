@@ -14,9 +14,9 @@ class CompactPolicy(unittest.TestCase):
     def test_selection_and_single_attempt_limits_survive_reselection(self):
         p=b.Policy();setup=b.fixture_commands()[0]
         with self.assertRaises(ValueError):p.before(list(setup))
-        select=b.common.select(b.PRIVATE[0]);p.after(select,list(b'CPROT\x01'),0x90,0)
+        select=b.common.select(b.PRIVATE[0]);p.after(select,list(b'CPROT\x02'),0x90,0)
         self.assertEqual(p.before(list(setup)),setup)
-        p.after(select,list(b'CPROT\x01'),0x90,0)
+        p.after(select,list(b'CPROT\x02'),0x90,0)
         with self.assertRaises(ValueError):p.before(list(setup))
         with self.assertRaises(ValueError):p.before(list(b.cmd(0x77,bytes(45))))
         scope=bytes(range(45));p.after(b.cmd(0x74),list(scope),0x90,0)
@@ -28,7 +28,7 @@ class CompactPolicy(unittest.TestCase):
             with self.assertRaises(ValueError):b.validate(list(command),True)
         for aid in [b.common.ISD]+b.common.PRODUCTION+b.OLD:
             with self.assertRaises(ValueError):b.validate(wrapped(0xe4,0,0,b'\x4f'+b.common.field(aid)))
-        for command in [wrapped(0xd8,1,0x81,bytes(67)),list(b.cmd(0x20,b'123456')),list(b.cmd(0x71,bytes(75))),list(b.cmd(0x7e)),[True]]:
+        for command in [list(b.cmd(0x70,b.fixture_commands()[0][5:-1])),wrapped(0xd8,1,0x81,bytes(67)),list(b.cmd(0x20,b'123456')),list(b.cmd(0x71,bytes(75))),list(b.cmd(0x7e)),[True]]:
             with self.assertRaises(ValueError):b.validate(command)
 
 if __name__=='__main__':unittest.main()

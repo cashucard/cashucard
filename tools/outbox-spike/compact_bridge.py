@@ -18,7 +18,7 @@ def fixture_commands():
     v=json.loads((Path(__file__).parent/'fixtures/assisted-settlement-v1.json').read_text())
     n32=lambda n:n.to_bytes(4,'big')
     counter=(int(v['identity']['id'])-1).to_bytes(8,'big')
-    setup=cmd(0x70,counter+bytes.fromhex(v['context']['installation'])+bytes([len(v['context']['mint'].encode())])+v['context']['mint'].encode())
+    setup=cmd(0x7e,counter+bytes.fromhex(v['context']['installation'])+bytes([len(v['context']['mint'].encode())])+v['context']['mint'].encode())
     keysets=[cmd(0x78,bytes([i,len(k)//2])+bytes.fromhex(k)) for i,k in enumerate(v['keysets'])]
     loads=[cmd(0x71,bytes([p['slot']])+n32(p['generation'])+bytes([p['keysetRef']])+n32(p['amount'])+bytes.fromhex(p['nonce']+p['C'])) for p in v['proofs']]
     outputs=cmd(0x73,b''.join(n32(o['amount'])+bytes([o['keysetRef']])+bytes.fromhex(o['B_']) for o in v['outputs']))
@@ -66,7 +66,7 @@ class Policy:
             self.sent[a]=self.sent.get(a,0)+1
         return a
     def after(self,a,data,sw1,sw2):
-        if a[:2]==b'\0\xa4':self.selected=a==common.select(PRIVATE[0]) and bytes(data)==b'CPROT\x01' and (sw1,sw2)==(0x90,0)
+        if a[:2]==b'\0\xa4':self.selected=a==common.select(PRIVATE[0]) and bytes(data)==b'CPROT\x02' and (sw1,sw2)==(0x90,0)
         if a==cmd(0x74) and (sw1,sw2)==(0x90,0) and len(data)==45:self.scope=bytes(data)
 
 def main():

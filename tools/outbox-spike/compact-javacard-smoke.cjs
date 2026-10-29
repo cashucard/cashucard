@@ -13,6 +13,7 @@ const manifest = JSON.parse(
   fs.readFileSync(path.join(artifact, "manifest.json")),
 );
 assert.equal(manifest.kind, "compact-javacard-prototype");
+assert.equal(manifest.probeFormat, 5);
 const cmd = (ins, data = Buffer.alloc(0)) =>
   Buffer.concat([
     Buffer.from([0xb0, ins, 0, 0]),
@@ -43,7 +44,7 @@ function setup(v) {
   const steps = [
     "00a404000bF04341534855434D505401",
     cmd(
-      0x70,
+      0x7e,
       Buffer.concat([
         counter,
         Buffer.from(v.context.installation, "hex"),
@@ -188,6 +189,7 @@ test("converted private image preserves the control instance shape and signs bot
   steps.push(...readSteps(559), cmd(0x7d), cmd(0x76));
   const r = run(steps);
   r.forEach(ok);
+  assert.ok(ok(r[0]).equals(Buffer.from("CPROT\x02")));
   const scope = ok(r[signAt]),
     packet = Buffer.concat(r.slice(pageAt, pageAt + 3).map(ok));
   assert.equal(verify(v, scope, packet).byteLength, 559);
@@ -196,6 +198,7 @@ test("converted private image preserves the control instance shape and signs bot
   assert.equal(mem.readUInt16BE(10), 16384);
   assert.equal(mem.readUInt16BE(12), 12288);
   assert.equal(mem[14], 2);
+  assert.equal(mem[15], 5);
   assert.deepEqual([...ok(r.at(-1)).subarray(2, 5)], [0, 2, 126]);
 });
 test("large input/output counts stream across short APDUs without new transient buffers", () => {
