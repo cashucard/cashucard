@@ -4358,3 +4358,36 @@ Declared-refusal cleanup still requires the original direct empty-body card
 response at an admitted stage. Transport uncertainty retains the journal and
 stops without retry. The CAP, private workload, production app and protocol
 remain unchanged.
+
+
+## <a id="d155"></a>D155: Select fixed compact capacity workloads explicitly
+
+**Decided (2026-10-28):** retain the default two-input/two-output bench profile
+and add one explicit `128-input-128-output-v1` catalogue entry. The latter is
+restricted to qualified card 09336320. A checked-in public fixture defines all
+128 input slots and outputs. Node and the independent Python bridge construct
+the same fixed setup, load, staging and export commands from that fixture.
+Unknown profile names fail before reader access. The bridge selects one profile
+per invocation; it cannot admit the union of both command sets.
+
+The candidate full-slot case stages outputs through 22 short APDUs, then exports
+23,163 bytes through 91 pages. Verify every canonical byte, both signatures and
+the exact scope before fixture retirement. Retain received public pages durably
+as they arrive so interrupted export preserves its available evidence. A stopped
+or invalid export cannot authorize retirement or deletion. Original identity,
+factory-key, baseline, journal, deadline and command ceilings remain in force.
+
+**Why:** the small physical payment passed on 09336320 in #210, establishing
+combined allocation, signing and export for that workload. The existing private
+image already handles a full-slot payment; a bounded explicit host profile can
+measure it without a firmware/layout variation. Matching independent bridge
+commands and simulator execution catch framing and count errors before hardware.
+The selected 128-output case is a candidate test, with final protocol limits
+still open.
+
+**Rejected:** arbitrary fixture/APDU input, automatic expansion to 07297620,
+changing time/command limits to make a run finish, or treating an export failure
+as permission to erase evidence. Many-small-record capacity, between-command
+power loss and cuts during writes remain separate measured gates. Physical
+execution still requires a named approved plan; production firmware, protocol
+assignments and release capability are unchanged.

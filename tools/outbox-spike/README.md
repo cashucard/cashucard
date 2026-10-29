@@ -448,9 +448,11 @@ The first physical image installed and answered diagnostics, then returned
 channel management. The revised private ABI uses `7E`, selection `CPROT/2` and
 manifest/diagnostic format 5. New runner admission rejects earlier formats.
 The [physical report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-28.j3r180-compact-setup.md)
-records the stop and verified cleanup; a revised physical run remains pending.
+records the stop and verified cleanup. The corrected image subsequently
+completed the [small physical payment](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-28.j3r180-compact-payment.md)
+on 09336320, with independent signature/export verification and return to blank.
 
-`run-compact.cjs` prepares the first physical check of the converted prototype.
+`run-compact.cjs` runs explicitly selected fixed synthetic profiles of the converted prototype.
 Preview reads local files and returns the runner fingerprint. Execution requires
 the exact manifest hash, source commit and fingerprint, an absolute Python path,
 a new journal inside a private operator-owned directory, and explicit factory
@@ -477,7 +479,7 @@ manager keys at version 1; a named plan still governs each physical run.
 
 It matches CPLC,
 requires production/previous probe objects absent, proves one factory-key
-channel and verifies the three exact platform registry entries. It loads only
+channel and verifies the selected card's exact captured platform registry. It loads only
 the compact package, installs opener then fixture applet, records diagnostics,
 and attempts the combined 12 KiB DLEQ/16 KiB pool setup once.
 
@@ -496,6 +498,9 @@ It rejects manager-key changes, production mutations and unrelated deletes.
 Each response has a 30-second deadline; a 120-second elapsed gate and 512-command
 ceiling stop further transmissions. These bounds stop the drill on uncertainty.
 The journal retains public packet/state, timings and fixed failure categories.
+Received export pages are persisted as they arrive, including during an
+interrupted export. Available pages remain evidence; complete packet verification
+is required before retirement.
 
 An approved plan may add `--cleanup-on-declared-refusal`. It applies only to
 empty-body `6F00`/`6A84` replies from fixture creation or setup, before fixture
@@ -506,7 +511,51 @@ Other failures close the reader and retain the journal for a reviewed next actio
 
 Physical execution requires a new plan naming the exact artifact, runner, card
 and actions under [AGENTS.md](../../AGENTS.md#rules-for-agents). Existing hardware
-approvals are complete. This first drill measures combined allocation and one
-small signed export; capacity, physical power-loss recovery, wear, mint/owner
+approvals are complete. The default profile measures combined allocation and one
+small signed export; broader capacity, physical power-loss recovery, wear, mint/owner
 authorization and release enablement remain separate gates. See
 [D151](../../docs/DECISIONS.md#d151).
+
+
+### Full-slot capacity profile
+
+Add `--workload 128-input-128-output-v1` to preview or execute the fixed full-slot
+case. It is admitted only for card 09336320 and uses the same private format-5
+CAP. The default remains `two-input-two-output-v1`. Unknown names and an
+unqualified card/profile combination fail before opening a reader. An explicit
+profile is also passed to the Python bridge so small-profile admission stays
+separate.
+
+`fixtures/compact-capacity-v1.json` contains public synthetic inputs and outputs.
+The profile loads 128 distinct slots, stages 128 outputs in 22 commands of up to
+six outputs, and signs one payment. Expected consumed state is 63 free headers,
+45 free pages, zero unspent, 128 spent, zero empty and no active staging. After
+reselection, 91 export pages reconstruct 23,163 canonical bytes. Both signatures,
+exact packet and scope must verify before retirement restores 128 empty slots,
+64 free headers and 90 free pages. Normal cleanup returns the card to its exact
+three-file blank baseline. The existing 30-second response deadline, 120-second
+elapsed gate and 512-command ceiling apply unchanged.
+
+The simulator uses this exact catalogue/command stream for its large case,
+including full reclamation. Offline policy tests compare every Node command
+with independent Python construction. Runner tests cover a complete large
+export, incorrect/truncated bytes and a lost final-page response: uncertainty
+preserves received pages and performs neither retirement nor deletion. The
+physical full-slot run remains pending a named approved plan. This candidate
+output count does not freeze the protocol's eventual limits.
+
+### Interruption evidence sequence
+
+| Gate | Required evidence |
+| --- | --- |
+| Full-slot case | Combined allocation, exact large signed packet, full retirement and blank cleanup on silicon |
+| Many small records | Measured refusal before consumption, retained existing packets and reuse only after verified retirement |
+| Power loss between commands | Operator removes the card after staging and after publication; a fresh process matches identity and proves the expected abandoned or committed state |
+| Power cut during a write | A bounded separately reviewed drill observes either the pre-commit state or a complete recoverable published packet, including resumed burn/retirement bookkeeping |
+
+Simulator reset/cut cases cover logical recovery boundaries. Physical removal
+between APDUs establishes a different claim from interrupting an in-progress
+write. A future interruption runner needs phase-specific durable journals,
+identity/key/context checks, explicit uncertainty handling and reviewed recovery
+commands before either physical step. Existing approvals have been consumed;
+this documentation authorizes no new card access.

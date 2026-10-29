@@ -316,6 +316,7 @@ async function openBridge(
   registryOnly = false,
   cleanupOnly = false,
   profile = "resource",
+  workload,
 ) {
   if (!["resource", "compact"].includes(profile))
     throw new Error("unknown bridge profile");
@@ -329,6 +330,7 @@ async function openBridge(
       ),
       "--reader",
       reader,
+      ...(profile === "compact" && workload ? ["--workload", workload] : []),
       ...(registryOnly ? ["--registry-only"] : []),
       ...(cleanupOnly ? ["--cleanup-only"] : []),
     ],
