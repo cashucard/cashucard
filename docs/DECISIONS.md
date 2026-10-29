@@ -4304,3 +4304,27 @@ original platform baseline. Retain both journals and their original artifact.
 EEPROM exhaustion, admitting a changed artifact with old pins, or inferring
 silicon dispatch behavior from simulator success. The regression check forbids
 runtime-owned `70` for setup, and both host policies agree on the fixed command.
+
+## <a id="d153"></a>D153: Bind each permitted bench card to its captured baseline
+
+**Decided (2026-10-28):** permit the compact bench runner on two exact CPLC IDs,
+09336320 and operator-selected 07297620. Select an immutable full-TLV baseline
+by that identity. The first retains its original three entries; the second adds
+the observed `A00000016443446F634C697465` version-1.0 load file. Require the
+selected baseline before loading and after cleanup. CPLC remains bound through
+cleanup. Unknown cards and entries from another profile fail before loading.
+
+**Why:** the operator requested inspection, blanking and continued testing on
+07297620. Inspection found a 2.0 installation and test value/history. After
+explicit loss acceptance, factory keys were proved at version 1. The registry
+identified its additional pre-existing file. Cashu objects were removed while
+preserving all four baseline files, then a separate read-only check confirmed
+the exact CPLC and all four Cashu AIDs absent. The original three-entry profile
+cannot describe this different card.
+
+**Rejected:** weakening the registry check for all D321 cards, dropping unknown
+entries, trying alternate manager keys, or replacing the original profile.
+The fixed synthetic workload, private ABI, CAP, factory-key policy and cleanup
+order are unchanged. Tests exercise the new profile, preserve rejection under
+the old profile, reject unknown identities, and verify cleanup uses the chosen
+CPLC. Production protocol and reset behavior remain unchanged.

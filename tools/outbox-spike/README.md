@@ -467,7 +467,15 @@ node tools/outbox-spike/run-compact.cjs \
   --reader 'ACS ACR122U PICC Interface'
 ```
 
-The fixed workload uses card 09336320 on the ACS ACR122U reader. It matches CPLC,
+The fixed workload supports two explicitly named cards on the ACS ACR122U
+reader: 09336320 and 07297620. Their exact CPLC IDs select separate captured
+baselines. The former requires three platform load files; the latter preserves
+its additional `A00000016443446F634C697465` load file. Each full TLV, version,
+lifecycle and domain must match. An unknown card or an entry from the other
+profile stops the run before loading. Both cards were observed with factory
+manager keys at version 1; a named plan still governs each physical run.
+
+It matches CPLC,
 requires production/previous probe objects absent, proves one factory-key
 channel and verifies the three exact platform registry entries. It loads only
 the compact package, installs opener then fixture applet, records diagnostics,
@@ -480,7 +488,7 @@ and verifies both signatures, exact canonical bytes and scope against the
 card-generated public key. Only then does it retire that exact fixture record,
 confirm empty/reclaimed state and remove the private applet, opener and package.
 Cleanup rematches CPLC, proves one fresh factory-key channel and verifies the
-original platform registry. Synthetic mint metadata is used locally.
+selected card's original baseline. Synthetic mint metadata is used locally.
 
 The dedicated PC/SC policy permits the exact fixture commands, single attempts,
 bounded diagnostics/status reads and retirement matching the returned scope.
