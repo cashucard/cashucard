@@ -79,6 +79,8 @@ function fixture(t) {
   };
 }
 function fake({
+  chip = "cplc-v1:4790d3213041093363205547",
+  cardDoc = chip === "cplc-v1:4790d3213180072976207515",
   wrongChip = false,
   authFailure = false,
   signFailure = false,
@@ -89,7 +91,14 @@ function fake({
   lowCommit = false,
   corruptPacket = false,
 } = {}) {
-  const calls = { opens: 0, closes: 0, auth: 0, deletes: [], stages: [] };
+  const calls = {
+    opens: 0,
+    closes: 0,
+    auth: 0,
+    deletes: [],
+    stages: [],
+    chipTargets: [],
+  };
   const sdk = require("../cardkit");
   let state = "blank",
     after = false;
@@ -106,6 +115,14 @@ function fake({
   const registry = () =>
     Buffer.concat([
       ...platform.map((x) => Buffer.from(x, "hex")),
+      ...(cardDoc
+        ? [
+            Buffer.from(
+              "e3214f0da00000016443446f634c6974659f700101ce020100cc08a000000151000000",
+              "hex",
+            ),
+          ]
+        : []),
       ...(state === "blank"
         ? []
         : [Buffer.from("e30c4f0aF04341534855434D5054", "hex")]),
@@ -175,8 +192,9 @@ function fake({
   const deps = {
     sdk: {
       ...sdk,
-      readChipIdentity: async () => {
-        if (wrongChip) throw Error("private chip text");
+      readChipIdentity: async (_tx, expected) => {
+        calls.chipTargets.push(expected);
+        if (wrongChip || expected !== chip) throw Error("private chip text");
       },
       openSession: async () => {
         calls.auth++;
@@ -283,6 +301,32 @@ test("preview and pins refuse changed artifacts before opening a reader", async 
   fs.appendFileSync(path.join(path.dirname(o.manifest), "load-file.bin"), "x");
   assert.throws(() => compactArtifact(o));
   assert.equal(f.calls.opens, 0);
+});
+test("07297620 uses only its exact captured baseline and remains bound through cleanup", async (t) => {
+  const o = fixture(t),
+    chip = "cplc-v1:4790d3213180072976207515",
+    f = fake({ chip });
+  const r = await runCompact({ ...o, chip }, f.deps);
+  assert.equal(r.chip, chip);
+  assert.equal(r.status, "complete");
+  assert.deepEqual(f.calls.chipTargets, [chip, chip]);
+  const old = fixture(t),
+    oldFake = fake({ cardDoc: true });
+  await assert.rejects(runCompact(old, oldFake.deps));
+  assert.ok(!oldFake.calls.stages.includes("install-for-load"));
+  const missing = fixture(t),
+    missingFake = fake({ chip, cardDoc: false });
+  await assert.rejects(runCompact({ ...missing, chip }, missingFake.deps));
+  assert.ok(!missingFake.calls.stages.includes("install-for-load"));
+  const unknown = fixture(t),
+    unknownFake = fake();
+  await assert.rejects(
+    runCompact(
+      { ...unknown, chip: "cplc-v1:4790d3213180072976217515" },
+      unknownFake.deps,
+    ),
+  );
+  assert.equal(unknownFake.calls.opens, 0);
 });
 test("one bounded synthetic payment verifies both signatures before retirement and exact cleanup", async (t) => {
   const o = fixture(t),

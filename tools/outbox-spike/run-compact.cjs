@@ -16,8 +16,15 @@ const {
   workload,
   verifyPacket,
 } = require("./compact-workload.cjs");
-const CHIP = "cplc-v1:4790d3213041093363205547",
-  READER = "ACS ACR122U PICC Interface";
+const READER = "ACS ACR122U PICC Interface";
+// Observed card-specific baselines, not a general permission for D321 cards.
+const BASELINES = Object.freeze({
+  "cplc-v1:4790d3213041093363205547": Object.freeze([...PLATFORM_FILES]),
+  "cplc-v1:4790d3213180072976207515": Object.freeze([
+    ...PLATFORM_FILES,
+    "e3214f0da00000016443446f634c6974659f700101ce020100cc08a000000151000000",
+  ]),
+});
 const AIDS = [PACKAGE + "01", PACKAGE + "4D", PACKAGE];
 const sha = (b) => createHash("sha256").update(b).digest("hex");
 const fail = (code) => {
@@ -134,7 +141,7 @@ function diagnostics(data, ready) {
     saturatedAvailability: [0, 2, 4].map((at) => b.readUInt16BE(at) === 32767),
   };
 }
-function verifyRegistry(registry, allowed) {
+function verifyRegistry(registry, allowed, baseline = PLATFORM_FILES) {
   const seen = new Set(),
     objects = new Set();
   for (const kind of ["applications", "load-files"]) {
@@ -149,7 +156,7 @@ function verifyRegistry(registry, allowed) {
     for (let i = 0; i < frames.length; i++) {
       const frame = frames[i],
         aid = entries[i].aid.toUpperCase();
-      if (kind === "load-files" && PLATFORM_FILES.includes(frame)) {
+      if (kind === "load-files" && baseline.includes(frame)) {
         if (seen.has(frame)) fail("registry-duplicate");
         seen.add(frame);
       } else if (
@@ -162,7 +169,7 @@ function verifyRegistry(registry, allowed) {
       else objects.add(aid);
     }
   }
-  if (seen.size !== PLATFORM_FILES.length) fail("registry-platform-baseline");
+  if (seen.size !== baseline.length) fail("registry-platform-baseline");
 }
 function deletion(aid) {
   if (!AIDS.includes(aid)) throw Error("private AID required");
@@ -170,8 +177,11 @@ function deletion(aid) {
   return [0x80, 0xe4, 0, 0, b.length + 2, 0x4f, b.length, ...b, 0];
 }
 async function runCompact(options, dependencies = {}) {
+  const baseline = Object.hasOwn(BASELINES, options.chip)
+    ? BASELINES[options.chip]
+    : undefined;
   if (
-    options.chip !== CHIP ||
+    !baseline ||
     options.reader !== READER ||
     (options.execute && options.cleanupOnly)
   )
@@ -179,7 +189,7 @@ async function runCompact(options, dependencies = {}) {
   const { manifest, load } = compactArtifact(options),
     runnerHash = fingerprint();
   const summary = {
-    chip: CHIP,
+    chip: options.chip,
     reader: READER,
     sourceCommit: manifest.sourceCommit,
     manifestSha256: options.manifestHash,
@@ -290,7 +300,7 @@ async function runCompact(options, dependencies = {}) {
       }
       if (!complete) fail("registry-incomplete");
     }
-    verifyRegistry(r, allowed);
+    verifyRegistry(r, allowed, baseline);
     state.registry = r;
     save();
     return r;
@@ -318,7 +328,9 @@ async function runCompact(options, dependencies = {}) {
         fail("drill-bound-exceeded");
       return tx(apdu);
     };
-    await step("match-chip", () => sdk.readChipIdentity(bridge.tx, CHIP));
+    await step("match-chip", () =>
+      sdk.readChipIdentity(bridge.tx, options.chip),
+    );
     const forbidden = [
       sdk.CARD_AID,
       sdk.TAG_AID,
@@ -343,7 +355,7 @@ async function runCompact(options, dependencies = {}) {
     );
     cleanup = async () => {
       await step("cleanup-match-chip", () =>
-        sdk.readChipIdentity(bridge.tx, CHIP),
+        sdk.readChipIdentity(bridge.tx, options.chip),
       );
       session = await step("cleanup-factory-authentication", () =>
         sdk.openSession(bridge.tx, sdk.FACTORY_KEYS, randomBytes, { kvn: 1 }),
