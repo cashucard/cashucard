@@ -4305,6 +4305,12 @@ EEPROM exhaustion, admitting a changed artifact with old pins, or inferring
 silicon dispatch behavior from simulator success. The regression check forbids
 runtime-owned `70` for setup, and both host policies agree on the fixed command.
 
+**Physical follow-up (2026-10-28):** the format-5/SETUP-7E image completed the
+small synthetic payment on 09336320, including combined DLEQ/outbox allocation,
+both independently verified signatures, exact export, retirement and return to
+blank. See the [hardware report](reports/HARDWARE_TEST_REPORT_2026-10-28.j3r180-compact-payment.md).
+Capacity, actual power-loss recovery and production integration remain open.
+
 ## <a id="d153"></a>D153: Bind each permitted bench card to its captured baseline
 
 **Decided (2026-10-28):** permit the compact bench runner on two exact CPLC IDs,
