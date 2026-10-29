@@ -81,12 +81,10 @@ The [PC/SC API](https://pcsclite.apdu.fr/api/group__API.html) identifies
 neither a JavaCard exception nor an allocation diagnosis. Baseline verification
 establishes object removal; the run supplied no post-cleanup memory snapshot.
 
-Pause installation attempts. The next proposed diagnostic compares public ISD
-memory before and after an operator-controlled cold card reset, matching CPLC
-for each read and performing no authentication or writes. That separate plan
-requires approval and a physical lift/return; it remains prepared and unexecuted.
-Full-slot, many-small-record and actual interrupted-write gates remain open.
-Assisted settlement remains disabled in released apps.
+After cleanup, installation attempts remained paused while the operator approved
+the read-only cold-reset comparison below. Full-slot, many-small-record and
+actual interrupted-write gates remain open. Assisted settlement remains disabled
+in released apps.
 
 ## Evidence retention
 
@@ -103,3 +101,54 @@ actual run timestamp.
 | `prototype-journal.json` | `12fffb7c4ff42c60f12e0f9af2ca51dc58ab7090a1e650a45e9928d6a8fcd107` |
 | `registry-before-delete.json` | `8ef22f734962c48fb684ac422423e2459a36e519680fd781408151f86cfbd7ac` |
 | `cleanup-journal.json` | `41aa344d057a687c21466cbe6ef7910936e1dd37f17d3b98e2a46d840b536e8b` |
+
+
+## Read-only cold-reset comparison
+
+The operator approved a separate plan and confirmed the blank card had stayed
+on the reader since cleanup. The first connection sent SELECT ISD, GET CPLC and
+GET DATA FF21 once each, matched 09336320, recorded the public memory values and
+closed. The operator then confirmed lifting the card away for five seconds and
+returning it. A second connection sent the same three reads, matched the same
+CPLC, recorded memory and closed. There was no authentication, applet selection,
+write, reader configuration change or installation in this diagnostic.
+
+| Public counter | Before lift | After lift | Change |
+| --- | ---: | ---: | ---: |
+| FF21 tag 81 | 1 | 1 | 0 |
+| Persistent availability, bytes | 164,176 | 164,176 | 0 |
+| Volatile availability, bytes | 3,990 | 3,990 | 0 |
+
+Both replies returned `9000`. These values match an earlier blank-card snapshot
+in the [allocation report](HARDWARE_TEST_REPORT_2026-10-28.j3r180-allocation-comparison.md).
+The comparison shows no additional reported memory reclaimed by this power
+cycle. Aggregate availability does not measure maximum contiguous allocation or
+identify the cause of the failed constructor/APDU exchange.
+
+The small run passed after the operator swapped 09336320 onto the reader, and
+the later creation failure followed its cleanup. Power continuity between that
+earlier cleanup and the failed capacity run was not recorded. The operator's
+confirmed no-lift interval applies to the failed capacity run's cleanup through
+the first memory read. This is therefore not a controlled warm/cold installation
+comparison. A reset-sensitive card/reader condition remains a hypothesis alongside
+intermittent transport, power and other runtime conditions.
+
+A single separately approved installation after the now-recorded five-second
+lift could establish a result under that explicit starting condition, keeping
+the image/workload/bounds fixed. Either outcome alone would not prove the earlier
+failure's cause. This read-only plan performed no installation and does not
+authorize a retry.
+
+Protected comparison evidence is retained under
+`assisted-compact-09336320-memory-2026-10-29`, including the approved plan,
+helper/runtime pins, operator lift confirmation, both results and comparison.
+The helper's direct execution is preview-only. Four offline fake-transport cases
+covered exact reads, identity mismatch before memory, fixed transport evidence,
+and unavailable/malformed data with reader closure.
+
+| Comparison evidence | SHA-256 |
+| --- | --- |
+| `plan.md` | `8ef3f73f59479ced130b3ea1a339e93505d441851aa04aff85b14358c71b581a` |
+| `before.json` | `7f879543e1cc61ffc211b9887a89e2f872632acd9970d8d792a3229928ae6162` |
+| `after.json` | `0cea702568e4251d853ee01a57846719e62e50e270cbe161d708df2ecfe279e1` |
+| `comparison.json` | `747d1319c7014e9280b9bd20e6e498ae3d738a599ccf38cc94f727e37d2a827f` |
