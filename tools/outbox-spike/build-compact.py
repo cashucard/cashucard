@@ -56,7 +56,7 @@ def main():
     assets=importlib.util.module_from_spec(spec);spec.loader.exec_module(assets)
     load=assets.load_file(str(cap));(out/'load-file.bin').write_bytes(load)
     sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
-    manifest=dict(kind='compact-javacard-prototype',probeFormat=4,sourceCommit=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip(),
+    manifest=dict(kind='compact-javacard-prototype',probeFormat=5,sourceCommit=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip(),
         packageAid=PACKAGE.replace(':',''),constructorSources=hashes,classShape=shape,poolBytes=16384,deferredDleqBytes=12288,
         generatedSources={f.name:sha(f) for f in (out/'src/me/flashapp/cashu').glob('*.java')},
         sdkApiSha256=sha(sdk/'lib/api_classic.jar'),sdkToolsSha256=sha(sdk/'lib/tools.jar'),

@@ -8,7 +8,7 @@
             b[2] = 0x52;
             b[3] = 0x4F;
             b[4] = 0x54;
-            b[5] = 1;
+            b[5] = 2;
             apdu.setOutgoingAndSend((short) 0, (short) 6);
             return;
         }
@@ -25,7 +25,7 @@
             Util.setShort(b, (short) 10, (short) (cardLocked[0] == 2 ? cardReceipts.length : 0));
             Util.setShort(b, (short) 12, (short) (dleq == null ? 0 : dleq.length));
             b[14] = cardLocked[0];
-            b[15] = 4;
+            b[15] = 5;
             apdu.setOutgoingAndSend((short) 0, (short) 16);
             return;
         }
@@ -34,7 +34,7 @@
             apdu.setOutgoingAndSend((short) 0, size);
             return;
         }
-        if (ins == (byte) 0x70) {
+        if (ins == (byte) 0x7E) {
             if (cardLocked[0] != 0) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
             short len = compactReceive(apdu);
             CompactState.validateSetup(b, ISO7816.OFFSET_CDATA, len);

@@ -404,14 +404,14 @@ and manifest kind. Physical access requires a separately reviewed runner and
 named approved plan. The release firmware and provisioner assets are unchanged.
 
 The private fixture ABI uses CLA `B0`, P1/P2 zero and short APDUs. Case-2 commands
-use Le=0. Selection returns ASCII `CPROT` and byte 1. Fixture loading accepts
+use Le=0. Selection returns ASCII `CPROT` and private ABI byte 2 (manifest/diagnostic format 5). Fixture loading accepts
 public synthetic proof data and structural compressed-point prefixes; holder
 permission, mint/DLEQ/fee verification and receipt/limit integration are separate
 work. Unsigned retirement is a bench command. This ABI is excluded from production.
 
 | INS | Private operation | Data | Response |
 | --- | --- | --- | --- |
-| `70` | One setup attempt | initial counter (8), nonce (32), mint length (1), ASCII HTTPS mint (up to 214) | `01` |
+| `7E` | One setup attempt | initial counter (8), nonce (32), mint length (1), ASCII HTTPS mint (up to 214) | `01` |
 | `78` | Append immutable keyset | index (1), ID length (1), ID (8 or 33) | count (1) |
 | `71` | Load fixture | slot (1), generation (4), registry index (1), amount (4), nonce (32), C (33) | slot (1) |
 | `72` | Reserve hidden staging | input count (1), output count (1), ordered slots | index (1) |
@@ -424,7 +424,7 @@ work. Unsigned retirement is a bench command. This ABI is excluded from producti
 | `79` | Record states | none | 64 bytes |
 | `7A` | Public installation key | none | 33 bytes |
 | `7B` | Abandon staging | none | `01` |
-| `7D` | Diagnostics | none | memory/commit counters, pool/DLEQ lengths, setup state, format 4 (16) |
+| `7D` | Diagnostics | none | memory/commit counters, pool/DLEQ lengths, setup state, format 5 (16) |
 
 Scope is index (1), payment ID (8), generation (4) and canonical packet ID (32).
 Signatures and payload stay hidden until publication. Reselection discards
@@ -442,6 +442,13 @@ leave physical memory, transaction rollback, wear and latency unverified. See
 [D150](../../docs/DECISIONS.md#d150) for the design and remaining gates.
 
 ## Private compact hardware runner
+
+The first physical image installed and answered diagnostics, then returned
+`6E00` for setup instruction `70`. That instruction belongs to JavaCard runtime
+channel management. The revised private ABI uses `7E`, selection `CPROT/2` and
+manifest/diagnostic format 5. New runner admission rejects earlier formats.
+The [physical report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-28.j3r180-compact-setup.md)
+records the stop and verified cleanup; a revised physical run remains pending.
 
 `run-compact.cjs` prepares the first physical check of the converted prototype.
 Preview reads local files and returns the runner fingerprint. Execution requires
