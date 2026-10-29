@@ -125,14 +125,19 @@ The comparison shows no additional reported memory reclaimed by this power
 cycle. Aggregate availability does not measure maximum contiguous allocation or
 identify the cause of the failed constructor/APDU exchange.
 
-The retained sequence motivates one controlled cold-start comparison: the small
-run passed after the operator swapped 09336320 onto the reader; the later
-creation failure followed its cleanup while the card remained powered. The
-07297620 failures also followed deletion of an existing installation or failed
-private image. A reset-sensitive card/reader state is a hypothesis consistent
-with that sequence. The current evidence cannot distinguish it from intermittent
-transport, power or other runtime conditions. This read-only plan performed no
-installation and does not authorize a retry.
+The small run passed after the operator swapped 09336320 onto the reader, and
+the later creation failure followed its cleanup. Power continuity between that
+earlier cleanup and the failed capacity run was not recorded. The operator's
+confirmed no-lift interval applies to the failed capacity run's cleanup through
+the first memory read. This is therefore not a controlled warm/cold installation
+comparison. A reset-sensitive card/reader condition remains a hypothesis alongside
+intermittent transport, power and other runtime conditions.
+
+A single separately approved installation after the now-recorded five-second
+lift could establish a result under that explicit starting condition, keeping
+the image/workload/bounds fixed. Either outcome alone would not prove the earlier
+failure's cause. This read-only plan performed no installation and does not
+authorize a retry.
 
 Protected comparison evidence is retained under
 `assisted-compact-09336320-memory-2026-10-29`, including the approved plan,
