@@ -4393,3 +4393,36 @@ as permission to erase evidence. Many-small-record capacity, between-command
 power loss and cuts during writes remain separate measured gates. Physical
 execution still requires a named approved plan; production firmware, protocol
 assignments and release capability are unchanged.
+
+## <a id="d156"></a>D156: Isolate the Android private creation control
+
+**Decided (2026-10-30):** prepare a separate offline Android lab application for
+one creation-only control on the Pixel and exact blank card 09336320. Generate
+it outside the checkout from committed source, under a separate application ID,
+with bundled JavaScript, disabled developer support, removed Internet
+permission, disabled release variants and public debug signing. Keep the
+CPROT/2 format-5 CAP and load bytes unchanged. Production firmware, CCP, store
+builds, service configuration and manager keys remain unchanged.
+
+The portable controller admits a fixed command sequence through cardkit's public
+API. Pin the load hash, match CPLC, prove factory version 1 before external
+authentication, and require exact baseline registry evidence. Load once, create
+opener then main, select the private version, read diagnostics and validate the
+public key. A successful control rematches CPLC, opens one fresh factory channel,
+requires the exact private objects and original baseline, removes only those
+objects and verifies return to blank. Persist intent before every transmission.
+A consumed journal survives relaunch; cancellation, uncertain transport,
+unexpected replies and persistence failures stop without retry or cleanup.
+
+**Why:** the sole recorded-reset ACS repeat stopped at opener creation with an
+unsuccessful exchange, before capacity measurement. A different transport with
+the same image and a smaller creation-only workload supplies a bounded control.
+It does not attribute a driver/card/power cause or replace physical capacity and
+interrupted-write tests. Availability of the Pixel authorizes local preparation
+only; a named reviewed physical plan remains required for device/card access.
+
+**Rejected:** more ACS installation attempts, changing the private image to make
+the test pass, enabling the production bench flow, automatic retries/cleanup
+after uncertainty, and replacing the installed CCP app or its saved work. See
+[Pixel creation control](../tools/outbox-spike/PIXEL-CONTROL.md) for preparation
+and the exact hardware boundary.
