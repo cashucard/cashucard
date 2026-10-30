@@ -95,7 +95,7 @@ export default function App() {
         ...result.value,
         session: result.meta,
         stamps: result.stamps,
-        sessionClosed: true,
+        sessionTeardownRequested: true,
       };
       await save(current);
     } catch {
@@ -103,7 +103,7 @@ export default function App() {
         ...current,
         status: "stopped",
         failure: "nfc-or-journal-stopped",
-        sessionClosed: true,
+        sessionTeardownRequested: true,
       };
       try {
         await save(current);

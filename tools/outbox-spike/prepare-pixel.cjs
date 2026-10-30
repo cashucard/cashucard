@@ -16,7 +16,7 @@ function androidFiles(original) {
     )
     .replace(
       '<uses-permission android:name="android.permission.INTERNET" />',
-      '<uses-permission android:name="android.permission.INTERNET" tools:node="remove" />',
+      '<uses-permission android:name="android.permission.INTERNET" tools:node="remove" />\n    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove" />',
     );
   if (!manifest.includes('tools:node="remove"'))
     throw Error("Network permission removal missing");

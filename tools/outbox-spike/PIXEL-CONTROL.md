@@ -21,7 +21,8 @@ baseline, deletes private main, opener and package, then verifies the blank
 baseline. Every stopped stage preserves evidence and requires separately
 reviewed cleanup; an uncertain command is never retried. There are at most 256
 commands and a 120-second gate on further transmissions. Android uses the
-existing 15-second IsoDep response timeout. Cancelling closes the NFC session
+existing 15-second IsoDep response timeout and requires a reported frame limit
+of at least 261 bytes. Unconfirmed limits stop before APDUs. Cancelling requests NFC teardown
 and stops further commands; a command already delivered can have taken effect.
 
 Intent and public results are persisted around each transmission. The journal
@@ -35,7 +36,7 @@ the public journal is the only result-export action.
 `prepare-pixel.cjs` creates a fresh project outside the checkout from committed
 files. The application ID is `org.cashucard.compactlab`, with the label
 **Cashu Card Lab**. It keeps the installed provisioner's app data separate.
-The generated manifest removes Internet permission, developer support is
+The generated manifest removes Internet and overlay permissions, developer support is
 disabled, release variants are disabled, and the sole signer is the published
 Android debug key. A bundled JavaScript asset runs without Metro. The normal
 CCP entry, ops-service client and store upload lanes are excluded from its entry

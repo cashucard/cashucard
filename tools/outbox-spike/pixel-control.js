@@ -278,6 +278,15 @@ async function runCreation({
     await persist();
   };
   try {
+    state.nfcLimits = {
+      platform: limits?.platform === "android" ? "android" : "unconfirmed",
+      androidTimeoutMs: Number.isFinite(limits?.androidTimeoutMs)
+        ? limits.androidTimeoutMs
+        : null,
+      maxTransceive: Number.isFinite(limits?.maxTransceive)
+        ? limits.maxTransceive
+        : null,
+    };
     if (
       limits?.platform !== "android" ||
       limits.androidTimeoutMs !== 15000 ||
@@ -286,7 +295,6 @@ async function runCreation({
     ) {
       stop("nfc-limits-unconfirmed");
     }
-    state.nfcLimits = limits;
     if (load.length !== PINS.bytes || hash(load) !== PINS.load)
       stop("image-mismatch");
     await identity("match-chip");

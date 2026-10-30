@@ -20,6 +20,11 @@ test("generated Android identity is separate, offline and has no enabled release
     ),
   });
   assert.ok(files.gradle.includes('applicationId "' + APP_ID + '"'));
+  assert.ok(
+    files.manifest.includes(
+      'android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"',
+    ),
+  );
   assert.ok(!files.gradle.includes("CASHU_ANDROID_UPLOAD"));
   assert.ok(
     files.gradle.includes('withBuildType("release")) { it.enable = false'),
