@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/standalone.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.workers.ts",
+    "src/do.ts",
+    "src/worker.ts",
+    "src/test-bootstrap.ts",
+    "src/local-reset.ts",
+    "src/reset-preflight.ts",
+    "src/pcsc-bridge.ts"
+  ]
+}

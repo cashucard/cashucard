@@ -1,6 +1,6 @@
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
-import {Linking, Modal, StyleSheet} from 'react-native';
+import {Linking, Modal, StyleSheet, Text} from 'react-native';
 import NfcManager from 'react-native-nfc-manager';
 import {InfoButton} from '../src/ui';
 import {CardsHomeScreen} from '../src/screens/CardsHomeScreen';
@@ -24,9 +24,7 @@ beforeEach(() => {
     operatorName: 'dread',
     session: null,
     serviceUrl: 'https://cashu-card-ops.old-cell-30e7.workers.dev',
-    theme: 'dark',
     signOut: jest.fn(),
-    setTheme: jest.fn(),
   } as unknown as ReturnType<typeof useApp>);
   jest.mocked(useProvisioning).mockReturnValue({
     status: 'ready',
@@ -243,5 +241,75 @@ test.each([
     expect(open).toHaveBeenCalledWith(origin);
     expect(useApp().serviceUrl).toBe(origin);
     expect(inspect).not.toHaveBeenCalled();
+  },
+);
+
+test('leaving a screen after dismissing help cancels its pending focus callback', async () => {
+  jest.spyOn(global, 'requestAnimationFrame').mockReturnValue(47);
+  const cancel = jest
+    .spyOn(global, 'cancelAnimationFrame')
+    .mockImplementation(() => {});
+  await render(
+    <InfoButton title="Batch setup" testID="focus-help">
+      Explanation
+    </InfoButton>,
+  );
+  await act(async () => action('focus-help').props.onPress());
+  await act(async () =>
+    tree.root.findByProps({testID: 'focus-help-close'}).props.onPress(),
+  );
+  await act(async () => tree.unmount());
+  expect(cancel).toHaveBeenCalledWith(47);
+});
+
+test('service choices expose the actual API address when the dashboard uses an alias', async () => {
+  const {
+    ServiceSelectorScreen,
+  } = require('../src/screens/ServiceSelectorScreen');
+  const origin = 'https://cashu-card-ops.old-cell-30e7.workers.dev';
+  jest.mocked(useApp).mockReturnValue({
+    ...useApp(),
+    serviceUrl: origin,
+    serviceProfiles: [origin],
+    serviceStatus: 'ready',
+  });
+  await render(<ServiceSelectorScreen onDone={noop} />);
+  const row = tree.root.findByProps({testID: `service-choice-${origin}`});
+  const words = row
+    .findAllByType(Text)
+    .map(node => node.props.children)
+    .join(' ');
+  expect(words).toContain('https://ops.cashucard.org');
+  expect(words).toContain(origin);
+});
+
+test.each([
+  ['https://cashu-card-ops.old-cell-30e7.workers.dev', 'ops.cashucard.org'],
+  ['https://cards.example.com:8443', 'cards.example.com:8443'],
+])(
+  'sign-in labels the current service and offers a clear Change action for %s',
+  async (origin, host) => {
+    jest.mocked(useApp).mockReturnValue({
+      ...useApp(),
+      serviceUrl: origin,
+      serviceStatus: 'ready',
+    });
+    const choose = jest.fn();
+    await render(<SignInScreen onServices={choose} />);
+    expect(
+      tree.root.findByProps({testID: 'sign-in-service-label'}).props.children,
+    ).toBe('Ops service');
+    expect(
+      tree.root.findByProps({testID: 'sign-in-service-host'}).props.children,
+    ).toBe(host);
+    expect(
+      tree.root.findByProps({testID: 'sign-in-service-change'}).props.children,
+    ).toBe('Change');
+    expect(action('sign-in-service').props.accessibilityLabel).toContain(
+      `Current service: https://${host}`,
+    );
+    expect(choose).not.toHaveBeenCalled();
+    await act(async () => action('sign-in-service').props.onPress());
+    expect(choose).toHaveBeenCalledTimes(1);
   },
 );

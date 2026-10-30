@@ -648,13 +648,14 @@ test('real installation setup exposes no holder controls and submits inert legac
     expect(tree.root.findAllByProps({testID})).toHaveLength(0);
   }
   expect(text(tree)).not.toContain('The holder wallet sets the PIN, mint and limits.');
-  expect(text(tree)).not.toContain('FL1 — Flash, black, the bolt');
+  expect(text(tree)).not.toContain('Cashu Card, the cashew chip');
   const countInput = () => tree.root.findByProps({testID: 'batch-count'});
   expect(countInput().props.selectTextOnFocus).toBe(true);
+  const initialCount = Number(countInput().props.value);
   await act(async () => {
     tree.root.findByProps({testID: 'batch-count-increment'}).props.onPress();
   });
-  expect(countInput().props.value).toBe('13');
+  expect(countInput().props.value).toBe(String(initialCount + 1));
   await act(async () => {
     tree.root.findByProps({testID: 'batch-count-decrement'}).props.onPress();
     countInput().props.onChangeText('');
@@ -685,12 +686,12 @@ test('real installation setup exposes no holder controls and submits inert legac
   await act(async () => {
     tree.root.findByProps({testID: 'batch-count'}).props.onChangeText('2');
   });
+  expect(tree.root.findByProps({testID: 'batch-inline-review'}).props.children).toContain('2 cards');
+  expect(tree.root.findByProps({testID: 'batch-inline-review'}).props.children).toContain(config.mint);
   await act(async () => {
-    await tree.root.findByProps({testID: 'start-batch'}).props.onPress();
+    await tree.root.findByProps({testID: 'create-batch-only'}).props.onPress();
   });
-  expect(f.service.batch).not.toHaveBeenCalled();
-  expect(text(tree)).toContain('Review batch');
-  await act(async () => {tree.root.findByProps({testID: 'confirm-start-batch'}).props.onPress();});
+  expect(f.service.reserve).not.toHaveBeenCalled();
   expect(f.service.batch).toHaveBeenCalledTimes(1);
   expect((f.service.batch as jest.Mock).mock.calls[0][0]).toMatchObject({
     count: 2,
@@ -1050,4 +1051,38 @@ test('a canceled operation waiting for the shared queue never arms a later card 
   await act(async () => second.cancel());
   await act(async () => {release(); await creating; expect(await reading).toBe(false);});
   expect(resetWithCard).not.toHaveBeenCalled();
+});
+
+test('one explicit start creates the reviewed batch and reaches the first card run without another tap', async () => {
+  const f = fixture();
+  const runCard = jest.fn(async () => 'interrupted' as const);
+  const tree = await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
+  await signIn();
+  expect(runCard).not.toHaveBeenCalled();
+  await act(async () => {await flow.startAndRead({...config, count: 1});});
+  expect(f.service.batch).toHaveBeenCalledTimes(1);
+  expect(f.service.reserve).toHaveBeenCalledTimes(1);
+  expect(runCard).toHaveBeenCalledTimes(1);
+  expect(flow.snapshot?.batch?.request.count).toBe(1);
+  expect(tree.root.findByProps({testID: 'real-progress'})).toBeDefined();
+  expect(f.bytes()).not.toContain('never-persist');
+});
+
+test('Stop while batch creation is waiting retains its original request and prevents a later first-card read', async () => {
+  const f = fixture();
+  const create = f.service.batch;
+  let finish!: () => void;
+  f.service.batch = jest.fn(request => new Promise(resolve => {finish = async () => resolve(await create(request));}));
+  const runCard = jest.fn(async () => 'interrupted' as const);
+  const tree = await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
+  await signIn();
+  let running!: Promise<boolean>;
+  await act(async () => {running = flow.startAndRead({...config, count: 1});});
+  expect(tree.root.findByProps({testID: 'batch-count'}).props.editable).toBe(false);
+  const request = JSON.parse(f.bytes()!).batch.request;
+  await act(async () => flow.cancel());
+  await act(async () => {finish(); expect(await running).toBe(false);});
+  expect(JSON.parse(f.bytes()!).batch.request).toEqual(request);
+  expect(f.service.reserve).not.toHaveBeenCalled();
+  expect(runCard).not.toHaveBeenCalled();
 });

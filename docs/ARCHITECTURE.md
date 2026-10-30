@@ -15,7 +15,7 @@ version and deployment contracts.
 | Firmware | `applet/` | JavaCard 3.0.5 applet, on-card keys/proofs, spend protection and NFC tag. The tracked CAP and its hashes are release evidence. |
 | cardkit | `tools/cardkit/` | Environment-neutral TypeScript API for installation, SCP02 manager-key rotation, interrupted-install recovery and owned-card reset. It receives an APDU transceiver; it does not open NFC, call HTTP or decide operator authorization. |
 | Provisioner | `apps/provisioner/` | React Native operator app (`com.islandbitcoin.provisioner`): sign-in, batch setup, card installation, saved recovery, status and reset. Platform NFC and HTTP adapters surround cardkit. |
-| Ops-service | `ops/` | Operator sessions/administration, reservations, chip binding, manager-key escrow, durable installation/reset records, recovery fences and encrypted exports. Node/SQLite is the local adapter; Workers/Durable Object SQLite is the deployment adapter. |
+| Ops-service | `ops/` | Operator sessions/administration, reservations, chip binding, manager-key escrow, durable installation/reset records, recovery fences and encrypted exports. The standalone Node/SQLite container and Workers/Durable Object SQLite host the same provisioning domain. The container runbook describes its configuration and recovery commands. |
 | Independent recovery copy | `tools/backup-copy/` | Copies and verifies encrypted R2 exports into independent storage and reports freshness. Its process uses scoped transfer credentials. The recovery identity stays with its custodian. StartOS/Atoll packaging lives separately. |
 | Host tools and simulator | `tools/cardctl/`, `tools/cardsim/` | PC/SC reference driver and hardware-free protocol simulation. The simulator's external client/routes remain a contract with wallet and terminal repositories. |
 | Public site | `website/` | Protocol introduction, implementation links and installation guide. It is not the operator app or an ops-service deployment. |
@@ -39,8 +39,8 @@ flowchart LR
   T[Merchant terminal] -->|payment APDUs| C
   W --> M[Cashu mint]
   T -->|settlement when online| M
-  O --> D[Durable Object SQLite]
-  O -->|encrypted exports| R[R2]
+  O --> D[SQLite: local volume or Durable Object]
+  O -->|encrypted exports| R[Filesystem or R2]
   R --> B[Independent recovery copier]
   B --> N[Nextcloud / recovery storage]
 ```
@@ -68,7 +68,7 @@ authentication is not retried.
 Encrypted backup files and their private recovery identity have separate
 custody. The recovery identity belongs in the designated restricted vault and
 protected offline copy. Keep it outside R2, Nextcloud and copier configuration. A fresh
-independent copy is an admission requirement for card changes; restoring data
+independent copy is an admission requirement in the production Workers deployment; restoring data
 also installs the recovery fences before issuance resumes. See
 [OPS-THREAT-MODEL](OPS-THREAT-MODEL.md) and the recovery runbooks.
 

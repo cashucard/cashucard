@@ -38,4 +38,5 @@ apps/provisioner/android/app/src/main/assets/
 
 # Built cardkit package (source is tracked; releases build the distributable)
 tools/cardkit/dist/
+ops/dist/
 *.tgz

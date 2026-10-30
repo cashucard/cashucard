@@ -3510,3 +3510,886 @@ address confusing and repeated explanations distracting from routine actions.
 **Rejected:** hover-only help on phones, moving required consent into a tooltip,
 silently switching the API origin, and removing review steps as part of a copy
 change.
+
+## <a id="d123"></a>D123: Operators select a service before signing in
+
+**Decided (2026-10-26):** sign-in offers saved service addresses and an explicit
+review of a new HTTPS DNS origin. Settings offers sign-out and service selection,
+with the existing saved-work confirmation. The build's default service remains
+available. Addresses are canonicalized without React Native's incomplete URL
+parser; credentials, paths, query strings and fragments are rejected.
+
+Only public service addresses and the selected address are saved in a separate
+preferences key. Unreadable preferences block authentication until reloaded or
+an explicit selection is saved. A failed selection retains the old destination.
+Credential fields are cleared when leaving sign-in; generation and origin
+checks reject late replies after cancellation or service changes. HTTP requests
+omit ambient credentials, request redirect rejection and refuse redirected or
+wrong-URL replies. A service's operator credentials are entered after selection.
+
+Switching requires sign-out and remains blocked by unconfirmed legacy registry
+rows. The existing workspace envelope retains each service/operator/environment's
+card work with the original device ID. Returning to that service and account
+restores its work; addresses and tokens are not reassigned to another service.
+Dashboard links continue to follow the selected service (D122).
+
+**Rejected:** retargeting a signed-in session, copying passwords or tokens between
+services, clearing journals on a switch, and accepting a redirected reply as
+evidence from the chosen service. D122's build-time-only service choice is
+superseded; the release preflight still validates the build's default origin.
+
+## <a id="d124"></a>D124: Batch setup reviews and starts the first card in two presses
+
+**Decided (2026-10-26):** Cards → New batch opens one editable mint/count review.
+Start & Read First Card creates the batch and starts its first card run. Create
+Batch Only saves the same reviewed configuration for later. Both paths take two
+presses from Cards with the shown defaults; editing mint/count adds the chosen
+input interactions. A fresh form defaults to one card and the service's first
+listed mint reference. Approved choices are remembered per service, verified
+operator and key environment, then checked against the fresh mint list. A removed
+mint requires an explicit replacement; late defaults cannot overwrite edits.
+
+Creation and the first run share one cancellable coordinator operation. The
+original request is saved before HTTP, the acknowledged batch is displayed
+before the first card run, and actor/generation/cancellation checks run between
+creation and reservation. Stop, sign-out and uncertain replies retain the
+original work and cannot arm a late read. Reopening or resuming a batch still
+requires an explicit card action. Existing chip checks, key gates, readout,
+recovery and reset consent remain in force.
+
+The optional count/mint defaults contain public form data in a separate key;
+card recovery does not depend on them. Build 11 includes this flow and D123's
+service selector, with no firmware, cardkit API or ops-service migration.
+
+**Rejected:** an extra review page for the shipping flow, opening NFC on screen
+entry or restart, and chaining two independent operations that could clear a
+Stop request between batch creation and card reservation.
+
+
+## <a id="d125"></a>D125: Sign-in shows the service as a compact connection row
+
+**Decided (2026-10-26):** replace the full-width URL action on sign-in with
+an “Ops service” label, a single-line hostname and a separate “Change” cue in
+one accessible button. Long hosts shorten in the middle; the full display
+address is announced to screen readers and remains available in the selector.
+The existing production display alias remains. The row uses the input surface
+and a quiet border, with an accent for Change and pressed feedback.
+
+**Why:** the uppercase URL button competed with sign-in and wrapped long
+addresses. The row distinguishes the current destination from its action.
+
+**Rejected:** a connectivity indicator without a service check, extra steps to
+switch services, and changing API origins or saved-work bindings for display.
+
+
+## <a id="d126"></a>D126: Provisioner sign-in shares the Cashu Card identity
+
+**Decided (2026-10-26):** use the canonical Cashu Card lockup on the app's
+sign-in screen in place of the lightning-bolt placeholder. Bundle exact dark
+and light SVG copies from the brand library, with a regression check against
+the originals. Use the site's forest, lime and paper colors in a sign-in-only
+theme, explicit field labels, and the ops console's left-aligned form hierarchy.
+The submit action stays outside the scrolling fields and above the keyboard.
+
+The rest of the app retains its selected theme. Service choice, credential
+clearing, cancellable sign-in and recovery ownership retain their existing
+behavior. Sign-in adds no network assets or service requests. Build 12 carries
+this update because build 11 already has a signed published release; its
+artifacts and tag stay unchanged while its store rollout is held.
+
+**Why:** the placeholder icon and black form did not match the Cashu Card site
+or the provisioning console. A shared identity makes the product recognizable
+while keeping the service destination visible before credentials are entered.
+
+**Rejected:** redrawing the logo, a marketing introduction before the form,
+a fixed hero that covers fields when the keyboard opens, and replacing build
+11's published artifacts.
+
+
+## <a id="d127"></a>D127: Every provisioner screen uses the forest palette
+
+**Decided (2026-10-26):** use the approved sign-in forest background throughout
+the app, including when the phone is in light mode. One shared theme supplies
+forest surfaces, pale text, sage secondary text, lime accents and coral danger
+states. Filled controls have explicit foreground colors for readable labels.
+Sign-in inherits this theme; its separate light palette is removed. The old
+System/Dark/Light selector and its unused state are removed from Settings.
+
+Card tools, service selection, setup, installation, recovery, results, help
+panels and the gated bench screen share the palette. The bench's release gate
+and hardware handlers retain their existing checks. Card artwork and progress
+meaning remain the same. Build 12 includes this refinement before distribution.
+
+**Why:** the operator approved the sign-in background and asked for it on all
+pages. OS appearance and per-screen overrides would make the app inconsistent.
+D126's sign-in-only theme scope is superseded by this decision.
+
+**Rejected:** changing only the page background while retaining unreadable
+button labels, keeping appearance controls that switch away from the chosen
+palette, and separate copies of the same theme for each screen.
+
+
+## <a id="d128"></a>D128: Daily card tools live on Cards home
+
+**Decided (2026-10-26):** remove Check a card and Reset a card for reuse from
+Settings. Their daily entry points remain on Cards home, with the existing
+saved-work, hardware-busy and reset guards. Contextual actions in card status
+and installation retain their current navigation and consent paths.
+
+Settings retains physical chip identity under Diagnostics, and the bench
+entry in approved laboratory builds. Identity returns to Settings, whose Back
+action returns to Cards. An empty diagnostics group is hidden. Build 12
+includes this cleanup before store distribution.
+
+**Why:** Cards home already gives direct access to checking and resetting a
+card. Duplicating those actions in Settings adds clutter and another entry
+path to the same tasks.
+
+**Rejected:** removing identity diagnostics, moving everyday tools back into
+Settings, and changing card operations or recovery rules for a navigation edit.
+
+## <a id="d129"></a>D129: A standalone container hosts the Node ops-service
+
+**Decided (2026-10-26):** package the existing Node/SQLite provisioning domain
+as one multi-stage OCI image, with native AMD64 and ARM64 acceptance in CI.
+Runtime carries compiled JavaScript and production dependencies. It runs as
+an unprivileged user with persistent SQLite, separate mounted secrets and
+filesystem exports. StartOS packaging can consume the same image later.
+
+The standalone process validates listener, mint and administrator configuration,
+accepts bounded regular secret files, applies the existing nonce-based operator
+setup before listening, and drains HTTP before closing SQLite. Separate live
+and ready endpoints distinguish a running database from a recovery-fenced
+issuer. Initialization creates private random credentials once. Encrypted export
+and restore reuse the existing v7 artifact format and recovery fence. The image
+changes no card protocol, manager-key derivation or deployed Cloudflare state.
+
+The existing Workers adapter continues to own R2 scheduling and companion
+enrollment/receipt HTTP APIs. The first container uses filesystem export with
+an external scheduler and independent copy procedure. Source documentation
+states that boundary; the public website guide remains deferred by the operator.
+
+**Why:** independent issuers need a portable deployment with private setup and
+durable state. A StartOS-specific runtime would tie the service to one host.
+
+**Rejected:** a TypeScript development runtime in the final image, embedded
+credentials or live databases, an automatically replaced issuer master, sharing
+one SQLite volume across replicas, and presenting container startup as backup
+or restore acceptance.
+
+## <a id="d130"></a>D130: Ops tags publish an immutable multi-platform image
+
+**Decided (2026-10-26):** an `ops-vX.Y.Z` component release publishes
+`ghcr.io/cashucard/ops-service:X.Y.Z` after full CI, using the exact tagged
+source and the existing container build. The index must contain Linux AMD64
+and ARM64 payloads. OCI provenance and an SBOM accompany the image. Release
+metadata records its digest, platforms and source commit; the GitHub release
+waits for both the Worker artifacts and the image before publication.
+
+The version-availability guard reads every registry version page, refuses an
+existing tag, and stops on ambiguous permission/network errors. The first
+package can be created after a confirmed API 404. Release jobs remain serialized
+by component tag. The workflow's repository token supplies registry access;
+registry credentials remain outside the build context and image layers.
+
+**Why:** independent operators need a pullable image with the same tested
+runtime on their CPU architecture. Source builds remain available, and hosting
+packages can pin the same digest. The public website guide was deferred here; D131 adds it after release validation.
+
+**Rejected:** a moving `latest` deployment tag, replacing an existing published
+image version, publishing a one-architecture index as a portable release, and
+announcing anonymous availability before checking package visibility.
+
+
+## <a id="d131"></a>D131: Developer docs separate card use, issuance and hosting
+
+**Decided (2026-10-26):** the public Developers page starts with the payment and
+issuance flows, identifies who operates each component, and offers separate paths
+for reader development, installation and service hosting. Optional storage,
+notification and recovery companions sit in expandable sections. A dedicated
+ops-service guide explains manager-key authority before Docker setup and links a
+release-pinned Compose file. It distinguishes standalone filesystem exports from
+the Workers pairing and receipt adapters.
+
+**Why:** a wallet developer needs the card/mint contract; a card issuer also needs
+operator authorization, persistent manager keys and installation history. A new
+reader should be able to identify that responsibility before encountering the
+host's recovery tools or deployment commands.
+
+**Rejected:** making the service a requirement of the payment protocol, presenting
+Nextcloud or ntfy as required server dependencies, and putting the full hosting
+runbook ahead of the component overview.
+
+
+## <a id="d132"></a>D132: Ecosystem map shares one physical card across flows
+
+**Decided (2026-10-26):** the developer overview uses a native SVG architecture
+map with separate desktop and phone compositions. Wallet, till and CCP connect
+to the same physical card running the applet. The mint serves payment flows;
+the ops-service authorizes installation and keeps manager keys and records.
+The supporting layer names the copy job, independent backup storage, alerts and
+separate backup-key custody. Captions distinguish Workers/Atoll from standalone
+filesystem exports. A text explanation remains available below the image.
+
+**Why:** two linear flow cards duplicated the card and combined till and mint,
+which obscured the actual relationships. One map makes the boundaries visible
+while keeping deployment detail in the hosting guide.
+
+**Rejected:** treating the ops-service as a payment intermediary, implying Atoll
+pairs with the standalone Docker service, and shrinking a desktop graph until
+its labels become unreadable on a phone.
+
+## <a id="d133"></a>D133: The provisioner draws a neutral Cashu Card face
+
+**Decided (2026-10-26):** the provisioner's card figure and batch-setup design
+row show the Cashu Card face: the brand's lime gradient, the lockup, the gold
+cashew-contacts chip and the mark. It is a generic face, not a design code in
+[CARD-DESIGNS.md](CARD-DESIGNS.md); holder wallets keep choosing and writing
+design codes. The ops-service default mint list now starts with
+`mint.minibits.cash`; `forge.flashapp.me` stays in the list, last. The
+installation screen's card-check button, hardware gate and recovery notice now
+sit inside the setup form's safe area.
+
+**Why:** the provisioner is a shared open source tool and its store listings
+show these screens. Drawing one issuer's card and preselecting its mint reads
+as that issuer's app. On Android the check button drew over the status bar.
+
+**Rejected:** registering a new design code for the figure (the provisioner
+writes no design), dropping the Flash mint from the list, and removing the
+check button from setup (it returns to the form, per D121).
+
+## <a id="d134"></a>D134: cashucard.org carries its own privacy, terms and support pages
+
+**Decided (2026-10-26):** cashucard.org publishes `/privacy`, `/terms` and
+`/support`, linked from every page's footer. Island Bitcoin LLC is named as the
+party responsible for cashucard.org, ops.cashucard.org and the Cashu Card
+Provisioner app, the three things it runs and publishes. Contacts are
+@cashucard.org addresses: support, privacy, security, conduct and hello.
+`/support` points to the questions and answers, GitHub Discussions and issues,
+and the support address.
+
+The privacy policy states what is collected: Cloudflare request logs for the
+site; the operator's sign-in and the batch and card records the app sends to
+the ops service it chooses; operator accounts, card records, issued keys and
+an audit log on ops.cashucard.org. The app carries no analytics, advertising
+or tracking code.
+
+**Why:** the provisioner's store listings and its sign-in screen linked to
+Flash's privacy policy, terms and support address. A shared open source project
+needs its own, and a privacy policy needs a named legal entity; "The Cashu Card
+authors" is a license holder, not one.
+
+**Rejected:** naming "The Cashu Card authors" as the responsible party, and
+publishing the pages before the @cashucard.org mailboxes receive mail.
+
+## <a id="d135"></a>D135: The provisioner and the repository use the @cashucard.org contacts
+
+**Decided (2026-10-26):** the @cashucard.org mailboxes receive mail on Proton,
+so the project points to them. The provisioner's Privacy Policy, Terms and
+Support links open cashucard.org/privacy, cashucard.org/terms and
+support@cashucard.org (replacing the Flash pages from D58). The Play listing's
+support line names cashucard.org/support and support@cashucard.org.
+SECURITY.md adds security@cashucard.org beside private advisories, the code of
+conduct takes reports at conduct@cashucard.org, and SUPPORT.md names the
+support and conduct addresses. The FAQ and the developers page give the
+security address too.
+
+**Why:** D134 published the pages and the addresses but held the switch until
+the mailboxes received mail. Test mail to all five arrived on 2026-10-26.
+
+**Rejected:** keeping GitHub advisories as the only security channel. A
+reporter without a GitHub account needs a private route too.
+
+
+## <a id="d136"></a>D136: Verify settlement before clearing retained spent slots
+
+**Decided (2026-10-27):** readers must obtain complete NUT-07 `SPENT`
+coverage for the same authenticated card's retained spent-proof snapshot before
+calling the existing all-slot `CLEAR_SPENT`. Incomplete, unavailable or
+unreconstructable evidence blocks cleanup. Interrupted cleanup retains its
+previously verified scope. Merchant output and owed-change records remain
+independently recoverable. The APDU bytes and applet version stay at 2.1.
+
+**Why:** a spent slot records a card signature, while an offline till may still
+hold the only signed swap. Clearing its reconstruction data before mint
+settlement can strand that payment. The corresponding shared reader-contract
+change is reviewed in cashucard/nut#4.
+
+**Rejected:** treating a zero card balance, input consumption on the card, or an
+empty phone queue as proof of mint settlement.
+
+Assisted settlement is being developed in separate gated slices: merchant
+pre-sign durability, exact-output recovery with replay-safe accounting, then a
+reviewed card outbox and selective retirement. The local feasibility rehearsal
+in `tools/cardsim/assisted-settlement.cjs` proves the signed-swap/restore path
+against a local Nutshell mint. Resource bounds and the new wire contract still
+need partner review and separately approved silicon measurements.
+
+
+## <a id="d137"></a>D137: Isolate the early outbox resource probe from released firmware
+
+**Decided (2026-10-27):** `tools/outbox-spike/build-probe.py` copies the current
+applet sources into a new scratch directory, preserves its installation path and
+adds a persistent pool (16 KiB by default) with persistent memory counters. It
+replaces command dispatch with probe-only memory reporting and a dummy 128-byte
+transaction. The package uses the private test AID `F0434153485550524F4245` and
+version 0.0. Production payment, PIN, load and reset commands are refused. The
+production CAP, protocol version and provisioner assets stay unchanged.
+
+**Why:** the outbox needs a physical-chip resource gate before choosing record
+limits. A generated probe can measure the current install demand plus a candidate
+pool without adding a full transient packet buffer or committing to production
+APDU assignments. Its manifest binds the source hashes, tool hash and CAP hash.
+
+**Rejected:** estimating the number of supported payments from nominal EEPROM,
+using simulator memory counts as chip measurements, and installing an unmeasured
+prototype through the released provisioner. This probe establishes a resource
+floor. Descriptor signing latency, the final transaction layout, power loss,
+record limits and wear still require the subsequent approved prototype drills.
+Physical installation and restoration need a named disposable card, confirmed
+empty/reconciled state, known key provenance and an approved action list.
+
+
+## <a id="d138"></a>D138: Run the resource probe only after a service-recorded factory reset
+
+**Decided (2026-10-27):** the USB resource runner accepts only the private 16 KiB
+probe profile, a pinned manifest hash, a named chip/ACS reader, confirmed factory
+reset and a fresh private journal. It uses cardkit 0.2.0's public API and factory
+keys only. It rejects an installed production applet or unexpected registry
+objects before loading. One known-key secure channel loads the probe; selection
+ends that channel, so one new known-key channel performs verified cleanup.
+Every failed operation stops without a retry or automatic cleanup.
+
+The bridge opens the reader exclusively, restricts mutation to the private
+probe's package/instances and refuses PUT KEY and production deletes. The
+runner verifies CPLC before each authentication, persists the next stage before
+mutation, measures one dummy publication and verifies registry absence after
+cleanup. It finishes factory-blank; the operator restores a recorded released
+applet through CCP's ordinary batch flow.
+
+**Why:** a disposable empty card may still have assigned manager keys. Using
+CCP's reset first preserves its service history and proves the documented
+factory transition while keeping issued keys inside the existing protected
+phone/service flow. The standalone probe needs no production credential or
+issued-key export.
+
+**Rejected:** guessing factory keys on an assigned-key card, widening the
+production delete whitelist, writing an unrecorded production installation over
+USB, and retrying after an uncertain LOAD or INSTALL. Physical execution remains
+behind a separate approved action list and a complete protected journal.
+
+
+## <a id="d139"></a>D139: Diagnose resource-probe registry failures without repeating the write drill
+
+**Decided (2026-10-27):** the resource runner records public GET STATUS replies
+and parsed registry fields in its protected journal, with fixed status, format,
+incomplete-response and unexpected-object failure codes. It excludes arbitrary
+exception text and all authentication payloads. A separate registry-only mode
+shares the pinned artifact, identity and known-factory-key checks, but returns
+before installation or cleanup. Its PC/SC bridge independently refuses every
+probe mutation. Both modes refuse journal reuse and stop without retries.
+
+**Why:** the approved first physical invocation stopped at the blank-registry
+gate before loading the probe. Its original stage-only journal cannot determine
+whether the cause was a registry status, parser refusal or unexpected object.
+Bounded public evidence makes the next separately approved diagnostic useful
+without rerunning a mutation workflow.
+
+**Rejected:** accepting an unparsed registry, automatically trying another format
+or secure channel, deleting unknown objects, and recording APDU/authentication
+transcripts. The original stopped invocation remains preserved. Inspection needs
+its own named-device approval and does not authorize resuming the write drill.
+
+
+## <a id="d140"></a>D140: Preserve the exact observed platform packages during the resource drill
+
+**Decided (2026-10-27):** the named 09336320 probe profile accepts the three
+pre-existing platform load files observed by the approved registry inspection.
+It pins their full public GET STATUS entries, requires every one before and
+after the drill, and permits only the private probe package/instances alongside
+them during cleanup. Different versions, metadata, missing entries, duplicates
+or extra objects stop the run. The profile requires an explicit flag and the
+matching CPLC. The default remains empty-registry-only.
+
+**Why:** the original D138 empty-registry assumption rejected this card's platform
+packages after a successful CCP reset. The same three entries appear in the
+owner's earlier captures. They are the SSD creation package and the JavaCard
+biometry libraries, not an installation left behind by CCP. The exact baseline
+is a preservation check; AID recognition alone is insufficient.
+
+**Rejected:** removing platform packages to satisfy an empty-registry check,
+accepting arbitrary installed packages, matching only AIDs, and accepting a
+missing baseline after cleanup. The bridge continues to allow deletion only of
+the private probe AIDs. The stopped invocation and diagnostic evidence remain
+retained, and the revised write plan needs separate approval before execution.
+
+
+## <a id="d141"></a>D141: Separate cleanup of a stopped resource drill from another install attempt
+
+**Decided (2026-10-27):** the resource runner has an explicitly selected cleanup
+mode for a separately approved named-card plan. It matches CPLC, requires known
+production objects absent, proves the factory channel once, checks the selected
+exact registry baseline, deletes only the private probe objects in dependency
+order and verifies the baseline afterward. An absent probe object is acceptable;
+unexpected state or any other command failure stops without retry. The bridge
+independently refuses loading, creation and dummy writes in cleanup mode.
+
+**Why:** the approved platform-profile drill loaded its package and created the
+opener, then stopped while creating the probe applet. It obtained no resource
+measurement. Restoring the released applet requires removing these private test
+objects first, without repeating their creation or assuming the final instance
+exists. The old host discarded status details for non-registry refusals, so the
+cause remains unresolved; future fixed failure codes include the public status
+word when available.
+
+**Rejected:** automatic rollback after an uncertain mutation, retrying INSTALL
+to discover the old failure, deleting platform or production objects, and
+recording arbitrary errors or authentication transcripts. Prior journals remain
+unchanged. Cleanup approval does not authorize another resource-probe attempt.
+
+
+## <a id="d142"></a>D142: Separate the resource probe's constructor, allocation and optional diagnostics
+
+**Decided (2026-10-27):** private format-2 probes have a zero-pool control with
+the original constructor unchanged and a pool profile adding only its persistent
+byte array. Both query the legacy capped memory counters after installation.
+The control refuses dummy publication; the pool publishes once only after
+available diagnostics and reported commit capacity permit it. The host and
+bridge bind selection to the pinned format/pool size. CI converts and exercises
+both generated profiles.
+
+**Why:** the format-1 probe combined extra installation-time memory queries,
+stats allocation and a 16 KiB pool, then stopped before measurements. Its result
+cannot identify the failing addition or establish a capacity limit. Separating
+these steps provides a control and keeps optional diagnostics out of creation.
+The legacy counter's 32767 cap is explicit, and successful allocation supplies
+its own evidence independently of exact free-memory estimates.
+
+An empty-body `6F00`, `6A81` or `6D00` from the private read-only measurement
+command is a declared diagnostic outcome: record unavailable, skip pending dummy
+publication and perform the planned cleanup. Other errors, malformed data and
+transport failures retain the stop-with-journal policy. The physical plan must
+include these outcomes. Counter unavailability supplies no memory measurement.
+
+**Rejected:** repeating the failed mixed probe to infer its old error, guessing
+an EEPROM limit, querying optional APIs inside the control constructor, runtime
+allocation, and interpreting capped counters as exact space. Existing format-1
+artifacts retain their original interpretation. Revised hardware actions require
+their own pinned profile plan and approval; production firmware is unchanged.
+
+## <a id="d143"></a>D143: Compare bounded allocation layouts with explicitly approved refusal cleanup
+
+**Decided (2026-10-27):** after the format-2 control succeeded and the single
+16 KiB allocation returned `6F00`, the next private comparison profiles are
+256 bytes, 4 KiB and four 4 KiB arrays. The manifest binds size and layout.
+The original constructor work and transient allocations are preserved. A dummy
+publication touches the first segment. Continue only after a prior profile's
+valid measurements, confirmed/re-read publication and verified cleanup.
+
+An opt-in plan may declare empty-body probe-creation `6F00`/`6A84` responses as
+refusals followed by cleanup. Persist the refusal, rematch identity, prove a new
+factory channel, check the exact baseline plus private probe objects, delete
+only those private objects and verify the baseline. Return a distinct
+`install-refused-cleaned` result (CLI exit 2), ending the sequence. A cleanup
+failure retains both errors. Default failure handling stays stop-with-journal.
+
+**Why:** the control gives measured constructor/commit-counter evidence, while
+the generic creation refusal leaves the allocation cause unresolved. Smaller
+and segmented candidates compare size/layout while keeping the test bounded.
+The successful cleanup path already establishes its identity, key and registry
+gates. Explicitly declaring this narrow outcome avoids a separate operator
+round trip for the same backout, while preserving prior evidence.
+
+**Rejected:** arbitrary adaptive sizing, advancing after refusal or unavailable
+measurements, inferring an EEPROM limit, changing transient allocation, and
+cleanup after ambiguous delivery, authentication failures, unexpected replies or
+registry changes. The flag requires a named approved allocation plan. Production
+firmware, CAP and protocol assignments are unchanged.
+
+## <a id="d144"></a>D144: Measure a one-time reservation after installation using one fixed image
+
+**Decided (2026-10-28):** the next private resource profile uses the same CAP
+for baseline measurements and 256-byte, 4 KiB or 16 KiB reservations. Its
+original constructor remains unchanged. One private command persists an
+attempt marker, then makes one persistent array outside a transaction. It
+refuses another attempt even after deselection. Diagnostics expose actual
+reserved bytes and the attempt marker. Only a confirmed reservation can
+proceed to the existing 128-byte dummy publication.
+
+**Why:** the 256-byte constructor probe failed with the same generic `6F00`
+as the 16 KiB probe. Both images were 19,751 bytes; the successful control was
+19,635 bytes. Existing chip evidence documents load-size sensitivity and a
+separate constructor allocation budget. D142/D143's comparisons therefore
+cannot isolate capacity. Separating reservation from INSTALL and retaining one
+binary across sizes removes those changes from the reservation comparison.
+The guarded deferred proof store in D17 supplies an existing implementation
+precedent; this experiment makes no production allocation-policy change.
+
+A caught allocation `SystemException` reports its public reason. Explicit
+refusal cleanup first persists that result and confirms zero reserved bytes,
+an attempted reservation and no publication. It then rematches CPLC, proves
+one new factory channel, validates the exact registry, removes private objects
+and verifies the baseline. The distinct result exits 2 and ends the sequence.
+Ambiguous delivery, malformed responses, failed persistence, authentication or
+registry checks retain stop-with-journal handling. Each physical run needs a
+named approved plan covering reservation and the declared cleanup outcomes.
+
+**Rejected:** inferring available capacity from generic INSTALL failures,
+changing the image between sizes, unbounded allocation retries, reserving
+inside a transaction and enabling this command in released firmware. Final
+outbox initialization, publication, limits and recovery remain design and
+physical validation gates after this resource experiment.
+
+## <a id="d145"></a>D145: Retain fixed reader failure categories and public PC/SC codes
+
+**Decided (2026-10-28):** the private probe bridge labels enumeration,
+connection, command validation and transmission failures with fixed codes.
+When pyscard provides an integer HRESULT, retain only its normalized eight-digit
+hexadecimal value. The host admits only the known code set and exact numeric
+shape, retaining those fields in its journal and stopped result. Exception
+text, command bodies, authentication data and arbitrary bridge fields stay out
+of diagnostic output. A disconnect failure preserves an earlier failure.
+
+**Why:** the approved fixed-image transfer stopped at LOAD block 13 with
+`operation-failed`. The reader remained visible, and offline command framing
+validation passed. The previous bridge discarded the information needed to
+distinguish command rejection, PC/SC failure and broken transport. The cause
+of that stopped run remains unresolved; its separately approved cleanup
+succeeded. Future fixed public diagnostics can narrow a failure without
+collecting authentication transcripts.
+
+**Rejected:** dumping exception strings or APDUs, inferring a physical cause
+from a generic error, retrying a stopped write to recover its old error, and
+widening cleanup authorization through an observability change. Physical
+actions and stop conditions retain their approved scope.
+
+## <a id="d146"></a>D146: Revalidate the known control before fixed image-layout comparisons
+
+**Decided (2026-10-28):** the next resource experiment starts with the previously
+successful pinned constructor control. Only a valid control and verified
+cleanup permit trying a new image. Two fixed post-install candidates alter
+only the existing unreachable padding method; constructor, reservation and
+publication code remain identical. Each selected image stays fixed across
+256-byte, 4 KiB and 16 KiB requests. A separately approved plan can permit the
+second image only after the first image's initial creation refusal and verified
+cleanup. Other failures retain their approved stop/backout rules.
+
+**Why:** the format-3 diagnostic rerun completed LOAD, then received `6F00` at
+creation before any pool command. It has no added pool in its constructor.
+The chip's documented load-size sensitivity and possible changes to its
+initialization baseline need separate controls. The generated candidates are
+20,068 and 20,196 bytes; 20,068 matches the released image's measured size,
+without establishing that a new image of that size will install.
+
+An explicit named-baseline execution may read the public ISD `FF21` memory tag
+before authentication. Admit its documented TLV structure and retain numeric
+counters, with tag 81 left uninterpreted. Declared empty unsupported-command
+responses record unavailable. Malformed data or other errors stop before
+loading. These optional counters supplement the capped JavaCard API; they
+do not select an adaptive allocation size.
+
+**Rejected:** treating a generic creation error as a capacity limit, repeating
+the same failed image as a new comparison, changing runtime code or allocations
+to pad an image, extrapolating a universal alignment rule, and unbounded image
+search on hardware. Pinned artifacts and an approved bounded plan remain
+required; production code, CAP and protocol behavior are unchanged.
+
+## <a id="d147"></a>D147: Preserve the converted instance shape in the private allocation diagnostic
+
+**Decided (2026-10-28):** an `existing-fields` private profile preserves all
+original fields and the constructor. Its restricted dispatcher borrows the
+initially null `dleq` reference for its pool and persistent `cardLocked[0]` for
+the one-attempt marker. Production commands remain unreachable in this image.
+It retains format 3 and the same bounded reservation/publication interface.
+
+**Why:** the known control installed again, while both fixed layouts were
+refused before reservation. The Oracle 3.0.5 verifier reports 50 declared instance cells
+and 50 references for the control, versus 52 cells and 51 references for those
+probes. Adding diagnostic fields altered instance layout even with an unchanged
+constructor body. The new profile removes that confound; the cause of the old
+refusals remains unresolved.
+
+A host-only inspector reads the converted Class/Import components through the
+pinned SDK. Builds record its hash and the class shape in the manifest. The
+existing-fields profile must have the known control's size 50, first reference
+token 0 and reference count 50. Source tests additionally compare the full
+class outside its private dispatcher/padding method. Unknown storage modes or
+shape mismatches are refused before reader access. Fixed padding variants keep
+the image constant within each reservation sequence.
+
+**Rejected:** inferring a hard field-count limit, assuming equal source
+constructors imply equal converted layout, adding scratch state to the control,
+and changing production ownership, locking or proof storage for an experiment.
+Borrowed state exists only in a private disposable diagnostic. Final firmware
+storage design remains gated on actual capacity, publication and recovery
+evidence, with a named approved plan required for every physical run.
+
+## <a id="d148"></a>D148: Model publication and retirement within a bounded byte image
+
+**Decided (2026-10-28):** use a host-only storage model for the next resource
+prototype slice. Its entire candidate bookkeeping and packet page pool occupy
+one explicit byte image. A hidden STAGING record becomes COMMITTED only after
+its complete frame is written and checked. That marker also commits burn intent;
+all modeled export, load, spend admission and balance operations resume burns
+before proceeding. Pending records pin their proof generations.
+
+A matching installation/payment/record-generation/digest acknowledgement moves
+a record to CLEARING. Proof cleanup resumes before any replacement load.
+A separate internal RELEASING state follows completed proof cleanup so a cut
+while freeing payload pages needs no access to already-released pages. Abandoned
+staging is reclaimed without consuming its inputs. Counters refuse at exhaustion.
+
+**Why:** the approved field-preserving B image physically reserved 16 KiB and
+published 128 bytes on 09336320. That is a floor for the next prototype, while
+record metadata, capacity and interrupted cleanup still need design evidence.
+The model permits exhaustive cuts after byte writes and modeled transactions.
+The largest assumed transaction covers 13 counter/identity/state bytes; staging
+length, digest and page maps are separate tearable byte writes. Transactions
+remain assumptions until JavaCard and silicon validation.
+
+The initial complete-packet candidate budgets 676 global/proof-bookkeeping bytes,
+32 headers of 48 bytes, and 109 pages of 128 payload bytes plus two page-map
+bytes each: 16,382 used bytes within a 16,384-byte image. The draft's fixed
+canonical fields total 89 bytes before URL, counts, entries and signatures;
+with a 24-byte URL and 33-byte full keysets, one-input/one-output packets total
+422 bytes and 128-input/one-output packets total 14,138 bytes. The model also
+stores a count plus five-byte slot/generation references. Four pages per small
+packet admit 27; the large packet cannot fit. These are candidate arithmetic
+and synthetic workload results, with no production capacity assignment.
+
+**Rejected:** treating a successful raw allocation as a final outbox size,
+storing complete expanded packets without accounting for metadata and page
+rounding, exposing staged signatures, freeing pinned inputs before retirement,
+and inferring physical tear safety from a host model. The next compact prototype
+must reconstruct inputs from pinned slots and keyset mappings while preserving
+exact canonical export bytes. Production APIs, wire bytes and assets are unchanged.
+
+## <a id="d149"></a>D149: Reconstruct the candidate packet from compact references
+
+**Decided (2026-10-28):** add a host-only compact export prototype following the
+open NUT proposal and its independently encoded signed vector. Ordered
+slot/generation references remain in the storage frame. The compact payload
+keeps outputs as amount, full-keyset registry reference and blinded point,
+followed by the original payment witness and descriptor signature. Immutable
+fixture state supplies the retained proof data and configuration.
+
+Canonical body and SIG_ALL hashes stream through fields. Export verifies both
+signatures before yielding bounded pages. Full keysets retain their exact
+8/33 bytes, ambiguous prefixes are refused, and uint64 payment identities use
+BigInt with explicit rejection of unsafe Numbers. Unsupported secret/date/refund
+profiles, change/refund output roles, duplicate inputs/outputs, overflow and trailing compact bytes fail
+closed. The canonical packet ID is distinct from the model's framing checksum.
+
+A synchronous storage builder checks record/byte capacity and fixes identity
+and input generations before invoking the test signer. Interleaved public model
+operations are refused during the builder. Signing/length failures preserve the
+unconsumed state; existing publication and recovery ordering is retained.
+
+**Why:** expanded storage could not fit the large draft-shaped payment. In the
+compact candidate, reserve 724 context/registry/mapping bytes and additional
+uint64 identity bytes inside the 16 KiB budget. With 64 candidate record headers,
+89 payload pages admit 44 small synthetic payments. The 128-input/128-output
+workload needs 5,635 frame bytes and streams a 23,163-byte signed packet for its
+fixture context. The independent mixed-keyset vector also pins a payment ID
+above JavaScript's exact Number range.
+
+**Rejected:** copying complete expanded inputs into every record, omitting
+metadata outside SIG_ALL, verifying only the payment witness, silently adapting
+unsupported secrets, and presenting software byte budgets as silicon evidence.
+The fixture assumes preverified immutable loading; owner/load provenance, fees,
+DLEQ, the physical combined setup, RAM, crypto timing and tears remain separate
+gates. The store still refuses at its internal uint32 counter limit; reserved
+uint64 bytes do not implement a new card counter. This changes no production
+APDU, protocol assignment, firmware, CAP or provisioner asset.
+
+## <a id="d150"></a>D150: Convert a private byte-backed JavaCard fixture prototype
+
+**Decided (2026-10-28):** generate a separate private package,
+`F04341534855434D5054`, preserving the production fields, constructor, crypto
+engines, scratch and proof hex cache. Conversion requires the known instance
+shape: 50 cells, first reference 0, 50 references. The release CAP is unchanged.
+
+One guarded setup persists intent before allocating the 12,288-byte DLEQ store
+and 16,384-byte pool outside a transaction. The pool borrows `cardReceipts`;
+its old buffer stays allocated. Private dispatch replaces ordinary operations,
+including owner/PIN, receipts, limits and production payment commands. Public
+synthetic fixture loading and unsigned retirement are bench interfaces only.
+
+The pool holds a real uint64 counter, immutable context/registry mappings, slot
+generations, 64 headers of 52 bytes and 90 linked 128-byte pages. Reusing the
+existing proof status bytes removes the host model's duplicate status/nonce
+budget and admits 45 small fixtures. BEGIN fixes identity/generation and hidden
+STAGING in a 21-data-byte transaction. Both signatures and canonical packet ID
+precede COMMITTED/burn intent. Burns and retirement resume before reuse;
+CLEARING advances to RELEASING only after every selected slot is empty.
+
+Burn completion is persisted last. Completed records avoid repeated full hashes
+on unrelated commands. Export/scope validates references and packet integrity
+once per selected session using existing transient state. Mutations invalidate
+the cache; selection clears it. A fresh session rejects corrupted pinned data.
+
+**Why:** the host model could not establish JavaCard conversion or byte-backed
+state/signing. The converted prototype uses the original Schnorr implementation
+and matches independently verified host exports for mixed/full keysets, large
+input/output counts and a uint64 identity above Number precision. Source checks
+preserve constructor demand and prohibit allocation in the static state engine.
+
+**Rejected:** modifying release firmware for an experiment, adding instance
+fields/transient buffers to the working constructor, freeing payload during
+incomplete proof cleanup, and treating simulator memory or cuts as silicon
+evidence. Fixed test keys and boundary cuts live only in separately compiled
+host harness sources and never enter the CAP. Generated-source, SDK and artifact
+hashes are retained. Existing hardware tooling rejects this package/kind.
+Physical setup, memory, signing/transfer latency and tears require a reviewed
+runner and named approved plan. Production authorization, mint/load validation,
+receipt/limit integration and the final capability remain separate gates.
+
+## <a id="d151"></a>D151: Bound the first private compact hardware drill
+
+**Decided (2026-10-28):** use a dedicated runner and PC/SC policy for the private
+compact package. Preview reads local files. Execution requires exact artifact,
+source and runner pins, the named 09336320/ACS reader, factory-reset confirmation
+and a new private journal. Existing resource artifact admission stays unchanged.
+Share the process bridge and journal transport; keep package/APDU admission
+separate. Fingerprints include the built cardkit files and dependency pins.
+
+The first workload attempts combined DLEQ/pool setup once, then signs two
+synthetic inputs into two outputs, reselects and exports the packet. Verify both
+signatures, exact canonical bytes and scope with the card-generated public key
+before unsigned bench retirement. Record memory/commit counters and timings.
+The original platform registry is exact; deletes name only the private applet,
+opener and package. CPLC and a fresh factory channel precede cleanup.
+
+Persist every stage before transmission. Single-attempt fixture commands,
+30-second response deadlines, a 120-second elapsed gate and 512-command ceiling
+bound the drill. Unknown delivery, malformed data, authentication failures and
+signature/export mismatches stop with retained evidence. A separately enabled
+declared-refusal branch permits bounded private cleanup after empty-body
+`6F00`/`6A84` from creation or setup. It ends the test; it cannot authorize a retry.
+
+**Why:** full integrated allocation and signing need physical evidence after the
+converted prototype. A small deterministic public fixture isolates those costs
+before larger capacity and power-loss workloads. Fake transports and offline
+policy tests exercise the host boundary before any physical access.
+
+**Rejected:** broadening the old resource artifact allowlist, accepting arbitrary
+proof/PIN/key input, submitting fixture data to a mint, retrying uncertain writes,
+and automatic cleanup after unknown delivery. A named approved plan remains the
+physical access gate. Production firmware, protocol assignments, assets and the
+released app stay unchanged.
+
+## <a id="d152"></a>D152: Separate private setup from runtime channel management
+
+**Decided (2026-10-28):** move the private compact prototype's setup instruction
+from `70` to `7E`. Bump its selection identifier to `CPROT/2` and its manifest
+and diagnostic format to 5. Update the runner, simulator and independent Python
+transport policy together; new admission rejects previous private formats.
+Production firmware, protocol versions and assignments remain unchanged.
+
+**Why:** the approved format-4 image loaded, installed both instances and
+answered diagnostics on 09336320, then setup returned `6E00`. The
+[JavaCard 3.0.5 programming notes](https://docs.oracle.com/cd/E59935_01/prognotes/isoiec_7816-42013_specific_apdu_commands_for_logical_channel_management.htm)
+and runtime specification section 4.6.1 identify `70` as MANAGE CHANNEL,
+handled by the runtime. This conflicts with an application setup instruction.
+Runtime interception is a plausible explanation for the observed status;
+the run supplied no post-setup allocation or signing evidence. The revised
+instruction still requires its own physical test.
+
+The host stopped on the unexpected status. The operator then explicitly
+requested return to blank; a separate named cleanup-only plan matched CPLC,
+proved one factory channel, removed only the private objects and verified the
+original platform baseline. Retain both journals and their original artifact.
+
+**Rejected:** retrying setup under the completed plan, treating the refusal as
+EEPROM exhaustion, admitting a changed artifact with old pins, or inferring
+silicon dispatch behavior from simulator success. The regression check forbids
+runtime-owned `70` for setup, and both host policies agree on the fixed command.
+
+**Physical follow-up (2026-10-28):** the format-5/SETUP-7E image completed the
+small synthetic payment on 09336320, including combined DLEQ/outbox allocation,
+both independently verified signatures, exact export, retirement and return to
+blank. See the [hardware report](reports/HARDWARE_TEST_REPORT_2026-10-28.j3r180-compact-payment.md).
+Capacity, actual power-loss recovery and production integration remain open.
+
+## <a id="d153"></a>D153: Bind each permitted bench card to its captured baseline
+
+**Decided (2026-10-28):** permit the compact bench runner on two exact CPLC IDs,
+09336320 and operator-selected 07297620. Select an immutable full-TLV baseline
+by that identity. The first retains its original three entries; the second adds
+the observed `A00000016443446F634C697465` version-1.0 load file. Require the
+selected baseline before loading and after cleanup. CPLC remains bound through
+cleanup. Unknown cards and entries from another profile fail before loading.
+
+**Why:** the operator requested inspection, blanking and continued testing on
+07297620. Inspection found a 2.0 installation and test value/history. After
+explicit loss acceptance, factory keys were proved at version 1. The registry
+identified its additional pre-existing file. Cashu objects were removed while
+preserving all four baseline files, then a separate read-only check confirmed
+the exact CPLC and all four Cashu AIDs absent. The original three-entry profile
+cannot describe this different card.
+
+**Rejected:** weakening the registry check for all D321 cards, dropping unknown
+entries, trying alternate manager keys, or replacing the original profile.
+The fixed synthetic workload, private ABI, CAP, factory-key policy and cleanup
+order are unchanged. Tests exercise the new profile, preserve rejection under
+the old profile, reject unknown identities, and verify cleanup uses the chosen
+CPLC. Production protocol and reset behavior remain unchanged.
+
+
+## <a id="d154"></a>D154: Preserve bounded transport evidence through SDK wrappers
+
+**Decided (2026-10-28):** the private bench runners retain a validated reader
+failure code and optional eight-digit lowercase PC/SC code when cardkit wraps
+that failure in its public `TransportError`. Unwrap only a direct, typed
+`ProbeFailure` with a fixed transport code. Share classification between the
+resource and compact runners. Keep arbitrary native messages, stacks, nested
+causes and unvalidated fields out of journals and CLI results.
+
+**Why:** the 07297620 compact attempt completed package loading and opener
+creation, then stopped at unconfirmed main-instance creation with only
+`operation-failed`. Cardkit wraps transceiver failures; the runner previously
+recognized only direct failures. The original cause was discarded and remains
+unknown. Bounded error preservation improves evidence for a future invocation.
+The separate cleanup verified the four-file blank baseline.
+
+**Rejected:** printing native exceptions, walking arbitrary cause chains,
+classifying a wrapped failure as a card reply, or extending automatic cleanup.
+Declared-refusal cleanup still requires the original direct empty-body card
+response at an admitted stage. Transport uncertainty retains the journal and
+stops without retry. The CAP, private workload, production app and protocol
+remain unchanged.
+
+
+## <a id="d155"></a>D155: Select fixed compact capacity workloads explicitly
+
+**Decided (2026-10-28):** retain the default two-input/two-output bench profile
+and add one explicit `128-input-128-output-v1` catalogue entry. The latter is
+restricted to qualified card 09336320. A checked-in public fixture defines all
+128 input slots and outputs. Node and the independent Python bridge construct
+the same fixed setup, load, staging and export commands from that fixture.
+Unknown profile names fail before reader access. The bridge selects one profile
+per invocation; it cannot admit the union of both command sets.
+
+The candidate full-slot case stages outputs through 22 short APDUs, then exports
+23,163 bytes through 91 pages. Verify every canonical byte, both signatures and
+the exact scope before fixture retirement. Retain received public pages durably
+as they arrive so interrupted export preserves its available evidence. A stopped
+or invalid export cannot authorize retirement or deletion. Original identity,
+factory-key, baseline, journal, deadline and command ceilings remain in force.
+The fixed host `drill-bound-exceeded` stop survives the SDK wrapper so a budget
+stop retains its reason without changing cleanup admission.
+
+**Why:** the small physical payment passed on 09336320 in #210, establishing
+combined allocation, signing and export for that workload. The existing private
+image already handles a full-slot payment; a bounded explicit host profile can
+measure it without a firmware/layout variation. Matching independent bridge
+commands and simulator execution catch framing and count errors before hardware.
+The selected 128-output case is a candidate test, with final protocol limits
+still open.
+
+**Rejected:** arbitrary fixture/APDU input, automatic expansion to 07297620,
+changing time/command limits to make a run finish, or treating an export failure
+as permission to erase evidence. Many-small-record capacity, between-command
+power loss and cuts during writes remain separate measured gates. Physical
+execution still requires a named approved plan; production firmware, protocol
+assignments and release capability are unchanged.

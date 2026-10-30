@@ -9,8 +9,8 @@ export const APP_NAME = 'Cashu card provisioner';
 
 export const SIGNIN = {
   tagline: 'Programs blank cards into Cashu cards. Operators only.',
-  button: 'SIGN IN',
-  signingIn: 'SIGNING IN…',
+  button: 'Sign in',
+  signingIn: 'Signing in…',
   failed: (reason: string) =>
     reason === 'bad-credentials'
       ? 'Check your operator name and password, then try again.'
@@ -76,10 +76,6 @@ export const SETTINGS = {
     'Saved batches and recovery work must match your account’s scope. Continue them with the original account and service. This value does not read or change a card’s keys. Use Check a card for card status.',
   factory: 'Factory',
   issued: 'Issued',
-  theme: 'Theme',
-  themeSystem: 'System',
-  themeDark: 'Dark',
-  themeLight: 'Light',
   about: 'About',
   version: (v: string) => `Version ${v}`,
   loadSha: (sha8: string) => `Load file ${sha8}…`,

@@ -1,12 +1,7 @@
 import {operatorAdminPage} from './operator-admin-page';
 /**
- * The service entry — the Node/dev side (D29): node:http on loopback, TLS at
- * the reverse proxy. The deployed shape is the Workers entry
- * (`worker.ts` + the Durable Object in `do.ts`, the ENG-740 hosting
- * amendment); this server and `bootstrap.ts` stay the ops-cli/dev path over
- * the same modules and the same DB seam. OPS_MASTER_KEY comes from the
- * runtime-injected environment — never a prompt, never shell history
- * (AGENTS.md).
+ * Node HTTP adapter. The standalone entry configures its listener and database;
+ * local callers retain loopback defaults. TLS terminates at the reverse proxy.
  */
 import http from 'node:http';
 
@@ -17,6 +12,7 @@ import {HolderIssueState} from './issue';
 import {route, RouterDeps} from './router';
 import {openSqliteFile} from './sqlite-file';
 import {DEFAULT_MINTS} from './config';
+import {independentBackupHealth} from './recovery-evidence';
 
 export {DEFAULT_MINTS} from './config';
 
@@ -25,21 +21,29 @@ export interface ServeOptions {
   readonly dbPath: string;
   readonly independentBackupIssuer?: string;
   readonly mints?: readonly string[];
+  readonly host?: string;
+  readonly db?: OpsDb;
+  readonly operatorAdmins?: () => string | undefined;
 }
 
 export function serve(options: ServeOptions): http.Server {
-  const master = new EnvMaster();
-  master.getMaster(); // fail fast at boot, not on the first batch
-  const db = new OpsDb({
-    sql: openSqliteFile(options.dbPath),
-    master,
-    independentBackupIssuer:
-      options.independentBackupIssuer ??
-      process.env.OPS_INDEPENDENT_BACKUP_ISSUER,
-  });
+  const db =
+    options.db ??
+    (() => {
+      const master = new EnvMaster();
+      master.getMaster();
+      return new OpsDb({
+        sql: openSqliteFile(options.dbPath),
+        master,
+        independentBackupIssuer:
+          options.independentBackupIssuer ??
+          process.env.OPS_INDEPENDENT_BACKUP_ISSUER,
+      });
+    })();
   const deps: RouterDeps = {
     db,
-    operatorAdmins: () => process.env.OPS_OPERATOR_ADMINS,
+    operatorAdmins:
+      options.operatorAdmins ?? (() => process.env.OPS_OPERATOR_ADMINS),
     // The last-good header persists to the anchor_tip table and seeds the
     // feed at boot: a restart keeps the header the 503 fallback answers with.
     anchor: new AnchorFeed(httpTipFetcher, undefined, db.tipStore()),
@@ -47,6 +51,38 @@ export function serve(options: ServeOptions): http.Server {
     mints: options.mints ?? DEFAULT_MINTS,
   };
   const server = http.createServer((req, res) => {
+    if (
+      req.method === 'GET' &&
+      (req.url === '/healthz' || req.url === '/readyz')
+    ) {
+      let ready = false;
+      try {
+        db.db.prepare('SELECT 1').get();
+        const control = db.db
+          .prepare(
+            'SELECT recovery_required FROM provisioning_control WHERE id = 1',
+          )
+          .get() as {recovery_required: number};
+        ready =
+          req.url === '/healthz' ||
+          (control.recovery_required === 0 &&
+            !!db.db
+              .prepare('SELECT id FROM operators WHERE disabled = 0 LIMIT 1')
+              .get() &&
+            !(
+              independentBackupHealth(db).required &&
+              independentBackupHealth(db).stale
+            ));
+      } catch {
+        /* Health responses expose no storage or account details. */
+      }
+      res.writeHead(ready ? 200 : 503, {
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      });
+      res.end(JSON.stringify({status: ready ? 'ok' : 'not-ready'}));
+      return;
+    }
     if (
       req.method === 'GET' &&
       (req.url === '/' || req.url === '/ops/operators')
@@ -63,7 +99,11 @@ export function serve(options: ServeOptions): http.Server {
       res.end(JSON.stringify({reason: 'internal'}));
     });
   });
-  server.listen(options.port, '127.0.0.1');
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 10_000;
+  server.once('close', () => db.close());
+  server.once('error', () => db.close());
+  server.listen(options.port, options.host ?? '127.0.0.1');
   return server;
 }
 

@@ -11,8 +11,8 @@ import {OpsDb} from './db';
 import {decryptEscrowExport, restoreEscrowExport} from './export';
 import {openSqliteFile} from './sqlite-file';
 
-async function main(): Promise<void> {
-  const [artifactPath, ...extra] = process.argv.slice(2);
+export async function recoverFile(args = process.argv.slice(2)): Promise<void> {
+  const [artifactPath, ...extra] = args;
   const directIdentity = process.env.OPS_RECOVERY_IDENTITY;
   const identityPath = process.env.OPS_RECOVERY_IDENTITY_FILE;
   const destination = process.env.OPS_DB;
@@ -69,7 +69,7 @@ async function main(): Promise<void> {
 }
 
 if (require.main === module) {
-  main().catch(() => {
+  recoverFile().catch(() => {
     console.error(
       'recovery failed; verify the artifact, identity and empty destination',
     );

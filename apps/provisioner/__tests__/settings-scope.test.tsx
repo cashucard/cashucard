@@ -13,8 +13,6 @@ test.each([
   async (env, label) => {
     jest.mocked(useApp).mockReturnValue({
       session: env ? {operator_id: 1, env, token: 'public-test-token'} : null,
-      theme: 'system',
-      setTheme: jest.fn(),
       signOut: jest.fn(),
     } as unknown as ReturnType<typeof useApp>);
     let tree!: Renderer.ReactTestRenderer;

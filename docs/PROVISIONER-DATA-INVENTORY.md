@@ -5,9 +5,9 @@ service. Use it when completing store privacy declarations and obtaining legal
 review. Review the final deployed service and included SDKs again before
 submission.
 
-The operator supplied [Privacy Policy](https://getflash.io/legal/privacy.html)
-and [Terms](https://getflash.io/legal/terms.html). The app exposes both before
-sign-in and in Settings. The operator confirmed public support at `support@getflash.io`; the app
+The app links the cashucard.org [Privacy Policy](https://cashucard.org/privacy)
+and [Terms](https://cashucard.org/terms) (D134, D135). The app exposes both before
+sign-in and in Settings. Public support is `support@cashucard.org`; the app
 provides a Support mail link with a readable address if no mail app opens. Confirm that the policy covers this application and these flows;
 the existing consumer-wallet wording alone is not evidence of coverage.
 
@@ -15,12 +15,21 @@ the existing consumer-wallet wording alone is not evidence of coverage.
 | --- | --- | --- |
 | Operator name and password | Operator authentication; typed password held in app memory. Service retains the password hash; typed passwords remain transient. | Account administration, access requests and retention policy. |
 | Session bearer token | App memory; service persists token hashes, expiry and revocation. | Hosting/log redaction and operational retention verification. |
+| Service selection and batch form defaults (build 11) | AsyncStorage retains public service origins and the selected origin, plus public mint/count defaults scoped by service/operator/environment. These keys are separate from recovery journals and contain no password, bearer token, PIN or manager key. | Check the selected issuer's support and privacy process when using its backend. |
 | Device identifier, batch and attempt IDs | Associate an operator/device with a reservation and interrupted attempt. These identifiers link operational records. | Map to store identifier categories and document linkage/retention. |
 | Chip CPLC identity, install configuration, dispositions and receipts | Prevent chip reuse, recover interrupted work and retain installation evidence. Service persists journals/records; the app persists its recovery journal through AsyncStorage. | User-facing explanation, device backup behavior and retention/deletion rules that preserve recovery safety. |
 | Issued GlobalPlatform manager keys | Service derives and escrows manager keys; they are operational secrets, distinct from holder ownership. They are not holder private keys or PINs. Database schema stores key bytes; no application-level encryption claim is made for those fields. | Restrict service/operator access, verify platform storage protection and complete recovery custody. |
 | Escrow backup and recovery metadata | Exports are encrypted to an age recipient. Planned independent Nextcloud copies contain ciphertext. The recovery identity belongs in restricted Vaultwarden custody plus a protected offline copy outside Zion. | Scheduled copy integrity/freshness, retention, alert delivery and actual restore evidence. Selection of custody locations is not proof of implementation. |
 | Mint/configuration and installed public card information | Configure and audit issuance. Completion means awaiting holder setup. Current issuer completion does not establish holder ownership or PIN readiness. | Confirm which fields appear in each deployed record and reviewer flow. |
 | Network metadata | Requests go to the configured ops origin and hosting providers may process connection metadata. Legal pages open in the system browser on a user press. | Confirm provider logging, IP retention, processing locations and contractual disclosures; do not assert none. |
+
+Build 11 allows the operator to select a compatible HTTPS ops-service before
+authentication. The selected service receives credentials and operational
+records for its own accounts. Selection itself makes no service request. The
+app clears credential fields on a change, saves only public connection
+preferences, and retains each service's card work in its original workspace.
+Data requests for another issuer's service belong with that service's
+administrator; the app's public support link remains the publisher's contact.
 
 Sources in this repository: `ops/src/db.ts` (persistent tables and migrations),
 `ops/src/auth.ts`, `apps/provisioner/src/store.tsx`,

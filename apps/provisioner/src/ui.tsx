@@ -123,7 +123,9 @@ export function PrimaryButton({
         danger && s.primaryDanger,
         disabled && s.primaryDisabled,
       ]}>
-      <Text style={s.primaryText}>{title}</Text>
+      <Text style={[s.primaryText, danger && s.primaryDangerText]}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
@@ -224,7 +226,7 @@ export const styles = (t: Theme) =>
     physicalBanner: {backgroundColor: t.card},
     physicalBannerText: {color: t.ink},
     bannerText: {
-      color: '#fff',
+      color: t.onDanger,
       fontFamily: FONT.semibold,
       fontSize: 12,
       letterSpacing: 1,
@@ -271,11 +273,12 @@ export const styles = (t: Theme) =>
     },
     secondaryText: {color: t.ink, fontFamily: FONT.medium, fontSize: 16},
     primaryText: {
-      color: '#fff',
+      color: t.onAccent,
       fontFamily: FONT.semibold,
       fontSize: 17,
       letterSpacing: 0.4,
     },
+    primaryDangerText: {color: t.onDanger},
     row: {
       backgroundColor: t.card,
       borderRadius: 12,

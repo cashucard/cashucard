@@ -4,6 +4,9 @@
 
 ## Guides
 
+- [Host an ops-service](https://cashucard.org/ops-service): why CCP uses a service, its manager-key and recovery responsibilities, and a version-pinned Docker setup with HTTPS, accounts and encrypted backups.
+- [Ops-service Compose file](https://cashucard.org/ops-compose.yaml): standalone release 0.1.0 pinned by immutable image digest; initialization creates private credentials locally.
+
 - [Install the Cashu Card applet, for AI agents](https://cashucard.org/guide.md): installs the applet on a blank J3R180 card from a computer with a card reader, with every command, its expected answer and the points where the agent stops and asks its person.
 - [Install guide](https://cashucard.org/guide): the same steps as a page for people.
 - [Questions and answers](https://cashucard.org/faq): what the card is, what it costs, what happens if one is lost, and the risks of an experimental project.

@@ -1,10 +1,10 @@
 /**
  * S5. Settings, grouped the way a 2026 settings screen is grouped: section
- * headers, one card per group, hairline dividers, a segmented theme pill,
- * the account scope as a read-only row, and signed-in card tools.
+ * headers, one card per group, hairline dividers,
+ * the account scope as a read-only row, and identity diagnostics.
  *
  * The batch-setup revamp's rules hold here too: tabular figures for every
- * number, the accent for the theme pill's active segment, and button semantics
+ * number and button semantics
  * for interactive rows.
  */
 import React from 'react';
@@ -57,21 +57,6 @@ const local = (t: Theme) =>
       fontVariant: ['tabular-nums'],
       fontSize: 15,
     },
-    pill: {
-      flexDirection: 'row',
-      backgroundColor: t.bg,
-      borderRadius: 12,
-      padding: 3,
-      gap: 2,
-    },
-    pillItem: {
-      paddingHorizontal: 16,
-      paddingVertical: 7,
-      borderRadius: 10,
-    },
-    pillItemOn: {backgroundColor: t.ink},
-    pillText: {color: t.dim, fontFamily: FONT.medium, fontSize: 14},
-    pillTextOn: {color: t.bg, fontFamily: FONT.semibold, fontSize: 14},
     note: {
       color: t.dim,
       fontFamily: FONT.regular,
@@ -99,7 +84,6 @@ const local = (t: Theme) =>
       fontSize: 12,
       fontVariant: ['tabular-nums'],
     },
-    rowCenter: {justifyContent: 'center'},
     rowLabelCol: {flex: 1},
     confirmBlock: {padding: 18, gap: 10},
   });
@@ -108,21 +92,21 @@ export function SettingsScreen({
   onBack,
   onBench,
   onIdentity,
-  onReset,
-  onStatus,
+  onChangeService,
   hardwareBusy = false,
   hasSavedBatch = false,
 }: {
   onBack: () => void;
   onBench: () => void;
   onIdentity?: () => void;
-  onReset?: () => void;
-  onStatus?: () => void;
+  onChangeService?: () => void;
   hardwareBusy?: boolean;
   hasSavedBatch?: boolean;
 }) {
   const app = useApp();
-  const [confirmSignOut, setConfirmSignOut] = React.useState(false);
+  const [confirmSignOut, setConfirmSignOut] = React.useState<
+    'sign-out' | 'service' | null
+  >(null);
   const t = useTheme();
   const s = local(t);
   const env = app.session?.env;
@@ -154,102 +138,52 @@ export function SettingsScreen({
           </View>
         </View>
 
-        <View style={s.section}>
-          <Text style={s.header}>{SETTINGS.theme}</Text>
-          <View style={s.card}>
-            <View style={[s.row, s.rowCenter]}>
-              <View style={s.pill}>
-                {(['system', 'dark', 'light'] as const).map(opt => {
-                  const on = app.theme === opt;
-                  return (
-                    <Pressable
-                      key={opt}
-                      testID={`theme-${opt}`}
-                      onPress={() => app.setTheme(opt)}
-                      style={[s.pillItem, on && s.pillItemOn]}>
-                      <Text style={on ? s.pillTextOn : s.pillText}>
-                        {opt === 'system'
-                          ? SETTINGS.themeSystem
-                          : opt === 'dark'
-                          ? SETTINGS.themeDark
-                          : SETTINGS.themeLight}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={s.section}>
-          <HelpHeading
-            title="Card tools"
-            titleStyle={s.header}
-            testID="settings-tools-help">
-            {
-              'Check reads public card status. Identity reads the chip’s CPLC identifier. Reset checks value, settlement and manager-key records before asking for erasure approval.'
-            }
-          </HelpHeading>
-          <View style={s.card}>
-            {onStatus ? (
-              <Pressable
-                testID="card-status-entry"
-                accessibilityRole="button"
-                onPress={onStatus}
-                disabled={hardwareBusy}
-                style={s.row}>
-                <View style={s.rowLabelCol}>
-                  <Text style={s.rowLabel}>Check a card</Text>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </Pressable>
-            ) : null}
-            {onIdentity ? (
-              <>
+        {onIdentity || BENCH_RUNS_ENABLED ? (
+          <View style={s.section}>
+            <HelpHeading
+              title="Diagnostics"
+              titleStyle={s.header}
+              testID="settings-tools-help">
+              {BENCH_RUNS_ENABLED
+                ? 'Identity reads the chip’s CPLC identifier. Bench tools are for approved laboratory runs.'
+                : 'Identity reads the chip’s CPLC identifier.'}
+            </HelpHeading>
+            <View style={s.card}>
+              {onIdentity ? (
                 <Pressable
                   testID="identity-entry"
+                  accessibilityRole="button"
                   onPress={onIdentity}
                   disabled={hardwareBusy}
+                  accessibilityState={{disabled: hardwareBusy}}
                   style={s.row}>
                   <View style={s.rowLabelCol}>
                     <Text style={s.rowLabel}>Read physical card identity</Text>
                   </View>
                   <Text style={s.chevron}>›</Text>
                 </Pressable>
-                <View style={s.divider} />
-              </>
-            ) : null}
-            {onReset ? (
-              <Pressable
-                testID="reset-entry"
-                accessibilityRole="button"
-                onPress={onReset}
-                disabled={hardwareBusy}
-                style={s.row}>
-                <View style={s.rowLabelCol}>
-                  <Text style={s.rowLabel}>Reset a card for reuse</Text>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </Pressable>
-            ) : null}
-            {BENCH_RUNS_ENABLED ? (
-              <Pressable
-                testID="bench-entry"
-                onPress={onBench}
-                disabled={hardwareBusy}
-                style={s.row}>
-                <View style={s.rowLabelCol}>
-                  <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
-                  <Text style={s.rowSub}>
-                    {'Load test against the spare card. Bench only.'}
-                  </Text>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </Pressable>
-            ) : null}
+              ) : null}
+              {BENCH_RUNS_ENABLED ? (
+                <>
+                  {onIdentity ? <View style={s.divider} /> : null}
+                  <Pressable
+                    testID="bench-entry"
+                    onPress={onBench}
+                    disabled={hardwareBusy}
+                    style={s.row}>
+                    <View style={s.rowLabelCol}>
+                      <Text style={s.rowLabel}>{SETTINGS.bench}</Text>
+                      <Text style={s.rowSub}>
+                        {'Load test against the spare card. Bench only.'}
+                      </Text>
+                    </View>
+                    <Text style={s.chevron}>›</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <View style={s.section}>
           <HelpHeading
@@ -259,11 +193,30 @@ export function SettingsScreen({
             {SETTINGS.signOutSub}
           </HelpHeading>
           <View style={s.card}>
+            {onChangeService ? (
+              <>
+                <Pressable
+                  testID="settings-change-service"
+                  style={s.row}
+                  accessibilityRole="button"
+                  disabled={hardwareBusy}
+                  accessibilityState={{disabled: hardwareBusy}}
+                  onPress={() =>
+                    hasSavedBatch
+                      ? setConfirmSignOut('service')
+                      : onChangeService()
+                  }>
+                  <Text style={s.rowLabel}>Change ops service</Text>
+                  <Text style={s.chevron}>›</Text>
+                </Pressable>
+                <View style={s.divider} />
+              </>
+            ) : null}
             <Pressable
               testID="sign-out"
               onPress={() => {
                 if (hasSavedBatch) {
-                  setConfirmSignOut(true);
+                  setConfirmSignOut('sign-out');
                 } else {
                   app.signOut();
                 }
@@ -281,14 +234,22 @@ export function SettingsScreen({
                   same operator and service to continue saved work.
                 </Text>
                 <SecondaryButton
-                  title="SIGN OUT AND KEEP SAVED WORK"
+                  title={
+                    confirmSignOut === 'service'
+                      ? 'SIGN OUT AND CHOOSE SERVICE'
+                      : 'SIGN OUT AND KEEP SAVED WORK'
+                  }
                   testID="confirm-sign-out"
-                  onPress={app.signOut}
+                  onPress={() =>
+                    confirmSignOut === 'service'
+                      ? onChangeService?.()
+                      : app.signOut()
+                  }
                 />
                 <SecondaryButton
                   title="KEEP SESSION"
                   testID="keep-session"
-                  onPress={() => setConfirmSignOut(false)}
+                  onPress={() => setConfirmSignOut(null)}
                 />
               </View>
             ) : null}

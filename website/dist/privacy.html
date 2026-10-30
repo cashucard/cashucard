@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#10271e" />
+    <meta name="description" content="How cashucard.org, ops.cashucard.org and the Cashu Card Provisioner app handle personal information." />
+    <meta property="og:title" content="Privacy policy | Cashu Card" />
+    <meta property="og:description" content="How cashucard.org, ops.cashucard.org and the Cashu Card Provisioner app handle personal information." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cashucard.org/privacy" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://cashucard.org/privacy" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/guide.css" />
+    <script src="/guide.js" defer></script>
+    <title>Privacy policy | Cashu Card</title>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
+      <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main" class="guide">
+      <section class="guide-hero" aria-labelledby="privacy-title">
+        <div class="guide-hero-inner">
+          <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> PRIVACY</div>
+          <h1 id="privacy-title">Privacy <em>policy</em></h1>
+          <p class="guide-lead">What cashucard.org, ops.cashucard.org and the Cashu Card Provisioner app collect, why, and how to reach us about it.</p>
+          <ul class="guide-facts" aria-label="At a glance"><li>Island Bitcoin LLC</li><li>No cookies</li><li>No tracking</li><li>26 Oct 2026</li></ul>
+        </div>
+      </section>
+
+      <div class="guide-layout">
+        <nav class="guide-rail" aria-label="On this page">
+          <span class="rail-label">On this page</span>
+          <ol><li><a href="#who">Who this covers</a></li><li><a href="#site">cashucard.org</a></li><li><a href="#app">The Cashu Card Provisioner app</a></li><li><a href="#ops">ops.cashucard.org</a></li><li><a href="#cards">Cards, wallets and mints</a></li><li><a href="#sharing">Sharing</a></li><li><a href="#choices">Your choices</a></li><li><a href="#changes">Changes</a></li></ol>
+        </nav>
+        <article class="guide-doc">
+          <section id="who" aria-labelledby="who-title">
+            <h2 id="who-title">Who this covers</h2>
+            <p>Island Bitcoin LLC runs cashucard.org and ops.cashucard.org, and publishes the Cashu Card Provisioner app on the App Store and Google Play. This policy covers those three. Write to <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a> with any privacy question or request.</p>
+            <p>Cashu Card is an open source project. Anyone can run their own copy of the site, the ops service or the app, and a copy run by someone else follows that operator&#8217;s own policy.</p>
+          </section>
+
+          <section id="site" aria-labelledby="site-title">
+            <h2 id="site-title">cashucard.org</h2>
+            <p>The site runs on Cloudflare Workers. For each request, Cloudflare records the time, the page asked for, your IP address and your browser&#8217;s user agent. We use these logs to keep the site running and to fix problems, and Cloudflare keeps them for a short period.</p>
+            <p>The site sets no cookies and loads no analytics, advertising or third-party scripts. Its fonts, images and films come from cashucard.org itself.</p>
+          </section>
+
+          <section id="app" aria-labelledby="app-title">
+            <h2 id="app-title">The Cashu Card Provisioner app</h2>
+            <p>The app is a tool for card operators: it installs the Cashu Card software on blank NFC cards. It works with the ops service the operator chooses.</p>
+            <ul><li><strong>On the phone</strong>, the app keeps the ops service addresses you saved, your signed-in session and your saved batch work, so an interrupted batch can resume.</li><li><strong>To the ops service you choose</strong>, it sends your operator name and password when you sign in, and the batch and card records it creates: each card&#8217;s chip identifiers, its installation results and the batch it belongs to.</li><li><strong>To the cards</strong>, it sends the commands that install the software and set the card&#8217;s manager keys.</li></ul>
+            <p>The app contains no analytics, advertising or tracking code. If you have chosen to share diagnostics with app developers in your phone&#8217;s settings, Apple or Google may pass crash reports to us.</p>
+          </section>
+
+          <section id="ops" aria-labelledby="ops-title">
+            <h2 id="ops-title">ops.cashucard.org</h2>
+            <p>When an operator uses ops.cashucard.org, it stores the operator accounts (name, a hash of the password, and sessions), the batches and card records the app sends, the keys it issues for each card, and an audit log of operator actions. It uses them only to run card provisioning and recovery.</p>
+            <p>It keeps encrypted backups so cards can still be managed if the service fails. Records stay while the service runs, because a card&#8217;s keys are needed for as long as the card is in use. An operator can ask for their account to be closed.</p>
+          </section>
+
+          <section id="cards" aria-labelledby="cards-title">
+            <h2 id="cards-title">Cards, wallets and mints</h2>
+            <p>A Cashu Card keeps its ecash and its keys on its own chip. Paying with a card happens between the card, a wallet or till, and a Cashu mint, and those are run by other people under their own policies. Island Bitcoin LLC receives no data about cardholders, balances or payments from cards, wallets or mints.</p>
+          </section>
+
+          <section id="sharing" aria-labelledby="sharing-title">
+            <h2 id="sharing-title">Sharing</h2>
+            <p>We sell no personal information. We share it with the services that run these products for us, which are Cloudflare (hosting), Apple and Google (app distribution) and our email provider, and when the law requires it.</p>
+          </section>
+
+          <section id="choices" aria-labelledby="choices-title">
+            <h2 id="choices-title">Your choices</h2>
+            <p>You can ask what we hold about you, ask us to correct it, or ask us to delete it, at <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a>. We answer within 30 days. The app and the ops service are tools for operators, and they are meant for adults.</p>
+          </section>
+
+          <section id="changes" aria-labelledby="changes-title">
+            <h2 id="changes-title">Changes</h2>
+            <p>Effective 26 October 2026. When this policy changes, the date above changes, and the <a href="https://github.com/cashucard/cashucard/commits/main/website/dist/privacy.html">full history</a> stays public on GitHub.</p>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
+  </body>
+</html>

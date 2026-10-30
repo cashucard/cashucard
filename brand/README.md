@@ -1,6 +1,6 @@
 # Cashu Card brand
 
-The Cashu Card mark is the Cashu cashew drawn as a card's chip, the part of the card that makes its key and keeps it. This folder holds the mark and every file drawn from it. `generate.swift` draws them all from one set of shapes and colors ([D119](../docs/DECISIONS.md#d119)): change it, run it on macOS, and commit what it writes.
+The Cashu Card mark is the Cashu cashew drawn as a card's chip, the part of the card that makes its key and keeps it. This folder holds the brand marks, visual assets and architecture diagrams. `generate.swift` draws the mark and its derived artwork from one set of shapes and colors ([D119](../docs/DECISIONS.md#d119)): change it, run it on macOS, and commit what it writes.
 
 ```sh
 swift brand/generate.swift
@@ -66,3 +66,7 @@ Keep words 4 mm inside the sticker's cut and 6 mm inside the counter card's trim
 ## What uses it
 
 `generate.swift` writes the provisioner's app and store icons in `apps/provisioner/` (iOS catalogs, Android launcher and adaptive icons, the Play icon and the feature graphic). cashucard.org's favicon and header, the card face in the film and the social kit move to the mark next.
+
+## Architecture diagrams
+
+[The Cashu Card ecosystem](diagrams/README.md): editable desktop and phone SVGs, a published preview, connection legend and hosting notes. The diagram generator writes both the library assets and their website copies.

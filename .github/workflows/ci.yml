@@ -41,6 +41,7 @@ jobs:
       cap: ${{ steps.select.outputs.cap }}
       cardkit: ${{ steps.select.outputs.cardkit }}
       ops: ${{ steps.select.outputs.ops }}
+      ops_container: ${{ steps.select.outputs.ops_container }}
       provisioner: ${{ steps.select.outputs.provisioner }}
       backup_copy: ${{ steps.select.outputs.backup_copy }}
       website: ${{ steps.select.outputs.website }}
@@ -222,6 +223,25 @@ jobs:
           CARDSIM_URL=http://127.0.0.1:9876 MINT_URL=http://127.0.0.1:3339 EXPECT_KEYSET_ID_BYTES=8 EXPECT_INPUT_FEE_PPK=0 \
             node --test tools/cardsim/e2e-swap.test.cjs
 
+      - name: Assisted settlement survives lost responses and a mint restart
+        run: |
+          for profile in nutshell:3338 nutv1:3339; do
+            mint="${profile%:*}"
+            port="${profile#*:}"
+            journal="$RUNNER_TEMP/assisted-$mint"
+            node tools/cardsim/assisted-settlement.cjs capture "$journal" "http://127.0.0.1:$port" http://127.0.0.1:9876
+            node tools/cardsim/assisted-settlement.cjs relay "$journal"
+            docker restart "$mint"
+            ready=false
+            for _ in $(seq 1 120); do
+              if curl -sf "http://127.0.0.1:$port/v1/keysets" > /dev/null; then ready=true; break; fi
+              sleep 1
+            done
+            if [ "$ready" != true ]; then echo "::error::local mint did not restart"; exit 1; fi
+            node tools/cardsim/assisted-settlement.cjs recover "$journal"
+            node tools/cardsim/assisted-settlement.cjs recover "$journal"
+          done
+
       # The app repos build this repo from a pinned ref for now; the artifact
       # is for a human pulling a jar off a run (release asset later).
       - name: Upload cardsim.jar
@@ -295,11 +315,16 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Build public cardkit for private runner tests
+        working-directory: tools/cardkit
+        run: yarn install --frozen-lockfile && yarn build
+
       # Argument parsing for tools/e2e-melt.cjs (a 0.x tool), the pure half of
       # tools/cardsim/client.test.cjs (encoders, parsers, no-retry) and the
       # Cashu arithmetic in tools/cardsim/cashu-crypto.test.cjs. Needs no card,
       # no cashu-client build, no bridge and no mint: the integration cases skip
       # without CARDSIM_URL / MINT_URL (the cardsim job runs them).
+      # Private runner tests use built cardkit with fake transports; no reader opens.
       # The glob is quoted so node, not the shell, expands it (Node 21+ treats
       # positional args as file paths, so a bare directory does not work).
       - name: Run tests
@@ -413,6 +438,49 @@ jobs:
       # through the same pinned converter here, and both files must be exactly
       # what tools/cardkit/make-assets.py makes of the two CAPs (the tracked one
       # was set aside above, before the build wrote over its path).
+      - name: Build isolated outbox control and pool probes
+        run: |
+          for profile in 0:1 256:1 4096:1 16384:1 16384:4 post:1 post-a:1 post-b:1 post-existing-a:1 post-existing-b:1; do
+            pool="${profile%:*}"
+            segments="${profile#*:}"
+            if [[ "$pool" = post* ]]; then
+              padding=none
+              storage="added-fields"
+              if [[ "$pool" = *-existing-* ]]; then storage="existing-fields"; fi
+              if [[ "$pool" = *-a ]]; then padding="padding-a"; fi
+              if [[ "$pool" = *-b ]]; then padding="padding-b"; fi
+              python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool-$segments" \
+                --pool-bytes 0 --post-install --image-padding "$padding" --state-storage "$storage" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+            else
+              python3 tools/outbox-spike/build-probe.py "$RUNNER_TEMP/outbox-resource-probe-$pool-$segments" \
+                --pool-bytes "$pool" --segments "$segments" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+            fi
+          done
+
+      - name: Check private probe dispatch in jCardSim
+        run: |
+          mvn -B -q -f tools/cardsim/pom.xml package -DskipTests
+          for profile in 0:1 256:1 4096:1 16384:1 16384:4 post:1 post-a:1 post-b:1 post-existing-a:1 post-existing-b:1; do
+            pool="${profile%:*}"
+            segments="${profile#*:}"
+            probe="$RUNNER_TEMP/outbox-resource-probe-$pool-$segments"
+            mkdir "$probe/classes"
+            javac --release 11 -cp tools/cardsim/target/cardsim.jar -d "$probe/classes" \
+              "$probe"/src/me/flashapp/cashu/*.java tools/outbox-spike/ProbeSmoke.java
+            smoke="$pool"
+            if [[ "$pool" = post* ]]; then smoke=post; fi
+            java -cp "$probe/classes:tools/cardsim/target/cardsim.jar" ProbeSmoke "$smoke"
+          done
+
+      - name: Convert private byte-backed compact prototype
+        run: |
+          python3 tools/outbox-spike/build-compact.py "$RUNNER_TEMP/compact-javacard" --sdk "$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
+
+      - name: Verify private compact signing, streaming and boundary recovery in jCardSim
+        run: |
+          python3 tools/outbox-spike/compile-compact-sim.py "$RUNNER_TEMP/compact-javacard"
+          node tools/outbox-spike/compact-javacard-smoke.cjs "$RUNNER_TEMP/compact-javacard"
+
       - name: Hello CAP, and the provisioner's load files match the CAPs
         run: |
           ant -f applet/build.xml hello-cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
@@ -525,6 +593,39 @@ jobs:
       - name: Format
         run: yarn format:check
 
+  ops-container:
+    needs: changes
+    if: needs.changes.outputs.ops_container == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    name: ops container (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ops/Dockerfile
+          load: true
+          tags: cashu-card-ops:test
+          build-args: REVISION=${{ inputs.ref || github.sha }}
+          cache-from: type=gha,scope=ops-${{ matrix.arch }}
+          cache-to: type=gha,scope=ops-${{ matrix.arch }},mode=max
+      - name: Exercise the built image
+        run: node ops/docker/smoke.cjs
+
   provisioner:
     needs: changes
     if: needs.changes.outputs.provisioner == 'true'
@@ -634,6 +735,7 @@ jobs:
         cap,
         cardkit,
         ops,
+        ops-container,
         provisioner,
         backup-copy,
         backup-roundtrip,

@@ -4,16 +4,7 @@
  * show what the run measured. For the spare card on the bench only.
  */
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {
-  Button,
-  SafeAreaView,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import {ScrollView, Share, StyleSheet, Switch, Text, View} from 'react-native';
 
 import {
   CASHU_PLAN,
@@ -39,6 +30,8 @@ import {randomBytes} from '../random';
 import {formatReadout, locksOut, makeReadout, type Readout} from '../readout';
 import {cancelCard, setCardMessage, withCard} from '../session';
 import {BENCH_RUNS_ENABLED} from '../releaseGates';
+import {FONT, useTheme, type Theme} from '../theme';
+import {Screen, SecondaryButton} from '../ui';
 
 async function runAction(
   action: Action,
@@ -59,6 +52,8 @@ async function runAction(
 }
 
 export function LoadTestScreen(): React.JSX.Element {
+  const t = useTheme();
+  const styles = local(t);
   const [running, setRunning] = useState<Action | null>(null);
   const [stopped, setStopped] = useState(false);
   const [replace, setReplace] = useState(false);
@@ -135,7 +130,7 @@ export function LoadTestScreen(): React.JSX.Element {
   const text = readout ? formatReadout(readout) : '';
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <Screen title="Bench tools">
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Cashu card provisioner</Text>
         <Text style={styles.note}>
@@ -149,22 +144,22 @@ export function LoadTestScreen(): React.JSX.Element {
           {status}
         </Text>
         <View style={styles.buttons}>
-          <Button
+          <SecondaryButton
             title={ACTION_NAMES.hello}
             disabled={!idle}
             onPress={() => start('hello')}
           />
-          <Button
+          <SecondaryButton
             title={ACTION_NAMES.cashu}
             disabled={!idle}
             onPress={() => start('cashu')}
           />
-          <Button
+          <SecondaryButton
             title={ACTION_NAMES.rotate}
             disabled={!idle}
             onPress={() => start('rotate')}
           />
-          <Button
+          <SecondaryButton
             title="Cancel"
             disabled={running === null}
             onPress={() => {
@@ -189,7 +184,7 @@ export function LoadTestScreen(): React.JSX.Element {
             <Text selectable style={styles.readout} testID="readout">
               {text}
             </Text>
-            <Button
+            <SecondaryButton
               title="Share readout"
               onPress={() => {
                 Share.share({message: text}).catch(e =>
@@ -200,18 +195,18 @@ export function LoadTestScreen(): React.JSX.Element {
           </View>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {flex: 1},
-  content: {padding: 16, gap: 12},
-  title: {fontSize: 20, fontWeight: '600'},
-  note: {fontSize: 13, opacity: 0.7},
-  status: {fontSize: 17, minHeight: 48},
-  buttons: {gap: 8},
-  row: {flexDirection: 'row', alignItems: 'center', gap: 8},
-  label: {flex: 1},
-  readout: {fontFamily: 'Courier', fontSize: 12},
-});
+const local = (t: Theme) =>
+  StyleSheet.create({
+    content: {padding: 16, gap: 12},
+    title: {color: t.ink, fontSize: 20, fontFamily: FONT.semibold},
+    note: {color: t.dim, fontSize: 13},
+    status: {color: t.ink, fontSize: 17, minHeight: 48},
+    buttons: {gap: 8},
+    row: {flexDirection: 'row', alignItems: 'center', gap: 8},
+    label: {flex: 1, color: t.ink},
+    readout: {color: t.ink, fontFamily: 'Courier', fontSize: 12},
+  });

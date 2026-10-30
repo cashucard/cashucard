@@ -133,3 +133,49 @@ test('an old account’s late batch reply is retained only in its own workspace 
     jest.restoreAllMocks();
   }
 });
+
+test('switching services with the same operator number restores only that service’s saved batch', async () => {
+  let bytes: string | null = null, ids = 0;
+  const workspaces = new WorkspaceStorage({read: async () => bytes, replace: async v => {bytes = v;}},
+    {read: async () => null, replace: async () => {}}, () => uuid(++ids));
+  const services = new Map<string, CardProvisioningService>();
+  let app!: ReturnType<typeof useApp>, flow!: ReturnType<typeof useProvisioning>;
+  function Probe() {app = useApp(); flow = useProvisioning(); return null;}
+  let profile: string | null = null;
+  let tree!: Renderer.ReactTestRenderer;
+  await act(async () => {tree = Renderer.create(<AppStore clientOptions={{baseUrl: 'https://ops.test'}} serviceStorage={{read: async () => profile, write: async v => {profile = v;}}}>
+    <ProvisioningProvider options={{workspaces, hardwareValidated: true, uuid: () => uuid(++ids),
+      serviceFor: (session, origin) => {
+        let service = services.get(origin);
+        if (!service) {
+          service = {scope: {service_origin: origin, operator_id: session.operator_id, key_env: session.env}, batch: jest.fn(async request => ({batch_id: origin === 'https://ops.test' ? 1 : 2,
+            batch_request_id: request.batch_request_id, operator_id: session.operator_id, device_id: request.device_id, next_ordinal: 0,
+            config: {...request, key_env: session.env, configuration_revision: 1}}))} as unknown as CardProvisioningService;
+          services.set(origin, service);
+        }
+        return service;
+      }}}><Probe /></ProvisioningProvider>
+  </AppStore>);});
+  const login = async () => {
+    const client = new ApiClient({baseUrl: app.serviceUrl});
+    jest.spyOn(client, 'operatorSession').mockResolvedValue({operator_id: 1, env: 'issued', token: `fixture-${app.serviceUrl}`});
+    await act(async () => app.signIn('operator', 'fixture', {client}));
+  };
+  try {
+    await login();
+    await act(async () => {await flow.create({count: 1, mint: 'https://mint.test', pinPolicy: 'perCard', pinBatch: '', dailyUsd: 0, noPinUsd: 0});});
+    const first = JSON.stringify(flow.snapshot);
+    const deviceId = flow.snapshot?.device_id;
+    await act(async () => app.signOut());
+    await act(async () => app.selectService('https://issuer.example.com'));
+    await login();
+    expect(flow.snapshot?.batch).toBeNull();
+    expect(flow.snapshot?.device_id).toBe(deviceId);
+    await act(async () => {await flow.create({count: 2, mint: 'https://mint.test', pinPolicy: 'perCard', pinBatch: '', dailyUsd: 0, noPinUsd: 0});});
+    expect(flow.snapshot?.batch?.batch_id).toBe(2);
+    await act(async () => app.signOut());
+    await act(async () => app.selectService('https://ops.test'));
+    await login();
+    expect(JSON.stringify(flow.snapshot)).toBe(first);
+  } finally {await act(async () => tree.unmount()); jest.restoreAllMocks();}
+});

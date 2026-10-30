@@ -31,14 +31,14 @@
       <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers" aria-current="page">Developers</a></nav>
       <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
     </header>
-    <main id="main" class="guide">
+    <main id="main" class="guide developer-guide">
       <section class="guide-hero" aria-labelledby="dev-title">
         <div class="guide-hero-inner">
           <div class="guide-hero-top">
             <div class="guide-hero-copy">
               <div class="eyebrow"><span class="status-dot"></span> DEVELOPERS <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
               <h1 id="dev-title">Build on <em>Cashu Card</em></h1>
-              <p class="guide-lead">A wallet that loads cards and a till that takes a tap both speak NUT-CCP, a draft Cashu NUT for NFC cards. This page links the draft, the card's commands, test vectors and the code. The protocol is experimental, and parts of it may change.</p>
+              <p class="guide-lead">Cards, wallets and tills share NUT-CCP, a draft Cashu protocol. Issuance tools prepare the cards for use. Start with the parts below, then choose your guide.</p>
               <ul class="guide-facts" aria-label="At a glance">
                 <li>Experimental</li>
                 <li>Applet 2.1</li>
@@ -61,6 +61,8 @@
         <nav class="guide-rail" aria-label="Developer contents">
           <span class="rail-label">On this page</span>
           <ol>
+            <li><a href="#overview">How the parts fit</a></li>
+            <li><a href="#issuers">Issuing cards</a></li>
             <li><a href="#status">Status</a></li>
             <li><a href="#spec">The specification</a></li>
             <li><a href="#code">The code</a></li>
@@ -75,6 +77,8 @@
           <details class="guide-toc">
             <summary>Contents</summary>
             <ol>
+              <li><a href="#overview">How the parts fit</a></li>
+              <li><a href="#issuers">Issuing cards</a></li>
               <li><a href="#status">Status</a></li>
               <li><a href="#spec">The specification</a></li>
               <li><a href="#code">The code</a></li>
@@ -84,6 +88,50 @@
               <li><a href="#contribute">Questions and contributions</a></li>
             </ol>
           </details>
+
+          <section id="overview" aria-labelledby="overview-title">
+            <h2 id="overview-title">How the parts fit</h2>
+            <p>One card connects the holder, merchant and issuer. Payments, installation and recovery have separate paths.</p>
+            <figure class="ecosystem" aria-labelledby="ecosystem-caption">
+              <picture>
+                <source media="(max-width:900px)" srcset="/assets/ecosystem-mobile.svg" />
+                <img src="/assets/ecosystem.svg" width="1000" height="824" alt="Wallet and till connect to the mint and tap the same physical card. Ops-service authorizes CCP to install the applet. Encrypted exports flow through a backup job to independent storage and alerts; the backup key has separate custody." decoding="async" />
+              </picture>
+              <figcaption id="ecosystem-caption">
+                <div class="ecosystem-legend" aria-label="Connection types"><span class="legend-nfc">NFC</span><span class="legend-online">Online API</span><span class="legend-recovery">Backup + alerts</span><a href="/assets/ecosystem.svg" download="cashu-card-ecosystem.svg">Download SVG ↗</a></div>
+                <p>* Atoll Recovery pairs with Workers/R2. The Docker service uses filesystem exports with your scheduled copy and alert jobs. <a href="/ops-service#backups">Backup setup ↗</a></p>
+              </figcaption>
+            </figure>
+            <details class="more"><summary>Who runs each part?</summary><div class="more-body">
+              <dl class="faults">
+                <div><dt>Card hardware and applet firmware</dt><dd>A compatible secure chip is the physical card. The open source applet is the software installed on it. Together they hold ecash and answer NFC commands.</dd></div>
+                <div><dt>Holder wallet</dt><dd>The holder runs a compatible wallet to set ownership and a PIN, load ecash and manage their card.</dd></div>
+                <div><dt>Till app</dt><dd>The merchant runs a compatible till on an NFC device to accept payments and settle them with the card's mint.</dd></div>
+                <div><dt>Mint</dt><dd>The mint operator issues the ecash proofs and checks redemption. A card issuer can reference an existing compatible mint.</dd></div>
+                <div><dt>CCP and ops-service</dt><dd>The card issuer's operators use Cashu Card Provisioner (CCP). The issuer runs an ops-service or uses an existing service they trust. The service manages issuance; holder wallets and tills handle payments through the card and mint.</dd></div>
+              </dl>
+            </div></details>
+            <details class="more"><summary>Optional backup storage and notifications</summary><div class="more-body">
+              <p>An issuer also needs operational recovery: encrypted exports, verified copies outside the service host, separate key custody and alerts for failed or stale backups. These support issuance and recovery; card payments follow the flow above.</p>
+              <ul>
+                <li><b>Nextcloud</b> is one destination for encrypted backup files.</li>
+                <li><b>ntfy</b> is one way to deliver failure and freshness alerts.</li>
+                <li><b><a href="https://github.com/islandbitcoin/atoll-recovery-startos">Atoll Recovery</a></b> is an optional StartOS companion that copies encrypted Workers exports to backup storage, reports freshness and can send alerts.</li>
+              </ul>
+              <p>The <a href="/ops-service#backups">hosting guide</a> covers encrypted exports, independent copying, alerts and recovery-key custody.</p>
+            </div></details>
+            <ul class="dev-cards dev-paths" aria-label="Choose your guide">
+              <li><b><a href="#reader">Build a wallet or till</a></b><span>Protocol, commands and test vectors.</span></li>
+              <li><b><a href="#issuers">Install cards</a></b><span>Phone app or computer and reader.</span></li>
+              <li><b><a href="/ops-service">Host your own ops-service</a></b><span>Docker, domain, operator access and recovery.</span></li>
+            </ul>
+          </section>
+
+          <section id="issuers" aria-labelledby="issuers-title">
+            <h2 id="issuers-title">Issuing cards</h2>
+            <p>Use <a href="/#install">Cashu Card Provisioner</a> to install the applet from a phone. An ops-service supplies operator accounts, assigned manager keys and durable installation/reset records. Read <a href="/ops-service#why">why this service is needed</a>, then use your issuer's service or follow the <a href="/ops-service">Docker self-hosting guide</a>.</p>
+            <p>For a computer with a USB reader, the <a href="/guide">manual install guide</a> covers the card commands and leaves manager-key custody with the operator. Holder-wallet setup follows either installation path.</p>
+          </section>
 
           <section id="status" aria-labelledby="status-title">
             <h2 id="status-title">Status</h2>
@@ -136,7 +184,7 @@
 
           <section id="report" aria-labelledby="report-title">
             <h2 id="report-title">Issues and security</h2>
-            <p>Report a bug or a place where the spec and the code disagree as a <a href="https://github.com/cashucard/cashucard/issues">GitHub issue</a>. Report anything that could affect funds privately, through a <a href="https://github.com/cashucard/cashucard/security/advisories/new">security advisory</a>, as the <a href="https://github.com/cashucard/cashucard/blob/main/SECURITY.md">security policy</a> asks. A flaw in the draft NUT itself goes there too.</p>
+            <p>Report a bug or a place where the spec and the code disagree as a <a href="https://github.com/cashucard/cashucard/issues">GitHub issue</a>. Report anything that could affect funds privately, to <a href="mailto:security@cashucard.org">security@cashucard.org</a> or through a <a href="https://github.com/cashucard/cashucard/security/advisories/new">security advisory</a>, as the <a href="https://github.com/cashucard/cashucard/blob/main/SECURITY.md">security policy</a> asks. A flaw in the draft NUT itself goes there too.</p>
           </section>
 
           <section id="contribute" aria-labelledby="contribute-title">
@@ -149,12 +197,12 @@
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an ops-service</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
         <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
       </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>
   </body>
 </html>

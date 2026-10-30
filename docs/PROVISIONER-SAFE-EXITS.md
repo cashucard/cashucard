@@ -11,8 +11,9 @@ legacy/lab screens. See [D109](DECISIONS.md#d109).
 | Sign-in, idle | Normal app exit; credentials are entered only in memory. | No operator session is assumed. |
 | Sign-in, waiting | Stop, including hardware Back. | Password input is cleared; an aborted/late result cannot sign in. A disconnected HTTP request may have reached the server. |
 | New batch, unsubmitted | Cancel setup → Cards. | No batch is silently created by leaving the form. |
-| Batch review, idle | Back/Edit batch, or Cancel setup → Cards. | Unsaved form values may be discarded. |
-| Batch creation waiting | Stop and keep saved work; Settings requests Stop before leaving. | The original request ID/body remain for reconciliation if the service already committed. |
+| Editable batch review, idle | Cancel setup → Cards. | Unsaved form values may be discarded; remembered public defaults remain separate. |
+| Service selection/review | Back or Keep current service; Close dismisses its help. | Changing the destination requires confirmation and a saved preference. Credential fields clear; card journals stay bound to their original service/account. |
+| Batch creation and first-card start waiting | Stop and keep saved work; Settings requests Stop before leaving. | The original request ID/body remain for reconciliation if the service already committed. A late creation reply cannot arm the first card after Stop. |
 | Cards home, batch end/close/retry waiting | Stop, including hardware Back. | Pending closure intent and the original request remain for service reconciliation. |
 | Installation, ready or paused | Stop for now → Cards. Existing End batch handles safe closure through the service. | Attempts, stopped chips and service acknowledgements remain. |
 | Installation, active NFC | Cancel tap / Stop, including hardware Back. | The last durable intent remains; transmitted commands may already have changed the card. |

@@ -7,9 +7,13 @@
  * Everything fits one screen on a phone; the only scrolling part is a mint
  * list that grows past four.
  */
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
+  Image,
   Pressable,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +24,7 @@ import {
 import {ApiClient} from '../api';
 import {SETUP} from '../strings';
 import {useApp, type BatchConfig} from '../store';
+import {readBatchDefaults} from '../batchDefaults';
 import {FONT, useTheme, type Theme} from '../theme';
 import {
   GearButton,
@@ -30,8 +35,9 @@ import {
   SecondaryButton,
 } from '../ui';
 
-/** The design code this build's card art draws (docs/CARD-DESIGNS.md). */
-const CARD_DESIGN = 'FL1: Flash, black, the bolt';
+/** The card face this build draws (CardFigure); holder wallets choose a design code. */
+const CARD_DESIGN = 'Cashu Card, the cashew chip';
+const CARD_FACE = require('../../assets/cardart/cashu-card-front.png');
 
 const local = (t: Theme) =>
   StyleSheet.create({
@@ -198,17 +204,7 @@ const local = (t: Theme) =>
       paddingHorizontal: 16,
       paddingVertical: 13,
     },
-    designChip: {
-      width: 28,
-      height: 40,
-      borderRadius: 6,
-      borderWidth: 2,
-      borderColor: t.ink,
-      backgroundColor: t.bg,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    designChipBolt: {color: t.ink, fontFamily: FONT.semibold, fontSize: 13},
+    designChip: {width: 48, height: 30, borderRadius: 4},
   });
 
 export function BatchSetupScreen({
@@ -217,18 +213,23 @@ export function BatchSetupScreen({
   onCancel,
   onStop,
   onCreate,
+  onStartAndRead,
   canStart = true,
   installationOnly = false,
   loadSha256,
+  lead,
 }: {
   onStart: () => void;
   onSettings: () => void;
   onCancel?: () => void;
   onStop?: () => void;
   onCreate?: (config: BatchConfig) => Promise<boolean>;
+  onStartAndRead?: (config: BatchConfig) => Promise<boolean>;
   canStart?: boolean;
   installationOnly?: boolean;
   loadSha256?: string;
+  /** Shown first inside the form's scroll, within the screen's safe area. */
+  lead?: React.ReactNode;
 }) {
   const app = useApp();
   const t = useTheme();
@@ -238,11 +239,25 @@ export function BatchSetupScreen({
   const [pinBatch, setPinBatch] = useState('');
   const [daily, setDaily] = useState('25.00');
   const [noPin, setNoPin] = useState('5.00');
-  const [count, setCount] = useState('12');
+  const [count, setCount] = useState(onStartAndRead ? '1' : '12');
+  const editedMint = useRef(false),
+    editedCount = useRef(false);
+  const [previousMintMissing, setPreviousMintMissing] = useState(false);
+  const fastStart = !!onStartAndRead;
+  const chooseMint = (value: string | null) => {
+    editedMint.current = true;
+    setPreviousMintMissing(false);
+    setMint(value);
+  };
+  const chooseCount = (value: string) => {
+    editedCount.current = true;
+    setCount(value);
+  };
   const maxCount = installationOnly ? 500 : 100000;
 
   const [creating, setCreating] = useState(false);
   const [review, setReview] = useState<BatchConfig | null>(null);
+  const editingLocked = creating || !canStart;
   const countNumber = Number(count);
   const validCount =
     /^\d+$/.test(count) &&
@@ -275,10 +290,13 @@ export function BatchSetupScreen({
       onStart();
     }
   };
-  const start = async () => {
+  const start = async (readFirst = true) => {
     if (!ready) {
       return;
     }
+    Keyboard.dismiss();
+    editedMint.current = true;
+    editedCount.current = true;
     const config: BatchConfig = {
       mint: mint!,
       // Legacy API fields are inert metadata in installation-only batches.
@@ -288,7 +306,16 @@ export function BatchSetupScreen({
       noPinUsd: installationOnly ? 0 : Number(noPin),
       count: countNumber,
     };
-    if (installationOnly) {
+    if (onStartAndRead && readFirst) {
+      setCreating(true);
+      try {
+        await onStartAndRead(config);
+      } finally {
+        setCreating(false);
+      }
+    } else if (onStartAndRead && onCreate) {
+      await submit(config);
+    } else if (installationOnly) {
       setReview(config);
     } else {
       await submit(config);
@@ -302,17 +329,35 @@ export function BatchSetupScreen({
   useEffect(() => {
     setServiceMints(null);
     setMintsFailed(false);
-    setMint(null);
+    if (!editedMint.current) {
+      setMint(null);
+    }
     if (!app.session) {
       return;
     }
     let alive = true;
     const client = new ApiClient({baseUrl: app.serviceUrl});
-    client
-      .mints(app.session.token)
-      .then(m => {
+    const defaults = fastStart
+      ? readBatchDefaults({
+          service_origin: app.serviceUrl,
+          operator_id: app.session.operator_id,
+          key_env: app.session.env,
+        })
+      : Promise.resolve(null);
+    Promise.all([client.mints(app.session.token), defaults])
+      .then(([m, saved]) => {
         if (alive) {
           setServiceMints(m);
+          if (fastStart) {
+            if (!editedCount.current && saved) {
+              setCount(String(saved.count));
+            }
+            if (!editedMint.current) {
+              const missing = !!saved && !m.includes(saved.mint);
+              setPreviousMintMissing(missing);
+              setMint(saved ? (missing ? null : saved.mint) : m[0] ?? null);
+            }
+          }
         }
       })
       .catch(() => {
@@ -323,7 +368,7 @@ export function BatchSetupScreen({
     return () => {
       alive = false;
     };
-  }, [app.session, app.serviceUrl, mintRequest]);
+  }, [app.session, app.serviceUrl, mintRequest, fastStart]);
   const mints = serviceMints ?? [];
 
   const customMint = mint !== null && !mints.includes(mint);
@@ -391,293 +436,345 @@ export function BatchSetupScreen({
   }
 
   return (
-    <Screen
-      title={SETUP.title}
-      onBack={onCancel}
-      onStop={creating ? onStop : undefined}
-      headerRight={
-        <GearButton
+    <KeyboardAvoidingView
+      style={s.grow}
+      enabled={Platform.OS === 'ios'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen
+        title={SETUP.title}
+        onBack={onCancel}
+        onStop={creating ? onStop : undefined}
+        headerRight={
+          <GearButton
+            onPress={() => {
+              if (creating) {
+                onStop?.();
+              }
+              onSettings();
+            }}
+            testID="settings"
+          />
+        }>
+        <View style={s.grow}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            testID="setup-scroll"
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag">
+            {lead}
+            {previousMintMissing ? (
+              <Text style={s.note}>
+                Choose a mint reference. Your previous choice is no longer
+                listed by this service.
+              </Text>
+            ) : null}
+            {mintsFailed ? (
+              <View>
+                <Text style={s.note}>{SETUP.mintsFailed}</Text>
+                <SecondaryButton
+                  title="RETRY MINT LIST"
+                  testID="retry-mints"
+                  onPress={() => setMintRequest(value => value + 1)}
+                />
+              </View>
+            ) : serviceMints === null ? (
+              <Text style={s.note}>Loading the mint list…</Text>
+            ) : serviceMints.length === 0 ? (
+              <Text style={s.note}>
+                The service has no mint references. Enter a batch reference
+                below.
+              </Text>
+            ) : null}
+
+            <View style={s.section}>
+              <HelpHeading
+                title={installationOnly ? 'Batch mint reference' : SETUP.mint}
+                titleStyle={s.sectionHeader}
+                testID="setup-mint-help">
+                {`The mint reference is for the batch record. The holder wallet sets the PIN, mint and limits when setting up each card.${
+                  loadSha256
+                    ? `\n\n${SETUP.buildLine(loadSha256.slice(0, 8))}`
+                    : ''
+                }`}
+              </HelpHeading>
+              <View style={s.card}>
+                <View style={s.mintGrid}>
+                  {mints.map((m, i) => {
+                    const host = m.replace(/^https:\/\//, '');
+                    const on = mint === m;
+                    return (
+                      <Pressable
+                        key={m}
+                        disabled={editingLocked}
+                        accessibilityState={{disabled: editingLocked}}
+                        onPress={() => chooseMint(m)}
+                        testID={`mint-${m}`}
+                        style={[
+                          s.mintCell,
+                          s.cellRow,
+                          s.mintCellBorder,
+                          i % 2 === 1 && s.cellRowEdgeR,
+                          i >= mints.length - 2 && mints.length % 2 === 0
+                            ? s.cellRowEdgeB
+                            : null,
+                          on ? s.cellSelected : null,
+                        ]}>
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.8}
+                          style={[s.mintName, on ? s.cellLabelOnAccent : null]}>
+                          {host}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {customMint ? (
+                  <>
+                    <View style={s.divider} />
+                    <View style={[s.cellRow, s.cellWide]}>
+                      <Text style={s.cellDot}>●</Text>
+                      <Text style={s.mintName}>Custom</Text>
+                      <TextInput
+                        value={mint ?? ''}
+                        editable={!editingLocked}
+                        onChangeText={chooseMint}
+                        placeholder="Enter custom mint URL"
+                        placeholderTextColor={t.dim}
+                        keyboardType="url"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        style={s.customInput}
+                        testID="mint-custom-input"
+                      />
+                    </View>
+                  </>
+                ) : null}
+                {!mint ? (
+                  <>
+                    <View style={s.divider} />
+                    <View style={[s.cellRow, s.cellWide]}>
+                      <TextInput
+                        value=""
+                        editable={!editingLocked}
+                        onChangeText={v => chooseMint(v || null)}
+                        placeholder="Or enter a mint URL…"
+                        placeholderTextColor={t.dim}
+                        keyboardType="url"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        style={s.emptyInput}
+                        testID="mint-custom-input"
+                      />
+                    </View>
+                  </>
+                ) : null}
+              </View>
+            </View>
+
+            {!installationOnly ? (
+              <View style={s.section}>
+                <Text style={s.sectionHeader}>PIN</Text>
+                <View style={s.card}>
+                  <Pressable
+                    style={s.policyRow}
+                    onPress={() => setPinPolicy('perCard')}
+                    testID="pin-perCard">
+                    <View
+                      style={[s.radio, pinPolicy === 'perCard' && s.radioOn]}>
+                      {pinPolicy === 'perCard' ? (
+                        <View style={s.radioDot} />
+                      ) : null}
+                    </View>
+                    <Text style={s.policyLabel}>{SETUP.pinPerCard}</Text>
+                  </Pressable>
+                  <View style={s.divider} />
+                  <Pressable
+                    style={s.policyRow}
+                    onPress={() => setPinPolicy('batch')}
+                    testID="pin-batch">
+                    <View style={[s.radio, pinPolicy === 'batch' && s.radioOn]}>
+                      {pinPolicy === 'batch' ? (
+                        <View style={s.radioDot} />
+                      ) : null}
+                    </View>
+                    <Text style={s.policyLabel}>{SETUP.pinBatch}</Text>
+                  </Pressable>
+                  {pinPolicy === 'batch' && !installationOnly ? (
+                    <TextInput
+                      value={pinBatch}
+                      onChangeText={v =>
+                        setPinBatch(v.replace(/\D/g, '').slice(0, 8))
+                      }
+                      placeholder="4–8 digits"
+                      placeholderTextColor={t.dim}
+                      keyboardType="numeric"
+                      secureTextEntry
+                      style={s.pinInput}
+                      testID="pin-batch-input"
+                    />
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            <View style={s.section}>
+              <Text style={s.sectionHeader}>
+                {installationOnly ? 'Cards' : SETUP.limits}
+              </Text>
+              <View style={s.card}>
+                {!installationOnly ? (
+                  <>
+                    <View style={s.fieldRow}>
+                      <Text style={s.fieldLabel}>{SETUP.daily}</Text>
+                      <TextInput
+                        value={daily}
+                        onChangeText={setDaily}
+                        keyboardType="numeric"
+                        editable={!editingLocked}
+                        style={s.fieldInput}
+                        testID="daily-limit"
+                      />
+                    </View>
+                    <View style={s.divider} />
+                    <View style={s.fieldRow}>
+                      <Text style={s.fieldLabel}>{SETUP.noPin}</Text>
+                      <TextInput
+                        value={noPin}
+                        onChangeText={setNoPin}
+                        keyboardType="numeric"
+                        editable={!editingLocked}
+                        style={s.fieldInput}
+                        testID="no-pin-limit"
+                      />
+                    </View>
+                    <View style={s.divider} />
+                  </>
+                ) : null}
+                <View style={s.fieldRow}>
+                  <Text style={s.fieldLabel}>{SETUP.count}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease cards in batch"
+                    accessibilityState={{
+                      disabled:
+                        editingLocked || !validCount || countNumber <= 1,
+                    }}
+                    disabled={editingLocked || !validCount || countNumber <= 1}
+                    onPress={() => chooseCount(String(countNumber - 1))}
+                    style={[
+                      s.countStep,
+                      (!validCount || countNumber <= 1) && s.countStepDisabled,
+                    ]}
+                    testID="batch-count-decrement">
+                    <Text style={s.countStepText}>−</Text>
+                  </Pressable>
+                  <TextInput
+                    value={count}
+                    onChangeText={value =>
+                      chooseCount(value.replace(/\D/g, ''))
+                    }
+                    keyboardType="number-pad"
+                    editable={!editingLocked}
+                    selectTextOnFocus
+                    accessibilityLabel="Cards in batch"
+                    style={[s.fieldInput, s.countInput]}
+                    testID="batch-count"
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase cards in batch"
+                    accessibilityState={{
+                      disabled: editingLocked || countNumber >= maxCount,
+                    }}
+                    disabled={editingLocked || countNumber >= maxCount}
+                    onPress={() =>
+                      chooseCount(String(validCount ? countNumber + 1 : 1))
+                    }
+                    style={[
+                      s.countStep,
+                      countNumber >= maxCount && s.countStepDisabled,
+                    ]}
+                    testID="batch-count-increment">
+                    <Text style={s.countStepText}>+</Text>
+                  </Pressable>
+                </View>
+                {!validCount ? (
+                  <Text
+                    style={
+                      s.countError
+                    }>{`Enter 1 to ${maxCount.toLocaleString()} cards.`}</Text>
+                ) : null}
+              </View>
+            </View>
+
+            {!installationOnly ? (
+              <View style={s.section}>
+                <View style={s.card}>
+                  <View style={s.designRow}>
+                    <Image
+                      source={CARD_FACE}
+                      style={s.designChip}
+                      resizeMode="cover"
+                    />
+                    <View style={s.grow}>
+                      <Text style={s.mintName}>Card design</Text>
+                      <Text style={s.cardSub}>{CARD_DESIGN}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+          </ScrollView>
+
+          <View style={s.footer} testID="setup-footer">
+            {onStartAndRead ? (
+              <>
+                <Text
+                  selectable
+                  style={s.note}
+                  testID="batch-inline-review">{`${count} ${
+                  count === '1' ? 'card' : 'cards'
+                } · ${mint ?? 'Choose a mint reference'}`}</Text>
+                <Text style={s.note}>
+                  Creates the batch and assigns manager keys for its cards.
+                </Text>
+              </>
+            ) : null}
+            <PrimaryButton
+              title={
+                creating
+                  ? 'CREATING BATCH…'
+                  : onStartAndRead
+                  ? 'START & READ FIRST CARD'
+                  : SETUP.start
+              }
+              disabled={!ready}
+              onPress={() => start()}
+              testID="start-batch"
+            />
+            {onStartAndRead && onCreate ? (
+              <SecondaryButton
+                title="CREATE BATCH ONLY"
+                testID="create-batch-only"
+                disabled={!ready}
+                onPress={() => start(false)}
+              />
+            ) : null}
+          </View>
+        </View>
+        <SecondaryButton
+          title={creating ? 'STOP AND KEEP SAVED WORK' : 'CANCEL SETUP'}
+          testID="cancel-batch-setup"
           onPress={() => {
             if (creating) {
               onStop?.();
             }
-            onSettings();
+            (onCancel ?? onSettings)();
           }}
-          testID="settings"
         />
-      }>
-      <View style={s.grow}>
-        <ScrollView
-          contentContainerStyle={s.scroll}
-          testID="setup-scroll"
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag">
-          {mintsFailed ? (
-            <View>
-              <Text style={s.note}>{SETUP.mintsFailed}</Text>
-              <SecondaryButton
-                title="RETRY MINT LIST"
-                testID="retry-mints"
-                onPress={() => setMintRequest(value => value + 1)}
-              />
-            </View>
-          ) : serviceMints === null ? (
-            <Text style={s.note}>Loading the mint list…</Text>
-          ) : serviceMints.length === 0 ? (
-            <Text style={s.note}>
-              The service has no mint references. Enter a batch reference below.
-            </Text>
-          ) : null}
-
-          <View style={s.section}>
-            <HelpHeading
-              title={installationOnly ? 'Batch mint reference' : SETUP.mint}
-              titleStyle={s.sectionHeader}
-              testID="setup-mint-help">
-              {`The mint reference is for the batch record. The holder wallet sets the PIN, mint and limits when setting up each card.${
-                loadSha256
-                  ? `\n\n${SETUP.buildLine(loadSha256.slice(0, 8))}`
-                  : ''
-              }`}
-            </HelpHeading>
-            <View style={s.card}>
-              <View style={s.mintGrid}>
-                {mints.map((m, i) => {
-                  const host = m.replace(/^https:\/\//, '');
-                  const on = mint === m;
-                  return (
-                    <Pressable
-                      key={m}
-                      onPress={() => setMint(m)}
-                      testID={`mint-${m}`}
-                      style={[
-                        s.mintCell,
-                        s.cellRow,
-                        s.mintCellBorder,
-                        i % 2 === 1 && s.cellRowEdgeR,
-                        i >= mints.length - 2 && mints.length % 2 === 0
-                          ? s.cellRowEdgeB
-                          : null,
-                        on ? s.cellSelected : null,
-                      ]}>
-                      <Text
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.8}
-                        style={[s.mintName, on ? s.cellLabelOnAccent : null]}>
-                        {host}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {customMint ? (
-                <>
-                  <View style={s.divider} />
-                  <View style={[s.cellRow, s.cellWide]}>
-                    <Text style={s.cellDot}>●</Text>
-                    <Text style={s.mintName}>Custom</Text>
-                    <TextInput
-                      value={mint ?? ''}
-                      onChangeText={setMint}
-                      placeholder="Enter custom mint URL"
-                      placeholderTextColor={t.dim}
-                      keyboardType="url"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      style={s.customInput}
-                      testID="mint-custom-input"
-                    />
-                  </View>
-                </>
-              ) : null}
-              {!mint ? (
-                <>
-                  <View style={s.divider} />
-                  <View style={[s.cellRow, s.cellWide]}>
-                    <TextInput
-                      value=""
-                      onChangeText={v => setMint(v || null)}
-                      placeholder="Or enter a mint URL…"
-                      placeholderTextColor={t.dim}
-                      keyboardType="url"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      style={s.emptyInput}
-                      testID="mint-custom-input"
-                    />
-                  </View>
-                </>
-              ) : null}
-            </View>
-          </View>
-
-          {!installationOnly ? (
-            <View style={s.section}>
-              <Text style={s.sectionHeader}>PIN</Text>
-              <View style={s.card}>
-                <Pressable
-                  style={s.policyRow}
-                  onPress={() => setPinPolicy('perCard')}
-                  testID="pin-perCard">
-                  <View style={[s.radio, pinPolicy === 'perCard' && s.radioOn]}>
-                    {pinPolicy === 'perCard' ? (
-                      <View style={s.radioDot} />
-                    ) : null}
-                  </View>
-                  <Text style={s.policyLabel}>{SETUP.pinPerCard}</Text>
-                </Pressable>
-                <View style={s.divider} />
-                <Pressable
-                  style={s.policyRow}
-                  onPress={() => setPinPolicy('batch')}
-                  testID="pin-batch">
-                  <View style={[s.radio, pinPolicy === 'batch' && s.radioOn]}>
-                    {pinPolicy === 'batch' ? <View style={s.radioDot} /> : null}
-                  </View>
-                  <Text style={s.policyLabel}>{SETUP.pinBatch}</Text>
-                </Pressable>
-                {pinPolicy === 'batch' && !installationOnly ? (
-                  <TextInput
-                    value={pinBatch}
-                    onChangeText={v =>
-                      setPinBatch(v.replace(/\D/g, '').slice(0, 8))
-                    }
-                    placeholder="4–8 digits"
-                    placeholderTextColor={t.dim}
-                    keyboardType="numeric"
-                    secureTextEntry
-                    style={s.pinInput}
-                    testID="pin-batch-input"
-                  />
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-
-          <View style={s.section}>
-            <Text style={s.sectionHeader}>
-              {installationOnly ? 'Cards' : SETUP.limits}
-            </Text>
-            <View style={s.card}>
-              {!installationOnly ? (
-                <>
-                  <View style={s.fieldRow}>
-                    <Text style={s.fieldLabel}>{SETUP.daily}</Text>
-                    <TextInput
-                      value={daily}
-                      onChangeText={setDaily}
-                      keyboardType="numeric"
-                      editable
-                      style={s.fieldInput}
-                      testID="daily-limit"
-                    />
-                  </View>
-                  <View style={s.divider} />
-                  <View style={s.fieldRow}>
-                    <Text style={s.fieldLabel}>{SETUP.noPin}</Text>
-                    <TextInput
-                      value={noPin}
-                      onChangeText={setNoPin}
-                      keyboardType="numeric"
-                      editable
-                      style={s.fieldInput}
-                      testID="no-pin-limit"
-                    />
-                  </View>
-                  <View style={s.divider} />
-                </>
-              ) : null}
-              <View style={s.fieldRow}>
-                <Text style={s.fieldLabel}>{SETUP.count}</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Decrease cards in batch"
-                  accessibilityState={{
-                    disabled: !validCount || countNumber <= 1,
-                  }}
-                  disabled={!validCount || countNumber <= 1}
-                  onPress={() => setCount(String(countNumber - 1))}
-                  style={[
-                    s.countStep,
-                    (!validCount || countNumber <= 1) && s.countStepDisabled,
-                  ]}
-                  testID="batch-count-decrement">
-                  <Text style={s.countStepText}>−</Text>
-                </Pressable>
-                <TextInput
-                  value={count}
-                  onChangeText={value => setCount(value.replace(/\D/g, ''))}
-                  keyboardType="number-pad"
-                  editable
-                  selectTextOnFocus
-                  accessibilityLabel="Cards in batch"
-                  style={[s.fieldInput, s.countInput]}
-                  testID="batch-count"
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Increase cards in batch"
-                  accessibilityState={{
-                    disabled: countNumber >= maxCount,
-                  }}
-                  disabled={countNumber >= maxCount}
-                  onPress={() =>
-                    setCount(String(validCount ? countNumber + 1 : 1))
-                  }
-                  style={[
-                    s.countStep,
-                    countNumber >= maxCount && s.countStepDisabled,
-                  ]}
-                  testID="batch-count-increment">
-                  <Text style={s.countStepText}>+</Text>
-                </Pressable>
-              </View>
-              {!validCount ? (
-                <Text
-                  style={
-                    s.countError
-                  }>{`Enter 1 to ${maxCount.toLocaleString()} cards.`}</Text>
-              ) : null}
-            </View>
-          </View>
-
-          {!installationOnly ? (
-            <View style={s.section}>
-              <View style={s.card}>
-                <View style={s.designRow}>
-                  <View style={s.designChip}>
-                    <Text style={s.designChipBolt}>⚡</Text>
-                  </View>
-                  <View style={s.grow}>
-                    <Text style={s.mintName}>Card design</Text>
-                    <Text style={s.cardSub}>{CARD_DESIGN}</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          ) : null}
-        </ScrollView>
-
-        <View style={s.footer} testID="setup-footer">
-          <PrimaryButton
-            title={SETUP.start}
-            disabled={!ready}
-            onPress={start}
-            testID="start-batch"
-          />
-        </View>
-      </View>
-      <SecondaryButton
-        title={creating ? 'STOP AND KEEP SAVED WORK' : 'CANCEL SETUP'}
-        testID="cancel-batch-setup"
-        onPress={() => {
-          if (creating) {
-            onStop?.();
-          }
-          (onCancel ?? onSettings)();
-        }}
-      />
-    </Screen>
+      </Screen>
+    </KeyboardAvoidingView>
   );
 }

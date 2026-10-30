@@ -147,6 +147,7 @@ export function ProvisioningScreen({
   const [exportFailed, setExportFailed] = React.useState(false);
   const s = StyleSheet.create({
     grow: {flex: 1},
+    lead: {gap: 12},
     headerTools: {flexDirection: 'row', alignItems: 'center'},
     scroll: {gap: 18, paddingBottom: 24},
     title: {color: t.ink, fontFamily: FONT.semibold, fontSize: 24},
@@ -279,37 +280,43 @@ export function ProvisioningScreen({
     );
   }
   if (!snapshot.batch) {
+    // The setup form is its own Screen; these lead it inside its safe area.
+    const lead =
+      onCheck || !flow.hardwareValidated || flow.notice ? (
+        <View style={s.lead}>
+          {onCheck ? (
+            <SecondaryButton
+              title="CHECK AN EXISTING CARD"
+              testID="open-card-status"
+              onPress={onCheck}
+              disabled={flow.busy}
+            />
+          ) : null}
+          {!flow.hardwareValidated ? (
+            <View style={s.card}>
+              <Dim>{GATE}</Dim>
+            </View>
+          ) : null}
+          {flow.notice ? (
+            <Text style={s.line} testID="recovery-notice">
+              {flow.notice}
+            </Text>
+          ) : null}
+        </View>
+      ) : null;
     return (
-      <View style={s.grow}>
-        {onCheck ? (
-          <SecondaryButton
-            title="CHECK AN EXISTING CARD"
-            testID="open-card-status"
-            onPress={onCheck}
-            disabled={flow.busy}
-          />
-        ) : null}
-        {!flow.hardwareValidated ? (
-          <View style={s.card}>
-            <Dim>{GATE}</Dim>
-          </View>
-        ) : null}
-        {flow.notice ? (
-          <Text style={s.line} testID="recovery-notice">
-            {flow.notice}
-          </Text>
-        ) : null}
-        <BatchSetupScreen
-          onCancel={onHome}
-          onStart={() => undefined}
-          onSettings={leave}
-          onStop={flow.cancel}
-          onCreate={flow.create}
-          canStart={flow.hardwareValidated && !flow.busy}
-          installationOnly
-          loadSha256={CASHU_PLAN.loadFile.sha256}
-        />
-      </View>
+      <BatchSetupScreen
+        onCancel={onHome}
+        onStart={() => undefined}
+        onSettings={leave}
+        onStop={flow.cancel}
+        onCreate={flow.create}
+        onStartAndRead={flow.startAndRead}
+        canStart={flow.hardwareValidated && !flow.busy}
+        installationOnly
+        loadSha256={CASHU_PLAN.loadFile.sha256}
+        lead={lead}
+      />
     );
   }
   const batch = snapshot.batch;

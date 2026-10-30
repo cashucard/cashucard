@@ -12,4 +12,4 @@ Cardholders finish ownership, PIN, mint configuration and funding in a compatibl
 Saved work stays separate for each operator account and service. Stopping preserves recovery records; it does not undo card changes already completed.
 
 Learn about the open Cashu Card protocol at cashucard.org.
-Support: https://userdocs.flashapp.me or support@getflash.io.
+Support: https://cashucard.org/support or support@cashucard.org.
