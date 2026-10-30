@@ -6,7 +6,13 @@ const kitRequire = require("node:module").createRequire(
   require.resolve("../cardkit/package.json"),
 );
 const { FakeCard } = kitRequire("@cashu-card/cardkit/testing");
-const { PINS, BASELINE, PRIVATE, runCreation } = require("./pixel-control.js");
+const {
+  PINS,
+  BASELINE,
+  PRIVATE,
+  runCreation,
+  resumeJournal,
+} = require("./pixel-control.js");
 const b = (hex) => [...Buffer.from(hex, "hex")];
 const hex = (bytes) => Buffer.from(bytes).toString("hex").toUpperCase();
 const sha = (bytes) =>
@@ -112,6 +118,11 @@ function fixture(options = {}) {
   };
   const args = {
     sdk,
+    limits: {
+      platform: "android",
+      androidTimeoutMs: 15000,
+      maxTransceive: 261,
+    },
     load: syntheticLoad(),
     hash: () => PINS.load,
     tx,
@@ -145,6 +156,29 @@ test("creation control uses real SCP02, creates both instances and verifies exac
   assert.equal(f.sent.filter((a) => a[1] === 0x50).length, 2);
   assert.ok(!f.sent.some((a) => [0xd8, 0x7e, 0x70, 0x74, 0x77].includes(a[1])));
   assert.equal(f.card.failedAuths, 0);
+});
+test("missing/clamped timeout or inadequate frame size stops before every APDU", async () => {
+  for (const limits of [
+    undefined,
+    { platform: "android", androidTimeoutMs: 618, maxTransceive: 261 },
+    { platform: "android", androidTimeoutMs: 15000, maxTransceive: 247 },
+  ]) {
+    const f = fixture();
+    f.args.limits = limits;
+    const r = await runCreation(f.args);
+    assert.equal(r.failure, "nfc-limits-unconfirmed");
+    assert.equal(f.sent.length, 0);
+  }
+});
+test("relaunch restores consumed states and malformed saved data cannot rearm", () => {
+  assert.equal(resumeJournal(null), null);
+  for (const status of ["armed", "running", "stopped", "complete"]) {
+    const record = { plan: PINS.plan, stage: "saved", status };
+    assert.deepEqual(resumeJournal(JSON.stringify(record)), record);
+  }
+  for (const data of ["null", "{}", "{", "[]", '""']) {
+    assert.equal(resumeJournal(data).status, "stopped");
+  }
 });
 test("actual SHA rejects an unpinned image before touching a transport", async () => {
   const f = fixture();

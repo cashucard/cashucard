@@ -8,11 +8,12 @@ import {
   StyleSheet,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import NfcManager from "react-native-nfc-manager";
 import * as sdk from "@cashu-card/cardkit";
 import { sha256 } from "@noble/hashes/sha2";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { withCard, cancelCard } from "./src/session";
-import { PINS, runCreation } from "./pixel-control";
+import { PINS, runCreation, resumeJournal } from "./pixel-control";
 import asset from "./pixel-asset.json";
 
 const JOURNAL = "cashucard-private-creation-v1";
@@ -24,11 +25,7 @@ export default function App() {
   useEffect(() => {
     AsyncStorage.getItem(JOURNAL)
       .then((value) => {
-        try {
-          setRecord(value === null ? null : JSON.parse(value));
-        } catch {
-          setRecord({ status: "stopped", failure: "saved-journal-unreadable" });
-        }
+        setRecord(resumeJournal(value));
       })
       .catch(() =>
         setRecord({ status: "stopped", failure: "journal-unavailable" }),
@@ -60,10 +57,16 @@ export default function App() {
       await save(current);
       const result = await withCard(
         "Hold card 09336320 still until the test ends.",
-        async (tx) =>
-          runCreation({
+        async (tx) => {
+          const limits = {
+            platform: "android",
+            androidTimeoutMs: await NfcManager.getTimeout(),
+            maxTransceive: await NfcManager.getMaxTransceiveLength(),
+          };
+          return runCreation({
             sdk,
             tx,
+            limits,
             load: sdk.fromHex(asset.loadHex),
             hash: (bytes) =>
               sdk.toHex(sha256(Uint8Array.from(bytes))).toLowerCase(),
@@ -84,7 +87,8 @@ export default function App() {
               current = { ...current, ...next };
               await save(current);
             },
-          }),
+          });
+        },
       );
       current = {
         ...current,

@@ -29,6 +29,27 @@ const hex = (bytes) =>
 const fromHex = (value) => value.match(/../g).map((v) => parseInt(v, 16));
 const PRIVATE = [PINS.package + "01", PINS.package + "4D", PINS.package];
 
+function resumeJournal(value) {
+  if (value === null) return null;
+  try {
+    const record = JSON.parse(value);
+    if (
+      record?.plan === PINS.plan &&
+      typeof record.stage === "string" &&
+      ["armed", "running", "stopped", "complete"].includes(record.status)
+    )
+      return record;
+  } catch {
+    /* Retain a consumed state for malformed saved data. */
+  }
+  return {
+    plan: PINS.plan,
+    stage: "saved-journal-unreadable",
+    status: "stopped",
+    failure: "saved-journal-unreadable",
+  };
+}
+
 function registryFrames(data) {
   const frames = [];
   let at = 0;
@@ -110,6 +131,7 @@ async function runCreation({
   now,
   cancelled = () => false,
   validateKey,
+  limits,
 }) {
   const state = {
     plan: PINS.plan,
@@ -256,6 +278,15 @@ async function runCreation({
     await persist();
   };
   try {
+    if (
+      limits?.platform !== "android" ||
+      limits.androidTimeoutMs !== 15000 ||
+      !Number.isInteger(limits.maxTransceive) ||
+      limits.maxTransceive < 261
+    ) {
+      stop("nfc-limits-unconfirmed");
+    }
+    state.nfcLimits = limits;
     if (load.length !== PINS.bytes || hash(load) !== PINS.load)
       stop("image-mismatch");
     await identity("match-chip");
@@ -361,4 +392,5 @@ module.exports = {
   verifyRegistry,
   registryFrames,
   LabStop,
+  resumeJournal,
 };
