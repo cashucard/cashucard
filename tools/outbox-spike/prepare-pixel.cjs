@@ -5,10 +5,18 @@ const { execFileSync } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { compactArtifact } = require("./run-compact.cjs");
 const { PINS } = require("./pixel-control.js");
+const { FIXTURE_SHA256 } = require("./pixel-capacity.js");
 const ROOT = path.resolve(__dirname, "../..");
 const APP_ID = "org.cashucard.compactlab";
+const CAPACITY_APP_ID = "org.cashucard.capacitylab";
+const modeId = (mode) => {
+  if (mode === "creation") return APP_ID;
+  if (mode === "capacity") return CAPACITY_APP_ID;
+  throw Error("Unknown fixed lab mode");
+};
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-function androidFiles(original) {
+function androidFiles(original, mode = "creation") {
+  const appId = modeId(mode);
   const manifest = original.manifest
     .replace(
       "<manifest ",
@@ -36,7 +44,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "${APP_ID}"
+        applicationId "${appId}"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -59,7 +67,8 @@ dependencies {
 `;
   return { manifest, application, gradle };
 }
-function prepare({ artifact, output }) {
+function prepare({ artifact, output, mode = "creation" }) {
+  const appId = modeId(mode);
   if (!path.isAbsolute(output) || fs.existsSync(output))
     throw Error("New absolute output directory required");
   if (output === ROOT || output.startsWith(ROOT + path.sep))
@@ -83,6 +92,14 @@ function prepare({ artifact, output }) {
     hash(load) !== PINS.load
   )
     throw Error("Fixed image pin mismatch");
+  const fixture =
+    mode === "capacity"
+      ? fs.readFileSync(
+          path.join(__dirname, "fixtures/compact-capacity-v1.json"),
+        )
+      : undefined;
+  if (fixture && hash(fixture) !== FIXTURE_SHA256)
+    throw Error("Fixed capacity fixture pin mismatch");
   const source = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: ROOT,
     encoding: "utf8",
@@ -113,10 +130,13 @@ function prepare({ artifact, output }) {
   const read = (name) => fs.readFileSync(path.join(app, name), "utf8");
   const kotlin =
     "android/app/src/main/java/com/islandbitcoin/provisioner/MainApplication.kt";
-  const files = androidFiles({
-    manifest: read("android/app/src/main/AndroidManifest.xml"),
-    application: read(kotlin),
-  });
+  const files = androidFiles(
+    {
+      manifest: read("android/app/src/main/AndroidManifest.xml"),
+      application: read(kotlin),
+    },
+    mode,
+  );
   const write = (name, data) => {
     const p = path.join(app, name);
     fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -143,6 +163,10 @@ function prepare({ artifact, output }) {
     fs.readFileSync(path.join(__dirname, "pixel-control.js")),
   );
   write(
+    "pixel-capacity.js",
+    fs.readFileSync(path.join(__dirname, "pixel-capacity.js")),
+  );
+  write(
     "src/session.ts",
     fs.readFileSync(path.join(ROOT, "apps/provisioner/src/session.ts")),
   );
@@ -152,9 +176,14 @@ function prepare({ artifact, output }) {
   );
   const build = {
     source,
-    appId: APP_ID,
+    appId,
+    mode,
     template: hash(fs.readFileSync(__filename)),
     core: hash(fs.readFileSync(path.join(__dirname, "pixel-control.js"))),
+    capacityCore: hash(
+      fs.readFileSync(path.join(__dirname, "pixel-capacity.js")),
+    ),
+    fixture: fixture ? FIXTURE_SHA256 : undefined,
     ui: hash(fs.readFileSync(path.join(__dirname, "PixelControlApp.jsx"))),
     session: hash(
       fs.readFileSync(path.join(ROOT, "apps/provisioner/src/session.ts")),
@@ -165,7 +194,12 @@ function prepare({ artifact, output }) {
   };
   write(
     "pixel-asset.json",
-    JSON.stringify({ build, loadHex: load.toString("hex") }) + "\n",
+    JSON.stringify({
+      build,
+      mode,
+      loadHex: load.toString("hex"),
+      fixtureHex: fixture?.toString("hex"),
+    }) + "\n",
   );
   fs.writeFileSync(
     path.join(output, "lab-build.json"),
@@ -173,11 +207,15 @@ function prepare({ artifact, output }) {
   );
   return build;
 }
-module.exports = { androidFiles, prepare, APP_ID };
+module.exports = { androidFiles, prepare, APP_ID, CAPACITY_APP_ID };
 if (require.main === module) {
   const { parseArgs } = require("node:util");
   const { values } = parseArgs({
-    options: { artifact: { type: "string" }, output: { type: "string" } },
+    options: {
+      artifact: { type: "string" },
+      output: { type: "string" },
+      mode: { type: "string", default: "creation" },
+    },
   });
   process.stdout.write(JSON.stringify(prepare(values), null, 2) + "\n");
 }

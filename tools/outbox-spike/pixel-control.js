@@ -1,4 +1,11 @@
-/* Portable private creation-only control. Dependencies are injected; no I/O imports. */
+/* Portable private lab controls. Dependencies are injected; no I/O imports. */
+const {
+  CAPACITY_PLAN,
+  FIXTURE_SHA256,
+  CapacityFailure,
+  capacityProfile,
+  executeCapacity,
+} = require("./pixel-capacity.js");
 const PINS = Object.freeze({
   plan: "pixel-creation-control-v1",
   chip: "cplc-v1:4790d3213041093363205547",
@@ -29,12 +36,13 @@ const hex = (bytes) =>
 const fromHex = (value) => value.match(/../g).map((v) => parseInt(v, 16));
 const PRIVATE = [PINS.package + "01", PINS.package + "4D", PINS.package];
 
-function resumeJournal(value) {
+function resumeJournal(value, plan = PINS.plan) {
+  if (![PINS.plan, CAPACITY_PLAN].includes(plan)) stop("unknown-plan");
   if (value === null) return null;
   try {
     const record = JSON.parse(value);
     if (
-      record?.plan === PINS.plan &&
+      record?.plan === plan &&
       typeof record.stage === "string" &&
       ["armed", "running", "stopped", "complete"].includes(record.status)
     )
@@ -43,7 +51,7 @@ function resumeJournal(value) {
     /* Retain a consumed state for malformed saved data. */
   }
   return {
-    plan: PINS.plan,
+    plan,
     stage: "saved-journal-unreadable",
     status: "stopped",
     failure: "saved-journal-unreadable",
@@ -110,6 +118,7 @@ function verifyRegistry(sdk, pages, allowed) {
 }
 
 function failureCode(error, sdk) {
+  if (error instanceof CapacityFailure) return error.code;
   if (error instanceof LabStop) return error.code;
   if (error instanceof sdk.TransportError) {
     return error.cause instanceof LabStop
@@ -121,20 +130,25 @@ function failureCode(error, sdk) {
   return "operation-stopped";
 }
 
-async function runCreation({
-  sdk,
-  load,
-  hash,
-  random,
-  tx: nativeTx,
-  save,
-  now,
-  cancelled = () => false,
-  validateKey,
-  limits,
-}) {
+async function runControl(
+  {
+    sdk,
+    load,
+    hash,
+    random,
+    tx: nativeTx,
+    save,
+    now,
+    cancelled = () => false,
+    validateKey,
+    limits,
+    fixture,
+    verifySignature,
+  },
+  capacityMode,
+) {
   const state = {
-    plan: PINS.plan,
+    plan: capacityMode ? CAPACITY_PLAN : PINS.plan,
     chip: PINS.chip,
     cap: PINS.cap,
     load: PINS.load,
@@ -170,7 +184,7 @@ async function runCreation({
     ) {
       stop("command-not-admitted");
     }
-    if (state.commands >= 256) stop("command-bound");
+    if (state.commands >= (capacityMode ? 512 : 256)) stop("command-bound");
     state.commands++;
     // Persist intent before each APDU. No challenge, MAC, PIN or key is recorded.
     state.header = hex(apdu.slice(0, 4));
@@ -278,6 +292,10 @@ async function runCreation({
     await persist();
   };
   try {
+    const profile = capacityMode ? capacityProfile(fixture, hash) : null;
+    if (capacityMode && typeof verifySignature !== "function")
+      stop("capacity-verifier-required");
+    if (capacityMode) state.fixtureSha256 = FIXTURE_SHA256;
     state.nfcLimits = {
       platform: limits?.platform === "android" ? "android" : "unconfirmed",
       androidTimeoutMs: Number.isFinite(limits?.androidTimeoutMs)
@@ -362,6 +380,18 @@ async function runCreation({
     state.cardKey = hex(key.data);
     state.creationVerified = true;
     await persist();
+    if (capacityMode) {
+      if (Math.min(word(6), word(8)) < 128) stop("capacity-commit-floor");
+      await executeCapacity({
+        profile,
+        key: key.data,
+        command: raw,
+        state,
+        persist,
+        hash,
+        verifySignature,
+      });
+    }
     // Successful control only: a fresh chip match/channel and exact registry precede deletion.
     await identity("cleanup-match-chip");
     const cleanup = await authenticate("cleanup-factory");
@@ -392,11 +422,14 @@ async function runCreation({
   }
   return state;
 }
+const runCreation = (options) => runControl(options, false);
+const runCapacity = (options) => runControl(options, true);
 module.exports = {
   PINS,
   BASELINE,
   PRIVATE,
   runCreation,
+  runCapacity,
   verifyRegistry,
   registryFrames,
   LabStop,
