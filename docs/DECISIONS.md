@@ -4542,7 +4542,7 @@ These counts supply an algorithmic improvement; hardware speed remains open.
 
 Retain the byte-backed layout, constructor/reference shape, allocation rules,
 publication/recovery semantics, fixture and all phone/host bounds. Keep every
-journal persistence barrier: the fake complete workflow records 1,676 saves,
+journal persistence barrier: the original 395-command fake workflow records 1,676 saves,
 but Android write latency is unmeasured. Host-only counters, fragmented-page
 reference checks and byte-store cuts stay outside generated CAP sources.
 Released firmware/assets, protocol, cardkit and existing Pixel image pins are
@@ -4558,6 +4558,6 @@ The fixed `capacity-optimized` mode pins the converted image from commit
 `038e298ec7c846cec75e7e40366b1bc4d25a88d6`, with 27,343 load bytes and 111 blocks.
 It uses a separate consumed plan/key under the same private app ID, version
 code 3, and preserves the earlier journals. Existing modes retain their old
-image pins; crossed profiles stop before hardware. The full fake path is 396
+image pins; crossed profiles stop before the first APDU. The full fake path is 396
 commands within the unchanged ceilings. Its exact APK and named physical plan
 still require review and approval.
