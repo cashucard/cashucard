@@ -4466,3 +4466,15 @@ Many-small-record capacity, physical interruptions, production authorization
 and final wire/limit agreement remain separate gates. No additional physical
 action is authorized by this decision; review the exact APK and named run plan
 before touching the phone or card.
+
+**Physical follow-up (2026-10-30):** the approved Pixel run created the private
+applets and allocated the 16 KiB pool and 12 KiB DLEQ area. It confirmed proof
+slots 0 through 84, then stopped at slot 85 with uncertain transport/delivery,
+before output staging or signing. The approved conditional ACS cleanup removed
+only private objects and verified the original blank baseline. The plan is
+consumed; full-slot capacity remains unmeasured. See the
+[hardware report](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-capacity-load-stop.md).
+Retain a bounded native failure category and failed-call elapsed envelope in
+the isolated lab before preparing another approved physical invocation. The
+image and existing limits remain unchanged; ACS installation attempts stay
+paused.
