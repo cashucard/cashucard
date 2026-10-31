@@ -193,6 +193,10 @@ function prepare({ artifact, output, mode = "creation" }) {
     fs.readFileSync(path.join(__dirname, "pixel-capacity.js")),
   );
   write(
+    "lab-journal.js",
+    fs.readFileSync(path.join(__dirname, "lab-journal.js")),
+  );
+  write(
     "src/session.ts",
     fs.readFileSync(path.join(ROOT, "apps/provisioner/src/session.ts")),
   );
@@ -209,6 +213,7 @@ function prepare({ artifact, output, mode = "creation" }) {
     fs.readFileSync(path.join(__dirname, "pixel-streamed.json")),
   );
   const build = {
+    presentation: hash(fs.readFileSync(path.join(__dirname, "lab-journal.js"))),
     streamedPins: hash(
       fs.readFileSync(path.join(__dirname, "pixel-streamed.json")),
     ),

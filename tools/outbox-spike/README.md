@@ -542,8 +542,15 @@ including full reclamation. Offline policy tests compare every Node command
 with independent Python construction. Runner tests cover a complete large
 export, incorrect/truncated bytes and a lost final-page response: uncertainty
 preserves received pages and performs neither retirement nor deletion. The
-physical full-slot run remains pending a named approved plan. This candidate
-output count does not freeze the protocol's eventual limits.
+physical full-slot result is recorded in the
+[October 31 report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-31.j3r180-full-capacity-recovery.md):
+signing and verified reader recovery to blank succeeded. The Pixel's single-pass
+elapsed budget remains open. This candidate output count does not freeze the
+protocol's eventual limits.
+
+The [phased qualification guide](PHASED-QUALIFICATION.md) describes the fixed
+many-record simulator recipe and the live execution work needed before its
+physical qualification.
 
 ### Interruption evidence sequence
 

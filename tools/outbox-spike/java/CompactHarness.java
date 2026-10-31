@@ -55,6 +55,7 @@ public final class CompactHarness {
             ((ECPublicKey)field(applet,"cardPubKey")).setW(w,(short)0,(short)65);
             JsonArray results=new JsonArray();
             java.util.List<byte[]> scopes=new java.util.ArrayList<>();
+            java.util.Map<String,byte[]> namedScopes=new java.util.HashMap<>();
             for(JsonElement item:req.getAsJsonArray("steps")) {
                 JsonObject step=item.isJsonPrimitive()?new JsonObject():item.getAsJsonObject();
                 if(item.isJsonPrimitive())step.addProperty("apdu",item.getAsString());
@@ -76,8 +77,8 @@ public final class CompactHarness {
                 if(step.has("reset"))sim.reset();
                 String command;
                 if(step.has("reset"))command="00a404000b"+AID_HEX;
-                else if(step.has("retire")) {
-                    byte[] scope=scopes.get(step.get("retire").getAsInt()).clone();
+                else if(step.has("retire") || step.has("retireAs")) {
+                    byte[] scope=(step.has("retireAs")?namedScopes.get(step.get("retireAs").getAsString()):scopes.get(step.get("retire").getAsInt())).clone();
                     if(step.has("flip"))scope[step.get("flip").getAsInt()]^=1;
                     command="b07700002d"+hex(scope)+"00";
                 }
@@ -98,6 +99,11 @@ public final class CompactHarness {
                 result.addProperty("canonicalDigestSmallCalls",CompactCut.digestSmallCalls);
                 result.addProperty("hex",reply==null?"6f00":hex(reply.getBytes()));
                 if(reply!=null && reply.getSW()==0x9000 && reply.getData().length==45 && (command.substring(2,4).equals("74") || command.substring(2,4).equals("7c")))scopes.add(reply.getData());
+                if(step.has("scopeAs")) {
+                    if(reply==null || reply.getSW()!=0x9000 || reply.getData().length!=45)throw new IllegalStateException("named scope missing");
+                    String label=step.get("scopeAs").getAsString();
+                    if(namedScopes.putIfAbsent(label,reply.getData())!=null)throw new IllegalStateException("named scope already captured");
+                }
                 results.add(result);
                 CompactCut.target=null;
                 CompactCut.cutWrite=0;

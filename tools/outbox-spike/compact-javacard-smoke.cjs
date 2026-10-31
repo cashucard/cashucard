@@ -447,6 +447,50 @@ test("the byte-backed pool refuses before signing when full and can reuse retire
   assert.equal(response(r.at(-2)).sw, 0x6985);
   assert.equal(ok(r.at(-1))[3], 45);
 });
+test("bounded many-record phases preserve every packet through refusal, reload and stale acknowledgement", () => {
+  const { qualification, verifyRecord } = require("./many-records.cjs");
+  const q = qualification(),
+    r = run(q.steps),
+    retained = new Map();
+  assert.equal(q.phases.length, 8);
+  for (const phase of q.phases) {
+    assert.ok(phase.steps.length <= 160);
+    for (const check of phase.checks) {
+      const actual = response(r[phase.start + check.at]);
+      assert.equal(actual.sw, check.sw, phase.name + " / " + check.at);
+      if (check.data) assert.deepEqual([...actual.data], check.data);
+    }
+    for (const capture of phase.captures) {
+      const scope = ok(r[phase.start + capture.scopeAt]);
+      const packet = Buffer.concat(
+        r
+          .slice(
+            phase.start + capture.pageAt,
+            phase.start + capture.pageAt + capture.pages,
+          )
+          .map(ok),
+      );
+      const verified = verifyRecord(
+        capture.record,
+        Buffer.from(original.context.cardKey, "hex"),
+        scope,
+        packet,
+      );
+      const old = retained.get(capture.record.token);
+      if (old) {
+        assert.ok(scope.equals(old.scope));
+        assert.ok(packet.equals(old.packet));
+      }
+      retained.set(capture.record.token, { scope, packet, verified });
+    }
+  }
+  assert.equal(retained.size, 46);
+  assert.notEqual(
+    retained.get("initial-0").verified.packetId,
+    retained.get("replacement-0").verified.packetId,
+  );
+  assert.deepEqual([...ok(r.at(-1))], q.finalStatus);
+});
 test("a load cut before its status commit is ignored and exhausted payment IDs cannot wrap", () => {
   const v = clone(original),
     steps = setup({ ...v, proofs: [] });

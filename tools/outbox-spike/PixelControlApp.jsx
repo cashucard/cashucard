@@ -28,6 +28,7 @@ import {
 } from "./pixel-control";
 import { CAPACITY_PLAN } from "./pixel-capacity";
 import asset from "./pixel-asset.json";
+import { createLabJournal } from "./lab-journal";
 
 const streamed = asset.mode === "capacity-streamed";
 const optimized = asset.mode === "capacity-optimized";
@@ -73,10 +74,13 @@ export default function App() {
       cancelCard();
     };
   }, []);
-  const save = async (value) => {
-    await AsyncStorage.setItem(JOURNAL, JSON.stringify(value));
-    setRecord(value);
-  };
+  const journal = useRef(null);
+  if (journal.current === null)
+    journal.current = createLabJournal({
+      write: (raw) => AsyncStorage.setItem(JOURNAL, raw),
+      present: setRecord,
+    });
+  const save = journal.current;
   const begin = async () => {
     if (running.current || record !== null) return;
     running.current = true;
