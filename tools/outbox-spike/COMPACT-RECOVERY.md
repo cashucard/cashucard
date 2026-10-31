@@ -2,7 +2,10 @@
 
 The [optimized Pixel run](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-optimized-sign-stop.md)
 lost its signing reply after complete synthetic staging. The card and journal
-are retained. Its completed hardware plan excludes cleanup after this stop.
+were retained at that stop. Its completed hardware plan excluded cleanup.
+The separately approved recovery has since established unpublished staging,
+completed conditional private cleanup and verified the original blank baseline;
+see the report's recovery follow-up. Both plans are consumed.
 
 `recover-compact.cjs` prepares a closed host flow for the same private image and
 fixed 128-input/128-output fixture on 09336320. Importing it opens no device.

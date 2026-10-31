@@ -4602,3 +4602,12 @@ launcher/plan and obtain approval before opening the reader.
 phone timeout to repeat signing, deleting a possibly committed packet, trusting
 only a success status or packet checksum, retirement before independent
 verification/durable save, and continuing after unknown state or delivery.
+
+
+**Physical follow-up (2026-10-30):** the approved recovery-only invocation
+matched 09336320 and the saved private installation key, then SELECT recovered
+all 128 synthetic proofs as unspent with all headers/pages free and no scope.
+This admitted the unpublished-staging branch. Conditional private-only cleanup
+verified the exact original blank baseline and closed the reader after 24
+commands. The plan is consumed; the card is blank. Full-size physical signing
+remains unproven. See the [recovery result](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-optimized-sign-stop.md#approved-recovery-and-final-blank-state).
