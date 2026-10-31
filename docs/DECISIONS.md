@@ -4678,3 +4678,34 @@ and private-only cleanup verified the original blank card and closed the reader
 after 117 commands. The plan is consumed. This establishes full-fixture physical
 signing/export/retirement capacity; the single-pass phone time budget remains
 open. See the [hardware report](reports/HARDWARE_TEST_REPORT_2026-10-31.j3r180-full-capacity-recovery.md).
+
+## D162: Private qualification phases and host timing evidence
+
+**Decision (2026-10-31):** retain the physically qualified private image and add
+a fixed eight-phase many-record recipe in the simulator. Capture 45 small
+payments, prove refusal before consumption when the page pool is full, verify
+every retained packet, retire and reload one slot, reject its stale retirement
+scope, verify all current records and retire those exact scopes. Every phase
+is bounded to at most 160 commands. The
+[qualification guide](../tools/outbox-spike/PHASED-QUALIFICATION.md) records its
+expected states and the remaining live executor requirements.
+
+Record native and persistence envelopes separately in the private Pixel journal.
+Retain an exact successful SIGN reply's public scope and native duration before
+checking the elapsed gate. Mark persisted save counters as covering preceding
+completed saves. Coalesce progress rendering by running stage while awaiting
+every storage barrier and presenting all terminal updates.
+
+**Why:** full-fixture physical signing/export capacity is established, but the
+combined Pixel run exceeded its elapsed gate. Host timing separates bridge and
+storage costs. The fixed record recipe addresses capacity refusal, preservation
+and reuse independently of another full-size payment attempt. Its simulator
+transcript is checked after execution; live use requires durable phase admission,
+same-card/context/image fencing and reconciliation of uncertain writes before
+further actions. Physical runtime and interrupted-write qualification remain open.
+
+**Rejected:** raising elapsed limits, dropping durable saves, treating a received
+scope as verified settlement evidence, re-signing an uncertain payment, retiring
+a reused slot with its old scope, or presenting simulator phase counts as
+physical timing evidence. Production firmware/assets and protocol remain
+unchanged; another hardware invocation needs a new approved named plan.

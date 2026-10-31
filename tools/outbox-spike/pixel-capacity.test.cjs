@@ -444,3 +444,34 @@ test("all distinct fixed capacity profiles refuse crossed image bytes before APD
       assert.equal(f.sent.length, 0);
     }
 });
+
+test("a successful SIGN reply crossing the gate retains its native timing and bounded public scope", async () => {
+  const f = capacityFake({ pins: STREAMED_PINS });
+  let clock = 0;
+  const tx = f.args.tx;
+  f.args.now = () => clock;
+  f.args.tx = async (a) => {
+    const reply = await tx(a);
+    if (a[0] === 0xb0 && a[1] === 0x74) clock = 120001;
+    return reply;
+  };
+  const r = await runCapacityStreamed(f.args);
+  assert.equal(r.failure, "elapsed-bound");
+  assert.equal(f.sent.at(-1)[1], 0x74);
+  assert.equal(r.lastExchange.elapsedMs, 120001);
+  assert.equal(r.lastExchange.command, r.commands);
+  assert.equal(r.lastExchange.status, "9000");
+  assert.equal(
+    r.lastExchange.receivedSignScope,
+    Buffer.from(scope).toString("hex"),
+  );
+  assert.ok(
+    f.records.some(
+      (p) =>
+        p.lastExchange?.receivedSignScope ===
+        Buffer.from(scope).toString("hex"),
+    ),
+  );
+  assert.equal(f.sent.filter((a) => a[1] === 0x74).length, 1);
+  assert.ok(!f.sent.some((a) => [0x75, 0x77, 0xe4].includes(a[1])));
+});

@@ -195,6 +195,14 @@ async function runControl(
     stage: "validate-image",
     commands: 0,
     timingsMs: {},
+    telemetry: {
+      nativeCalls: 0,
+      nativeMs: 0,
+      persistCalls: 0,
+      persistMs: 0,
+      serializedCodeUnits: 0,
+      accounting: "completed-saves-before-this-snapshot",
+    },
     blankBaselineVerified: false,
   };
   const began = now();
@@ -205,8 +213,15 @@ async function runControl(
     if (now() - began > 120000) stop("elapsed-bound");
   };
   const persist = async () => {
+    const at = now();
     try {
-      await save(JSON.parse(JSON.stringify(state)));
+      const serialized = JSON.stringify(state);
+      await save(JSON.parse(serialized));
+      const elapsed = now() - at;
+      state.telemetry.persistCalls++;
+      state.telemetry.serializedCodeUnits += serialized.length;
+      if (Number.isFinite(elapsed) && elapsed >= 0)
+        state.telemetry.persistMs += elapsed;
     } catch {
       stop("journal-unavailable");
     }
@@ -233,7 +248,31 @@ async function runControl(
     // Measure only this JS-to-native await, after the durable intent. The bridge
     // and native queue are included; this is not isolated card execution time.
     const started = now();
+    const recordExchange = (reply) => {
+      const elapsed = now() - started;
+      const duration =
+        Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null;
+      state.telemetry.nativeCalls++;
+      if (duration !== null) state.telemetry.nativeMs += duration;
+      state.lastExchange = {
+        command: state.commands,
+        stage: state.stage,
+        elapsedMs: duration,
+        status: reply ? hex(reply.slice(-2)) : null,
+      };
+      // Only this fixed private public response is retained. GP authentication
+      // response bodies and arbitrary native messages are never journaled.
+      if (
+        state.stage === "capacity-sign" &&
+        equal(apdu, [0xb0, 0x74, 0, 0, 0]) &&
+        reply?.length === 47 &&
+        reply[45] === 0x90 &&
+        reply[46] === 0
+      )
+        state.lastExchange.receivedSignScope = hex(reply.slice(0, 45));
+    };
     const failedExchange = (category) => {
+      recordExchange(null);
       const elapsed = now() - started;
       state.failedExchange = {
         command: state.commands,
@@ -255,6 +294,7 @@ async function runControl(
     }
     if (!Array.isArray(reply) || reply.length < 2)
       failedExchange("short-reply");
+    recordExchange(reply);
     state.reply = hex(reply.slice(-2));
     await persist();
     check();

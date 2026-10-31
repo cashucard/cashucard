@@ -213,3 +213,33 @@ test("session finalization preserves an earlier stopped result and consumed jour
     "nfc-or-journal-stopped",
   );
 });
+
+test("native and persistence envelopes are separate and persisted save counters are explicitly lagged", async () => {
+  const f = fixture();
+  let clock = 0;
+  const tx = f.args.tx,
+    save = f.args.save;
+  f.args.now = () => clock;
+  f.args.tx = async (a) => {
+    const r = await tx(a);
+    clock += 7;
+    return r;
+  };
+  f.args.save = async (v) => {
+    await save(v);
+    clock += 3;
+  };
+  const r = await runCreation(f.args);
+  assert.equal(r.status, "complete");
+  assert.equal(r.telemetry.nativeCalls, f.sent.length);
+  assert.equal(r.telemetry.nativeMs, f.sent.length * 7);
+  assert.equal(r.telemetry.persistCalls, f.records.length);
+  assert.equal(r.telemetry.persistMs, f.records.length * 3);
+  assert.equal(
+    f.records.at(-1).telemetry.persistCalls,
+    r.telemetry.persistCalls - 1,
+  );
+  assert.equal(r.telemetry.accounting, "completed-saves-before-this-snapshot");
+  assert.ok(f.records.every((v) => !v.lastExchange?.receivedSignScope));
+  assert.ok(!JSON.stringify(r).includes("PRIVATE RAW"));
+});
