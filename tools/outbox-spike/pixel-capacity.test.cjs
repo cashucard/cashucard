@@ -264,6 +264,11 @@ for (const [option, reason] of [
       assert.ok(r.exportPages.length > 0);
       assert.ok(!f.sent.some((a) => a[1] === 0x77 || a[1] === 0xe4));
       if (option === "loseLastPage") assert.equal(r.exportPages.length, 90);
+      if (option === "truncatePage") {
+        assert.equal(r.exportPages.length, 2);
+        assert.equal(r.exportPages[1].receivedBytes, 254);
+        assert.equal(r.exportPages[1].data.length, 508);
+      }
     },
   );
 test("capacity resume refuses a completed creation journal and preserves its own consumed journal", () => {

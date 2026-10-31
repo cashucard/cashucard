@@ -209,9 +209,10 @@ async function executeCapacity({
   };
   await commandData("setup-capacity", profile.setup, [1]);
   const after = await commandData("capacity-diagnostics", cmd(0x7d));
-  diagnostics(after, 2);
-  state.capacityDiagnostics = hex(after);
+  state.capacityDiagnostics = hex(after.slice(0, 256));
+  state.capacityDiagnosticBytes = after.length;
   await persist();
+  diagnostics(after, 2);
   await commandData("capacity-empty", cmd(0x76), EMPTY);
   for (let i = 0; i < profile.keysets.length; i++)
     await commandData("capacity-keyset-" + i, profile.keysets[i], [i + 1]);
@@ -225,10 +226,11 @@ async function executeCapacity({
       profile.stagedCounts[i],
     ]);
   const scope = await commandData("capacity-sign", cmd(0x74));
+  state.scope = hex(scope.slice(0, 256));
+  state.scopeBytes = scope.length;
+  await persist();
   if (scope.length !== 45 || !equal(scope.slice(0, 13), profile.scopePrefix))
     fail("capacity-scope-mismatch");
-  state.scope = hex(scope);
-  await persist();
   await commandData("capacity-consumed", cmd(0x76), CONSUMED);
   await commandData(
     "capacity-reselect",
@@ -241,10 +243,15 @@ async function executeCapacity({
   for (let i = 0; i < profile.pages.length; i++) {
     const page = await commandData("capacity-export-" + i, profile.pages[i]);
     const expected = i === 90 ? 213 : 255;
+    state.exportPages.push({
+      offset: i * 255,
+      data: hex(page.slice(0, 256)),
+      receivedBytes: page.length,
+      expectedBytes: expected,
+    });
+    await persist();
     if (page.length !== expected) fail("capacity-page-length");
     packet.push(...page);
-    state.exportPages.push({ offset: i * 255, data: hex(page) });
-    await persist();
   }
   state.verified = verifyCapacityPacket({
     profile,
