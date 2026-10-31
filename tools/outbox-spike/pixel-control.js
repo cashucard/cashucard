@@ -18,6 +18,7 @@ const PINS = Object.freeze({
   source: "c23c492eafba998fad14f5ef5a82d6686b67d98d",
 });
 const OPTIMIZED_PINS = Object.freeze(require("./pixel-optimized.json"));
+const STREAMED_PINS = Object.freeze(require("./pixel-streamed.json"));
 const BASELINE = Object.freeze([
   "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000",
   "e31b4f07a00000006202049f700101ce020100cc08a000000151000000",
@@ -70,6 +71,7 @@ function resumeJournal(value, plan = PINS.plan) {
       CAPACITY_PLAN,
       CAPACITY_DIAGNOSTIC_PLAN,
       OPTIMIZED_PINS.plan,
+      STREAMED_PINS.plan,
     ].includes(plan)
   )
     stop("unknown-plan");
@@ -492,8 +494,12 @@ const runCapacityDiagnostics = (options) =>
   runControl(options, true, CAPACITY_DIAGNOSTIC_PLAN);
 const runCapacityOptimized = (options) =>
   runControl(options, true, OPTIMIZED_PINS.plan, OPTIMIZED_PINS);
+const runCapacityStreamed = (options) =>
+  runControl(options, true, STREAMED_PINS.plan, STREAMED_PINS);
 module.exports = {
   PINS,
+  STREAMED_PINS,
+  runCapacityStreamed,
   OPTIMIZED_PINS,
   runCapacityOptimized,
   BASELINE,

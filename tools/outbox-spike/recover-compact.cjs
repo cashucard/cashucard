@@ -7,7 +7,10 @@ const { diagnostics, deletion } = require("./run-compact.cjs");
 const { verifyRegistry, PRIVATE } = require("./pixel-control.js");
 const { fixtureView } = require("./compact-export.cjs");
 const { workload, verifyPacket, MAX, cmd } = require("./compact-workload.cjs");
-const PINS = require("./pixel-optimized.json");
+const PROFILES = Object.freeze({
+  optimized: require("./pixel-optimized.json"),
+  streamed: require("./pixel-streamed.json"),
+});
 const bytes = (s) => [...Buffer.from(s, "hex")];
 const hex = (b) => Buffer.from(b).toString("hex");
 const equal = (a, b) => Buffer.from(a).equals(Buffer.from(b));
@@ -41,10 +44,15 @@ async function recoverToBlank({
   expectedKey,
   independentVerify,
   random = randomBytes,
+  profile = "optimized",
 }) {
+  const validProfile =
+    typeof profile === "string" && Object.hasOwn(PROFILES, profile);
+  const PINS = validProfile ? PROFILES[profile] : PROFILES.optimized;
   const w = workload(MAX);
   const state = {
-    plan: "compact-optimized-sign-recovery-v1",
+    plan:
+      "compact-" + (validProfile ? profile : "unknown") + "-sign-recovery-v1",
     chip: PINS.chip,
     cap: PINS.cap,
     status: "running",
@@ -223,6 +231,7 @@ async function recoverToBlank({
     await persist();
   };
   try {
+    if (!validProfile) fail("recovery-profile-invalid");
     if (typeof independentVerify !== "function")
       fail("independent-verifier-required");
     if (

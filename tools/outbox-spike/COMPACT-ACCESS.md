@@ -147,3 +147,11 @@ requires its own converted image, separate lab journal/profile, reviewed build
 and approved named plan before physical execution. The 15-second phone timeout,
 120-second transmission gate, command ceiling, fixture and journal barriers
 remain unchanged. Production firmware/assets and the protocol are unchanged.
+
+
+The `capacity-streamed` mode pins the converted image from commit
+`96eb11df58c0969e2d00a1d52a2ca726f8d2d971`, with 28,067 load bytes in 114
+blocks. The private lab version code is 4 / `0.0.4-lab`, with journal key
+`cashucard-private-capacity-streamed-v1`. The fake full workflow uses 399
+commands. Earlier modes, image pins and consumed journal keys remain. Crossed
+image tests cover all six distinct pairs before any APDU.

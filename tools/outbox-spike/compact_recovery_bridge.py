@@ -1,6 +1,7 @@
 """Fixed recovery/export/retirement policy; SIGN and installation are excluded."""
 import argparse
 import json
+import re
 import sys
 import compact_bridge as b
 
@@ -83,8 +84,9 @@ class Policy:
             else:self.retire_ack=True
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--reader',required=True);args=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--reader',required=True);p.add_argument('--expected-key',default=EXPECTED_KEY.hex());args=p.parse_args()
     if args.reader!='ACS ACR122U PICC Interface':raise ValueError('named reader required')
+    if not re.fullmatch(r'(02|03)[0-9a-f]{64}',args.expected_key):raise ValueError('compressed public key required')
     from smartcard.System import readers
     from smartcard.scard import SCARD_LEAVE_CARD,SCARD_SHARE_EXCLUSIVE
     matches=[r for r in b.common.checked('reader-enumeration-failed',readers) if str(r)==args.reader]
@@ -92,7 +94,7 @@ def main():
     c=b.common.checked('reader-connect-failed',matches[0].createConnection);connected=False
     try:
         b.common.checked('reader-connect-failed',lambda:c.connect(mode=SCARD_SHARE_EXCLUSIVE,disposition=SCARD_LEAVE_CARD));connected=True
-        b.common.emit({'ready':True});policy=Policy()
+        b.common.emit({'ready':True});policy=Policy(expected_key=bytes.fromhex(args.expected_key))
         while True:
             line=sys.stdin.readline(4097)
             if not line:return

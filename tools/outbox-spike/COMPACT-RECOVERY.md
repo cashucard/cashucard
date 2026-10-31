@@ -38,8 +38,9 @@ commands; an uncertain retirement or deletion gets no retry.
 
 `compact_recovery_bridge.py` admits only ISD/private selection, CPLC, the fixed
 diagnostic/public-key/status/scope reads, exact export pages, one scope-bound
-retirement and factory registry/private deletion frames. The physical entry
-pins the saved installation public key. It requires every complete page before
+retirement and factory registry/private deletion frames. The protected launcher pins the saved installation public key. The physical
+entry accepts a compressed public key from that launcher; its historical default
+remains the original optimized attempt's key. It requires every complete page before
 retirement and the confirmed free state before deletion; the host adds exact
 canonical verification and durable save barriers. SIGN, setup, loading,
 installation, key changes and production AIDs are refused.
@@ -69,3 +70,22 @@ A named approved plan is required before physical execution. The legacy ACS
 installation stop remains in effect. Recovery supplies evidence about the
 existing attempt and cannot establish a successful uninterrupted phone signing
 or full-run latency result.
+
+
+## Streamed image profile
+
+The host accepts two closed image names: `optimized` (the historical default)
+and `streamed`. The latter selects only `pixel-streamed.json`, with the same
+fixed workload and recovery-state predicates. An unknown profile stops before
+an APDU. The bridge accepts `--expected-key` for the new attempt's saved public
+key; malformed keys are refused before importing PC/SC. The Node bridge
+wrapper excludes that argument from other profiles. No private signing or
+manager key is accepted.
+
+A streamed-image launcher must bind this public key to the exact phone journal,
+reviewed source, image/load/manifest hashes, CPLC, fixture and consumed run. Its
+approved plan must name the conditional recovery actions before reader access.
+Both branches retain complete export/canonical/signature/durable-save barriers
+and the original one-SELECT, one-RETIRE, private-delete and timing/command bounds.
+This lets the next named plan cover recovery of its own interrupted signing
+attempt while preserving earlier plans and journals.

@@ -4646,3 +4646,24 @@ attempts remain paused.
 cursor caches, dropping ownership/duplicate/integrity checks, bulk persistent
 state writes, allocating another buffer, and treating simulator counters as
 proof of physical completion.
+
+
+The fixed `capacity-streamed` profile pins the image built from
+`96eb11df58c0969e2d00a1d52a2ca726f8d2d971`: CAP
+`b22479280337d4192b4001f06a38d136d69523c38c90f88cab00f2b9e374ce27`,
+load `74caa34bc570427b4a292b6696328ed499c3967e13d8ab11066dfb103a4ac048`,
+28,067 bytes / 114 blocks. Its version-code-4 private APK uses a new consumed
+journal key while preserving previous records. All three image profiles reject
+interchanged load bytes before APDUs. The full fake workflow is 399 commands;
+all existing ceilings and persistence barriers remain. Building the APK locally
+opens no phone; physical execution still requires a named approved plan.
+
+
+The closed recovery host also accepts the exact `streamed` image profile. Its
+launcher binds the observed public key to the same attempt's pinned journal and
+image. The reader bridge admits a compressed expected public key, retaining
+the historical optimized key as its default. Unknown image profiles, malformed
+keys and key arguments to other bridge profiles stop before device access.
+The named hardware plan can include one conditional recovery connection with
+the existing complete-export, independent-verification and cleanup gates;
+SIGN and authentication are never retried.

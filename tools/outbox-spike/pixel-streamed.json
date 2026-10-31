@@ -1,0 +1,11 @@
+{
+  "plan": "pixel-capacity-streamed-v1",
+  "chip": "cplc-v1:4790d3213041093363205547",
+  "package": "F04341534855434D5054",
+  "manifest": "b2adaa4252e1ad988cecb0ff31e001ce22f2be0ce00a5c1b25dbb0d451e5bca4",
+  "cap": "b22479280337d4192b4001f06a38d136d69523c38c90f88cab00f2b9e374ce27",
+  "load": "74caa34bc570427b4a292b6696328ed499c3967e13d8ab11066dfb103a4ac048",
+  "bytes": 28067,
+  "blocks": 114,
+  "source": "96eb11df58c0969e2d00a1d52a2ca726f8d2d971"
+}

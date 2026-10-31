@@ -4,7 +4,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { compactArtifact } = require("./run-compact.cjs");
-const { PINS, OPTIMIZED_PINS } = require("./pixel-control.js");
+const { PINS, OPTIMIZED_PINS, STREAMED_PINS } = require("./pixel-control.js");
 const { FIXTURE_SHA256 } = require("./pixel-capacity.js");
 const { ORIGINAL_SHA256, PATCHED_SHA256 } = require("./patch-pixel-nfc.cjs");
 const ROOT = path.resolve(__dirname, "../..");
@@ -12,7 +12,14 @@ const APP_ID = "org.cashucard.compactlab";
 const CAPACITY_APP_ID = "org.cashucard.capacitylab";
 const modeId = (mode) => {
   if (mode === "creation") return APP_ID;
-  if (["capacity", "capacity-diagnostics", "capacity-optimized"].includes(mode))
+  if (
+    [
+      "capacity",
+      "capacity-diagnostics",
+      "capacity-optimized",
+      "capacity-streamed",
+    ].includes(mode)
+  )
     return CAPACITY_APP_ID;
   throw Error("Unknown fixed lab mode");
 };
@@ -49,8 +56,8 @@ android {
         applicationId "${appId}"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode ${mode === "capacity-optimized" ? 3 : 2}
-        versionName "${mode === "capacity-optimized" ? "0.0.3" : "0.0.2"}-lab"
+        versionCode ${mode === "capacity-streamed" ? 4 : mode === "capacity-optimized" ? 3 : 2}
+        versionName "${mode === "capacity-streamed" ? "0.0.4" : mode === "capacity-optimized" ? "0.0.3" : "0.0.2"}-lab"
     }
     signingConfigs { debug {
         storeFile file('debug.keystore')
@@ -71,7 +78,12 @@ dependencies {
 }
 function prepare({ artifact, output, mode = "creation" }) {
   const appId = modeId(mode);
-  const pins = mode === "capacity-optimized" ? OPTIMIZED_PINS : PINS;
+  const pins =
+    mode === "capacity-streamed"
+      ? STREAMED_PINS
+      : mode === "capacity-optimized"
+        ? OPTIMIZED_PINS
+        : PINS;
   if (!path.isAbsolute(output) || fs.existsSync(output))
     throw Error("New absolute output directory required");
   if (output === ROOT || output.startsWith(ROOT + path.sep))
@@ -99,6 +111,7 @@ function prepare({ artifact, output, mode = "creation" }) {
     "capacity",
     "capacity-diagnostics",
     "capacity-optimized",
+    "capacity-streamed",
   ].includes(mode)
     ? fs.readFileSync(path.join(__dirname, "fixtures/compact-capacity-v1.json"))
     : undefined;
@@ -191,7 +204,14 @@ function prepare({ artifact, output, mode = "creation" }) {
     "pixel-optimized.json",
     fs.readFileSync(path.join(__dirname, "pixel-optimized.json")),
   );
+  write(
+    "pixel-streamed.json",
+    fs.readFileSync(path.join(__dirname, "pixel-streamed.json")),
+  );
   const build = {
+    streamedPins: hash(
+      fs.readFileSync(path.join(__dirname, "pixel-streamed.json")),
+    ),
     source,
     optimizedPins: hash(
       fs.readFileSync(path.join(__dirname, "pixel-optimized.json")),
