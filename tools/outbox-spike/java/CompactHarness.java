@@ -59,9 +59,16 @@ public final class CompactHarness {
                 JsonObject step=item.isJsonPrimitive()?new JsonObject():item.getAsJsonObject();
                 if(item.isJsonPrimitive())step.addProperty("apdu",item.getAsString());
                 CompactCut.fired=false;
+                CompactCut.pageHops=0;
+                CompactCut.writes=0;
+                CompactCut.pool=(byte[])field(applet,"cardReceipts");
+                CompactCut.cutWrite=step.has("cutWrite")?step.get("cutWrite").getAsInt():0;
                 CompactCut.target=step.has("cut")?step.get("cut").getAsString():null;
                 if(step.has("corruptProof")) {
                     byte[] proofs=(byte[])field(applet,"proofStorage"); proofs[step.get("corruptProof").getAsInt()]^=1;
+                }
+                if(step.has("corruptPool")) {
+                    byte[] pool=(byte[])field(applet,"cardReceipts"); pool[step.get("corruptPool").getAsInt()]^=1;
                 }
                 if(step.has("reset"))sim.reset();
                 String command;
@@ -81,10 +88,13 @@ public final class CompactHarness {
                 }
                 JsonObject result=new JsonObject();
                 result.addProperty("cut",CompactCut.fired);
+                result.addProperty("pageHops",CompactCut.pageHops);
+                result.addProperty("writes",CompactCut.writes);
                 result.addProperty("hex",reply==null?"6f00":hex(reply.getBytes()));
                 if(reply!=null && reply.getSW()==0x9000 && reply.getData().length==45 && (command.substring(2,4).equals("74") || command.substring(2,4).equals("7c")))scopes.add(reply.getData());
                 results.add(result);
                 CompactCut.target=null;
+                CompactCut.cutWrite=0;
             }
             System.out.println("COMPACT_RESULT:"+gson.toJson(results));
         }

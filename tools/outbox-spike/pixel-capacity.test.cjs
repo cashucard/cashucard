@@ -226,7 +226,7 @@ function capacityFake(options = {}) {
   };
   return f;
 }
-test("full Pixel workflow verifies 91 pages before retirement and exact blank cleanup", async () => {
+test("full Pixel workflow verifies 91 pages before retirement and exact blank cleanup", async (t) => {
   const f = capacityFake();
   const r = await runCapacity(f.args);
   assert.equal(r.status, "complete", JSON.stringify(r));
@@ -247,6 +247,16 @@ test("full Pixel workflow verifies 91 pages before retirement and exact blank cl
   assert.equal(f.sent.filter((a) => a[1] === 0x77).length, 1);
   assert.equal(r.blankBaselineVerified, true);
   assert.equal(f.card.packages.size, 0);
+  t.diagnostic(
+    JSON.stringify({
+      journalSaves: f.records.length,
+      serializedSnapshotBytes: f.records.reduce(
+        (n, r) => n + Buffer.byteLength(JSON.stringify(r)),
+        0,
+      ),
+      note: "Fake transport snapshot workload, not measured Android persistence latency",
+    }),
+  );
 });
 test("failed persistence of verified packet blocks retirement and deletion", async () => {
   const f = capacityFake({ failVerifiedJournal: true });

@@ -144,8 +144,40 @@ public final class CompactState {
     public static byte get(byte[] p,short index,short offset) {
         return p[address(p,index,offset)];
     }
+    private static short forward(byte[] p,short index,short physical,short distance) {
+        while(distance>0) {
+            short relative=(short)(physical-DATA),available=(short)(128-relative%128);
+            if(distance<available)return (short)(physical+distance);
+            short page=(short)(relative/128);
+            page=u(p[(short)(NEXT+page)]);
+            data(page<PAGES && u(p[(short)(OWNER+page)])==(short)(index+1));
+            physical=(short)(DATA+page*128);
+            distance-=available;
+        }
+        return physical;
+    }
+    private static void transfer(byte[] p,short index,short offset,byte[] b,short from,short len,boolean writing) {
+        if(len==0)return;
+        short limit=Util.getShort(p,(short)(h(index)+13));
+        data(offset>=0 && len>0 && offset<=limit && len<=(short)(limit-offset));
+        data(from>=0 && from<=b.length && len<=(short)(b.length-from));
+        short physical=address(p,index,offset);
+        while(len>0) {
+            short relative=(short)(physical-DATA),n=(short)(128-relative%128);
+            if(n>len)n=len;
+            // Keep the original ordered byte stores and publication boundary.
+            if(writing)copy(b,from,p,physical,n);
+            else copy(p,physical,b,from,n);
+            from+=n;
+            len-=n;
+            if(len>0)physical=forward(p,index,physical,n);
+        }
+    }
+    public static void read(byte[] p,short index,short offset,byte[] b,short to,short len) {
+        transfer(p,index,offset,b,to,len,false);
+    }
     public static void write(byte[] p,short index,short offset,byte[] b,short from,short len) {
-        for(short i=0;i<len;i++)put(p,address(p,index,(short)(offset+i)),b[(short)(from+i)]);
+        transfer(p,index,offset,b,from,len,true);
     }
     private static void frameByte(byte[] p,short index,short offset,byte value) {
         put(p,address(p,index,offset),value);
@@ -238,7 +270,7 @@ public final class CompactState {
         // SIM-CUT frame-staged
         return index;
     }
-    public static short append(byte[] p,short index,short done,byte[] b,short at,short len) {
+    public static short append(byte[] p,short index,short done,byte[] b,short at,short len,byte[] work) {
         require(p[h(index)]==STAGING);
         data(len>0 && len%38==0);
         short more=(short)(len/38),start=outputStart(p,index),total=u(get(p,index,(short)(start-1)));
@@ -247,17 +279,13 @@ public final class CompactState {
             short from=(short)(at+38*i);
             registry(p,u(b[(short)(from+4)]));
             data(!empty(b,from,(short)4) && (b[(short)(from+5)]==2 || b[(short)(from+5)]==3));
-            for(short j=0;j<(short)(done+i);j++) {
-                boolean same=true;
-                for(short k=0;k<33;k++) {
-                    byte other=j<done?get(p,index,(short)(start+38*j+5+k)):b[(short)(at+38*(j-done)+5+k)];
-                    if(other!=b[(short)(from+5+k)]) {
-                        same=false;
-                        break;
-                    }
-                }
-                data(!same);
-            }
+            for(short j=0;j<i;j++)data(!equal(b,(short)(at+38*j+5),b,(short)(from+5),(short)33));
+        }
+        // Fetch each prior point once into the existing scratch buffer, then
+        // compare every incoming point. Every check still precedes frame writes.
+        for(short j=0;j<done;j++) {
+            read(p,index,(short)(start+38*j+5),work,(short)0,(short)33);
+            for(short i=0;i<more;i++)data(!equal(work,(short)0,b,(short)(at+38*i+5),(short)33));
         }
         write(p,index,(short)(start+done*38),b,at,len);
         return (short)(done+more);
@@ -278,6 +306,8 @@ public final class CompactState {
     public static void inputs(byte[] p,byte[] proofs,short index,byte state,byte[] work) {
         structure(p,index);
         zero(work,(short)0,(short)4);
+        // 128-slot duplicate detection in 16 bytes of existing transient scratch.
+        zero(work,(short)16,(short)16);
         short count=u(get(p,index,(short)0));
         for(short i=0;i<count;i++) {
             short ref=(short)(1+5*i),slot=u(get(p,index,ref));
@@ -285,7 +315,10 @@ public final class CompactState {
             for(short k=0;k<4;k++)require(get(p,index,(short)(ref+1+k))==p[(short)(GENS+slot*4+k)]);
             byte status=proofs[(short)(slot*82)];
             require(state==CLEARING?(status==0 || status==2):(status==1 || (state==COMMITTED && status==2)));
-            for(short j=0;j<i;j++)data(get(p,index,(short)(1+5*j))!=(byte)slot);
+            short seen=(short)(16+slot/8);
+            byte bit=(byte)(1 << (slot%8));
+            data((work[seen]&bit)==0);
+            put(work,seen,(byte)(work[seen]|bit));
             short reg=registry(p,u(p[(short)(MAP+slot)]));
             data(equal(proofs,(short)(slot*82+1),p,(short)(reg+1),(short)8) && empty(proofs,(short)(slot*82+78),(short)4));
             add(proofs,(short)(slot*82+9),work,(short)0);
@@ -298,7 +331,7 @@ public final class CompactState {
         for(short i=0;i<count;i++) {
             short off=(short)(start+38*i);
             registry(p,u(get(p,index,(short)(off+4))));
-            for(short k=0;k<4;k++)work[(short)(8+k)]=get(p,index,(short)(off+k));
+            read(p,index,off,work,(short)8,(short)4);
             data(!empty(work,(short)8,(short)4));
             add(work,(short)8,work,(short)4);
         }
@@ -314,6 +347,12 @@ public final class CompactState {
         return (short)(pos+len);
     }
     private static short field(byte[] p,short index,short at,short len,MessageDigest md,byte[] out,short wanted,short limit,short pos) {
+        if(md==null) {
+            short next=(short)(pos+len),lo=pos>wanted?pos:wanted,hi=next,end=(short)(wanted+limit);
+            if(hi>end)hi=end;
+            if(hi>lo)read(p,index,(short)(at+lo-pos),out,(short)(lo-wanted),(short)(hi-lo));
+            return next;
+        }
         while(len>0) {
             short n=(short)(128-at%128);
             if(n>len)n=len;
@@ -337,21 +376,24 @@ public final class CompactState {
         pos=emit(md,p,MINT,mint,out,wanted,limit,pos);
         pos=emit(md,p,UNIT,(short)1,out,wanted,limit,pos);
         pos=field(p,index,(short)0,(short)1,md,out,wanted,limit,pos);
-        short count=u(get(p,index,(short)0));
+        short count=u(get(p,index,(short)0)),inputRef=address(p,index,(short)1);
         for(short i=0;i<count;i++) {
-            short ref=(short)(1+5*i),slot=u(get(p,index,ref)),base=(short)(slot*82),reg=registry(p,u(p[(short)(MAP+slot)]));
+            short ref=(short)(1+5*i),slot=u(p[inputRef]),base=(short)(slot*82),reg=registry(p,u(p[(short)(MAP+slot)]));
             pos=field(p,index,ref,(short)5,md,out,wanted,limit,pos);
             pos=emit(md,proofs,(short)(base+9),(short)4,out,wanted,limit,pos);
             pos=emit(md,p,reg,(short)(1+u(p[reg])),out,wanted,limit,pos);
             pos=emit(md,proofs,(short)(base+13),(short)65,out,wanted,limit,pos);
+            if((short)(i+1)<count)inputRef=forward(p,index,inputRef,(short)5);
         }
         short start=outputStart(p,index),outputs=u(get(p,index,(short)(start-1)));
         pos=field(p,index,(short)(start-1),(short)1,md,out,wanted,limit,pos);
+        short outputRef=address(p,index,(short)(start+4));
         for(short i=0;i<outputs;i++) {
-            short off=(short)(start+38*i),reg=registry(p,u(get(p,index,(short)(off+4))));
+            short off=(short)(start+38*i),reg=registry(p,u(p[outputRef]));
             pos=field(p,index,off,(short)4,md,out,wanted,limit,pos);
             pos=emit(md,p,reg,(short)(1+u(p[reg])),out,wanted,limit,pos);
             pos=field(p,index,(short)(off+5),(short)33,md,out,wanted,limit,pos);
+            if((short)(i+1)<outputs)outputRef=forward(p,index,outputRef,(short)38);
         }
         pos=field(p,index,signatureStart(p,index),(short)(descriptor?128:64),md,out,wanted,limit,pos);
         return pos;
