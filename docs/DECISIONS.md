@@ -4512,3 +4512,13 @@ operator reports the result; omit live host UI inspection during card commands.
 changing production dependencies or the card image, erasing/reusing a consumed
 journal, automatic retries/cleanup after uncertainty, and extending deadlines
 or increasing command limits. ACS installation attempts remain paused.
+
+**Physical follow-up (2026-10-30):** the approved diagnostic invocation confirmed
+all 128 input slots and 72 outputs. Output stage 12 returned `9000`, then the
+120-second host elapsed gate stopped the run before response-body validation
+or signing. The journal records 278 commands and 120,927 ms connected, with no
+failed native exchange. Conditional cleanup verified the original blank card
+and closed the reader. The plan is consumed. See the
+[hardware report](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-capacity-deadline-stop.md).
+Analyze staging and host persistence costs offline before preparing another
+physical invocation; full packet capacity remains open.
