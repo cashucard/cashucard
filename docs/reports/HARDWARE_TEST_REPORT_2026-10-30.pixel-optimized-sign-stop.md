@@ -116,3 +116,43 @@ parsed journal, timing analysis and the consumed-plan record.
 | --- | --- |
 | Approved `plan.md` | `f02dc8951010ba8b57cfa0081f2197b6a0f3bebac7cb1c9c0e613f164aa20bc1` |
 | `pixel-journal.json` | `976c2dbeb23cc0bc621d1393e331d8771543fe3a2a3f8860cec812c3aacf2132` |
+
+
+## Approved recovery and final blank state
+
+The operator approved the separately pinned recovery-only plan. The existing
+private image was left in place until one exclusive ACS ACR122U connection
+matched 09336320, proved factory-version-1 keys and required the exact original
+platform baseline plus private main/opener/package. The private SELECT invoked
+recovery once. Diagnostics and public key matched the saved installation.
+
+Recovered status was `[64,90,128,0,0,0]`: all 128 synthetic proofs unspent,
+64 headers and 90 pages free. Scope index 0 returned `6985` with no body. This
+establishes the unpublished-staging branch after recovery. A committed packet
+was absent; no packet export, signature verification or RETIRE was performed.
+The observation does not locate the interruption within signing or identify
+why Android reported tag loss. Full-size physical signing remains unproven.
+
+The approved conditional cleanup then matched CPLC again, proved a fresh
+factory channel, required the same exact registry and deleted only private
+main, opener and package in that order. Final registry reported no applications
+and exactly the original three platform load-file records. A separate host
+TLV decoder confirmed those saved records without further hardware access.
+The reader closed successfully. Card 09336320 is verified blank; manager keys
+were unchanged. The invocation completed 24 commands and its plan is consumed.
+
+| Recovery evidence | Value |
+| --- | --- |
+| Host source / merged PR | `0ea4fb681cc98674886510c5b00c24553a750398` / [#223](https://github.com/cashucard/cashucard/pull/223), merge `651108f13d7e5a31227cfd203c7ec61094dd22a3` |
+| Review / CI | Exact-head review; all 22 checks passed |
+| Approved recovery-plan SHA-256 | `5b8f2e055a02107530e1c762a7feccd3909f2abc2ac8f03428ec80b89b8c5bb5` |
+| Recovery-journal SHA-256 | `95b57b17d323fe6f074eea16858ca496d71327ba480d5128b021df0d40a30b3a` |
+| Private SELECT/recovery envelope | 204.737 ms |
+| Recovered diagnostics | `7fff0a0e0a0014001400400030000205` |
+| Final applications / load-file replies | `6a88` with no body / `9000` with exact original baseline |
+
+Protected evidence is under `compact-sign-recovery-2026-10-30`, including
+approval/pins, one-shot lock, all three registry snapshots, recovery journal,
+close result and independent saved-evidence check. The original Pixel journal
+retains its recorded hash. Further work on full-size signing begins with
+offline analysis; a fresh physical invocation requires its own reviewed plan.
