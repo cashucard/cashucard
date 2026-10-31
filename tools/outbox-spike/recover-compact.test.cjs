@@ -281,3 +281,26 @@ test("independent Python verification rejects either damaged signature", () => {
     assert.equal(verifyIndependent("python3", key, bad, verified), false);
   }
 });
+test("the streamed image recovers the same two exact states with its own image evidence", async () => {
+  for (const unpublished of [false, true]) {
+    const f = fake({ unpublished });
+    f.args.profile = "streamed";
+    const r = await recoverToBlank(f.args);
+    assert.equal(r.status, "complete", JSON.stringify(r));
+    assert.equal(r.plan, "compact-streamed-sign-recovery-v1");
+    assert.equal(r.cap, require("./pixel-streamed.json").cap);
+    assert.equal(r.blankBaselineVerified, true);
+    assert.equal(f.sent.filter((a) => a[1] === 0x74).length, 0);
+    assert.equal(
+      f.sent.filter((a) => a[1] === 0x77).length,
+      unpublished ? 0 : 1,
+    );
+  }
+});
+test("an unknown recovery image profile stops before any APDU", async () => {
+  const f = fake();
+  f.args.profile = "arbitrary";
+  const r = await recoverToBlank(f.args);
+  assert.equal(r.failure, "recovery-profile-invalid");
+  assert.equal(f.sent.length, 0);
+});

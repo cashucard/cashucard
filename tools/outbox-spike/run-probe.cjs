@@ -318,6 +318,7 @@ async function openBridge(
   cleanupOnly = false,
   profile = "resource",
   workload,
+  recoveryKey,
 ) {
   if (!["resource", "compact", "compact-recovery"].includes(profile))
     throw new Error("unknown bridge profile");
@@ -326,6 +327,13 @@ async function openBridge(
     (registryOnly || cleanupOnly || workload)
   )
     throw new Error("closed recovery profile requires no mode overrides");
+  if (
+    recoveryKey !== undefined &&
+    (profile !== "compact-recovery" ||
+      typeof recoveryKey !== "string" ||
+      !/^(02|03)[0-9a-f]{64}$/.test(recoveryKey))
+  )
+    throw new Error("closed recovery requires a compressed public key");
   const child = spawn(
     python,
     [
@@ -343,6 +351,7 @@ async function openBridge(
       ...(profile === "compact" && workload ? ["--workload", workload] : []),
       ...(registryOnly ? ["--registry-only"] : []),
       ...(cleanupOnly ? ["--cleanup-only"] : []),
+      ...(recoveryKey ? ["--expected-key", recoveryKey] : []),
     ],
     { stdio: ["pipe", "pipe", "ignore"] },
   );

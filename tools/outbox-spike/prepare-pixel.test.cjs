@@ -88,6 +88,12 @@ test("capacity mode uses a distinct application identity and keeps creation data
     optimized.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'),
   );
   assert.ok(optimized.gradle.includes("versionCode 3"));
+  const streamed = androidFiles(original, "capacity-streamed");
+  assert.ok(
+    streamed.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'),
+  );
+  assert.ok(streamed.gradle.includes("versionCode 4"));
+  assert.ok(streamed.gradle.includes('versionName "0.0.4-lab"'));
   assert.throws(
     () => androidFiles(original, "custom"),
     /Unknown fixed lab mode/,

@@ -61,6 +61,9 @@ public final class CompactHarness {
                 CompactCut.fired=false;
                 CompactCut.pageHops=0;
                 CompactCut.writes=0;
+                CompactCut.digestCalls=0;
+                CompactCut.digestBytes=0;
+                CompactCut.digestSmallCalls=0;
                 CompactCut.pool=(byte[])field(applet,"cardReceipts");
                 CompactCut.cutWrite=step.has("cutWrite")?step.get("cutWrite").getAsInt():0;
                 CompactCut.target=step.has("cut")?step.get("cut").getAsString():null;
@@ -90,6 +93,9 @@ public final class CompactHarness {
                 result.addProperty("cut",CompactCut.fired);
                 result.addProperty("pageHops",CompactCut.pageHops);
                 result.addProperty("writes",CompactCut.writes);
+                result.addProperty("canonicalDigestCalls",CompactCut.digestCalls);
+                result.addProperty("canonicalDigestBytes",CompactCut.digestBytes);
+                result.addProperty("canonicalDigestSmallCalls",CompactCut.digestSmallCalls);
                 result.addProperty("hex",reply==null?"6f00":hex(reply.getBytes()));
                 if(reply!=null && reply.getSW()==0x9000 && reply.getData().length==45 && (command.substring(2,4).equals("74") || command.substring(2,4).equals("7c")))scopes.add(reply.getData());
                 results.add(result);

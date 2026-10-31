@@ -4611,3 +4611,59 @@ This admitted the unpublished-staging branch. Conditional private-only cleanup
 verified the exact original blank baseline and closed the reader after 24
 commands. The plan is consumed; the card is blank. Full-size physical signing
 remains unproven. See the [recovery result](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-optimized-sign-stop.md#approved-recovery-and-final-blank-state).
+
+
+## <a id="d161"></a>D161: Stream private compact reads and buffer canonical digest updates
+
+**Decided (2026-10-31):** remove the remaining repeated frame-head scans in the
+private compact prototype. Use local physical cursors derived from validated
+logical offsets for duplicate checks, input/output validation, canonical fields
+and payment-message output reads. Preserve logical span/buffer/alignment and
+page-owner checks; retain whole-chain validation before canonical rendering.
+
+Buffer canonical bytes in 128-byte blocks within the existing transient scratch.
+Flush a final partial block before finalization and preserve the tagged prefix.
+The export path remains clipped copying. Scratch is distinct from persistent
+pool/proofs, and its lifetime moves from input validation to hashing within the
+same command. No new fields, arrays or command-time allocations are introduced.
+Persistent store order, publication/recovery boundaries and signature transcripts
+remain unchanged.
+
+**Why:** the optimized Pixel run completed staging but lost the signing reply;
+its subsequent recovery established an unpublished record and restored the blank
+card. Offline profiling found remaining head scans and thousands of small digest
+updates. The new helper reduces signing page-link reads from 37,211 to 1,479 and
+canonical digest updates from 2,849 to 545 for the same fixture and hash bytes.
+See the [access profile](../tools/outbox-spike/COMPACT-ACCESS.md#local-cursors-and-buffered-hashing-october-31).
+These counts supply an offline improvement; silicon timing remains unproven.
+
+Retain existing Pixel image pins, release CAP/assets, protocol, phone/host
+bounds and durable journal barriers. A separately pinned image/lab profile and
+approved named plan precede another physical invocation. ACS installation
+attempts remain paused.
+
+**Rejected:** raising timeouts or elapsed gates, reducing fixture size, persistent
+cursor caches, dropping ownership/duplicate/integrity checks, bulk persistent
+state writes, allocating another buffer, and treating simulator counters as
+proof of physical completion.
+
+
+The fixed `capacity-streamed` profile pins the image built from
+`96eb11df58c0969e2d00a1d52a2ca726f8d2d971`: CAP
+`b22479280337d4192b4001f06a38d136d69523c38c90f88cab00f2b9e374ce27`,
+load `74caa34bc570427b4a292b6696328ed499c3967e13d8ab11066dfb103a4ac048`,
+28,067 bytes / 114 blocks. Its version-code-4 private APK uses a new consumed
+journal key while preserving previous records. All three image profiles reject
+interchanged load bytes before APDUs. The full fake workflow is 399 commands;
+all existing ceilings and persistence barriers remain. Building the APK locally
+opens no phone; physical execution still requires a named approved plan.
+
+
+The closed recovery host also accepts the exact `streamed` image profile. Its
+launcher binds the observed public key to the same attempt's pinned journal and
+image. The reader bridge admits a compressed expected public key, retaining
+the historical optimized key as its default. Unknown image profiles, malformed
+keys and key arguments to other bridge profiles stop before device access.
+The named hardware plan can include one conditional recovery connection with
+the existing complete-export, independent-verification and cleanup gates;
+SIGN and authentication are never retried.

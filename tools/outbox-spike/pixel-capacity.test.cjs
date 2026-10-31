@@ -17,6 +17,8 @@ const {
   CAPACITY_DIAGNOSTIC_PLAN,
   OPTIMIZED_PINS,
   runCapacityOptimized,
+  STREAMED_PINS,
+  runCapacityStreamed,
 } = require("./pixel-control.js");
 const {
   capacityProfile,
@@ -400,4 +402,45 @@ test("capacity image profiles cannot be interchanged before hardware", async () 
     assert.equal(r.failure, "image-mismatch");
     assert.equal(f.sent.length, 0);
   }
+});
+
+test("the fixed streamed image completes the packet with its own consumed plan", async () => {
+  const f = capacityFake({ pins: STREAMED_PINS });
+  const r = await runCapacityStreamed(f.args);
+  assert.equal(r.status, "complete", JSON.stringify(r));
+  assert.equal(r.plan, STREAMED_PINS.plan);
+  assert.equal(r.cap, STREAMED_PINS.cap);
+  assert.equal(r.commands, 285 + STREAMED_PINS.blocks);
+  assert.equal(
+    f.sent.filter((a) => a[1] === 0xe8).length,
+    STREAMED_PINS.blocks,
+  );
+  assert.equal(r.exportPages.length, 91);
+  assert.equal(r.capacityVerified, true);
+  assert.equal(r.blankBaselineVerified, true);
+  assert.deepEqual(resumeJournal(JSON.stringify(r), STREAMED_PINS.plan), r);
+  for (const oldPlan of [
+    CAPACITY_PLAN,
+    CAPACITY_DIAGNOSTIC_PLAN,
+    OPTIMIZED_PINS.plan,
+  ])
+    assert.equal(
+      resumeJournal(JSON.stringify(r), oldPlan).failure,
+      "saved-journal-unreadable",
+    );
+});
+test("all distinct fixed capacity profiles refuse crossed image bytes before APDUs", async () => {
+  const modes = [
+    [PINS, runCapacity],
+    [OPTIMIZED_PINS, runCapacityOptimized],
+    [STREAMED_PINS, runCapacityStreamed],
+  ];
+  for (const [image] of modes)
+    for (const [expected, run] of modes) {
+      if (image === expected) continue;
+      const f = capacityFake({ pins: image });
+      const r = await run(f.args);
+      assert.equal(r.failure, "image-mismatch");
+      assert.equal(f.sent.length, 0);
+    }
 });

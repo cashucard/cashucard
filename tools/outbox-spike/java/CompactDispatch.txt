@@ -103,15 +103,16 @@
             shaAll.reset();
             short n = (short) (CompactState.get(cardReceipts, index, (short) 0) & 255);
             for (short i = 0; i < n; i++) secretInto(shaAll, (short) (CompactState.get(cardReceipts, index, (short) (1 + 5 * i)) & 255), b, tail);
-            short out = CompactState.outputStart(cardReceipts, index), count = (short) (CompactState.get(cardReceipts, index, (short) (out - 1)) & 255);
+            short out = CompactState.outputStart(cardReceipts, index), count = (short) (CompactState.get(cardReceipts, index, (short) (out - 1)) & 255), outputRef = CompactState.cursor(cardReceipts, index, out);
             for (short i = 0; i < count; i++) {
                 short off = (short) (out + 38 * i);
-                CompactState.read(cardReceipts, index, off, scratch, X_NUM, (short) 4);
+                CompactState.readCursor(cardReceipts, index, off, outputRef, scratch, X_NUM, (short) 4);
                 short digits = toDecimal(scratch, X_NUM);
                 shaAll.update(scratch, (short) (X_DEC + 10 - digits), digits);
-                CompactState.read(cardReceipts, index, (short) (off + 5), b, (short) 0, (short) 33);
+                CompactState.readCursor(cardReceipts, index, (short) (off + 5), CompactState.forward(cardReceipts, index, outputRef, (short) 5), b, (short) 0, (short) 33);
                 toHex(b, (short) 0, (short) 33);
                 shaAll.update(scratch, X_HEX, (short) 66);
+                if ((short) (i + 1) < count) outputRef = CompactState.forward(cardReceipts, index, outputRef, (short) 38);
             }
             shaAll.doFinal(b, (short) 0, (short) 0, scratch, X_MSG);
             short sig = schnorrHW.sign(cardPrivKey, cardPubKey, scratch, X_MSG, b, (short) 0);

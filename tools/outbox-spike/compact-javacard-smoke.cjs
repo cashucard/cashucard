@@ -257,16 +257,20 @@ test("large input/output counts stream across short APDUs without new transient 
       .slice(signAt - w.outputPages.length, signAt)
       .map((x) => x.pageHops),
     signPageHops: r[signAt].pageHops,
+    canonicalDigestCalls: r[signAt].canonicalDigestCalls,
+    canonicalDigestBytes: r[signAt].canonicalDigestBytes,
+    canonicalDigestSmallCalls: r[signAt].canonicalDigestSmallCalls,
     exportPageHops: r
       .slice(pageAt, pageAt + w.pages.length)
       .map((x) => x.pageHops),
   };
   t.diagnostic(JSON.stringify(metrics));
+  assert.ok(metrics.canonicalDigestCalls < 600, "canonical digest call budget");
   assert.ok(
-    metrics.outputPageHops.every((n) => n < 4096),
+    metrics.outputPageHops.every((n) => n < 256),
     "output staging page-walk budget",
   );
-  assert.ok(metrics.signPageHops < 60000, "signing page-walk budget");
+  assert.ok(metrics.signPageHops < 3000, "signing page-walk budget");
   assert.ok(
     metrics.exportPageHops[0] < 30000,
     "first export includes integrity validation",
@@ -282,6 +286,34 @@ test("large input/output counts stream across short APDUs without new transient 
       "persistent byte-write count unchanged",
     );
   });
+});
+test("buffered canonical hashing preserves exact transcripts at full and partial block boundaries", () => {
+  const base = workload("two-input-two-output-v1");
+  for (const remainder of [0, 1, 31, 32, 63, 64, 65, 127]) {
+    const v = clone(base.vector);
+    const mintBytes = Array.from({ length: 207 }, (_, i) => i + 8).find(
+      (n) =>
+        (base.packetBytes - 64 + n - v.context.mint.length) % 128 === remainder,
+    );
+    assert.ok(mintBytes !== undefined);
+    v.context.mint = "https://" + "a".repeat(mintBytes - 8);
+    const packetBytes =
+      base.packetBytes + mintBytes - base.vector.context.mint.length;
+    const steps = [...setup(v), begin(v), ...outputs(v), cmd(0x74)];
+    const signAt = steps.length - 1;
+    steps.push(...readSteps(packetBytes));
+    const r = run(steps);
+    r.forEach(ok);
+    const packet = Buffer.concat(r.slice(signAt + 1).map(ok));
+    assert.equal(packet.length, packetBytes);
+    verify(v, ok(r[signAt]), packet);
+    const bytes = packetBytes - 64;
+    assert.equal(r[signAt].canonicalDigestBytes, bytes * 3 + 64);
+    assert.equal(
+      r[signAt].canonicalDigestCalls,
+      Math.ceil(bytes / 128) * 3 + 2,
+    );
+  }
 });
 test("staged signatures stay hidden and committed burn intent resumes after simulated cuts", () => {
   for (const cut of [

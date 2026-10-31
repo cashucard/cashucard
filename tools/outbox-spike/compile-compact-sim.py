@@ -27,6 +27,8 @@ for file in (out/'src/me/flashapp/cashu').glob('*.java'):
   assert 'u(p[(short)(NEXT+' not in text, 'unmetered page-link expression'
   assert text.count('a[at]=value;')==1
   text=text.replace('a[at]=value;','a[at]=value; CompactCut.write(a);')
+  assert text.count('md.update(')>0
+  text=text.replace('md.update(','CompactCut.digestUpdate(md,')
  (src/file.name).write_text(text)
 shutil.copyfile(HERE/'java/CompactCut.java',src/'CompactCut.java')
 subprocess.run(['javac','--release','11','-cp',str(ROOT/'tools/cardsim/target/cardsim.jar'),'-d',str(classes),
