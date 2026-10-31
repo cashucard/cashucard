@@ -20,8 +20,15 @@ for file in (out/'src/me/flashapp/cashu').glob('*.java'):
  text=file.read_text()
  text=re.sub(r'/\* SIM-CUT ([a-z-]+) \*/',lambda m:'CompactCut.check("'+m.group(1)+'");',text)
  text=re.sub(r'// SIM-CUT ([a-z-]+)',lambda m:'CompactCut.check("'+m.group(1)+'");',text)
+ if file.name=='CompactState.java':
+  # Count actual page-link dereferences and byte writes in host copies only.
+  assert text.count('u(p[(short)(NEXT+page)])')>0
+  text=text.replace('u(p[(short)(NEXT+page)])','CompactCut.next(p[(short)(NEXT+page)])')
+  assert 'u(p[(short)(NEXT+' not in text, 'unmetered page-link expression'
+  assert text.count('a[at]=value;')==1
+  text=text.replace('a[at]=value;','a[at]=value; CompactCut.write(a);')
  (src/file.name).write_text(text)
 shutil.copyfile(HERE/'java/CompactCut.java',src/'CompactCut.java')
 subprocess.run(['javac','--release','11','-cp',str(ROOT/'tools/cardsim/target/cardsim.jar'),'-d',str(classes),
- *[str(f) for f in src.glob('*.java')],str(HERE/'java/CompactHarness.java')],check=True)
+ *[str(f) for f in src.glob('*.java')],str(HERE/'java/CompactHarness.java'),str(HERE/'java/CompactAccessChecks.java')],check=True)
 print('Simulator instrumentation compiled separately; CAP sources unchanged.')

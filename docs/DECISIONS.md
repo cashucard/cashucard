@@ -4522,3 +4522,42 @@ and closed the reader. The plan is consumed. See the
 [hardware report](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-capacity-deadline-stop.md).
 Analyze staging and host persistence costs offline before preparing another
 physical invocation; full packet capacity remains open.
+
+## <a id="d159"></a>D159: Reduce private compact page traversal without changing durability
+
+**Decided (2026-10-30):** optimize the private prototype's page access before
+another physical capacity invocation. Resolve span addresses once, traverse at
+page boundaries, and preserve the original ordered byte stores. Reuse existing
+scratch for batched output-point comparisons and a 16-byte input-slot bitmap.
+Use local cursors for canonical references and access only the requested frame
+range during export, retaining full hashing and page-chain validation.
+
+**Why:** #220 recorded full input loading followed by a host deadline stop
+during output staging. Offline metering found repeated walks from the head for
+individual bytes and repeated complete-field traversal for short exports. The
+fixed large fixture's staging/sign/export link reads fell from 1,479,099 to
+87,096, while its full canonical packet and independently verified signatures
+remain valid. See the [access profile](../tools/outbox-spike/COMPACT-ACCESS.md).
+These counts supply an algorithmic improvement; hardware speed remains open.
+
+Retain the byte-backed layout, constructor/reference shape, allocation rules,
+publication/recovery semantics, fixture and all phone/host bounds. Keep every
+journal persistence barrier: the fake complete workflow records 1,676 saves,
+but Android write latency is unmeasured. Host-only counters, fragmented-page
+reference checks and byte-store cuts stay outside generated CAP sources.
+Released firmware/assets, protocol, cardkit and existing Pixel image pins are
+unchanged. A new exact image/APK and named approved plan precede hardware use.
+
+**Rejected:** raising deadlines, shrinking the fixture to claim the same gate,
+discarding duplicate checks, persistent cross-command cursor caches, changing
+byte-store atomicity with bulk EEPROM copies, removing durable intent/page
+barriers without recovery evidence, or inferring chip timing from JVM counts.
+ACS installation attempts remain paused.
+
+The fixed `capacity-optimized` mode pins the converted image from commit
+`038e298ec7c846cec75e7e40366b1bc4d25a88d6`, with 27,343 load bytes and 111 blocks.
+It uses a separate consumed plan/key under the same private app ID, version
+code 3, and preserves the earlier journals. Existing modes retain their old
+image pins; crossed profiles stop before hardware. The full fake path is 396
+commands within the unchanged ceilings. Its exact APK and named physical plan
+still require review and approval.

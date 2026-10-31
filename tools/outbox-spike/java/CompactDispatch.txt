@@ -85,7 +85,7 @@
         }
         if (ins == (byte) 0x73) {
             if (active == 0) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-            short done = CompactState.append(cardReceipts, (short) (active - 1), (short) (allState[1] & 255), b, ISO7816.OFFSET_CDATA, compactReceive(apdu));
+            short done = CompactState.append(cardReceipts, (short) (active - 1), (short) (allState[1] & 255), b, ISO7816.OFFSET_CDATA, compactReceive(apdu), scratch);
             allState[1] = (byte) done;
             b[0] = (byte) done;
             apdu.setOutgoingAndSend((short) 0, (short) 1);
@@ -106,10 +106,10 @@
             short out = CompactState.outputStart(cardReceipts, index), count = (short) (CompactState.get(cardReceipts, index, (short) (out - 1)) & 255);
             for (short i = 0; i < count; i++) {
                 short off = (short) (out + 38 * i);
-                for (short j = 0; j < 4; j++) scratch[(short) (X_NUM + j)] = CompactState.get(cardReceipts, index, (short) (off + j));
+                CompactState.read(cardReceipts, index, off, scratch, X_NUM, (short) 4);
                 short digits = toDecimal(scratch, X_NUM);
                 shaAll.update(scratch, (short) (X_DEC + 10 - digits), digits);
-                for (short j = 0; j < 33; j++) b[j] = CompactState.get(cardReceipts, index, (short) (off + 5 + j));
+                CompactState.read(cardReceipts, index, (short) (off + 5), b, (short) 0, (short) 33);
                 toHex(b, (short) 0, (short) 33);
                 shaAll.update(scratch, X_HEX, (short) 66);
             }

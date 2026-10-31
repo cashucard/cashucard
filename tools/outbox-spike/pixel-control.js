@@ -14,8 +14,10 @@ const PINS = Object.freeze({
   cap: "41bfc03d191ab9ee109370b83ddfdfcd3505f2bf24953583ea2c775470059941",
   load: "cad4d1f3093fc1e694dfe02806e62050211dd9baac9d4b0e11a9336fe7825c64",
   bytes: 26934,
+  blocks: 110,
   source: "c23c492eafba998fad14f5ef5a82d6686b67d98d",
 });
+const OPTIMIZED_PINS = Object.freeze(require("./pixel-optimized.json"));
 const BASELINE = Object.freeze([
   "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000",
   "e31b4f07a00000006202049f700101ce020100cc08a000000151000000",
@@ -62,7 +64,14 @@ function stoppedSession(current) {
 }
 
 function resumeJournal(value, plan = PINS.plan) {
-  if (![PINS.plan, CAPACITY_PLAN, CAPACITY_DIAGNOSTIC_PLAN].includes(plan))
+  if (
+    ![
+      PINS.plan,
+      CAPACITY_PLAN,
+      CAPACITY_DIAGNOSTIC_PLAN,
+      OPTIMIZED_PINS.plan,
+    ].includes(plan)
+  )
     stop("unknown-plan");
   if (value === null) return null;
   try {
@@ -172,13 +181,14 @@ async function runControl(
     verifySignature,
   },
   capacityMode,
-  plan = capacityMode ? CAPACITY_PLAN : PINS.plan,
+  plan,
+  pins = PINS,
 ) {
   const state = {
     plan,
-    chip: PINS.chip,
-    cap: PINS.cap,
-    load: PINS.load,
+    chip: pins.chip,
+    cap: pins.cap,
+    load: pins.load,
     status: "running",
     stage: "validate-image",
     commands: 0,
@@ -280,7 +290,7 @@ async function runControl(
     step(
       name,
       [exact(sdk.selectAid(sdk.ISD_AID)), exact([0x80, 0xca, 0x9f, 0x7f, 0])],
-      () => sdk.readChipIdentity(tx, PINS.chip),
+      () => sdk.readChipIdentity(tx, pins.chip),
     );
   const authenticate = async (name) => {
     const hs = await step(
@@ -363,7 +373,7 @@ async function runControl(
     ) {
       stop("nfc-limits-unconfirmed");
     }
-    if (load.length !== PINS.bytes || hash(load) !== PINS.load)
+    if (load.length !== pins.bytes || hash(load) !== pins.load)
       stop("image-mismatch");
     await identity("match-chip");
     const absent = [
@@ -391,19 +401,23 @@ async function runControl(
     await secure(
       "install-for-load",
       session,
-      sdk.installForLoad(fromHex(PINS.package)),
+      sdk.installForLoad(fromHex(pins.package)),
     );
     const blocks = sdk.splitLoad(load);
-    if (blocks.length !== 110) stop("load-block-count");
+    if (blocks.length !== pins.blocks) stop("load-block-count");
     for (let i = 0; i < blocks.length; i++) {
-      await secure("load-" + (i + 1) + "-of-110", session, blocks[i]);
+      await secure(
+        "load-" + (i + 1) + "-of-" + pins.blocks,
+        session,
+        blocks[i],
+      );
     }
     for (const suffix of ["4D", "01"]) {
-      const aid = fromHex(PINS.package + suffix);
+      const aid = fromHex(pins.package + suffix);
       await secure(
         "create-" + suffix,
         session,
-        sdk.installAndSelectable(fromHex(PINS.package), aid, aid),
+        sdk.installAndSelectable(fromHex(pins.package), aid, aid),
       );
     }
     const selected = await raw(
@@ -472,12 +486,16 @@ async function runControl(
   }
   return state;
 }
-const runCreation = (options) => runControl(options, false);
-const runCapacity = (options) => runControl(options, true);
+const runCreation = (options) => runControl(options, false, PINS.plan);
+const runCapacity = (options) => runControl(options, true, CAPACITY_PLAN);
 const runCapacityDiagnostics = (options) =>
   runControl(options, true, CAPACITY_DIAGNOSTIC_PLAN);
+const runCapacityOptimized = (options) =>
+  runControl(options, true, OPTIMIZED_PINS.plan, OPTIMIZED_PINS);
 module.exports = {
   PINS,
+  OPTIMIZED_PINS,
+  runCapacityOptimized,
   BASELINE,
   PRIVATE,
   runCreation,

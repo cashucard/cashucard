@@ -174,6 +174,22 @@ function verify(v, scope, packet) {
   assert.equal(e.packetId, scope.subarray(13).toString("hex"));
   return e;
 }
+test("fragmented page transfers match the logical reference through every byte-store cut", (t) => {
+  const r = spawnSync(
+    "java",
+    [
+      "-cp",
+      path.join(artifact, "sim-classes") +
+        path.delimiter +
+        path.join(root, "tools/cardsim/target/cardsim.jar"),
+      "CompactAccessChecks",
+    ],
+    { encoding: "utf8", timeout: 30000 },
+  );
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+  assert.match(r.stdout, /includes 228 byte-store cuts/);
+  t.diagnostic(r.stdout.trim());
+});
 test("converted private image preserves the control instance shape and signs both candidate commitments", () => {
   const manifestBytes = fs.readFileSync(path.join(artifact, "manifest.json"));
   assert.throws(() =>
@@ -211,7 +227,7 @@ test("converted private image preserves the control instance shape and signs bot
   assert.equal(mem[15], 5);
   assert.deepEqual([...ok(r.at(-1)).subarray(2, 5)], [0, 2, 126]);
 });
-test("large input/output counts stream across short APDUs without new transient buffers", () => {
+test("large input/output counts stream across short APDUs without new transient buffers", (t) => {
   const w = workload(MAX),
     v = w.vector;
   const hex = (a) => Buffer.from(a).toString("hex");
@@ -236,6 +252,36 @@ test("large input/output counts stream across short APDUs without new transient 
   verify(v, ok(r[signAt]), packet);
   assert.deepEqual([...ok(r.at(-3))], w.consumedStatus);
   assert.deepEqual([...ok(r.at(-1))], [64, 90, 0, 0, 128, 0]);
+  const metrics = {
+    outputPageHops: r
+      .slice(signAt - w.outputPages.length, signAt)
+      .map((x) => x.pageHops),
+    signPageHops: r[signAt].pageHops,
+    exportPageHops: r
+      .slice(pageAt, pageAt + w.pages.length)
+      .map((x) => x.pageHops),
+  };
+  t.diagnostic(JSON.stringify(metrics));
+  assert.ok(
+    metrics.outputPageHops.every((n) => n < 4096),
+    "output staging page-walk budget",
+  );
+  assert.ok(metrics.signPageHops < 60000, "signing page-walk budget");
+  assert.ok(
+    metrics.exportPageHops[0] < 30000,
+    "first export includes integrity validation",
+  );
+  assert.ok(
+    metrics.exportPageHops.slice(1).every((n) => n < 1024),
+    "cached export page-walk budget",
+  );
+  r.slice(signAt - w.outputPages.length, signAt).forEach((result, i) => {
+    assert.equal(
+      result.writes,
+      w.outputPages[i][4],
+      "persistent byte-write count unchanged",
+    );
+  });
 });
 test("staged signatures stay hidden and committed burn intent resumes after simulated cuts", () => {
   for (const cut of [
@@ -406,4 +452,82 @@ test("a fresh session revalidates packet integrity instead of trusting the expor
   assert.equal(response(r[at + 1]).sw, 0x6985);
   assert.equal(response(r[at + 2]).sw, 0x6985);
   assert.deepEqual([...ok(r.at(-1)).subarray(2, 5)], [0, 2, 126]);
+});
+
+test("duplicate points in the current batch or earlier staging cannot advance outputs", () => {
+  for (const earlier of [false, true]) {
+    const v = workload(MAX).vector;
+    v.outputs = v.outputs.slice(0, 12);
+    const good = outputs(v),
+      bad = clone(v);
+    bad.outputs[earlier ? 11 : 5].B_ = bad.outputs[earlier ? 5 : 0].B_;
+    const steps = [...setup(v), begin(v)];
+    if (earlier) steps.push(good[0]);
+    const at = steps.length;
+    steps.push(
+      outputs(bad)[earlier ? 1 : 0],
+      ...good.slice(earlier ? 1 : 0),
+      cmd(0x74),
+    );
+    const r = run(steps);
+    r.slice(0, at).forEach(ok);
+    assert.equal(response(r[at]).sw, 0x6a80);
+    assert.equal(r[at].writes, 0, "refusal precedes persistent frame stores");
+    r.slice(at + 1).forEach(ok);
+  }
+});
+
+test("an aliased input slot is refused before signatures or consumption", () => {
+  const v = workload(MAX).vector;
+  v.outputs = v.outputs.slice(0, 2);
+  const steps = [...setup(v), begin(v), ...outputs(v)];
+  const at = steps.length;
+  steps.push(
+    { apdu: cmd(0x74), corruptPool: 4752 + 6 },
+    { reset: true },
+    cmd(0x76),
+  );
+  const r = run(steps);
+  r.slice(0, at).forEach(ok);
+  assert.equal(response(r[at]).sw, 0x6a80);
+  assert.equal(r[at].writes, 0);
+  ok(r[at + 1]);
+  assert.deepEqual([...ok(r[at + 2])], [64, 90, 128, 0, 0, 0]);
+});
+
+test("unrequested corrupt pages still block cached export", () => {
+  const w = workload(MAX),
+    hex = (a) => Buffer.from(a).toString("hex");
+  for (const where of [4572 + 44, 4662 + 43]) {
+    const steps = [
+      "00a404000bF04341534855434D505401",
+      w.setup,
+      ...w.keysets,
+      ...w.loads,
+      w.begin,
+      ...w.outputPages,
+    ].map((a) => (typeof a === "string" ? a : hex(a)));
+    steps.push(cmd(0x74), page(0, 0, 64));
+    const at = steps.length;
+    steps.push({ apdu: page(0, 0, 64), corruptPool: where });
+    const r = run(steps);
+    r.slice(0, at).forEach(ok);
+    assert.equal(response(r[at]).sw, 0x6a80);
+  }
+});
+
+test("a byte interruption in output staging stays invisible and frees staging on reselect", () => {
+  const v = workload(MAX).vector;
+  v.outputs = v.outputs.slice(0, 12);
+  for (const cutWrite of [1, 124, 125, 126, 227, 228]) {
+    const steps = [...setup(v), begin(v), { apdu: outputs(v)[0], cutWrite }];
+    const at = steps.length - 1;
+    steps.push(cmd(0x7c, Buffer.from([0])), { reset: true }, cmd(0x76));
+    const r = run(steps);
+    r.slice(0, at).forEach(ok);
+    assert.ok(r[at].cut);
+    assert.equal(response(r[at + 1]).sw, 0x6985);
+    ok(r[at + 2]);
+    assert.deepEqual([...ok(r[at + 3])], [64, 90, 128, 0, 0, 0]);
+  }
 });

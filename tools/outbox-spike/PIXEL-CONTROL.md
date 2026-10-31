@@ -153,3 +153,27 @@ plan should collect terminal results after the operator reports completion or
 stop, avoiding host UI automation during card commands. That removes an
 unmeasured observation variable without assigning it as the earlier cause.
 Local native-classifier regressions need JDK 17; CI installs it explicitly.
+
+## Optimized image control
+
+The [offline access profile](COMPACT-ACCESS.md) records the prototype's page
+traversal changes and preservation checks. Explicit `--mode capacity-optimized`
+admits only the new image pins in `pixel-optimized.json`: source
+`038e298ec7c846cec75e7e40366b1bc4d25a88d6`, 27,343 load bytes, 111 blocks,
+the same private AIDs and CPROT/2 format 5. Existing modes keep their old image
+pins, so use the matching retained artifact directory when generating a build.
+
+This mode generates private app version code 3, titled Pixel optimized capacity,
+with plan `pixel-capacity-optimized-v1` and key
+`cashucard-private-capacity-optimized-v1`. It preserves both earlier capacity
+and diagnostic keys in the same app sandbox. Its normal fake path has 396
+commands, retaining the existing 512-command ceiling, 120-second elapsed gate,
+15-second native timeout and short-frame limit. Packet verification, durable
+pages and verified packet, scoped retirement and cleanup admission are
+unchanged. A source/image mismatch stops before the first APDU.
+
+Prepare and review an exact APK and named plan before upgrading or arming this
+mode on a phone. Preserve and compare both prior journals around the approved
+upgrade. Follow the diagnostic plan's operator-reported terminal result and
+conditional cleanup boundaries. The offline access improvement has yet to be
+measured on silicon; the earlier plans are consumed.
