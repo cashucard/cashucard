@@ -15,6 +15,8 @@ import { secp256k1, schnorr } from "@noble/curves/secp256k1";
 import { withCard, cancelCard } from "./src/session";
 import {
   PINS,
+  OPTIMIZED_PINS,
+  runCapacityOptimized,
   runCreation,
   runCapacity,
   resumeJournal,
@@ -25,20 +27,26 @@ import {
 import { CAPACITY_PLAN } from "./pixel-capacity";
 import asset from "./pixel-asset.json";
 
+const optimized = asset.mode === "capacity-optimized";
+const CARD_PINS = optimized ? OPTIMIZED_PINS : PINS;
 const diagnostics = asset.mode === "capacity-diagnostics";
-const capacity = diagnostics || asset.mode === "capacity";
-const PLAN = diagnostics
-  ? CAPACITY_DIAGNOSTIC_PLAN
-  : capacity
-    ? CAPACITY_PLAN
-    : PINS.plan;
+const capacity = optimized || diagnostics || asset.mode === "capacity";
+const PLAN = optimized
+  ? OPTIMIZED_PINS.plan
+  : diagnostics
+    ? CAPACITY_DIAGNOSTIC_PLAN
+    : capacity
+      ? CAPACITY_PLAN
+      : PINS.plan;
 // An explicitly reviewed diagnostic invocation gets its own one-shot journal.
 // The previous capacity record remains untouched in the same app's storage.
-const JOURNAL = diagnostics
-  ? "cashucard-private-capacity-diagnostics-v1"
-  : capacity
-    ? "cashucard-private-capacity-v1"
-    : "cashucard-private-creation-v1";
+const JOURNAL = optimized
+  ? "cashucard-private-capacity-optimized-v1"
+  : diagnostics
+    ? "cashucard-private-capacity-diagnostics-v1"
+    : capacity
+      ? "cashucard-private-capacity-v1"
+      : "cashucard-private-creation-v1";
 export default function App() {
   const [record, setRecord] = useState(undefined);
   const [busy, setBusy] = useState(false);
@@ -70,7 +78,11 @@ export default function App() {
       plan: PLAN,
       status: "armed",
       stage: "waiting-for-card",
-      artifact: { source: PINS.source, cap: PINS.cap, load: PINS.load },
+      artifact: {
+        source: CARD_PINS.source,
+        cap: CARD_PINS.cap,
+        load: CARD_PINS.load,
+      },
       build: asset.build,
       armedAt: new Date().toISOString(),
     };
@@ -85,11 +97,13 @@ export default function App() {
             androidTimeoutMs: await NfcManager.getTimeout(),
             maxTransceive: await NfcManager.getMaxTransceiveLength(),
           };
-          const run = diagnostics
-            ? runCapacityDiagnostics
-            : capacity
-              ? runCapacity
-              : runCreation;
+          const run = optimized
+            ? runCapacityOptimized
+            : diagnostics
+              ? runCapacityDiagnostics
+              : capacity
+                ? runCapacity
+                : runCreation;
           return run({
             sdk,
             tx,
@@ -150,11 +164,13 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>PRIVATE HARDWARE CONTROL</Text>
         <Text style={styles.title}>
-          {diagnostics
-            ? "Pixel capacity diagnostics"
-            : capacity
-              ? "Pixel capacity test"
-              : "Pixel creation test"}
+          {optimized
+            ? "Pixel optimized capacity"
+            : diagnostics
+              ? "Pixel capacity diagnostics"
+              : capacity
+                ? "Pixel capacity test"
+                : "Pixel creation test"}
         </Text>
         <Text style={styles.copy}>
           Card 09336320 only. Hold it still until the result appears.
@@ -227,7 +243,7 @@ export default function App() {
           network permission and does not sign into an ops-service.
         </Text>
         <Text selectable style={styles.fine}>
-          CAP {PINS.cap}
+          CAP {CARD_PINS.cap}
           {"\n"}
           {asset.build.source}
         </Text>

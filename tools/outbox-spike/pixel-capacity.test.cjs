@@ -15,6 +15,8 @@ const {
   resumeJournal,
   runCapacityDiagnostics,
   CAPACITY_DIAGNOSTIC_PLAN,
+  OPTIMIZED_PINS,
+  runCapacityOptimized,
 } = require("./pixel-control.js");
 const {
   capacityProfile,
@@ -145,14 +147,15 @@ test("tampered canonical bytes, scope and either signature are refused even with
   );
 });
 function capacityFake(options = {}) {
-  const f = fixture();
+  const pins = options.pins || PINS;
+  const f = fixture({ pins });
   let stage = "",
     scopeSeen = false,
     setup = false;
   const originalSave = f.args.save,
     originalTx = f.args.tx;
   f.args.hash = (bytes) =>
-    bytes.length === PINS.bytes ? PINS.load : sha(bytes);
+    bytes.length === pins.bytes ? pins.load : sha(bytes);
   f.args.fixture = raw;
   f.args.verifySignature = options.rejectSignature
     ? () => false
@@ -368,4 +371,33 @@ test("a late loading failure keeps the exact slot and native envelope, then stop
   assert.equal(r.reply, null);
   assert.equal(f.sent.length, 222);
   assert.ok(!f.sent.some((a) => [0x70, 0x74, 0x77, 0xe4].includes(a[1])));
+});
+
+test("the fixed optimized image completes the same packet with 111 admitted load blocks", async () => {
+  const f = capacityFake({ pins: OPTIMIZED_PINS });
+  const r = await runCapacityOptimized(f.args);
+  assert.equal(r.status, "complete", JSON.stringify(r));
+  assert.equal(r.plan, OPTIMIZED_PINS.plan);
+  assert.equal(r.cap, OPTIMIZED_PINS.cap);
+  assert.equal(r.commands, 396);
+  assert.equal(f.sent.filter((a) => a[1] === 0xe8).length, 111);
+  assert.equal(r.exportPages.length, 91);
+  assert.equal(r.capacityVerified, true);
+  assert.equal(r.blankBaselineVerified, true);
+  assert.deepEqual(resumeJournal(JSON.stringify(r), OPTIMIZED_PINS.plan), r);
+  assert.equal(
+    resumeJournal(JSON.stringify(r), CAPACITY_DIAGNOSTIC_PLAN).failure,
+    "saved-journal-unreadable",
+  );
+  assert.equal(OPTIMIZED_PINS.package, PINS.package);
+  assert.equal(OPTIMIZED_PINS.chip, PINS.chip);
+});
+
+test("capacity image profiles cannot be interchanged before hardware", async () => {
+  for (const optimized of [false, true]) {
+    const f = capacityFake({ pins: optimized ? PINS : OPTIMIZED_PINS });
+    const r = await (optimized ? runCapacityOptimized : runCapacity)(f.args);
+    assert.equal(r.failure, "image-mismatch");
+    assert.equal(f.sent.length, 0);
+  }
 });

@@ -47,6 +47,14 @@ original 50-cell, 50-reference instance shape. Released firmware/CAP/assets,
 protocol files, cardkit and current Pixel image pins remain unchanged. A future
 physical test needs a separately prepared exact image/APK and named approval.
 
+The explicit `capacity-optimized` lab mode admits a separately pinned image
+from commit `038e298ec7c846cec75e7e40366b1bc4d25a88d6`. Its load file is
+27,343 bytes in 111 blocks. The normal fixed workflow is 396 commands; all
+existing ceilings remain. The generated version-code-3 APK keeps the same
+private app ID and uses its own consumed plan/key while preserving earlier
+creation, capacity and diagnostic records. Existing modes retain their original
+image pins. Unknown modes and interchanged image profiles fail before APDUs.
+
 ## Journal workload
 
 The complete fake Pixel workflow saves 1,676 snapshots, serializing 25,945,234

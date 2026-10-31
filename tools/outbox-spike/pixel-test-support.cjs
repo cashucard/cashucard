@@ -18,30 +18,31 @@ const sha = (bytes) =>
 
 // Synthetic parseable CAP envelope, not the pinned hardware image. Positive workflow
 // cases stub only its digest; the real SHA implementation is used by the rejection case.
-function syntheticLoad() {
+function syntheticLoad(pins = PINS) {
   const component = (tag, data) => [
     tag,
     data.length >> 8,
     data.length & 255,
     ...data,
   ];
-  const aid = b(PINS.package);
+  const aid = b(pins.package);
   const header = component(1, [...Array(9).fill(0), aid.length, ...aid]);
   const applets = component(3, [
     2,
     ...["4D", "01"].flatMap((s) => {
-      const a = b(PINS.package + s);
+      const a = b(pins.package + s);
       return [a.length, ...a, 0, 0];
     }),
   ]);
   const filler = component(
     2,
-    Array(PINS.bytes - 4 - header.length - applets.length - 3).fill(0),
+    Array(pins.bytes - 4 - header.length - applets.length - 3).fill(0),
   );
   const body = [...header, ...applets, ...filler];
   return [0xc4, 0x82, body.length >> 8, body.length & 255, ...body];
 }
 function fixture(options = {}) {
+  const pins = options.pins || PINS;
   const card = new FakeCard(options.wrongKeys ? { keys: sdk.SPIKE_KEYS } : {});
   const records = [],
     sent = [];
@@ -121,8 +122,8 @@ function fixture(options = {}) {
       androidTimeoutMs: 15000,
       maxTransceive: 261,
     },
-    load: syntheticLoad(),
-    hash: () => PINS.load,
+    load: syntheticLoad(pins),
+    hash: () => pins.load,
     tx,
     random: (n) => Array.from({ length: n }, (_, i) => i),
     now: () => clock,

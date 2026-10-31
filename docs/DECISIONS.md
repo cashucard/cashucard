@@ -4553,3 +4553,11 @@ discarding duplicate checks, persistent cross-command cursor caches, changing
 byte-store atomicity with bulk EEPROM copies, removing durable intent/page
 barriers without recovery evidence, or inferring chip timing from JVM counts.
 ACS installation attempts remain paused.
+
+The fixed `capacity-optimized` mode pins the converted image from commit
+`038e298ec7c846cec75e7e40366b1bc4d25a88d6`, with 27,343 load bytes and 111 blocks.
+It uses a separate consumed plan/key under the same private app ID, version
+code 3, and preserves the earlier journals. Existing modes retain their old
+image pins; crossed profiles stop before hardware. The full fake path is 396
+commands within the unchanged ceilings. Its exact APK and named physical plan
+still require review and approval.

@@ -83,6 +83,11 @@ test("capacity mode uses a distinct application identity and keeps creation data
     diagnostics.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'),
   );
   assert.ok(diagnostics.gradle.includes("versionCode 2"));
+  const optimized = androidFiles(original, "capacity-optimized");
+  assert.ok(
+    optimized.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'),
+  );
+  assert.ok(optimized.gradle.includes("versionCode 3"));
   assert.throws(
     () => androidFiles(original, "custom"),
     /Unknown fixed lab mode/,

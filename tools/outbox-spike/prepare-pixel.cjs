@@ -4,7 +4,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { compactArtifact } = require("./run-compact.cjs");
-const { PINS } = require("./pixel-control.js");
+const { PINS, OPTIMIZED_PINS } = require("./pixel-control.js");
 const { FIXTURE_SHA256 } = require("./pixel-capacity.js");
 const { ORIGINAL_SHA256, PATCHED_SHA256 } = require("./patch-pixel-nfc.cjs");
 const ROOT = path.resolve(__dirname, "../..");
@@ -12,7 +12,7 @@ const APP_ID = "org.cashucard.compactlab";
 const CAPACITY_APP_ID = "org.cashucard.capacitylab";
 const modeId = (mode) => {
   if (mode === "creation") return APP_ID;
-  if (["capacity", "capacity-diagnostics"].includes(mode))
+  if (["capacity", "capacity-diagnostics", "capacity-optimized"].includes(mode))
     return CAPACITY_APP_ID;
   throw Error("Unknown fixed lab mode");
 };
@@ -49,8 +49,8 @@ android {
         applicationId "${appId}"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "0.0.2-lab"
+        versionCode ${mode === "capacity-optimized" ? 3 : 2}
+        versionName "${mode === "capacity-optimized" ? "0.0.3" : "0.0.2"}-lab"
     }
     signingConfigs { debug {
         storeFile file('debug.keystore')
@@ -71,6 +71,7 @@ dependencies {
 }
 function prepare({ artifact, output, mode = "creation" }) {
   const appId = modeId(mode);
+  const pins = mode === "capacity-optimized" ? OPTIMIZED_PINS : PINS;
   if (!path.isAbsolute(output) || fs.existsSync(output))
     throw Error("New absolute output directory required");
   if (output === ROOT || output.startsWith(ROOT + path.sep))
@@ -84,17 +85,21 @@ function prepare({ artifact, output, mode = "creation" }) {
     throw Error("Commit/review the source before generating a lab build");
   const { manifest, load } = compactArtifact({
     manifest: path.join(artifact, "manifest.json"),
-    manifestHash: PINS.manifest,
-    sourceCommit: PINS.source,
+    manifestHash: pins.manifest,
+    sourceCommit: pins.source,
   });
   if (
-    manifest.capSha256 !== PINS.cap ||
-    manifest.loadFileSha256 !== PINS.load ||
-    load.length !== PINS.bytes ||
-    hash(load) !== PINS.load
+    manifest.capSha256 !== pins.cap ||
+    manifest.loadFileSha256 !== pins.load ||
+    load.length !== pins.bytes ||
+    hash(load) !== pins.load
   )
     throw Error("Fixed image pin mismatch");
-  const fixture = ["capacity", "capacity-diagnostics"].includes(mode)
+  const fixture = [
+    "capacity",
+    "capacity-diagnostics",
+    "capacity-optimized",
+  ].includes(mode)
     ? fs.readFileSync(path.join(__dirname, "fixtures/compact-capacity-v1.json"))
     : undefined;
   if (fixture && hash(fixture) !== FIXTURE_SHA256)
@@ -182,8 +187,15 @@ function prepare({ artifact, output, mode = "creation" }) {
     "src/cardkit.ts",
     "export type {Transceiver} from '@cashu-card/cardkit';\n",
   );
+  write(
+    "pixel-optimized.json",
+    fs.readFileSync(path.join(__dirname, "pixel-optimized.json")),
+  );
   const build = {
     source,
+    optimizedPins: hash(
+      fs.readFileSync(path.join(__dirname, "pixel-optimized.json")),
+    ),
     appId,
     mode,
     template: hash(fs.readFileSync(__filename)),
@@ -201,9 +213,9 @@ function prepare({ artifact, output, mode = "creation" }) {
     session: hash(
       fs.readFileSync(path.join(ROOT, "apps/provisioner/src/session.ts")),
     ),
-    manifest: PINS.manifest,
-    cap: PINS.cap,
-    load: PINS.load,
+    manifest: pins.manifest,
+    cap: pins.cap,
+    load: pins.load,
   };
   write(
     "pixel-asset.json",
