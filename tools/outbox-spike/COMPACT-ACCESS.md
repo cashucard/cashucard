@@ -57,7 +57,7 @@ image pins. Unknown modes and interchanged image profiles fail before APDUs.
 
 ## Journal workload
 
-The original 395-command fake Pixel workflow saves 1,676 snapshots, serializing 25,945,234
+The complete fake Pixel workflow saves 1,676 snapshots, serializing 25,945,234
 bytes in total. This measures snapshot volume; Android persistence latency was
 unmeasured. Every existing persistence barrier is retained, including intent
 before transmission, received pages before the next request and the verified
