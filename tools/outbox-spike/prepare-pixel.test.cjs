@@ -2,7 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { androidFiles, APP_ID, prepare } = require("./prepare-pixel.cjs");
+const {
+  androidFiles,
+  APP_ID,
+  CAPACITY_APP_ID,
+  prepare,
+} = require("./prepare-pixel.cjs");
 const root = path.resolve(__dirname, "../..");
 test("generated Android identity is separate, offline and has no enabled release variant", () => {
   const app = path.join(root, "apps/provisioner");
@@ -38,11 +43,43 @@ test("generated Android identity is separate, offline and has no enabled release
 });
 test("generator refuses an existing destination without touching its contents", () => {
   assert.throws(
+    () =>
+      prepare({
+        mode: "arbitrary",
+        output: "/missing-lab-project",
+        artifact: "/missing",
+      }),
+    /Unknown fixed lab mode/,
+  );
+  assert.throws(
     () => prepare({ output: root, artifact: "/missing" }),
     /New absolute/,
   );
   assert.throws(
     () => prepare({ output: "relative", artifact: "/missing" }),
     /New absolute/,
+  );
+});
+test("capacity mode uses a distinct application identity and keeps creation data separate", () => {
+  const app = path.join(root, "apps/provisioner");
+  const original = {
+    manifest: fs.readFileSync(
+      path.join(app, "android/app/src/main/AndroidManifest.xml"),
+      "utf8",
+    ),
+    application: fs.readFileSync(
+      path.join(
+        app,
+        "android/app/src/main/java/com/islandbitcoin/provisioner/MainApplication.kt",
+      ),
+      "utf8",
+    ),
+  };
+  const result = androidFiles(original, "capacity");
+  assert.ok(result.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'));
+  assert.notEqual(APP_ID, CAPACITY_APP_ID);
+  assert.throws(
+    () => androidFiles(original, "custom"),
+    /Unknown fixed lab mode/,
   );
 });

@@ -11,12 +11,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import NfcManager from "react-native-nfc-manager";
 import * as sdk from "@cashu-card/cardkit";
 import { sha256 } from "@noble/hashes/sha2";
-import { secp256k1 } from "@noble/curves/secp256k1";
+import { secp256k1, schnorr } from "@noble/curves/secp256k1";
 import { withCard, cancelCard } from "./src/session";
-import { PINS, runCreation, resumeJournal } from "./pixel-control";
+import { PINS, runCreation, runCapacity, resumeJournal } from "./pixel-control";
+import { CAPACITY_PLAN } from "./pixel-capacity";
 import asset from "./pixel-asset.json";
 
-const JOURNAL = "cashucard-private-creation-v1";
+const capacity = asset.mode === "capacity";
+const PLAN = capacity ? CAPACITY_PLAN : PINS.plan;
+const JOURNAL = capacity
+  ? "cashucard-private-capacity-v1"
+  : "cashucard-private-creation-v1";
 export default function App() {
   const [record, setRecord] = useState(undefined);
   const [busy, setBusy] = useState(false);
@@ -25,7 +30,7 @@ export default function App() {
   useEffect(() => {
     AsyncStorage.getItem(JOURNAL)
       .then((value) => {
-        setRecord(resumeJournal(value));
+        setRecord(resumeJournal(value, PLAN));
       })
       .catch(() =>
         setRecord({ status: "stopped", failure: "journal-unavailable" }),
@@ -45,7 +50,7 @@ export default function App() {
     aborted.current = false;
     setBusy(true);
     let current = {
-      plan: PINS.plan,
+      plan: PLAN,
       status: "armed",
       stage: "waiting-for-card",
       artifact: { source: PINS.source, cap: PINS.cap, load: PINS.load },
@@ -63,11 +68,19 @@ export default function App() {
             androidTimeoutMs: await NfcManager.getTimeout(),
             maxTransceive: await NfcManager.getMaxTransceiveLength(),
           };
-          return runCreation({
+          const run = capacity ? runCapacity : runCreation;
+          return run({
             sdk,
             tx,
             limits,
             load: sdk.fromHex(asset.loadHex),
+            fixture: capacity ? sdk.fromHex(asset.fixtureHex) : undefined,
+            verifySignature: (signature, message, key) =>
+              schnorr.verify(
+                Uint8Array.from(signature),
+                Uint8Array.from(message),
+                Uint8Array.from(key),
+              ),
             hash: (bytes) =>
               sdk.toHex(sha256(Uint8Array.from(bytes))).toLowerCase(),
             random: (n) => global.crypto.getRandomValues(new Uint8Array(n)),
@@ -120,14 +133,16 @@ export default function App() {
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>PRIVATE HARDWARE CONTROL</Text>
-        <Text style={styles.title}>Pixel creation test</Text>
+        <Text style={styles.title}>
+          {capacity ? "Pixel capacity test" : "Pixel creation test"}
+        </Text>
         <Text style={styles.copy}>
           Card 09336320 only. Hold it still until the result appears.
         </Text>
         <Text style={styles.copy}>
-          Creates the private opener and applet, reads diagnostics and its
-          public key, then removes the private package. No setup, payment
-          fixtures or manager-key changes.
+          {capacity
+            ? "Loads 128 synthetic proof slots, signs the fixed payment, verifies all 91 export pages and both signatures, then retires the fixture and returns the card to blank."
+            : "Creates the private opener and applet, reads diagnostics and its public key, then removes the private package. No setup, payment fixtures or manager-key changes."}
         </Text>
         <Text style={styles.status}>
           {complete
@@ -151,7 +166,9 @@ export default function App() {
             onPress={begin}
             accessibilityRole="button"
           >
-            <Text style={styles.buttonText}>START CREATION TEST</Text>
+            <Text style={styles.buttonText}>
+              {capacity ? "START CAPACITY TEST" : "START CREATION TEST"}
+            </Text>
           </Pressable>
         )}
         {busy && (

@@ -4433,3 +4433,36 @@ blank on 09336320. The saved journal recorded 143 commands and a 20,783-ms
 connected session. See the [hardware report](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-compact-creation.md).
 This is creation evidence for that invocation; capacity and interrupted-write
 gates remain open, and the ACS failure cause remains unassigned.
+
+## <a id="d157"></a>D157: Verify the closed full-slot workload on the Pixel
+
+**Decided (2026-10-30):** add one explicit capacity mode to the isolated Pixel
+lab generator, under a separate application ID and consumed journal. Reuse the
+unchanged private CPROT/2 image and exact 09336320/factory/baseline admission.
+Pin the committed 128-input/128-output fixture bytes and construct its fixed
+commands with portable arrays. Unknown modes/fixtures stop before hardware.
+
+After verified creation, the mode performs private allocation/setup, loads the
+128 synthetic input slots, stages 128 outputs, signs once and reselects. Persist
+all 91 export pages as they arrive. Rebuild the exact 23,163 canonical bytes
+from the pinned fixture and observed public key, match scope identity/generation
+and packet hash, and verify both BIP-340 signatures. Persist the verified packet
+before scoped retirement. Require the fully free status before fresh identity,
+factory and registry checks permit private-only deletion and blank verification.
+
+**Why:** the independent Pixel creation control passed in #216, while capacity
+remained unmeasured. The existing Node codec/workload uses Node-only APIs.
+A closed portable implementation can run on the offline Pixel without adding
+Buffer/Node shims or changing production dependencies. Tests match its commands,
+packet bytes and both signatures against the existing independent host code.
+The capacity command ceiling matches the existing 512-command host limit; the
+120-second gate and 15-second native response timeout remain unchanged.
+
+**Rejected:** arbitrary on-phone fixtures/APDUs, trusting a valid signature over
+different canonical bytes, retirement before verification/durable packet save,
+automatic cleanup after uncertainty, replacing the creation app to erase its
+journal, and treating this private control as production protocol enablement.
+Many-small-record capacity, physical interruptions, production authorization
+and final wire/limit agreement remain separate gates. No additional physical
+action is authorized by this decision; review the exact APK and named run plan
+before touching the phone or card.

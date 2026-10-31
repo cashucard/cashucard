@@ -78,3 +78,40 @@ Do not clear the lab journal, reinstall to bypass a consumed attempt, arm anothe
 session after failure, enable CCP bench tools, change manager keys, or contact a
 mint/ops-service under this plan. Physical findings belong in a dated hardware
 report after the approved invocation.
+
+## Fixed full-capacity mode
+
+The creation control passed on Pixel 8 Pro in
+[the hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-compact-creation.md).
+The next prepared software adds explicit `--mode capacity` to the generator.
+This selects `org.cashucard.capacitylab` and a separate consumed journal, keeping
+the creation app/evidence intact. Unknown modes fail before generation.
+The CAP/load bytes, factory-key checks, identity and baseline rules stay pinned.
+
+The sole capacity fixture is the committed 58,507-byte
+`fixtures/compact-capacity-v1.json`, SHA-256
+`15990af5e270685eeb56d2ac0ac9395111090114466d71b4c55188ebc6b8343e`.
+The portable phone command builder matches the independent Node workload for
+every setup/keyset/proof/staging/export command. It sets up the existing private
+pool/DLEQ allocation, loads 128 synthetic proofs, stages 128 merchant outputs
+through 22 commands, signs once, reselects and exports 23,163 bytes through 91
+pages. These are synthetic fixtures; the APK has no mint or ops-service traffic.
+
+Persist each received page before requesting the next. The portable verifier
+rebuilds every canonical byte from the pinned fixture and observed card key,
+matches the exact record identity/generation and packet hash, and verifies both
+BIP-340 signatures with the installed noble library. It matches the existing
+Node codec, whose BIP-340 implementation supplies an independent check in tests.
+Only after saving the complete verified packet does the controller retire that
+exact scope, require 128 empty slots/64 free headers/90 free pages, and enter the
+existing fresh-channel private-only cleanup. Any stopped or invalid export,
+signature, status, scope or persistence result preserves evidence and sends no
+retirement or deletion.
+
+The capacity ceiling is 512 commands, matching the existing fixed host capacity
+runner. The 120-second elapsed gate, 15-second native response timeout, one
+signing attempt and short-frame limit remain. This control tests one large
+record; many-small-record and physical interrupted-write tests are separate.
+The capacity APK and its physical run need a fresh named approved plan; the
+completed creation plan is consumed. A successful run ends blank. A stopped
+signing/export run keeps the card and journal aside for reviewed recovery.
