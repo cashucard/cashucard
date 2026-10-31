@@ -4561,3 +4561,44 @@ code 3, and preserves the earlier journals. Existing modes retain their old
 image pins; crossed profiles stop before the first APDU. The full fake path is 396
 commands within the unchanged ceilings. Its exact APK and named physical plan
 still require review and approval.
+
+**Physical follow-up (2026-10-30):** the optimized Pixel invocation confirmed
+all 128 inputs and all 128 outputs, then stopped at signing with no reply/scope.
+The journal records 289 commands, `android-tag-lost` and a 15,015.558-ms failed
+native-call envelope. The approved cleanup gate rejected this uncertainty and
+the card remains preserved. See the
+[hardware report](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-optimized-sign-stop.md).
+
+## <a id="d160"></a>D160: Recover an existing private signing attempt without signing again
+
+**Decided (2026-10-30):** prepare a closed reader recovery flow for the optimized
+private image and exact synthetic full-slot fixture on 09336320. Pin the stopped
+journal and saved installation key. Match CPLC, prove factory-version-1 keys
+before external authentication and require the exact baseline/private registry.
+SELECT the private applet once, explicitly permitting its recovery side effects.
+
+Proceed only after proving either released unpublished staging with all 128
+proofs unspent and no scope, or the exact committed scope with 128 spent proofs.
+For a committed scope, persist every export page, verify the full canonical
+packet and both signatures with Node plus independent Python, and durably save
+that evidence before one scoped retirement and a confirmed free state. Only
+then may a fresh identity/factory/registry check admit private-only deletion and
+verified return to the original blank baseline. Keep all registry snapshots.
+
+**Why:** signing uncertainty cannot establish whether publication completed.
+Retrying SIGN or deleting the applet would replace or erase the evidence. The
+private applet's SELECT can release staging or finish committed bookkeeping,
+so describing this as read-only would misstate its behavior. Existing simulator
+cuts cover those recovery states; focused host/policy tests cover the new flow.
+
+The independent reader policy excludes signing, loading, installation, setup,
+key changes and production namespaces. Keep the existing reader response bound
+and elapsed gate, with 160 commands and short frames. All uncertainty stops
+without further commands. See [private recovery](../tools/outbox-spike/COMPACT-RECOVERY.md).
+No hardware action is authorized by this decision; prepare an exact pinned
+launcher/plan and obtain approval before opening the reader.
+
+**Rejected:** treating tag loss as proof of a failed signature, increasing the
+phone timeout to repeat signing, deleting a possibly committed packet, trusting
+only a success status or packet checksum, retirement before independent
+verification/durable save, and continuing after unknown state or delivery.

@@ -319,15 +319,24 @@ async function openBridge(
   profile = "resource",
   workload,
 ) {
-  if (!["resource", "compact"].includes(profile))
+  if (!["resource", "compact", "compact-recovery"].includes(profile))
     throw new Error("unknown bridge profile");
+  if (
+    profile === "compact-recovery" &&
+    (registryOnly || cleanupOnly || workload)
+  )
+    throw new Error("closed recovery profile requires no mode overrides");
   const child = spawn(
     python,
     [
       "-u",
       path.join(
         __dirname,
-        profile === "compact" ? "compact_bridge.py" : "probe_bridge.py",
+        profile === "compact-recovery"
+          ? "compact_recovery_bridge.py"
+          : profile === "compact"
+            ? "compact_bridge.py"
+            : "probe_bridge.py",
       ),
       "--reader",
       reader,
@@ -354,7 +363,7 @@ async function openBridge(
               child.kill();
               reject(new ProbeFailure("reader-response-timeout"));
             },
-            profile === "compact" ? 30000 : 10000,
+            profile.startsWith("compact") ? 30000 : 10000,
           );
         }),
       ]);
@@ -387,13 +396,19 @@ async function openBridge(
       });
     });
     lines.close();
+    if (profile === "compact-recovery" && child.exitCode !== 0)
+      throw new ProbeFailure("reader-close-failed");
   }
   try {
     if ((await next()).ready !== true) {
       throw new ProbeFailure("reader-not-ready");
     }
   } catch (error) {
-    await close();
+    try {
+      await close();
+    } catch {
+      /* Keep the original startup failure. */
+    }
     throw error;
   }
   return {
