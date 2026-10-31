@@ -13,15 +13,32 @@ import * as sdk from "@cashu-card/cardkit";
 import { sha256 } from "@noble/hashes/sha2";
 import { secp256k1, schnorr } from "@noble/curves/secp256k1";
 import { withCard, cancelCard } from "./src/session";
-import { PINS, runCreation, runCapacity, resumeJournal } from "./pixel-control";
+import {
+  PINS,
+  runCreation,
+  runCapacity,
+  resumeJournal,
+  stoppedSession,
+  CAPACITY_DIAGNOSTIC_PLAN,
+  runCapacityDiagnostics,
+} from "./pixel-control";
 import { CAPACITY_PLAN } from "./pixel-capacity";
 import asset from "./pixel-asset.json";
 
-const capacity = asset.mode === "capacity";
-const PLAN = capacity ? CAPACITY_PLAN : PINS.plan;
-const JOURNAL = capacity
-  ? "cashucard-private-capacity-v1"
-  : "cashucard-private-creation-v1";
+const diagnostics = asset.mode === "capacity-diagnostics";
+const capacity = diagnostics || asset.mode === "capacity";
+const PLAN = diagnostics
+  ? CAPACITY_DIAGNOSTIC_PLAN
+  : capacity
+    ? CAPACITY_PLAN
+    : PINS.plan;
+// An explicitly reviewed diagnostic invocation gets its own one-shot journal.
+// The previous capacity record remains untouched in the same app's storage.
+const JOURNAL = diagnostics
+  ? "cashucard-private-capacity-diagnostics-v1"
+  : capacity
+    ? "cashucard-private-capacity-v1"
+    : "cashucard-private-creation-v1";
 export default function App() {
   const [record, setRecord] = useState(undefined);
   const [busy, setBusy] = useState(false);
@@ -68,7 +85,11 @@ export default function App() {
             androidTimeoutMs: await NfcManager.getTimeout(),
             maxTransceive: await NfcManager.getMaxTransceiveLength(),
           };
-          const run = capacity ? runCapacity : runCreation;
+          const run = diagnostics
+            ? runCapacityDiagnostics
+            : capacity
+              ? runCapacity
+              : runCreation;
           return run({
             sdk,
             tx,
@@ -112,12 +133,7 @@ export default function App() {
       };
       await save(current);
     } catch {
-      current = {
-        ...current,
-        status: "stopped",
-        failure: "nfc-or-journal-stopped",
-        sessionTeardownRequested: true,
-      };
+      current = stoppedSession(current);
       try {
         await save(current);
       } catch {
@@ -134,7 +150,11 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>PRIVATE HARDWARE CONTROL</Text>
         <Text style={styles.title}>
-          {capacity ? "Pixel capacity test" : "Pixel creation test"}
+          {diagnostics
+            ? "Pixel capacity diagnostics"
+            : capacity
+              ? "Pixel capacity test"
+              : "Pixel creation test"}
         </Text>
         <Text style={styles.copy}>
           Card 09336320 only. Hold it still until the result appears.
@@ -159,6 +179,13 @@ export default function App() {
           {record?.stage || "One attempt per installation"}
           {record?.commands ? "\n" + record.commands + " commands" : ""}
           {record?.failure ? "\n" + record.failure : ""}
+          {record?.failedExchange
+            ? "\n" +
+              record.failedExchange.category +
+              " · " +
+              (record.failedExchange.elapsedMs ?? "unknown") +
+              " ms call envelope"
+            : ""}
         </Text>
         {record === null && (
           <Pressable

@@ -78,6 +78,11 @@ test("capacity mode uses a distinct application identity and keeps creation data
   const result = androidFiles(original, "capacity");
   assert.ok(result.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'));
   assert.notEqual(APP_ID, CAPACITY_APP_ID);
+  const diagnostics = androidFiles(original, "capacity-diagnostics");
+  assert.ok(
+    diagnostics.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'),
+  );
+  assert.ok(diagnostics.gradle.includes("versionCode 2"));
   assert.throws(
     () => androidFiles(original, "custom"),
     /Unknown fixed lab mode/,

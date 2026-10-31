@@ -4478,3 +4478,37 @@ Retain a bounded native failure category and failed-call elapsed envelope in
 the isolated lab before preparing another approved physical invocation. The
 image and existing limits remain unchanged; ACS installation attempts stay
 paused.
+
+## <a id="d158"></a>D158: Preserve bounded native failure evidence in the Pixel lab
+
+**Decided (2026-10-30):** improve only the private generated Android lab after
+the Pixel full-slot invocation stopped with a generic transport error. Pin the
+original and patched NFC dependency source hashes. During generated postinstall,
+replace its transceive exception catch with a finite class-based token and
+remove that catch's raw exception log. Fail the build on unknown source. Keep
+normal CCP source/dependencies and every NFC command, image and limit unchanged.
+
+Measure the failed JS-to-native await after intent persistence, retaining only
+stage, command ordinal, finite category and elapsed envelope. A short reply gets
+its own bounded category. Preserve `transport-uncertain` and existing cleanup
+admission; preserve a controller's stopped reason through outer session/save
+failure. Exclude native text, stack traces, APDU bodies and nested causes.
+
+**Why:** #218 records successful creation/setup and 85 confirmed loaded slots,
+then unknown delivery at slot 85. Its record cannot distinguish even a native
+I/O category or failed-call duration. The dependency discarded exception type
+before JavaScript could observe it. A private build-only patch and offline Java
+classifier regression address that evidence gap without modifying card behavior.
+An I/O or tag-loss category still leaves its underlying cause open.
+
+The explicit capacity-diagnostics mode upgrades the same private app to code 2
+and adds one fixed consumed plan/journal, preserving the prior capacity key and
+evidence. It executes the identical workload. Existing modes keep their own
+consumed journals. A new exact APK and named plan require approval before
+upgrade, arming or other hardware access. Collect terminal results after the
+operator reports the result; omit live host UI inspection during card commands.
+
+**Rejected:** recording raw native messages, inferring timeout from generic I/O,
+changing production dependencies or the card image, erasing/reusing a consumed
+journal, automatic retries/cleanup after uncertainty, and extending deadlines
+or increasing command limits. ACS installation attempts remain paused.

@@ -115,3 +115,41 @@ record; many-small-record and physical interrupted-write tests are separate.
 The capacity APK and its physical run need a fresh named approved plan; the
 completed creation plan is consumed. A successful run ends blank. A stopped
 signing/export run keeps the card and journal aside for reviewed recovery.
+
+## Failure diagnostics and preserved attempts
+
+The [first Pixel capacity invocation](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-capacity-load-stop.md)
+stopped during proof loading. The pinned Android dependency 3.17.2 collapses
+transceive exceptions into `transceive fail`. The generated lab's postinstall
+now applies a hash-pinned, idempotent change to its own dependency copy. Only
+the transceive catch changes: it returns one fixed token for TagLostException,
+IOException, SecurityException, IllegalStateException or other Exception, and
+omits the original exception log. IOException has several possible causes;
+the category supplies no timeout diagnosis. The dependency's NFC behavior and
+the normal CCP source/dependencies are unchanged.
+
+The controller measures the JS-to-native await after durable command intent.
+On rejection or short reply it retains `failedExchange` with command number,
+stage, finite category and elapsed milliseconds, or null for an invalid clock
+measurement. Bridge/queue time is included. Raw native messages, stacks,
+authentication frames and nested causes are excluded. An unknown error maps to
+`unclassified`. The main failure remains `transport-uncertain`, and every such
+stop preserves the card without retry, retirement or automatic cleanup.
+Session-finalization errors preserve an earlier stopped reason and evidence.
+
+The generated version is 0.0.2-lab (code 2). Explicit
+`--mode capacity-diagnostics` keeps application ID `org.cashucard.capacitylab`
+for an approved upgrade, and uses plan `pixel-capacity-diagnostics-v1` with key
+`cashucard-private-capacity-diagnostics-v1`. The prior
+`cashucard-private-capacity-v1` record stays in the same app storage. Existing
+creation/capacity modes retain their consumed keys. The diagnostic mode admits
+the same image, fixture and command path, with unchanged bounds. Unknown modes
+are refused. It has a single start action, and its own journal prevents a
+second diagnostic invocation. Installation, upgrade and arming require their
+own exact approved plan; preparing this software authorizes no device access.
+
+Preserve the pre-upgrade database archive and journal as evidence. A named run
+plan should collect terminal results after the operator reports completion or
+stop, avoiding host UI automation during card commands. That removes an
+unmeasured observation variable without assigning it as the earlier cause.
+Local native-classifier regressions need JDK 17; CI installs it explicitly.
