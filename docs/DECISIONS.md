@@ -4426,3 +4426,10 @@ the test pass, enabling the production bench flow, automatic retries/cleanup
 after uncertainty, and replacing the installed CCP app or its saved work. See
 [Pixel creation control](../tools/outbox-spike/PIXEL-CONTROL.md) for preparation
 and the exact hardware boundary.
+
+**Physical follow-up (2026-10-30):** the approved Pixel 8 Pro control completed
+both private creations, diagnostics/public-key validation and exact return to
+blank on 09336320. The saved journal recorded 143 commands and a 20,783-ms
+connected session. See the [hardware report](reports/HARDWARE_TEST_REPORT_2026-10-30.pixel-compact-creation.md).
+This is creation evidence for that invocation; capacity and interrupted-write
+gates remain open, and the ACS failure cause remains unassigned.
