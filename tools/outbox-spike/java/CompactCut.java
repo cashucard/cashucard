@@ -1,10 +1,17 @@
 package me.flashapp.cashu;
+import javacard.security.MessageDigest;
 /** Host-only named-boundary interruption. This class is never part of a CAP. */
 public final class CompactCut {
     public static String target;
     public static boolean fired;
-    public static int pageHops, writes, cutWrite;
+    public static int pageHops, writes, cutWrite, digestCalls, digestBytes, digestSmallCalls;
     public static byte[] pool;
+    public static void digestUpdate(MessageDigest md,byte[] b,short at,short len) {
+        digestCalls++;
+        digestBytes+=len;
+        if(len<32)digestSmallCalls++;
+        md.update(b,at,len);
+    }
     public static short next(byte value) {
         pageHops++;
         return (short)(value & 255);

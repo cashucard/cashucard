@@ -144,7 +144,18 @@ public final class CompactState {
     public static byte get(byte[] p,short index,short offset) {
         return p[address(p,index,offset)];
     }
-    private static short forward(byte[] p,short index,short physical,short distance) {
+    private static void position(byte[] p,short index,short physical) {
+        h(index);
+        data(physical>=DATA && physical<(short)(DATA+PAGES*128));
+        short relative=(short)(physical-DATA),page=(short)(relative/128);
+        data(u(p[(short)(OWNER+page)])==(short)(index+1));
+    }
+    public static short cursor(byte[] p,short index,short offset) {
+        return address(p,index,offset);
+    }
+    public static short forward(byte[] p,short index,short physical,short distance) {
+        position(p,index,physical);
+        data(distance>=0 && distance<(short)(PAGES*128));
         while(distance>0) {
             short relative=(short)(physical-DATA),available=(short)(128-relative%128);
             if(distance<available)return (short)(physical+distance);
@@ -155,6 +166,26 @@ public final class CompactState {
             distance-=available;
         }
         return physical;
+    }
+    // A cursor is derived from address/forward within this command only. The
+    // logical offset bounds the span; ownership is checked on every page.
+    public static void readCursor(byte[] p,short index,short offset,short physical,byte[] b,short to,short len) {
+        if(len==0)return;
+        short limit=Util.getShort(p,(short)(h(index)+13));
+        data(offset>=0 && len>0 && offset<=limit && len<=(short)(limit-offset));
+        data(to>=0 && to<=b.length && len<=(short)(b.length-to));
+        position(p,index,physical);
+        short relative=(short)(physical-DATA);
+        data((short)(relative%128)==(short)(offset%128));
+        while(len>0) {
+            relative=(short)(physical-DATA);
+            short n=(short)(128-relative%128);
+            if(n>len)n=len;
+            copy(p,physical,b,to,n);
+            to+=n;
+            len-=n;
+            if(len>0)physical=forward(p,index,physical,n);
+        }
     }
     private static void transfer(byte[] p,short index,short offset,byte[] b,short from,short len,boolean writing) {
         if(len==0)return;
@@ -283,9 +314,11 @@ public final class CompactState {
         }
         // Fetch each prior point once into the existing scratch buffer, then
         // compare every incoming point. Every check still precedes frame writes.
+        short previous=address(p,index,(short)(start+5));
         for(short j=0;j<done;j++) {
-            read(p,index,(short)(start+38*j+5),work,(short)0,(short)33);
+            readCursor(p,index,(short)(start+38*j+5),previous,work,(short)0,(short)33);
             for(short i=0;i<more;i++)data(!equal(work,(short)0,b,(short)(at+38*i+5),(short)33));
+            if((short)(j+1)<done)previous=forward(p,index,previous,(short)38);
         }
         write(p,index,(short)(start+done*38),b,at,len);
         return (short)(done+more);
@@ -308,11 +341,13 @@ public final class CompactState {
         zero(work,(short)0,(short)4);
         // 128-slot duplicate detection in 16 bytes of existing transient scratch.
         zero(work,(short)16,(short)16);
-        short count=u(get(p,index,(short)0));
+        short count=u(get(p,index,(short)0)),inputRef=address(p,index,(short)1);
         for(short i=0;i<count;i++) {
-            short ref=(short)(1+5*i),slot=u(get(p,index,ref));
+            short ref=(short)(1+5*i);
+            readCursor(p,index,ref,inputRef,work,(short)32,(short)5);
+            short slot=u(work[32]);
             data(slot<128);
-            for(short k=0;k<4;k++)require(get(p,index,(short)(ref+1+k))==p[(short)(GENS+slot*4+k)]);
+            require(equal(work,(short)33,p,(short)(GENS+slot*4),(short)4));
             byte status=proofs[(short)(slot*82)];
             require(state==CLEARING?(status==0 || status==2):(status==1 || (state==COMMITTED && status==2)));
             short seen=(short)(16+slot/8);
@@ -322,23 +357,40 @@ public final class CompactState {
             short reg=registry(p,u(p[(short)(MAP+slot)]));
             data(equal(proofs,(short)(slot*82+1),p,(short)(reg+1),(short)8) && empty(proofs,(short)(slot*82+78),(short)4));
             add(proofs,(short)(slot*82+9),work,(short)0);
+            if((short)(i+1)<count)inputRef=forward(p,index,inputRef,(short)5);
         }
     }
     public static void outputs(byte[] p,short index,short done,byte[] work) {
         short start=outputStart(p,index),count=u(get(p,index,(short)(start-1)));
         require(done==count);
         zero(work,(short)4,(short)4);
+        short outputRef=address(p,index,start);
         for(short i=0;i<count;i++) {
             short off=(short)(start+38*i);
-            registry(p,u(get(p,index,(short)(off+4))));
-            read(p,index,off,work,(short)8,(short)4);
+            registry(p,u(p[forward(p,index,outputRef,(short)4)]));
+            readCursor(p,index,off,outputRef,work,(short)8,(short)4);
             data(!empty(work,(short)8,(short)4));
             add(work,(short)8,work,(short)4);
+            if((short)(i+1)<count)outputRef=forward(p,index,outputRef,(short)38);
         }
         data(lessEqual(work,(short)4,work,(short)0));
     }
     private static short emit(MessageDigest md,byte[] source,short at,short len,byte[] out,short wanted,short limit,short pos) {
-        if(md!=null)md.update(source,at,len);
+        if(md!=null) {
+            // Hashing owns the existing scratch for this call. Buffer canonical
+            // bytes in 128-byte blocks instead of making a native call for
+            // each small field. Export keeps its separate clipped-copy path.
+            while(len>0) {
+                short used=(short)(pos%128),n=(short)(128-used);
+                if(n>len)n=len;
+                Util.arrayCopyNonAtomic(source,at,out,used,n);
+                pos+=n;
+                at+=n;
+                len-=n;
+                if((short)(pos%128)==0)md.update(out,(short)0,(short)128);
+            }
+            return pos;
+        }
         else {
             short lo=pos>wanted?pos:wanted,hi=(short)(pos+len),end=(short)(wanted+limit);
             if(hi>end)hi=end;
@@ -353,12 +405,22 @@ public final class CompactState {
             if(hi>lo)read(p,index,(short)(at+lo-pos),out,(short)(lo-wanted),(short)(hi-lo));
             return next;
         }
+        return fieldCursor(p,index,at,address(p,index,at),len,md,out,wanted,limit,pos);
+    }
+    private static short fieldCursor(byte[] p,short index,short at,short physical,short len,MessageDigest md,byte[] out,short wanted,short limit,short pos) {
+        if(md==null) {
+            short next=(short)(pos+len),lo=pos>wanted?pos:wanted,hi=next,end=(short)(wanted+limit);
+            if(hi>end)hi=end;
+            if(hi>lo)readCursor(p,index,(short)(at+lo-pos),forward(p,index,physical,(short)(lo-pos)),out,(short)(lo-wanted),(short)(hi-lo));
+            return next;
+        }
+        position(p,index,physical);
         while(len>0) {
-            short n=(short)(128-at%128);
+            short relative=(short)(physical-DATA),n=(short)(128-relative%128);
             if(n>len)n=len;
-            pos=emit(md,p,address(p,index,at),n,out,wanted,limit,pos);
-            at+=n;
+            pos=emit(md,p,physical,n,out,wanted,limit,pos);
             len-=n;
+            if(len>0)physical=forward(p,index,physical,n);
         }
         return pos;
     }
@@ -379,7 +441,7 @@ public final class CompactState {
         short count=u(get(p,index,(short)0)),inputRef=address(p,index,(short)1);
         for(short i=0;i<count;i++) {
             short ref=(short)(1+5*i),slot=u(p[inputRef]),base=(short)(slot*82),reg=registry(p,u(p[(short)(MAP+slot)]));
-            pos=field(p,index,ref,(short)5,md,out,wanted,limit,pos);
+            pos=fieldCursor(p,index,ref,inputRef,(short)5,md,out,wanted,limit,pos);
             pos=emit(md,proofs,(short)(base+9),(short)4,out,wanted,limit,pos);
             pos=emit(md,p,reg,(short)(1+u(p[reg])),out,wanted,limit,pos);
             pos=emit(md,proofs,(short)(base+13),(short)65,out,wanted,limit,pos);
@@ -387,24 +449,26 @@ public final class CompactState {
         }
         short start=outputStart(p,index),outputs=u(get(p,index,(short)(start-1)));
         pos=field(p,index,(short)(start-1),(short)1,md,out,wanted,limit,pos);
-        short outputRef=address(p,index,(short)(start+4));
+        short outputRef=address(p,index,start);
         for(short i=0;i<outputs;i++) {
-            short off=(short)(start+38*i),reg=registry(p,u(p[outputRef]));
-            pos=field(p,index,off,(short)4,md,out,wanted,limit,pos);
+            short off=(short)(start+38*i),reg=registry(p,u(p[forward(p,index,outputRef,(short)4)]));
+            pos=fieldCursor(p,index,off,outputRef,(short)4,md,out,wanted,limit,pos);
             pos=emit(md,p,reg,(short)(1+u(p[reg])),out,wanted,limit,pos);
-            pos=field(p,index,(short)(off+5),(short)33,md,out,wanted,limit,pos);
+            pos=fieldCursor(p,index,(short)(off+5),forward(p,index,outputRef,(short)5),(short)33,md,out,wanted,limit,pos);
             if((short)(i+1)<outputs)outputRef=forward(p,index,outputRef,(short)38);
         }
         pos=field(p,index,signatureStart(p,index),(short)(descriptor?128:64),md,out,wanted,limit,pos);
         return pos;
     }
     public static void hash(byte[] p,byte[] proofs,short index,MessageDigest md,byte[] work,boolean tagged) {
+        data(work.length>=128 && work!=p && work!=proofs);
         md.reset();
         if(tagged) {
             md.update(p,TAG,(short)32);
             md.update(p,TAG,(short)32);
         }
-        render(p,proofs,index,md,work,(short)0,(short)0,false);
+        short length=render(p,proofs,index,md,work,(short)0,(short)0,false),remaining=(short)(length%128);
+        if(remaining>0)md.update(work,(short)0,remaining);
         md.doFinal(work,(short)0,(short)0,work,(short)0);
     }
     public static void rememberHash(byte[] p,short index,byte[] work) {
