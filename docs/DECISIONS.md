@@ -4667,3 +4667,14 @@ keys and key arguments to other bridge profiles stop before device access.
 The named hardware plan can include one conditional recovery connection with
 the existing complete-export, independent-verification and cleanup gates;
 SIGN and authentication are never retried.
+
+
+**Physical follow-up (2026-10-31):** the streamed Pixel run confirmed all 128
+inputs/outputs and received `9000` from SIGN at command 292, then hit the
+elapsed gate before saving scope. Its already approved reader recovery found
+the exact committed record, exported all 91 pages / 23,163 canonical bytes and
+verified both signatures in Node plus independent Python. Scoped retirement
+and private-only cleanup verified the original blank card and closed the reader
+after 117 commands. The plan is consumed. This establishes full-fixture physical
+signing/export/retirement capacity; the single-pass phone time budget remains
+open. See the [hardware report](reports/HARDWARE_TEST_REPORT_2026-10-31.j3r180-full-capacity-recovery.md).
