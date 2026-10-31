@@ -35,9 +35,35 @@ const hex = (bytes) =>
   Array.from(bytes, (v) => v.toString(16).padStart(2, "0")).join("");
 const fromHex = (value) => value.match(/../g).map((v) => parseInt(v, 16));
 const PRIVATE = [PINS.package + "01", PINS.package + "4D", PINS.package];
+const CAPACITY_DIAGNOSTIC_PLAN = "pixel-capacity-diagnostics-v1";
+// Exact fixed bridge tokens only. Do not serialize native messages, stacks or causes.
+const NATIVE_FAILURES = new Map([
+  ["cashucard-lab:tag-lost", "android-tag-lost"],
+  ["cashucard-lab:io", "android-io"],
+  ["cashucard-lab:security", "android-security"],
+  ["cashucard-lab:state", "android-illegal-state"],
+  ["cashucard-lab:other", "android-other"],
+  ["no tech request available", "android-no-tech-request"],
+  ["transceive fail", "android-transceive-failed"],
+  ["Card session cancelled", "session-cancelled"],
+  ["UserCancel", "session-cancelled"],
+]);
+
+function stoppedSession(current) {
+  return {
+    ...current,
+    status: "stopped",
+    failure:
+      current.status === "stopped" && typeof current.failure === "string"
+        ? current.failure
+        : "nfc-or-journal-stopped",
+    sessionTeardownRequested: true,
+  };
+}
 
 function resumeJournal(value, plan = PINS.plan) {
-  if (![PINS.plan, CAPACITY_PLAN].includes(plan)) stop("unknown-plan");
+  if (![PINS.plan, CAPACITY_PLAN, CAPACITY_DIAGNOSTIC_PLAN].includes(plan))
+    stop("unknown-plan");
   if (value === null) return null;
   try {
     const record = JSON.parse(value);
@@ -146,9 +172,10 @@ async function runControl(
     verifySignature,
   },
   capacityMode,
+  plan = capacityMode ? CAPACITY_PLAN : PINS.plan,
 ) {
   const state = {
-    plan: capacityMode ? CAPACITY_PLAN : PINS.plan,
+    plan,
     chip: PINS.chip,
     cap: PINS.cap,
     load: PINS.load,
@@ -191,8 +218,31 @@ async function runControl(
     state.reply = null;
     await persist();
     check();
-    const reply = await nativeTx(apdu);
-    if (reply.length < 2) stop("transport-uncertain");
+    // Measure only this JS-to-native await, after the durable intent. The bridge
+    // and native queue are included; this is not isolated card execution time.
+    const started = now();
+    const failedExchange = (category) => {
+      const elapsed = now() - started;
+      state.failedExchange = {
+        command: state.commands,
+        stage: state.stage,
+        category,
+        elapsedMs: Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null,
+      };
+      stop("transport-uncertain");
+    };
+    let reply;
+    try {
+      reply = await nativeTx(apdu);
+    } catch (error) {
+      failedExchange(
+        error instanceof Error
+          ? NATIVE_FAILURES.get(error.message) || "unclassified"
+          : "unclassified",
+      );
+    }
+    if (!Array.isArray(reply) || reply.length < 2)
+      failedExchange("short-reply");
     state.reply = hex(reply.slice(-2));
     await persist();
     check();
@@ -424,6 +474,8 @@ async function runControl(
 }
 const runCreation = (options) => runControl(options, false);
 const runCapacity = (options) => runControl(options, true);
+const runCapacityDiagnostics = (options) =>
+  runControl(options, true, CAPACITY_DIAGNOSTIC_PLAN);
 module.exports = {
   PINS,
   BASELINE,
@@ -434,4 +486,7 @@ module.exports = {
   registryFrames,
   LabStop,
   resumeJournal,
+  stoppedSession,
+  CAPACITY_DIAGNOSTIC_PLAN,
+  runCapacityDiagnostics,
 };

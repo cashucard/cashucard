@@ -5,6 +5,7 @@ const {
   PRIVATE,
   runCreation,
   resumeJournal,
+  stoppedSession,
 } = require("./pixel-control.js");
 const { fixture, sha, hex, sdk } = require("./pixel-test-support.cjs");
 
@@ -128,4 +129,87 @@ test("an SDK call outside its admitted sequence is refused before the native tra
   const r = await runCreation(f.args);
   assert.equal(r.failure, "command-not-admitted");
   assert.equal(f.sent.length, 0);
+});
+
+test("a failed native call retains its bounded category and elapsed envelope without retry", async () => {
+  for (const [message, category] of [
+    ["cashucard-lab:tag-lost", "android-tag-lost"],
+    ["cashucard-lab:io", "android-io"],
+    ["cashucard-lab:security", "android-security"],
+    ["cashucard-lab:state", "android-illegal-state"],
+    ["cashucard-lab:other", "android-other"],
+    ["no tech request available", "android-no-tech-request"],
+    ["transceive fail", "android-transceive-failed"],
+    ["Card session cancelled", "session-cancelled"],
+    ["PRIVATE KEY OR APDU", "unclassified"],
+    ["cashucard-lab:tag-lost PRIVATE", "unclassified"],
+  ]) {
+    const f = fixture();
+    let clock = 0,
+      calls = 0;
+    f.args.now = () => clock;
+    f.args.save = async (record) => {
+      clock += 29;
+      f.records.push(record);
+    };
+    f.args.tx = async () => {
+      calls++;
+      clock += 1234;
+      throw new Error(message);
+    };
+    const result = await runCreation(f.args);
+    assert.equal(result.failure, "transport-uncertain");
+    assert.deepEqual(result.failedExchange, {
+      command: 1,
+      stage: "match-chip",
+      category,
+      elapsedMs: 1234,
+    });
+    assert.deepEqual(f.records.at(-1).failedExchange, result.failedExchange);
+    assert.equal(calls, 1);
+    assert.equal(result.reply, null);
+    assert.ok(!JSON.stringify(result).includes(message), message);
+  }
+});
+
+test("short native reply retains failure timing; an intent-save failure never reports a native call", async () => {
+  const f = fixture();
+  let clock = 0;
+  f.args.now = () => clock;
+  f.args.tx = async () => {
+    clock += 73;
+    return [0x90];
+  };
+  const r = await runCreation(f.args);
+  assert.equal(r.failedExchange.category, "short-reply");
+  assert.equal(r.failedExchange.elapsedMs, 73);
+  assert.equal(r.commands, 1);
+  const denied = fixture();
+  denied.args.save = async () => {
+    throw Error("PRIVATE STORAGE ERROR");
+  };
+  const stopped = await runCreation(denied.args);
+  assert.equal(stopped.failure, "journal-unavailable");
+  assert.equal(stopped.failedExchange, undefined);
+  assert.equal(denied.sent.length, 0);
+});
+
+test("session finalization preserves an earlier stopped result and consumed journal", () => {
+  const original = {
+    plan: PINS.plan,
+    status: "stopped",
+    stage: "capacity-proof-85",
+    failure: "transport-uncertain",
+    commands: 222,
+    failedExchange: { category: "android-io", elapsedMs: 450, command: 222 },
+  };
+  const result = stoppedSession(original);
+  assert.equal(result.failure, "transport-uncertain");
+  assert.deepEqual(result.failedExchange, original.failedExchange);
+  assert.equal(result.sessionTeardownRequested, true);
+  assert.deepEqual(resumeJournal(JSON.stringify(result)), result);
+  assert.equal(
+    stoppedSession({ status: "armed" }).failure,
+    "nfc-or-journal-stopped",
+  );
 });

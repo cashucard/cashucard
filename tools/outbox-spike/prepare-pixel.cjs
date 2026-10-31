@@ -6,12 +6,14 @@ const { createHash } = require("node:crypto");
 const { compactArtifact } = require("./run-compact.cjs");
 const { PINS } = require("./pixel-control.js");
 const { FIXTURE_SHA256 } = require("./pixel-capacity.js");
+const { ORIGINAL_SHA256, PATCHED_SHA256 } = require("./patch-pixel-nfc.cjs");
 const ROOT = path.resolve(__dirname, "../..");
 const APP_ID = "org.cashucard.compactlab";
 const CAPACITY_APP_ID = "org.cashucard.capacitylab";
 const modeId = (mode) => {
   if (mode === "creation") return APP_ID;
-  if (mode === "capacity") return CAPACITY_APP_ID;
+  if (["capacity", "capacity-diagnostics"].includes(mode))
+    return CAPACITY_APP_ID;
   throw Error("Unknown fixed lab mode");
 };
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -47,8 +49,8 @@ android {
         applicationId "${appId}"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.0.1-lab"
+        versionCode 2
+        versionName "0.0.2-lab"
     }
     signingConfigs { debug {
         storeFile file('debug.keystore')
@@ -92,12 +94,9 @@ function prepare({ artifact, output, mode = "creation" }) {
     hash(load) !== PINS.load
   )
     throw Error("Fixed image pin mismatch");
-  const fixture =
-    mode === "capacity"
-      ? fs.readFileSync(
-          path.join(__dirname, "fixtures/compact-capacity-v1.json"),
-        )
-      : undefined;
+  const fixture = ["capacity", "capacity-diagnostics"].includes(mode)
+    ? fs.readFileSync(path.join(__dirname, "fixtures/compact-capacity-v1.json"))
+    : undefined;
   if (fixture && hash(fixture) !== FIXTURE_SHA256)
     throw Error("Fixed capacity fixture pin mismatch");
   const source = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -143,6 +142,15 @@ function prepare({ artifact, output, mode = "creation" }) {
     fs.writeFileSync(p, data);
   };
   write("android/app/build.gradle", files.gradle);
+  const pkg = JSON.parse(read("package.json"));
+  if (pkg.scripts.postinstall !== "patch-package")
+    throw Error("Unrecognized lab postinstall hook");
+  pkg.scripts.postinstall += " && node patch-pixel-nfc.cjs";
+  write("package.json", JSON.stringify(pkg, null, 2) + "\n");
+  write(
+    "patch-pixel-nfc.cjs",
+    fs.readFileSync(path.join(__dirname, "patch-pixel-nfc.cjs")),
+  );
   write("android/app/src/main/AndroidManifest.xml", files.manifest);
   write(
     "android/app/src/debug/AndroidManifest.xml",
@@ -184,6 +192,11 @@ function prepare({ artifact, output, mode = "creation" }) {
       fs.readFileSync(path.join(__dirname, "pixel-capacity.js")),
     ),
     fixture: fixture ? FIXTURE_SHA256 : undefined,
+    nativePatch: hash(
+      fs.readFileSync(path.join(__dirname, "patch-pixel-nfc.cjs")),
+    ),
+    nativeOriginal: ORIGINAL_SHA256,
+    nativePatched: PATCHED_SHA256,
     ui: hash(fs.readFileSync(path.join(__dirname, "PixelControlApp.jsx"))),
     session: hash(
       fs.readFileSync(path.join(ROOT, "apps/provisioner/src/session.ts")),

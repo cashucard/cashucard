@@ -319,6 +319,12 @@ jobs:
         working-directory: tools/cardkit
         run: yarn install --frozen-lockfile && yarn build
 
+      - name: JDK for the private Android failure classifier regression
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       # Argument parsing for tools/e2e-melt.cjs (a 0.x tool), the pure half of
       # tools/cardsim/client.test.cjs (encoders, parsers, no-retry) and the
       # Cashu arithmetic in tools/cardsim/cashu-crypto.test.cjs. Needs no card,

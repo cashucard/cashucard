@@ -9,7 +9,13 @@ const {
   sdk,
   kitRequire,
 } = require("./pixel-test-support.cjs");
-const { PINS, runCapacity, resumeJournal } = require("./pixel-control.js");
+const {
+  PINS,
+  runCapacity,
+  resumeJournal,
+  runCapacityDiagnostics,
+  CAPACITY_DIAGNOSTIC_PLAN,
+} = require("./pixel-control.js");
 const {
   capacityProfile,
   verifyCapacityPacket,
@@ -302,4 +308,54 @@ test("invalid fixture or missing signature verifier stops before the first APDU"
     assert.equal(result.failure, reason);
     assert.equal(f.sent.length, 0);
   }
+});
+
+test("diagnostic invocation keeps the same full-slot commands and uses a distinct consumed plan", async () => {
+  const f = capacityFake();
+  const result = await runCapacityDiagnostics(f.args);
+  assert.equal(result.status, "complete");
+  assert.equal(result.plan, CAPACITY_DIAGNOSTIC_PLAN);
+  assert.equal(result.commands, 395);
+  assert.equal(result.blankBaselineVerified, true);
+  assert.equal(result.failedExchange, undefined);
+  assert.deepEqual(
+    resumeJournal(JSON.stringify(result), CAPACITY_DIAGNOSTIC_PLAN),
+    result,
+  );
+  assert.equal(
+    resumeJournal(JSON.stringify(result), CAPACITY_PLAN).failure,
+    "saved-journal-unreadable",
+  );
+});
+
+test("a late loading failure keeps the exact slot and native envelope, then stops before signing", async () => {
+  const f = capacityFake();
+  const send = f.args.tx,
+    save = f.args.save;
+  let stage,
+    clock = 0;
+  f.args.save = async (record) => {
+    stage = record.stage;
+    await save(record);
+  };
+  f.args.now = () => clock;
+  f.args.tx = async (command) => {
+    const reply = await send(command);
+    if (stage === "capacity-proof-85") {
+      clock += 471;
+      throw Error("cashucard-lab:io");
+    }
+    return reply;
+  };
+  const r = await runCapacityDiagnostics(f.args);
+  assert.equal(r.failure, "transport-uncertain");
+  assert.deepEqual(r.failedExchange, {
+    stage: "capacity-proof-85",
+    command: 222,
+    category: "android-io",
+    elapsedMs: 471,
+  });
+  assert.equal(r.reply, null);
+  assert.equal(f.sent.length, 222);
+  assert.ok(!f.sent.some((a) => [0x70, 0x74, 0x77, 0xe4].includes(a[1])));
 });
