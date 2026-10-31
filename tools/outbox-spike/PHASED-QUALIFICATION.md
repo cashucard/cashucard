@@ -10,9 +10,11 @@ verified the committed packet, retired it and returned card 09336320 to blank.
 
 `many-records.cjs` defines the next fixed recipe. The simulator executes it
 against the same JavaCard engine. Its phase boundaries and command counts are
-offline evidence; physical runtime, interrupted writes and live phase recovery
-still require qualification. The recipe currently has no phone or reader
-executor. Hardware access requires a new named approved plan.
+offline evidence; physical runtime and interrupted writes still require
+qualification. A local injected-transport controller now executes and reconciles
+these phases in jCardSim. Device policy, installation/admission and hardware
+launchers remain to be implemented and reviewed. Hardware access requires a new
+named approved plan.
 
 ## Record recipe
 
@@ -61,6 +63,63 @@ the exact verified installation, slot, payment ID, generation and packet ID.
 The simulator harness executes a command transcript and checks its results
 afterward; it cannot serve as this live executor.
 
+## Local phase controller
+
+`phase-recovery.cjs` provides `createJournal`, `executePhase` and
+`reconcilePhase`. The caller supplies a transceiver, storage callback, public
+installation key and runtime fingerprint. Each invocation derives its next
+command from retained receipts for the fixed recipe. It validates the saved
+binding and canonical packets before its transport budget begins. The binding
+covers the run ID, named CPLC, public key, installation context, qualified image,
+recipe, controller/codec/SDK files and externally pinned runtime.
+
+Before recipe commands, the controller selects the ISD, reads CPLC, selects the
+private applet and checks its key, format-5 diagnostics and commit floor. An
+initialized phase also checks the expected proof/record counts. The controller
+persists each command's intent before transmission and its reply before checking
+the elapsed gate. A completed export carries durable verification metadata
+before a later command can retire its scope. Native-call durations include the
+transport/bridge envelope; they remain separate from physical timing evidence.
+Each invocation permits at most 160 commands, a 30-second response deadline and
+a 120-second gate on further transmissions.
+
+An unresolved command blocks normal execution. Reconciliation uses selection
+and public read commands; the applet may complete existing burn/reclamation
+bookkeeping while handling them. For an uncertain SIGN, it reads the exact
+slot's scope and packet, verifies identity/generation and both signatures, and
+checks the expected committed state. The receipt is labelled as recovered,
+preserving the distinction from a received SIGN reply. A later execution starts
+with exports for that record, so signing occurs once.
+
+For an uncertain retirement, reconciliation requires the old scope to be absent,
+every other retained scope/packet to match, and the exact post-retirement counts.
+A present scope, an unpublished SIGN, incomplete staging, an uncertain setup or
+proof load, or inconsistent evidence stops for reviewed recovery. This controller
+automatically resumes only the supported states; its recovery path issues no
+SIGN, RETIRE, setup, load or authentication commands.
+
+`phase-journal.cjs` holds an exclusive file lease around the caller's operation.
+It requires an operator-owned private directory and file, rejects symlinks and
+hardlinks, and writes through a new file followed by file sync, rename and
+directory sync. A future device launcher must verify its actual runtime/artifact
+hashes and installation receipt, then acquire the lease before opening its
+connection. Its transceiver should open the device lazily on the first admitted
+command, after source/receipt validation; connection setup then counts inside
+the invocation budget. A lock left by an interrupted process blocks execution until
+reviewed recovery; it is retained on restart. Earlier Pixel journals use their
+existing paths and are outside this controller's storage.
+
+`phase-javacard-smoke.cjs` exercises all eight phases with this file journal and a
+persistent JavaCard simulator. Its CPLC/ISD replies are synthetic; all private
+commands execute against the real applet source. It kills a separate host
+process after successful signing and before reply delivery, confirms the stale
+lease blocks access, then clears that exact exited test worker's lease and
+recovers from disk in a new host process. It also drops a successful retirement
+reply. Both recoveries verify packet retention, and the run finishes with 46
+SIGN commands and 47 retirement commands (including the required stale
+acknowledgement refusal). This test's explicit lease cleanup is confined to its
+temporary directory.
+
 ## Timing and presentation
 
 The private Pixel controller records the native-call envelope separately from
@@ -82,12 +141,15 @@ unchanged. The existing CAP, image pins and timeout values remain unchanged.
 
 ## Offline verification
 
-With Node 22, JDK 17 and the cardsim jar built, compile the simulator adapter for
-an existing private artifact and run:
+With Node 22, JDK 17 and the cardsim jar built, copy the reviewed private
+artifact into a new scratch directory, excluding earlier `sim-src/` and
+`sim-classes/` outputs. The adapter checks its generated source hashes before
+creating fresh simulator outputs. Run:
 
 ```sh
 python3 tools/outbox-spike/compile-compact-sim.py /absolute/private-artifact
 node tools/outbox-spike/compact-javacard-smoke.cjs /absolute/private-artifact
+node tools/outbox-spike/phase-javacard-smoke.cjs /absolute/private-artifact
 node --test 'tools/**/*.test.cjs'
 ```
 

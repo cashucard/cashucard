@@ -4709,3 +4709,40 @@ scope as verified settlement evidence, re-signing an uncertain payment, retiring
 a reused slot with its old scope, or presenting simulator phase counts as
 physical timing evidence. Production firmware/assets and protocol remain
 unchanged; another hardware invocation needs a new approved named plan.
+
+## D163: Durable private phase execution and scoped reconciliation
+
+**Decision (2026-10-31):** execute D162's fixed recipe through a local
+injected-transport controller and an exclusive, atomically persisted file
+journal. Derive progress from ordered receipts; bind the chip, installation
+public key/context, qualified image, recipe, controller/codec/SDK and runtime.
+Persist intent before each command, received replies before elapsed checks and
+packet verification before scoped retirement. Keep the 30-second response,
+120-second further-transmission and 160-command bounds for each invocation.
+
+An uncertain command blocks normal execution. Reconcile a published SIGN by
+reading and verifying its exact scope/packet and committed counts. Reconcile a
+completed retirement by proving the old scope absent, every other retained packet
+unchanged and the expected reclaimed state. Label these receipts as recovered.
+Selection/public reads can complete the applet's existing recovery bookkeeping;
+the reconciliation path issues no new signing, retirement, load, setup or
+authentication command. Unsupported or inconsistent states require reviewed
+recovery. See the [controller guide](../tools/outbox-spike/PHASED-QUALIFICATION.md#local-phase-controller).
+
+**Why:** bounded phases need durable evidence across host restarts and lost
+responses. A completed write with a missing reply cannot justify repeating the
+payment. Exact packet identity/generation and retained-record checks also
+prevent an old retirement acknowledgement from clearing a reused slot. The
+local JavaCard test kills the signing host before reply delivery, verifies the
+stale lease blocks execution, and reconciles from disk in a new process after
+explicit test-only lease cleanup. It also drops a completed retirement reply.
+Native duration remains a host envelope;
+physical timing and interruption qualification are separate gates.
+
+**Rejected:** trusting a saved cursor without receipt/packet validation,
+automatically re-signing an uncertain payment, clearing a stale file lease on
+restart, accepting a scope without its verified packet, or deleting unverified
+records. This local iteration supplies the controller and simulator adapter;
+device admission, installation, closed reader policy and hardware launchers still
+need implementation/review before another approved physical run. Production
+firmware, protocol, provisioner releases and earlier journals remain unchanged.

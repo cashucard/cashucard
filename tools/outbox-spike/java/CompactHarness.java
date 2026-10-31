@@ -40,22 +40,30 @@ public final class CompactHarness {
         Gson gson=new Gson();
         BufferedReader input=new BufferedReader(new InputStreamReader(System.in));
         String line;
+        boolean session=args.length==1 && args[0].equals("--session");
+        Runtime runtime=null;
+        CardSimulator sim=null;
+        Applet applet=null;
+        java.util.List<byte[]> scopes=new java.util.ArrayList<>();
+        java.util.Map<String,byte[]> namedScopes=new java.util.HashMap<>();
         while((line=input.readLine())!=null) {
             JsonObject req=JsonParser.parseString(line).getAsJsonObject();
-            Runtime runtime=new Runtime();
-            CardSimulator sim=new CardSimulator(runtime);
-            AID aid=AIDUtil.create(AID_HEX);
-            CompactCut.target=null;
-            sim.installApplet(aid,CashuApplet.class);
-            Applet applet=runtime.applet(aid);
-            byte[] d=new byte[32];
-            d[31]=3;
-            ((ECPrivateKey)field(applet,"cardPrivKey")).setS(d,(short)0,(short)32);
-            byte[] w=hex(TEST_W);
-            ((ECPublicKey)field(applet,"cardPubKey")).setW(w,(short)0,(short)65);
+            if(!session || sim==null) {
+                runtime=new Runtime();
+                sim=new CardSimulator(runtime);
+                AID aid=AIDUtil.create(AID_HEX);
+                CompactCut.target=null;
+                sim.installApplet(aid,CashuApplet.class);
+                applet=runtime.applet(aid);
+                byte[] d=new byte[32];
+                d[31]=3;
+                ((ECPrivateKey)field(applet,"cardPrivKey")).setS(d,(short)0,(short)32);
+                byte[] w=hex(TEST_W);
+                ((ECPublicKey)field(applet,"cardPubKey")).setW(w,(short)0,(short)65);
+                scopes.clear();
+                namedScopes.clear();
+            }
             JsonArray results=new JsonArray();
-            java.util.List<byte[]> scopes=new java.util.ArrayList<>();
-            java.util.Map<String,byte[]> namedScopes=new java.util.HashMap<>();
             for(JsonElement item:req.getAsJsonArray("steps")) {
                 JsonObject step=item.isJsonPrimitive()?new JsonObject():item.getAsJsonObject();
                 if(item.isJsonPrimitive())step.addProperty("apdu",item.getAsString());
