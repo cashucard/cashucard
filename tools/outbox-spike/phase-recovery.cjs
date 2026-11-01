@@ -4,6 +4,7 @@ const { createHash } = require("node:crypto");
 const assert = require("node:assert/strict");
 const { qualification, verifyRecord } = require("./many-records.cjs");
 const { diagnostics, fingerprint } = require("./run-compact.cjs");
+const { ProbeFailure } = require("./run-probe.cjs");
 const sdk = require("../cardkit");
 const pins = require("./pixel-streamed.json");
 const fixture = require("./fixtures/compact-capacity-v1.json");
@@ -29,6 +30,20 @@ const cmd = (ins, data = Buffer.alloc(0)) =>
     Buffer.from([0]),
   ]).toString("hex");
 const busy = new WeakSet();
+const TRANSPORT_FAILURES = new Set([
+  "reader-response-timeout",
+  "reader-pipe-closed",
+  "reader-not-ready",
+  "reader-protocol-error",
+  "reader-unavailable",
+  "reader-connect-failed",
+  "reader-transmit-failed",
+  "reader-close-failed",
+  "bridge-command-refused",
+  "bridge-input-invalid",
+  "drill-bound-exceeded",
+  "probe-bridge-stopped",
+]);
 // Only exact already-verified public bytes are cached. Restarting loses this
 // bounded optimization and re-verifies the journal from its retained packets.
 const verifiedPackets = new Map();
@@ -204,8 +219,10 @@ function apply(m, b, p, rows, at) {
     if (a[1] === 0x72) {
       const next = p.captures.find((v) => v.scopeAt === at + 2);
       assert.ok(next);
+      assert.ok(actual.data.equals(Buffer.from([next.record.index])));
       m.active = next.record.index + 1;
     }
+    if (a[1] === 0x73) assert.ok(actual.data.equals(Buffer.from([1])));
     if (a[1] === 0x74) {
       for (const proof of c.record.vector.proofs) {
         assert.equal(m.slots[proof.slot], 1);
@@ -295,6 +312,140 @@ function pageReads(r) {
     ),
   );
 }
+function scopePrefix(r) {
+  const out = Buffer.alloc(13);
+  out[0] = r.index;
+  out.writeBigUInt64BE(r.id, 1);
+  out.writeUInt32BE(r.generation, 9);
+  return hex(out);
+}
+/** Compile the exact next invocation without opening a device or writing files. */
+function preparePhase({ journal, binding: options, recover = false }) {
+  const j = clone(journal),
+    b = binding(options);
+  const { m, phase, step } = replay(j, b);
+  const commands = [];
+  const add = (frame, check) => commands.push({ frame, check });
+  const exact = (frame, data, sw = 0x9000) => add(frame, { sw, data });
+  const scope = (r, known) => {
+    if (known) exact(scopeRead(r.index), known.scope);
+    else
+      add(scopeRead(r.index), {
+        sw: 0x9000,
+        length: 45,
+        prefix: scopePrefix(r),
+      });
+  };
+  const pages = (r, known) => {
+    for (const [i, a] of pageReads(r).entries()) {
+      if (known)
+        exact(a, known.packet.slice(i * 510, i * 510 + bytes(a)[8] * 2));
+      else add(a, { sw: 0x9000, length: bytes(a)[8] });
+    }
+  };
+  if (phase < q.phases.length) {
+    if (!recover && (j.intent || j.recoveryTarget))
+      throw Error("recovery-required");
+    if (!recover && m.active) throw Error("staging-requires-review");
+    const target = j.recoveryTarget || j.intent;
+    if (recover && !target) throw Error("no-uncertain-command");
+    if (
+      recover &&
+      target.kind === "step" &&
+      (![0x74, 0x77].includes(bytes(target.frame)[1]) ||
+        q.phases[phase].checks[step].sw !== 0x9000)
+    )
+      throw Error("mutation-requires-review");
+    add(hex(sdk.selectAid(sdk.ISD_AID)), { sw: 0x9000, maxLength: 255 });
+    add("80ca9f7f00", { sw: 0x9000, kind: "cplc", id: b.chip });
+    exact(SELECT, hex(Buffer.from("CPROT\x02")));
+    exact(cmd(0x7a), b.key);
+    add(cmd(0x7d), { sw: 0x9000, kind: "diagnostics", ready: m.setup ? 2 : 0 });
+    if (recover) {
+      if (target.kind === "read") {
+        if (m.setup) exact(cmd(0x76), hex(status(m)));
+      } else if (bytes(target.frame)[1] === 0x74) {
+        const r = captureAt(q.phases[phase], step).record;
+        assert.ok(!m.records.has(r.index) && m.slots[r.index] === 1);
+        scope(r);
+        pages(r);
+        const after = status(m);
+        after[0]--;
+        after[1] -= 2;
+        after[2]--;
+        after[3]++;
+        exact(cmd(0x76), hex(after));
+      } else {
+        const targetRecord = m.records.get(bytes(target.frame)[5]);
+        assert.ok(targetRecord && m.verified.has(targetRecord.token));
+        exact(scopeRead(targetRecord.index), "", 0x6985);
+        for (const r of m.records.values()) {
+          if (r.token === targetRecord.token) continue;
+          const known = m.verified.get(r.token);
+          assert.ok(known);
+          scope(r, known);
+          pages(r, known);
+        }
+        const after = status(m);
+        after[0]++;
+        after[1] += 2;
+        after[3]--;
+        after[4]++;
+        exact(cmd(0x76), hex(after));
+      }
+    } else {
+      if (m.setup) exact(cmd(0x76), hex(status(m)));
+      const p = q.phases[phase];
+      for (let at = step; at < p.steps.length; at++) {
+        const a = frame(p.steps[at], m),
+          instruction = bytes(a)[1],
+          expected = p.checks[at];
+        const c = captureAt(p, at);
+        const page = p.captures.find(
+          (v) => at >= v.pageAt && at < v.pageAt + v.pages,
+        );
+        const begin = p.captures.find((v) => v.scopeAt === at + 2);
+        if (expected.sw !== 0x9000) exact(a, "", expected.sw);
+        else if (instruction === 0x7a) exact(a, b.key);
+        else if (expected.data) exact(a, hex(expected.data));
+        else if (c) {
+          const known = m.verified.get(c.record.token);
+          if (known) exact(a, known.scope);
+          else
+            add(a, { sw: 0x9000, length: 45, prefix: scopePrefix(c.record) });
+        } else if (page) {
+          const known = m.verified.get(page.record.token),
+            dataSize = bytes(a)[8];
+          if (known) {
+            const offset = bytes(a).readUInt16BE(6) * 2;
+            exact(a, known.packet.slice(offset, offset + dataSize * 2));
+          } else add(a, { sw: 0x9000, length: dataSize });
+        } else if (begin) exact(a, hex([begin.record.index]));
+        else if (instruction === 0x73) exact(a, "01");
+        else throw Error("unclassified-recipe-command");
+      }
+    }
+  }
+  assert.ok(commands.length <= 160);
+  const retirements = [];
+  for (const { frame: a } of commands) {
+    if (!a.startsWith("b077")) continue;
+    const scope = a.slice(10, 100);
+    if (retirements.some((r) => r.scope === scope)) continue;
+    const saved = [...m.verified.values()].find((r) => r.scope === scope);
+    assert.ok(saved, "retirement requires retained verified packet");
+    retirements.push({ scope, packet: saved.packet });
+  }
+  return {
+    format: "compact-phase-wire-v1",
+    mode: recover ? "reconcile" : "execute",
+    binding: b,
+    phase,
+    step,
+    commands,
+    retirements,
+  };
+}
 async function invoke(options, recover) {
   const { tx, save, now = () => performance.now() } = options;
   if (busy.has(tx)) throw Error("controller-busy");
@@ -334,11 +485,30 @@ async function invoke(options, recover) {
       result = await Promise.race([
         tx([...bytes(a)]),
         new Promise((_, reject) => {
-          timer = setTimeout(() => reject(Error()), 30000);
+          timer = setTimeout(
+            () => reject(new ProbeFailure("reader-response-timeout")),
+            30000,
+          );
         }),
       ]);
-    } catch {
+    } catch (error) {
       j.intent.failedNativeMs = nativeDuration();
+      j.intent.transportCategory =
+        error instanceof ProbeFailure && TRANSPORT_FAILURES.has(error.code)
+          ? error.code
+          : "unclassified";
+      if (
+        error instanceof ProbeFailure &&
+        typeof error.pcscCode === "string" &&
+        /^[0-9a-f]{8}$/.test(error.pcscCode)
+      )
+        j.intent.pcscCode = error.pcscCode;
+      if (
+        error instanceof ProbeFailure &&
+        Number.isInteger(error.bridgePid) &&
+        error.bridgePid > 0
+      )
+        j.intent.bridgePid = error.bridgePid;
       stop("transport-uncertain");
     } finally {
       clearTimeout(timer);
@@ -387,7 +557,7 @@ async function invoke(options, recover) {
     const chunks = [];
     for (const a of pageReads(r)) chunks.push(await okRead(a));
     const body = Buffer.concat(chunks);
-    verifyRecord(r, Buffer.from(j.binding.key, "hex"), scope, body);
+    verifySaved(r, j.binding, scope, body, state.m);
     return body;
   };
   try {
@@ -504,4 +674,4 @@ async function invoke(options, recover) {
 }
 const executePhase = (options) => invoke(options, false);
 const reconcilePhase = (options) => invoke(options, true);
-module.exports = { createJournal, executePhase, reconcilePhase };
+module.exports = { createJournal, executePhase, reconcilePhase, preparePhase };

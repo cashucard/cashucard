@@ -11,10 +11,10 @@ verified the committed packet, retired it and returned card 09336320 to blank.
 `many-records.cjs` defines the next fixed recipe. The simulator executes it
 against the same JavaCard engine. Its phase boundaries and command counts are
 offline evidence; physical runtime and interrupted writes still require
-qualification. A local injected-transport controller now executes and reconciles
-these phases in jCardSim. Device policy, installation/admission and hardware
-launchers remain to be implemented and reviewed. Hardware access requires a new
-named approved plan.
+qualification. The controller, closed USB policy and campaign admission now have
+local simulator coverage. An installation-only Pixel build and receipt generator
+remain to be implemented before preparing a physical campaign. Hardware access
+requires a new named approved plan.
 
 ## Record recipe
 
@@ -108,6 +108,65 @@ command, after source/receipt validation; connection setup then counts inside
 the invocation budget. A lock left by an interrupted process blocks execution until
 reviewed recovery; it is retained on restart. Earlier Pixel journals use their
 existing paths and are outside this controller's storage.
+
+## Closed USB admission
+
+`preparePhase` compiles the next invocation into an exact ordered wire program.
+It includes the CPLC/key/diagnostic/state checks, expected replies, and retained
+canonical packets for every retirement scope. Unexpected BEGIN or APPEND replies
+stop the controller before signing. Program generation uses local files and
+performs no device access.
+
+`phase_wire.py` independently restricts commands to this fixed synthetic recipe,
+phase and namespace. It verifies the canonical metadata, packet identity and both
+BIP-340 signatures for each retirement packet using the Python reference
+verifier. `phase_bridge.py` validates the private request file and its hash before
+importing PC/SC or enumerating readers. It uses the named ACS ACR122U exclusively,
+checks every command and reply in order and stops after a mismatch. Recovery
+programs contain selection and public reads only; GlobalPlatform management,
+installation, deletion and manager-key changes are outside this bridge.
+
+`phase-device.cjs` checks the campaign hash and explicit approval, clean local
+source commit, qualified image, runtime, installation evidence and saved phase
+journal. It acquires the journal lease, writes and syncs a new immutable wire
+request, and rechecks static admission immediately before the lazy connection.
+The runtime fingerprint includes the Node/Python executables, OS/architecture,
+virtual-environment metadata, pyscard package and bridge/verifier sources.
+Python runs with isolated imports, site startup disabled and bytecode writes
+disabled, using a fresh private cache prefix and the pinned package directory.
+
+The campaign format is `compact-phase-campaign-v1`. Its fields are `approved`,
+`reader`, `chip`, `python`, `sourceCommit`, `binding`, `journal`, `artifact` and
+`installation`. The binding uses `runId`, `key` (the compressed public installation
+key) and `runtimeSha256`. The installation reference uses `path` and `sha256`.
+The journal must already exist under its new run binding.
+
+An installation receipt has format `compact-phase-install-v1`, the installer
+source commit, and absolute path/hash pairs for the APK and captured phone
+journal. The phone evidence must have plan `pixel-phase-install-v1`, status
+`installed-for-phases`, the matching CPLC/public key, `factoryVersionVerified: 1`,
+`initialBaselineVerified: true`, `installedRegistryVerified: true`, and uninitialized format-5
+diagnostics with the commit floor. Its build records mode `phase-install`, the
+reviewed installer source, and the pinned manifest/CAP/load hashes. Existing
+capacity or cleanup journals fail this contract. The dedicated installer that
+produces this evidence is the next local implementation step.
+
+Preview is the default and reads local files:
+
+```sh
+node tools/outbox-spike/phase-device.cjs \
+  --campaign /absolute/private/campaign.json --sha256 CAMPAIGN_SHA256
+```
+
+`--mode reconcile` previews supported recovery. Actual execution additionally
+requires `--execute`, a campaign with explicit named approval, and the complete
+installation evidence. This software iteration grants no hardware approval.
+
+Startup or close uncertainty retains the lease and records the host PID plus
+the bridge PID when available. Clearing it requires reviewed recovery and
+confirmation of the processes/connection state. A PID alone is insufficient
+authority to remove a lease. Request files remain local evidence. Admission
+errors print a fixed message, keeping private configuration values out of logs.
 
 `phase-javacard-smoke.cjs` exercises all eight phases with this file journal and a
 persistent JavaCard simulator. Its CPLC/ISD replies are synthetic; all private

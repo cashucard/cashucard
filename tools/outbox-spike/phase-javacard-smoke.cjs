@@ -5,13 +5,14 @@ const fs = require("node:fs"),
   path = require("node:path"),
   os = require("node:os");
 const { createHash } = require("node:crypto");
-const { spawn, fork } = require("node:child_process");
+const { spawn, fork, execFileSync } = require("node:child_process");
 const { createInterface } = require("node:readline");
 const { once } = require("node:events");
 const {
   createJournal,
   executePhase,
   reconcilePhase,
+  preparePhase,
 } = require("./phase-recovery.cjs");
 const { withPhaseJournal } = require("./phase-journal.cjs");
 const { kitRequire } = require("./pixel-test-support.cjs");
@@ -59,13 +60,20 @@ function simulator() {
   child.on("error", failed);
   child.on("close", () => failed(Error("simulator stopped: " + errors)));
   const identity = new FakeCard(),
-    sent = [];
+    sent = [],
+    trace = [];
   const tx = async (a) => {
     sent.push([...a]);
     // Only the identity-domain replies are synthetic; every private applet
     // command, mutation and recovery read executes in the persistent JVM.
-    if (a[1] === 0xca || (a[1] === 0xa4 && a[5] === 0xa0))
-      return identity.transceive(a);
+    if (a[1] === 0xca || (a[1] === 0xa4 && a[5] === 0xa0)) {
+      const response = await identity.transceive(a);
+      trace.push({
+        frame: Buffer.from(a).toString("hex"),
+        reply: Buffer.from(response).toString("hex"),
+      });
+      return response;
+    }
     if (pending) throw Error("concurrent simulator command");
     const promise = new Promise((resolve, reject) => {
       pending = { resolve, reject };
@@ -74,6 +82,7 @@ function simulator() {
       a[1] === 0xa4 ? { reset: true } : Buffer.from(a).toString("hex");
     child.stdin.write(JSON.stringify({ steps: [step] }) + "\n");
     const raw = await promise;
+    trace.push({ frame: Buffer.from(a).toString("hex"), reply: raw });
     if (lose === a[1]) {
       lose = null;
       throw Error("simulated missing native reply");
@@ -83,6 +92,7 @@ function simulator() {
   return {
     tx,
     sent,
+    trace,
     lose: (ins) => {
       lose = ins;
     },
@@ -119,19 +129,73 @@ test("disk-backed phases recover a killed signing host and a lost retirement rep
     runtimeSha256,
   };
   let initial = createJournal(binding);
+  let policyChecks = 0;
+  let corruptRetirementRejected = false;
+  const checkWire = (program, start, complete) => {
+    if (program.retirements.length && !corruptRetirementRejected) {
+      const bad = JSON.parse(JSON.stringify(program));
+      const packet = Buffer.from(bad.retirements[0].packet, "hex");
+      packet[packet.length - 1] ^= 1;
+      bad.retirements[0].packet = packet.toString("hex");
+      assert.throws(() =>
+        execFileSync(
+          "python3",
+          ["-I", "-S", "-B", path.join(__dirname, "phase_wire.py")],
+          {
+            input: JSON.stringify({ program: bad, trace: [], complete: false }),
+            stdio: ["pipe", "pipe", "pipe"],
+          },
+        ),
+      );
+      corruptRetirementRejected = true;
+    }
+    const result = JSON.parse(
+      execFileSync(
+        "python3",
+        ["-I", "-S", "-B", path.join(__dirname, "phase_wire.py")],
+        {
+          input: JSON.stringify({
+            program,
+            trace: sim.trace.slice(start),
+            complete,
+          }),
+          encoding: "utf8",
+          maxBuffer: 2 * 1024 * 1024,
+        },
+      ),
+    );
+    assert.equal(result.ok, true);
+    policyChecks++;
+  };
   const run = (recover = false) =>
     withPhaseJournal(file, initial, async ({ journal, save }) => {
       initial = null;
-      return (recover ? reconcilePhase : executePhase)({
+      let program;
+      try {
+        program = preparePhase({ journal, binding, recover });
+      } catch {
+        /* The controller must refuse without transmitting. */
+      }
+      const start = sim.trace.length;
+      const result = await (recover ? reconcilePhase : executePhase)({
         binding,
         journal,
         save,
         tx: sim.tx,
         now: () => 0,
       });
+      if (program) checkWire(program, start, result.outcome !== "stopped");
+      else assert.equal(sim.trace.length, start);
+      return result;
     });
   const freshHost = ({ recover = false, killAfterSign = false } = {}) =>
     new Promise((resolve, reject) => {
+      const program = preparePhase({
+        journal: JSON.parse(fs.readFileSync(file)),
+        binding,
+        recover,
+      });
+      const start = sim.trace.length;
       const child = fork(path.join(__dirname, "phase-host-worker.cjs"), [], {
         silent: true,
       });
@@ -164,7 +228,12 @@ test("disk-backed phases recover a killed signing host and a lost retirement rep
       child.on("error", reject);
       child.on("close", () => {
         clearTimeout(timer);
-        resolve({ result, killed, pid: child.pid });
+        try {
+          checkWire(program, start, !killed && result?.outcome !== "stopped");
+          resolve({ result, killed, pid: child.pid });
+        } catch (error) {
+          reject(error);
+        }
       });
       child.send({ file, binding, recover });
     });
@@ -224,6 +293,8 @@ test("disk-backed phases recover a killed signing host and a lost retirement rep
     assert.equal(sim.sent.filter((a) => a[1] === 0x77).length, 47);
     assert.equal(saved.intent, null);
     assert.equal(saved.recoveryTarget, null);
+    assert.equal(policyChecks, 12);
+    assert.equal(corruptRetirementRejected, true);
   } finally {
     await sim.close();
     fs.rmSync(directory, { recursive: true, force: true });

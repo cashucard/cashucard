@@ -390,3 +390,22 @@ test("an unpublished uncertain SIGN stays stopped after read-only inspection", a
   );
   assert.equal(f.sent.length, count);
 });
+
+test("unexpected staging replies stop before attempting SIGN", async () => {
+  for (const instruction of [0x72, 0x73]) {
+    const f = fixture(),
+      prepared = (await execute(f)).journal;
+    const tx = f.args.tx;
+    let attempted = 0;
+    f.args.tx = async (a) => {
+      if (a[1] === 0x74) {
+        attempted++;
+        throw Error("unexpected signing attempt");
+      }
+      const r = await tx(a);
+      return a[1] === instruction ? [2, 0x90, 0] : r;
+    };
+    assert.equal((await execute(f, prepared)).failure, "evidence-mismatch");
+    assert.equal(attempted, 0);
+  }
+});

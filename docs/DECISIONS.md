@@ -4746,3 +4746,42 @@ records. This local iteration supplies the controller and simulator adapter;
 device admission, installation, closed reader policy and hardware launchers still
 need implementation/review before another approved physical run. Production
 firmware, protocol, provisioner releases and earlier journals remain unchanged.
+
+## D164: Closed USB phase programs and installation admission
+
+**Decision (2026-11-01):** compile the next private phase invocation from the
+validated journal into an exact ordered wire program. Keep this bridge separate
+from GlobalPlatform installation and cleanup. Its independent Python policy
+restricts commands to the named phase's synthetic fixture, checks the CPLC/key/
+diagnostic/state fence and expected replies, and independently verifies canonical
+retirement packets and both BIP-340 signatures before reader enumeration.
+Recovery programs permit selection and public reads. Retain the per-invocation
+30-second response, 120-second transmission and 160-command bounds.
+
+Campaign admission binds explicit approval, clean local source, actual image and
+runtime files, a dedicated installation-only phone receipt and the current phase
+journal. Acquire the exclusive file lease before opening the device, preserve
+the generated wire request and recheck static admission at the lazy connection.
+Use isolated Python imports with a fresh cache prefix and the hashed pyscard
+package. Retain the lease on startup/close uncertainty, including known process
+IDs; clearing it requires reviewed recovery. Preview and error reporting keep
+private configuration contents out of logs.
+
+**Why:** the injected controller needs a transport that cannot broaden the
+approved actions or confuse a previous capacity run with a newly installed
+uninitialized test image. Exact phase programs fit the existing bounds and derive
+retirement scopes from retained verified packets. The local JavaCard run checks
+all 12 normal/recovery invocations against the independent wire policy, including
+the killed signing host, lost retirement reply and refusal of a corrupted
+retirement signature. The process transport is tested with an isolated fake PC/SC
+package; physical timing remains unqualified. See the
+[admission guide](../tools/outbox-spike/PHASED-QUALIFICATION.md#closed-usb-admission).
+
+**Rejected:** expanding the earlier generic probe bridge, accepting an old
+capacity/cleanup journal as installation evidence, trusting response lengths for
+retirement authority, checking source/runtime only before acquiring the lease,
+automatically removing an uncertain lease, and raising deadlines to admit a run.
+This iteration stays local. The dedicated Pixel installation-only build and
+receipt generator remain the next step; another physical run requires a complete
+named plan and fresh approval. Production firmware and store releases remain
+unchanged.
