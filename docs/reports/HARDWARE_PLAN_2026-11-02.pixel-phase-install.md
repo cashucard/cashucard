@@ -63,6 +63,32 @@ generation.
 Every earlier lab key stays in the same app storage. The install key is new and
 unused; a second invocation on this phone is refused by the consumed journal.
 
+## Built APK (step 2 complete)
+
+Built from the reviewed commit `803cc28ee41c048b6fddc7c220a8cab1f1d266a1`,
+which `lab-build.json` records as `source`. Preserved, with `lab-build.json` and
+the Gradle log, in the private directory
+`/Users/dread/.cashucard/pixel-install-2026-11-02/` (mode `0700`, files `0600`).
+
+| Observation       | Result                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| APK SHA-256       | `e41e5845c3ceb0aa77b4848bb113893afdb34cf281262b5d5d626ca937c14875`                                                           |
+| APK size          | 39,538,652 bytes                                                                                                             |
+| Package / version | `org.cashucard.capacitylab` / 5 / `0.0.5-lab`                                                                                |
+| Label             | Cashu Card Lab                                                                                                               |
+| Permissions       | `android.permission.NFC`, `android.permission.VIBRATE`, own non-exported receiver permission; no `INTERNET`                  |
+| `uses-feature`    | `android.hardware.nfc` required                                                                                              |
+| Bundled bundle    | names `cashucard-private-capacity-install-v1`, `pixel-phase-install-v1`, `INSTALL FOR PHASES`; contains no `INTERNET` string |
+| Signer            | one V2 signer, CN=Android Debug, SHA-256 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`                  |
+| `lab-build.json`  | mode `phase-install`, `installPins` `8a3450ee…8f29e15`, equal to the SHA-256 of the generated `pixel-install.json`           |
+| Fixture           | none bundled                                                                                                                 |
+
+Two permissions beyond the plan text are present and are not developer support:
+`VIBRATE` is the provisioner's haptic feedback, and the custom receiver
+permission is React Native's non-exported dynamic-receiver guard. Release
+variants stay off; `debuggable` is the debug build variant. Recorded here
+rather than treated as a deviation.
+
 ## Steps and gates
 
 Each step is its own gate. A failure stops the plan; it does not open the next
