@@ -49,6 +49,15 @@ function fake(options = {}) {
   const f = fixture({
     wrongChip: options.wrongChip,
     wrongKeys: options.wrongKeys,
+    // The fake card opens no secret channel, so the protected applet's answers
+    // for this run are served on the plain transport recovery reads.
+    protected: {
+      instances: { extra: [PRIVATE[2]] },
+      diagnostics: "7fff0a0e0a0014001400400030000205",
+      cardKey: options.wrongKey
+        ? "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+        : key.toString("hex"),
+    },
   });
   f.card.packages.set(PRIVATE[2], {
     aid: PRIVATE[2],
@@ -88,10 +97,12 @@ function fake(options = {}) {
         reply = [...reply];
         reply[10] = 2;
       }
+      // A card swapped before cleanup — the second chip identity read answers
+      // another chip, so the factory authentication before the deletions fails.
       if (
         options.swapCleanup &&
-        stage === "cleanup-match-chip" &&
-        apdu[1] === 0xca
+        apdu[1] === 0xca &&
+        f.sent.filter((a) => a[1] === 0xca).length === 2
       ) {
         reply = [...reply];
         reply[15] ^= 1;
@@ -144,7 +155,7 @@ function fake(options = {}) {
         reply = ok(Array(300).fill(0));
       if (
         options.unknownRegistry &&
-        stage.startsWith("before-recovery-load-files")
+        stage.startsWith("before-recovery-applications")
       )
         reply = [
           ...reply.slice(0, -2),

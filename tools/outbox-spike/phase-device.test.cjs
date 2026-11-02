@@ -51,6 +51,7 @@ function fixture() {
   const phone = {
     plan: "pixel-phase-install-v1",
     status: "installed-for-phases",
+    stage: "installed-for-phases",
     chip: pins.chip,
     cardKey: binding.key,
     factoryVersionVerified: 1,
@@ -63,7 +64,9 @@ function fixture() {
       manifest: pins.manifest,
       cap: pins.cap,
       load: pins.load,
+      blocks: pins.blocks,
     },
+    artifact: { source: pins.source, cap: pins.cap, load: pins.load },
   };
   const receipt = {
     format: "compact-phase-install-v1",

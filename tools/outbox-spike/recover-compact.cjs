@@ -219,9 +219,17 @@ async function recoverToBlank({
       if (!done) fail("recovery-registry-incomplete");
     }
     try {
+      // One card, one registry: an instance listing is read as instances, a
+      // load-file listing as load files, never both at once. The installed card
+      // lists its package twice, and a registry that held that twice is exactly
+      // what sdk.parseRegistryEntries refuses.
+      const listing = pages.filter((p) => p.kind === "applications");
       verifyRegistry(
         sdk,
-        pages.map((p) => ({ kind: p.kind, data: bytes(p.data) })),
+        (listing.length ? listing : pages).map((p) => ({
+          kind: p.kind,
+          data: bytes(p.data),
+        })),
         allowed,
       );
     } catch {

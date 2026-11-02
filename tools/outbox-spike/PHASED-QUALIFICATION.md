@@ -12,9 +12,9 @@ verified the committed packet, retired it and returned card 09336320 to blank.
 against the same JavaCard engine. Its phase boundaries and command counts are
 offline evidence; physical runtime and interrupted writes still require
 qualification. The controller, closed USB policy and campaign admission now have
-local simulator coverage. An installation-only Pixel build and receipt generator
-remain to be implemented before preparing a physical campaign. Hardware access
-requires a new named approved plan.
+local simulator coverage, including the installation-only Pixel build and the
+receipt that admits phase zero. Hardware access still requires a new named
+approved plan.
 
 ## Record recipe
 
@@ -143,13 +143,32 @@ The journal must already exist under its new run binding.
 
 An installation receipt has format `compact-phase-install-v1`, the installer
 source commit, and absolute path/hash pairs for the APK and captured phone
-journal. The phone evidence must have plan `pixel-phase-install-v1`, status
-`installed-for-phases`, the matching CPLC/public key, `factoryVersionVerified: 1`,
-`initialBaselineVerified: true`, `installedRegistryVerified: true`, and uninitialized format-5
-diagnostics with the commit floor. Its build records mode `phase-install`, the
-reviewed installer source, and the pinned manifest/CAP/load hashes. Existing
-capacity or cleanup journals fail this contract. The dedicated installer that
-produces this evidence is the next local implementation step.
+journal: `{format, sourceCommit, apk: {path, sha256}, journal: {path, sha256}}`.
+`phase-install-receipt.cjs` reads both files itself. Each must be absolute, a
+regular single-link file with no group/other permissions, owned by the invoking
+account, inside a directory that account owns with no group/other permissions;
+the APK is bounded to 200 MiB and the journal to 1 MiB, is opened
+`O_NOFOLLOW`, and is hashed after an inode/device recheck.
+
+The phone evidence must have plan `pixel-phase-install-v1`, status and stage
+`installed-for-phases`, no failure, the public key matched by the campaign
+binding, `factoryVersionVerified: 1`, `initialBaselineVerified: true`,
+`installedRegistryVerified: true`, and uninitialized format-5 diagnostics.
+`run-compact.cjs` reads those bytes at setup state 0: format 5, setup state
+zero, no saturated counter, and both commit counters at least 128. Its build
+records mode `phase-install`, the receipt's installer source, the pinned
+manifest/CAP/load hashes and block count, and its artifact names the pinned
+source and image hashes. Existing capacity or
+cleanup journals, and any record carrying `blankBaselineVerified: true`, fail
+this contract. The phone app journals no CPLC, so the card is the campaign's own
+`chip`; the app admitted only that chip before installing.
+
+The installer is `--mode phase-install` in `prepare-pixel.cjs`: private app
+version code 5 (`0.0.5-lab`), plan `pixel-phase-install-v1`, journal key
+`cashucard-private-capacity-install-v1`, the qualified image pins and
+`pixel-install.json`. See [PIXEL-CONTROL.md](PIXEL-CONTROL.md) for its command
+set. Its evidence comes from the phone journal the app writes; it must be
+exported before the card is used again, and no host step reconstructs it.
 
 Preview is the default and reads local files:
 

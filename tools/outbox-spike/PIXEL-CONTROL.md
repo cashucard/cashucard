@@ -177,3 +177,48 @@ mode on a phone. Preserve and compare both prior journals around the approved
 upgrade. Follow the diagnostic plan's operator-reported terminal result and
 conditional cleanup boundaries. The offline access improvement has yet to be
 measured on silicon; the earlier plans are consumed.
+
+## Phase install profile
+
+Explicit `--mode phase-install` prepares the card for the phased
+assisted-settlement recipe and stops there. It admits the same qualified image
+pins as the streamed profile through its own `pixel-install.json`
+(plan `pixel-phase-install-v1`), keeps application ID
+`org.cashucard.capacitylab`, and generates app version code 5
+(`0.0.5-lab`) with journal key
+`cashucard-private-capacity-install-v1`. Every earlier key stays in the same
+app storage; generation writes `pixel-install.json` into the project and
+records its hash as `installPins` in `lab-build.json`. No fixture is bundled.
+
+The run sends, in this order: the identity read against the pinned CPLC; ten
+selections that must all answer `6A82` — the payment, Tag, opener and cashu
+package AIDs, three legacy `F0…` AIDs, and the private package with both its
+instances; the factory channel; an initial registry listing that must be the
+platform baseline with no private instance; `INSTALL [for load]`; 114 LOAD
+blocks; creation of the opener (`…4D`) then the main instance (`…01`); an
+installed registry listing that must
+name exactly those two instances and nothing else; selection of the main
+instance expecting `CPROT\x02`; the format-5 diagnostics read, which must still
+be uninitialized; and one public-key read. It then records
+`installed-for-phases` and stops. Fixture SETUP, proof loading, SIGN,
+retirement, the cleanup DELETE sequence and manager-key rotation are not in this
+profile; the USB phase-zero invocation owns the fixture setup.
+
+Registry failures are reported by cause: `registry-objects` (a private record
+is not a load-file object of the pinned package), `registry-baseline` (the
+platform's three load files are not the exact baseline), `registry-duplicate`
+(two records print the same frame), `registry-private-set` (the listing does not
+name exactly the permitted instances), `registry-framing` (pages that do not
+split into whole entries) and `diagnostics-uninitialized` when the card still
+reports a setup prompt. A card that is declined, holds another key or runs
+another card-manager version stops at `wrong-chip`, `factory-keys-not-proved`
+or `factory-version-mismatch` before any LOAD; a refused private selection or
+diagnostics read is `card-status-<sw>`.
+
+The completion status is `installed-for-phases`, not `complete`: this profile
+never reaches a blank card, so `blankBaselineVerified` is never its evidence.
+Export the phone journal before the card is used again;
+`phase-install-receipt.cjs` turns it plus the APK into the receipt that admits
+the USB phase-zero campaign, under the rules in
+[PHASED-QUALIFICATION.md](PHASED-QUALIFICATION.md). Preparing this software
+authorizes no device access, installation or card command.

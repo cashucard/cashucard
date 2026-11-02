@@ -6,39 +6,24 @@ const { createHash, randomUUID } = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const assert = require("node:assert/strict");
 const { readPrivateJSON, withPhaseJournal } = require("./phase-journal.cjs");
+const { verifyInstallationReceipt } = require("./phase-install-receipt.cjs");
 const {
   preparePhase,
   executePhase,
   reconcilePhase,
 } = require("./phase-recovery.cjs");
 const { openPhaseBridge } = require("./phase-transport.cjs");
-const { compactArtifact, diagnostics } = require("./run-compact.cjs");
+const { compactArtifact } = require("./run-compact.cjs");
 const pins = require("./pixel-streamed.json");
+// The install profile loads the same qualified image and creates the same
+// package, so phase zero admits both plans by the pins they share.
+const INSTALL_PLAN = require("./pixel-install.json").plan;
 const READER = "ACS ACR122U PICC Interface";
 const ROOT = path.resolve(__dirname, "../..");
 const sha = (raw) => createHash("sha256").update(raw).digest("hex");
-const hex64 = (s) => typeof s === "string" && /^[0-9a-f]{64}$/.test(s);
 const image = Object.fromEntries(
   ["source", "manifest", "cap", "load"].map((k) => [k, pins[k]]),
 );
-function pinnedFile(file, expected) {
-  assert.ok(path.isAbsolute(file) && hex64(expected));
-  const before = fs.lstatSync(file);
-  assert.ok(
-    before.isFile() &&
-      before.uid === process.getuid() &&
-      before.nlink === 1 &&
-      before.size <= 200 * 1024 * 1024,
-  );
-  const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
-  try {
-    const after = fs.fstatSync(fd);
-    assert.ok(before.ino === after.ino && before.dev === after.dev);
-    assert.equal(sha(fs.readFileSync(fd)), expected);
-  } finally {
-    fs.closeSync(fd);
-  }
-}
 function phaseRuntime(python) {
   assert.ok(typeof python === "string" && path.isAbsolute(python));
   fs.accessSync(python, fs.constants.X_OK);
@@ -150,25 +135,21 @@ function admission(options, dependencies = {}, includeJournal = true) {
     "installation receipt changed",
   );
   const r = receipt.value;
-  assert.equal(r.format, "compact-phase-install-v1");
-  assert.match(r.sourceCommit, /^[0-9a-f]{40}$/);
-  pinnedFile(r.apk.path, r.apk.sha256);
-  const captured = readPrivateJSON(r.journal.path);
-  assert.equal(captured.sha256, r.journal.sha256);
-  const phone = captured.value;
-  assert.equal(phone.plan, "pixel-phase-install-v1");
-  assert.equal(phone.status, "installed-for-phases");
-  assert.equal(phone.chip, pins.chip);
-  assert.equal(phone.cardKey, p.binding.key);
-  assert.equal(phone.factoryVersionVerified, 1);
-  assert.equal(phone.initialBaselineVerified, true);
-  assert.equal(phone.installedRegistryVerified, true);
-  assert.equal(phone.build.mode, "phase-install");
-  assert.equal(phone.build.source, r.sourceCommit);
-  for (const k of ["manifest", "cap", "load"])
-    assert.equal(phone.build[k], pins[k]);
-  const diag = diagnostics(Buffer.from(phone.diagnostics, "hex"), 0);
-  assert.ok(Math.min(diag.maxCommit, diag.unusedCommit) >= 128);
+  // The same contract the installer's own tests hold the receipt to: pinned
+  // files, this source's installer, and an uninitialized format-5 card.
+  const evidence = verifyInstallationReceipt(r, r.sourceCommit);
+  assert.equal(evidence.plan, INSTALL_PLAN);
+  // The phone journals no CPLC; the campaign names the card and the app only
+  // admitted that one, so the campaign's chip is compared here.
+  assert.equal(evidence.cardKey, p.binding.key);
+  assert.equal(evidence.mode, "phase-install");
+  assert.equal(evidence.sourceCommit, r.sourceCommit);
+  assert.ok(
+    Math.min(
+      evidence.diagnostics.maxCommit,
+      evidence.diagnostics.unusedCommit,
+    ) >= 128,
+  );
   if (!includeJournal) return { p, runtime, campaignSha256: approved.sha256 };
   const current = readPrivateJSON(p.journal);
   assert.equal(current.value.binding.chip, pins.chip);

@@ -99,3 +99,35 @@ test("capacity mode uses a distinct application identity and keeps creation data
     /Unknown fixed lab mode/,
   );
 });
+test("install mode is its own app version with install-only pins", () => {
+  const app = path.join(root, "apps/provisioner");
+  const original = {
+    manifest: fs.readFileSync(
+      path.join(app, "android/app/src/main/AndroidManifest.xml"),
+      "utf8",
+    ),
+    application: fs.readFileSync(
+      path.join(
+        app,
+        "android/app/src/main/java/com/islandbitcoin/provisioner/MainApplication.kt",
+      ),
+      "utf8",
+    ),
+  };
+  const install = androidFiles(original, "phase-install");
+  assert.ok(install.gradle.includes('applicationId "' + CAPACITY_APP_ID + '"'));
+  assert.ok(install.gradle.includes("versionCode 5"));
+  assert.ok(install.gradle.includes('versionName "0.0.5-lab"'));
+  // No other profile shares that version code.
+  for (const mode of [
+    "creation",
+    "capacity",
+    "capacity-diagnostics",
+    "capacity-optimized",
+    "capacity-streamed",
+  ])
+    assert.ok(!androidFiles(original, mode).gradle.includes("versionCode 5"));
+  const pins = require("./pixel-install.json");
+  assert.equal(pins.plan, "pixel-phase-install-v1");
+  assert.equal(pins.blocks, 114);
+});
