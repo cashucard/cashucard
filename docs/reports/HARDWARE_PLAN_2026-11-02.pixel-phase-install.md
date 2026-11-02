@@ -89,6 +89,28 @@ permission is React Native's non-exported dynamic-receiver guard. Release
 variants stay off; `debuggable` is the debug build variant. Recorded here
 rather than treated as a deviation.
 
+## Device inventory and install (steps 3–4 complete)
+
+```text
+$ adb devices -l
+List of devices attached
+42201FDJG00048         device usb:0-1.4 product:husky model:Pixel_8_Pro device:husky transport_id:6
+```
+
+One device, the named Pixel. Android 17 (`ro.build.version.release`), build
+`CP3A.261005.005`, fingerprint
+`google/husky/husky:17/CP3A.261005.005/2026102101:user/release-keys`, security
+patch `2026-10-05`.
+
+The reviewed APK was installed over the retained graded build in
+`org.cashucard.capacitylab` (version code 4 / `0.0.4-lab` from 2026-10-31) with
+`adb install -r -d`; the app storage holding the earlier journals is unchanged.
+After install the package reads version code 5 / `0.0.5-lab`. Launched once with
+the card off the reader; the screen renders `Pixel install for phases`, "Card
+09336320 only", `Ready for the approved test`, the single `INSTALL FOR PHASES`
+action, and the CAP/source fingerprint ending `803cc28ee41c048b6fddc7c220a8cab1f1d266a1`.
+No NFC command has been sent.
+
 ## Steps and gates
 
 Each step is its own gate. A failure stops the plan; it does not open the next
