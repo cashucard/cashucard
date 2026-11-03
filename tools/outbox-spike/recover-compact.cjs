@@ -4,7 +4,11 @@ const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 const { ProbeFailure, failureEvidence } = require("./run-probe.cjs");
 const { diagnostics, deletion } = require("./run-compact.cjs");
-const { verifyRegistry, PRIVATE } = require("./pixel-control.js");
+const {
+  verifyRegistry,
+  PRIVATE,
+  INSTALL_ALLOWED,
+} = require("./pixel-control.js");
 const { fixtureView } = require("./compact-export.cjs");
 const { workload, verifyPacket, MAX, cmd } = require("./compact-workload.cjs");
 const PROFILES = Object.freeze({
@@ -45,10 +49,14 @@ async function recoverToBlank({
   independentVerify,
   random = randomBytes,
   profile = "optimized",
+  installed = false,
 }) {
   const validProfile =
     typeof profile === "string" && Object.hasOwn(PROFILES, profile);
   const PINS = validProfile ? PROFILES[profile] : PROFILES.optimized;
+  // The installed card lists only its two instance AIDs; the capacity cards
+  // list those plus the package record, so the allowance follows the card.
+  const registered = installed ? INSTALL_ALLOWED : PRIVATE;
   const w = workload(MAX);
   const state = {
     plan:
@@ -258,7 +266,7 @@ async function recoverToBlank({
     }
     await identity("match-chip");
     const initial = await auth("initial-factory-authentication");
-    await registry("before-recovery", initial, PRIVATE);
+    await registry("before-recovery", initial, registered);
     // SELECT runs the private applet's recovery: unpublished staging may be
     // released; a committed record's remaining burn bookkeeping may finish.
     await data(
@@ -348,8 +356,8 @@ async function recoverToBlank({
     }
     await identity("cleanup-match-chip");
     const cleanup = await auth("cleanup-factory-authentication");
-    await registry("before-delete", cleanup, PRIVATE);
-    for (const aid of PRIVATE) {
+    await registry("before-delete", cleanup, registered);
+    for (const aid of registered) {
       const plain = deletion(aid);
       await step("delete-" + aid, [secure(plain)], async () =>
         expect(await cleanup.send(tx, plain)),

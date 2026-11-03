@@ -44,6 +44,9 @@ const hex = (bytes) =>
   Array.from(bytes, (v) => v.toString(16).padStart(2, "0")).join("");
 const fromHex = (value) => value.match(/../g).map((v) => parseInt(v, 16));
 const PRIVATE = [PINS.package + "01", PINS.package + "4D", PINS.package];
+// The install profile's card lists its two instances and no separate package
+// record, so an allowance for that card names the instances only.
+const INSTALL_ALLOWED = INSTALL_PRIVATE;
 const CAPACITY_DIAGNOSTIC_PLAN = "pixel-capacity-diagnostics-v1";
 // Exact fixed bridge tokens only. Do not serialize native messages, stacks or causes.
 const NATIVE_FAILURES = new Map([
@@ -420,6 +423,11 @@ async function runControl(
       }
       if (!complete) stop("registry-incomplete");
     }
+    // A stop at a listing is decided by these bytes alone, so they are kept
+    // before the verifier can reject them: the journal is the only record a
+    // stopped run leaves behind.
+    state.registry = pages.map((p) => ({ kind: p.kind, data: hex(p.data) }));
+    await persist();
     return pages;
   };
   // Installation-only profile (pixel-phase-install-v1). It loads the qualified
@@ -513,10 +521,7 @@ async function runControl(
     await persist();
   };
   const registry = async (name, session, allowed) => {
-    const pages = await registryPages(name, session);
-    verifyRegistry(sdk, pages, allowed);
-    state.registry = pages.map((p) => ({ kind: p.kind, data: hex(p.data) }));
-    await persist();
+    verifyRegistry(sdk, await registryPages(name, session), allowed);
   };
   try {
     const profile = capacityMode ? capacityProfile(fixture, hash) : null;
@@ -679,6 +684,7 @@ module.exports = {
   runCapacityOptimized,
   BASELINE,
   PRIVATE,
+  INSTALL_ALLOWED,
   runCreation,
   runCapacity,
   verifyRegistry,

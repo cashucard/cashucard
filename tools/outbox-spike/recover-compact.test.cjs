@@ -315,3 +315,59 @@ test("an unknown recovery image profile stops before any APDU", async () => {
   assert.equal(r.failure, "recovery-profile-invalid");
   assert.equal(f.sent.length, 0);
 });
+// A card the install profile left loaded: two instance AIDs and no separate
+// package record. Its allowance is those two AIDs, not the capacity set's.
+function installedFake() {
+  const f = fixture({
+    mode: "phase-install",
+    pins: require("./pixel-install.json"),
+  });
+  const installed = [
+    require("./pixel-install.json").package + "4D",
+    require("./pixel-install.json").package + "01",
+  ];
+  f.card.packages.set(installed[1].slice(0, -2), {
+    aid: installed[1].slice(0, -2),
+    modules: installed,
+    size: 27343,
+    instancesMade: 2,
+  });
+  for (const aid of installed) {
+    f.card.instances.set(aid, {
+      aid,
+      module: aid,
+      pkg: installed[1].slice(0, -2),
+      state: { unspent: 0, spent: 0, pin: 0, record: 0, owner: 0 },
+    });
+  }
+  const original = f.args.tx;
+  const args = {
+    sdk,
+    installed: true,
+    expectedKey: key.toString("hex"),
+    now: () => 0,
+    random: (n) => Array.from({ length: n }, (_, i) => i),
+    independentVerify: () => true,
+    save: async () => {},
+    tx: async (apdu) => {
+      const reply = await original(apdu);
+      if (apdu[0] === 0xb0 && apdu[1] === 0x7d)
+        return [...b("7fff0a0e0a0014001400400030000205"), 0x90, 0];
+      if (apdu[0] === 0xb0 && apdu[1] === 0x7a) return [...key, 0x90, 0];
+      return reply;
+    },
+  };
+  return { args, card: f.card, sent: f.sent };
+}
+test("the installed card's two-AID registry is the allowance recovery verifies against", async () => {
+  const f = installedFake(),
+    r = await recoverToBlank(f.args);
+  // The pre-check is the point: before the allowance followed the card, this
+  // stopped at registry-private-set on the platform's own listing.
+  assert.notEqual(r.failure, "recovery-registry-mismatch", JSON.stringify(r));
+  assert.ok(r.commands > 0);
+  assert.ok(
+    f.sent.some((a) => a[1] === 0xf2),
+    "the registry was read",
+  );
+});

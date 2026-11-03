@@ -135,6 +135,21 @@ test("a foreign load-file record stops at the installed listing after creation",
   assert.equal(r.initialBaselineVerified, true);
   assert.ok(!f.sent.some((a) => [0xe4, 0xb0].includes(a[1])));
   assert.deepEqual(f.card.instanceAids(), INSTALLED);
+  // The stop is decided by the listing, so the journal keeps every page of it:
+  // without those bytes a stopped run cannot be diagnosed afterwards.
+  assert.ok(Array.isArray(r.registry), "the listing was journaled");
+  const loadFiles = r.registry.filter((p) => p.kind === "load-files");
+  const applications = r.registry.filter((p) => p.kind === "applications");
+  assert.equal(applications.length, 1);
+  assert.equal(loadFiles.length, 1);
+  // Three platform frames, then the record the verifier rejected: the bytes a
+  // reader-side attempt could not have recovered after the fact.
+  assert.ok(loadFiles[0].data.startsWith("e31b4f07a0000001515350"));
+  assert.ok(
+    loadFiles[0].data.endsWith(
+      "e31b4f07a00000009999999f700101ce020100cc08a000000151000000",
+    ),
+  );
 });
 
 test("a lost install reply stops without retry, cleanup or raw exception text", async () => {
