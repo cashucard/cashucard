@@ -18,8 +18,17 @@ pool bytes, zero DLEQ bytes. `recover-compact.cjs` asked
 card whose install stopped earlier could never pass it. The offline fixture
 answered a set-up card, which is why no test saw this.
 
-The fix is to ask for the state the card is actually in, from the one fact that
-says which card this is:
+A second defect stops the run before the diagnostics are reached at all: the
+reader answers the CPLC GET DATA with **46** bytes — one ISO 7816-4 control byte
+ahead of the 45-byte `9F7F` TLV — while the SDK's `parseCplc` takes the TLV. The
+first attempt at this plan (`07615b7`-era tree, journal below) stopped at
+`match-chip` with `wrong-chip` after two commands because of it. `trim_cplc` in
+`compact_recovery_bridge.py` drops that byte after the frame is admitted, only
+when the length and tag are exact; nothing else is reshaped, and a regression
+drops the rule to "short enough" and fails.
+
+The readiness fix asks for the state the card is actually in, from the one fact
+that says which card this is:
 
 ```js
 diagnostics(diagnostic, installed ? 0 : 2);
@@ -76,6 +85,8 @@ for `recover-installed-v1` and is unchanged.
 
 ## Steps and gates
 
+0. **Drop the CPLC control byte** in the bridge, with the length-and-tag-exact
+   regression (done: `07615b7`).
 1. **Fix the readiness state.** `diagnostics(diagnostic, installed ? 0 : 2)`,
    with a regression that runs the installed fixture at the unset-up reply and
    asserts the flow reaches the key read instead of stopping at

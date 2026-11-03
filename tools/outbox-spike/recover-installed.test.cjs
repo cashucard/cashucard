@@ -159,7 +159,9 @@ test("the installed flow deletes exactly the two instance AIDs and verifies blan
 
 test("the chip id the launcher pins is the one the SDK parses", () => {
   const live = Buffer.from(
-    "9f7f2a4790d321470000000000304109336320554700000000000000000432a939333336330000000000000000",
+    // Captured from this card through the bridge on 2026-11-03: the 45-byte
+    // 9F7F TLV alone, status bytes stripped by the transceiver.
+    "9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000",
     "hex",
   );
   const launcher = require("./recover-installed.cjs");

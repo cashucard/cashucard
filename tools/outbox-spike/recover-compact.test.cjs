@@ -383,6 +383,20 @@ test("an install that stopped before SETUP still reaches the key read", async ()
   );
 });
 
+test("the recovery flow resolves the pinned chip against the card it was pinned from", () => {
+  // The 46-byte reply an earlier pass thought it saw parsed to no id at all;
+  // the card's own 45-byte CPLC is this one, and a launcher pinned to anything
+  // else stops at match-chip with wrong-chip before a single recovery frame.
+  const sdk = require("./pixel-test-support.cjs").sdk;
+  const launcher = require("./recover-installed.cjs");
+  const cplc = Buffer.from(
+    "9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000",
+    "hex",
+  );
+  assert.equal(cplc.length, 45);
+  assert.equal(sdk.parseCplc(cplc).id, launcher.chip);
+});
+
 test("the installed card's two-AID registry is the allowance recovery verifies against", async () => {
   const f = installedFake(),
     r = await recoverToBlank(f.args);

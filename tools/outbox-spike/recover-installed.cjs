@@ -30,7 +30,7 @@ function cardkit(module) {
 
 const here = __dirname;
 const READER = "ACS ACR122U PICC Interface";
-const CHIP = "cplc-v1:4790d3213041093363205547";
+const CHIP = "cplc-v1:4790d3213041093361205547";
 const PLAN = "recover-installed-v1";
 /** The run name `recoverToBlank` stamps into the state it saves. */
 const FLOW_PLAN = "compact-optimized-sign-recovery-v1";

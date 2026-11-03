@@ -58,7 +58,7 @@ class Refused(Exception):
     pass
 
 
-EXPECTED_CPLC = "cplc-v1:4790d3213041093363205547"
+EXPECTED_CPLC = "cplc-v1:4790d3213041093361205547"
 
 
 def cplc_id(data: bytes) -> str:

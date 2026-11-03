@@ -86,16 +86,19 @@ class Policy:
 CPLC_FRAME=bytes.fromhex('80ca9f7f00')
 
 def trim_cplc(frame,reply):
-    # A CPLC GET DATA is answered with one extra ISO 7816-4 control byte in
-    # front of the 9F7F TLV, measured twice on this card (46 bytes returned for
-    # the 45-byte TLV, same value both times). The SDK's parseCplc takes the
-    # TLV, so the byte is dropped here -- after the frame was admitted -- and
-    # only when the length and tag are exact, so no other reply is reshaped.
+    # A CPLC GET DATA answered with one byte ahead of the 9F7F TLV is trimmed
+    # here, after its frame was admitted. The rule is as narrow as it can be:
+    # the exact frame, success, one byte of margin over the 45-byte TLV, and
+    # that TLV's own tag behind the byte. A reply of any other shape is left
+    # untouched, for parseCplc to accept or reject on its own.
     data,sw1,sw2=reply
     raw=bytes(data)
-    if frame==CPLC_FRAME and (sw1,sw2)==(0x90,0) and len(raw)==46 and raw[1:4]==b'\x9f\x7f\x2a':
+    if (frame==CPLC_FRAME and (sw1,sw2)==(0x90,0) and len(raw)==46
+            and raw[1:4]==b'\x9f\x7f*'):
         raw=raw[1:]
-    return raw,sw1,sw2
+    # pyscard answers with a list, and the loop emits the reply by
+    # concatenating onto it; bytes here would end the bridge.
+    return list(raw),sw1,sw2
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--reader',required=True);p.add_argument('--expected-key',default=EXPECTED_KEY.hex());args=p.parse_args()
