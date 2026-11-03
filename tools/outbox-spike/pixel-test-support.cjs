@@ -48,6 +48,10 @@ const LOAD_FILE = registryRecord(
   INSTALL_PINS.package,
   sdk.ISD_AID,
 );
+// A load-file record the baseline does not name: a foreign AID at life cycle 1
+// under the same ISD. The card lists it where the image's own record belongs.
+const FOREIGN_LOAD_FILE =
+  "e31b4f07a00000009999999f700101ce020100cc08a000000151000000";
 // P2 counts the last command written: a listing inside the channel carries a
 // command number where the plain one carries a fixed byte.
 const MODE = (apdu) => (apdu[0] === 0x84 ? apdu[2] : apdu[4]);
@@ -146,7 +150,9 @@ function fixture(options = {}) {
         }
         const entries = BASELINE.flatMap(b);
         if (options.mode === "phase-install" && card.instances.size === 2)
-          entries.push(...b(LOAD_FILE));
+          entries.push(
+            ...b(options.wrongLoadFile ? FOREIGN_LOAD_FILE : LOAD_FILE),
+          );
         if (options.unknownRegistry) entries.push(...entries.slice(0, 0x1d));
         reply = [...entries, 0x90, 0];
       }

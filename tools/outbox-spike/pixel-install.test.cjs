@@ -122,6 +122,21 @@ test("a mismatched installed registry or bad diagnostics stops after creation wi
   }
 });
 
+test("a foreign load-file record stops at the installed listing after creation", async () => {
+  const f = fixture({
+    mode: "phase-install",
+    pins: INSTALL_PINS,
+    wrongLoadFile: true,
+  });
+  const r = await runPhaseInstall(f.args);
+  assert.equal(r.status, "stopped");
+  assert.equal(r.failure, "registry-baseline");
+  assert.equal(r.installedRegistryVerified, undefined);
+  assert.equal(r.initialBaselineVerified, true);
+  assert.ok(!f.sent.some((a) => [0xe4, 0xb0].includes(a[1])));
+  assert.deepEqual(f.card.instanceAids(), INSTALLED);
+});
+
 test("a lost install reply stops without retry, cleanup or raw exception text", async () => {
   const f = fixture({
     mode: "phase-install",
