@@ -203,6 +203,41 @@ is **not** retried here.
 - Reporting an install as qualified from an offline or simulator run; silicon
   evidence is this run's hardware report.
 
+## Terminal result (step 5)
+
+The install session was started once and reached its terminal state. It stopped;
+nothing after this step ran, and the plan ends here.
+
+| Observation        | Value                                             |
+| ------------------ | ------------------------------------------------- |
+| Rendered result    | `Stopped · keep the card aside`                   |
+| Stage              | `installed-load-files-0`                          |
+| Commands           | 135                                               |
+| Failure            | `registry-baseline`                               |
+| Journal key        | `cashucard-private-capacity-install-v1`, consumed |
+| Cleanup sent       | none                                              |
+| Diagnostics read   | none                                              |
+| Card after the run | both install instances present                    |
+
+Reading: the 114 LOAD blocks, the opener install, the main install and both
+selectable creations completed — 135 commands is the recorded shape minus the
+three that follow creation. The run then stopped in the post-install listing
+check, before `installedRegistryVerified` was set, so the receipt verifier
+refuses this journal by design and no receipt is written.
+
+The listing check accepts only the platform's three load files, byte for byte,
+plus the named private AIDs. The card returned a listing the fixture cannot
+produce: its load-file listing always carried the image's own record, so 179
+offline tests could not exercise this branch. The fix and its regression are
+commit `7c28559`; the offline procedure that produces them is
+[`HARDWARE-LOOP.md`](../../HARDWARE-LOOP.md).
+
+This is a fixture fidelity gap, not a proven card fault: the journal's raw
+listing bytes are the only way to tell which entry the card actually returned,
+and the plan's journal export (step 6) was never reached — the app offers its
+public test result, which omits raw listing bytes. Do not re-run this plan; the
+card is no longer blank and the attempt is consumed.
+
 ## Revocation and evidence
 
 Approval covers one phone, one card and one install session. It expires when the
