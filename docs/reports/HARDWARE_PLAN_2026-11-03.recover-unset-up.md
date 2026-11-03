@@ -1,7 +1,8 @@
 # Hardware plan: finish recovering card 09336320 from its stopped install
 
 Plan ID: `recover-unset-up-v1`.
-Status: **approved 2026-11-03** (see [Approval](#approval)).
+Status: **consumed 2026-11-03 — two reader sessions, both stopped before any
+deletion. Superseded by [plan `recover-unset-up-v2`](HARDWARE_PLAN_2026-11-03.recover-unset-up-2.md).**
 
 ## Why
 
@@ -58,7 +59,7 @@ In scope:
 - The `installed` readiness change above, with a regression that drives the
   unset-up reply through the whole flow.
 - One reader session through `tools/outbox-spike/recover-installed.cjs
-  --recover`, with `--expected-key` = the key pass A read on this card,
+--recover`, with `--expected-key` = the key pass A read on this card,
   `03d0b08a4f96d57301cedc89435b15a809f18cc9a7abe30614e07e464ca8ce0570`.
 - A new private journal directory, one journal, the report.
 
