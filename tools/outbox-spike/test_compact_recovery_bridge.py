@@ -61,4 +61,28 @@ class RecoveryPolicy(unittest.TestCase):
         altered=list(a);altered[5]=1
         with self.assertRaises(ValueError):p.before(altered)
 
+class AnsweredCplc(unittest.TestCase):
+    """The reader's CPLC reply carries one control byte ahead of the TLV."""
+    TLV = bytes.fromhex('9f7f2a4790d321470000000000304109336120554700000000000000000434a93933333631') + bytes(8)
+    FRAME = bytes.fromhex('80ca9f7f00')
+
+    def test_the_control_byte_is_removed_and_nothing_else(self):
+        self.assertEqual(len(self.TLV), 45)
+        data, sw1, sw2 = r.trim_cplc(self.FRAME, [list(b'\x00' + self.TLV), 0x90, 0])
+        self.assertEqual((data, sw1, sw2), (self.TLV, 0x90, 0))
+
+    def test_no_other_reply_is_reshaped(self):
+        # Each of these is refused a trim, so the SDK sees the bytes it expects
+        # to reject rather than a value this function invented.
+        for reply in (
+            # 44 bytes: a loose "short enough" rule would trim this to 43.
+            [list(b'\x00' + self.TLV[:43]), 0x90, 0],
+            [list(self.TLV), 0x90, 0],
+            [list(b'\x00\x00' + self.TLV[:44]), 0x90, 0],
+            [list(b'\x00' + self.TLV), 0x6a, 0x86],
+        ):
+            self.assertEqual(r.trim_cplc(self.FRAME, reply)[0], bytes(reply[0]))
+        other = bytes.fromhex('b07a000000')
+        self.assertEqual(r.trim_cplc(other, [list(b'\x00' + self.TLV), 0x90, 0])[0], b'\x00' + self.TLV)
+
 if __name__=='__main__':unittest.main()

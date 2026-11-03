@@ -83,6 +83,20 @@ class Policy:
             if data!=b'\1':self.failed=True
             else:self.retire_ack=True
 
+CPLC_FRAME=bytes.fromhex('80ca9f7f00')
+
+def trim_cplc(frame,reply):
+    # A CPLC GET DATA is answered with one extra ISO 7816-4 control byte in
+    # front of the 9F7F TLV, measured twice on this card (46 bytes returned for
+    # the 45-byte TLV, same value both times). The SDK's parseCplc takes the
+    # TLV, so the byte is dropped here -- after the frame was admitted -- and
+    # only when the length and tag are exact, so no other reply is reshaped.
+    data,sw1,sw2=reply
+    raw=bytes(data)
+    if frame==CPLC_FRAME and (sw1,sw2)==(0x90,0) and len(raw)==46 and raw[1:4]==b'\x9f\x7f\x2a':
+        raw=raw[1:]
+    return raw,sw1,sw2
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--reader',required=True);p.add_argument('--expected-key',default=EXPECTED_KEY.hex());args=p.parse_args()
     if args.reader!='ACS ACR122U PICC Interface':raise ValueError('named reader required')
@@ -103,7 +117,14 @@ def main():
             if message=={'close':True}:return
             if not isinstance(message,dict) or set(message)!={'apdu'}:raise b.common.BridgeFailure('bridge-input-invalid')
             a=b.common.checked('bridge-command-refused',lambda:policy.before(message['apdu']))
-            data,sw1,sw2=b.common.checked('reader-transmit-failed',lambda:c.transmit(list(a)))
+            # A CPLC GET DATA is answered with one extra ISO 7816-4 control
+            # byte in front of the 9F7F TLV, measured here twice on this card
+            # (45-byte TLV, 46 bytes returned, same value). The SDK's parseCplc
+            # takes the TLV, so the byte is removed here -- in this bridge only,
+            # after its frame has been admitted -- and the length is required to
+            # be exact so a different reply is never silently trimmed.
+            return_value = b.common.checked('reader-transmit-failed',lambda:c.transmit(list(a)))
+            data,sw1,sw2=trim_cplc(a,return_value)
             policy.after(a,data,sw1,sw2);b.common.emit({'reply':data+[sw1,sw2]})
     finally:
         if connected:
