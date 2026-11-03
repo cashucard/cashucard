@@ -125,8 +125,10 @@ test("the installed flow deletes exactly the two instance AIDs and verifies blan
     save: async () => {},
     tx: async (apdu) => {
       const reply = await original(apdu);
+      // The reply this card actually gives: the install stopped before SETUP,
+      // so the applet has no pool, no DLEQ and ready state 0.
       if (apdu[0] === 0xb0 && apdu[1] === 0x7d)
-        return [...b("7fff0a0e0a0014001400400030000205"), 0x90, 0];
+        return [...b("7fff0a0e0a0014001400000000000005"), 0x90, 0];
       if (apdu[0] === 0xb0 && apdu[1] === 0x7a) return [...KEY, 0x90, 0];
       // The installed card's applet has no signable record: its status, scope
       // and export answers are the flow's other branch, exercised elsewhere.

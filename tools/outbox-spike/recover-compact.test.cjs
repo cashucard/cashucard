@@ -317,7 +317,7 @@ test("an unknown recovery image profile stops before any APDU", async () => {
 });
 // A card the install profile left loaded: two instance AIDs and no separate
 // package record. Its allowance is those two AIDs, not the capacity set's.
-function installedFake() {
+function installedFake(setupReached = true) {
   const f = fixture({
     mode: "phase-install",
     pins: require("./pixel-install.json"),
@@ -351,14 +351,38 @@ function installedFake() {
     save: async () => {},
     tx: async (apdu) => {
       const reply = await original(apdu);
+      // A stopped install never ran SETUP, so the applet reports state 0 with
+      // no pool or DLEQ allocated; a completed one reports state 2.
       if (apdu[0] === 0xb0 && apdu[1] === 0x7d)
-        return [...b("7fff0a0e0a0014001400400030000205"), 0x90, 0];
+        return [
+          ...b(
+            setupReached
+              ? "7fff0a0e0a0014001400400030000205"
+              : "7fff0a0e0a0014001400000000000005",
+          ),
+          0x90,
+          0,
+        ];
       if (apdu[0] === 0xb0 && apdu[1] === 0x7a) return [...key, 0x90, 0];
       return reply;
     },
   };
   return { args, card: f.card, sent: f.sent };
 }
+test("an install that stopped before SETUP still reaches the key read", async () => {
+  const f = installedFake(false),
+    r = await recoverToBlank(f.args);
+  // This card's real reply. Before the state followed `installed`, this stopped
+  // at read-diagnostics with diagnostic-mismatch, which is exactly what pass B
+  // of recover-installed-v1 did against card 09336320.
+  assert.equal(r.diagnostics, "7fff0a0e0a0014001400000000000005");
+  assert.notEqual(r.failure, "diagnostic-mismatch", JSON.stringify(r));
+  assert.ok(
+    f.sent.some((a) => a[1] === 0x7a),
+    "the key read was reached",
+  );
+});
+
 test("the installed card's two-AID registry is the allowance recovery verifies against", async () => {
   const f = installedFake(),
     r = await recoverToBlank(f.args);

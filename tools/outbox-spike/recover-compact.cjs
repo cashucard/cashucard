@@ -276,7 +276,13 @@ async function recoverToBlank({
     );
     const diagnostic = await data("read-diagnostics", cmd(0x7d));
     state.diagnostics = hex(diagnostic);
-    diagnostics(diagnostic, 2);
+    // An installed card is the one an installer left behind, and its state is
+    // whatever that installer reached: a stopped install leaves the applet at
+    // ready state 0, with no pool or DLEQ allocated, because SETUP never ran.
+    // That is the same reply the installer records for itself (run-compact's
+    // `diagnostics-before`), and `diagnostics(d, 0)` already refuses any other
+    // reading of it. What must still hold is the commit floor below.
+    diagnostics(diagnostic, installed ? 0 : 2);
     await persist();
     const key = await data("read-public-key", cmd(0x7a));
     state.cardKey = hex(key);

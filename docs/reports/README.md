@@ -44,6 +44,7 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 | 2026-11-02 | [Pixel phase install](HARDWARE_PLAN_2026-11-02.pixel-phase-install.md)  | Approved Pixel-side install of the 0.0.5-lab image (stopped at the installed listing)         |
 | 2026-11-02 | [Registry readout](HARDWARE_PLAN_2026-11-02.registry-readout.md)        | Read-only listing of card 09336320 (stopped at 6982, no authenticated channel)                |
 | 2026-11-02 | [Recover installed card](HARDWARE_PLAN_2026-11-02.recover-installed.md) | Key read from card 09336320; cleanup stopped at `read-diagnostics` (card unset-up, untouched) |
+| 2026-11-03 | [Recover unset-up card](HARDWARE_PLAN_2026-11-03.recover-unset-up.md)   | Installed readiness state fix, then one cleanup of card 09336320                              |
 
 ## Ops service
 
