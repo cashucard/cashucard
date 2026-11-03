@@ -33,16 +33,17 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 
 ## Hardware plans
 
-| Date       | Plan                                                                   | Subject                                                                               |
-| ---------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 2026-10-20 | [Device validation](PROVISIONER-DEVICE-VALIDATION.md)                  | Proposed owner-run checklist for the installation gate                                |
-| 2026-10-20 | [First write drill](PROVISIONER-FIRST-WRITE-DRILL.md)                  | Proposed scope for the first provisioning write                                       |
-| 2026-10-20 | [Max write drill](PROVISIONER-MAX-WRITE-DRILL.md)                      | Proposed scope for an iPhone write run                                                |
-| 2026-10-23 | [Owned-card reset drill](OWNED-CARD-RESET-DRILL.md)                    | Approved scope for the reset of card 09336320 (completed)                             |
-| 2026-10-23 | [Physical end-to-end plan](PHYSICAL-CARD-E2E-PLAN.md)                  | Approved devices and value cap for the end-to-end run (completed)                     |
-| 2026-10-23 | [Spent-entry audit](SPENT-SETTLEMENT-AUDIT-PLAN.md)                    | Read-only check that card 09336320's spent entries settled (completed)                |
-| 2026-11-02 | [Pixel phase install](HARDWARE_PLAN_2026-11-02.pixel-phase-install.md) | Approved Pixel-side install of the 0.0.5-lab image (stopped at the installed listing) |
-| 2026-11-02 | [Registry readout](HARDWARE_PLAN_2026-11-02.registry-readout.md)       | Read-only listing of card 09336320 (stopped at 6982, no authenticated channel)        |
+| Date       | Plan                                                                    | Subject                                                                                       |
+| ---------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-10-20 | [Device validation](PROVISIONER-DEVICE-VALIDATION.md)                   | Proposed owner-run checklist for the installation gate                                        |
+| 2026-10-20 | [First write drill](PROVISIONER-FIRST-WRITE-DRILL.md)                   | Proposed scope for the first provisioning write                                               |
+| 2026-10-20 | [Max write drill](PROVISIONER-MAX-WRITE-DRILL.md)                       | Proposed scope for an iPhone write run                                                        |
+| 2026-10-23 | [Owned-card reset drill](OWNED-CARD-RESET-DRILL.md)                     | Approved scope for the reset of card 09336320 (completed)                                     |
+| 2026-10-23 | [Physical end-to-end plan](PHYSICAL-CARD-E2E-PLAN.md)                   | Approved devices and value cap for the end-to-end run (completed)                             |
+| 2026-10-23 | [Spent-entry audit](SPENT-SETTLEMENT-AUDIT-PLAN.md)                     | Read-only check that card 09336320's spent entries settled (completed)                        |
+| 2026-11-02 | [Pixel phase install](HARDWARE_PLAN_2026-11-02.pixel-phase-install.md)  | Approved Pixel-side install of the 0.0.5-lab image (stopped at the installed listing)         |
+| 2026-11-02 | [Registry readout](HARDWARE_PLAN_2026-11-02.registry-readout.md)        | Read-only listing of card 09336320 (stopped at 6982, no authenticated channel)                |
+| 2026-11-02 | [Recover installed card](HARDWARE_PLAN_2026-11-02.recover-installed.md) | Key read from card 09336320; cleanup stopped at `read-diagnostics` (card unset-up, untouched) |
 
 ## Ops service
 
