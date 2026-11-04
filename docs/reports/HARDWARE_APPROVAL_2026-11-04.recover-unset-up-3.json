@@ -1,0 +1,7 @@
+{
+  "format": "unset-up-execution-approval-v1",
+  "planId": "recover-unset-up-v3",
+  "approved": false,
+  "operatorDecision": "Preparation and offline implementation only. No execution approval has been given.",
+  "planSha256": null
+}

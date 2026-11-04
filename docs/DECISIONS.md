@@ -4822,3 +4822,39 @@ phone qualification. A reserved logical mint maps to explicit loopback origins
 only in this demonstration. Production transport, holder authorization, final
 wire/limits and partner review remain open. Released firmware/assets, app
 capabilities and hardware approvals remain unchanged.
+
+## D166: Recover only the independently identified, installed unset-up private image
+
+**Decision (2026-11-04):** add a separate host and independent Python policy for
+`recover-unset-up-v3`. Fix the observed chip, public installation key, exact
+installed registry and original platform records in a public profile derived
+from the retained audit. Admit only the unset-up diagnostic state through the
+unchanged validator. Read the key, reconfirm identity and the complete registry,
+then delete main, opener and package in that order. Verify full applications and
+load-files again, final identity and confirmed reader closure. Require independent
+policy completion before declaring blank.
+
+A private campaign binds a clean source commit, final plan, tracked operator
+approval, runtime files and a fixed fresh journal. Default preview performs only
+local reads. Recheck the source, runtime and historical evidence after durable
+one-shot consumption, immediately before opening one isolated exclusive reader
+connection. Preserve a permanent consumption marker, persist each command intent
+and public reply, and retain the journal lock when closure is uncertain. Neither
+controller nor bridge retries. Commands remain bounded by the plan's exact stage
+sequence, four pages per registry kind, 64-command ceiling and 120-second gate;
+responses have a 30-second bound. Authentication bodies are excluded from receipts.
+
+**Why:** correcting the stale chip identity alone does not make the earlier
+initialized recovery flow usable. The private JavaCard dispatcher refuses its
+status/scope commands before setup. Saved registry evidence also includes the
+private load-file, so deleting two instances or scanning only applications cannot
+prove blank. Synthetic SCP02 and isolated fake PC/SC tests, plus actual JavaCard
+logic in a simulator, exercise the new path without a device.
+
+**Rejected:** weakening initialized recovery, allowing another card/key or registry
+object, setting up the card to make recovery work, fabricating readiness replies,
+authentication retries, accepting an unconfirmed disconnect, or reusing consumed
+plans/journals. The tracked execution approval remains false. This change grants
+no hardware permission; the [named plan](reports/HARDWARE_PLAN_2026-11-04.recover-unset-up-3.md)
+requires a separate operator execution decision. Released applets, CAPs and phone
+applications are unchanged.
