@@ -8,7 +8,7 @@ const {
 } = require("./pixel-capacity.js");
 const PINS = Object.freeze({
   plan: "pixel-creation-control-v1",
-  chip: "cplc-v1:4790d3213041093363205547",
+  chip: "cplc-v1:4790d3213041093361205547",
   package: "F04341534855434D5054",
   manifest: "b0515dcea92a00cc7a61deae88e1541ae9d68e8c1d9a4557ed64b8554f09da25",
   cap: "41bfc03d191ab9ee109370b83ddfdfcd3505f2bf24953583ea2c775470059941",

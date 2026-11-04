@@ -9,7 +9,7 @@ import {FakeCard, pullAt} from '../../testing/fake-card';
 import {CASHU_LOAD_FILE} from './assets';
 
 const authority = {
-  chipId: 'cplc-v1:4790d3213041093363205547',
+  chipId: 'cplc-v1:4790d3213041093361205547',
   installationId: '03' + '5a'.repeat(32),
   sourceRef: 'https://issuer.test/escrow/00000000-0000-4000-8000-000000000001',
   intentReceipt: 'service-intent-1',

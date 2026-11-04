@@ -453,7 +453,7 @@ async function runProbe(options, dependencies = {}) {
   }
   if (
     options.platformBaseline &&
-    options.chip !== "cplc-v1:4790d3213041093363205547"
+    options.chip !== "cplc-v1:4790d3213041093361205547"
   ) {
     throw new Error("platform baseline is approved only for 09336320");
   }

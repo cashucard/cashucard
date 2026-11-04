@@ -1,6 +1,6 @@
 {
   "plan": "pixel-phase-install-v1",
-  "chip": "cplc-v1:4790d3213041093363205547",
+  "chip": "cplc-v1:4790d3213041093361205547",
   "package": "F04341534855434D5054",
   "manifest": "b2adaa4252e1ad988cecb0ff31e001ce22f2be0ce00a5c1b25dbb0d451e5bca4",
   "cap": "b22479280337d4192b4001f06a38d136d69523c38c90f88cab00f2b9e374ce27",

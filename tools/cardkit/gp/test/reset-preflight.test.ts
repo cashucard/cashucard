@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {assessResetPreflight} from '../reset-preflight';
 
-const chipId = 'cplc-v1:4790d3213041093363205547';
+const chipId = 'cplc-v1:4790d3213041093361205547';
 const installationId = '02' + '5a'.repeat(32);
 const evidence = {
   chipId,

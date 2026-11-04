@@ -22,7 +22,7 @@ const {
 const READER = "ACS ACR122U PICC Interface";
 // Observed card-specific baselines, not a general permission for D321 cards.
 const BASELINES = Object.freeze({
-  "cplc-v1:4790d3213041093363205547": Object.freeze([...PLATFORM_FILES]),
+  "cplc-v1:4790d3213041093361205547": Object.freeze([...PLATFORM_FILES]),
   "cplc-v1:4790d3213180072976207515": Object.freeze([
     ...PLATFORM_FILES,
     "e3214f0da00000016443446f634c6974659f700101ce020100cc08a000000151000000",
@@ -182,7 +182,7 @@ function deletion(aid) {
 }
 async function runCompact(options, dependencies = {}) {
   const w = workload(options.workload ?? SMALL);
-  if (w.name === MAX && options.chip !== "cplc-v1:4790d3213041093363205547")
+  if (w.name === MAX && options.chip !== "cplc-v1:4790d3213041093361205547")
     throw Error("maximum workload requires the qualified 09336320 card");
   const baseline = Object.hasOwn(BASELINES, options.chip)
     ? BASELINES[options.chip]

@@ -6,12 +6,36 @@ import test from 'node:test';
 import {fromHex, toHex} from '../bytes';
 import {CardError, TransportError, type Transceiver} from '../scp02';
 import {parseCplc, readChipIdentity, ChipIdentityMismatch} from '../identity';
+import {FakeCard} from '../../testing/fake-card';
 
 const CPLC = fromHex(
   '9F7F2A4790D32147000000000031800729762075150000000000000000048C2337323937360000000000000000',
 );
 const CHIP_ID = 'cplc-v1:4790d3213180072976207515';
 const COMMANDS = ['00A4040008A00000015100000000', '80CA9F7F00'];
+
+test('the fake matches the November 3 capture and refuses the spare identity', async () => {
+  // The independently tapped TLV, not a profile-generated reply. The H0
+  // gp-info.txt capture below belongs to a different card and stays unchanged.
+  const captured = parseCplc(
+    fromHex(
+      '9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000',
+    ),
+  );
+  assert.equal(captured.icSerialNumber, '09336120');
+  assert.equal(captured.icBatchIdentifier, '5547');
+  assert.equal(captured.id, 'cplc-v1:4790d3213041093361205547');
+  const card = new FakeCard();
+  assert.deepEqual(
+    await readChipIdentity(card.transceive, captured.id),
+    captured,
+  );
+  await assert.rejects(
+    readChipIdentity(card.transceive, 'cplc-v1:4790d3213041093363205547'),
+    ChipIdentityMismatch,
+  );
+  assert.deepEqual(card.log.map(toHex), [...COMMANDS, ...COMMANDS]);
+});
 
 test('the owner CPLC capture yields its canonical chip identity', t => {
   const fixture = join(__dirname, 'fixtures', 'gp-info.txt');
@@ -101,7 +125,7 @@ test('identity reads send only SELECT ISD and GET DATA, and reject a mismatched 
     [...CPLC, 0x90, 0],
   ]);
   await assert.rejects(
-    readChipIdentity(mismatch.tx, 'cplc-v1:4790d3213041093363205547'),
+    readChipIdentity(mismatch.tx, 'cplc-v1:4790d3213041093361205547'),
     ChipIdentityMismatch,
   );
   assert.deepEqual(mismatch.commands, COMMANDS);
