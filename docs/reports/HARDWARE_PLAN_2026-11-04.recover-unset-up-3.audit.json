@@ -1,0 +1,146 @@
+{
+  "planId": "recover-unset-up-v3",
+  "date": "2026-11-04",
+  "preparationAuthorized": true,
+  "approved": false,
+  "consumed": false,
+  "cardAccessed": false,
+  "preparationSourceCommit": "2c954a97b1beedd443149005639d8321d6e06f8c",
+  "executionSourceCommit": null,
+  "executionRunner": null,
+  "runtimeFinalized": false,
+  "reader": "ACS ACR122U PICC Interface",
+  "chip": "cplc-v1:4790d3213041093361205547",
+  "historicalLabel": "09336320",
+  "expectedPublicKey": "03d0b08a4f96d57301cedc89435b15a809f18cc9a7abe30614e07e464ca8ce0570",
+  "journals": [
+    {
+      "name": "attempt-1",
+      "path": "/Users/dread/.cashucard/recover-unset-up-2026-11-03/attempt-1-chip-trim/recover.json",
+      "sha256": "c47122e4bbc0f22bfa04c063b637223b789ce1b9823259abe381643ab25a0cb2",
+      "plan": "compact-optimized-sign-recovery-v1",
+      "status": "stopped",
+      "stage": "match-chip",
+      "failure": "wrong-chip",
+      "commands": 2
+    },
+    {
+      "name": "attempt-2",
+      "path": "/Users/dread/.cashucard/recover-unset-up-2026-11-03/recover.json",
+      "sha256": "a1e4a267e9747f98b597d513632f52e2c6e84b4fb3e8cae34ca9456a01e7ab03",
+      "plan": "compact-optimized-sign-recovery-v1",
+      "status": "stopped",
+      "stage": "match-chip",
+      "failure": "operation-failed",
+      "commands": 1
+    },
+    {
+      "name": "attempt-3",
+      "path": "/Users/dread/.cashucard/recover-unset-up-2026-11-03/attempt-3-cplc-list/recover.json",
+      "sha256": "bf5034001746c1f828e389425a220e1b4a5368166ca15ec5d925c1eadad2321c",
+      "plan": "compact-optimized-sign-recovery-v1",
+      "status": "stopped",
+      "stage": "match-chip",
+      "failure": "wrong-chip",
+      "commands": 2
+    },
+    {
+      "name": "earlier-key-read",
+      "path": "/Users/dread/.cashucard/recover-installed-2026-11-02/pass-a.json",
+      "sha256": "d6dd402e3bac471e8775337180a7f60d272fac130318ee909e96188cc716d208",
+      "plan": "recover-installed-v1",
+      "status": "complete",
+      "stage": null,
+      "failure": null,
+      "commands": null
+    },
+    {
+      "name": "earlier-diagnostic-stop",
+      "path": "/Users/dread/.cashucard/recover-installed-2026-11-02/pass-b.json",
+      "sha256": "146c19cc21184cd76ee7ec64249967138ce48ed64227a9d27fe695e571448f24",
+      "plan": "compact-optimized-sign-recovery-v1",
+      "status": "stopped",
+      "stage": "read-diagnostics",
+      "failure": "diagnostic-mismatch",
+      "commands": 9
+    }
+  ],
+  "capturedBeforeRecoveryRegistry": [
+    {
+      "kind": "applications",
+      "data": "e32c4f0bf04341534855434d50544d9f700107c503000000c40af04341534855434d5054cc08a000000151000000e32c4f0bf04341534855434d5054019f700107c503000000c40af04341534855434d5054cc08a000000151000000",
+      "sw": "9000"
+    },
+    {
+      "kind": "load-files",
+      "data": "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000e31b4f07a00000006202049f700101ce020100cc08a000000151000000e31b4f07a00000006202029f700101ce020103cc08a000000151000000e31e4f0af04341534855434d50549f700101ce020000cc08a000000151000000",
+      "sw": "9000"
+    }
+  ],
+  "historicalDiagnostics": "7fff0a0e0a0014001400000000000005",
+  "installedImageContext": {
+    "plan": "pixel-phase-install-v1",
+    "chip": "cplc-v1:4790d3213041093361205547",
+    "package": "F04341534855434D5054",
+    "manifest": "b2adaa4252e1ad988cecb0ff31e001ce22f2be0ce00a5c1b25dbb0d451e5bca4",
+    "cap": "b22479280337d4192b4001f06a38d136d69523c38c90f88cab00f2b9e374ce27",
+    "load": "74caa34bc570427b4a292b6696328ed499c3967e13d8ab11066dfb103a4ac048",
+    "bytes": 28067,
+    "blocks": 114,
+    "source": "96eb11df58c0969e2d00a1d52a2ca726f8d2d971"
+  },
+  "sourceHashes": {
+    "tools/outbox-spike/run-compact.cjs": "4a6cf6aad3b950bfb6caa3bf44026099ce1f52ab3a58828a755211d5654bcb3f",
+    "tools/outbox-spike/pixel-control.js": "d1a0c736842e019c00e8bcc58cf1ee34968c81b56bf0c70039b0e5a4096bc4b4",
+    "tools/outbox-spike/compact_bridge.py": "6946869b249fd85f3c4a7ee0ae44e442fa126a2cd52c3cdf348836c04e265a6d",
+    "tools/outbox-spike/compact_recovery_bridge.py": "e3bd5539cdd2d161ccd819e7e6db6c6f8024f9c988b5d8373a9f2e6f77a4a3c0",
+    "tools/outbox-spike/recover-compact.cjs": "06662b12bf6f3a64a7b327518d0b1cf2881c345d7aef8b31654942dd8742ef13",
+    "tools/outbox-spike/recover-installed.cjs": "1b0f0f945577406fce8a2eb919ca7020c1e86e84705480d52f9bf57a30559cfd",
+    "tools/outbox-spike/java/CompactDispatch.txt": "747779dbaf9d8db7c049f229b21c18916a2e3f7a9234c07978bf5cb23fbe9897",
+    "tools/cardkit/gp/identity.ts": "844e67d863bfe763c301408d2f30e4938b6e128396e1d4d9bea91428ee35a02b",
+    "tools/outbox-spike/pixel-install.json": "75cb52d9e680192615a9757098e2afcc8beaa95ed9ce92f4056196b79a3f5c48"
+  },
+  "preparationRuntime": {
+    "node": {
+      "path": "/opt/homebrew/opt/node@22/bin/node",
+      "realPath": "/opt/homebrew/Cellar/node@22/22.23.4/bin/node",
+      "sha256": "210bbbc13dee7ee3913eef05cc9d7eaee5b327a86dfe524bfb8cb3e5949e50dc",
+      "version": "v22.23.4"
+    },
+    "python": {
+      "path": "/Users/dread/Repos/cashu-card-pixel-capacity/tools/cardctl/.venv/bin/python",
+      "realPath": "/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/bin/python3.15",
+      "sha256": "1955899cb535256cfa477d926d016819e52e747984722c44f76e39a4950fee0e",
+      "version": "Python 3.15.0"
+    }
+  },
+  "offlineChecks": {
+    "nodeRecoveryCases": 34,
+    "pythonRecoveryPolicyCases": 10,
+    "nodeLogSha256": "2eddf242b7a1383c172ff629dc2d83a76505a5dc269c10dacfcce6c453875268",
+    "uninitializedSimulatorStatuses": ["9000", "9000", "9000", "6985", "6985"],
+    "fullSavedRegistryWithInstalledAllowance": "refused: registry-baseline",
+    "applicationsOnlyEmptyListingWithEmptyAllowance": "accepted; insufficient to prove blank"
+  },
+  "proposedBounds": {
+    "connections": 1,
+    "furtherTransmissionGateMs": 120000,
+    "perResponseBoundMs": 30000,
+    "apduCeiling": 64,
+    "maximumPlannedApdus": 42,
+    "registrySnapshots": 3,
+    "maximumPagesPerKindPerSnapshot": 4,
+    "authenticationPhases": 2,
+    "deletionAids": [
+      "F04341534855434D505401",
+      "F04341534855434D50544D",
+      "F04341534855434D5054"
+    ]
+  },
+  "executionBlockers": [
+    "No unset-up cleanup host/independent policy is implemented and qualified.",
+    "The existing generic flow and bridge do not support unset-up cleanup.",
+    "Final execution source/runtime fingerprints and entry command are not pinned.",
+    "Operator has authorized preparation only; execution approval is absent."
+  ]
+}

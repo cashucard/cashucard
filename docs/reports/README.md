@@ -46,6 +46,10 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 | 2026-11-02 | [Recover installed card](HARDWARE_PLAN_2026-11-02.recover-installed.md) | Key read from card 09336320; cleanup stopped at `read-diagnostics` (card unset-up, untouched) |
 | 2026-11-03 | [Recover unset-up card](HARDWARE_PLAN_2026-11-03.recover-unset-up.md)   | Installed readiness state fix, then one cleanup of card 09336320                              |
 
+The [November 4 unset-up recovery successor](HARDWARE_PLAN_2026-11-04.recover-unset-up-3.md)
+is preparation-only. It records all three November 3 stops and blocks execution
+until a separate unset-up cleanup path is qualified and explicitly approved.
+
 ## Ops service
 
 | Date       | Report                                                                     | Subject                                                 |
