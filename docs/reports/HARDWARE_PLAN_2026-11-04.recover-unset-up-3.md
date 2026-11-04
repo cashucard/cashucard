@@ -1,12 +1,14 @@
 # Recovery plan for the installed, unset-up card
 
 - Plan ID: `recover-unset-up-v3`.
-- Status: **prepared; execution blocked and unapproved**.
+- Status: **offline implementation qualified; execution unapproved**.
 - `approved: false`; `consumed: false`; hardware commands during preparation: **0**.
 - Preparation authorized by the operator on 2026-11-04: "yes I authorize
   preparing a fresh, bounded recovery plan for the stopped card."
 - Preparation base: `2c954a97b1beedd443149005639d8321d6e06f8c`, including signed
-  identity correction `62cd278`. The execution commit is not yet qualified.
+  identity correction `62cd278`. Implementation: signed `45b449a`; independent
+  saved-evidence verification: signed `5472ba9`. The final clean documentation
+  commit and runtime hashes are bound in the private preparation campaign.
 
 This plan proposes one future ACS connection to remove only the private test
 main instance, opener and package and verify the original factory-key platform
@@ -86,11 +88,12 @@ names the consumed `recover-installed-v1` and cannot provide this plan's closed
 unset-up cleanup contract. No readiness/status response may be synthesized,
 SETUP sent to make recovery work, or prior journal edited to create admission.
 
-## Offline gates before an execution plan can be approved
+## Qualified offline implementation
 
-Implement and review a **separate unset-up cleanup host and independent policy**.
-This is a prerequisite, not code implemented by this preparation-only change.
-It must:
+The separate host `tools/outbox-spike/recover-unset-up.cjs`, independent
+`unset_up_policy.py`, isolated transport and `unset_up_verify.py` now implement
+these gates (D166). The tests and their limits are in the
+[qualification report](RECOVERY_QUALIFICATION_2026-11-04.unset-up.md). They:
 
 - Bind this plan ID, corrected chip, observed public key, exact saved registry,
   installed-image context, source/runtime hashes and a fresh single-use journal
@@ -113,11 +116,19 @@ It must:
 - Demonstrate complete deletion order, full two-kind blank verification and
   unchanged old-journal hashes. Every new behavior needs a failing-before test.
 
-Then run the full affected suites, pin the final clean signed execution commit,
-actual Node/Python/pyscard/SDK/bridge files and exact command, and commit the
-revised plan. The current runtime hashes are preparation evidence only. Execution
-approval must cover those final bytes. No runnable execution command is blessed
-while the host, policy and fingerprints remain unqualified.
+The final affected suite passed 205 outbox cases, including the actual unset-up
+JavaCard reply test; cardkit passed 129 cases and Python policies passed 43.
+Fault checks cover every one of the typical 24 command positions. The isolated
+process tests use a synthetic PC/SC package. They do not establish physical card
+state, native reader behavior or physical timing. Protected source and all five
+historical journal hashes remain unchanged.
+
+The launcher pins actual Node/Python binaries, its source and policies, SDK
+output, crypto packages, pyscard files, profile, final plan and tracked approval:
+611 runtime files in this environment. Preview performs local reads only. The
+private preparation campaign and receipt bind the final clean signed HEAD and
+exact runtime digest after this plan is committed. That campaign remains
+unapproved and cannot be executed.
 
 ## Proposed single-connection sequence
 
@@ -147,9 +158,14 @@ the exact three platform frames in the audit plus the saved private package
 frame, lifecycle 1 under the same ISD. Registry ordering/page boundaries may
 vary; duplicate, missing, extra or changed records stop.
 
+Each successful DELETE may return an empty body or the GP acknowledgement byte
+`00`; any other body stops. The successful status must still be `9000`.
+
 Final applications must be empty, and final load-files must be exactly the
 original three platform frames, byte-for-byte. All three private objects must
-be absent. A separate host decode of saved final pages must agree. Set
+be absent. An isolated Python decoder re-reads the newly saved journal by hash and verifies
+all three complete snapshots, diagnostics, public key and final identity receipts.
+Its result and the live independent bridge policy must agree. Set
 `blankBaselineVerified` only after those checks, final chip match and confirmed
 reader closure; do not use success from two DELETE replies as a substitute.
 
@@ -165,6 +181,10 @@ reader closure; do not use success from two DELETE replies as a substitute.
   response bound, shortened by the remaining overall budget. Do not increase
   the limits, reset the card or continue after a late/uncertain reply. Report
   uncertain closure separately; a host timeout is not proof of card rollback.
+- Before any reader startup, permanently create the new `.consumed` marker and
+  acquire the exclusive journal lease. Revalidate all static admission pins after
+  consumption and immediately before lazy reader opening. Existing marker,
+  journal, request or lock refuses the invocation, including after a clean stop.
 - Require intent fsync before transmission and received public evidence fsync
   before continuation. A failed save stops the invocation. Preserve startup,
   command and closure outcomes without raw native exceptions or secret bodies.
@@ -177,19 +197,44 @@ reader closure; do not use success from two DELETE replies as a substitute.
   journal. No conditional second connection, package sweep, new install,
   fifth attempt or plan rewrite is pre-authorized.
 
-## Preparation outcome and approval gate
+## Launch form and approval gate
 
-Preparation accessed saved local files and simulators only. The existing Node
-recovery suites passed **34 cases**, and the independent Python recovery policy
-passed **10 cases**. Offline probes reproduced the unset-up command refusals,
-the full saved registry's rejection by the old installed allowance, and why an
-applications-only blank check is insufficient. These results identify software
-gates; they do not qualify a destructive execution path or prove current state.
+Working tree: `/Users/dread/Repos/cashu-card-recovery-v3`, local branch
+`feat/unset-up-recovery`. Fixed Node:
+`/opt/homebrew/opt/node@22/bin/node` (22.23.4). Fixed reviewed Python:
+`/Users/dread/Repos/cashu-card-recovery-v3/tools/cardctl/.venv/bin/python`
+(3.15.0; its resolved executable and pyscard files are hashed).
 
-All five re-read historical journal hashes are pinned in the audit and remain
-unchanged. No existing protected evidence or production system was modified.
+Preparation records will be new private files under
+`~/.cashucard/recover-unset-up-v3-preparation-2026-11-04/qualification-1/`:
+`campaign.json`, `runtime.json` and `preview.json`. No execution directory or
+consumption marker is created during preparation. The receipt records the exact
+absolute argv and campaign digest. Default invocation omits `--execute` and must
+return `mode: preview`, `approved: false`, `cardAccessed: false`. An explicit
+execution request with that same unapproved campaign must fail before startup.
 
-**Execution remains unapproved and blocked.** After the offline gates and final
-pins are complete, present the revised exact plan for a separate operator
-execution decision. The authorization in this conversation covers preparation
-only. No device was enumerated or opened, and no APDU was sent.
+The execution argv is the same fixed Node and runner with
+`--campaign <absolute-new-private-campaign-path> --sha256 <that-file-sha256>
+--execute`. Python, chip, key, reader, approval, source, runtime and the exact
+journal are validated from the pinned campaign/profile; there is no alternate
+journal, key, reader, retry or cleanup switch. The process transport launches
+Python with `-I -S -B -u`, then the exact bridge/request/hash/package-directory
+arguments. No printf pipeline, shell substitution or secret argument is needed.
+
+**Execution remains unapproved.** Before a future invocation, the operator must:
+
+1. Confirm custody of the same parsed `09336120` card, no intervening changes,
+   and its availability in the named ACS reader.
+2. Explicitly authorize the single bounded connection and three-object cleanup
+   in this exact plan. The present authorization covers preparation only.
+
+After that decision, record approval and this plan's SHA-256 in the tracked
+approval JSON and sign the metadata-only commit. Preserve this unapproved
+campaign. Create a fresh private approved campaign binding the resulting clean
+HEAD and rehashed runtime, then preview it before the single execution. Any
+implementation, bounds, evidence or device-state change requires a new decision.
+No automatic successor attempt, installation or phone operation is authorized.
+
+Preparation used saved files, simulators and synthetic transports only: no device
+was enumerated or opened, no physical APDU was sent and no production system was
+accessed. The five historical journals remain intact.
