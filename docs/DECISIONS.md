@@ -4785,3 +4785,40 @@ This iteration stays local. The dedicated Pixel installation-only build and
 receipt generator remain the next step; another physical run requires a complete
 named plan and fresh approval. Production firmware and store releases remain
 unchanged.
+
+## D165: Rehearse card-carried settlement through a portable relay and the real till
+
+**Decision (2026-11-04):** add a portable private packet decoder, durable paged
+capture/resume and exact-payment reconciliation engine against the existing
+candidate descriptor. Inject cryptography, an approved HTTP transport and durable
+storage. Revalidate both card signatures, the mint/card/installation context and
+scope before mint work. Save submission intent, reconcile a lost response using
+complete original output signatures and every input state, and distinguish helper
+`outputs-confirmed` evidence from the till's independent proceeds/accounting.
+
+Connect the unchanged private JavaCard engine to Flash POS's actual preparation,
+signature, merchant recovery and inventory code through fresh host processes.
+Keep the merchant's openings solely in its protected synthetic store. Exercise
+both local mint keyset shapes, lost successful swap replies, mint restart, a POS
+process killed after its synced inventory write, replay and a barrier-controlled
+phone/till submission race. Bind retained software evidence to actual source
+hashes. The runner creates only uniquely named, loopback-published FakeWallet
+services on a dedicated Docker network and cleans up its own services. A public
+per-campaign seed and in-container keyset checks bind the host endpoints to this
+campaign's newly created mints.
+
+**Why:** private signing/export capacity and isolated restore rehearsals do not
+establish the full merchant outcome. This slice connects the carrier, a
+phone-compatible engine and the deployed-code accounting boundaries in one local
+test. See the [run guide](../tools/assisted-relay/README.md). Network work occurs
+after packet capture, outside NFC. There is no destructive card operation in the
+relay engine.
+
+**Rejected:** showing merchant settlement from input consumption alone, replacing
+outputs after an ambiguous swap, crediting restored inventory twice, placing
+merchant openings in the relay, trusting a cached confirmed flag, fetching an
+arbitrary packet URL, or treating a simulator/native-free runtime test as physical
+phone qualification. A reserved logical mint maps to explicit loopback origins
+only in this demonstration. Production transport, holder authorization, final
+wire/limits and partner review remain open. Released firmware/assets, app
+capabilities and hardware approvals remain unchanged.
