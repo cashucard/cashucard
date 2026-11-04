@@ -592,3 +592,7 @@ Offline tests: `node --test 'tools/outbox-spike/unset-up-*.test.cjs'` and
 uses `UNSET_SIM_ARTIFACT` pointing to an existing private simulator conversion and
 a built cardsim jar; it uses no reader. The process tests supply an isolated
 synthetic PC/SC package and never import the installed native reader package.
+The physical launcher also invokes `unset_up_verify.py` in isolated Python to
+re-read the newly saved journal by hash. It independently checks all three full
+registry snapshots and public identity evidence before success; it has no reader
+imports and sends no commands.

@@ -80,6 +80,7 @@ async function cleanupUnsetUp({
   expectedKey = profile.key,
   began = now(),
   requirePolicyCompletion = false,
+  verifyEvidence,
 }) {
   const state = {
     plan: profile.planId,
@@ -295,6 +296,20 @@ async function cleanupUnsetUp({
     await identity("final-match-chip");
     state.registryBlankVerified = true;
     await persist();
+    if (verifyEvidence) {
+      check();
+      state.stage = "verify-saved-evidence";
+      await persist();
+      check();
+      try {
+        await verifyEvidence();
+      } catch {
+        fail("saved-evidence-refused");
+      }
+      state.savedEvidenceVerified = true;
+      await persist();
+      check();
+    }
   } catch (error) {
     firstFailure = error;
     state.status = "stopped";

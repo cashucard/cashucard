@@ -3,6 +3,7 @@
 const fs = require("node:fs"),
   path = require("node:path");
 const { parseArgs } = require("node:util");
+const { execFileSync } = require("node:child_process");
 const profile = require("./unset-up-profile.json");
 const { readPrivateJSON, withPhaseJournal } = require("./phase-journal.cjs");
 const {
@@ -100,6 +101,36 @@ async function runRecovery(options, deps = {}) {
         save,
         expectedKey: profile.key,
         requirePolicyCompletion: true,
+        verifyEvidence:
+          deps.verifyEvidence ||
+          (() => {
+            const record = readPrivateJSON(file);
+            const proof = JSON.parse(
+              execFileSync(
+                admitted.runtime.python,
+                [
+                  "-I",
+                  "-S",
+                  "-B",
+                  path.join(__dirname, "unset_up_verify.py"),
+                  "--journal",
+                  file,
+                  "--sha256",
+                  record.sha256,
+                ],
+                {
+                  encoding: "utf8",
+                  timeout: Math.max(
+                    1,
+                    Math.min(5000, 120000 - (performance.now() - began)),
+                  ),
+                  stdio: ["ignore", "pipe", "ignore"],
+                },
+              ),
+            );
+            if (proof.savedEvidenceVerified !== true)
+              throw Error("saved-evidence-refused");
+          }),
         tx: async (apdu) => {
           if (!bridge) {
             if (!checked) {

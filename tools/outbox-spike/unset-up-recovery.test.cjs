@@ -200,3 +200,18 @@ test("paged unordered registries are verified completely; a fifth page stops bef
     else assert.ok(r.commands > 24);
   }
 });
+
+test("a failed independent saved-evidence check prevents blank success and still closes", async () => {
+  const f = fixture();
+  const r = await cleanupUnsetUp({
+    ...f.args,
+    verifyEvidence: async () => {
+      throw Error("changed evidence");
+    },
+  });
+  assert.equal(r.status, "stopped");
+  assert.equal(r.failure, "saved-evidence-refused");
+  assert.equal(r.blankBaselineVerified, false);
+  assert.equal(f.closes, 1);
+  assert.equal(f.sent.length, 24);
+});

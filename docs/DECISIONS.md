@@ -4832,7 +4832,9 @@ from the retained audit. Admit only the unset-up diagnostic state through the
 unchanged validator. Read the key, reconfirm identity and the complete registry,
 then delete main, opener and package in that order. Verify full applications and
 load-files again, final identity and confirmed reader closure. Require independent
-policy completion before declaring blank.
+policy completion before declaring blank. An isolated decoder also rechecks the
+newly persisted registry snapshots, diagnostics, key and final identity receipts
+before closure and a successful outcome.
 
 A private campaign binds a clean source commit, final plan, tracked operator
 approval, runtime files and a fixed fresh journal. Default preview performs only

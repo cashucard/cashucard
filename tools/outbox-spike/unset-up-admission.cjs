@@ -78,6 +78,7 @@ function runtimeInfo(python) {
     "tools/outbox-spike/unset-up-transport.cjs",
     "tools/outbox-spike/unset_up_bridge.py",
     "tools/outbox-spike/unset_up_policy.py",
+    "tools/outbox-spike/unset_up_verify.py",
     "tools/outbox-spike/unset-up-profile.json",
     "tools/outbox-spike/phase-journal.cjs",
     "tools/outbox-spike/run-compact.cjs",

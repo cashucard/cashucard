@@ -13,6 +13,12 @@ const {
 } = require("./unset-up-admission.cjs");
 const { runRecovery, createPrivate } = require("./recover-unset-up.cjs");
 const { fixture } = require("./unset-up-test-support.cjs");
+const { execFileSync } = require("node:child_process");
+const python = execFileSync(
+  "python3",
+  ["-c", "import sys;print(sys.executable)"],
+  { encoding: "utf8" },
+).trim();
 function campaign(t, approved = true) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "unset-admission-"));
   fs.chmodSync(dir, 0o700);
@@ -38,7 +44,7 @@ function campaign(t, approved = true) {
       sha256: "c".repeat(64),
     }),
   };
-  const value = template("/synthetic/python", deps);
+  const value = template(python, deps);
   createPrivate(file, Object.fromEntries(Object.entries(value).reverse()));
   const options = {
     campaign: file,
