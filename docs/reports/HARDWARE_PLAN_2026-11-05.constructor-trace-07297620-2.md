@@ -1,8 +1,9 @@
 # Fresh diagnostic invocation after the zero-command host stop
 
-- Plan ID `constructor-trace-07297620-v2`; execution approval **false**;
-  unconsumed. This is a concrete successor proposal for operator review, not
-  automatic retry authority from the failed first invocation.
+- Plan ID `constructor-trace-07297620-v2`; execution approval **true**;
+  unconsumed before this invocation. The operator said **"approved"** after
+  reviewing this finished successor. This grants exactly its one fresh run,
+  with no inherited approval or automatic successor from the first stop.
 - Exact card `cplc-v1:4790d3213180072976207515`, serial **07297620**, batch **7515**;
   exact reader `ACS ACR122U PICC Interface`, one exclusive leave-card connection.
 - The [first attempt](HARDWARE_TEST_REPORT_2026-11-05.d321-07297620-constructor-host-stop.md)
@@ -101,8 +102,9 @@ No journal, reader, key, package, artifact or retry override exists.
 /opt/homebrew/opt/node@22/bin/node tools/outbox-spike/constructor-diagnostic-07297620-v2.cjs --campaign <absolute-new-private-campaign.json> --sha256 <actual-sha256>
 ```
 
-Describe/save/preview are local-only and do not consume the attempt. False v2
-approval blocks execution. After recorded approval and refreshed signed pins,
+Describe/save/preview are local-only and do not consume the attempt. The initial
+unapproved v2 preparation remains intact. After this recorded approval and
+refreshed signed pins,
 append `--execute` to the same approved preview arguments once. Preserve the
 unapproved preparation and create new approved receipts.
 

@@ -4,7 +4,7 @@
   "reader": "ACS ACR122U PICC Interface",
   "format": "card-constructor-trace-profile-v1",
   "planId": "constructor-trace-07297620-v2",
-  "approved": false,
+  "approved": true,
   "package": "F0434153485543545243",
   "artifactDir": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/image",
   "manifestSha256": "3004dc15805313049c9331249c4a04640155916df88304948dc2d529ac89e41c",
@@ -38,5 +38,5 @@
       "sw": "9000"
     }
   ],
-  "auditSha256": "8e0561f1ee85abde90c995980511c73291376be8b0aeee3883feeb88dff54995"
+  "auditSha256": "a9e58ed4e88e8ee9e3c1d95119ef82665b24f3e30e5c4e7096cd96fbb35d1592"
 }

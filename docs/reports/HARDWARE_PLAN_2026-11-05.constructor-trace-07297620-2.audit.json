@@ -2,7 +2,7 @@
   "format": "card-constructor-diagnostic-successor-evidence-v1",
   "planId": "constructor-trace-07297620-v2",
   "preparationApproved": true,
-  "executionApproved": false,
+  "executionApproved": true,
   "operatorStatement": "ok continue",
   "operatorDecision": "Fresh unapproved proposal after a verified zero-command host stop. Same card/image/APDU scope; no inherited execution approval.",
   "chip": "cplc-v1:4790d3213180072976207515",
@@ -177,5 +177,7 @@
       "sha256": "bf44e945e509de1625f4774746584f5f1faa66d9de0201122c1c8d4c3451eeae"
     }
   ],
-  "hardwareAccessDuringPreparation": false
+  "hardwareAccessDuringPreparation": false,
+  "executionOperatorStatement": "approved",
+  "executionOperatorDecision": "The operator approved the finished v2 successor: same exact 07297620, ACS reader, image and 100/112-command diagnostic scope, one fresh pass-2 invocation, no cleanup/retry/successor."
 }
