@@ -4951,3 +4951,24 @@ and helper/till tests without a gratuitous reinstall.
 record, inventing the new key, erasing after uncertain creation, replacing an
 old lab app/journal, raising timeouts, or calling a synthetic success silicon
 qualification. See the [named plan](reports/HARDWARE_PLAN_2026-11-05.pixel-07297620-create.md).
+
+## D171: Inspect uncertain 07297620 creation through registry reads only
+
+**Decision (2026-11-05):** prepare a separate, initially unapproved single-use
+inspection of 07297620 after the Pixel's unconfirmed main-creation reply. Match
+its CPLC, prove one public factory channel, read both complete registry kinds,
+rematch identity, replay the saved public evidence independently and confirm
+closure. Require the four original platform frames, private package and opener;
+classify the main frame as present or absent. No private applet command is needed.
+
+**Why:** LOAD and opener acknowledgements establish neither main absence nor a
+usable applet. A narrowly bounded registry read can resolve membership without
+running, recreating or erasing the uncertain instance. Keep a new profile,
+transport, native policy and journal so every old guard and consumed invocation
+stays intact. Preparation approval is not device execution approval.
+
+**Rejected:** retrying creation, treating an absent reply as a card status,
+weakening a blank-state validator to accept an installation, selecting the main
+applet merely to determine registry membership, dropping CardDocLite or the
+package frame, and automatically continuing after inspection. See the
+[named plan](reports/HARDWARE_PLAN_2026-11-05.inspect-07297620.md).

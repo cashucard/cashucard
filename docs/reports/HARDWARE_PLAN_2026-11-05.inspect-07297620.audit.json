@@ -1,0 +1,89 @@
+{
+  "format": "card-inspection-evidence-v1",
+  "planId": "inspect-07297620-v1",
+  "preparationApproved": true,
+  "executionApproved": false,
+  "operatorStatement": "yes",
+  "operatorDecision": "Prepare a bounded read-only inspection after the stopped Pixel creation; device execution remains pending.",
+  "chip": "cplc-v1:4790d3213180072976207515",
+  "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
+  "sourceHashes": {
+    "tools/outbox-spike/pixel-control.js": "d1a0c736842e019c00e8bcc58cf1ee34968c81b56bf0c70039b0e5a4096bc4b4",
+    "tools/outbox-spike/pixel-capacity.js": "2c7cef745bea31a714530c4a609f23d48c5f4c1cffb3ec13b1aa098eee437d2b",
+    "tools/outbox-spike/pixel-07297620-create.js": "aab22bbfc20a7265c0ada84e9f75ecb0a3d91267463b79bb34d168e220d83552",
+    "tools/outbox-spike/pixel-07297620-create.json": "319b49e3c707f7d6cbef9e17195b69c758685a415712b97d5ea6874a64f84325",
+    "tools/outbox-spike/compact_bridge.py": "6946869b249fd85f3c4a7ee0ae44e442fa126a2cd52c3cdf348836c04e265a6d",
+    "tools/outbox-spike/unset_up_policy.py": "5e7d846eeceecee6963c29cc08ca2f1cbf4823f5050f3207c11dfba0a72cb9e3",
+    "tools/outbox-spike/readiness-07297620.cjs": "33d9bd44a739c0f29c224d54f7b7cf49fee158b511a856c663f4989b4cef0ca8",
+    "tools/outbox-spike/readiness-07297620-v2.cjs": "44f7a70b1a5b103279bdaa9ca0bb28e0beef6a1939d98d372338a94a7a143772",
+    "tools/outbox-spike/readiness_07297620.py": "8026e15ef6c2a6cee1e72958d3930b535cbd0db0eaced34661dd705eb5ac0820",
+    "tools/outbox-spike/readiness_07297620_v2.py": "55c9fd2751033c588a2fccc7a681a9394e669a8908c1e533e51cb209ed577bce",
+    "tools/outbox-spike/readiness-transport.cjs": "5d16db49576105d2d6628541303fa6f2e2c6163299968a374246c056792d1eef",
+    "tools/outbox-spike/readiness-07297620.json": "c49147a6f3e0cf92efb1dfbffd4b2dabf385c4bef33a02549dddefb706291314",
+    "tools/outbox-spike/readiness-07297620-v2.json": "42b5f5d66c553daa7f5e4791dfcf8f3728e8462d6f3a5e171d44fc8937d6886b"
+  },
+  "evidence": [
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-2026-10-28/cleanup-journal.json",
+      "sha256": "5d56123c62762fffb1cc7a4ab423dc6f5f5cff1ac5e68e11a3a6492c479b2ab1"
+    },
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-diagnostics-2026-10-28/prototype-journal.json",
+      "sha256": "93172a0004ff17c3752dfc9a0bda7a07ae1ac849ccaa4457147137f8157b6c73"
+    },
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-diagnostics-2026-10-28/cleanup-journal.json",
+      "sha256": "9185333af1fa9655659144a39d5cf2be8c367253725e8d2a0a27a293934791a0"
+    },
+    {
+      "path": "/Users/dread/.cashucard/switched-card-identity-2026-11-04/receipt.json",
+      "sha256": "b1084c53d485f7cf0ad3e10b0b7903ca32167d2949ccf138669adb6271e013e6"
+    },
+    {
+      "path": "/Users/dread/.cashucard/switched-card-identity-2026-11-04/pass-1/result.json",
+      "sha256": "8134baa6524dc6435d4f410b62b0baa869fd061e0fe9f0a1da4444e95a1a2c71"
+    },
+    {
+      "path": "/Users/dread/.cashucard/recover-unset-up-2026-11-04/attempt-4/recover.json",
+      "sha256": "17db6c388dc76d22ee8466eb2b82a3b483f0dcb34728f03fc211d62f8c814b09"
+    },
+    {
+      "path": "/Users/dread/.cashucard/readiness-07297620-2026-11-04/pass-1/readiness.json",
+      "sha256": "9cbef5cac558c2ce871bfdcc38d76ea33f5b3f6b8af5fb6f002f414b5285b4b1"
+    },
+    {
+      "path": "/Users/dread/.cashucard/readiness-07297620-2026-11-04/preparation/result.json",
+      "sha256": "acedaf2946b019538530787255011a1a4bef3b8823e09c44bba1cbbee6323ada"
+    },
+    {
+      "path": "/Users/dread/.cashucard/readiness-07297620-2026-11-05/pass-2/readiness.json",
+      "sha256": "c45962384f33478f1022ece106471e46e5966f8989e8a686504f2a3b5659c29d"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/lab-build.json",
+      "sha256": "d38805ad0bd96b8609b71485e33f9202d6a956592a3766cf5305ec157f75832f"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/activation.json",
+      "sha256": "43be35db3b710470ec5f0d97f5b182afa6857068b6aff6c003f7946b4968ccb4"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/app-debug.apk",
+      "sha256": "0c3e9f1b8b7d41c2f539d81506742191537b0e164a55c2301d4c6b98d2366988"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/collection-1/app-databases.tar",
+      "sha256": "3f44efb97d9967166b0f5b0fca271de6242d934c195b08d1ba3116f54c535fd8"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/collection-1/journal.json",
+      "sha256": "30f018b5ebb75bceddf607145e6db381c4a4818d3a62c5037fa49b24ffae3986"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/collection-1/review.json",
+      "sha256": "f3f60ef04a05b6da24b4a513bbf5f98d20e5e58371b7a9f5032c5cbf2da1dfb7"
+    }
+  ],
+  "currentMainExistence": "unknown",
+  "hardwareAccessDuringPreparation": false
+}
