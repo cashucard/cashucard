@@ -85,9 +85,12 @@ async function qualifyBlank({
   random = randomBytes,
   now = () => performance.now(),
   began = now(),
+  planId = profile.planId,
 }) {
+  if (!["readiness-07297620-v1", "readiness-07297620-v2"].includes(planId))
+    fail("unknown-readiness-plan");
   const state = {
-    plan: profile.planId,
+    plan: planId,
     chip: profile.chip,
     status: "running",
     stage: "admission",

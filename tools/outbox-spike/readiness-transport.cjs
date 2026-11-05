@@ -10,7 +10,10 @@ async function openReadinessBridge({
   sha256,
   now = () => performance.now(),
   began = now(),
+  planId = "readiness-07297620-v1",
 }) {
+  if (!["readiness-07297620-v1", "readiness-07297620-v2"].includes(planId))
+    throw new CleanupFailure("unknown-readiness-plan");
   const child = spawn(
     python,
     [
@@ -18,7 +21,12 @@ async function openReadinessBridge({
       "-S",
       "-B",
       "-u",
-      path.join(__dirname, "readiness_07297620.py"),
+      path.join(
+        __dirname,
+        planId === "readiness-07297620-v2"
+          ? "readiness_07297620_v2.py"
+          : "readiness_07297620.py",
+      ),
       "--request",
       request,
       "--sha256",

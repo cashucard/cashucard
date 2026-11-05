@@ -4905,3 +4905,23 @@ old profiles, policies, CAPs and evidence intact.
 policy, declaring blank from applications alone, authenticating without a proved
 factory cryptogram, or automatically installing after a readiness result. See the
 [named execution plan](reports/HARDWARE_PLAN_2026-11-04.readiness-07297620.md).
+
+## D169: Recheck readiness only after an operator-reported external reset
+
+**Decision (2026-11-05):** prepare one explicitly named v2 readiness invocation
+for 07297620 after the operator reported a reset and returned it to the reader.
+Keep the original consumed v1 campaign/profile/journal intact. Reuse the exact
+wire predicates, expected chip, public factory-key proof, four-file baseline,
+15-command ceiling and deadlines. Bind a distinct fixed journal and profile to
+v2; unknown plan labels are rejected before transmission. The independent Python
+successor checks that all device/baseline fields equal the original before use.
+
+**Why:** an operator action changes the premise for a fresh check, but is not
+proof of restored keys or blank state. The first check stopped before external
+authentication; the new one must still prove the factory cryptogram and complete
+registry. It must not erase or provision a card based on the reset claim alone.
+
+**Rejected:** deleting a consumed marker, moving or rewriting an old journal,
+trying another key set, assuming reset released an ops fence, broadening device
+or command admission, or automatically repeating a failed check. See the
+[post-reset plan](reports/HARDWARE_PLAN_2026-11-05.readiness-07297620-2.md).

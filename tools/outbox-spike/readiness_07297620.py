@@ -14,7 +14,10 @@ from unset_up_policy import frames, secure
 from compact_recovery_bridge import trim_cplc
 import probe_bridge as common
 
-PROFILE = json.loads((HERE/'readiness-07297620.json').read_text())
+PROFILE_FILE = HERE/'readiness-07297620.json'
+ENTRY_FILE = HERE/'readiness_07297620.py'
+JOURNAL_RELATIVE = '.cashucard/readiness-07297620-2026-11-04/pass-1/readiness.json'
+PROFILE = json.loads(PROFILE_FILE.read_text())
 ISD = common.select(common.ISD)
 CPLC = bytes.fromhex('80ca9f7f00')
 BASELINE = frames(bytes.fromhex(next(p['data'] for p in PROFILE['baselinePages'] if p['kind']=='load-files')))
@@ -117,16 +120,16 @@ def request(args):
         raise ValueError('request fields')
     if v['format']!='card-readiness-request-v1' or v['planId']!=PROFILE['planId'] or v['approved'] is not True or PROFILE['approved'] is not True:
         raise ValueError('execution approval required')
-    if v['profileSha256']!=hashlib.sha256((HERE/'readiness-07297620.json').read_bytes()).hexdigest():raise ValueError('profile changed')
+    if v['profileSha256']!=hashlib.sha256(PROFILE_FILE.read_bytes()).hexdigest():raise ValueError('profile changed')
     if os.path.realpath(v['python'])!=os.path.realpath(sys.executable) or v['sitePackages']!=args.site_packages:raise ValueError('runtime changed')
     site=Path(args.site_packages)
     if not site.is_absolute() or site.resolve(strict=True)!=site or site.name!='site-packages' or not (site/'smartcard').is_dir():raise ValueError('package path')
-    required=[str(HERE/'readiness_07297620.py'),str(HERE/'readiness-07297620.json'),os.path.realpath(sys.executable)]
+    required=[str(HERE/'readiness_07297620.py'),str(ENTRY_FILE),str(PROFILE_FILE),os.path.realpath(sys.executable)]
     if not isinstance(v['files'],dict) or len(v['files'])>2000 or any(p not in v['files'] for p in required):raise ValueError('runtime pins')
     for name,digest in v['files'].items():
         p=Path(name)
         if not p.is_absolute() or p.is_symlink() or not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest()!=digest:raise ValueError('runtime file changed')
-    journal=str(Path.home()/'.cashucard/readiness-07297620-2026-11-04/pass-1/readiness.json')
+    journal=str(Path.home()/JOURNAL_RELATIVE)
     if v['journal']!=journal or v['marker']['path']!=journal+'.consumed':raise ValueError('named journal required')
     marker=private_json(v['marker']['path'],v['marker']['sha256'])
     if marker!={'format':'card-readiness-consumed-v1','planId':PROFILE['planId'],'campaignSha256':v['campaignSha256'],'journal':journal}:raise ValueError('consumption marker')

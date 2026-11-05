@@ -16,7 +16,15 @@ const python = fs.realpathSync(
     encoding: "utf8",
   }).trim(),
 );
-async function setup(t, mode = "ok") {
+async function setup(t, mode = "ok", planId = "readiness-07297620-v1") {
+  const selectedProfile =
+    planId === "readiness-07297620-v2"
+      ? require("./readiness-07297620-v2.json")
+      : profile;
+  const profileFile =
+    planId === "readiness-07297620-v2"
+      ? "readiness-07297620-v2.json"
+      : "readiness-07297620.json";
   const root = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), "readiness-wire-")),
   );
@@ -71,31 +79,36 @@ async function setup(t, mode = "ok") {
   const fakeHome = path.join(root, "synthetic-home"),
     journal = path.join(
       fakeHome,
-      ".cashucard/readiness-07297620-2026-11-04/pass-1/readiness.json",
+      planId === "readiness-07297620-v2"
+        ? ".cashucard/readiness-07297620-2026-11-05/pass-2/readiness.json"
+        : ".cashucard/readiness-07297620-2026-11-04/pass-1/readiness.json",
     );
   fs.mkdirSync(path.dirname(journal), { recursive: true, mode: 0o700 });
   const campaignSha256 = "a".repeat(64),
     marker = { path: journal + ".consumed" };
   marker.sha256 = createPrivate(marker.path, {
     format: "card-readiness-consumed-v1",
-    planId: profile.planId,
+    planId: selectedProfile.planId,
     campaignSha256,
     journal,
   });
   const files = {};
   for (const file of [
     python,
-    ...["readiness_07297620.py", "readiness-07297620.json"].map((n) =>
-      path.join(__dirname, n),
-    ),
+    ...[
+      "readiness_07297620.py",
+      "readiness_07297620_v2.py",
+      "readiness-07297620.json",
+      profileFile,
+    ].map((n) => path.join(__dirname, n)),
     ...fs.readdirSync(pkg).map((n) => path.join(pkg, n)),
   ])
     files[file] = hash(fs.readFileSync(file));
   const value = {
     format: "card-readiness-request-v1",
-    planId: profile.planId,
+    planId: selectedProfile.planId,
     approved: true,
-    profileSha256: files[path.join(__dirname, "readiness-07297620.json")],
+    profileSha256: files[path.join(__dirname, profileFile)],
     python,
     sitePackages: site,
     files,
@@ -128,7 +141,7 @@ async function setup(t, mode = "ok") {
     pkg,
     f,
     value,
-    options: { python: wrapper, sitePackages: site, request, sha256 },
+    options: { python: wrapper, sitePackages: site, request, sha256, planId },
     rewrite(v) {
       fs.unlinkSync(request);
       this.options.sha256 = createPrivate(request, v);
@@ -205,4 +218,40 @@ test("independent decoder re-reads saved public registry and refuses retained ob
     if (changed) assert.throws(check);
     else assert.deepEqual(check(), { savedEvidenceVerified: true });
   }
+});
+
+test("post-reset process binds v2 to its new consumption marker and saved-evidence decoder", async (t) => {
+  const f = await setup(t, "ok", "readiness-07297620-v2"),
+    bridge = await openReadinessBridge(f.options);
+  const r = await qualifyBlank({
+    ...f.f.args,
+    planId: "readiness-07297620-v2",
+    tx: bridge.tx,
+    close: bridge.close,
+  });
+  assert.equal(r.status, "ready", JSON.stringify(r));
+  assert.equal(r.plan, "readiness-07297620-v2");
+  const value = structuredClone(
+    f.f.saved.findLast((s) => s.stage === "verify-saved-evidence"),
+  );
+  value.plan = "readiness-07297620-v2";
+  const file = path.join(f.root, "saved-v2.json"),
+    sha256 = createPrivate(file, value);
+  const proof = JSON.parse(
+    execFileSync(
+      python,
+      [
+        "-I",
+        "-S",
+        "-B",
+        path.join(__dirname, "readiness_07297620_v2.py"),
+        "--verify-journal",
+        file,
+        "--sha256",
+        sha256,
+      ],
+      { encoding: "utf8" },
+    ),
+  );
+  assert.equal(proof.savedEvidenceVerified, true);
 });
