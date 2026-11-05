@@ -1,0 +1,13 @@
+    public void process(APDU apdu) {
+        byte[] b=apdu.getBuffer();
+        if (selectingApplet()) {
+            b[0]=0x43; b[1]=0x54; b[2]=0x52; b[3]=0x41; b[4]=0x43; b[5]=0x45; b[6]=1;
+            apdu.setOutgoingAndSend((short)0,(short)7);
+            return;
+        }
+        if (b[ISO7816.OFFSET_CLA]!=(byte)0xB0) ISOException.throwIt(ISO7816.SW_CLA_NOT_SUPPORTED);
+        if (b[ISO7816.OFFSET_P1]!=0 || b[ISO7816.OFFSET_P2]!=0) ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+        if (b[4]!=0) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        if (b[ISO7816.OFFSET_INS]!=(byte)0x7D) ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
+        ConstructorTrace.reply(apdu);
+    }

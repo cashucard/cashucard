@@ -4993,3 +4993,27 @@ largest allocation or transaction budget from counters, blind installation or
 padding retries, raising timeouts, dropping baseline objects, and reusing the
 consumed inspection approval. See the
 [named plan](reports/HARDWARE_PLAN_2026-11-05.memory-07297620.md).
+
+## D173: Register only a private diagnostic after a catchable constructor fault
+
+**Decision (2026-11-05):** prepare a separate constructor-only diagnostic image
+in namespace `F0434153485543545243`. Preserve original instance fields and ordered
+initialization operations, add source-bound stage calls, catch bounded JavaCard
+API/runtime exceptions inside the constructor, and expose only a read-only
+status from the resulting diagnostic instance. Keep every allocation at install
+time, disable legacy selection/shared-interface behavior, and require the same
+converted 50-reference class shape. Released code, images and guards stay intact.
+
+**Why:** the selected card's main is absent after an unconfirmed creation, while
+source budgets and public counters do not identify an operation. A caught API
+fault can be recorded before diagnostic registration commits that result. An
+INSTALL acknowledgement must therefore be distinguished from constructor
+completion; a partial diagnostic is never a Cashu payment applet.
+
+**Rejected:** trusting non-atomic breadcrumbs after failed installation,
+application-driven transaction abort while allocating, moving allocations onto
+APDU paths, exporting secrets, retrying a stage, weakening older private guards,
+or asserting that instrumentation preserves the original image's silicon fit.
+An unconfirmed diagnostic INSTALL remains inconclusive and stops. See the
+[design and offline checks](../tools/outbox-spike/CONSTRUCTOR-TRACE.md).
+No device access is authorized by this decision or source-only preparation.
