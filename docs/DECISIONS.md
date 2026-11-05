@@ -4925,3 +4925,29 @@ registry. It must not erase or provision a card based on the reset claim alone.
 trying another key set, assuming reset released an ops fence, broadening device
 or command admission, or automatically repeating a failed check. See the
 [post-reset plan](reports/HARDWARE_PLAN_2026-11-05.readiness-07297620-2.md).
+
+## D170: Isolate 07297620's phone creation control and retain its installation
+
+**Decision (2026-11-05):** use a separate offline Android debug app and portable
+creation controller for the operator-selected 07297620 and available Pixel 8 Pro.
+Bind the exact streamed image and this card's four-file baseline. Check complete
+registry sets before loading and after opener/main creation, record unset-up
+format-5 diagnostics and a newly observed valid public key, then rematch CPLC.
+Leave the installation intact for the separately planned small payment test.
+
+Use a distinct application ID/journal, consumed before NFC, and no replacement
+of existing app storage. The new generator preserves production sources/assets
+and does not broaden the older Pixel policies or NFC patch allowlist. Keep one
+factory channel, fixed APDUs, deadlines and stop-on-uncertainty behavior. No
+SETUP, proof, payment, key rotation or cleanup belongs to this invocation.
+
+**Why:** 07297620's fresh readiness now proves factory authority and its exact
+blank baseline, but its earlier USB main creation stopped. Another card's phone
+success does not establish creation on this card. A retained installation/key
+receipt supplies the correct provenance for the next physical signing/export
+and helper/till tests without a gratuitous reinstall.
+
+**Rejected:** editing global card profiles, accepting instances without a package
+record, inventing the new key, erasing after uncertain creation, replacing an
+old lab app/journal, raising timeouts, or calling a synthetic success silicon
+qualification. See the [named plan](reports/HARDWARE_PLAN_2026-11-05.pixel-07297620-create.md).

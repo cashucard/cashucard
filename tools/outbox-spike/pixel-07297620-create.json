@@ -1,0 +1,40 @@
+{
+  "package": "F04341534855434D5054",
+  "manifest": "b2adaa4252e1ad988cecb0ff31e001ce22f2be0ce00a5c1b25dbb0d451e5bca4",
+  "cap": "b22479280337d4192b4001f06a38d136d69523c38c90f88cab00f2b9e374ce27",
+  "load": "74caa34bc570427b4a292b6696328ed499c3967e13d8ab11066dfb103a4ac048",
+  "bytes": 28067,
+  "blocks": 114,
+  "source": "96eb11df58c0969e2d00a1d52a2ca726f8d2d971",
+  "plan": "pixel-07297620-create-v1",
+  "chip": "cplc-v1:4790d3213180072976207515",
+  "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
+  "appId": "org.cashucard.card072creation",
+  "journalKey": "cashucard-card072-creation-v1",
+  "baselinePages": [
+    {
+      "kind": "applications",
+      "page": 0,
+      "sw": "6a88",
+      "data": ""
+    },
+    {
+      "kind": "load-files",
+      "page": 0,
+      "sw": "9000",
+      "data": "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000e3214f0da00000016443446f634c6974659f700101ce020100cc08a000000151000000e31b4f07a00000006202049f700101ce020100cc08a000000151000000e31b4f07a00000006202029f700101ce020103cc08a000000151000000"
+    }
+  ],
+  "installedPrivatePages": [
+    {
+      "kind": "applications",
+      "data": "e32c4f0bf04341534855434d50544d9f700107c503000000c40af04341534855434d5054cc08a000000151000000e32c4f0bf04341534855434d5054019f700107c503000000c40af04341534855434d5054cc08a000000151000000",
+      "sw": "9000"
+    },
+    {
+      "kind": "load-files",
+      "data": "e31e4f0af04341534855434d50549f700101ce020000cc08a000000151000000",
+      "sw": "9000"
+    }
+  ]
+}
