@@ -29,7 +29,7 @@
   ],
   "format": "card-inspection-profile-v1",
   "planId": "inspect-07297620-v1",
-  "approved": false,
+  "approved": true,
   "reader": "ACS ACR122U PICC Interface",
-  "auditSha256": "38dfbbfee0879ffddad0b9588d4bb85c2b11b8f28cbfab467d4dbbceb3a30d01"
+  "auditSha256": "77f3b4c90bd71cb0751ae499fa72239c3d7f26d604ec22f27ad77df55710fb3f"
 }

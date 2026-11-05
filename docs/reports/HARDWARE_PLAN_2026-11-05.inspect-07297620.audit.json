@@ -2,9 +2,9 @@
   "format": "card-inspection-evidence-v1",
   "planId": "inspect-07297620-v1",
   "preparationApproved": true,
-  "executionApproved": false,
+  "executionApproved": true,
   "operatorStatement": "yes",
-  "operatorDecision": "Prepare a bounded read-only inspection after the stopped Pixel creation; device execution remains pending.",
+  "operatorDecision": "The operator approved execution of the finished inspect-07297620-v1 plan after review. Exactly one named-reader registry inspection, no follow-up connection or mutation.",
   "chip": "cplc-v1:4790d3213180072976207515",
   "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
   "sourceHashes": {
@@ -85,5 +85,6 @@
     }
   ],
   "currentMainExistence": "unknown",
-  "hardwareAccessDuringPreparation": false
+  "hardwareAccessDuringPreparation": false,
+  "executionOperatorStatement": "approved"
 }

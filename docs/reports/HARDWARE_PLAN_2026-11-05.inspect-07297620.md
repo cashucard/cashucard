@@ -1,9 +1,10 @@
 # Read-only registry inspection after 07297620's uncertain main creation
 
-- Plan ID: `inspect-07297620-v1`; execution approval **false**; unconsumed.
+- Plan ID: `inspect-07297620-v1`; execution approval **true**; unconsumed before this invocation.
 - The operator said **"yes"** to preparing a bounded read-only inspection after
-  the Pixel stop. Preparation is authorized; device execution awaits approval
-  of this finished plan. No earlier execution decision is carried forward.
+  the Pixel stop, then **"approved"** after reviewing this finished plan. This
+  authorizes exactly its one named-reader inspection. No earlier execution
+  decision is carried forward and no successor action is authorized.
 - Card: exactly `cplc-v1:4790d3213180072976207515`, serial **07297620**, batch
   **7515**, with the exact raw CPLC pinned in `inspect-07297620.json`.
 - Reader: exactly `ACS ACR122U PICC Interface`, one exclusive connection.
@@ -118,10 +119,10 @@ From the isolated worktree use the pinned Node/Python paths:
 
 The first command describes a host-only campaign. Save the actual JSON privately
 without modifying existing files; the second command is local-only preview.
-After approval and refreshed pins, execute the exact preview arguments once by
-adding `--execute`. With the present `approved: false`, `--execute` refuses before
-reading any campaign or importing/enumerating PC/SC. Do not execute that command
-as part of preparation or assume placing a card on the reader is approval.
+After the recorded approval and refreshed pins, execute the exact preview
+arguments once by adding `--execute`. The original preparation preview remains
+preserved with `approved: false`; a new approved campaign must be described and
+previewed from signed clean source. Device placement alone is never approval.
 
 Qualification includes meaningful missing-implementation red runs, both
 membership outcomes through fake-card SCP02, split pages, unexpected/missing
