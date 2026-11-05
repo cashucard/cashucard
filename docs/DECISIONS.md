@@ -4860,3 +4860,26 @@ plans/journals. The tracked execution approval remains false. This change grants
 no hardware permission; the [named plan](reports/HARDWARE_PLAN_2026-11-04.recover-unset-up-3.md)
 requires a separate operator execution decision. Released applets, CAPs and phone
 applications are unchanged.
+
+## D167: Select 07297620 with its own readiness and creation gates
+
+**Decision (2026-11-04):** follow the operator's replacement-card selection and
+plan the assisted-payment work on `cplc-v1:4790d3213180072976207515`. Preserve
+D153's exact four-file baseline, including CardDocLite. Its saved cleanup proves
+historical blank state; the fresh identity read does not prove current blank
+state. Prepare a no-deletion readiness campaign first, then a separately scoped
+phone creation control before the smallest physical payment/relay/till case.
+
+**Why:** this card's last recorded state is blank after separate cleanup, while
+the stopped unset-up image/key belonged to a different identity. Two earlier ACS
+creation attempts on 07297620 stopped before setup; their cause remains unknown.
+Another card's Pixel creation result is a reason to prepare an independent
+phone control, not evidence that this card supports that image. Keep the session
+acceptance condition at independently recovered merchant proceeds exactly once.
+
+**Rejected:** changing the consumed recovery plan's identity/key, erasing a card
+based on historical state, dropping its fourth platform file, another blind ACS
+installation, widening the full-slot qualification guard, or treating target
+selection as approval of new hardware actions. No released firmware, protocol,
+phone asset or global profile changes. See the
+[replacement plan](reports/PLAN_2026-11-04.adopt-07297620.md).
