@@ -1,8 +1,10 @@
 # One catchable-constructor diagnostic on 07297620
 
-- Plan ID `constructor-trace-07297620-v1`; execution approval **false**,
-  unconsumed. The operator's **"ok continue"** authorizes this offline
-  preparation after the completed memory read, not a new installation.
+- Plan ID `constructor-trace-07297620-v1`; execution approval **true**,
+  unconsumed before this invocation. The operator's **"ok continue"** authorized
+  preparation; the subsequent **"approved"**, after reviewing the finished plan,
+  authorizes exactly this one diagnostic installation and result read. No
+  consumed approval or successor authority is reused.
 - Card exactly `cplc-v1:4790d3213180072976207515`, serial **07297620**, batch
   **7515**, exact raw CPLC fixed in `constructor-trace-07297620.json`.
 - Reader exactly `ACS ACR122U PICC Interface`; one exclusive connection,
@@ -150,7 +152,9 @@ removed or rewritten to rearm. Uncertain closure retains the lease.
 
 Describe/save/preview are local-only and do not consume the attempt. After
 approval and refreshed pins, execute the exact preview arguments once with
-`--execute`. False approval rejects before campaign access/native startup.
+`--execute`. The original false-approval preparation remains intact; create a
+new approved campaign/preview from signed clean source before this invocation.
+False approval would reject before campaign access/native startup.
 There is no reader, image, package, key, journal or retry override.
 
 Missing-implementation and command-intent regressions failed before the new

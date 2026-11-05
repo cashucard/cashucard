@@ -2,7 +2,7 @@
   "format": "card-constructor-diagnostic-evidence-v1",
   "planId": "constructor-trace-07297620-v1",
   "preparationApproved": true,
-  "executionApproved": false,
+  "executionApproved": true,
   "operatorStatement": "ok continue",
   "operatorDecision": "Prepare a new diagnostic offline after the consumed memory snapshot. Hardware execution requires approval of this finished named-device plan.",
   "chip": "cplc-v1:4790d3213180072976207515",
@@ -153,5 +153,7 @@
       "sha256": "726d0d74a5051c8c43852e0c08b6ffb3200d2669aa94a13706f55897856157ac"
     }
   ],
-  "hardwareAccessDuringPreparation": false
+  "hardwareAccessDuringPreparation": false,
+  "executionOperatorStatement": "approved",
+  "executionOperatorDecision": "The operator approved the finished constructor-trace-07297620-v1 plan: one new diagnostic installation alongside the retained package/opener on exactly 07297620 in the named ACS reader, no cleanup, retry, successor connection or payment."
 }
