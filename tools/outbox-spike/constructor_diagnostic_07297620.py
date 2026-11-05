@@ -179,7 +179,7 @@ def request(args):
     if os.path.realpath(v['python'])!=os.path.realpath(sys.executable) or v['sitePackages']!=args.site_packages:raise ValueError('runtime changed')
     site=Path(args.site_packages)
     if not site.is_absolute() or site.resolve(strict=True)!=site or site.name!='site-packages' or not (site/'smartcard').is_dir():raise ValueError('package path')
-    required=[str(ENTRY_FILE),str(PROFILE_FILE),str(HERE/'unset_up_bridge.py'),str(HERE/'unset_up_policy.py'),str(HERE/'compact_recovery_bridge.py'),str(HERE/'probe_bridge.py'),os.path.realpath(sys.executable),*[str(Path(PROFILE['artifactDir'])/n) for n in ['manifest.json','constructor-trace.cap','load-file.bin','stages.json']]]
+    required=[str(HERE/'constructor_diagnostic_07297620.py'),str(ENTRY_FILE),str(PROFILE_FILE),str(HERE/'unset_up_bridge.py'),str(HERE/'unset_up_policy.py'),str(HERE/'compact_recovery_bridge.py'),str(HERE/'probe_bridge.py'),os.path.realpath(sys.executable),*[str(Path(PROFILE['artifactDir'])/n) for n in ['manifest.json','constructor-trace.cap','load-file.bin','stages.json']]]
     if not isinstance(v['files'],dict) or len(v['files'])>2000 or any(p not in v['files'] for p in required):raise ValueError('runtime pins')
     for name,digest in v['files'].items():
         p=Path(name)

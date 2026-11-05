@@ -1,0 +1,181 @@
+{
+  "format": "card-constructor-diagnostic-successor-evidence-v1",
+  "planId": "constructor-trace-07297620-v2",
+  "preparationApproved": true,
+  "executionApproved": false,
+  "operatorStatement": "ok continue",
+  "operatorDecision": "Fresh unapproved proposal after a verified zero-command host stop. Same card/image/APDU scope; no inherited execution approval.",
+  "chip": "cplc-v1:4790d3213180072976207515",
+  "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
+  "sourceHashes": {
+    "tools/outbox-spike/pixel-control.js": "d1a0c736842e019c00e8bcc58cf1ee34968c81b56bf0c70039b0e5a4096bc4b4",
+    "tools/outbox-spike/pixel-capacity.js": "2c7cef745bea31a714530c4a609f23d48c5f4c1cffb3ec13b1aa098eee437d2b",
+    "tools/outbox-spike/pixel-07297620-create.js": "aab22bbfc20a7265c0ada84e9f75ecb0a3d91267463b79bb34d168e220d83552",
+    "tools/outbox-spike/pixel-07297620-create.json": "319b49e3c707f7d6cbef9e17195b69c758685a415712b97d5ea6874a64f84325",
+    "tools/outbox-spike/compact_bridge.py": "6946869b249fd85f3c4a7ee0ae44e442fa126a2cd52c3cdf348836c04e265a6d",
+    "tools/outbox-spike/unset_up_policy.py": "5e7d846eeceecee6963c29cc08ca2f1cbf4823f5050f3207c11dfba0a72cb9e3",
+    "tools/outbox-spike/readiness-07297620.cjs": "33d9bd44a739c0f29c224d54f7b7cf49fee158b511a856c663f4989b4cef0ca8",
+    "tools/outbox-spike/readiness-07297620-v2.cjs": "44f7a70b1a5b103279bdaa9ca0bb28e0beef6a1939d98d372338a94a7a143772",
+    "tools/outbox-spike/readiness_07297620.py": "8026e15ef6c2a6cee1e72958d3930b535cbd0db0eaced34661dd705eb5ac0820",
+    "tools/outbox-spike/readiness_07297620_v2.py": "55c9fd2751033c588a2fccc7a681a9394e669a8908c1e533e51cb209ed577bce",
+    "tools/outbox-spike/readiness-transport.cjs": "5d16db49576105d2d6628541303fa6f2e2c6163299968a374246c056792d1eef",
+    "tools/outbox-spike/readiness-07297620.json": "c49147a6f3e0cf92efb1dfbffd4b2dabf385c4bef33a02549dddefb706291314",
+    "tools/outbox-spike/readiness-07297620-v2.json": "42b5f5d66c553daa7f5e4791dfcf8f3728e8462d6f3a5e171d44fc8937d6886b",
+    "tools/outbox-spike/inspect-07297620.cjs": "6b11e368be6d08c1a2aecfec4d44a4c23e1201c2178d626d20f7c6a792d01167",
+    "tools/outbox-spike/inspect-07297620.json": "c0ee4458970c9d07913211fdd6a537a0d1c788c4d6e9f74e7d9572301afda708",
+    "tools/outbox-spike/inspect-transport.cjs": "7bde4b303e214dee8427f16c4a442535f160b29755f46485331d3f10a545054d",
+    "tools/outbox-spike/inspect_07297620.py": "4c3ecb3aeba8f4205fb2aaa5d24321474d3d6d6e4d35794aaedd19e839a8305e",
+    "tools/outbox-spike/run-probe.cjs": "d882be6e3740cd8b10e4319dc83572b9e0af3e56c7937bf6b460a5c5857ad03c",
+    "tools/outbox-spike/probe_bridge.py": "e170e84f1ccb5146686fe8d3589adbc8bae0b128526c0f9acf573c912ee33a2d",
+    "tools/outbox-spike/memory-07297620.cjs": "57376bd75e632ac154d98c9a987638f86553b70e7febb1f9e2fa02ca62a985e3",
+    "tools/outbox-spike/memory-07297620.json": "67badc487549ffac37d9aae64c3914835a6beeb8beb360d27e1fc00d70bc094f",
+    "tools/outbox-spike/memory-transport.cjs": "0d6a8cbcfff714002bbfaf31d6a7245082d4f015ad993b255c72bb5aeecf50f4",
+    "tools/outbox-spike/memory_07297620.py": "7d1719d366a24f334d99097707b4c202d1b8199be9018d296d2062d0f90a97a1",
+    "tools/outbox-spike/build-constructor-trace.py": "b5277cd2fc36c0862551f5986a74ca97345a9102e8269e711f357b60a2bcd417",
+    "tools/outbox-spike/build-probe.py": "6da5246938229eabe759a8ddb014642b13f6f212300b5460b6c28d3d3052326e",
+    "tools/outbox-spike/constructor-trace.cjs": "6b9f516cdb09a37e2c9032e1c7a1105c9b4c9ef23c16c248dcdcea332382bbc3",
+    "tools/outbox-spike/java/ConstructorTrace.java": "2da91ad83368e3c4619fc7b51d43dd60b803302e83cee5fe6e46b603caee0bc6",
+    "tools/outbox-spike/java/ConstructorDispatch.txt": "89f4df9a62e3dea71f152a9bddb635c1df9585f9a617bc5d0ebb2284a1e0df96",
+    "applet/src/main/java/me/flashapp/cashu/CashuApplet.java": "8bb9371f420e261ce271755abe187c7469157e043d032b2ad4a47fed19b8ba7d",
+    "applet/src/main/java/me/flashapp/cashu/SchnorrHW.java": "a063e72966a7ec98878f2af555bca86d97bafda6e449371509862b4fab7daf0a",
+    "tools/outbox-spike/constructor-diagnostic-07297620.cjs": "a9722ef373c5a73d3837a467702578a0565409792ed11b76b2c980c8f979b762",
+    "tools/outbox-spike/constructor-trace-07297620.json": "90e114d88236b001523c7abf723a975714e099059e220f5e70e8accb7237efda",
+    "tools/outbox-spike/constructor_diagnostic_07297620.py": "5be847e4b95a62c7dcc5bd102b877ca88994f89cef84e4b08384153d31bbaa05",
+    "tools/outbox-spike/constructor-diagnostic-transport.cjs": "d744b74c70f02703157e267f39c9d364ddd3e1876a13fdb0b3a4897a28bf6f39"
+  },
+  "evidence": [
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-2026-10-28/cleanup-journal.json",
+      "sha256": "5d56123c62762fffb1cc7a4ab423dc6f5f5cff1ac5e68e11a3a6492c479b2ab1"
+    },
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-diagnostics-2026-10-28/prototype-journal.json",
+      "sha256": "93172a0004ff17c3752dfc9a0bda7a07ae1ac849ccaa4457147137f8157b6c73"
+    },
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-diagnostics-2026-10-28/cleanup-journal.json",
+      "sha256": "9185333af1fa9655659144a39d5cf2be8c367253725e8d2a0a27a293934791a0"
+    },
+    {
+      "path": "/Users/dread/.cashucard/switched-card-identity-2026-11-04/receipt.json",
+      "sha256": "b1084c53d485f7cf0ad3e10b0b7903ca32167d2949ccf138669adb6271e013e6"
+    },
+    {
+      "path": "/Users/dread/.cashucard/switched-card-identity-2026-11-04/pass-1/result.json",
+      "sha256": "8134baa6524dc6435d4f410b62b0baa869fd061e0fe9f0a1da4444e95a1a2c71"
+    },
+    {
+      "path": "/Users/dread/.cashucard/recover-unset-up-2026-11-04/attempt-4/recover.json",
+      "sha256": "17db6c388dc76d22ee8466eb2b82a3b483f0dcb34728f03fc211d62f8c814b09"
+    },
+    {
+      "path": "/Users/dread/.cashucard/readiness-07297620-2026-11-04/pass-1/readiness.json",
+      "sha256": "9cbef5cac558c2ce871bfdcc38d76ea33f5b3f6b8af5fb6f002f414b5285b4b1"
+    },
+    {
+      "path": "/Users/dread/.cashucard/readiness-07297620-2026-11-04/preparation/result.json",
+      "sha256": "acedaf2946b019538530787255011a1a4bef3b8823e09c44bba1cbbee6323ada"
+    },
+    {
+      "path": "/Users/dread/.cashucard/readiness-07297620-2026-11-05/pass-2/readiness.json",
+      "sha256": "c45962384f33478f1022ece106471e46e5966f8989e8a686504f2a3b5659c29d"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/lab-build.json",
+      "sha256": "d38805ad0bd96b8609b71485e33f9202d6a956592a3766cf5305ec157f75832f"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/activation.json",
+      "sha256": "43be35db3b710470ec5f0d97f5b182afa6857068b6aff6c003f7946b4968ccb4"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/app-debug.apk",
+      "sha256": "0c3e9f1b8b7d41c2f539d81506742191537b0e164a55c2301d4c6b98d2366988"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/collection-1/app-databases.tar",
+      "sha256": "3f44efb97d9967166b0f5b0fca271de6242d934c195b08d1ba3116f54c535fd8"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/collection-1/journal.json",
+      "sha256": "30f018b5ebb75bceddf607145e6db381c4a4818d3a62c5037fa49b24ffae3986"
+    },
+    {
+      "path": "/Users/dread/.cashucard/pixel-07297620-create-2026-11-05/collection-1/review.json",
+      "sha256": "f3f60ef04a05b6da24b4a513bbf5f98d20e5e58371b7a9f5032c5cbf2da1dfb7"
+    },
+    {
+      "path": "/Users/dread/.cashucard/inspect-07297620-2026-11-05/pass-1/inspection.json",
+      "sha256": "0d24d86f6e69f7755f61b74ace3e71acebdad78e790492d8c47ef13293644acf"
+    },
+    {
+      "path": "/Users/dread/.cashucard/inspect-07297620-2026-11-05/pass-1/inspection.json.consumed",
+      "sha256": "05231878677b4a4b9d86ba7b2e14cc9d76f7d510cf5cecff159457503fbc96b6"
+    },
+    {
+      "path": "/Users/dread/.cashucard/inspect-07297620-2026-11-05/preparation-2/result.json",
+      "sha256": "967c32aa075d8b9f696934feef5b4b8adc292a450a0ff339b5535a4ede2e3868"
+    },
+    {
+      "path": "/Users/dread/.cashucard/inspect-07297620-2026-11-05/preparation-2/saved-review.json",
+      "sha256": "c2ef1fe91c454c1bdc2af8f2739db2320a7209120be6a80658beb504a7653114"
+    },
+    {
+      "path": "/Users/dread/.cashucard/creation-analysis-07297620-2026-11-05/analysis.json",
+      "sha256": "935832cf7b5256f6da1a6c7cedad15de83a4eb6a89f10905870a4675f5871f96"
+    },
+    {
+      "path": "/Users/dread/.cashucard/memory-07297620-2026-11-05/pass-1/memory.json",
+      "sha256": "4a3cbe37b9ce69124f56e193206e979ace7bbb03070f894ccba16e9bb9306724"
+    },
+    {
+      "path": "/Users/dread/.cashucard/memory-07297620-2026-11-05/pass-1/memory.json.consumed",
+      "sha256": "0aec0d68019c1ad4c60d34ab525014deac97e4d17fc8469df182c4668bd76ee9"
+    },
+    {
+      "path": "/Users/dread/.cashucard/memory-07297620-2026-11-05/preparation-2/result.json",
+      "sha256": "7c0bc66c07177bf893feb33dc00914c3be7eb491dc3e20517b2ee4264177e8d7"
+    },
+    {
+      "path": "/Users/dread/.cashucard/memory-07297620-2026-11-05/preparation-2/saved-review.json",
+      "sha256": "81be93e1a04581a432f9c914c3f78bcc82a11c6fa6f62451dc8d573269d94cb9"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/image/manifest.json",
+      "sha256": "3004dc15805313049c9331249c4a04640155916df88304948dc2d529ac89e41c"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/image/constructor-trace.cap",
+      "sha256": "f3cd1dc65e44da93bc7c90c2f7151735610f90599ca2ead5f8d51d03b128e7ba"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/image/load-file.bin",
+      "sha256": "619c41f59e59d31c2d8e5aa46136a2d84ef14c0bf86d945da82b6ad626a94559"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/image/stages.json",
+      "sha256": "726d0d74a5051c8c43852e0c08b6ffb3200d2669aa94a13706f55897856157ac"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/pass-1/diagnostic.json",
+      "sha256": "e397f252c9c23499cf2aed0289fcacc655269d9be57a59010def0af3fac151ca"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/pass-1/diagnostic.json.consumed",
+      "sha256": "2373b674ea665c60d63053190be6f020591f0af734f830340d4e351781f0a009"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/pass-1/diagnostic.json.request.json",
+      "sha256": "1f950d1d8e661cc3d790480267bfc209b983b0bd8ad9573acc9cad78a42052ae"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/preparation-2/result.json",
+      "sha256": "2ca14d5d4f8892efb58b85fc0193080265d37283a1e53869d9884d4595dbc83a"
+    },
+    {
+      "path": "/Users/dread/.cashucard/constructor-trace-07297620-2026-11-05/preparation-2/saved-review.json",
+      "sha256": "bf44e945e509de1625f4774746584f5f1faa66d9de0201122c1c8d4c3451eeae"
+    }
+  ],
+  "hardwareAccessDuringPreparation": false
+}

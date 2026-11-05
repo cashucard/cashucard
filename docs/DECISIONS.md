@@ -5017,3 +5017,24 @@ or asserting that instrumentation preserves the original image's silicon fit.
 An unconfirmed diagnostic INSTALL remains inconclusive and stops. See the
 [design and offline checks](../tools/outbox-spike/CONSTRUCTOR-TRACE.md).
 No device access is authorized by this decision or source-only preparation.
+
+## D174: Fix host hashing and isolate a fresh diagnostic invocation
+
+**Decision (2026-11-05):** normalize the diagnostic controller's byte-array load
+with `Buffer.from` before the default SHA-256 call. Test that actual default path
+and stop injecting a hash in real-artifact native-process fixtures. Preserve the
+first invocation's zero-command journal/marker. Prepare an unapproved v2 with a
+fixed separate journal, native wrapper and transport, allowing only its explicit
+label while requiring equality of every device/image/registry field with v1.
+
+**Why:** the host rejected an array before identity or native startup, but the
+one-use attempt was already consumed. Tests with a substituted hash missed the
+real input contract. Correcting the host does not imply a new card result or
+authorize rearming old evidence. V2 requests exactly the previously reviewed
+physical scope; its execution requires a fresh decision.
+
+**Rejected:** deleting consumption, rewriting a zero-command journal as success,
+claiming a reader closure was observed when none opened, changing CAP/timeout,
+or carrying approval across a consumed invocation. See the
+[incident](reports/HARDWARE_TEST_REPORT_2026-11-05.d321-07297620-constructor-host-stop.md)
+and [fresh proposal](reports/HARDWARE_PLAN_2026-11-05.constructor-trace-07297620-2.md).

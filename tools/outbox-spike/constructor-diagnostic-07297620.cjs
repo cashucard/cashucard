@@ -87,9 +87,17 @@ async function runDiagnostic({
   random = randomBytes,
   now = () => performance.now(),
   began = now(),
+  planId = profile.planId,
 }) {
+  if (
+    ![
+      "constructor-trace-07297620-v1",
+      "constructor-trace-07297620-v2",
+    ].includes(planId)
+  )
+    fail("unknown-constructor-plan");
   const state = {
-    plan: profile.planId,
+    plan: planId,
     chip: profile.chip,
     status: "running",
     stage: "admission",
@@ -269,7 +277,7 @@ async function runDiagnostic({
     if (
       !Array.isArray(load) ||
       load.length !== profile.bytes ||
-      hash(load) !== profile.load
+      hash(Buffer.from(load)) !== profile.load
     )
       fail("trace-image-mismatch");
     trace.validateStages(stages, profile.terminalStage);

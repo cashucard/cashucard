@@ -58,7 +58,7 @@ function fixture(o = {}) {
       sdk,
       load: o.image ? [...o.image.load] : load(),
       stages: o.image ? o.image.stages : stages,
-      hash: () => p.load,
+      hash: o.image ? undefined : () => p.load,
       random: (n) => Array.from({ length: n }, (_, i) => i),
       now: () => clock,
       save: async (s) => {

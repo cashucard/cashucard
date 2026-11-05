@@ -93,3 +93,16 @@ test("saved intent digests bind every public command without retaining authentic
     assert.equal(e.intentSha256, sha(Buffer.from(plain)));
   }
 });
+test("default hash validates the actual byte-array input rather than requiring an injected hash", async () => {
+  const f = fixture(),
+    prior = p.load;
+  p.load = sha(Buffer.from(f.args.load));
+  f.args.hash = undefined;
+  try {
+    const r = await runDiagnostic(f.args);
+    assert.equal(r.status, "diagnostic-recorded");
+    assert.equal(r.commands, p.blocks + 16);
+  } finally {
+    p.load = prior;
+  }
+});
