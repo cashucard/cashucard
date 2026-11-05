@@ -4,6 +4,6 @@
   "reader": "ACS ACR122U PICC Interface",
   "format": "card-memory-profile-v1",
   "planId": "memory-07297620-v1",
-  "approved": false,
-  "auditSha256": "7bda31a96c2c7c99b75b85b80e624099206c47f891afa1c24d4870a24d37c16d"
+  "approved": true,
+  "auditSha256": "94dfa65784267238dfd680c13042cc9eac7023d738593203bc6998d96d674256"
 }

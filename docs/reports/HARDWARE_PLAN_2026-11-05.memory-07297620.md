@@ -1,9 +1,10 @@
 # Public memory snapshot of 07297620 after uncertain creation
 
-- Plan ID `memory-07297620-v1`; execution approval **false**, unconsumed.
-- The operator's **"ok continue"** authorizes offline investigation/preparation
-  after the completed registry inspection. Device execution of this new named
-  plan remains a separate final decision; no consumed approval is reused.
+- Plan ID `memory-07297620-v1`; execution approval **true**, unconsumed before this invocation.
+- The operator's **"ok continue"** authorized offline investigation/preparation
+  after the completed registry inspection. The subsequent **"yes"**, after
+  reviewing this finished plan, approves exactly its one five-command snapshot.
+  No consumed approval is reused and no successor action is authorized.
 - Card exactly `cplc-v1:4790d3213180072976207515`, serial **07297620**, batch
   **7515**; exact raw CPLC is fixed in `memory-07297620.json`.
 - Reader exactly `ACS ACR122U PICC Interface`; one exclusive connection using
@@ -76,9 +77,9 @@ all execution evidence and confirm native closure before reporting success.
 
 Describe/save/preview perform local reads only and do not consume the attempt.
 After recorded approval and refreshed pins, append `--execute` to the exact
-preview arguments once. The current false approval rejects execution before
-reading a campaign or starting the native child. No reader/key/journal override
-or retry switch exists.
+preview arguments once. The original false-approval preparation remains intact;
+create a new approved campaign/preview after recording this approval and signing
+clean source. No reader/key/journal override or retry switch exists.
 
 ## Qualification and terminal boundary
 

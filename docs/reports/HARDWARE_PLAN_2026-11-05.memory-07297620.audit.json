@@ -2,7 +2,7 @@
   "format": "card-memory-evidence-v1",
   "planId": "memory-07297620-v1",
   "preparationApproved": true,
-  "executionApproved": false,
+  "executionApproved": true,
   "operatorStatement": "ok continue",
   "operatorDecision": "Offline analysis and preparation only after the consumed registry inspection. New device execution approval remains pending.",
   "chip": "cplc-v1:4790d3213180072976207515",
@@ -110,5 +110,7 @@
       "sha256": "935832cf7b5256f6da1a6c7cedad15de83a4eb6a89f10905870a4675f5871f96"
     }
   ],
-  "hardwareAccessDuringPreparation": false
+  "hardwareAccessDuringPreparation": false,
+  "executionOperatorStatement": "yes",
+  "executionOperatorDecision": "The operator approved the finished five-command memory-07297620-v1 snapshot on 07297620 in the named ACS reader. No successor connection or mutation is authorized."
 }
