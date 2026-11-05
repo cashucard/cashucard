@@ -1,0 +1,24 @@
+{
+  "format": "card-readiness-profile-v1",
+  "planId": "readiness-07297620-v1",
+  "approved": true,
+  "operatorDecision": "Operator selected 07297620 for the replacement plan and then instructed ok execute.",
+  "reader": "ACS ACR122U PICC Interface",
+  "chip": "cplc-v1:4790d3213180072976207515",
+  "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
+  "baselinePages": [
+    {
+      "kind": "applications",
+      "page": 0,
+      "sw": "6a88",
+      "data": ""
+    },
+    {
+      "kind": "load-files",
+      "page": 0,
+      "sw": "9000",
+      "data": "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000e3214f0da00000016443446f634c6974659f700101ce020100cc08a000000151000000e31b4f07a00000006202049f700101ce020100cc08a000000151000000e31b4f07a00000006202029f700101ce020103cc08a000000151000000"
+    }
+  ],
+  "auditSha256": "0e3556f8a4e4f501cf1cd2443939100776411c8741038bf984fdcba492c3a3ae"
+}

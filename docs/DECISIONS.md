@@ -4883,3 +4883,25 @@ installation, widening the full-slot qualification guard, or treating target
 selection as approval of new hardware actions. No released firmware, protocol,
 phone asset or global profile changes. See the
 [replacement plan](reports/PLAN_2026-11-04.adopt-07297620.md).
+
+## D168: Qualify 07297620 readiness without reusing cleanup authority
+
+**Decision (2026-11-04):** implement a separate fixed readiness host and
+independent Python policy under the operator's instruction to execute the
+07297620 replacement plan. Match that exact CPLC before one proved factory
+channel, read both complete registry kinds, require its exact four-file blank
+baseline, recheck identity, independently decode saved evidence and confirm
+closure. No install, delete or private command is admitted. Retain durable
+single-use consumption, synced public evidence, bounded responses and uncertain
+closure locks.
+
+**Why:** the selected card's last recorded state is blank, and its fresh identity
+read alone cannot establish that state now. Carrying the previous card's unset-up
+cleanup policy over would assume a foreign installation key, a wrong registry
+baseline and unnecessary deletion authority. The new dedicated profile leaves
+old profiles, policies, CAPs and evidence intact.
+
+**Rejected:** treating identity as readiness, broadening the older recovery
+policy, declaring blank from applications alone, authenticating without a proved
+factory cryptogram, or automatically installing after a readiness result. See the
+[named execution plan](reports/HARDWARE_PLAN_2026-11-04.readiness-07297620.md).
