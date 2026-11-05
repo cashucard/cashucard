@@ -4972,3 +4972,24 @@ weakening a blank-state validator to accept an installation, selecting the main
 applet merely to determine registry membership, dropping CardDocLite or the
 package frame, and automatically continuing after inspection. See the
 [named plan](reports/HARDWARE_PLAN_2026-11-05.inspect-07297620.md).
+
+## D172: Read current public resources before another constructor experiment
+
+**Decision (2026-11-05):** after 07297620's main was absent from the complete
+registry, prepare one separate, initially unapproved five-command public ISD
+memory snapshot. Match CPLC before and after one exact FF21 read; require known
+framing, independent saved receipt replay, durable consumption and closure.
+There is no authentication or private applet command and no installation change.
+
+**Why:** the retained image has the original constructor/fields/signer and the
+expected 50-reference converted shape, while its large compact/DLEQ allocations
+are deferred beyond the failed stage. Current resources remain unmeasured; the
+October 28 post-cleanup counters predate this installation and an operator reset.
+An availability snapshot can inform the next diagnostic decision without
+repeating construction or selecting the uncertain applet.
+
+**Rejected:** calling constructor equality proof of silicon fit, inferring a
+largest allocation or transaction budget from counters, blind installation or
+padding retries, raising timeouts, dropping baseline objects, and reusing the
+consumed inspection approval. See the
+[named plan](reports/HARDWARE_PLAN_2026-11-05.memory-07297620.md).
