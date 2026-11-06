@@ -724,7 +724,6 @@ jobs:
         cardsim,
         cardctl,
         e2e-tools,
-        tools,
         cap,
         cardkit,
         ops,
