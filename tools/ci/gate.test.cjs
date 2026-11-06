@@ -44,3 +44,21 @@ test("change detection, policy checks and missing job wiring cannot be bypassed"
   assert.throws(() => checkResults(malformed));
   assert.throws(() => checkResults(results(["misspelled-job"])));
 });
+test("the gate job in ci.yml needs exactly the jobs the gate script knows", () => {
+  // A `needs` entry naming a job that no longer exists makes GitHub refuse the
+  // whole workflow file at startup, on every event (seen after #233 removed
+  // the tools job: every push run on main died with "workflow file issue").
+  const workflow = require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "../../.github/workflows/ci.yml"),
+    "utf8",
+  );
+  const gate = workflow.slice(workflow.indexOf("\n  gate:\n"));
+  const needs = gate.match(/needs:\s*\[([^\]]*)\]/)[1];
+  const listed = needs
+    .split(",")
+    .map((job) => job.trim())
+    .filter(Boolean);
+  assert.deepEqual(listed, ["changes", "policy", ...JOBS]);
+  for (const job of listed)
+    assert.match(workflow, new RegExp(`^  ${job}:$`, "m"), `${job} is a job`);
+});
