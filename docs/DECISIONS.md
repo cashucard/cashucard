@@ -4710,7 +4710,7 @@ a reused slot with its old scope, or presenting simulator phase counts as
 physical timing evidence. Production firmware/assets and protocol remain
 unchanged; another hardware invocation needs a new approved named plan.
 
-## D163: Durable private phase execution and scoped reconciliation
+## <a id="d163"></a>D163: Durable private phase execution and scoped reconciliation
 
 **Decision (2026-10-31):** execute D162's fixed recipe through a local
 injected-transport controller and an exclusive, atomically persisted file
@@ -4747,7 +4747,7 @@ device admission, installation, closed reader policy and hardware launchers stil
 need implementation/review before another approved physical run. Production
 firmware, protocol, provisioner releases and earlier journals remain unchanged.
 
-## D164: Closed USB phase programs and installation admission
+## <a id="d164"></a>D164: Closed USB phase programs and installation admission
 
 **Decision (2026-11-01):** compile the next private phase invocation from the
 validated journal into an exact ordered wire program. Keep this bridge separate
@@ -4786,7 +4786,7 @@ receipt generator remain the next step; another physical run requires a complete
 named plan and fresh approval. Production firmware and store releases remain
 unchanged.
 
-## D165: Rehearse card-carried settlement through a portable relay and the real till
+## <a id="d165"></a>D165: Rehearse card-carried settlement through a portable relay and the real till
 
 **Decision (2026-11-04):** add a portable private packet decoder, durable paged
 capture/resume and exact-payment reconciliation engine against the existing
@@ -4823,7 +4823,7 @@ only in this demonstration. Production transport, holder authorization, final
 wire/limits and partner review remain open. Released firmware/assets, app
 capabilities and hardware approvals remain unchanged.
 
-## D166: Recover only the independently identified, installed unset-up private image
+## <a id="d166"></a>D166: Recover only the independently identified, installed unset-up private image
 
 **Decision (2026-11-04):** add a separate host and independent Python policy for
 `recover-unset-up-v3`. Fix the observed chip, public installation key, exact
@@ -4861,7 +4861,7 @@ no hardware permission; the [named plan](reports/HARDWARE_PLAN_2026-11-04.recove
 requires a separate operator execution decision. Released applets, CAPs and phone
 applications are unchanged.
 
-## D167: Select 07297620 with its own readiness and creation gates
+## <a id="d167"></a>D167: Select 07297620 with its own readiness and creation gates
 
 **Decision (2026-11-04):** follow the operator's replacement-card selection and
 plan the assisted-payment work on `cplc-v1:4790d3213180072976207515`. Preserve
@@ -4884,7 +4884,7 @@ selection as approval of new hardware actions. No released firmware, protocol,
 phone asset or global profile changes. See the
 [replacement plan](reports/PLAN_2026-11-04.adopt-07297620.md).
 
-## D168: Qualify 07297620 readiness without reusing cleanup authority
+## <a id="d168"></a>D168: Qualify 07297620 readiness without reusing cleanup authority
 
 **Decision (2026-11-04):** implement a separate fixed readiness host and
 independent Python policy under the operator's instruction to execute the
@@ -4906,7 +4906,7 @@ policy, declaring blank from applications alone, authenticating without a proved
 factory cryptogram, or automatically installing after a readiness result. See the
 [named execution plan](reports/HARDWARE_PLAN_2026-11-04.readiness-07297620.md).
 
-## D169: Recheck readiness only after an operator-reported external reset
+## <a id="d169"></a>D169: Recheck readiness only after an operator-reported external reset
 
 **Decision (2026-11-05):** prepare one explicitly named v2 readiness invocation
 for 07297620 after the operator reported a reset and returned it to the reader.
@@ -4926,7 +4926,7 @@ trying another key set, assuming reset released an ops fence, broadening device
 or command admission, or automatically repeating a failed check. See the
 [post-reset plan](reports/HARDWARE_PLAN_2026-11-05.readiness-07297620-2.md).
 
-## D170: Isolate 07297620's phone creation control and retain its installation
+## <a id="d170"></a>D170: Isolate 07297620's phone creation control and retain its installation
 
 **Decision (2026-11-05):** use a separate offline Android debug app and portable
 creation controller for the operator-selected 07297620 and available Pixel 8 Pro.
@@ -4952,7 +4952,7 @@ record, inventing the new key, erasing after uncertain creation, replacing an
 old lab app/journal, raising timeouts, or calling a synthetic success silicon
 qualification. See the [named plan](reports/HARDWARE_PLAN_2026-11-05.pixel-07297620-create.md).
 
-## D171: Inspect uncertain 07297620 creation through registry reads only
+## <a id="d171"></a>D171: Inspect uncertain 07297620 creation through registry reads only
 
 **Decision (2026-11-05):** prepare a separate, initially unapproved single-use
 inspection of 07297620 after the Pixel's unconfirmed main-creation reply. Match
@@ -4973,7 +4973,7 @@ applet merely to determine registry membership, dropping CardDocLite or the
 package frame, and automatically continuing after inspection. See the
 [named plan](reports/HARDWARE_PLAN_2026-11-05.inspect-07297620.md).
 
-## D172: Read current public resources before another constructor experiment
+## <a id="d172"></a>D172: Read current public resources before another constructor experiment
 
 **Decision (2026-11-05):** after 07297620's main was absent from the complete
 registry, prepare one separate, initially unapproved five-command public ISD
@@ -4994,7 +4994,7 @@ padding retries, raising timeouts, dropping baseline objects, and reusing the
 consumed inspection approval. See the
 [named plan](reports/HARDWARE_PLAN_2026-11-05.memory-07297620.md).
 
-## D173: Register only a private diagnostic after a catchable constructor fault
+## <a id="d173"></a>D173: Register only a private diagnostic after a catchable constructor fault
 
 **Decision (2026-11-05):** prepare a separate constructor-only diagnostic image
 in namespace `F0434153485543545243`. Preserve original instance fields and ordered
@@ -5018,7 +5018,7 @@ An unconfirmed diagnostic INSTALL remains inconclusive and stops. See the
 [design and offline checks](../tools/outbox-spike/CONSTRUCTOR-TRACE.md).
 No device access is authorized by this decision or source-only preparation.
 
-## D174: Fix host hashing and isolate a fresh diagnostic invocation
+## <a id="d174"></a>D174: Fix host hashing and isolate a fresh diagnostic invocation
 
 **Decision (2026-11-05):** normalize the diagnostic controller's byte-array load
 with `Buffer.from` before the default SHA-256 call. Test that actual default path
