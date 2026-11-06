@@ -5106,6 +5106,12 @@ a phone's NFC timeout (a retry is safe). jCardSim cannot tear a write, so the
 tests set the torn states directly. Until ENG-818 installs it on silicon, the
 tracked CAP is the plan's, not the chip's.
 
+**Shown on 2026-11-06** (amended by D176, which moved the record's allocation out
+of the constructor after the chip refused it): the whole flow ran on a J3R180
+with the production mint, SIGN wrote the packet, the phone relayed it and the till
+recovered 7 sat once
+([the end-to-end report](reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-assisted-settlement.md)).
+
 **Rejected:** a new `spec/NUT-XX.md` here (cashucard/javacard mirrors this
 `spec/` and has its own); staging the outputs inside the record (a refused
 payment would erase the last record); a keyset per output (a wire change);
@@ -5166,9 +5172,10 @@ applet created in 2.17 s, the tag after it, `cardctl info` answering 2.2 and
 size and a smaller constructor at once), so 21,540 stays a failed size in refcheck's
 table and 21,631 is added as one that installs.
 
-**Not yet shown.** Whether the first `SET_CARD` is given the 4,285 bytes is the
-bench card's next answer to record: the card is set up from the phone, and the first
-payment's `GET_OUTBOX` shows a packet if it was.
+**Shown on 2026-11-06, later the same morning.** The first `SET_CARD` from the
+phone was given the room: the first payment's `GET_OUTBOX` returned a valid
+631-byte packet, the phone relayed it and the till recovered its 7 sat once
+([the end-to-end report](reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-assisted-settlement.md)).
 
 **Rejected:** shrinking `OUTBOX_MAX` (out of scope, and +300 bytes is the largest
 constructor growth measured to install, far below even a minimal record);
