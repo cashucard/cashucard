@@ -69,7 +69,7 @@ function fixture(t) {
     manifestHash: hash(fs.readFileSync(file)),
     sourceCommit: source,
     runnerHash: fingerprint(),
-    chip: "cplc-v1:4790d3213041093363205547",
+    chip: "cplc-v1:4790d3213041093361205547",
     reader: "ACS ACR122U PICC Interface",
     journal: path.join(dir, "journal.json"),
     execute: true,
@@ -79,7 +79,7 @@ function fixture(t) {
 }
 function fake({
   workloadName = "two-input-two-output-v1",
-  chip = "cplc-v1:4790d3213041093363205547",
+  chip = "cplc-v1:4790d3213041093361205547",
   cardDoc = chip === "cplc-v1:4790d3213180072976207515",
   wrongChip = false,
   authFailure = false,

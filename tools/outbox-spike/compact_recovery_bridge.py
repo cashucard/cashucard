@@ -83,6 +83,23 @@ class Policy:
             if data!=b'\1':self.failed=True
             else:self.retire_ack=True
 
+CPLC_FRAME=bytes.fromhex('80ca9f7f00')
+
+def trim_cplc(frame,reply):
+    # A CPLC GET DATA answered with one byte ahead of the 9F7F TLV is trimmed
+    # here, after its frame was admitted. The rule is as narrow as it can be:
+    # the exact frame, success, one byte of margin over the 45-byte TLV, and
+    # that TLV's own tag behind the byte. A reply of any other shape is left
+    # untouched, for parseCplc to accept or reject on its own.
+    data,sw1,sw2=reply
+    raw=bytes(data)
+    if (frame==CPLC_FRAME and (sw1,sw2)==(0x90,0) and len(raw)==46
+            and raw[1:4]==b'\x9f\x7f*'):
+        raw=raw[1:]
+    # pyscard answers with a list, and the loop emits the reply by
+    # concatenating onto it; bytes here would end the bridge.
+    return list(raw),sw1,sw2
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--reader',required=True);p.add_argument('--expected-key',default=EXPECTED_KEY.hex());args=p.parse_args()
     if args.reader!='ACS ACR122U PICC Interface':raise ValueError('named reader required')
@@ -103,7 +120,14 @@ def main():
             if message=={'close':True}:return
             if not isinstance(message,dict) or set(message)!={'apdu'}:raise b.common.BridgeFailure('bridge-input-invalid')
             a=b.common.checked('bridge-command-refused',lambda:policy.before(message['apdu']))
-            data,sw1,sw2=b.common.checked('reader-transmit-failed',lambda:c.transmit(list(a)))
+            # A CPLC GET DATA is answered with one extra ISO 7816-4 control
+            # byte in front of the 9F7F TLV, measured here twice on this card
+            # (45-byte TLV, 46 bytes returned, same value). The SDK's parseCplc
+            # takes the TLV, so the byte is removed here -- in this bridge only,
+            # after its frame has been admitted -- and the length is required to
+            # be exact so a different reply is never silently trimmed.
+            return_value = b.common.checked('reader-transmit-failed',lambda:c.transmit(list(a)))
+            data,sw1,sw2=trim_cplc(a,return_value)
             policy.after(a,data,sw1,sw2);b.common.emit({'reply':data+[sw1,sw2]})
     finally:
         if connected:

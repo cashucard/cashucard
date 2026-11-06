@@ -567,3 +567,32 @@ write. A future interruption runner needs phase-specific durable journals,
 identity/key/context checks, explicit uncertainty handling and reviewed recovery
 commands before either physical step. Existing approvals have been consumed;
 this documentation authorizes no new card access.
+
+### Installed, unset-up recovery preparation
+
+`recover-unset-up.cjs` is the separate D166 path for the stopped card with parsed
+serial `09336120`. The historical `09336320` label is not its identity pin. The
+[bounded plan](../../docs/reports/HARDWARE_PLAN_2026-11-04.recover-unset-up-3.md)
+names the only reader, chip, key, commands and fresh journal. Its tracked execution
+approval is **false**. Do not substitute `recover-installed.cjs` or reuse an old
+campaign.
+
+`--describe --python /absolute/path/to/reviewed/venv/bin/python` prints a local-only
+campaign template. Save it as a new private file in a private directory, then use
+`--campaign /absolute/private/campaign.json --sha256 <its-sha256>` for local-only
+admission preview. The template binds the current clean commit, plan, tracked
+approval, actual Node/Python binaries, SDK, crypto packages, pyscard and policy
+files. Execution adds `--execute`, requires a separately authorized tracked
+approval bound to the final plan, and permanently consumes the one invocation
+before reader startup. Changing approval or any pinned file requires a new
+campaign. Do not remove consumption markers or uncertain locks to retry.
+
+Offline tests: `node --test 'tools/outbox-spike/unset-up-*.test.cjs'` and
+`python3 -B tools/outbox-spike/test_unset_up_policy.py`. The optional JavaCard test
+uses `UNSET_SIM_ARTIFACT` pointing to an existing private simulator conversion and
+a built cardsim jar; it uses no reader. The process tests supply an isolated
+synthetic PC/SC package and never import the installed native reader package.
+The physical launcher also invokes `unset_up_verify.py` in isolated Python to
+re-read the newly saved journal by hash. It independently checks all three full
+registry snapshots and public identity evidence before success; it has no reader
+imports and sends no commands.

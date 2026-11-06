@@ -4709,3 +4709,332 @@ scope as verified settlement evidence, re-signing an uncertain payment, retiring
 a reused slot with its old scope, or presenting simulator phase counts as
 physical timing evidence. Production firmware/assets and protocol remain
 unchanged; another hardware invocation needs a new approved named plan.
+
+## <a id="d163"></a>D163: Durable private phase execution and scoped reconciliation
+
+**Decision (2026-10-31):** execute D162's fixed recipe through a local
+injected-transport controller and an exclusive, atomically persisted file
+journal. Derive progress from ordered receipts; bind the chip, installation
+public key/context, qualified image, recipe, controller/codec/SDK and runtime.
+Persist intent before each command, received replies before elapsed checks and
+packet verification before scoped retirement. Keep the 30-second response,
+120-second further-transmission and 160-command bounds for each invocation.
+
+An uncertain command blocks normal execution. Reconcile a published SIGN by
+reading and verifying its exact scope/packet and committed counts. Reconcile a
+completed retirement by proving the old scope absent, every other retained packet
+unchanged and the expected reclaimed state. Label these receipts as recovered.
+Selection/public reads can complete the applet's existing recovery bookkeeping;
+the reconciliation path issues no new signing, retirement, load, setup or
+authentication command. Unsupported or inconsistent states require reviewed
+recovery. See the [controller guide](../tools/outbox-spike/PHASED-QUALIFICATION.md#local-phase-controller).
+
+**Why:** bounded phases need durable evidence across host restarts and lost
+responses. A completed write with a missing reply cannot justify repeating the
+payment. Exact packet identity/generation and retained-record checks also
+prevent an old retirement acknowledgement from clearing a reused slot. The
+local JavaCard test kills the signing host before reply delivery, verifies the
+stale lease blocks execution, and reconciles from disk in a new process after
+explicit test-only lease cleanup. It also drops a completed retirement reply.
+Native duration remains a host envelope;
+physical timing and interruption qualification are separate gates.
+
+**Rejected:** trusting a saved cursor without receipt/packet validation,
+automatically re-signing an uncertain payment, clearing a stale file lease on
+restart, accepting a scope without its verified packet, or deleting unverified
+records. This local iteration supplies the controller and simulator adapter;
+device admission, installation, closed reader policy and hardware launchers still
+need implementation/review before another approved physical run. Production
+firmware, protocol, provisioner releases and earlier journals remain unchanged.
+
+## <a id="d164"></a>D164: Closed USB phase programs and installation admission
+
+**Decision (2026-11-01):** compile the next private phase invocation from the
+validated journal into an exact ordered wire program. Keep this bridge separate
+from GlobalPlatform installation and cleanup. Its independent Python policy
+restricts commands to the named phase's synthetic fixture, checks the CPLC/key/
+diagnostic/state fence and expected replies, and independently verifies canonical
+retirement packets and both BIP-340 signatures before reader enumeration.
+Recovery programs permit selection and public reads. Retain the per-invocation
+30-second response, 120-second transmission and 160-command bounds.
+
+Campaign admission binds explicit approval, clean local source, actual image and
+runtime files, a dedicated installation-only phone receipt and the current phase
+journal. Acquire the exclusive file lease before opening the device, preserve
+the generated wire request and recheck static admission at the lazy connection.
+Use isolated Python imports with a fresh cache prefix and the hashed pyscard
+package. Retain the lease on startup/close uncertainty, including known process
+IDs; clearing it requires reviewed recovery. Preview and error reporting keep
+private configuration contents out of logs.
+
+**Why:** the injected controller needs a transport that cannot broaden the
+approved actions or confuse a previous capacity run with a newly installed
+uninitialized test image. Exact phase programs fit the existing bounds and derive
+retirement scopes from retained verified packets. The local JavaCard run checks
+all 12 normal/recovery invocations against the independent wire policy, including
+the killed signing host, lost retirement reply and refusal of a corrupted
+retirement signature. The process transport is tested with an isolated fake PC/SC
+package; physical timing remains unqualified. See the
+[admission guide](../tools/outbox-spike/PHASED-QUALIFICATION.md#closed-usb-admission).
+
+**Rejected:** expanding the earlier generic probe bridge, accepting an old
+capacity/cleanup journal as installation evidence, trusting response lengths for
+retirement authority, checking source/runtime only before acquiring the lease,
+automatically removing an uncertain lease, and raising deadlines to admit a run.
+This iteration stays local. The dedicated Pixel installation-only build and
+receipt generator remain the next step; another physical run requires a complete
+named plan and fresh approval. Production firmware and store releases remain
+unchanged.
+
+## <a id="d165"></a>D165: Rehearse card-carried settlement through a portable relay and the real till
+
+**Decision (2026-11-04):** add a portable private packet decoder, durable paged
+capture/resume and exact-payment reconciliation engine against the existing
+candidate descriptor. Inject cryptography, an approved HTTP transport and durable
+storage. Revalidate both card signatures, the mint/card/installation context and
+scope before mint work. Save submission intent, reconcile a lost response using
+complete original output signatures and every input state, and distinguish helper
+`outputs-confirmed` evidence from the till's independent proceeds/accounting.
+
+Connect the unchanged private JavaCard engine to Flash POS's actual preparation,
+signature, merchant recovery and inventory code through fresh host processes.
+Keep the merchant's openings solely in its protected synthetic store. Exercise
+both local mint keyset shapes, lost successful swap replies, mint restart, a POS
+process killed after its synced inventory write, replay and a barrier-controlled
+phone/till submission race. Bind retained software evidence to actual source
+hashes. The runner creates only uniquely named, loopback-published FakeWallet
+services on a dedicated Docker network and cleans up its own services. A public
+per-campaign seed and in-container keyset checks bind the host endpoints to this
+campaign's newly created mints.
+
+**Why:** private signing/export capacity and isolated restore rehearsals do not
+establish the full merchant outcome. This slice connects the carrier, a
+phone-compatible engine and the deployed-code accounting boundaries in one local
+test. See the [run guide](../tools/assisted-relay/README.md). Network work occurs
+after packet capture, outside NFC. There is no destructive card operation in the
+relay engine.
+
+**Rejected:** showing merchant settlement from input consumption alone, replacing
+outputs after an ambiguous swap, crediting restored inventory twice, placing
+merchant openings in the relay, trusting a cached confirmed flag, fetching an
+arbitrary packet URL, or treating a simulator/native-free runtime test as physical
+phone qualification. A reserved logical mint maps to explicit loopback origins
+only in this demonstration. Production transport, holder authorization, final
+wire/limits and partner review remain open. Released firmware/assets, app
+capabilities and hardware approvals remain unchanged.
+
+## <a id="d166"></a>D166: Recover only the independently identified, installed unset-up private image
+
+**Decision (2026-11-04):** add a separate host and independent Python policy for
+`recover-unset-up-v3`. Fix the observed chip, public installation key, exact
+installed registry and original platform records in a public profile derived
+from the retained audit. Admit only the unset-up diagnostic state through the
+unchanged validator. Read the key, reconfirm identity and the complete registry,
+then delete main, opener and package in that order. Verify full applications and
+load-files again, final identity and confirmed reader closure. Require independent
+policy completion before declaring blank. An isolated decoder also rechecks the
+newly persisted registry snapshots, diagnostics, key and final identity receipts
+before closure and a successful outcome.
+
+A private campaign binds a clean source commit, final plan, tracked operator
+approval, runtime files and a fixed fresh journal. Default preview performs only
+local reads. Recheck the source, runtime and historical evidence after durable
+one-shot consumption, immediately before opening one isolated exclusive reader
+connection. Preserve a permanent consumption marker, persist each command intent
+and public reply, and retain the journal lock when closure is uncertain. Neither
+controller nor bridge retries. Commands remain bounded by the plan's exact stage
+sequence, four pages per registry kind, 64-command ceiling and 120-second gate;
+responses have a 30-second bound. Authentication bodies are excluded from receipts.
+
+**Why:** correcting the stale chip identity alone does not make the earlier
+initialized recovery flow usable. The private JavaCard dispatcher refuses its
+status/scope commands before setup. Saved registry evidence also includes the
+private load-file, so deleting two instances or scanning only applications cannot
+prove blank. Synthetic SCP02 and isolated fake PC/SC tests, plus actual JavaCard
+logic in a simulator, exercise the new path without a device.
+
+**Rejected:** weakening initialized recovery, allowing another card/key or registry
+object, setting up the card to make recovery work, fabricating readiness replies,
+authentication retries, accepting an unconfirmed disconnect, or reusing consumed
+plans/journals. The tracked execution approval remains false. This change grants
+no hardware permission; the [named plan](reports/HARDWARE_PLAN_2026-11-04.recover-unset-up-3.md)
+requires a separate operator execution decision. Released applets, CAPs and phone
+applications are unchanged.
+
+## <a id="d167"></a>D167: Select 07297620 with its own readiness and creation gates
+
+**Decision (2026-11-04):** follow the operator's replacement-card selection and
+plan the assisted-payment work on `cplc-v1:4790d3213180072976207515`. Preserve
+D153's exact four-file baseline, including CardDocLite. Its saved cleanup proves
+historical blank state; the fresh identity read does not prove current blank
+state. Prepare a no-deletion readiness campaign first, then a separately scoped
+phone creation control before the smallest physical payment/relay/till case.
+
+**Why:** this card's last recorded state is blank after separate cleanup, while
+the stopped unset-up image/key belonged to a different identity. Two earlier ACS
+creation attempts on 07297620 stopped before setup; their cause remains unknown.
+Another card's Pixel creation result is a reason to prepare an independent
+phone control, not evidence that this card supports that image. Keep the session
+acceptance condition at independently recovered merchant proceeds exactly once.
+
+**Rejected:** changing the consumed recovery plan's identity/key, erasing a card
+based on historical state, dropping its fourth platform file, another blind ACS
+installation, widening the full-slot qualification guard, or treating target
+selection as approval of new hardware actions. No released firmware, protocol,
+phone asset or global profile changes. See the
+[replacement plan](reports/PLAN_2026-11-04.adopt-07297620.md).
+
+## <a id="d168"></a>D168: Qualify 07297620 readiness without reusing cleanup authority
+
+**Decision (2026-11-04):** implement a separate fixed readiness host and
+independent Python policy under the operator's instruction to execute the
+07297620 replacement plan. Match that exact CPLC before one proved factory
+channel, read both complete registry kinds, require its exact four-file blank
+baseline, recheck identity, independently decode saved evidence and confirm
+closure. No install, delete or private command is admitted. Retain durable
+single-use consumption, synced public evidence, bounded responses and uncertain
+closure locks.
+
+**Why:** the selected card's last recorded state is blank, and its fresh identity
+read alone cannot establish that state now. Carrying the previous card's unset-up
+cleanup policy over would assume a foreign installation key, a wrong registry
+baseline and unnecessary deletion authority. The new dedicated profile leaves
+old profiles, policies, CAPs and evidence intact.
+
+**Rejected:** treating identity as readiness, broadening the older recovery
+policy, declaring blank from applications alone, authenticating without a proved
+factory cryptogram, or automatically installing after a readiness result. See the
+[named execution plan](reports/HARDWARE_PLAN_2026-11-04.readiness-07297620.md).
+
+## <a id="d169"></a>D169: Recheck readiness only after an operator-reported external reset
+
+**Decision (2026-11-05):** prepare one explicitly named v2 readiness invocation
+for 07297620 after the operator reported a reset and returned it to the reader.
+Keep the original consumed v1 campaign/profile/journal intact. Reuse the exact
+wire predicates, expected chip, public factory-key proof, four-file baseline,
+15-command ceiling and deadlines. Bind a distinct fixed journal and profile to
+v2; unknown plan labels are rejected before transmission. The independent Python
+successor checks that all device/baseline fields equal the original before use.
+
+**Why:** an operator action changes the premise for a fresh check, but is not
+proof of restored keys or blank state. The first check stopped before external
+authentication; the new one must still prove the factory cryptogram and complete
+registry. It must not erase or provision a card based on the reset claim alone.
+
+**Rejected:** deleting a consumed marker, moving or rewriting an old journal,
+trying another key set, assuming reset released an ops fence, broadening device
+or command admission, or automatically repeating a failed check. See the
+[post-reset plan](reports/HARDWARE_PLAN_2026-11-05.readiness-07297620-2.md).
+
+## <a id="d170"></a>D170: Isolate 07297620's phone creation control and retain its installation
+
+**Decision (2026-11-05):** use a separate offline Android debug app and portable
+creation controller for the operator-selected 07297620 and available Pixel 8 Pro.
+Bind the exact streamed image and this card's four-file baseline. Check complete
+registry sets before loading and after opener/main creation, record unset-up
+format-5 diagnostics and a newly observed valid public key, then rematch CPLC.
+Leave the installation intact for the separately planned small payment test.
+
+Use a distinct application ID/journal, consumed before NFC, and no replacement
+of existing app storage. The new generator preserves production sources/assets
+and does not broaden the older Pixel policies or NFC patch allowlist. Keep one
+factory channel, fixed APDUs, deadlines and stop-on-uncertainty behavior. No
+SETUP, proof, payment, key rotation or cleanup belongs to this invocation.
+
+**Why:** 07297620's fresh readiness now proves factory authority and its exact
+blank baseline, but its earlier USB main creation stopped. Another card's phone
+success does not establish creation on this card. A retained installation/key
+receipt supplies the correct provenance for the next physical signing/export
+and helper/till tests without a gratuitous reinstall.
+
+**Rejected:** editing global card profiles, accepting instances without a package
+record, inventing the new key, erasing after uncertain creation, replacing an
+old lab app/journal, raising timeouts, or calling a synthetic success silicon
+qualification. See the [named plan](reports/HARDWARE_PLAN_2026-11-05.pixel-07297620-create.md).
+
+## <a id="d171"></a>D171: Inspect uncertain 07297620 creation through registry reads only
+
+**Decision (2026-11-05):** prepare a separate, initially unapproved single-use
+inspection of 07297620 after the Pixel's unconfirmed main-creation reply. Match
+its CPLC, prove one public factory channel, read both complete registry kinds,
+rematch identity, replay the saved public evidence independently and confirm
+closure. Require the four original platform frames, private package and opener;
+classify the main frame as present or absent. No private applet command is needed.
+
+**Why:** LOAD and opener acknowledgements establish neither main absence nor a
+usable applet. A narrowly bounded registry read can resolve membership without
+running, recreating or erasing the uncertain instance. Keep a new profile,
+transport, native policy and journal so every old guard and consumed invocation
+stays intact. Preparation approval is not device execution approval.
+
+**Rejected:** retrying creation, treating an absent reply as a card status,
+weakening a blank-state validator to accept an installation, selecting the main
+applet merely to determine registry membership, dropping CardDocLite or the
+package frame, and automatically continuing after inspection. See the
+[named plan](reports/HARDWARE_PLAN_2026-11-05.inspect-07297620.md).
+
+## <a id="d172"></a>D172: Read current public resources before another constructor experiment
+
+**Decision (2026-11-05):** after 07297620's main was absent from the complete
+registry, prepare one separate, initially unapproved five-command public ISD
+memory snapshot. Match CPLC before and after one exact FF21 read; require known
+framing, independent saved receipt replay, durable consumption and closure.
+There is no authentication or private applet command and no installation change.
+
+**Why:** the retained image has the original constructor/fields/signer and the
+expected 50-reference converted shape, while its large compact/DLEQ allocations
+are deferred beyond the failed stage. Current resources remain unmeasured; the
+October 28 post-cleanup counters predate this installation and an operator reset.
+An availability snapshot can inform the next diagnostic decision without
+repeating construction or selecting the uncertain applet.
+
+**Rejected:** calling constructor equality proof of silicon fit, inferring a
+largest allocation or transaction budget from counters, blind installation or
+padding retries, raising timeouts, dropping baseline objects, and reusing the
+consumed inspection approval. See the
+[named plan](reports/HARDWARE_PLAN_2026-11-05.memory-07297620.md).
+
+## <a id="d173"></a>D173: Register only a private diagnostic after a catchable constructor fault
+
+**Decision (2026-11-05):** prepare a separate constructor-only diagnostic image
+in namespace `F0434153485543545243`. Preserve original instance fields and ordered
+initialization operations, add source-bound stage calls, catch bounded JavaCard
+API/runtime exceptions inside the constructor, and expose only a read-only
+status from the resulting diagnostic instance. Keep every allocation at install
+time, disable legacy selection/shared-interface behavior, and require the same
+converted 50-reference class shape. Released code, images and guards stay intact.
+
+**Why:** the selected card's main is absent after an unconfirmed creation, while
+source budgets and public counters do not identify an operation. A caught API
+fault can be recorded before diagnostic registration commits that result. An
+INSTALL acknowledgement must therefore be distinguished from constructor
+completion; a partial diagnostic is never a Cashu payment applet.
+
+**Rejected:** trusting non-atomic breadcrumbs after failed installation,
+application-driven transaction abort while allocating, moving allocations onto
+APDU paths, exporting secrets, retrying a stage, weakening older private guards,
+or asserting that instrumentation preserves the original image's silicon fit.
+An unconfirmed diagnostic INSTALL remains inconclusive and stops. See the
+[design and offline checks](../tools/outbox-spike/CONSTRUCTOR-TRACE.md).
+No device access is authorized by this decision or source-only preparation.
+
+## <a id="d174"></a>D174: Fix host hashing and isolate a fresh diagnostic invocation
+
+**Decision (2026-11-05):** normalize the diagnostic controller's byte-array load
+with `Buffer.from` before the default SHA-256 call. Test that actual default path
+and stop injecting a hash in real-artifact native-process fixtures. Preserve the
+first invocation's zero-command journal/marker. Prepare an unapproved v2 with a
+fixed separate journal, native wrapper and transport, allowing only its explicit
+label while requiring equality of every device/image/registry field with v1.
+
+**Why:** the host rejected an array before identity or native startup, but the
+one-use attempt was already consumed. Tests with a substituted hash missed the
+real input contract. Correcting the host does not imply a new card result or
+authorize rearming old evidence. V2 requests exactly the previously reviewed
+physical scope; its execution requires a fresh decision.
+
+**Rejected:** deleting consumption, rewriting a zero-command journal as success,
+claiming a reader closure was observed when none opened, changing CAP/timeout,
+or carrying approval across a consumed invocation. See the
+[incident](reports/HARDWARE_TEST_REPORT_2026-11-05.d321-07297620-constructor-host-stop.md)
+and [fresh proposal](reports/HARDWARE_PLAN_2026-11-05.constructor-trace-07297620-2.md).

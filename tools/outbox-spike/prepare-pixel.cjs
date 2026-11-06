@@ -4,7 +4,12 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { compactArtifact } = require("./run-compact.cjs");
-const { PINS, OPTIMIZED_PINS, STREAMED_PINS } = require("./pixel-control.js");
+const {
+  PINS,
+  INSTALL_PINS,
+  OPTIMIZED_PINS,
+  STREAMED_PINS,
+} = require("./pixel-control.js");
 const { FIXTURE_SHA256 } = require("./pixel-capacity.js");
 const { ORIGINAL_SHA256, PATCHED_SHA256 } = require("./patch-pixel-nfc.cjs");
 const ROOT = path.resolve(__dirname, "../..");
@@ -18,6 +23,7 @@ const modeId = (mode) => {
       "capacity-diagnostics",
       "capacity-optimized",
       "capacity-streamed",
+      "phase-install",
     ].includes(mode)
   )
     return CAPACITY_APP_ID;
@@ -43,6 +49,16 @@ function androidFiles(original, mode = "creation") {
   );
   if (application === original.application)
     throw Error("Developer support switch missing");
+  // Each lab profile is its own install on the phone, so each carries a version
+  // no other profile used and its own journal key.
+  const version =
+    mode === "phase-install"
+      ? { code: 5, name: "0.0.5" }
+      : mode === "capacity-streamed"
+        ? { code: 4, name: "0.0.4" }
+        : mode === "capacity-optimized"
+          ? { code: 3, name: "0.0.3" }
+          : { code: 2, name: "0.0.2" };
   const gradle = `apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
@@ -56,8 +72,8 @@ android {
         applicationId "${appId}"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode ${mode === "capacity-streamed" ? 4 : mode === "capacity-optimized" ? 3 : 2}
-        versionName "${mode === "capacity-streamed" ? "0.0.4" : mode === "capacity-optimized" ? "0.0.3" : "0.0.2"}-lab"
+        versionCode ${version.code}
+        versionName "${version.name}-lab"
     }
     signingConfigs { debug {
         storeFile file('debug.keystore')
@@ -79,11 +95,13 @@ dependencies {
 function prepare({ artifact, output, mode = "creation" }) {
   const appId = modeId(mode);
   const pins =
-    mode === "capacity-streamed"
-      ? STREAMED_PINS
-      : mode === "capacity-optimized"
-        ? OPTIMIZED_PINS
-        : PINS;
+    mode === "phase-install"
+      ? INSTALL_PINS
+      : mode === "capacity-streamed"
+        ? STREAMED_PINS
+        : mode === "capacity-optimized"
+          ? OPTIMIZED_PINS
+          : PINS;
   if (!path.isAbsolute(output) || fs.existsSync(output))
     throw Error("New absolute output directory required");
   if (output === ROOT || output.startsWith(ROOT + path.sep))
@@ -212,6 +230,11 @@ function prepare({ artifact, output, mode = "creation" }) {
     "pixel-streamed.json",
     fs.readFileSync(path.join(__dirname, "pixel-streamed.json")),
   );
+  if (mode === "phase-install")
+    write(
+      "pixel-install.json",
+      fs.readFileSync(path.join(__dirname, "pixel-install.json")),
+    );
   const build = {
     presentation: hash(fs.readFileSync(path.join(__dirname, "lab-journal.js"))),
     streamedPins: hash(
@@ -220,6 +243,9 @@ function prepare({ artifact, output, mode = "creation" }) {
     source,
     optimizedPins: hash(
       fs.readFileSync(path.join(__dirname, "pixel-optimized.json")),
+    ),
+    installPins: hash(
+      fs.readFileSync(path.join(__dirname, "pixel-install.json")),
     ),
     appId,
     mode,

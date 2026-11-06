@@ -62,7 +62,24 @@ export interface FakeCardOptions {
   heavyModules?: string[];
   failedAuthLimit?: number;
   freeNonVolatile?: number;
+  /**
+   * The GET DATA 9F7F reply (the whole CPLC TLV, hex) this card answers with.
+   * Defaults to {@link CPLC_09336320}; pass {@link CPLC_09336120} for the
+   * November 3 capture.
+   */
+  cplc?: string;
 }
+
+/** The default fake identity, `cplc-v1:4790d3213041093363205547`. */
+export const CPLC_09336320 =
+  '9F7F2A4790D32147000000000030410933632055470000000000000000048C2337323937360000000000000000';
+
+/**
+ * The CPLC tapped from the card on November 3, independently of any profile:
+ * `cplc-v1:4790d3213041093361205547`.
+ */
+export const CPLC_09336120 =
+  '9F7F2A4790D321470000000000304109336120554700000000000000000434A939333336310000000000000000';
 
 interface Package {
   aid: string;
@@ -106,6 +123,7 @@ export class FakeCard {
   kvn: number;
   seq: number;
   free: number;
+  readonly cplc: string;
   override: Override | undefined;
   readonly packages = new Map<string, Package>();
   /** In the order they were made. */
@@ -124,7 +142,7 @@ export class FakeCard {
   } | null = null;
   private challengeCounter = 0;
   private readonly opts: Required<
-    Omit<FakeCardOptions, 'keys' | 'kvn' | 'seq' | 'freeNonVolatile'>
+    Omit<FakeCardOptions, 'keys' | 'kvn' | 'seq' | 'freeNonVolatile' | 'cplc'>
   >;
 
   constructor(options: FakeCardOptions = {}) {
@@ -132,6 +150,7 @@ export class FakeCard {
     this.kvn = options.kvn ?? 0x01;
     this.seq = options.seq ?? 0x0009;
     this.free = options.freeNonVolatile ?? 164176;
+    this.cplc = options.cplc ?? CPLC_09336320;
     this.opts = {
       macOverModifiedApdu: options.macOverModifiedApdu ?? true,
       openerRule: options.openerRule ?? 'mute',
@@ -391,12 +410,7 @@ export class FakeCard {
       return this.freeMemory();
     }
     if (cla === 0x80 && ins === 0xca && p1 === 0x9f && apdu[3] === 0x7f) {
-      return sw(
-        0x9000,
-        fromHex(
-          '9F7F2A4790D32147000000000030410933632055470000000000000000048C2337323937360000000000000000',
-        ),
-      );
+      return sw(0x9000, fromHex(this.cplc));
     }
     if (ins === 0xe4 || ins === 0xe6 || ins === 0xe8 || ins === 0xd8) {
       return sw(0x6982);

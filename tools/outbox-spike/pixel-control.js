@@ -8,7 +8,7 @@ const {
 } = require("./pixel-capacity.js");
 const PINS = Object.freeze({
   plan: "pixel-creation-control-v1",
-  chip: "cplc-v1:4790d3213041093363205547",
+  chip: "cplc-v1:4790d3213041093361205547",
   package: "F04341534855434D5054",
   manifest: "b0515dcea92a00cc7a61deae88e1541ae9d68e8c1d9a4557ed64b8554f09da25",
   cap: "41bfc03d191ab9ee109370b83ddfdfcd3505f2bf24953583ea2c775470059941",
@@ -19,6 +19,12 @@ const PINS = Object.freeze({
 });
 const OPTIMIZED_PINS = Object.freeze(require("./pixel-optimized.json"));
 const STREAMED_PINS = Object.freeze(require("./pixel-streamed.json"));
+const INSTALL_PINS = Object.freeze(require("./pixel-install.json"));
+// The install profile creates only these two instances: opener, then main.
+const INSTALL_PRIVATE = Object.freeze([
+  INSTALL_PINS.package + "4D",
+  INSTALL_PINS.package + "01",
+]);
 const BASELINE = Object.freeze([
   "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000",
   "e31b4f07a00000006202049f700101ce020100cc08a000000151000000",
@@ -38,6 +44,9 @@ const hex = (bytes) =>
   Array.from(bytes, (v) => v.toString(16).padStart(2, "0")).join("");
 const fromHex = (value) => value.match(/../g).map((v) => parseInt(v, 16));
 const PRIVATE = [PINS.package + "01", PINS.package + "4D", PINS.package];
+// The install profile's card lists its two instances and no separate package
+// record, so an allowance for that card names the instances only.
+const INSTALL_ALLOWED = INSTALL_PRIVATE;
 const CAPACITY_DIAGNOSTIC_PLAN = "pixel-capacity-diagnostics-v1";
 // Exact fixed bridge tokens only. Do not serialize native messages, stacks or causes.
 const NATIVE_FAILURES = new Map([
@@ -72,6 +81,7 @@ function resumeJournal(value, plan = PINS.plan) {
       CAPACITY_DIAGNOSTIC_PLAN,
       OPTIMIZED_PINS.plan,
       STREAMED_PINS.plan,
+      INSTALL_PINS.plan,
     ].includes(plan)
   )
     stop("unknown-plan");
@@ -93,6 +103,12 @@ function resumeJournal(value, plan = PINS.plan) {
     status: "stopped",
     failure: "saved-journal-unreadable",
   };
+}
+
+// A baseline string is a frame prefix: the hand-written constants omit the
+// entry-length byte, and the frames read off the card are lowercase hex.
+function frameIs(frame, base) {
+  return frame.toLowerCase().startsWith(base.toLowerCase());
 }
 
 function registryFrames(data) {
@@ -118,6 +134,29 @@ function registryFrames(data) {
   return frames;
 }
 
+// One entry is verified when it is one of the named AIDs and carries that AID's
+// shape. The package's own record names it as its load file and sits at life
+// cycle 1, listed under the load files or under the applications that loaded
+// it; an instance is an application entry at life cycle 7 under the package
+// that grants no privilege. A later listing repeats what an earlier one already
+// verified: the platform's load files reappear once per package loaded into it.
+function entryAllowed(entry, aid, kind) {
+  if (entry.domain !== "A000000151000000") return false;
+  if (aid === PINS.package)
+    return (
+      entry.lifeCycle === 1 && entry.loadFile?.toUpperCase() === PINS.package
+    );
+  return (
+    kind === "applications" &&
+    entry.lifeCycle === 7 &&
+    entry.loadFile?.toUpperCase() === PINS.package &&
+    Boolean(entry.privileges) &&
+    entry.privileges.every((v) => v === 0)
+  );
+}
+
+// `allowed` is the exact set of private AIDs the card must show, and every other
+// entry listed is a platform load file whose bytes are the baseline's own.
 function verifyRegistry(sdk, pages, allowed) {
   const seen = new Set(),
     objects = new Set();
@@ -128,27 +167,20 @@ function verifyRegistry(sdk, pages, allowed) {
     if (frames.length !== entries.length) stop("registry-framing");
     entries.forEach((entry, i) => {
       const aid = entry.aid.toUpperCase();
-      if (kind === "load-files" && BASELINE.includes(frames[i])) {
-        if (seen.has(frames[i])) stop("registry-duplicate");
-        seen.add(frames[i]);
-      } else {
-        if (
-          !allowed.includes(aid) ||
-          objects.has(aid) ||
-          kind !== (aid === PINS.package ? "load-files" : "applications") ||
-          entry.domain !== "A000000151000000" ||
-          entry.lifeCycle !== (aid === PINS.package ? 1 : 7) ||
-          entry.loadFile !== (aid === PINS.package ? null : PINS.package) ||
-          (aid !== PINS.package && !entry.privileges) ||
-          (entry.privileges && entry.privileges.some((v) => v !== 0))
-        ) {
+      if (allowed.includes(aid)) {
+        if (!objects.has(aid) && !entryAllowed(entry, aid, kind))
           stop("registry-objects");
-        }
         objects.add(aid);
+      } else {
+        if (seen.has(frames[i])) stop("registry-duplicate");
+        if (!BASELINE.some((base) => frameIs(frames[i], base)))
+          stop("registry-baseline");
+        seen.add(frames[i]);
       }
     });
   }
-  if (seen.size !== BASELINE.length) stop("registry-baseline");
+  // A listing of the instances alone still carries the platform's load files.
+  if (seen.size && seen.size !== BASELINE.length) stop("registry-baseline");
   if (objects.size !== allowed.length || allowed.some((a) => !objects.has(a))) {
     stop("registry-private-set");
   }
@@ -164,6 +196,7 @@ function failureCode(error, sdk) {
   }
   if (error instanceof sdk.WrongKeys) return "factory-keys-not-proved";
   if (error instanceof sdk.ChipIdentityMismatch) return "wrong-chip";
+  if (error instanceof sdk.RegistryEvidenceError) return "registry-framing";
   return "operation-stopped";
 }
 
@@ -361,9 +394,10 @@ async function runControl(
   };
   const secure = (name, session, command, codes) =>
     raw(name, session.wrap(command), codes);
-  const registry = async (name, session, allowed) => {
+  // One registry listing, or a single kind of it, as fetched pages.
+  const registryPages = async (name, session, only) => {
     const pages = [];
-    for (const kind of ["applications", "load-files"]) {
+    for (const kind of only ? [only] : ["applications", "load-files"]) {
       let complete = false,
         length = 0;
       for (let i = 0; i < 16; i++) {
@@ -389,9 +423,105 @@ async function runControl(
       }
       if (!complete) stop("registry-incomplete");
     }
-    verifyRegistry(sdk, pages, allowed);
+    // A stop at a listing is decided by these bytes alone, so they are kept
+    // before the verifier can reject them: the journal is the only record a
+    // stopped run leaves behind.
     state.registry = pages.map((p) => ({ kind: p.kind, data: hex(p.data) }));
     await persist();
+    return pages;
+  };
+  // Installation-only profile (pixel-phase-install-v1). It loads the qualified
+  // image, creates opener then main and stops after uninitialized format-5
+  // diagnostics. Fixture SETUP, proofs, signing, retirement, cleanup and key
+  // rotation belong to the USB phase-zero invocation and are never sent here.
+  const installForPhases = async () => {
+    const absent = [
+      sdk.CARD_AID,
+      sdk.TAG_AID,
+      sdk.OPENER_AID,
+      sdk.CASHU_PACKAGE_AID,
+      ...[
+        "F0434153485550524F4245",
+        "F0434153485550524F42454D",
+        "F0434153485550524F424501",
+        ...INSTALL_PRIVATE,
+        INSTALL_PINS.package,
+      ].map(fromHex),
+    ];
+    await identity("match-chip");
+    for (let i = 0; i < absent.length; i++) {
+      const reply = await raw(
+        "require-absent-" + i,
+        sdk.selectAid(absent[i]),
+        [0x6a82],
+      );
+      if (reply.data.length) stop("absence-response");
+    }
+    const session = await authenticate("factory");
+    // The platform's own load files, with no private package yet.
+    verifyRegistry(sdk, await registryPages("initial", session), []);
+    state.initialBaselineVerified = true;
+    state.factoryVersionVerified = 1;
+    await persist();
+    await secure(
+      "install-for-load",
+      session,
+      sdk.installForLoad(fromHex(INSTALL_PINS.package)),
+    );
+    const blocks = sdk.splitLoad(load);
+    if (blocks.length !== INSTALL_PINS.blocks) stop("load-block-count");
+    for (let i = 0; i < blocks.length; i++) {
+      await secure(
+        "load-" + (i + 1) + "-of-" + INSTALL_PINS.blocks,
+        session,
+        blocks[i],
+      );
+    }
+    for (const suffix of ["4D", "01"]) {
+      const aid = fromHex(INSTALL_PINS.package + suffix);
+      await secure(
+        "create-" + suffix,
+        session,
+        sdk.installAndSelectable(fromHex(INSTALL_PINS.package), aid, aid),
+      );
+    }
+    // Both instances, each at its own verified shape, and nothing else private.
+    verifyRegistry(sdk, await registryPages("installed", session), [
+      ...INSTALL_PRIVATE,
+    ]);
+    state.installedRegistryVerified = true;
+    const selected = await raw(
+      "select-private",
+      sdk.selectAid(fromHex(INSTALL_PRIVATE[1])),
+      [0x9000],
+    );
+    if (!equal(selected.data, [67, 80, 82, 79, 84, 2])) stop("private-version");
+    // Format 5 with no holder key yet: the card proves it is uninitialized.
+    const diagnostic = await raw("diagnostics", [0xb0, 0x7d, 0, 0, 0]);
+    const d = diagnostic.data;
+    const word = (at) => d[at] * 256 + d[at + 1];
+    if (
+      d.length !== 16 ||
+      d[15] !== 5 ||
+      d[14] !== 0 ||
+      d.slice(10, 14).some((v) => v !== 0) ||
+      [0, 2, 4, 6, 8].some((at) => word(at) > 32767) ||
+      word(8) > word(6)
+    ) {
+      stop("diagnostics-uninitialized");
+    }
+    state.diagnostics = hex(d);
+    const key = await raw("public-key", [0xb0, 0x7a, 0, 0, 0]);
+    if (key.data.length !== 33 || !validateKey(key.data))
+      stop("invalid-public-key");
+    state.cardKey = hex(key.data);
+    state.diagnosticsVerified = true;
+    state.status = "installed-for-phases";
+    state.stage = "installed-for-phases";
+    await persist();
+  };
+  const registry = async (name, session, allowed) => {
+    verifyRegistry(sdk, await registryPages(name, session), allowed);
   };
   try {
     const profile = capacityMode ? capacityProfile(fixture, hash) : null;
@@ -417,6 +547,10 @@ async function runControl(
     }
     if (load.length !== pins.bytes || hash(load) !== pins.load)
       stop("image-mismatch");
+    if (plan === INSTALL_PINS.plan) {
+      await installForPhases();
+      return state;
+    }
     await identity("match-chip");
     const absent = [
       sdk.CARD_AID,
@@ -501,7 +635,8 @@ async function runControl(
     // Successful control only: a fresh chip match/channel and exact registry precede deletion.
     await identity("cleanup-match-chip");
     const cleanup = await authenticate("cleanup-factory");
-    await registry("cleanup", cleanup, PRIVATE);
+    // Cleanup proves the two instances and no residual instance before deleting.
+    await registry("cleanup", cleanup, PRIVATE.slice(0, 2));
     for (const aid of PRIVATE) {
       const bytes = fromHex(aid);
       await secure(
@@ -511,6 +646,7 @@ async function runControl(
         [0x9000, 0x6a88],
       );
     }
+    // Blank means every private instance is gone: the listing is the platform's.
     await registry("verify-blank", cleanup, []);
     state.blankBaselineVerified = true;
     state.status = "complete";
@@ -529,6 +665,8 @@ async function runControl(
   return state;
 }
 const runCreation = (options) => runControl(options, false, PINS.plan);
+const runPhaseInstall = (options) =>
+  runControl(options, false, INSTALL_PINS.plan, INSTALL_PINS);
 const runCapacity = (options) => runControl(options, true, CAPACITY_PLAN);
 const runCapacityDiagnostics = (options) =>
   runControl(options, true, CAPACITY_DIAGNOSTIC_PLAN);
@@ -538,12 +676,15 @@ const runCapacityStreamed = (options) =>
   runControl(options, true, STREAMED_PINS.plan, STREAMED_PINS);
 module.exports = {
   PINS,
+  INSTALL_PINS,
+  runPhaseInstall,
   STREAMED_PINS,
   runCapacityStreamed,
   OPTIMIZED_PINS,
   runCapacityOptimized,
   BASELINE,
   PRIVATE,
+  INSTALL_ALLOWED,
   runCreation,
   runCapacity,
   verifyRegistry,

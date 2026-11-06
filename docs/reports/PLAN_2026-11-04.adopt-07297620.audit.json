@@ -1,0 +1,106 @@
+{
+  "format": "adopt-07297620-evidence-v1",
+  "planId": "adopt-07297620-v1",
+  "operatorSelectedSerial": "07297620",
+  "identity": {
+    "id": "cplc-v1:4790d3213180072976207515",
+    "icFabricator": "4790",
+    "icType": "d321",
+    "icFabricationDate": "3180",
+    "icSerialNumber": "07297620",
+    "icBatchIdentifier": "7515"
+  },
+  "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
+  "lastKnownBlank": {
+    "date": "2026-10-28",
+    "currentRegistryVerified": false,
+    "registry": {
+      "pages": [
+        {
+          "kind": "applications",
+          "page": 0,
+          "sw": "6a88",
+          "data": ""
+        },
+        {
+          "kind": "load-files",
+          "page": 0,
+          "sw": "9000",
+          "data": "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000e3214f0da00000016443446f634c6974659f700101ce020100cc08a000000151000000e31b4f07a00000006202049f700101ce020100cc08a000000151000000e31b4f07a00000006202029f700101ce020103cc08a000000151000000"
+        }
+      ],
+      "entries": [
+        {
+          "kind": "load-files",
+          "aid": "A0000001515350",
+          "lifeCycle": 1,
+          "privileges": null,
+          "loadFile": null,
+          "domain": "A000000151000000"
+        },
+        {
+          "kind": "load-files",
+          "aid": "A00000016443446F634C697465",
+          "lifeCycle": 1,
+          "privileges": null,
+          "loadFile": null,
+          "domain": "A000000151000000"
+        },
+        {
+          "kind": "load-files",
+          "aid": "A0000000620204",
+          "lifeCycle": 1,
+          "privileges": null,
+          "loadFile": null,
+          "domain": "A000000151000000"
+        },
+        {
+          "kind": "load-files",
+          "aid": "A0000000620202",
+          "lifeCycle": 1,
+          "privileges": null,
+          "loadFile": null,
+          "domain": "A000000151000000"
+        }
+      ]
+    }
+  },
+  "evidence": [
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-2026-10-28/cleanup-journal.json",
+      "sha256": "5d56123c62762fffb1cc7a4ab423dc6f5f5cff1ac5e68e11a3a6492c479b2ab1"
+    },
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-diagnostics-2026-10-28/prototype-journal.json",
+      "sha256": "93172a0004ff17c3752dfc9a0bda7a07ae1ac849ccaa4457147137f8157b6c73"
+    },
+    {
+      "path": "/Users/dread/.cashucard/assisted-compact-07297620-diagnostics-2026-10-28/cleanup-journal.json",
+      "sha256": "9185333af1fa9655659144a39d5cf2be8c367253725e8d2a0a27a293934791a0"
+    },
+    {
+      "path": "/Users/dread/.cashucard/switched-card-identity-2026-11-04/receipt.json",
+      "sha256": "b1084c53d485f7cf0ad3e10b0b7903ca32167d2949ccf138669adb6271e013e6"
+    },
+    {
+      "path": "/Users/dread/.cashucard/switched-card-identity-2026-11-04/pass-1/result.json",
+      "sha256": "8134baa6524dc6435d4f410b62b0baa869fd061e0fe9f0a1da4444e95a1a2c71"
+    },
+    {
+      "path": "/Users/dread/.cashucard/recover-unset-up-2026-11-04/attempt-4/recover.json",
+      "sha256": "17db6c388dc76d22ee8466eb2b82a3b483f0dcb34728f03fc211d62f8c814b09"
+    }
+  ],
+  "candidateImage": {
+    "package": "F04341534855434D5054",
+    "manifest": "b2adaa4252e1ad988cecb0ff31e001ce22f2be0ce00a5c1b25dbb0d451e5bca4",
+    "cap": "b22479280337d4192b4001f06a38d136d69523c38c90f88cab00f2b9e374ce27",
+    "load": "74caa34bc570427b4a292b6696328ed499c3967e13d8ab11066dfb103a4ac048",
+    "bytes": 28067,
+    "blocks": 114,
+    "source": "96eb11df58c0969e2d00a1d52a2ca726f8d2d971"
+  },
+  "candidateImageQualifiedOnThisCard": false,
+  "oldRecoveryPlanConsumed": true,
+  "hardwareAccessDuringReplanning": false
+}

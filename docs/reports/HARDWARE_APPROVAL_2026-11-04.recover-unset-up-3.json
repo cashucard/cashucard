@@ -1,0 +1,7 @@
+{
+  "format": "unset-up-execution-approval-v1",
+  "planId": "recover-unset-up-v3",
+  "approved": true,
+  "operatorDecision": "Operator identified 09336120 on the reader and explicitly stated execution approved for recover-unset-up-v3: one bounded connection, named three-object cleanup and blank verification, with no retry.",
+  "planSha256": "ecd9b3c9073a96d61ae045fcb34a1b18cf5f3cf3881c3b62daa2a4e13eb9610c"
+}

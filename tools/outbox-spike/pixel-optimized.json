@@ -1,6 +1,6 @@
 {
   "plan": "pixel-capacity-optimized-v1",
-  "chip": "cplc-v1:4790d3213041093363205547",
+  "chip": "cplc-v1:4790d3213041093361205547",
   "package": "F04341534855434D5054",
   "manifest": "c97412fb1883e5550b080996cf06e7127117932d355c961c7c735516c8213c9c",
   "cap": "f714eae75a1cc8e6e867279e6e29470d41c5924820c30ca10bcaa9c8db473eb4",

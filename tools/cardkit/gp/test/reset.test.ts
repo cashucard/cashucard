@@ -5,11 +5,11 @@ import {resetOwnedCard, type ResetStage, type ResetOptions} from '../reset';
 import {cashuPlan, provision, rotateKeys} from '../provision';
 import {FACTORY_KEYS, SPIKE_KEYS} from '../scp02';
 import {toHex} from '../bytes';
-import {FakeCard, pullAt} from '../../testing/fake-card';
+import {CPLC_09336120, FakeCard, pullAt} from '../../testing/fake-card';
 import {CASHU_LOAD_FILE} from './assets';
 
 const authority = {
-  chipId: 'cplc-v1:4790d3213041093363205547',
+  chipId: 'cplc-v1:4790d3213041093361205547',
   installationId: '03' + '5a'.repeat(32),
   sourceRef: 'https://issuer.test/escrow/00000000-0000-4000-8000-000000000001',
   intentReceipt: 'service-intent-1',
@@ -28,7 +28,7 @@ function options(extra: Partial<ResetOptions> = {}): ResetOptions {
   };
 }
 async function installed() {
-  const card = new FakeCard();
+  const card = new FakeCard({cplc: CPLC_09336120});
   assert.equal(
     (
       await provision(card.transceive, cashuPlan(CASHU_LOAD_FILE), {

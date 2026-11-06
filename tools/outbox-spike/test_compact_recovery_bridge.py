@@ -53,6 +53,14 @@ class RecoveryPolicy(unittest.TestCase):
         with self.assertRaises(ValueError):p.before(list(b.cmd(0x76)))
         p=selected();send(p,b.cmd(0x76),r.CONSUMED);send(p,b.cmd(0x7c,b'\0'),b'',(0x69,0x85))
         with self.assertRaises(ValueError):p.before(DELETE)
+    def test_an_unset_up_card_is_read_but_never_deleted(self):
+        # The installer's own diagnostics, from a card that never reached SETUP.
+        # The read is allowed -- recovery has to know where the card stands --
+        # but it latches the stop, so no frame after it can delete anything.
+        p=r.Policy();send(p,b.common.select(b.PRIVATE[0]),b'CPROT\x02')
+        send(p,b.cmd(0x7d),bytes.fromhex('7fff0a0e0a0014001400000000000005'))
+        for command in (b.cmd(0x7a),b.cmd(0x76),b.cmd(0x7c,b'\0'),DELETE):
+            with self.assertRaises(ValueError):p.before(list(command))
     def test_authentication_cannot_be_retried_before_cleanup_is_proved(self):
         p=r.Policy();a=list(bytes.fromhex('8050010008')+bytes(9));p.before(a)
         altered=list(a);altered[5]=1
@@ -60,5 +68,33 @@ class RecoveryPolicy(unittest.TestCase):
         p=r.Policy();a=wrapped(0x82,1,0,bytes(8));p.before(a)
         altered=list(a);altered[5]=1
         with self.assertRaises(ValueError):p.before(altered)
+
+class AnsweredCplc(unittest.TestCase):
+    """A CPLC reply carrying one byte ahead of the 9F7F TLV, and the shape the
+    bridge's loop needs back: a list, because the reply is emitted by
+    concatenating onto what pyscard returned."""
+    # The card's own CPLC, as captured through this bridge: 45 bytes, TLV only.
+    TLV=bytes.fromhex('9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000')
+    FRAME=bytes.fromhex('80ca9f7f00')
+
+    def test_the_leading_byte_is_dropped_and_a_list_comes_back(self):
+        self.assertEqual(len(self.TLV),45)
+        data,sw1,sw2=r.trim_cplc(self.FRAME,(list(b'\x00'+self.TLV),0x90,0))
+        self.assertEqual((data,sw1,sw2),(list(self.TLV),0x90,0))
+        self.assertIsInstance(data,list)
+
+    def test_nothing_else_is_reshaped(self):
+        for reply in (
+            (list(self.TLV),0x90,0),                         # already a TLV
+            (list(b'\x00'+self.TLV[:44]),0x90,0),           # one byte short
+            (list(b'\x00\x00'+self.TLV),0x90,0),           # two ahead
+            (list(b'\x00'+b'\x9f\x7f\x2b'+bytes(42)),0x90,0), # wrong tag
+            (list(b'\x00'+self.TLV),0x6a,0x86),             # not a success
+        ):
+            self.assertEqual(r.trim_cplc(self.FRAME,reply)[0],reply[0],reply[0][:4])
+
+    def test_another_command_is_left_alone(self):
+        other=bytes.fromhex('b07a000000')
+        self.assertEqual(r.trim_cplc(other,(list(b'\x00'+self.TLV),0x90,0))[0],list(b'\x00'+self.TLV))
 
 if __name__=='__main__':unittest.main()

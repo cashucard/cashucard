@@ -49,6 +49,15 @@ function fake(options = {}) {
   const f = fixture({
     wrongChip: options.wrongChip,
     wrongKeys: options.wrongKeys,
+    // The fake card opens no secret channel, so the protected applet's answers
+    // for this run are served on the plain transport recovery reads.
+    protected: {
+      instances: { extra: [PRIVATE[2]] },
+      diagnostics: "7fff0a0e0a0014001400400030000205",
+      cardKey: options.wrongKey
+        ? "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+        : key.toString("hex"),
+    },
   });
   f.card.packages.set(PRIVATE[2], {
     aid: PRIVATE[2],
@@ -88,10 +97,12 @@ function fake(options = {}) {
         reply = [...reply];
         reply[10] = 2;
       }
+      // A card swapped before cleanup — the second chip identity read answers
+      // another chip, so the factory authentication before the deletions fails.
       if (
         options.swapCleanup &&
-        stage === "cleanup-match-chip" &&
-        apdu[1] === 0xca
+        apdu[1] === 0xca &&
+        f.sent.filter((a) => a[1] === 0xca).length === 2
       ) {
         reply = [...reply];
         reply[15] ^= 1;
@@ -144,7 +155,7 @@ function fake(options = {}) {
         reply = ok(Array(300).fill(0));
       if (
         options.unknownRegistry &&
-        stage.startsWith("before-recovery-load-files")
+        stage.startsWith("before-recovery-applications")
       )
         reply = [
           ...reply.slice(0, -2),
@@ -303,4 +314,98 @@ test("an unknown recovery image profile stops before any APDU", async () => {
   const r = await recoverToBlank(f.args);
   assert.equal(r.failure, "recovery-profile-invalid");
   assert.equal(f.sent.length, 0);
+});
+// A card the install profile left loaded: two instance AIDs and no separate
+// package record. Its allowance is those two AIDs, not the capacity set's.
+function installedFake(setupReached = true) {
+  const f = fixture({
+    mode: "phase-install",
+    pins: require("./pixel-install.json"),
+  });
+  const installed = [
+    require("./pixel-install.json").package + "4D",
+    require("./pixel-install.json").package + "01",
+  ];
+  f.card.packages.set(installed[1].slice(0, -2), {
+    aid: installed[1].slice(0, -2),
+    modules: installed,
+    size: 27343,
+    instancesMade: 2,
+  });
+  for (const aid of installed) {
+    f.card.instances.set(aid, {
+      aid,
+      module: aid,
+      pkg: installed[1].slice(0, -2),
+      state: { unspent: 0, spent: 0, pin: 0, record: 0, owner: 0 },
+    });
+  }
+  const original = f.args.tx;
+  const args = {
+    sdk,
+    installed: true,
+    expectedKey: key.toString("hex"),
+    now: () => 0,
+    random: (n) => Array.from({ length: n }, (_, i) => i),
+    independentVerify: () => true,
+    save: async () => {},
+    tx: async (apdu) => {
+      const reply = await original(apdu);
+      // A stopped install never ran SETUP, so the applet reports state 0 with
+      // no pool or DLEQ allocated; a completed one reports state 2.
+      if (apdu[0] === 0xb0 && apdu[1] === 0x7d)
+        return [
+          ...b(
+            setupReached
+              ? "7fff0a0e0a0014001400400030000205"
+              : "7fff0a0e0a0014001400000000000005",
+          ),
+          0x90,
+          0,
+        ];
+      if (apdu[0] === 0xb0 && apdu[1] === 0x7a) return [...key, 0x90, 0];
+      return reply;
+    },
+  };
+  return { args, card: f.card, sent: f.sent };
+}
+test("an install that stopped before SETUP still reaches the key read", async () => {
+  const f = installedFake(false),
+    r = await recoverToBlank(f.args);
+  // This card's real reply. Before the state followed `installed`, this stopped
+  // at read-diagnostics with diagnostic-mismatch, which is exactly what pass B
+  // of recover-installed-v1 did against card 09336320.
+  assert.equal(r.diagnostics, "7fff0a0e0a0014001400000000000005");
+  assert.notEqual(r.failure, "diagnostic-mismatch", JSON.stringify(r));
+  assert.ok(
+    f.sent.some((a) => a[1] === 0x7a),
+    "the key read was reached",
+  );
+});
+
+test("the recovery flow resolves the pinned chip against the card it was pinned from", () => {
+  // The 46-byte reply an earlier pass thought it saw parsed to no id at all;
+  // the card's own 45-byte CPLC is this one, and a launcher pinned to anything
+  // else stops at match-chip with wrong-chip before a single recovery frame.
+  const sdk = require("./pixel-test-support.cjs").sdk;
+  const launcher = require("./recover-installed.cjs");
+  const cplc = Buffer.from(
+    "9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000",
+    "hex",
+  );
+  assert.equal(cplc.length, 45);
+  assert.equal(sdk.parseCplc(cplc).id, launcher.chip);
+});
+
+test("the installed card's two-AID registry is the allowance recovery verifies against", async () => {
+  const f = installedFake(),
+    r = await recoverToBlank(f.args);
+  // The pre-check is the point: before the allowance followed the card, this
+  // stopped at registry-private-set on the platform's own listing.
+  assert.notEqual(r.failure, "recovery-registry-mismatch", JSON.stringify(r));
+  assert.ok(r.commands > 0);
+  assert.ok(
+    f.sent.some((a) => a[1] === 0xf2),
+    "the registry was read",
+  );
 });

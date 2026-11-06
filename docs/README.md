@@ -13,6 +13,7 @@ runs. Historical proposals retain the assumptions and gates of their date.
 - [Glossary](GLOSSARY.md): terms used across the code and documentation.
 - [Security model](SECURITY-MODEL.md): card threats and verification coverage.
 - [Hardware deployment](HARDWARE_DEPLOYMENT.md): build, install and package details.
+- [Hardware loop](HARDWARE-LOOP.md): turning one silicon observation into a fixture fix, a regression and a green suite without a second human round.
 
 ## Provisioner
 

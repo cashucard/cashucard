@@ -1,0 +1,9 @@
+{
+  "chip": "cplc-v1:4790d3213180072976207515",
+  "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
+  "reader": "ACS ACR122U PICC Interface",
+  "format": "card-memory-profile-v1",
+  "planId": "memory-07297620-v1",
+  "approved": true,
+  "auditSha256": "94dfa65784267238dfd680c13042cc9eac7023d738593203bc6998d96d674256"
+}

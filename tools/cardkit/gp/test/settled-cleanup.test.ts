@@ -15,7 +15,7 @@ const {
   compressed,
   hashToCurve,
 } = require('../../../cardsim/cashu-crypto.cjs');
-const chipId = 'cplc-v1:4790d3213041093363205547';
+const chipId = 'cplc-v1:4790d3213041093361205547';
 const secret = '01'.padStart(64, '0');
 const installationId = toHex(secp256k1.getPublicKey(secret)).toLowerCase();
 const mint = 'https://mint.example.test';
@@ -41,7 +41,7 @@ function card(initialSpent = 1) {
     let data: number[] = [];
     if (a[1] === 0xca) {
       data = fromHex(
-        '9f7f2a4790d32147000000000030410933632055470000000000000000048c2337323937360000000000000000',
+        '9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000',
       );
     } else if (a[1] === 0xa4) {
       data = a.slice(5, -1).at(-1) === 1 && a[5] === 0xf0 ? [2, 1] : [];

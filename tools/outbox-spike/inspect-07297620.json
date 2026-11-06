@@ -1,0 +1,35 @@
+{
+  "chip": "cplc-v1:4790d3213180072976207515",
+  "cplc": "9f7f2a4790d32147000000000031800729762075150000000000000000048c2337323937360000000000000000",
+  "baselinePages": [
+    {
+      "kind": "applications",
+      "page": 0,
+      "sw": "6a88",
+      "data": ""
+    },
+    {
+      "kind": "load-files",
+      "page": 0,
+      "sw": "9000",
+      "data": "e31b4f07a00000015153509f700101ce02ffffcc08a000000151000000e3214f0da00000016443446f634c6974659f700101ce020100cc08a000000151000000e31b4f07a00000006202049f700101ce020100cc08a000000151000000e31b4f07a00000006202029f700101ce020103cc08a000000151000000"
+    }
+  ],
+  "installedPrivatePages": [
+    {
+      "kind": "applications",
+      "data": "e32c4f0bf04341534855434d50544d9f700107c503000000c40af04341534855434d5054cc08a000000151000000e32c4f0bf04341534855434d5054019f700107c503000000c40af04341534855434d5054cc08a000000151000000",
+      "sw": "9000"
+    },
+    {
+      "kind": "load-files",
+      "data": "e31e4f0af04341534855434d50549f700101ce020000cc08a000000151000000",
+      "sw": "9000"
+    }
+  ],
+  "format": "card-inspection-profile-v1",
+  "planId": "inspect-07297620-v1",
+  "approved": true,
+  "reader": "ACS ACR122U PICC Interface",
+  "auditSha256": "77f3b4c90bd71cb0751ae499fa72239c3d7f26d604ec22f27ad77df55710fb3f"
+}

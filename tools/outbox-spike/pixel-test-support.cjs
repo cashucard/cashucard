@@ -3,15 +3,59 @@ const sdk = require("../cardkit");
 const kitRequire = require("node:module").createRequire(
   require.resolve("../cardkit/package.json"),
 );
-const { FakeCard } = kitRequire("@cashu-card/cardkit/testing");
+const { FakeCard, CPLC_09336120 } = kitRequire("@cashu-card/cardkit/testing");
 const {
   PINS,
+  INSTALL_PINS,
   BASELINE,
   PRIVATE,
   runCreation,
   resumeJournal,
+  runPhaseInstall,
 } = require("./pixel-control.js");
+// The install profile loads through opener then main and creates no Tag.
+const INSTALLED = [INSTALL_PINS.package + "4D", INSTALL_PINS.package + "01"];
 const b = (hex) => [...Buffer.from(hex, "hex")];
+// One entry of a registry listing: AID, life cycle, no privileges, the package
+// that loaded it and the ISD that registered it, under the card's E3 TLV.
+const registryRecord = (aid, lifeCycle, owner, isd) => {
+  const body = [
+    0x4f,
+    aid.length / 2,
+    ...b(aid),
+    0x9f,
+    0x70,
+    0x01,
+    lifeCycle,
+    0xc5,
+    0x03,
+    0,
+    0,
+    0,
+    0xc4,
+    0x0a,
+    ...b(owner),
+    0xcc,
+    0x08,
+    ...isd,
+  ];
+  return [0xe3, body.length, ...body];
+};
+// The load-file entry the installed image registers, as the card lists it.
+const LOAD_FILE = registryRecord(
+  INSTALL_PINS.package + "4D",
+  7,
+  INSTALL_PINS.package,
+  sdk.ISD_AID,
+);
+// A load-file record the baseline does not name: a foreign AID at life cycle 1
+// under the same ISD. The card lists it where the image's own record belongs.
+const FOREIGN_LOAD_FILE =
+  "e31b4f07a00000009999999f700101ce020100cc08a000000151000000";
+// P2 counts the last command written: a listing inside the channel carries a
+// command number where the plain one carries a fixed byte.
+const MODE = (apdu) => (apdu[0] === 0x84 ? apdu[2] : apdu[4]);
+// Records the fixture synthesizes are uppercase, as the card prints them.
 const hex = (bytes) => Buffer.from(bytes).toString("hex").toUpperCase();
 const sha = (bytes) =>
   createHash("sha256").update(Buffer.from(bytes)).digest("hex");
@@ -42,13 +86,36 @@ function syntheticLoad(pins = PINS) {
   return [0xc4, 0x82, body.length >> 8, body.length & 255, ...body];
 }
 function fixture(options = {}) {
+  // The fake card cannot open a secret channel, so the commands the protected
+  // applet answers only inside one are served here as recovery reads them.
+  const isolated = options.protected;
   const pins = options.pins || PINS;
-  const card = new FakeCard(options.wrongKeys ? { keys: sdk.SPIKE_KEYS } : {});
+  // The Pixel profiles pin the November 3 capture, not the shared fake's default.
+  const card = new FakeCard({
+    cplc: CPLC_09336120,
+    ...(options.wrongKeys ? { keys: sdk.SPIKE_KEYS } : {}),
+  });
   const records = [],
     sent = [];
   let clock = 0,
     aborted = false,
-    changedChip = false;
+    changedChip = false,
+    selected = "";
+  // The applet's answer to a listing inside the channel: its package's own
+  // record at life cycle 1, then every instance in the order the module printed
+  // them, with the package AID resolving to that record rather than an instance.
+  const plainListing = ({ isd = sdk.ISD_AID, extra = [] } = {}) => {
+    const pkg = extra.at(-1);
+    return [
+      ...(pkg ? registryRecord(pkg, 1, pkg, isd) : []),
+      ...card
+        .instanceAids()
+        .flatMap((aid) => (aid === pkg ? extra.slice(0, -1) : [aid]))
+        .flatMap((aid) => registryRecord(aid, 7, pkg, isd)),
+      0x90,
+      0,
+    ];
+  };
   const tx = async (apdu) => {
     sent.push(apdu);
     let reply = await card.transceive(apdu);
@@ -65,38 +132,87 @@ function fixture(options = {}) {
       reply[10] = 2;
     }
     if (apdu[1] === 0xf2) {
-      const baseline = BASELINE.flatMap(b);
-      const data = reply.slice(0, -2);
-      const extra = options.unknownRegistry
-        ? b("e30e4f05a0000000999f700101ce020100")
-        : [];
-      if (apdu[2] === 0x20) reply = [...baseline, ...data, ...extra, 0x90, 0];
+      // P1 20 lists load files and P1 40 instances; the fake answers with what
+      // that registry holds at this point in the install.
+      if (apdu[2] === 0x20) {
+        // Before the load the card lists the platform's three load files and no
+        // instances; once the image's package exists it lists it as the fourth.
+        // A run that lists inside the channel stages the same records there, so
+        // this listing carries its package record while the package exists, and
+        // drops it with the package. Only here: the fake card cannot open that
+        // channel, so this is the one listing a blanked card can give.
+        if (isolated?.instances && MODE(apdu) > 0) {
+          const pkg = isolated.instances.extra.at(-1);
+          return [
+            ...(card.packages.has(pkg)
+              ? registryRecord(pkg, 1, pkg, sdk.ISD_AID)
+              : []),
+            ...BASELINE.flatMap(b),
+            0x90,
+            0,
+          ];
+        }
+        const entries = BASELINE.flatMap(b);
+        if (options.mode === "phase-install" && card.instances.size === 2)
+          entries.push(
+            ...b(options.wrongLoadFile ? FOREIGN_LOAD_FILE : LOAD_FILE),
+          );
+        if (options.unknownRegistry) entries.push(...entries.slice(0, 0x1d));
+        reply = [...entries, 0x90, 0];
+      }
+      if (apdu[2] === 0x40 && isolated?.instances && MODE(apdu) > 0) {
+        // A listing inside the channel answers what the applet holds. Without
+        // that channel a recovered card gives this listing, so it stands in for
+        // both reads, and drops to the platform's files once the package is gone.
+        reply = card.instanceAids().length
+          ? plainListing(isolated.instances)
+          : [...BASELINE.flatMap(b), 0x90, 0];
+      }
+      // Recovery lists instances once authenticated; that listing appends any
+      // foreign record, including inside a protected instance.
       if (
         options.unknownCleanup &&
         card.instanceAids().length === 2 &&
         apdu[2] === 0x40
       ) {
-        reply = [...data, ...b("e30e4f05a0000000999f700101ce020100"), 0x90, 0];
+        reply = [
+          ...reply.slice(0, -2),
+          ...b("e3104f05a0000000999f700101ce020100"),
+          0x90,
+          0,
+        ];
       }
     }
-    if (
-      apdu[1] === 0xa4 &&
-      hex(apdu.slice(5, 5 + apdu[4])) === PRIVATE[0] &&
-      card.instances.has(PRIVATE[0])
-    ) {
-      reply = [...Buffer.from("CPROT\x02"), 0x90, 0];
+    if (apdu[1] === 0xa4) {
+      const aid = hex(apdu.slice(5, 5 + apdu[4]));
+      const privateInstance =
+        aid === PRIVATE[0] ||
+        (options.mode === "phase-install" && aid === INSTALLED[1]);
+      if (privateInstance) selected = aid;
+      // The applet answers a select with its version. The install profile
+      // selects it only through the full AID, so a partial name keeps the
+      // card's own answer there.
+      if (
+        privateInstance &&
+        card.instances.has(aid) &&
+        (options.mode !== "phase-install" || apdu[4] > 0)
+      )
+        reply = [...Buffer.from("CPROT\x02"), 0x90, 0];
     }
-    if (apdu[0] === 0xb0 && apdu[1] === 0x7d) {
-      const words = [
-        32767,
-        2574,
-        2560,
-        5120,
-        options.badDiagnostic ? 6000 : 5120,
+    // The applet answers diagnostics only while its instance is selected, so a
+    // read before creation keeps the card's 6D00.
+    if (apdu[0] === 0xb0 && apdu[1] === 0x7d && selected === INSTALLED[1]) {
+      const words = [32767, 2574, 2560, 5120, 5120];
+      // Saturated counters, the commit floor, then pool and DLEQ reservations at
+      // zero, setup state zero and format five.
+      reply = [
+        ...words.flatMap((w) => [w >> 8, w & 255]),
+        ...(options.badDiagnostic ? [0, 2, 0, 0] : [0, 0, 0, 0]),
         0,
+        5,
+        0x90,
         0,
       ];
-      reply = [...words.flatMap((w) => [w >> 8, w & 255]), 0, 5, 0x90, 0];
     }
     if (apdu[0] === 0xb0 && apdu[1] === 0x7a) {
       reply = [
@@ -132,11 +248,26 @@ function fixture(options = {}) {
     save: async (record) => {
       records.push(record);
       if (options.expire && record.stage === "install-for-load") clock = 120001;
-      if (options.journalFails && record.stage === "load-1-of-110")
+      if (
+        options.journalFails &&
+        record.stage ===
+          "load-1-of-" + (options.mode === "phase-install" ? 114 : 110)
+      )
         throw Error("storage failed");
     },
   };
   return { card, records, sent, args };
 }
 
-module.exports = { fixture, sha, hex, b, sdk, kitRequire };
+module.exports = {
+  fixture,
+  sha,
+  hex,
+  b,
+  sdk,
+  kitRequire,
+  INSTALLED,
+  runPhaseInstall,
+  INSTALL_PINS,
+  resumeJournal,
+};

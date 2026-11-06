@@ -54,7 +54,7 @@ function fixture(t, { format = 1, poolBytes = 16384, layout = "single" } = {}) {
   return {
     manifest: path.join(directory, "manifest.json"),
     manifestHash: hash(raw),
-    chip: "cplc-v1:4790d3213041093363205547",
+    chip: "cplc-v1:4790d3213041093361205547",
     reader: "ACS ACR122U PICC Interface",
     journal: path.join(directory, "journal.json"),
     execute: true,
