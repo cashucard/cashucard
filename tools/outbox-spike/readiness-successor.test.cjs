@@ -4,6 +4,7 @@ const fs = require("node:fs"),
   { createHash } = require("node:crypto");
 const { fixture } = require("./readiness-test-support.cjs");
 const { qualifyBlank } = require("./readiness-07297620.cjs");
+const { labPath, labSkip } = require("./lab-present.cjs");
 test("post-reset readiness carries its own plan identity through every receipt", async () => {
   const f = fixture(),
     r = await qualifyBlank({ ...f.args, planId: "readiness-07297620-v2" });
@@ -27,12 +28,20 @@ test("successor preserves the original profile, consumed journal and distinct fi
     require("./readiness-07297620.json").planId,
     "readiness-07297620-v1",
   );
-  const p =
-    "/Users/dread/.cashucard/readiness-07297620-2026-11-04/pass-1/readiness.json";
-  // Local retained evidence is optional in CI; if present it must remain immutable.
-  if (fs.existsSync(p))
+});
+const READINESS = labPath(
+  "readiness-07297620-2026-11-04",
+  "pass-1",
+  "readiness.json",
+);
+// Retained evidence is optional off the lab Mac; where present it must remain immutable.
+test(
+  "the retained first-pass readiness journal is unchanged",
+  { skip: labSkip(READINESS) },
+  () => {
     assert.equal(
-      createHash("sha256").update(fs.readFileSync(p)).digest("hex"),
+      createHash("sha256").update(fs.readFileSync(READINESS)).digest("hex"),
       "9cbef5cac558c2ce871bfdcc38d76ea33f5b3f6b8af5fb6f002f414b5285b4b1",
     );
-});
+  },
+);

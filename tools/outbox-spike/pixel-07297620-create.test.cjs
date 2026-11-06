@@ -8,6 +8,12 @@ const kit = require("node:module").createRequire(
 );
 const { FakeCard } = kit("@cashu-card/cardkit/testing");
 const pins = require("./pixel-07297620-create.json");
+const { labPath, labSkip } = require("./lab-present.cjs");
+const RETAINED_LOAD = labPath(
+  "qualification-phases-2026-10-31",
+  "image",
+  "load-file.bin",
+);
 const {
   runCreation,
   verifyRegistry,
@@ -223,17 +229,11 @@ test("consumed/unreadable UI journal never becomes a fresh start and registry re
 test(
   "the exact pinned candidate runs through real fake-card SCP02 when the retained image is present",
   {
-    skip: !fs.existsSync(
-      "/Users/dread/.cashucard/qualification-phases-2026-10-31/image/load-file.bin",
-    ),
+    skip: labSkip(RETAINED_LOAD),
   },
   async () => {
     const f = fixture(),
-      load = [
-        ...fs.readFileSync(
-          "/Users/dread/.cashucard/qualification-phases-2026-10-31/image/load-file.bin",
-        ),
-      ];
+      load = [...fs.readFileSync(RETAINED_LOAD)];
     assert.equal(hash(load), pins.load);
     const r = await runCreation({ ...f.args, load, hash });
     assert.equal(r.status, "installed-unset-up", JSON.stringify(r));

@@ -10,9 +10,20 @@ const {
   hash,
   PLAN,
   ROOT,
+  AUDIT,
 } = require("./unset-up-admission.cjs");
 const { runRecovery, createPrivate } = require("./recover-unset-up.cjs");
 const { fixture } = require("./unset-up-test-support.cjs");
+const { labSkip } = require("./lab-present.cjs");
+// Admission rehashes the retained journals the audit pins; without them it
+// refuses for that reason, not the one a test is about.
+const lab = {
+  skip: labSkip(
+    JSON.parse(fs.readFileSync(path.join(ROOT, AUDIT), "utf8")).journals.map(
+      (j) => j.path,
+    ),
+  ),
+};
 const { execFileSync } = require("node:child_process");
 const python = execFileSync(
   "python3",
@@ -59,15 +70,19 @@ function campaign(t, approved = true) {
     change: () => (changed = true),
   };
 }
-test("admission accepts semantic fields independent of JSON key order and rechecks static pins after consumption", (t) => {
-  const c = campaign(t);
-  assert.equal(admission(c.options, c.deps).p.journal, c.journal);
-  createPrivate(c.journal + ".consumed", {});
-  assert.throws(() => admission(c.options, c.deps), /consumed/);
-  assert.doesNotThrow(() => revalidate(c.options, c.deps));
-  c.change();
-  assert.throws(() => revalidate(c.options, c.deps), /changed/);
-});
+test(
+  "admission accepts semantic fields independent of JSON key order and rechecks static pins after consumption",
+  lab,
+  (t) => {
+    const c = campaign(t);
+    assert.equal(admission(c.options, c.deps).p.journal, c.journal);
+    createPrivate(c.journal + ".consumed", {});
+    assert.throws(() => admission(c.options, c.deps), /consumed/);
+    assert.doesNotThrow(() => revalidate(c.options, c.deps));
+    c.change();
+    assert.throws(() => revalidate(c.options, c.deps), /changed/);
+  },
+);
 test("unapproved, changed campaign and dirty source refuse before device startup", async (t) => {
   for (const mode of ["unapproved", "changed", "dirty"]) {
     const c = campaign(t, mode !== "unapproved");
@@ -86,69 +101,77 @@ test("unapproved, changed campaign and dirty source refuse before device startup
     assert.equal(fs.existsSync(c.journal + ".consumed"), false);
   }
 });
-test("launcher revalidates after durable consumption and before lazy reader open", async (t) => {
-  const c = campaign(t);
-  let checks = 0,
-    opens = 0;
-  const result = await runRecovery(c.options, {
-    admission: (o) => admission(o, c.deps),
-    revalidate: () => {
-      checks++;
-      throw Error("changed");
-    },
-    openBridge: () => {
-      opens++;
-    },
-  });
-  assert.equal(checks, 1);
-  assert.equal(opens, 0);
-  assert.equal(result.status, "stopped");
-  assert.equal(result.commands, 1);
-  assert.equal(result.blankBaselineVerified, false);
-  assert.equal(fs.existsSync(c.journal + ".consumed"), true);
-  await assert.rejects(
-    runRecovery(c.options, { admission: (o) => admission(o, c.deps) }),
-    /consumed/,
-  );
-});
-test("full launcher uses durable one-shot journal and retains lease on uncertain startup or close", async (t) => {
-  for (const mode of ["success", "startup", "close", "incomplete-policy"]) {
-    const c = campaign(t),
-      f = fixture();
-    let opens = 0;
+test(
+  "launcher revalidates after durable consumption and before lazy reader open",
+  lab,
+  async (t) => {
+    const c = campaign(t);
+    let checks = 0,
+      opens = 0;
     const result = await runRecovery(c.options, {
       admission: (o) => admission(o, c.deps),
-      revalidate: (o) => revalidate(o, c.deps),
-      sdk: f.args.sdk,
-      openBridge: async () => {
+      revalidate: () => {
+        checks++;
+        throw Error("changed");
+      },
+      openBridge: () => {
         opens++;
-        if (mode === "startup") {
-          const e = Error("startup");
-          e.closeUncertain = true;
-          e.bridgePid = 12345;
-          throw e;
-        }
-        return {
-          pid: 12345,
-          tx: f.args.tx,
-          close: async () => {
-            await f.args.close();
-            if (mode === "close") throw Error("close");
-            return { policyComplete: mode !== "incomplete-policy" };
-          },
-        };
       },
     });
-    assert.equal(opens, 1);
-    assert.equal(result.status, mode === "success" ? "complete" : "stopped");
-    assert.equal(result.blankBaselineVerified, mode === "success");
-    assert.equal(
-      fs.existsSync(c.journal + ".lock"),
-      ["startup", "close"].includes(mode),
-    );
+    assert.equal(checks, 1);
+    assert.equal(opens, 0);
+    assert.equal(result.status, "stopped");
+    assert.equal(result.commands, 1);
+    assert.equal(result.blankBaselineVerified, false);
     assert.equal(fs.existsSync(c.journal + ".consumed"), true);
-    const raw = fs.readFileSync(c.journal, "utf8");
-    assert.equal(JSON.parse(raw).status, result.status);
-    assert.ok(!raw.includes("cryptogram"));
-  }
-});
+    await assert.rejects(
+      runRecovery(c.options, { admission: (o) => admission(o, c.deps) }),
+      /consumed/,
+    );
+  },
+);
+test(
+  "full launcher uses durable one-shot journal and retains lease on uncertain startup or close",
+  lab,
+  async (t) => {
+    for (const mode of ["success", "startup", "close", "incomplete-policy"]) {
+      const c = campaign(t),
+        f = fixture();
+      let opens = 0;
+      const result = await runRecovery(c.options, {
+        admission: (o) => admission(o, c.deps),
+        revalidate: (o) => revalidate(o, c.deps),
+        sdk: f.args.sdk,
+        openBridge: async () => {
+          opens++;
+          if (mode === "startup") {
+            const e = Error("startup");
+            e.closeUncertain = true;
+            e.bridgePid = 12345;
+            throw e;
+          }
+          return {
+            pid: 12345,
+            tx: f.args.tx,
+            close: async () => {
+              await f.args.close();
+              if (mode === "close") throw Error("close");
+              return { policyComplete: mode !== "incomplete-policy" };
+            },
+          };
+        },
+      });
+      assert.equal(opens, 1);
+      assert.equal(result.status, mode === "success" ? "complete" : "stopped");
+      assert.equal(result.blankBaselineVerified, mode === "success");
+      assert.equal(
+        fs.existsSync(c.journal + ".lock"),
+        ["startup", "close"].includes(mode),
+      );
+      assert.equal(fs.existsSync(c.journal + ".consumed"), true);
+      const raw = fs.readFileSync(c.journal, "utf8");
+      assert.equal(JSON.parse(raw).status, result.status);
+      assert.ok(!raw.includes("cryptogram"));
+    }
+  },
+);

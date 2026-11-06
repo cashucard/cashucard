@@ -6,7 +6,7 @@ const { recoverToBlank } = require("./recover-compact.cjs");
 const { fixture, sdk, b } = require("./pixel-test-support.cjs");
 
 const here = __dirname;
-const python = path.join(here, "..", "cardctl", ".venv", "bin", "python");
+const { CARDCTL_PYTHON: python, venvSkip } = require("./lab-present.cjs");
 const PACKAGE = require("./pixel-install.json").package;
 const KEY = Buffer.from(
   "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
@@ -51,49 +51,57 @@ print(json.dumps(out))`,
   );
 }
 
-test("the read-key policy admits one ordered pass and nothing else", () => {
-  const steps = JSON.parse(policy());
-  const by = Object.fromEntries(steps);
-  // Each of these is a frame the pass really sends, refused at the point
-  // where it would be wrong: the CPLC before the applet it needs is selected,
-  // and any frame after the pass's bounded budget is spent.
-  assert.equal(by["cplc-before-isd"], "security domain not selected");
-  assert.equal(by.isd, "admitted");
-  assert.equal(by.cplc, "admitted");
-  assert.equal(by.select, "admitted");
-  assert.equal(by.key, "admitted");
-  assert.equal(by["key-again"], "admitted");
-  for (const frame of ["delete", "status", "diagnostics", "auth"])
-    assert.equal(by[frame], "read-only command refused", frame);
-  // The budget is spent by the real pass, so a card that keeps answering
-  // cannot keep the reader open past its one pass.
-  assert.equal(by["past-budget"], "read stopped");
-});
+test(
+  "the read-key policy admits one ordered pass and nothing else",
+  { skip: venvSkip() },
+  () => {
+    const steps = JSON.parse(policy());
+    const by = Object.fromEntries(steps);
+    // Each of these is a frame the pass really sends, refused at the point
+    // where it would be wrong: the CPLC before the applet it needs is selected,
+    // and any frame after the pass's bounded budget is spent.
+    assert.equal(by["cplc-before-isd"], "security domain not selected");
+    assert.equal(by.isd, "admitted");
+    assert.equal(by.cplc, "admitted");
+    assert.equal(by.select, "admitted");
+    assert.equal(by.key, "admitted");
+    assert.equal(by["key-again"], "admitted");
+    for (const frame of ["delete", "status", "diagnostics", "auth"])
+      assert.equal(by[frame], "read-only command refused", frame);
+    // The budget is spent by the real pass, so a card that keeps answering
+    // cannot keep the reader open past its one pass.
+    assert.equal(by["past-budget"], "read stopped");
+  },
+);
 
-test("the launcher's pinned frames are the ones the read policy admits", () => {
-  const launcher = require("./recover-installed.cjs");
-  const { KEY_READ } = launcher;
-  // Both programs spell the three frames independently; a drift between them
-  // would be caught only at the reader, so it is caught here instead.
-  const approved = execFileSync(
-    python,
-    [
-      "-c",
-      `import sys,json
+test(
+  "the launcher's pinned frames are the ones the read policy admits",
+  { skip: venvSkip() },
+  () => {
+    const launcher = require("./recover-installed.cjs");
+    const { KEY_READ } = launcher;
+    // Both programs spell the three frames independently; a drift between them
+    // would be caught only at the reader, so it is caught here instead.
+    const approved = execFileSync(
+      python,
+      [
+        "-c",
+        `import sys,json
 sys.path.insert(0, sys.argv[1])
 import recovery_key_bridge as r
 print(json.dumps({'chip': r.CPLC.hex(), 'select': r.SELECT.hex(), 'key': r.KEY.hex(),
                   'flow_select': r.common.select(r.b.PRIVATE[0]).hex()}))`,
-      here,
-    ],
-    { encoding: "utf8" },
-  );
-  const policy = JSON.parse(approved);
-  const hex = (bytes) => Buffer.from(bytes).toString("hex");
-  assert.equal(hex(KEY_READ.chip), policy.chip);
-  assert.equal(hex(KEY_READ.select), policy.select);
-  assert.equal(hex(KEY_READ.key), policy.key);
-});
+        here,
+      ],
+      { encoding: "utf8" },
+    );
+    const policy = JSON.parse(approved);
+    const hex = (bytes) => Buffer.from(bytes).toString("hex");
+    assert.equal(hex(KEY_READ.chip), policy.chip);
+    assert.equal(hex(KEY_READ.select), policy.select);
+    assert.equal(hex(KEY_READ.key), policy.key);
+  },
+);
 
 test("the installed flow deletes exactly the two instance AIDs and verifies blank", async () => {
   const f = fixture({
