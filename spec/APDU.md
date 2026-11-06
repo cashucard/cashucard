@@ -475,11 +475,12 @@ of those inputs and outputs. In 2.2 every output carries the first input's 8-byt
 keyset, as the card's change always has, because `SPEND_ALL_OUTPUTS` carries no
 keyset: a till that blinds an output for another keyset gets a packet the mint
 refuses. A mint that serves v2 keyset ids knows each keyset only by its 33-byte
-id, so a relay sends the full id that the packet's 8 bytes begin, from the mint's
-`/v1/keysets`, for the inputs and the outputs alike, and refuses a prefix that
-begins more than one id there. The id names the same keyset, and the NUT-11
-SIG_ALL message carries no keyset id, so the witness verifies either way. Each input's generation is the card's. The payment id is unique only
-together with the generation, since `RESET_CARD` sets the receipt count back to 0.
+id, so a relay sends the full id that the packet's 8 bytes begin, from the
+mint's `/v1/keysets`, for the inputs and the outputs alike, and refuses a prefix
+that begins more than one id there. The id names the same keyset, and the NUT-11
+SIG_ALL message carries no keyset id, so the witness verifies either way.
+Each input's generation is the card's. The payment id is unique only together
+with the generation, since `RESET_CARD` sets the receipt count back to 0.
 
 **When.** The record is written by `SPEND_ALL_SIGN`, after the payment's receipt,
 for the payment that was signed. The old record is let go first, so that a

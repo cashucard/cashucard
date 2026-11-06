@@ -482,6 +482,33 @@ test("an 8-byte packet keyset resolves to the mint's full v2 id for swap and res
   assert.equal(swaps(m), 1);
 });
 
+test("a v2 journal saved as pending keeps its keyset map and resumes on full ids", async () => {
+  const m = mint({ catalogue: v2Catalogue(), ids: { [SHORT]: V2 } });
+  m.pending = true;
+  m.spent = false;
+  let disk = journal();
+  const r = await reconcilePayment(
+    quiet(m, disk, async (s) => {
+      disk = structuredClone(s);
+    }),
+  );
+  assert.equal(r.state, "pending");
+  assert.equal(disk.state, "pending");
+  assert.deepEqual(disk.keysetIds, { [SHORT]: V2 });
+  assert.equal(swaps(m), 0);
+  // The resumed journal must reuse the saved map: the mock's swap asserts full
+  // ids on inputs and outputs, so an identity map would fail input-keyset.
+  m.pending = false;
+  const done = await reconcilePayment(
+    quiet(m, disk, async (s) => {
+      disk = structuredClone(s);
+    }),
+  );
+  assert.equal(done.state, "outputs-confirmed");
+  assert.equal(swaps(m), 1);
+  assert.deepEqual(done.keysetIds, { [SHORT]: V2 });
+});
+
 test("an 8-byte mint keeps identity ids and evidence carries no keyset map", async () => {
   const m = mint();
   const r = await reconcilePayment(quiet(m));
