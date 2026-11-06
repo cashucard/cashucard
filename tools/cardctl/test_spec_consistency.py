@@ -238,7 +238,7 @@ def test_the_applet_version_is_the_one_the_spec_the_guide_and_selftest_expect():
     """
     version = dict(re.findall(r"static final byte VERSION_(MAJOR|MINOR)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})", _applet_text()))
     major, minor = int(version["MAJOR"], 16), int(version["MINOR"], 16)
-    assert (major, minor) == (2, 1)
+    assert (major, minor) == (2, 2)
     assert f"`{major:02X} {minor:02X}`" in _heading_body("SELECT APPLICATION"), "the spec's SELECT response"
     guide = DEPLOYMENT_MD.read_text(encoding="utf-8")
     tracked = re.search(r"The CAP tracked in this repo is \*\*applet version (\d+)\.(\d+)\*\*", guide)
@@ -251,7 +251,9 @@ def test_the_applet_version_is_the_one_the_spec_the_guide_and_selftest_expect():
         assert (int(hi, 16), int(lo, 16)) == (major, minor), f"the guide shows {hi} {lo}"
     ok, detail = cardctl._select_verdict(bytes([major, minor]))
     assert ok and detail == f"version {major}.{minor}", detail
-    assert cardctl.SELFTEST_MIN_VERSION == (major, minor)
+    # 2.2 (D175) adds a read and changes nothing a 2.1 card does, so selftest's floor stays 2.1: a 2.1 card is not swept
+    assert cardctl.SELFTEST_MIN_VERSION == (2, 1) and cardctl.SELFTEST_MIN_VERSION <= (major, minor)
+    assert cardctl._select_verdict(bytes([2, 1]))[0], "selftest passes a 2.1 card"
     assert not cardctl._select_verdict(bytes([1, 20]))[0], "selftest passes Foxy's 1.20"
 
 
@@ -503,6 +505,8 @@ _DRIVEN = [
     ("ALLOW_LOAD", "allow_load", (p256.TEST_OWNER_PRIVATE,), [bytes(16), b""]),
     ("REFRESH", "refresh", (p256.TEST_OWNER_PRIVATE, bytes(80)), [bytes(16), bytes(4)]),
     ("LOCK_CARD", "lock_card", (p256.TEST_OWNER_PRIVATE,), [bytes(16), b""]),
+    ("GET_OUTBOX", "get_outbox_scope", (), [bytes(45)]),
+    ("GET_OUTBOX", "get_outbox_page", (0,), [bytes(255)]),
 ]
 
 

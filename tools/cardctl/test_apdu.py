@@ -1126,6 +1126,115 @@ def test_timing_flag_is_global_and_off_by_default():
     assert parser.parse_args(["--timing", "selftest", "--rounds", "5"]).timing is True
     assert parser.parse_args(["-t", "auth"]).timing is True
 
+# ── GET_OUTBOX (2.2, D175) ───────────────────────────────────────────────────
+import pathlib  # noqa: E402
+
+# A packet the cardsim outbox test verified with relay.js and recorded (tools/cardsim/outbox.test.cjs).
+OUTBOX_FIXTURE = pathlib.Path(__file__).resolve().parents[1] / "assisted-relay" / "fixtures" / "packet-2in2out-494.hex"
+
+
+def _outbox_packet() -> bytes:
+    return bytes.fromhex(OUTBOX_FIXTURE.read_text(encoding="ascii").strip())
+
+
+def test_get_outbox_encodings():
+    card = make_card([(bytes(45), 0x9000)])
+    assert card.get_outbox_scope() == bytes(45)
+    assert card.connection.last == bytes.fromhex("B01B000000")
+    card = make_card([(b"\x01" * 7, 0x9000)])
+    assert card.get_outbox_page(510, 49) == b"\x01" * 7
+    assert card.connection.last == bytes.fromhex("B01B01000301FE3100")
+    for bad in ((-1, 1), (0x10000, 1), (0, 0), (0, 256)):
+        try:
+            card.get_outbox_page(*bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"{bad} was sent")
+
+
+def test_get_outbox_reads_the_scope_the_pages_and_the_scope_again():
+    packet = _outbox_packet()
+    scope = bytes([7]) * 45
+    card = make_card([(scope, 0x9000), (packet[:255], 0x9000), (packet[255:], 0x9000), (scope, 0x9000)])
+    assert card.get_outbox() == (packet, scope)
+    assert [a.hex().upper() for a in card.connection.sent] == ["B01B000000", "B01B0100030000FF00", "B01B01000300FFFF00", "B01B000000"]
+    # a whole number of pages ends at 6A83
+    whole = bytes(510)
+    card = make_card([(scope, 0x9000), (whole[:255], 0x9000), (whole[255:], 0x9000), (b"", 0x6A83), (scope, 0x9000)])
+    assert card.get_outbox() == (whole, scope)
+    # a record that changed while it was read is refused
+    card = make_card([(scope, 0x9000), (packet[:255], 0x9000), (packet[255:], 0x9000), (bytes(45), 0x9000)])
+    try:
+        card.get_outbox()
+    except SystemExit as exc:
+        assert "changed while it was read" in str(exc)
+    else:
+        raise AssertionError("a changed record was kept")
+    # no record
+    card = make_card([(b"", 0x6A88)])
+    try:
+        card.get_outbox()
+    except cardctl.CardError as exc:
+        assert exc.sw == 0x6A88
+    else:
+        raise AssertionError("6A88 was not raised")
+
+
+def test_decode_outbox_verifies_the_recorded_packet():
+    packet = _outbox_packet()
+    p = cardctl.decode_outbox(packet)
+    assert len(packet) == 494
+    assert p["witness_valid"] and p["descriptor_valid"]
+    assert p["mint"] == "https://mint.test" and p["payment_id"] == 1 and p["generation"] == 1 and p["index"] == 0
+    assert [(i["slot"], i["amount"]) for i in p["inputs"]] == [(0, 8), (1, 4)]
+    assert [o["amount"] for o in p["outputs"]] == [8, 4]
+    assert all(o["keyset"] == p["inputs"][0]["keyset"] for o in p["outputs"]), "every output under the first input's keyset"
+    assert p["scope"][13:] == __import__("hashlib").sha256(packet[:-64]).digest()
+    # a byte of the body changed: the descriptor no longer verifies; a byte of an output: the witness neither
+    torn = bytearray(packet)
+    torn[90] ^= 1                                   # in the mint, which the payment's message does not cover
+    q = cardctl.decode_outbox(bytes(torn))
+    assert not q["descriptor_valid"] and q["witness_valid"]
+    torn = bytearray(packet)
+    torn[89 + 17 + 1 + 2 * 83 + 1 + 3] ^= 1         # the first output's amount, 8 to 9
+    q = cardctl.decode_outbox(bytes(torn))
+    assert q["outputs"][0]["amount"] == 9
+    assert not q["descriptor_valid"] and not q["witness_valid"]
+    for cut in (packet[:-1], packet + b"\x00", b"XCP-AS\x01" + packet[7:]):
+        try:
+            cardctl.decode_outbox(cut)
+        except ValueError:
+            continue
+        raise AssertionError("a malformed packet was decoded")
+
+
+def test_cmd_outbox_prints_valid_for_the_card_and_invalid_for_a_tampered_packet():
+    packet = _outbox_packet()
+    p = cardctl.decode_outbox(packet)
+    card = make_card([(p["scope"], 0x9000), (packet[:255], 0x9000), (packet[255:], 0x9000), (p["scope"], 0x9000), (p["card_key"], 0x9000)])
+    args = cardctl.build_parser().parse_args(["outbox"])
+    with stubbed_connect(card) as out:
+        assert args.func(args) == 0
+    assert out.getvalue().rstrip().endswith("VALID") and "INVALID" not in out.getvalue()
+    assert "https://mint.test" in out.getvalue()
+    # a scope that is not the packet's
+    card = make_card([(bytes(45), 0x9000), (packet[:255], 0x9000), (packet[255:], 0x9000), (bytes(45), 0x9000), (p["card_key"], 0x9000)])
+    with stubbed_connect(card) as out:
+        assert args.func(args) == 1
+    assert out.getvalue().rstrip().endswith("INVALID")
+    # a saved packet, tampered
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".hex", delete=False) as f:
+        torn = bytearray(packet)
+        torn[-1] ^= 1
+        f.write(bytes(torn).hex())
+    args = cardctl.build_parser().parse_args(["outbox", "--file", f.name])
+    with stubbed_connect(None) as out:
+        assert args.func(args) == 1
+    assert "DOES NOT VERIFY" in out.getvalue() and out.getvalue().rstrip().endswith("INVALID")
+    pathlib.Path(f.name).unlink()
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
