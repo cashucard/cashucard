@@ -41,6 +41,7 @@ SIZES = {
     19634: True,
     20060: True,  # v2.0.0-rc.1 (sha256 59f66673...), ENG-681: the install counted 20,057; selftest 12/12
     20068: True,  # v2.1.0 (sha256 f27d92b...), ENG-699: three steps, opener first; selftest 12/12 (docs/reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)
+    21631: True,  # 2.2 (sha256 86839ccf...), ENG-823, 2026-11-06: three steps, opener first, card applet created in 2.17 s on 09336320; info says 2.2, outbox 6A88 (docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
     21540: False,  # 2.2 first build (sha256 51ddeee4...), ENG-823, 2026-11-06: loaded (88 blocks), card applet 6F00 at create; cause not isolated: the size window or the constructor's +4,321 B persistent (D176, docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
 }
 NEAR = 8  # bytes: a size this close to one that failed is treated as that one

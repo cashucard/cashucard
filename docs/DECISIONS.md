@@ -5159,11 +5159,16 @@ and the two new once-only allocations in `ONCE_ONLY_ALLOCATIONS`; the
 constructor's persistent total is back to 29,842 bytes (1.19's 29,806 and the
 36). `OutboxTest` covers the null cases.
 
-**Not yet shown.** The fixed build (load file 21,631 bytes, a size refcheck has
-not seen, 91 more than the one that loaded) has not been installed on a J3R180;
-whether its first `SET_CARD` is given the 4,285 bytes is the bench card's answer
-to record. A `6F00` at create from that build would not tell the two causes
-apart either: it would be a new size and a smaller constructor at once.
+**Shown on 2026-11-06.** The fixed build (load file 21,631 bytes, 91 more than the
+one that loaded) installed on the same J3R180, 09336320: 88 LOAD blocks, the card
+applet created in 2.17 s, the tag after it, `cardctl info` answering 2.2 and
+`cardctl outbox` 6A88 (the report). That does not tell the two causes apart (a new
+size and a smaller constructor at once), so 21,540 stays a failed size in refcheck's
+table and 21,631 is added as one that installs.
+
+**Not yet shown.** Whether the first `SET_CARD` is given the 4,285 bytes is the
+bench card's next answer to record: the card is set up from the phone, and the first
+payment's `GET_OUTBOX` shows a packet if it was.
 
 **Rejected:** shrinking `OUTBOX_MAX` (out of scope, and +300 bytes is the largest
 constructor growth measured to install, far below even a minimal record);

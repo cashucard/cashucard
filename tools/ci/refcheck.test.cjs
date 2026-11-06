@@ -48,12 +48,15 @@ test("21,540 bytes, measured 6F00 at INSTALL, is refused", () => {
 });
 
 test("a size known to install passes, and an untried one is named untried", () => {
-  const known = refcheck(20068);
-  assert.equal(known.status, 0, known.out);
-  assert.match(known.out, /a size known to install/);
-  const fixed = refcheck(21631);
-  assert.equal(fixed.status, 0, fixed.out);
-  assert.match(fixed.out, /a size not yet tried on the chip/);
-  // 21,540 is not a size that installs, so it must not be offered as the nearest one.
-  assert.match(fixed.out, /the nearest known to install is 20068 bytes/);
+  for (const size of [20068, 21631]) {
+    const known = refcheck(size);
+    assert.equal(known.status, 0, known.out);
+    assert.match(known.out, /a size known to install/);
+  }
+  // an untried size between the two installs is named untried, and 21,540, which is
+  // not a size that installs, must not be offered as the nearest one.
+  const untried = refcheck(21600);
+  assert.equal(untried.status, 0, untried.out);
+  assert.match(untried.out, /a size not yet tried on the chip/);
+  assert.match(untried.out, /the nearest known to install is 21631 bytes/);
 });

@@ -73,9 +73,11 @@ window refcheck exists to catch. The
 refcheck's table records 21,540 as a size that failed (the only measurement there is a
 refusal). The tracked build reserves the
 record's two large arrays at the first `SET_CARD` instead (D176): its load file is
-**21,631 bytes** (127 past a multiple of 256), sha256 `86839ccf…`, a size refcheck has
-not seen. **It has not been installed on a J3R180 yet**: install it on a bench card,
-and record the answer in refcheck's table, before any card that holds money gets it. The 2.1 build was 20,068 bytes
+**21,631 bytes** (127 past a multiple of 256), sha256 `86839ccf…`. It installed on
+the same J3R180 on 2026-11-06, opener first, in the three steps below (the card
+applet created in 2.17 s; `cardctl info` says 2.2), and refcheck's table has it as a
+size that installs. Whether its first `SET_CARD` is given the record's 4,285 bytes is
+the next bench answer (D176). The 2.1 build was 20,068 bytes
 by refcheck's measure (100 past a multiple of 256). It installed on a J3R180 with
 the opener first, in the three steps below, on 2026-10-14, and refcheck's table has
 it as a size that installs ([D26](DECISIONS.md#d26),

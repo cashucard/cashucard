@@ -49,10 +49,31 @@ and 75. Every card answer before each drop was `9000` and under 140 ms. The drop
 stopped once the ACR122U was moved to another USB port. Suspect the host's port
 before the card when a LOAD drops like this.
 
-## Not covered
+## The fixed build installs
 
 The fixed build (ENG-823: the record's two large arrays reserved at the first
 `SET_CARD`; load file 21,631 bytes, CAP sha256
-`86839ccf74d9b7a2aa7f7b8d8d47af1e1649ae14f30a4ac135f285e277e1f66d`) has not been
-installed yet. Its install result, and whether the first `SET_CARD` is given the
-4,285 bytes, are pending on the bench card.
+`86839ccf74d9b7a2aa7f7b8d8d47af1e1649ae14f30a4ac135f285e277e1f66d`) was installed on
+09336320 at 2026-11-06 07:55Z, over the same ACR122U with gp v25.10.20 and factory
+keys, after the 2.1 control's three instances and package were deleted (each under
+1.4 s):
+
+| Step | Result |
+|---|---|
+| `--install` (load + opener `F04341534855434152444D`) | ok: 88 LOAD blocks, 14.67 s |
+| `--create` card applet `F043415348554341524401` | **ok, 2.17 s** |
+| `--create` tag `D2760000850101` | ok, 1.04 s |
+| `cardctl info` | applet version 2.2 (format 4), 128 slots empty, no PIN, no owner, record not set |
+| `cardctl outbox` | `6A88` during GET_OUTBOX scope (no record on a card not set up) |
+
+The card applet that the chip refused at 21,540 bytes with the record in its
+constructor was created at 21,631 bytes with the record reserved later. This does
+not separate the two causes (a smaller constructor and a new size at once), so
+21,540 stays in refcheck's table as a size that failed and 21,631 is added as one
+that installs.
+
+## Not covered
+
+Whether the first `SET_CARD` is given the 4,285 bytes is still the bench card's
+answer to record: the card is set up from the phone (ENG-818 step 0b), and the
+first payment's `cardctl outbox` shows a packet if it was.
