@@ -54,4 +54,6 @@ test("a size known to install passes, and an untried one is named untried", () =
   const fixed = refcheck(21631);
   assert.equal(fixed.status, 0, fixed.out);
   assert.match(fixed.out, /a size not yet tried on the chip/);
+  // 21,540 is not a size that installs, so it must not be offered as the nearest one.
+  assert.match(fixed.out, /the nearest known to install is 20068 bytes/);
 });
