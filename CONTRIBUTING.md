@@ -164,8 +164,8 @@ for actual device/card behavior.
 4. A change to the protocol's core starts as a pull request in
    [cashucard/nut](https://github.com/cashucard/nut), before any implementation
    changes. Changes to `spec/` (the command reference, its profiles and the
-   vectors) are made here; [cashucard/javacard](https://github.com/cashucard/javacard)
-   mirrors this repo's `spec/` after each merge and takes no spec PRs of its own.
+   vectors) are made here and nowhere else; [cashucard/javacard](https://github.com/cashucard/javacard),
+   which once mirrored `spec/`, is archived ([D177](docs/DECISIONS.md#d177)).
 5. **Do not claim testing you did not perform.** In a repo handling bearer
    funds, reviewers have to take those statements at face value.
 

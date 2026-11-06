@@ -6,7 +6,6 @@ const JOBS = [
   "cardsim",
   "cardctl",
   "e2e-tools",
-  "tools",
   "cap",
   "cardkit",
   "ops",
@@ -73,10 +72,6 @@ function classify(files) {
     }
     if (file.startsWith("tools/cardctl/")) {
       selected.add("cardctl");
-      continue;
-    }
-    if (/^tools\/mirror-spec/.test(file)) {
-      selected.add("tools");
       continue;
     }
     if (/^tools\/[^/]+\.(cjs|mjs)$/.test(file)) {

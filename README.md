@@ -15,8 +15,8 @@ for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
 of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
 
 The card is developed here. [cashucard/javacard](https://github.com/cashucard/javacard),
-where it began, keeps a read-only mirror of [`spec/`](spec/), copied there after
-each spec change merges here ([`AGENTS.md`](AGENTS.md)).
+where it began, is archived (2026-11-06): its history and releases stay for
+reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)).
 
 > ### Credit
 >
