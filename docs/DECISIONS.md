@@ -5054,7 +5054,9 @@ not in the private compact image of [D150](#d150): the compact image's
 allocation is still unresolved on the chip, and the relay needs a card a phone
 can actually be handed.
 
-**How it is kept.** Four arrays, all made in the constructor (no transient RAM,
+**How it is kept.** (Amended by [D176](#d176): the J3R180 refused this
+constructor, so the record and the staging are reserved at the first `SET_CARD`;
+the installation and the generation stay at install.) Four arrays, all made in the constructor (no transient RAM,
 no class added): the record (3,692 bytes: a head of four and a packet of at most
 3,688), the outputs of the payment in hand (593), the installation's 32 random
 bytes (drawn at install, kept through `RESET_CARD`) and the generation (4: 1 at
@@ -5108,3 +5110,60 @@ tracked CAP is the plan's, not the chip's.
 `spec/` and has its own); staging the outputs inside the record (a refused
 payment would erase the last record); a keyset per output (a wire change);
 putting the record in the compact image.
+
+## <a id="d176"></a>D176: The outbox is reserved at the first SET_CARD, not at install
+
+**Decided (ENG-823, 2026-11-06):** the two large arrays of [D175](#d175)'s
+assisted-settlement record, the record itself (`outbox`, 3,692 bytes) and the
+staging of the payment in hand (`outStage`, 593), are no longer made in the
+constructor. The first `SET_CARD` that goes through reserves them, once, each
+behind its own null guard, outside any transaction and before the one that
+writes the card's record, right after the store of the mint's proofs
+([D17](#d17)), whose room matters more. The installation's 32 random bytes and
+the generation (4) stay in the constructor: they are facts of the install, and
+36 bytes is within what the chip gives there. SELECT still answers `02 02` (no
+card has had 2.2), and the CAP keeps its name.
+
+**The measurement (2026-11-06 about 07:12Z, J3R180 CPLC 09336320, ACR122U,
+gp v25.10.20, factory keys, SCP02):**
+
+| CAP | `--install` (load and opener) | `--create` card applet `F043415348554341524401` | `--create` tag `D2760000850101` |
+| --- | --- | --- | --- |
+| 2.2 first build, sha256 `51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37`, load file 21,540 B | ok: 88 LOAD blocks, 14.68 s, package LOADED, opener SELECTABLE | **`6F00` after 1.76 s** | not reached |
+| 2.1 release, sha256 `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5` (control, same card, 2 min later) | ok: 82 blocks, 13.79 s | ok, 2.19 s | ok, 1.02 s |
+
+The load file's size installs (refcheck's table now has 21,540 as one that
+does). What the chip refused is the constructor's 4,321 extra persistent bytes,
+the install-time allocation limit [D17](#d17) and [D10](#d10) already record:
++300 bytes in a constructor installed, +12,288 did not, and the same bytes asked
+for by a command after the install were given. The same `6F00` came from card
+07297620, but that card refused the compact image's main applet too
+(ENG-817), so it is no evidence
+either way. Full report:
+[HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md](reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md).
+
+**While null.** Every use of the two arrays is safe while they are null: a card
+not yet set up, or one whose `SET_CARD` was refused the room (or the staging's
+after the record's), keeps no record. `SPEND_ALL_BEGIN` and the output and
+change staging do nothing, `SPEND_ALL_SIGN` signs, burns and receipts the payment
+as ever and writes no record, and `GET_OUTBOX` answers `6A88` to both forms, the
+same answer as a card with no record yet, so the wire of ENG-820 (flash-mobile
+`relay.js`) and ENG-821 (flash-pos) is unchanged. `RESET_CARD` still steps the
+generation. A later `SET_CARD` asks for the room again, as D17's store does.
+
+**Pinned by** `SchnorrHWMathTest.theOutboxIsReservedInSetCardAndNowhereElse`
+and the two new once-only allocations in `ONCE_ONLY_ALLOCATIONS`; the
+constructor's persistent total is back to 29,842 bytes (1.19's 29,806 and the
+36). `OutboxTest` covers the null cases.
+
+**Not yet shown.** The fixed build (load file 21,631 bytes, a size refcheck has
+not seen, 91 more than the one that loaded) has not been installed on a J3R180;
+whether its first `SET_CARD` is given the 4,285 bytes is the bench card's answer
+to record.
+
+**Rejected:** shrinking `OUTBOX_MAX` (out of scope, and +300 bytes is the largest
+constructor growth measured to install, far below even a minimal record);
+reserving the arrays on the first `SPEND_ALL_SIGN` (an allocation on the payment
+path, and a record that appears on some payments and not others); dropping the
+staging array and staging in the record (D175 rejected it: a refused payment
+would erase the last record).

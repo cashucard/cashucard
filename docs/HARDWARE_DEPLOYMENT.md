@@ -61,12 +61,18 @@ The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
 keeps nothing of it) and checks the load file's size against what the J3R180 has
 been seen to install (`tools/refcheck.py`, from
 [FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.2 build ([D175](DECISIONS.md#d175):
-`GET_OUTBOX` and the 4,321 bytes of persistent memory its record reserves at install)
-is **21,540 bytes** by refcheck's measure (36 past a multiple of 256). **It has not
-been installed on a J3R180 yet**: refcheck reports it as a size not yet tried, and
-neither that size nor a constructor asking for 4,321 bytes more has been measured on
-the chip (ENG-818). Install it on a bench card, and record the answer in refcheck's
-table, before any card that holds money gets it. The 2.1 build was 20,068 bytes
+`GET_OUTBOX`) was first **21,540 bytes** by refcheck's measure, and on 2026-11-06 a
+J3R180 (09336320) loaded it (88 blocks, 14.68 s, opener selectable), then refused
+to create the card's applet, `6F00` after 1.76 s: its constructor asked for the
+record's 4,321 bytes of persistent memory, more than the chip gives at install. The
+2.1 CAP, re-created on the same card two minutes later, installed all three applets
+([D176](DECISIONS.md#d176),
+[the report](reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)).
+refcheck's table has 21,540 as a size that installs. The tracked build reserves the
+record's two large arrays at the first `SET_CARD` instead (D176): its load file is
+**21,631 bytes** (127 past a multiple of 256), sha256 `86839ccf…`, a size refcheck has
+not seen. **It has not been installed on a J3R180 yet**: install it on a bench card,
+and record the answer in refcheck's table, before any card that holds money gets it. The 2.1 build was 20,068 bytes
 by refcheck's measure (100 past a multiple of 256). It installed on a J3R180 with
 the opener first, in the three steps below, on 2026-10-14, and refcheck's table has
 it as a size that installs ([D26](DECISIONS.md#d26),
@@ -90,6 +96,9 @@ refcheck's table.
 > them are not made at install: the chip would refuse the card's applet if its
 > constructor asked for them. The first `SET_CARD` reserves them. A card that is
 > refused them is set up all the same and works as a card with no room for proofs.
+> The assisted-settlement record's 4,285 bytes are reserved the same way, after
+> them ([D176](DECISIONS.md#d176)); a card refused those keeps no record and
+> answers `GET_OUTBOX` with `6A88`.
 
 > **3.0.5 is a hard floor.** `SchnorrHW` performs the `k·G` scalar multiply with
 > `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY`, which was introduced in JavaCard 3.0.5
@@ -113,7 +122,7 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 2.2**, sha256
-`51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37`
+`86839ccf74d9b7a2aa7f7b8d8d47af1e1649ae14f30a4ac135f285e277e1f66d`
 (`applet/target/cashu-javacard-2.1.0.cap`). A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
 timestamp into `META-INF/MANIFEST.MF`. Every other entry is byte-identical when
@@ -306,7 +315,8 @@ the applet reads a 65-byte `04 ‖ X ‖ Y`, and some parts return the bare 64-b
 `X ‖ Y` instead. `SchnorrHW.init()` therefore performs one throwaway `2·G` at
 install time and refuses to install if the framing is not what `sign()` indexes
 into. If `gp --install` fails with `6F00`, that probe is the first thing to
-suspect, after the size of the load file (above).
+suspect, after the size of the load file (above), or a constructor that asks for
+more than the chip gives at install ([D17](DECISIONS.md#d17), [D176](DECISIONS.md#d176)).
 
 ---
 

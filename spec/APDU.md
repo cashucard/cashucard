@@ -413,6 +413,9 @@ it. The packet format and the relay are the draft in
 [cashucard/nut#6](https://github.com/cashucard/nut/pull/6); this section is the
 card's side of it. Public: no PIN and no grant, since the packet says only what
 the till that took the payment already holds, and nothing in it can spend.
+The record's room is reserved at the card's first `SET_CARD`, not at install
+([D176](../docs/DECISIONS.md#d176)): a card not yet set up, or one that could not
+reserve it, keeps no record and answers `6A88`, until a later `SET_CARD` reserves it.
 
 | Field | Value |
 |---|---|
@@ -485,9 +488,9 @@ with no record.
 
 **Capacity and timing.** 3,688 bytes at the most (a 77-byte mint, 32 inputs and
 16 outputs), in 15 pages; 494 for two inputs and two outputs with the mint
-`https://mint.test`. The card reserves 4,321 bytes of persistent memory for it at
-install: the record (3,692), the outputs of the payment in hand (593), the
-installation (32) and the generation (4). `SPEND_ALL_SIGN` writes about 500 bytes
+`https://mint.test`. The card keeps 4,321 bytes of persistent memory for it: the
+installation (32) and the generation (4) from install, and the record (3,692) and
+the outputs of the payment in hand (593) from the first `SET_CARD`. `SPEND_ALL_SIGN` writes about 500 bytes
 more for a payment of two pieces and two outputs, and 3.6 KB at the most; the
 first read signs once (about as long as `AUTH`), and every later read only copies.
 
