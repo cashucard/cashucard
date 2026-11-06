@@ -342,7 +342,8 @@ class SchnorrHWMathTest {
     /**
      * The allocations that are not install-time and are let through all the same (1.20), each by its file, by the method it is
      * in and by the whole statement it is, so that nothing else in that method, or anywhere else, goes through with it:
-     * { file, the method's declaration, the statement }. There is one, the room for the mint's proofs. The chip will not install an
+     * { file, the method's declaration, the statement }. There are three: the room for the mint's proofs, and the two arrays of
+     * 2.2's assisted-settlement record (D176), which the chip refused in the constructor as well. The chip will not install an
      * applet whose constructor asks for that much more (+300 bytes installs, +12,288 does not: docs/FOXY-CARD-HARDWARE.md), and gives the
      * same bytes asked for after the install, so SET_CARD reserves them. What this test exists to catch, an allocation that repeats on
      * every command until the card's persistent memory is gone, cannot come of it: it is guarded so that it happens once in a card's
@@ -352,6 +353,11 @@ class SchnorrHWMathTest {
     private static final String[][] ONCE_ONLY_ALLOCATIONS = {
         { "CashuApplet.java", "private void processSetCard(",
           "if (dleq == null) { try { dleq = new byte[(short)(MAX_PROOFS * DLEQ_LEN)]; } catch (SystemException e) { dleq = null; } }" },
+        // 2.2's assisted-settlement record (D176), for the same reason: the J3R180 refused the constructor that made it (6F00 at create)
+        { "CashuApplet.java", "private void processSetCard(",
+          "if (outbox == null) { try { outbox = new byte[OUTBOX_LEN]; } catch (SystemException e) { outbox = null; } }" },
+        { "CashuApplet.java", "private void processSetCard(",
+          "if (outbox != null && outStage == null) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e) { outStage = null; } }" },
     };
 
     /**
@@ -541,16 +547,56 @@ class SchnorrHWMathTest {
     }
 
     /**
+     * 2.2's assisted-settlement record is reserved in SET_CARD (D176), as the store of the mint's proofs is: the constructor names
+     * neither `outbox` nor `outStage` (the J3R180 refused 2.2's constructor with them, 6F00 at create), SET_CARD reserves both, each
+     * behind its guard, `outStage` only once `outbox` is there, after the store and before the transaction that writes the record
+     * and outside any, and nothing else assigns either. The installation and the generation stay in the constructor.
+     */
+    @Test
+    @DisplayName("the assisted-settlement record is reserved in SET_CARD, guarded, after the store of the mint's proofs, before and outside its transaction, and no constructor or other method assigns it; the installation and the generation are made at install")
+    void theOutboxIsReservedInSetCardAndNowhereElse() throws Exception {
+        String src = stripCommentsAndCharLiterals(new String(
+            java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        int[] constructor = bodyRange(src, "private CashuApplet()");
+        String ctor = src.substring(constructor[0], constructor[1]);
+        org.junit.jupiter.api.Assertions.assertFalse(ctor.contains("outbox"), "the constructor does not name the record: the chip refused it there");
+        org.junit.jupiter.api.Assertions.assertFalse(ctor.contains("outStage"), "nor its staging");
+        org.junit.jupiter.api.Assertions.assertTrue(ctor.contains("outInstall      = new byte[(short) 32];") && ctor.contains("outGen          = new byte[(short) 4];"),
+            "the installation and the generation are made at install");
+        int[] setCard = bodyRange(src, "private void processSetCard(");
+        String body = src.substring(setCard[0], setCard[1]);
+        int store = body.indexOf("dleq = new byte[");
+        int guard = body.indexOf("if (outbox == null)");
+        int allocation = body.indexOf("outbox = new byte[OUTBOX_LEN]");
+        int stageGuard = body.indexOf("if (outbox != null && outStage == null)");
+        int stage = body.indexOf("outStage = new byte[OUT_STAGE_LEN]");
+        int begin = body.indexOf("JCSystem.beginTransaction()");
+        org.junit.jupiter.api.Assertions.assertTrue(store > 0 && store < guard && guard < allocation && allocation < stageGuard && stageGuard < stage && stage < begin,
+            "after the store, each behind its guard, the staging after the record, before the transaction that writes the record");
+        org.junit.jupiter.api.Assertions.assertFalse(body.substring(0, stage).contains("beginTransaction"), "and outside any transaction");
+        for (String name : new String[] { "outbox", "outStage" }) {
+            java.util.regex.Matcher assigned = java.util.regex.Pattern.compile("(?<![\\w.])" + name + "\\s*=(?!=)").matcher(src);
+            int assignments = 0;
+            while (assigned.find()) {
+                assignments++;
+                org.junit.jupiter.api.Assertions.assertTrue(assigned.start() > setCard[0] && assigned.start() < setCard[1],
+                    name + " is assigned only in SET_CARD, near: ..." + src.substring(Math.max(0, assigned.start() - 60), Math.min(src.length(), assigned.start() + 40)).replaceAll("\\s+", " "));
+            }
+            org.junit.jupiter.api.Assertions.assertEquals(2, assignments, name + ": the allocation, and the null the catch leaves it as");
+        }
+    }
+
+    /**
      * The persistent arrays the constructors make, by their sizes: 29,806 bytes in 1.19, and the same in 1.20. The chip took +300 bytes
      * more in a constructor and refused +12,288 (measured, docs/FOXY-CARD-HARDWARE.md), where the 12,288 bytes of the mint's proofs are
      * given when asked for after the install. A figure past this one has to be measured on a card first.
      *
-     * 2.2 (ENG-819, D175) adds the assisted-settlement record's four arrays, 4,321 bytes (outbox 3,692, outStage 593, outInstall 32,
-     * outGen 4), accepted by the architect before a card has taken them: 34,127 in all. Until a J3R180 installs this build
-     * (ENG-818) the figure is the plan's and not the chip's.
+     * 2.2 (ENG-819, D175) added the assisted-settlement record's four arrays, 4,321 bytes (outbox 3,692, outStage 593, outInstall 32,
+     * outGen 4), and a J3R180 refused that constructor at create (6F00, 2026-11-06, D176). The two large ones are reserved at the
+     * first SET_CARD now; the installation and the generation (36 bytes) stay: 29,842 in all.
      */
     @Test
-    @DisplayName("the constructors make 34,127 bytes of persistent arrays, 1.19's 29,806 and 2.2's record of 4,321: the 12,288 of the mint's proofs are not among them, for the chip refuses a constructor that asks for that much more")
+    @DisplayName("the constructors make 29,842 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36): neither the 12,288 of the mint's proofs nor the record's 4,285 are among them, for the chip refuses a constructor that asks for that much more")
     void theConstructorsAskForNoMorePersistentMemoryThanTheBuildThatInstalls() throws Exception {
         String applet = stripCommentsAndCharLiterals(new String(
             java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -568,10 +614,10 @@ class SchnorrHWMathTest {
                 arrays++;
             }
         }
-        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 4_321, total,
+        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36, total,
             "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install) "
-            + "and 2.2's assisted-settlement record, 4,321 (D175). A larger figure has to be measured on a card first: +300 bytes installed, +12,288 did not.");
-        org.junit.jupiter.api.Assertions.assertEquals(24, arrays, "the parse found the 21 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
+            + "and 2.2's installation and generation, 36 (the record's 4,285 are made at SET_CARD, D176). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
+        org.junit.jupiter.api.Assertions.assertEquals(22, arrays, "the parse found the 19 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
         org.junit.jupiter.api.Assertions.assertTrue(total + 12_288 > 29_806 + 300, "and the store is the kind of figure the chip refuses there");
     }
 

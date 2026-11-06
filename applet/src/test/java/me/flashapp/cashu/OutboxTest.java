@@ -42,12 +42,13 @@ class OutboxTest {
         fresh(MINT);
     }
 
+    /** A new card, set up with the record naming `mint`; or, for a null `mint`, just installed and not set up. */
     private void fresh(String mint) {
         runtime = new ExposedRuntime();
         sim = new CardSimulator(runtime);
         sim.installApplet(AIDUtil.create(AID_HEX), CashuApplet.class);
         reselect();
-        readyOn(sim, 0, true, mint);
+        if (mint != null) readyOn(sim, 0, true, mint);
         pieces.clear();
     }
 
@@ -499,8 +500,10 @@ class OutboxTest {
         assertFalse(dispatch.contains("!= INS_GET_OUTBOX"), "not a step of a payment: a read drops one begun");
     }
 
-    private void setOutbox(byte[] a) throws Exception {
-        java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("outbox");
+    private void setOutbox(byte[] a) throws Exception { setField("outbox", a); }
+    private void setOutStage(byte[] a) throws Exception { setField("outStage", a); }
+    private void setField(String name, byte[] a) throws Exception {
+        java.lang.reflect.Field f = CashuApplet.class.getDeclaredField(name);
         f.setAccessible(true);
         f.set(runtime.appletAt(AIDUtil.create(AID_HEX)), a);
     }
@@ -548,8 +551,82 @@ class OutboxTest {
     }
 
     @Test
-    @DisplayName("the layout: OUTBOX_MAX is 3,688 and the four arrays are 4,321 bytes, all persistent and made at install")
+    @DisplayName("the record's room is reserved by the first SET_CARD that goes through (D176): none after install, where GET_OUTBOX answers 6A88 to both forms; 3,692 and 593 bytes after it; the same arrays after every SET_CARD that follows")
+    void theRecordIsReservedAtTheFirstSetCard() throws Exception {
+        fresh(null);
+        assertNull(field("outbox"), "not made at install");
+        assertNull(field("outStage"), "not made at install");
+        assertEquals(SW_SLOT_EMPTY, scope().getSW(), "a card not set up has no record: 6A88, as an empty one");
+        assertEquals(SW_SLOT_EMPTY, page(0, 255).getSW(), "and the same to a page");
+        assertEquals(SW_INCORRECT_P1P2, tx(new CommandAPDU(CLA, INS_GET_OUTBOX, 2, 0, 256)).getSW(), "a P1 that is not 00 or 01 is still refused first");
+        assertArrayEquals(new byte[] { 0, 0, 0, 1 }, field("outGen"), "the generation is made at install");
+        readyOn(sim, 0, true, MINT);
+        byte[] outbox = field("outbox");
+        byte[] outStage = field("outStage");
+        assertNotNull(outbox, "the first SET_CARD reserves the record");
+        assertEquals(3692, outbox.length);
+        assertEquals(593, outStage.length);
+        assertEquals(SW_SLOT_EMPTY, scope().getSW(), "and it holds none yet");
+        byte[] rec = record(MINT, REFUND);
+        byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
+        assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, ownerData(ownerProof(L_CARD, OWNER, n, rec), rec))).getSW(), "a second SET_CARD, the owner's");
+        assertSame(outbox, field("outbox"), "does not make another");
+        assertSame(outStage, field("outStage"));
+        Payment p = twoByTwo();
+        assertRecord(expectedBody(p, MINT, receiptCount(), 1), packet());
+    }
+
+    @Test
+    @DisplayName("a card whose SET_CARD could not reserve the record (D176) works as one that keeps none: a SIG_ALL payment is signed, burned and receipted with no exception and no transaction open, GET_OUTBOX answers 6A88 to both forms, and RESET_CARD and SET_CARD still go through")
+    void aCardWithNoRoomForTheRecordPaysAndKeepsNone() throws Exception {
+        // the record refused (and so its staging, which is only asked for after it)
+        setOutbox(null);
+        setOutStage(null);
+        long count = receiptCount();
+        paidDespiteAFault("no room for a record", count);
+        assertEquals(SW_SLOT_EMPTY, page(0, 255).getSW(), "no page either");
+        assertNull(field("outbox"));
+        assertNull(field("outStage"));
+
+        // RESET_CARD lets nothing go but steps the generation as ever
+        byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
+        assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_RESET_CARD, 0, RESET_CONFIRM, ownerData(ownerProof(L_RESET, OWNER, n, new byte[0]), new byte[0]))).getSW(), "RESET_CARD");
+        assertArrayEquals(new byte[] { 0, 0, 0, 2 }, field("outGen"), "the generation stepped");
+        assertEquals(SW_SLOT_EMPTY, scope().getSW());
+        // and the next SET_CARD asks again (here the simulator gives the room, so the card records again)
+        readyOn(sim, 0, true, MINT);
+        pieces.clear();
+        assertNotNull(field("outbox"), "SET_CARD asks for the room again");
+        Payment p = twoByTwo();
+        assertRecord(expectedBody(p, MINT, 1, 2), packet());
+    }
+
+    @Test
+    @DisplayName("a card that reserved the record but not its staging (D176) keeps no record either: the payment is paid, GET_OUTBOX answers 6A88, and the record's room is left as it was")
+    void aCardWithNoRoomForTheStagingPaysAndKeepsNone() throws Exception {
+        setOutStage(null);
+        byte[] outbox = field("outbox");
+        paidDespiteAFault("no room for the staging", receiptCount());
+        assertSame(outbox, field("outbox"));
+        assertTrue(allZeroBytes(outbox), "nothing written to the record");
+    }
+
+    private static boolean allZeroBytes(byte[] a) {
+        for (byte b : a) if (b != 0) return false;
+        return true;
+    }
+
+    @Test
+    @DisplayName("the layout: OUTBOX_MAX is 3,688 and the four arrays are 4,321 bytes, all persistent: the installation and the generation (36) made at install, the record and its staging (3,692 + 593) at the first SET_CARD (D176)")
     void layoutConstants() throws Exception {
+        // a card just installed: the installation and the generation, and no record or staging yet
+        fresh(null);
+        assertNull(field("outbox"), "the record's room is not made at install: the J3R180 refused the constructor that made it (D176)");
+        assertNull(field("outStage"), "nor its staging");
+        assertEquals(32, field("outInstall").length);
+        assertEquals(4, field("outGen").length);
+        assertEquals(36, field("outInstall").length + field("outGen").length);
+        readyOn(sim, 0, true, MINT);
         assertEquals(3688, CashuApplet.OUTBOX_MAX);
         assertEquals(166 + 1 + 32 * 83 + 1 + 16 * 46 + 64 + 64, CashuApplet.OUTBOX_MAX);
         assertEquals(32, CashuApplet.OUT_IN_MOST);
