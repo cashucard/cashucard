@@ -57,6 +57,14 @@ The campaign performs:
 3. A fresh payment where the phone and till both observe unspent inputs and
    wait at a barrier before concurrently submitting the same signed swap.
 
+A 2.2 packet names each keyset by its 8-byte prefix. When the mint knows that
+keyset only by a 33-byte (v2) id, `reconcilePayment` sends the one catalogue id
+the prefix begins, for inputs, outputs and restore, and refuses a prefix that
+begins more than one (`keyset-ambiguous`). The map is saved in the journal
+(`keysetIds`) with the submitted intent, before the swap, and a resumed attempt
+reuses it rather than resolving again. Evidence keeps the packet's outputs and
+adds `keysetIds` only when an id changed.
+
 Each normal flow discards the successful swap response, restarts the mint,
 kills the POS process immediately after its synced inventory write, then starts
 fresh POS processes for queue completion and repeated recovery. Phone replay
@@ -104,7 +112,10 @@ packet, original outputs, input states, amount keys and current fee profile.
 It submits at most one exact swap per invocation, after saving its intent.
 An unknown response leads to restore and state reconciliation. Complete original
 output coverage and valid DLEQ plus all inputs spent permit `outputs-confirmed`.
-Pending, partial, inconsistent or invalid observations retain unresolved work.
+Inputs still `PENDING` give the state `pending`, with no evidence, whether or
+not restore already returns signatures; the next run observes again. Signatures
+beside an `UNSPENT` input contradict each other and fail `settlement-unresolved`.
+Partial, inconsistent or invalid observations retain unresolved work.
 Even an earlier `outputs-confirmed` claim is reverified on restart.
 
 This helper result establishes recoverable original output issuance. The till
