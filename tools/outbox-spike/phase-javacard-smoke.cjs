@@ -16,7 +16,7 @@ const {
 } = require("./phase-recovery.cjs");
 const { withPhaseJournal } = require("./phase-journal.cjs");
 const { kitRequire } = require("./pixel-test-support.cjs");
-const { FakeCard } = kitRequire("@cashu-card/cardkit/testing");
+const { FakeCard, CPLC_09336120 } = kitRequire("@cashu-card/cardkit/testing");
 const fixture = require("./fixtures/compact-capacity-v1.json");
 const artifact = path.resolve(process.argv[2]);
 const root = path.resolve(__dirname, "../..");
@@ -59,7 +59,7 @@ function simulator() {
   };
   child.on("error", failed);
   child.on("close", () => failed(Error("simulator stopped: " + errors)));
-  const identity = new FakeCard(),
+  const identity = new FakeCard({ cplc: CPLC_09336120 }),
     sent = [],
     trace = [];
   const tx = async (a) => {

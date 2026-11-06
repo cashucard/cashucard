@@ -1,12 +1,16 @@
 const { createRequire } = require("node:module");
 const sdk = require("../cardkit");
 const kit = createRequire(require.resolve("../cardkit/package.json"));
-const { FakeCard } = kit("@cashu-card/cardkit/testing");
+const { FakeCard, CPLC_09336120 } = kit("@cashu-card/cardkit/testing");
 const profile = require("./unset-up-profile.json");
 const b = (s) => [...Buffer.from(s, "hex")];
 
 function fixture(options = {}) {
-  const card = new FakeCard(options.wrongKeys ? { keys: sdk.SPIKE_KEYS } : {}),
+  // The profile pins the November 3 capture, not the shared fake's default.
+  const card = new FakeCard({
+      cplc: CPLC_09336120,
+      ...(options.wrongKeys ? { keys: sdk.SPIKE_KEYS } : {}),
+    }),
     sent = [],
     snapshots = [],
     exchanges = [];

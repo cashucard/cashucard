@@ -13,7 +13,7 @@ const {
 const { createJournal, preparePhase } = require("./phase-recovery.cjs");
 const { openPhaseBridge } = require("./phase-transport.cjs");
 const { sdk, kitRequire } = require("./pixel-test-support.cjs");
-const { FakeCard } = kitRequire("@cashu-card/cardkit/testing");
+const { FakeCard, CPLC_09336120 } = kitRequire("@cashu-card/cardkit/testing");
 const pins = require("./pixel-streamed.json"),
   vector = require("./fixtures/compact-capacity-v1.json");
 const sha = (raw) => createHash("sha256").update(raw).digest("hex");
@@ -109,7 +109,7 @@ function fixture() {
       if (startFails) throw Error("startup failure");
       const program = JSON.parse(fs.readFileSync(request));
       let at = 0;
-      const identity = new FakeCard();
+      const identity = new FakeCard({ cplc: CPLC_09336120 });
       return {
         pid: 999999,
         tx: async (apdu) => {
@@ -314,7 +314,7 @@ test("the isolated Python transport uses only the supplied fake PC/SC package an
     assert.ok(!fs.existsSync(path.join(pkg, "loaded")));
     const journal = JSON.parse(fs.readFileSync(f.plan.journal));
     const program = preparePhase({ journal, binding: f.plan.binding });
-    const identity = new FakeCard(),
+    const identity = new FakeCard({ cplc: CPLC_09336120 }),
       responses = [];
     for (const row of program.commands) {
       const a = [...Buffer.from(row.frame, "hex")];

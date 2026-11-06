@@ -13,7 +13,7 @@ const {
 } = require("./compact-export.cjs");
 const { sdk, kitRequire } = require("./pixel-test-support.cjs");
 const { schnorr } = kitRequire("@noble/curves/secp256k1");
-const { FakeCard } = kitRequire("@cashu-card/cardkit/testing");
+const { FakeCard, CPLC_09336120 } = kitRequire("@cashu-card/cardkit/testing");
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const full = require("./fixtures/compact-capacity-v1.json");
 const q = qualification();
@@ -25,7 +25,7 @@ const binding = {
 const secret = Uint8Array.from([...Array(31).fill(0), 3]);
 const hex = (b) => Buffer.from(b).toString("hex");
 function fixture() {
-  const identity = new FakeCard(),
+  const identity = new FakeCard({ cplc: CPLC_09336120 }),
     slots = Array(128).fill(0),
     records = new Map();
   const sent = [],

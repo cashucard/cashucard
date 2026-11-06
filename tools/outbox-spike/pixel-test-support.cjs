@@ -3,7 +3,7 @@ const sdk = require("../cardkit");
 const kitRequire = require("node:module").createRequire(
   require.resolve("../cardkit/package.json"),
 );
-const { FakeCard } = kitRequire("@cashu-card/cardkit/testing");
+const { FakeCard, CPLC_09336120 } = kitRequire("@cashu-card/cardkit/testing");
 const {
   PINS,
   INSTALL_PINS,
@@ -90,7 +90,11 @@ function fixture(options = {}) {
   // applet answers only inside one are served here as recovery reads them.
   const isolated = options.protected;
   const pins = options.pins || PINS;
-  const card = new FakeCard(options.wrongKeys ? { keys: sdk.SPIKE_KEYS } : {});
+  // The Pixel profiles pin the November 3 capture, not the shared fake's default.
+  const card = new FakeCard({
+    cplc: CPLC_09336120,
+    ...(options.wrongKeys ? { keys: sdk.SPIKE_KEYS } : {}),
+  });
   const records = [],
     sent = [];
   let clock = 0,

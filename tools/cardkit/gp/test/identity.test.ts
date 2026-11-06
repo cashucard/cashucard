@@ -6,7 +6,7 @@ import test from 'node:test';
 import {fromHex, toHex} from '../bytes';
 import {CardError, TransportError, type Transceiver} from '../scp02';
 import {parseCplc, readChipIdentity, ChipIdentityMismatch} from '../identity';
-import {FakeCard} from '../../testing/fake-card';
+import {CPLC_09336120, CPLC_09336320, FakeCard} from '../../testing/fake-card';
 
 const CPLC = fromHex(
   '9F7F2A4790D32147000000000031800729762075150000000000000000048C2337323937360000000000000000',
@@ -14,7 +14,26 @@ const CPLC = fromHex(
 const CHIP_ID = 'cplc-v1:4790d3213180072976207515';
 const COMMANDS = ['00A4040008A00000015100000000', '80CA9F7F00'];
 
-test('the fake matches the November 3 capture and refuses the spare identity', async () => {
+for (const [name, tlv, other] of [
+  ['the November 3 capture', CPLC_09336120, 'cplc-v1:4790d3213041093363205547'],
+  ['the default identity', CPLC_09336320, 'cplc-v1:4790d3213041093361205547'],
+] as const) {
+  test(`the fake answers ${name} and refuses the other identity`, async () => {
+    const parsed = parseCplc(fromHex(tlv));
+    const card = new FakeCard({cplc: tlv});
+    assert.deepEqual(
+      await readChipIdentity(card.transceive, parsed.id),
+      parsed,
+    );
+    await assert.rejects(
+      readChipIdentity(card.transceive, other),
+      ChipIdentityMismatch,
+    );
+    assert.deepEqual(card.log.map(toHex), [...COMMANDS, ...COMMANDS]);
+  });
+}
+
+test('the November 3 constant is the independently tapped TLV', async () => {
   // The independently tapped TLV, not a profile-generated reply. The H0
   // gp-info.txt capture below belongs to a different card and stays unchanged.
   const captured = parseCplc(
@@ -25,16 +44,20 @@ test('the fake matches the November 3 capture and refuses the spare identity', a
   assert.equal(captured.icSerialNumber, '09336120');
   assert.equal(captured.icBatchIdentifier, '5547');
   assert.equal(captured.id, 'cplc-v1:4790d3213041093361205547');
+  assert.deepEqual(parseCplc(fromHex(CPLC_09336120)), captured);
+});
+
+test('a FakeCard without a cplc option keeps the shared 09336320 identity', async () => {
   const card = new FakeCard();
-  assert.deepEqual(
-    await readChipIdentity(card.transceive, captured.id),
-    captured,
+  assert.equal(
+    (
+      await readChipIdentity(
+        card.transceive,
+        'cplc-v1:4790d3213041093363205547',
+      )
+    ).id,
+    'cplc-v1:4790d3213041093363205547',
   );
-  await assert.rejects(
-    readChipIdentity(card.transceive, 'cplc-v1:4790d3213041093363205547'),
-    ChipIdentityMismatch,
-  );
-  assert.deepEqual(card.log.map(toHex), [...COMMANDS, ...COMMANDS]);
 });
 
 test('the owner CPLC capture yields its canonical chip identity', t => {
