@@ -74,7 +74,7 @@ def instrument(app,signer):
 
 def prepare(output):
     hashes=resource.prepare(output,0)
-    sources=ROOT/'applet/src/main/java/me/flashapp/cashu';dest=output/'src/me/flashapp/cashu'
+    sources=resource.CONTROL;dest=output/'src/me/flashapp/cashu'
     generated,stages=instrument((sources/'CashuApplet.java').read_text(),(sources/'SchnorrHW.java').read_text())
     for name,text in generated.items():(dest/name).write_text(text)
     helper=(HERE/'java/ConstructorTrace.java').read_text();(dest/'ConstructorTrace.java').write_text(helper)
@@ -109,7 +109,7 @@ def main():
     load=assets.load_file(str(cap));(out/'load-file.bin').write_bytes(load)
     sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
     manifest=dict(kind='constructor-trace-diagnostic-v1',format=1,sourceCommit=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip(),sourceDirty=bool(subprocess.check_output(['git','-C',str(ROOT),'status','--porcelain'],text=True).strip()),packageAid=PACKAGE.replace(':',''),classShape=shape,stageCount=len(stages),terminalStage=next(v['id'] for v in stages if v['statement']=='schnorrHW.init();'),
-        stagesSha256=sha(out/'stages.json'),generatedSources={f.name:sha(f) for f in (out/'src/me/flashapp/cashu').glob('*.java')},originalSources={f.name:sha(f) for f in (ROOT/'applet/src/main/java/me/flashapp/cashu').glob('*.java')},builderSha256=sha(Path(__file__)),baseBuilderSha256=sha(HERE/'build-probe.py'),helperSha256=sha(HERE/'java/ConstructorTrace.java'),dispatchSha256=sha(HERE/'java/ConstructorDispatch.txt'),sdkApiSha256=sha(sdk/'lib/api_classic.jar'),sdkToolsSha256=sha(sdk/'lib/tools.jar'),capSha256=sha(cap),loadFileSize=len(load),loadFileSha256=hashlib.sha256(load).hexdigest(),hardwareAccessed=False)
+        stagesSha256=sha(out/'stages.json'),generatedSources={f.name:sha(f) for f in (out/'src/me/flashapp/cashu').glob('*.java')},originalSources={f.name:sha(f) for f in resource.CONTROL.glob('*.java')},builderSha256=sha(Path(__file__)),baseBuilderSha256=sha(HERE/'build-probe.py'),helperSha256=sha(HERE/'java/ConstructorTrace.java'),dispatchSha256=sha(HERE/'java/ConstructorDispatch.txt'),sdkApiSha256=sha(sdk/'lib/api_classic.jar'),sdkToolsSha256=sha(sdk/'lib/tools.jar'),capSha256=sha(cap),loadFileSize=len(load),loadFileSha256=hashlib.sha256(load).hexdigest(),hardwareAccessed=False)
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('Private constructor diagnostic converted; no device accessed.')
 

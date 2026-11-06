@@ -12,6 +12,10 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
+# The released 2.1 applet's sources (origin/main 7057e2e, the source of the v2.1.0 CAP, sha256 f27d92b...), frozen
+# here: every private image these tools build is the known control plus its diagnostic, and the class shape they
+# check (D147) is that control's. The release applet has moved on (2.2, D175), and these images must not move with it.
+CONTROL = Path(__file__).resolve().parent / 'control/me/flashapp/cashu'
 PACKAGE = 'F0:43:41:53:48:55:50:52:4F:42:45'
 IMAGE_PADDING = {'none': (0, 0), 'padding-a': (17, 5), 'padding-b': (43, 1)}
 EXISTING_IMAGE_PADDING = {'none': (0, 0), 'padding-a': (22, 1), 'padding-b': (41, 3)}
@@ -160,7 +164,7 @@ def source_probe(source, size, segments=1, post_install=False, image_padding="no
 def prepare(output, size, segments=1, post_install=False, image_padding="none", state_storage="added-fields"):
     # Refuse reuse so an old CAP cannot be mistaken for this build.
     output.mkdir(parents=True, exist_ok=False)
-    sources = ROOT / 'applet/src/main/java/me/flashapp/cashu'
+    sources = CONTROL
     destination = output / 'src/me/flashapp/cashu'
     destination.mkdir(parents=True)
     hashes = {}
@@ -226,7 +230,7 @@ def main():
     if not (args.sdk / 'lib/api_classic.jar').is_file():
         parser.error('JavaCard 3.0.5 SDK is missing')
     # Validate before creating files.
-    source_probe((ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text(), args.pool_bytes, args.segments, args.post_install, args.image_padding, args.state_storage)
+    source_probe((CONTROL / 'CashuApplet.java').read_text(), args.pool_bytes, args.segments, args.post_install, args.image_padding, args.state_storage)
     hashes = prepare(output, args.pool_bytes, args.segments, args.post_install, args.image_padding, args.state_storage)
     cap = output / 'resource-probe.cap'
     subprocess.run(['ant', '-f', str(output / 'build.xml'), 'cap',

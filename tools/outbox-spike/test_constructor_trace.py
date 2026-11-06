@@ -12,8 +12,8 @@ m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 class TraceGeneration(unittest.TestCase):
     def test_instrumented_constructor_preserves_operations_and_field_shape(self):
-        app=(m.ROOT/'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
-        signer=(m.ROOT/'applet/src/main/java/me/flashapp/cashu/SchnorrHW.java').read_text()
+        app=(m.resource.CONTROL/'CashuApplet.java').read_text()
+        signer=(m.resource.CONTROL/'SchnorrHW.java').read_text()
         generated,stages=m.instrument(app,signer)
         self.assertEqual(app[:app.index('    public static void install(')],generated['CashuApplet.java'][:generated['CashuApplet.java'].index('    public static void install(')])
         self.assertGreater(len(stages),50);self.assertLess(len(stages),128)

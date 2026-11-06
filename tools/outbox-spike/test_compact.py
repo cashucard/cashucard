@@ -10,7 +10,7 @@ m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 
 class CompactGeneration(unittest.TestCase):
     def test_original_fields_constructor_and_transient_budget_preserved(self):
-        source=(ROOT/'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        source=(m.resource.CONTROL/'CashuApplet.java').read_text()
         generated=m.source_compact(source)
         constructor=lambda text: text[text.index('    private CashuApplet() {'):text.index('\n    /**',text.index('    private CashuApplet() {'))]
         self.assertEqual(constructor(source),constructor(generated))
