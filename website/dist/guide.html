@@ -41,7 +41,7 @@
           <p class="guide-lead">This guide puts the Cashu Card applet on a blank NXP J3R180 card from a computer with a card reader, then checks that the card answers. The first card takes about 20 minutes, most of it spent installing tools, and each card after that takes a few minutes. Cashu Card is experimental: read the <a href="/#risks">risks</a> before a card holds value.</p>
           <ul class="guide-facts" aria-label="At a glance">
             <li>Experimental</li>
-            <li>Applet 2.1</li>
+            <li>Applet 2.2</li>
             <li>NXP J3R180 cards</li>
             <li>GlobalPlatformPro</li>
             <li>About 20 minutes</li>
@@ -54,7 +54,7 @@
 <span class="out">APP: F043415348554341524401 (SELECTABLE)</span>
 <span class="out">APP: D2760000850101 (SELECTABLE)</span>
 <span class="prompt">$</span> gp --apdu 00A404000BF043415348554341524401
-<span class="out">0201 9000</span></code></pre>
+<span class="out">0202 9000</span></code></pre>
           </figure>
           </div>
           <ol class="guide-steps" aria-label="The six steps">
@@ -62,7 +62,7 @@
             <li><a href="#applet"><b>02</b><strong>Get the applet</strong><span>Download one CAP file and check its hash.</span></a></li>
             <li><a href="#check"><b>03</b><strong>Check the card</strong><span>Read it, then log in once.</span></a></li>
             <li><a href="#install"><b>04</b><strong>Install</strong><span>Install three applets in order.</span></a></li>
-            <li><a href="#verify"><b>05</b><strong>Check the install</strong><span>The card answers 02 01.</span></a></li>
+            <li><a href="#verify"><b>05</b><strong>Check the install</strong><span>The card answers 02 02.</span></a></li>
             <li><a href="#setup"><b>06</b><strong>Set the card up</strong><span>Set it up before you hand it over.</span></a></li>
           </ol>
         </div>
@@ -153,7 +153,7 @@ chmod +x /usr/local/bin/gp</code></pre>
 
           <section id="applet" aria-labelledby="applet-title">
             <h2 id="applet-title"><span class="step-no" aria-hidden="true">02</span>Get the applet</h2>
-            <p>The applet ships as one CAP file, applet version 2.1, at <code>applet/target/cashu-javacard-2.1.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
+            <p>The applet ships as one CAP file, applet version 2.2, at <code>applet/target/cashu-javacard-2.1.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>git clone https://github.com/cashucard/cashucard
@@ -163,7 +163,7 @@ cd cashucard/applet</code></pre>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
               <pre><code>sha256sum target/cashu-javacard-2.1.0.cap</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5  target/cashu-javacard-2.1.0.cap</code></pre></div>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>035811ae33341775e6e6bb17d2acd173bf74e1e7f2272175f67b4caf94ceb75a  target/cashu-javacard-2.1.0.cap</code></pre></div>
             </figure>
             <p>On a macOS release without <code>sha256sum</code>, <code>shasum -a 256</code> prints the same line.</p>
             <details class="more">
@@ -243,14 +243,14 @@ APP: D2760000850101 (SELECTABLE)           ← the tag</code></pre></div>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>gp --apdu 00A404000BF043415348554341524401</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0201 9000</code></pre></div>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0202 9000</code></pre></div>
             </figure>
             <p>Read its state with <code>GET_INFO</code>. A new card shows 128 empty slots, with its PIN, owner and record still unset:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>gp --apdu B0010000</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>02 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-SW: 9000</code></pre><p>Read in order: version 2.1, 128 slots, 0 unspent, 0 spent, 128 empty, capabilities FF, no PIN, card file format 4, 3 PIN tries, unlocked, and no record, limit, owner, clock, window or change grant.</p></div>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>02 02 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+SW: 9000</code></pre><p>Read in order: version 2.2, 128 slots, 0 unspent, 0 spent, 128 empty, capabilities FF, no PIN, card file format 4, 3 PIN tries, unlocked, and no record, limit, owner, clock, window or change grant.</p></div>
             </figure>
             <p>Read the card's public key with <code>GET_PUBKEY</code>:</p>
             <figure class="cmd">
@@ -293,7 +293,7 @@ python3 cardctl.py set-limit --owner-key &lt;…&gt; --day 50000 --payment 0 --a
 python3 cardctl.py selftest</code></pre>
                 </figure>
                 <p class="note"><b>Use this on bench cards.</b> When <code>--owner-key</code> is left out, cardctl signs with its TEST key, which anyone with the repository holds.</p>
-                <p><code>cardctl selftest</code> passes a card that answers <code>02 01</code> or a later 2.x version.</p>
+                <p><code>cardctl selftest</code> passes a card that answers <code>02 01</code>, <code>02 02</code> or a later 2.x version.</p>
               </div>
             </details>
           </section>

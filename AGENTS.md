@@ -11,7 +11,7 @@ how the card behaves.
 ## What this repo is, and what cashucard/javacard is now
 
 `cashucard/cashucard` is the working repository of the shared Cashu card
-(protocol 2.1, one wire for Flash and for Foxy's wallet): the JavaCard applet,
+(protocol 2.2, one wire for Flash and for Foxy's wallet): the JavaCard applet,
 its host tools and simulator, the command reference in `spec/`, the TypeScript card
 library with the bench-spike app that installs the card from a phone, the provisioning app and its ops-service. It began as a copy of
 `cashucard/javacard` main with its whole history. `cashucard/javacard`

@@ -1,6 +1,6 @@
 # Install the Cashu Card applet: the guide for AI agents
 
-This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 2.1, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
+This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 2.2, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
@@ -58,7 +58,7 @@ sha256sum target/cashu-javacard-2.1.0.cap
 On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-2.1.0.cap`. Expected:
 
 ```
-f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5  target/cashu-javacard-2.1.0.cap
+035811ae33341775e6e6bb17d2acd173bf74e1e7f2272175f67b4caf94ceb75a  target/cashu-javacard-2.1.0.cap
 ```
 
 Stop if the hash differs.
@@ -118,7 +118,7 @@ APP: D2760000850101 (SELECTABLE)
 
 ## 5. Check the install
 
-Select the card's applet by its whole AID. It answers with its version, 2.1, and `9000` for success:
+Select the card's applet by its whole AID. It answers with its version, 2.2, and `9000` for success:
 
 ```sh
 gp --apdu 00A404000BF043415348554341524401
@@ -127,7 +127,7 @@ gp --apdu 00A404000BF043415348554341524401
 Expected:
 
 ```
-0201 9000
+0202 9000
 ```
 
 Read its state with GET_INFO:
@@ -139,7 +139,7 @@ gp --apdu B0010000
 Expected on a new card, with 128 empty slots and its PIN, owner and record still unset:
 
 ```
-02 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+02 02 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 SW: 9000
 ```
 
