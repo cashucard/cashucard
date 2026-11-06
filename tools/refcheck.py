@@ -41,6 +41,7 @@ SIZES = {
     19634: True,
     20060: True,  # v2.0.0-rc.1 (sha256 59f66673...), ENG-681: the install counted 20,057; selftest 12/12
     20068: True,  # v2.1.0 (sha256 f27d92b...), ENG-699: three steps, opener first; selftest 12/12 (docs/reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)
+    # 21540: 2.2 (sha256 035811a...), ENG-819 (D175), not yet tried on a J3R180: its answer is ENG-818's to add here
 }
 NEAR = 8  # bytes: a size this close to one that failed is treated as that one
 PAGE = 256

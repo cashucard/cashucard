@@ -8,7 +8,7 @@ the components refcheck counts, in refcheck's order (tools/refcheck.py, LOADED
 and components; GlobalPlatformPro's CAPFile.getCode sends the same). The card's
 comes from the tracked CAP, applet/target/cashu-javacard-2.1.0.cap (its sha256
 is published in docs/HARDWARE_DEPLOYMENT.md, and pinned below as CAP_SHA256),
-and must be the 20,068 bytes refcheck measures, with the sha256 pinned below as
+and must be the 21,540 bytes refcheck measures, with the sha256 pinned below as
 LOAD_FILE_SHA256: the provisioner checks that hash again before it sends a
 byte. The hello applet's comes from `ant -f applet/build.xml hello-cap`.
 
@@ -30,9 +30,9 @@ from refcheck import LOADED, components  # noqa: E402
 
 CAP = 'applet/target/cashu-javacard-2.1.0.cap'
 HELLO_CAP = 'applet/target/hello-1.0.cap'
-CAP_SHA256 = 'f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5'
-LOAD_FILE_SHA256 = 'fe7d8ac31be1284f8a9a6d031cdee9b4690f8d02e0a9ab1fa3bac645f6bc13ee'
-LOAD_FILE_SIZE = 20068
+CAP_SHA256 = '51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37'
+LOAD_FILE_SHA256 = '11dee5d728142d56178cdfd33a0e552207c80d13a7c08dba33f3d123b9eed2b3'
+LOAD_FILE_SIZE = 21540
 ASSETS = 'apps/provisioner/src/assets'
 
 

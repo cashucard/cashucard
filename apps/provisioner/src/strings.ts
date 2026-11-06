@@ -37,7 +37,7 @@ export const SETUP = {
   start: 'START BATCH',
   mintsFailed:
     'The mint list could not be loaded. Retry or enter a batch reference.',
-  buildLine: (sha8: string) => `Builds the 2.1 card. Load file ${sha8}…`,
+  buildLine: (sha8: string) => `Builds the 2.2 card. Load file ${sha8}…`,
 };
 
 export const PHASES: Record<string, string> = {

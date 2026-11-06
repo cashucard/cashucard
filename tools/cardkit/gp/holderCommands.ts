@@ -1,5 +1,5 @@
 /** Holder-wallet owner commands. No private keys, PINs, manager login or retries. */
-import {CARD_AID} from './aids';
+import {CARD_AID, supportedCardVersion} from './aids';
 import {bytes, equal, fromHex, type Bytes} from './bytes';
 import {
   encodeCardRecord,
@@ -149,7 +149,8 @@ export async function executeHolderCommand(
   };
   try {
     await readChipIdentity(guarded, intent.chipId);
-    if (!equal((await send(selectAid(CARD_AID))).data, [2, 1]))
+    const version = (await send(selectAid(CARD_AID))).data;
+    if (!supportedCardVersion(version))
       throw new RangeError('unsupported applet version');
     if (
       !equal(
@@ -161,8 +162,7 @@ export async function executeHolderCommand(
     const info = (await send([0xb0, 1, 0, 0, 0])).data;
     if (
       info.length !== 30 ||
-      info[0] !== 2 ||
-      info[1] !== 1 ||
+      !equal(info.slice(0, 2), version) ||
       info[3] !== 0 ||
       info[4] !== 0 ||
       info[10] !== 0 ||

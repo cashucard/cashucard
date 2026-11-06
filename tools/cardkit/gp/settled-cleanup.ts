@@ -1,7 +1,7 @@
 /** Empty-card spent-entry cleanup. Private proof/PIN material stays in this call. */
 import {secp256k1, schnorr} from '@noble/curves/secp256k1';
 import {sha256} from '@noble/hashes/sha256';
-import {CARD_AID, TAG_AID} from './aids';
+import {CARD_AID, TAG_AID, supportedCardVersion} from './aids';
 import {equal, toHex} from './bytes';
 import {readChipIdentity} from './identity';
 import {
@@ -58,11 +58,11 @@ const send = async (tx: Transceiver, a: number[]) => {
   if (r.sw !== 0x9000) throw new CardError(r.sw, a[1]!);
   return r.data;
 };
-function info(data: number[]) {
+/** GET_INFO's answer, its version held to the one SELECT answered (`selected`), as inspect does. */
+function info(data: number[], selected: readonly number[]) {
   if (
     data.length !== 30 ||
-    data[0] !== 2 ||
-    data[1] !== 1 ||
+    !equal(data.slice(0, 2), selected) ||
     data[2] !== 128 ||
     data[8] !== 4 ||
     data[3]! + data[4]! + data[5]! !== 128 ||
@@ -88,9 +88,9 @@ async function snapshot(
   expected?: Pick<ResetReview, 'chipId' | 'installationId'>,
 ) {
   const chip = await readChipIdentity(tx, expected?.chipId);
-  if (!equal(await send(tx, selectAid(CARD_AID)), [2, 1]))
-    stop('unsupported-card');
-  const state = info(await send(tx, [0xb0, 1, 0, 0, 0]));
+  const version = await send(tx, selectAid(CARD_AID));
+  if (!supportedCardVersion(version)) stop('unsupported-card');
+  const state = info(await send(tx, [0xb0, 1, 0, 0, 0]), version);
   const installationId = hex(await send(tx, [0xb0, 0x10, 0, 0, 0x21]));
   if (
     !point(installationId) ||
@@ -127,7 +127,7 @@ async function snapshot(
     recordDigest: digest(record),
   };
   // Return to the card; SELECT deliberately removes any prior grants.
-  if (!equal(await send(tx, selectAid(CARD_AID)), [2, 1]))
+  if (!supportedCardVersion(await send(tx, selectAid(CARD_AID))))
     stop('unsupported-card');
   return {review, record};
 }

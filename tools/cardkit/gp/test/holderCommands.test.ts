@@ -74,6 +74,13 @@ test('identity, public context and fresh nonce are bound to one exact owner comm
     ],
   });
 });
+test('a 2.2 card (D175: GET_OUTBOX added, nothing else moved) takes the same owner command', async () => {
+  const f = fixture();
+  f.replies[2] = [2, 2];
+  f.replies[4] = [2, 2, ...Array(14).fill(0), 1, ...Array(13).fill(0)];
+  await executeHolderCommand(f.tx, context, {kind: 'allow-load'}, f.options);
+  assert.equal(f.log.at(-1), 'B045000009083006020101020101');
+});
 test('wrong identity, storage failure and cancellation while signing prevent the owner write', async () => {
   const wrong = fixture();
   await assert.rejects(() =>
@@ -126,17 +133,35 @@ test('invalid proof, wrong applet and refused owner command never retry', async 
     ),
   );
   assert.equal(malformed.log.length, 6);
-  const version = fixture();
-  version.replies[2] = [2, 2];
+  // an applet version this kit does not know (2.1 and 2.2 it does: CARD_VERSIONS)
+  for (const unknown of [
+    [2, 0],
+    [2, 3],
+  ]) {
+    const version = fixture();
+    version.replies[2] = unknown;
+    await assert.rejects(() =>
+      executeHolderCommand(
+        version.tx,
+        context,
+        {kind: 'allow-load'},
+        version.options,
+      ),
+    );
+    assert.equal(version.log.length, 3);
+  }
+  // GET_INFO's version not SELECT's
+  const mixed = fixture();
+  mixed.replies[2] = [2, 2];
   await assert.rejects(() =>
     executeHolderCommand(
-      version.tx,
+      mixed.tx,
       context,
       {kind: 'allow-load'},
-      version.options,
+      mixed.options,
     ),
   );
-  assert.equal(version.log.length, 3);
+  assert.equal(mixed.log.length, 5);
   const refused = fixture();
   const tx = async (a: number[]) =>
     a[1] === 0x45 ? (refused.log.push(toHex(a)), [0x6a, 0x91]) : refused.tx(a);

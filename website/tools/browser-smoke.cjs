@@ -292,7 +292,7 @@ async function main() {
     await until("document.readyState==='complete'&&document.querySelectorAll('.guide-doc h2').length===10", "Install guide loads with its ten sections");
     assert.equal(await evaluate("document.querySelector('.wordmark img').getAttribute('src')"), "/assets/cashu-card-lockup.svg", "The guide's header shows the lockup");
     await evaluate("document.fonts.ready");
-    assert.ok(await evaluate("document.body.textContent.includes('f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5')"), "Guide publishes the CAP's sha256");
+    assert.ok(await evaluate("document.body.textContent.includes('51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37')"), "Guide publishes the CAP's sha256");
     assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Install guide fits desktop");
     assert.ok(await evaluate("!!document.querySelector('#need a[href^=\"https://www.amazon.com/dp/\"]')"), "The guide links a card reader to buy");
     assert.ok(await evaluate("!!document.querySelector('#need a[href=\"/#install\"]')"), "The guide points card issuers at the provisioner");
@@ -302,7 +302,7 @@ async function main() {
     const agentGuide = await fetch(origin + "/guide.md").then(async (r) => ({ status: r.status, type: r.headers.get("content-type") || "", text: await r.text() }));
     assert.equal(agentGuide.status, 200, "The agent's guide is served");
     assert.match(agentGuide.type, /^text\/markdown/, "The agent's guide is Markdown");
-    assert.ok(agentGuide.text.includes("f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5"), "The agent's guide publishes the CAP's sha256");
+    assert.ok(agentGuide.text.includes("51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37"), "The agent's guide publishes the CAP's sha256");
     const llms = await fetch(origin + "/llms.txt").then((r) => r.text());
     assert.ok(llms.includes("https://cashucard.org/guide.md"), "llms.txt points agents at the guide");
     assert.ok(llms.includes("https://github.com/cashucard/nut/blob/main/CCP.md"), "llms.txt points agents at the draft NUT");

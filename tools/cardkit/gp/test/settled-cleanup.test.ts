@@ -19,7 +19,7 @@ const chipId = 'cplc-v1:4790d3213041093361205547';
 const secret = '01'.padStart(64, '0');
 const installationId = toHex(secp256k1.getPublicKey(secret)).toLowerCase();
 const mint = 'https://mint.example.test';
-function card(initialSpent = 1) {
+function card(initialSpent = 1, minor = 1, infoMinor = minor) {
   let spent = initialSpent;
   const commands: number[][] = [];
   const raw = [
@@ -44,11 +44,11 @@ function card(initialSpent = 1) {
         '9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000',
       );
     } else if (a[1] === 0xa4) {
-      data = a.slice(5, -1).at(-1) === 1 && a[5] === 0xf0 ? [2, 1] : [];
+      data = a.slice(5, -1).at(-1) === 1 && a[5] === 0xf0 ? [2, minor] : [];
     } else if (a[1] === 1) {
       data = [
         2,
-        1,
+        infoMinor,
         128,
         0,
         spent,
@@ -119,6 +119,27 @@ function card(initialSpent = 1) {
     },
   };
 }
+
+test('a 2.2 card (D175) is reviewed as a 2.1 card is, and a version this kit does not know stops', async () => {
+  const review = await readResetReview(card(1, 2).tx);
+  assert.equal(review.chipId, chipId);
+  assert.equal(review.spent, 1);
+  for (const minor of [0, 3]) {
+    await assert.rejects(() => readResetReview(card(1, minor).tx));
+  }
+});
+
+test("GET_INFO's version must be SELECT's, as inspect requires: a 2.1 SELECT with a 2.2 GET_INFO, or the reverse, stops", async () => {
+  for (const [selected, reported] of [
+    [1, 2],
+    [2, 1],
+  ] as const) {
+    await assert.rejects(
+      () => readResetReview(card(1, selected, reported).tx),
+      (e: unknown) => (e as {code?: string}).code === 'unsupported-card',
+    );
+  }
+});
 
 test('review is read-only; cleanup checks the exact proof at the mint, saves intent, seals PIN and verifies zero slots', async () => {
   const c = card();

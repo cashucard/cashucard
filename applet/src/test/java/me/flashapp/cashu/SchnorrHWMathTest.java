@@ -544,9 +544,13 @@ class SchnorrHWMathTest {
      * The persistent arrays the constructors make, by their sizes: 29,806 bytes in 1.19, and the same in 1.20. The chip took +300 bytes
      * more in a constructor and refused +12,288 (measured, docs/FOXY-CARD-HARDWARE.md), where the 12,288 bytes of the mint's proofs are
      * given when asked for after the install. A figure past this one has to be measured on a card first.
+     *
+     * 2.2 (ENG-819, D175) adds the assisted-settlement record's four arrays, 4,321 bytes (outbox 3,692, outStage 593, outInstall 32,
+     * outGen 4), accepted by the architect before a card has taken them: 34,127 in all. Until a J3R180 installs this build
+     * (ENG-818) the figure is the plan's and not the chip's.
      */
     @Test
-    @DisplayName("the constructors make 29,806 bytes of persistent arrays, 1.19's figure: the 12,288 of the mint's proofs are not among them, for the chip refuses a constructor that asks for that much more")
+    @DisplayName("the constructors make 34,127 bytes of persistent arrays, 1.19's 29,806 and 2.2's record of 4,321: the 12,288 of the mint's proofs are not among them, for the chip refuses a constructor that asks for that much more")
     void theConstructorsAskForNoMorePersistentMemoryThanTheBuildThatInstalls() throws Exception {
         String applet = stripCommentsAndCharLiterals(new String(
             java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -564,10 +568,10 @@ class SchnorrHWMathTest {
                 arrays++;
             }
         }
-        org.junit.jupiter.api.Assertions.assertEquals(29_806, total,
-            "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install). "
-            + "A larger figure has to be measured on a card first: +300 bytes installed, +12,288 did not.");
-        org.junit.jupiter.api.Assertions.assertEquals(20, arrays, "the parse found the 17 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
+        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 4_321, total,
+            "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install) "
+            + "and 2.2's assisted-settlement record, 4,321 (D175). A larger figure has to be measured on a card first: +300 bytes installed, +12,288 did not.");
+        org.junit.jupiter.api.Assertions.assertEquals(24, arrays, "the parse found the 21 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
         org.junit.jupiter.api.Assertions.assertTrue(total + 12_288 > 29_806 + 300, "and the store is the kind of figure the chip refuses there");
     }
 

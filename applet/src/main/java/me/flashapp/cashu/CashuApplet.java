@@ -125,6 +125,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     // the PIN's form) leaves the budget as it is, where 2.0 set it back to 7. Nothing on the wire is added or moved; two
     // answers change (GET_CARD's bytes 76 and 77 after such a payment or such a SET_LIMIT), and v2.0.0 was released with
     // the old ones, so a reader can tell the two builds apart by the minor alone.
+    // 2.2 is ENG-819 (D175): the card keeps one self-contained record of its last SIG_ALL payment, the assisted-settlement
+    // packet (`outbox`), and GET_OUTBOX (0x1B, public: no PIN, no grant) serves it in pages. It is written after the
+    // payment's receipt, data first and its status byte last, and only for a payment that was signed; a refused or dropped
+    // payment leaves the one before it as it was. Nothing else on the wire moves.
     static final byte VERSION_MAJOR = (byte) 0x02;
     // 1.9 takes its PIN sealed: enciphered to a key the card keeps for that and nothing else, under
     // sixteen bytes of its own that are good once (see `unseal`). Capability bit 7 says so.
@@ -172,7 +176,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // constructor, which the chip refuses to install with so much more in it (docs/FOXY-CARD-HARDWARE.md); the same bytes asked for
     // after the install are given. Every use of `dleq` is safe while it is null (before the first SET_CARD, or after the card has
     // refused the room). GET_INFO is 1.19's to the byte but for the version; a phone tells a 1.20 card by that.
-    static final byte VERSION_MINOR = (byte) 0x01;
+    static final byte VERSION_MINOR = (byte) 0x02;
     static final byte FORMAT        = (byte) 0x04;
 
     // -------------------------------------------------------------------------
@@ -190,6 +194,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte INS_GET_LOG          = (byte) 0x18;
     static final byte INS_GET_CHANGE       = (byte) 0x19;
     static final byte INS_GET_DLEQ         = (byte) 0x1A;
+    /** 2.2 (D175): the last SIG_ALL payment's assisted-settlement packet; P1 = 0 its scope, P1 = 1 a page of it. Public. */
+    static final byte INS_GET_OUTBOX       = (byte) 0x1B;
     // 0x20 was SPEND_PROOF: one piece, one signature over its secret alone. A
     // piece of format 4 says SIG_ALL in its secret, and a mint takes no such
     // signature for it. It answers 6D00 and stays unassigned.
@@ -365,6 +371,28 @@ public class CashuApplet extends Applet implements TagSwitch {
     // their number (`finishBurn`).
     static final short ALL_MOST            = MAX_PROOFS;
     static final short ALL_OUTPUT_LEN      = (short) 37;
+
+    // The assisted-settlement record (2.2, D175), in packet wire order (relay.js `readPacket`):
+    //   header   magic "CCP-AS" 01 (7), card key (33), installation (32), payment id (8: 4 zero bytes and the receipt count),
+    //            index 00, generation (4), profile 01, mint length (2), mint (at most CARD_MINT_MAX), unit 00
+    //   inputs   count (1), then for each: place (1), generation (4), amount (4), keyset length 08, keyset (8), nonce (32), C (33)
+    //   outputs  count (1), then for each: amount (4), keyset length 08, keyset (8: the first input's), B_ (33)
+    //   witness  the payment's signature (64), then the descriptor (64): the card key's BIP-340 signature over
+    //            SHA-256(tag || tag || body), tag = SHA-256("CashuCard/assisted-settlement/v1"), made at the first read
+    // `outbox` is a head of four bytes (status, descriptor signed, body length) and then the packet.
+    static final short OUT_IN_MOST    = (short) 32;
+    static final short OUT_OUT_MOST   = (short) 16;
+    static final short OUT_HEAD_LEN   = (short) 89;   // the header less the mint: 7 + 33 + 32 + 8 + 1 + 4 + 1 + 2 + 1
+    static final short OUT_INPUT_LEN  = (short) 83;
+    static final short OUT_OUTPUT_LEN = (short) 46;
+    /** The largest packet: a 77-byte mint, 32 inputs and 16 outputs, the witness and the descriptor (3,688). */
+    static final short OUTBOX_MAX     = (short)(OUT_HEAD_LEN + CARD_MINT_MAX + 1 + OUT_IN_MOST * OUT_INPUT_LEN
+                                                + 1 + OUT_OUT_MOST * OUT_OUTPUT_LEN + 64 + 64);
+    static final short OUTBOX_LEN     = (short)(4 + OUTBOX_MAX);
+    /** The outputs of the payment in hand, staged until SIGN: a count (or FF, not recordable), then amount (4) and B_ (33) each. */
+    static final short OUT_STAGE_LEN  = (short)(1 + OUT_OUT_MOST * ALL_OUTPUT_LEN);
+    /** GET_OUTBOX P1 = 0: index (1), payment id (8), generation (4), SHA-256 of the body (32). */
+    static final short OUT_SCOPE_LEN  = (short) 45;
 
     // The change a payment makes for itself (1.12): the card's own change outputs, kept open from the
     // moment they are made until the piece is written back. An opening is the amount (4), the keyset
@@ -684,6 +712,13 @@ public class CashuApplet extends Applet implements TagSwitch {
         'C','a','s','h','u','C','a','r','d','/','r','e','f','r','e','s','h' };
     private static final byte[] LABEL_TAG = {   // CashuCard/tag
         'C','a','s','h','u','C','a','r','d','/','t','a','g' };
+    /** The assisted-settlement descriptor's tag (2.2, D175): the descriptor signs SHA-256(tag || tag || body), tag = SHA-256(this). */
+    private static final byte[] LABEL_ASSISTED = {   // CashuCard/assisted-settlement/v1
+        'C','a','s','h','u','C','a','r','d','/','a','s','s','i','s','t','e','d','-','s','e','t','t','l','e','m','e','n','t','/','v','1' };
+    /** The packet's magic: "CCP-AS" and the format, 01. */
+    private static final byte[] OUT_MAGIC = { 'C','C','P','-','A','S', (byte) 0x01 };
+    /** What a mint's address must begin with for its payment to be recorded: the relay talks to https mints only. */
+    private static final byte[] HTTPS = { 'h','t','t','p','s',':','/','/' };
     /* The least work a block header must show to be taken, as a header carries
      * its difficulty (`bits`, little-endian): 0x17087BC0, four times the
      * target of the network's blocks when this version was made (0x17021EF0),
@@ -920,6 +955,19 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private byte[] lastSig;
     /**
+     * The assisted-settlement record of the last SIG_ALL payment (2.2, D175): [0] 1 while it holds one whole packet, [1] 1
+     * once its descriptor is signed, [2..3] the body's length, then the body and the descriptor. Permanent, and written after
+     * the payment's receipt: [0] goes to 0 first, the body is written, and [0] goes to 1 last, so a read finds a whole
+     * record or none.
+     */
+    private byte[] outbox;
+    /** The outputs of the payment in hand (OUT_STAGE_LEN), kept apart from `outbox` so that a payment refused or dropped leaves the last record whole. */
+    private byte[] outStage;
+    /** This installation's 32 random bytes, drawn once in the constructor and kept through RESET_CARD: the packet's installation. */
+    private byte[] outInstall;
+    /** The card's generation (4, big-endian): 1 at install, one more at each RESET_CARD, stopping at FFFFFFFF. */
+    private byte[] outGen;
+    /**
      * The places of the payment last committed: how many (1), then a byte
      * each. Written before the payment's transaction, and read only while
      * `burnPending` is set. See `finishBurn`.
@@ -1002,6 +1050,10 @@ public class CashuApplet extends Applet implements TagSwitch {
         rsaRoot         = fieldKey(RSA_D_ROOT);
         rsaEuler        = fieldKey(RSA_D_EULER);
         lastSig         = new byte[(short) 65];
+        outbox          = new byte[OUTBOX_LEN];
+        outStage        = new byte[OUT_STAGE_LEN];
+        outInstall      = new byte[(short) 32];
+        outGen          = new byte[(short) 4];
         burnList        = new byte[(short)(MAX_PROOFS + 1)];
         burnPending     = new byte[1];
         pinKeySig       = new byte[(short) 65];
@@ -1013,6 +1065,8 @@ public class CashuApplet extends Applet implements TagSwitch {
          * refused to install it (6F00). No simulator has a limit there. */
         seal            = scratch;
         rng             = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
+        rng.generateData(outInstall, (short) 0, (short) 32);
+        outGen[3]       = (byte) 1;
         sha.reset();
         sha.doFinal(AUTH_TAG, (short) 0, (short) AUTH_TAG.length, authTagHash, (short) 0);
         initCardKeypair();
@@ -1147,6 +1201,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             case INS_GET_LOG:          processGetLog(apdu);         break;
             case INS_GET_CHANGE:       processGetChange(apdu);      break;
             case INS_GET_DLEQ:         processGetDleq(apdu);        break;
+            case INS_GET_OUTBOX:       processGetOutbox(apdu);      break;
             case INS_SPEND_ALL_BEGIN:   processSpendAllBegin(apdu);   break;
             case INS_SPEND_ALL_OUTPUTS: processSpendAllOutputs(apdu); break;
             case INS_SPEND_ALL_CHANGE:  processSpendAllChange(apdu);  break;
@@ -1645,6 +1700,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         allState[1] = (byte) n;
         allState[0] = (byte) 1;
+        // the outputs this payment names are staged from nothing (2.2): the record of the last payment is not touched
+        outStage[0] = (byte) 0;
         Util.arrayCopyNonAtomic(allSum, (short) 0, buf, (short) 0, (short) 4);
         apdu.setOutgoingAndSend((short) 0, (short) 4);
     }
@@ -1673,7 +1730,27 @@ public class CashuApplet extends Applet implements TagSwitch {
             short digits = decimalBefore(buf, at, (short)(X_OUT + 10));
             hexInto(buf, (short)(at + 4), (short) 33, (short)(X_OUT + 10));
             shaAll.update(scratch, (short)(X_OUT + 10 - digits), (short)(digits + 66));
+            stageOutput(buf, at, buf, (short)(at + 4));
         }
+    }
+
+    /**
+     * One output of the payment in hand, staged for its assisted-settlement record (2.2, D175): its amount (4) at `amountAt`
+     * in `amounts` and its B_ (33) at `pointAt` in `points`, after the outputs staged before it. The terminal's outputs come first and then
+     * the card's change, as they are hashed. The seventeenth, or an output of nothing (which no relay can submit), marks the
+     * payment as not recordable (FF): it is still paid, and leaves no record.
+     */
+    private void stageOutput(byte[] amounts, short amountAt, byte[] points, short pointAt) {
+        short count = (short)(outStage[0] & 0xFF);
+        if (count == (short) 0xFF) return;
+        if (count >= OUT_OUT_MOST || isZero(amounts, amountAt, (short) 4)) {
+            outStage[0] = (byte) 0xFF;
+            return;
+        }
+        short at = (short)(1 + count * ALL_OUTPUT_LEN);
+        Util.arrayCopyNonAtomic(amounts, amountAt, outStage, at, (short) 4);
+        Util.arrayCopyNonAtomic(points, pointAt, outStage, (short)(at + 4), (short) 33);
+        outStage[0] = (byte)(count + 1);
     }
 
     /**
@@ -1722,6 +1799,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         } catch (CryptoException e) {
             dropPayment(SW_CRYPTO_ERROR);
         }
+        // staged for the payment's record (2.2): the amount from the opening, B_ from buf[0..33), which blindChange left there
+        stageOutput(changeOpen, (short)(open + OPEN_AMOUNT), buf, (short) 0);
         // the opening is the payment's until it is signed for (SIGN) or given up (BEGIN)
         openState[which] = OPEN_DRAFT;
         Util.arrayCopyNonAtomic(scratch, X_TAP, allChange, (short) 0, (short) 4);
@@ -1987,6 +2066,140 @@ public class CashuApplet extends Applet implements TagSwitch {
         apdu.setOutgoingAndSend((short) 0, at);
     }
 
+    /**
+     * The assisted-settlement record of the payment just signed (2.2, D175), written over the last one. `n` is how many
+     * places it paid with (`allSlots`), and `buf` is working room. The old record is let go first, whatever follows: a
+     * payment that leaves no record leaves none of the one before it either. No record is left for a payment of more
+     * than OUT_IN_MOST pieces or more than OUT_OUT_MOST outputs (or none, or one of nothing), for dated pieces (the
+     * packet has no field for a locktime or a refund key, and the relay rebuilds an undated secret), for a mint whose
+     * address is not https, or when the payment id or the generation has stopped at FFFFFFFF. The body is written
+     * outside any transaction, and only then is the record marked whole, in one transaction with its length: a card
+     * pulled away before that has no record, never a mix of two.
+     */
+    private void writeOutbox(byte[] buf, short n) {
+        JCSystem.beginTransaction();
+        outbox[0] = (byte) 0;
+        outbox[1] = (byte) 0;
+        JCSystem.commitTransaction();
+
+        short outs = (short)(outStage[0] & 0xFF);
+        if (n < (short) 1 || n > OUT_IN_MOST || outs == (short) 0 || outs > OUT_OUT_MOST) return;
+        short first = (short)((short)(allSlots[0] & 0xFF) * PROOF_SIZE);
+        if (!isZero(proofStorage, (short)(first + PROOF_DATE_OFFSET), (short) 4)) return;
+        short mintLen = (short)(cardRecord[CARD_MINTLEN_OFFSET] & 0xFF);
+        if (mintLen < (short) HTTPS.length || mintLen > CARD_MINT_MAX
+            || Util.arrayCompare(cardRecord, CARD_MINT_OFFSET, HTTPS, (short) 0, (short) HTTPS.length) != 0) return;
+        if (isAllOnes(cardReceipts, (short) 0) || isAllOnes(outGen, (short) 0)) return;
+
+        // the header
+        short at = Util.arrayCopyNonAtomic(OUT_MAGIC, (short) 0, outbox, (short) 4, (short) OUT_MAGIC.length);
+        short keyLen = toCompressed(buf, cardPubKey.getW(buf, (short) 0));
+        at = Util.arrayCopyNonAtomic(buf, (short) 0, outbox, at, keyLen);
+        at = Util.arrayCopyNonAtomic(outInstall, (short) 0, outbox, at, (short) 32);
+        // the payment id: four bytes of zeros and the receipt count, which the commit before this one stepped
+        at = Util.arrayFillNonAtomic(outbox, at, (short) 4, (byte) 0);
+        at = Util.arrayCopyNonAtomic(cardReceipts, (short) 0, outbox, at, (short) 4);
+        outbox[at++] = (byte) 0;
+        at = Util.arrayCopyNonAtomic(outGen, (short) 0, outbox, at, (short) 4);
+        outbox[at++] = (byte) 1;
+        at = Util.setShort(outbox, at, mintLen);
+        at = Util.arrayCopyNonAtomic(cardRecord, CARD_MINT_OFFSET, outbox, at, mintLen);
+        outbox[at++] = (byte) 0;
+        // the inputs, in the order they were named and hashed
+        outbox[at++] = (byte) n;
+        for (short i = 0; i < n; i++) {
+            short slot = (short)(allSlots[i] & 0xFF);
+            short base = (short)(slot * PROOF_SIZE);
+            outbox[at++] = (byte) slot;
+            at = Util.arrayCopyNonAtomic(outGen, (short) 0, outbox, at, (short) 4);
+            at = Util.arrayCopyNonAtomic(proofStorage, (short)(base + PROOF_AMOUNT_OFFSET), outbox, at, (short) 4);
+            outbox[at++] = (byte) 8;
+            at = Util.arrayCopyNonAtomic(proofStorage, (short)(base + PROOF_KEYSET_OFFSET), outbox, at, (short) 8);
+            at = Util.arrayCopyNonAtomic(proofStorage, (short)(base + PROOF_NONCE_OFFSET), outbox, at, (short) 32);
+            at = Util.arrayCopyNonAtomic(proofStorage, (short)(base + PROOF_C_OFFSET), outbox, at, (short) 33);
+        }
+        // the outputs, as staged: the terminal's and then the change; every one under the first input's keyset (D175)
+        outbox[at++] = (byte) outs;
+        for (short k = 0; k < outs; k++) {
+            short st = (short)(1 + k * ALL_OUTPUT_LEN);
+            at = Util.arrayCopyNonAtomic(outStage, st, outbox, at, (short) 4);
+            outbox[at++] = (byte) 8;
+            at = Util.arrayCopyNonAtomic(proofStorage, (short)(first + PROOF_KEYSET_OFFSET), outbox, at, (short) 8);
+            at = Util.arrayCopyNonAtomic(outStage, (short)(st + 4), outbox, at, (short) 33);
+        }
+        // the witness: the payment's signature, as the commit kept it
+        at = Util.arrayCopyNonAtomic(lastSig, (short) 1, outbox, at, (short) 64);
+
+        JCSystem.beginTransaction();
+        Util.setShort(outbox, (short) 2, (short)(at - 4));
+        outbox[0] = (byte) 1;
+        JCSystem.commitTransaction();
+    }
+
+    private static boolean isAllOnes(byte[] a, short off) {
+        return (byte)(a[off] & a[(short)(off + 1)] & a[(short)(off + 2)] & a[(short)(off + 3)]) == (byte) 0xFF;
+    }
+
+    /**
+     * GET_OUTBOX (0x1B, 2.2, D175): the last SIG_ALL payment's assisted-settlement packet, to anyone (no PIN, no grant: it
+     * says what a terminal that took the payment already knows, and gives nothing that can spend). P2 is 00.
+     *
+     * P1 = 00, no data: the scope, 45 bytes: the index, the payment id (8), the generation (4) and SHA-256 of the body.
+     * P1 = 01, data the offset (2, big-endian) and a count (1): that many bytes of body || descriptor from the offset, or
+     * as many as are left. The descriptor is signed at the first read of either form and kept.
+     *
+     * `6A86` for another P1 or a P2 not 00; `6A88` with no record; `6700` for a page's data not three bytes, or a count
+     * of 0; `6A83` for an offset at or past the packet's end. Not a step of a payment: one begun is dropped.
+     */
+    private void processGetOutbox(APDU apdu) {
+        byte[] buf = apdu.getBuffer();
+        byte p1 = buf[ISO7816.OFFSET_P1];
+        if (buf[ISO7816.OFFSET_P2] != (byte) 0 || (p1 != (byte) 0 && p1 != (byte) 1)) ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+        if (outbox[0] != (byte) 1) ISOException.throwIt(SW_SLOT_EMPTY);
+        short bodyLen = Util.getShort(outbox, (short) 2);
+        if (p1 == (byte) 0) {
+            // a case 2 command: nothing is received, so a reader's Le is never taken for an Lc
+            ensureDescriptor(buf, bodyLen);
+            buf[0] = outbox[(short)(4 + 80)];
+            Util.arrayCopyNonAtomic(outbox, (short)(4 + 72), buf, (short) 1, (short) 8);
+            Util.arrayCopyNonAtomic(outbox, (short)(4 + 81), buf, (short) 9, (short) 4);
+            sha.reset();
+            sha.doFinal(outbox, (short) 4, bodyLen, buf, (short) 13);
+            apdu.setOutgoingAndSend((short) 0, OUT_SCOPE_LEN);
+            return;
+        }
+        if (apdu.setIncomingAndReceive() != (short) 3) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        short offset = Util.getShort(buf, ISO7816.OFFSET_CDATA);
+        short count = (short)(buf[(short)(ISO7816.OFFSET_CDATA + 2)] & 0xFF);
+        if (count == (short) 0) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        short total = (short)(bodyLen + 64);
+        if (offset < (short) 0 || offset >= total) ISOException.throwIt(SW_SLOT_OUT_OF_RANGE);
+        ensureDescriptor(buf, bodyLen);
+        if (count > (short)(total - offset)) count = (short)(total - offset);
+        Util.arrayCopyNonAtomic(outbox, (short)(4 + offset), buf, (short) 0, count);
+        apdu.setOutgoingAndSend((short) 0, count);
+    }
+
+    /**
+     * The record's descriptor, signed once: the card key's BIP-340 signature over SHA-256(tag || tag || body), tag =
+     * SHA-256("CashuCard/assisted-settlement/v1"), after the body, and outbox[1] set to say so in a transaction of one
+     * byte. A card pulled away before that signs it again at the next read. `buf` is working room.
+     */
+    private void ensureDescriptor(byte[] buf, short bodyLen) {
+        if (outbox[1] == (byte) 1) return;
+        sha.reset();
+        sha.doFinal(LABEL_ASSISTED, (short) 0, (short) LABEL_ASSISTED.length, scratch, X_HEX);
+        sha.reset();
+        sha.update(scratch, X_HEX, (short) 32);
+        sha.update(scratch, X_HEX, (short) 32);
+        sha.doFinal(outbox, (short) 4, bodyLen, scratch, X_MSG);
+        schnorrHW.sign(cardPrivKey, cardPubKey, scratch, X_MSG, buf, (short) 0);
+        Util.arrayCopyNonAtomic(buf, (short) 0, outbox, (short)(4 + bodyLen), (short) 64);
+        JCSystem.beginTransaction();
+        outbox[1] = (byte) 1;
+        JCSystem.commitTransaction();
+    }
+
     /** The place holding a piece with the 32-byte nonce at `off` in `a`, spent or not, or -1. */
     private short slotWithNonce(byte[] a, short off) {
         for (short i = 0; i < MAX_PROOFS; i++) {
@@ -2201,8 +2414,20 @@ public class CashuApplet extends Applet implements TagSwitch {
         addUint32Stop(cardReceipts, (short) 0, ONE, (short) 0);
         JCSystem.commitTransaction();
 
+        /* The payment's assisted-settlement record (2.2, D175), after the receipt and by itself, as the receipt is after the
+         * burn: true only of a payment that was made. Nothing in it can change the answer: should it fail, there is no
+         * record, and the payment is answered as it would have been. */
+        try {
+            writeOutbox(buf, n);
+        } catch (Exception e) {
+            if (JCSystem.getTransactionDepth() != (byte) 0) JCSystem.abortTransaction();
+            outbox[0] = (byte) 0;
+        }
+        // the signature again, from where the commit kept it: the record used the APDU buffer for its working room
+        Util.arrayCopyNonAtomic(lastSig, (short) 1, buf, (short) 0, (short) 64);
         apdu.setOutgoingAndSend((short) 0, sigLen);
     }
+
 
     /**
      * Mark every place of the payment last committed as spent, and take the
@@ -3567,6 +3792,20 @@ public class CashuApplet extends Applet implements TagSwitch {
         freeSpent();
         // and the mint's proofs that were kept with them (1.20): none is a place's now, and none is for the next owner to read
         if (dleq != null) Util.arrayFillNonAtomic(dleq, (short) 0, (short)(MAX_PROOFS * DLEQ_LEN), (byte) 0);
+        /* The last payment's assisted-settlement record (2.2, D175), whose key is about to go: none is left (its status
+         * byte first, one byte and so whole), and the next is of a new generation, so that its payment id (the receipt count,
+         * which begins again) is not taken for an old one's. The generation is stepped BEFORE the receipts are zeroed below:
+         * a card torn anywhere after this has at worst a larger generation, never a receipt count of 0 under the old one,
+         * which would give a later record the (payment id, generation) pair an earlier one had. It is worked out in RAM and
+         * written with the atomic copy, so a tear leaves the old one or the new one; a reset sent again after a tear steps
+         * it again, which is only a larger number. It stops at FFFFFFFF, where no record is written. The installation's
+         * bytes stay: it is the same card. */
+        outbox[0] = (byte) 0;
+        outbox[1] = (byte) 0;
+        outStage[0] = (byte) 0;
+        Util.arrayCopyNonAtomic(outGen, (short) 0, scratch, X_NUM, (short) 4);
+        addUint32Stop(scratch, X_NUM, ONE, (short) 0);
+        Util.arrayCopy(scratch, X_NUM, outGen, (short) 0, (short) 4);
         // nothing of the last owner's taps: the log, the receipts, the change openings and the last signature (the burn list is the places of a payment finished, and nothing reads it)
         Util.arrayFillNonAtomic(cardLog, (short) 0, LOG_LEN, (byte) 0);
         Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);

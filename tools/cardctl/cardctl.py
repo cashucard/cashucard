@@ -76,6 +76,7 @@ INS_GET_PIECES = 0x17
 INS_GET_LOG = 0x18
 INS_GET_CHANGE = 0x19
 INS_GET_DLEQ = 0x1A
+INS_GET_OUTBOX = 0x1B
 INS_SPEND_ALL_BEGIN = 0x22
 INS_SPEND_ALL_OUTPUTS = 0x23
 INS_SPEND_ALL_SIGN = 0x24
@@ -114,8 +115,17 @@ PIN_STATE_NAMES = {0: "none", 1: "set", 2: "blocked"}
 # The lowest applet version selftest passes: the shared protocol (D18) as 2.1
 # has it (D26: a payment of nothing spends no roll, and SET_LIMIT without the
 # budget's byte leaves the budget). A 2.0 card is swept and reinstalled. A 0.x
-# or Foxy 1.x card does not answer the 2.x AID at all.
+# or Foxy 1.x card does not answer the 2.x AID at all. 2.2 (D175) only adds a
+# read, GET_OUTBOX, so a 2.1 card in the field still passes: nothing about it
+# calls for a sweep.
 SELFTEST_MIN_VERSION = (2, 1)
+
+# GET_OUTBOX (2.2, spec/APDU.md, D175): the scope's length, one page's most, the
+# descriptor's tag, and the packet's magic and format.
+OUTBOX_SCOPE_LEN = 45
+OUTBOX_PAGE = 255
+OUTBOX_TAG = "CashuCard/assisted-settlement/v1"
+OUTBOX_MAGIC = b"CCP-AS\x01"
 FORMAT = 4
 
 LOCK_CONFIRM_BYTE = 0xDE
@@ -458,6 +468,43 @@ class Card:
             raise SystemExit(f"AUTH returned {len(b)} bytes, expected 80: {_hex(b)}")
         return b[:AUTH_NONCE_LEN], b[AUTH_NONCE_LEN:]
 
+    def get_outbox_scope(self) -> bytes:
+        """GET_OUTBOX P1 = 0: the scope of the last payment's packet (45 bytes). 6A88 with no record."""
+        b = self.send(INS_GET_OUTBOX, p1=0, le=0x00, context="GET_OUTBOX scope")
+        if len(b) != OUTBOX_SCOPE_LEN:
+            raise SystemExit(f"GET_OUTBOX returned a scope of {len(b)} bytes, expected {OUTBOX_SCOPE_LEN}")
+        return b
+
+    def get_outbox_page(self, offset: int, count: int = OUTBOX_PAGE) -> bytes:
+        """GET_OUTBOX P1 = 1: `count` bytes of the packet from `offset`, or as many as are left."""
+        if not 0 <= offset <= 0xFFFF or not 1 <= count <= OUTBOX_PAGE:
+            raise ValueError(f"offset 0..65535 and count 1..{OUTBOX_PAGE}, got {offset} and {count}")
+        return self.send(INS_GET_OUTBOX, p1=1, data=offset.to_bytes(2, "big") + bytes([count]), le=0x00,
+                         context=f"GET_OUTBOX page at {offset}")
+
+    def get_outbox(self) -> Tuple[bytes, bytes]:
+        """
+        The last payment's packet (body || descriptor) and its scope: the scope, pages
+        of 255 until one comes back short (or 6A83 past a whole number of pages), and
+        the scope again, which must be the same: a packet read across a new payment is
+        refused, never mixed. Public: no PIN.
+        """
+        before = self.get_outbox_scope()
+        packet = b""
+        for offset in range(0, 0x10000, OUTBOX_PAGE):
+            try:
+                page = self.get_outbox_page(offset)
+            except CardError as exc:
+                if exc.sw == 0x6A83 and offset > 0:
+                    break
+                raise
+            packet += page
+            if len(page) < OUTBOX_PAGE:
+                break
+        if self.get_outbox_scope() != before:
+            raise SystemExit("GET_OUTBOX: the record changed while it was read")
+        return packet, before
+
     def get_nonce(self) -> bytes:
         b = self.send(INS_GET_NONCE, le=0x10, context="GET_NONCE")
         if len(b) != 16:
@@ -715,6 +762,101 @@ def parse_header(value: str, what: str = "--header") -> bytes:
 
 def check_signature(pubkey: bytes, message: bytes, sig: bytes) -> bool:
     return bip340.verify(bip340.x_only(pubkey), message, sig)
+
+
+def card_secret(nonce: bytes, card_key: bytes) -> str:
+    """An undated card proof secret (NUT-CCP), as the relay rebuilds it for a packet's input."""
+    return ('["P2PK",{"nonce":"' + nonce.hex() + '","data":"' + card_key.hex()
+            + '","tags":[["sigflag","SIG_ALL"]]}]')
+
+
+def decode_outbox(packet: bytes) -> dict:
+    """
+    A GET_OUTBOX packet (spec/APDU.md, GET_OUTBOX), read in relay.js's order, with its two
+    signatures checked here: the witness over the SIG_ALL message (each input's secret and
+    C in hex, then each output's amount in decimal and B_ in hex), and the descriptor over
+    SHA-256(tag || tag || body). Raises ValueError on a packet that does not parse; the
+    signatures' results are `witness_valid` and `descriptor_valid`.
+    """
+    at = 0
+
+    def take(n: int) -> bytes:
+        nonlocal at
+        if at + n > len(packet):
+            raise ValueError(f"the packet ends at {len(packet)} bytes, short of a field at {at}")
+        b = packet[at:at + n]
+        at += n
+        return b
+
+    def number(n: int) -> int:
+        return int.from_bytes(take(n), "big")
+
+    if take(7) != OUTBOX_MAGIC:
+        raise ValueError("not a CCP-AS 01 packet")
+    card_key = take(33)
+    installation = take(32)
+    payment_id = number(8)
+    index = number(1)
+    generation = number(4)
+    if number(1) != 1:
+        raise ValueError("not profile 01")
+    mint = take(number(2)).decode("ascii")
+    unit = number(1)
+    inputs = []
+    for _ in range(number(1)):
+        slot, gen, amount = number(1), number(4), number(4)
+        keyset = take(number(1))
+        inputs.append({"slot": slot, "generation": gen, "amount": amount, "keyset": keyset,
+                       "nonce": take(32), "c": take(33)})
+    outputs = []
+    for _ in range(number(1)):
+        amount = number(4)
+        keyset = take(number(1))
+        outputs.append({"amount": amount, "keyset": keyset, "b_": take(33)})
+    witness = take(64)
+    body = packet[:at]
+    descriptor = take(64)
+    if at != len(packet):
+        raise ValueError(f"{len(packet) - at} bytes after the descriptor")
+    for i in inputs:
+        i["secret"] = card_secret(i["nonce"], card_key)
+    transcript = "".join(i["secret"] + i["c"].hex() for i in inputs) + "".join(f"{o['amount']}{o['b_'].hex()}" for o in outputs)
+    message = hashlib.sha256(transcript.encode("ascii")).digest()
+    tag = hashlib.sha256(OUTBOX_TAG.encode("ascii")).digest()
+    described = hashlib.sha256(tag + tag + body).digest()
+    return {
+        "card_key": card_key, "installation": installation, "payment_id": payment_id, "index": index,
+        "generation": generation, "mint": mint, "unit": unit, "inputs": inputs, "outputs": outputs,
+        "witness": witness, "descriptor": descriptor, "body": body, "payment_message": message,
+        "scope": bytes([index]) + payment_id.to_bytes(8, "big") + generation.to_bytes(4, "big") + hashlib.sha256(body).digest(),
+        "witness_valid": check_signature(card_key, message, witness),
+        "descriptor_valid": check_signature(card_key, described, descriptor),
+    }
+
+
+def print_outbox(p: dict, card_key: Optional[bytes] = None, scope: Optional[bytes] = None) -> bool:
+    """Print a decoded packet, field by field, and VALID or INVALID. True when valid."""
+    print(f"card key     : {_hex(p['card_key'])}")
+    print(f"installation : {_hex(p['installation'])}")
+    print(f"payment id   : {p['payment_id']}   index {p['index']}   generation {p['generation']}")
+    print(f"mint         : {p['mint']}   unit {p['unit']}")
+    for i in p["inputs"]:
+        print(f"input        : slot {i['slot']:3}  gen {i['generation']}  {i['amount']:>10}  keyset {_hex(i['keyset'])}  "
+              f"nonce {_hex(i['nonce'])}  C {_hex(i['c'])}")
+    for o in p["outputs"]:
+        print(f"output       : {o['amount']:>10}  keyset {_hex(o['keyset'])}  B_ {_hex(o['b_'])}")
+    print(f"payment msg  : {_hex(p['payment_message'])}")
+    print(f"witness      : {_hex(p['witness'])}  {'verifies' if p['witness_valid'] else 'DOES NOT VERIFY'}")
+    print(f"descriptor   : {_hex(p['descriptor'])}  {'verifies' if p['descriptor_valid'] else 'DOES NOT VERIFY'}")
+    ok = p["witness_valid"] and p["descriptor_valid"]
+    if card_key is not None and card_key != p["card_key"]:
+        print("card key     : NOT the card's (GET_PUBKEY)")
+        ok = False
+    if scope is not None and scope != p["scope"]:
+        print(f"scope        : {_hex(scope)} is NOT the packet's {_hex(p['scope'])}")
+        ok = False
+    print("VALID" if ok else "INVALID")
+    return ok
 
 
 
@@ -1492,6 +1634,26 @@ def cmd_lock(args) -> int:
     return 0
 
 
+def cmd_outbox(args) -> int:
+    """GET_OUTBOX: the last payment's assisted-settlement packet, every field, both signatures checked here."""
+    if args.file:
+        with open(args.file, encoding="ascii") as f:
+            packet = parse_hex(f.read().strip(), None, "packet")
+        card_key = scope = None
+    else:
+        card = connect(args)
+        packet, scope = card.get_outbox()
+        card_key = card.get_pubkey()
+    try:
+        p = decode_outbox(packet)
+    except (ValueError, UnicodeDecodeError) as exc:
+        print(f"packet of {len(packet)} bytes: {exc}")
+        print("INVALID")
+        return 1
+    print(f"packet       : {len(packet)} bytes")
+    return 0 if print_outbox(p, card_key, scope) else 1
+
+
 def cmd_apdu(args) -> int:
     card = Card(reader_index=args.reader, verbose=True)
     if not args.no_select:
@@ -1746,6 +1908,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
     _owner_arg(s)
     s.set_defaults(func=cmd_lock)
+
+    s = sub.add_parser("outbox", help="GET_OUTBOX (2.2): the last payment's settlement packet, its signatures checked")
+    s.add_argument("--file", help="decode a packet saved as hex instead of reading a card")
+    s.set_defaults(func=cmd_outbox)
 
     s = sub.add_parser("apdu", help="send a raw APDU (hex)")
     s.add_argument("apdu")

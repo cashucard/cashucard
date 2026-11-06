@@ -31,7 +31,7 @@ def source_compact(source):
 def prepare(output):
     hashes=resource.prepare(output,0)
     app=output/'src/me/flashapp/cashu/CashuApplet.java'
-    app.write_text(source_compact((ROOT/'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()))
+    app.write_text(source_compact((resource.CONTROL/'CashuApplet.java').read_text()))
     shutil.copyfile(HERE/'java/CompactState.java',app.with_name('CompactState.java'))
     tree=ET.parse(output/'build.xml');cap=tree.find("target[@name='cap']/javacard/cap")
     cap.set('aid',PACKAGE)

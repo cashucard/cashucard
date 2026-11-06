@@ -36,9 +36,9 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 20,068-byte
-  load file in 82 blocks, the opener, the card's applet, then the tag under
-  `D2760000850101`. Then it checks the card's applet answers `02 01`, `GET_INFO`
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 21,540-byte
+  load file in 88 blocks, the opener, the card's applet, then the tag under
+  `D2760000850101`. Then it checks the card's applet answers `02 02`, `GET_INFO`
   (30 bytes), `GET_PUBKEY` (33 bytes) and the tag's SELECT.
 - **Rotate keys and back.** The card manager from its factory keys (`40` to `4F`)
   to the spike's public test set (ENC `10` to `1F`, MAC `20` to `2F`, DEK `30` to

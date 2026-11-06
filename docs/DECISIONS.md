@@ -5038,3 +5038,73 @@ claiming a reader closure was observed when none opened, changing CAP/timeout,
 or carrying approval across a consumed invocation. See the
 [incident](reports/HARDWARE_TEST_REPORT_2026-11-05.d321-07297620-constructor-host-stop.md)
 and [fresh proposal](reports/HARDWARE_PLAN_2026-11-05.constructor-trace-07297620-2.md).
+
+## <a id="d175"></a>D175: The release applet keeps the last SIG_ALL payment's settlement packet (2.2, GET_OUTBOX)
+
+**Decided (ENG-819, 2026-11-05):** applet 2.2 keeps one self-contained record of
+its last successful SIG_ALL payment, as the assisted-settlement packet in the
+order the portable relay reads it (`tools/assisted-relay/relay.js`,
+[cashucard/nut#6](https://github.com/cashucard/nut/pull/6)), and serves it to
+anyone with the new INS `1B`, `GET_OUTBOX` ([`spec/APDU.md`](../spec/APDU.md#get_outbox-0x1b)).
+P1 `00` answers the 45-byte scope (index, payment id, generation, SHA-256 of the
+body); P1 `01` a page of `offset (2) ‖ count (1)`. No PIN and no grant: the packet
+says what the till already holds and nothing in it can spend. SELECT answers
+`02 02`; nothing else on the wire moves. The record goes in the release applet,
+not in the private compact image of [D150](#d150): the compact image's
+allocation is still unresolved on the chip, and the relay needs a card a phone
+can actually be handed.
+
+**How it is kept.** Four arrays, all made in the constructor (no transient RAM,
+no class added): the record (3,692 bytes: a head of four and a packet of at most
+3,688), the outputs of the payment in hand (593), the installation's 32 random
+bytes (drawn at install, kept through `RESET_CARD`) and the generation (4: 1 at
+install, one more at each reset). 4,321 bytes in all, accepted above the "about
+4 KB" of the brief so that a separate stage keeps the last record whole through a
+payment that is refused or dropped. `SPEND_ALL_SIGN` writes the record after the
+payment's receipt, by itself, in [D14](#d14)'s order: the status byte to 0 in a
+transaction, the body outside any transaction, then the length and status 1 in
+one transaction. A tear leaves a whole record or none, never a mix; a tear
+between the receipt and the record leaves the payment made with no record. The
+descriptor (the card key's BIP-340 signature over SHA-256(tag ‖ tag ‖ body),
+tag = SHA-256(`CashuCard/assisted-settlement/v1`)) is made at the first read and
+kept. A failure in the record never changes the payment's answer.
+
+**The limits of 2.2, known to ENG-820 and ENG-821.**
+1. *Output keysets.* `SPEND_ALL_OUTPUTS` carries no keyset, and adding one would
+   move the wire, so every output is recorded under the first input's 8-byte
+   keyset, as the card's own change always is. A till that blinds an output for
+   another keyset, or for a 33-byte one, gets a packet the mint refuses.
+2. *Dated pieces.* The packet has no field for a locktime or a refund key, and
+   the relay rebuilds the undated secret, so a payment of dated pieces leaves no
+   record (flash-mobile never dates its pieces). A profile `02` is the way to
+   them, in the shared contract first.
+3. *Payment id.* It is the receipt count (`RESET_CARD` sets it back to 0), unique
+   only together with the generation.
+
+No record is left for more than 32 inputs or 16 outputs, no outputs or one of 0,
+a mint that is not `https://`, or a receipt count or generation at `FFFFFFFF`.
+The CAP keeps its name, `cashu-javacard-2.1.0.cap`, and build.xml its version,
+to keep the pins few; a rename waits for the next version.
+
+**Around it.** [D28](#d28)'s kept gaps are untouched. `cardctl selftest` keeps
+its floor at 2.1, and cardkit (inspect, holder commands, reset review) and the
+provisioner read 2.1 and 2.2 cards alike, since 2.2 only adds a read; the
+provisioner installs and verifies 2.2. The private outbox spike's builders
+(`build-probe.py`, `build-compact.py`, `build-constructor-trace.py`) now take
+the released 2.1 sources frozen in `tools/outbox-spike/control/`, since their
+images are that known control plus a diagnostic and D147's class-shape check is
+the control's; the release applet's four new references would otherwise fail it.
+
+**Not yet shown.** No J3R180 has installed 2.2. The load file is 21,540 bytes,
+a size refcheck has no answer for, and the constructor asks for 4,321 bytes more
+than the build that installs; allocation is where the compact image failed.
+SIGN writes about 500 more bytes for two inputs and two outputs, 3.6 KB at the
+most, against an unmeasured tap budget, and the first read's signature may meet
+a phone's NFC timeout (a retry is safe). jCardSim cannot tear a write, so the
+tests set the torn states directly. Until ENG-818 installs it on silicon, the
+tracked CAP is the plan's, not the chip's.
+
+**Rejected:** a new `spec/NUT-XX.md` here (cashucard/javacard mirrors this
+`spec/` and has its own); staging the outputs inside the record (a refused
+payment would erase the last record); a keyset per output (a wire change);
+putting the record in the compact image.

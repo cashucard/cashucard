@@ -6,6 +6,14 @@ returned counters; adding one 16 KiB array failed at applet creation. The cause
 remains unresolved. Both attempts and their cleanup are recorded in the
 [hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-10-27.j3r180-assisted-preflight.md).
 
+The builders here (`build-probe.py`, `build-compact.py` and
+`build-constructor-trace.py`) start from the released 2.1 applet, frozen in
+[`control/`](control/me/flashapp/cashu) as it was at the v2.1.0 CAP's source:
+every image they make is that known control plus a diagnostic, and the class
+shape they require is the control's. The release applet itself moved on to 2.2
+(GET_OUTBOX, [D175](../../docs/DECISIONS.md#d175)); these images do not move
+with it.
+
 ## Profiles
 
 | Format-2 profile            | Pool                        | Installation change                                                      | Dummy publication                      |

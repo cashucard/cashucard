@@ -44,6 +44,7 @@ const INS = Object.freeze({
   GET_LOG: 0x18,
   GET_CHANGE: 0x19,
   GET_DLEQ: 0x1a,
+  GET_OUTBOX: 0x1b,
   SPEND_ALL_BEGIN: 0x22,
   SPEND_ALL_OUTPUTS: 0x23,
   SPEND_ALL_SIGN: 0x24,
@@ -105,7 +106,10 @@ const SELECT_AIDS = Object.freeze([APPLET_AID, PACKAGE_AID])
 // Withdrawn: a card that answers these, or does not answer the 2.0 AID, needs an update.
 const OLD_AIDS = Object.freeze({ upstream0x: Buffer.from("D2760000850102", "hex"), foxy1x: Buffer.from("F0464F585943415244", "hex") })
 
-const VERSION = Object.freeze({ major: 2, minor: 1 })
+const VERSION = Object.freeze({ major: 2, minor: 2 })
+/** GET_OUTBOX (2.2): the scope's length, and the most bytes one page answers. */
+const OUTBOX_SCOPE_LEN = 45
+const OUTBOX_PAGE = 255
 const MAX_PROOFS = 128
 const PROOF_SIZE = 82
 const DLEQ_LEN = 96
@@ -328,6 +332,14 @@ const encode = Object.freeze({
   getPieces: (first = 0, form = 0) => apdu(INS.GET_PIECES, slotIndex(first), form, null, 0x00),
   getChange: (page = 0) => apdu(INS.GET_CHANGE, page, 0, null, 0x00),
   getDleq: (first, second = null) => apdu(INS.GET_DLEQ, slotIndex(first), second === null ? 0xff : slotIndex(second), null, 0x00),
+  /** GET_OUTBOX (2.2) P1 = 0: the scope of the last payment's packet, 45 bytes (index, payment id, generation, SHA-256 of the body). */
+  getOutboxScope: () => apdu(INS.GET_OUTBOX, 0, 0, null, 0x00),
+  /** GET_OUTBOX P1 = 1: `count` (1 to 255) bytes of the packet from `offset` (0 to 65535), or as many as are left. */
+  getOutboxPage: (offset, count = OUTBOX_PAGE) => {
+    if (!Number.isInteger(offset) || offset < 0 || offset > 0xffff) throw new RangeError(`offset must be an integer in 0..65535, got ${offset}`)
+    if (!Number.isInteger(count) || count < 1 || count > OUTBOX_PAGE) throw new RangeError(`count must be an integer in 1..${OUTBOX_PAGE}, got ${count}`)
+    return apdu(INS.GET_OUTBOX, 1, 0, Buffer.from([offset >> 8, offset & 0xff, count]), 0x00)
+  },
   spendAllBegin: slots => {
     if (!Array.isArray(slots) || slots.length < 1 || slots.length > MAX_PROOFS) throw new RangeError(`a payment names 1 to ${MAX_PROOFS} slots`)
     return apdu(INS.SPEND_ALL_BEGIN, 0, 0, Buffer.from(slots.map(slotIndex)), 0x04)
@@ -627,6 +639,32 @@ class CardSim {
   }
   async getChange(page = 0) { return parseChange(await this.send(encode.getChange(page), "GET_CHANGE")) }
   async getDleq(first, second = null) { return this.send(encode.getDleq(first, second), "GET_DLEQ") }
+  /** GET_OUTBOX's scope (2.2): 45 bytes. A card with no record throws CardError 6A88. Public: no PIN. */
+  async getOutboxScope() {
+    const scope = await this.send(encode.getOutboxScope(), "GET_OUTBOX scope")
+    if (scope.length !== OUTBOX_SCOPE_LEN) throw new Error(`GET_OUTBOX: a scope of ${scope.length} bytes, expected ${OUTBOX_SCOPE_LEN}`)
+    return scope
+  }
+  async getOutboxPage(offset, count = OUTBOX_PAGE) { return this.send(encode.getOutboxPage(offset, count), `GET_OUTBOX page at ${offset}`) }
+  /**
+   * The last payment's whole packet (body || descriptor): the scope, then pages of 255 until one comes back short (or the
+   * next offset is past the end, 6A83), then the scope again, which must not have changed: a packet read across a new
+   * payment is refused, never mixed. Throws CardError 6A88 with no record.
+   */
+  async getOutbox() {
+    const before = await this.getOutboxScope()
+    const parts = []
+    for (let offset = 0; offset <= 0xffff; offset += OUTBOX_PAGE) {
+      const { data, sw } = await this.apdu(encode.getOutboxPage(offset, OUTBOX_PAGE))
+      if (sw === SW.SLOT_OUT_OF_RANGE && offset > 0) break
+      if (sw !== SW.OK) throw new CardError(sw, `GET_OUTBOX page at ${offset}`)
+      parts.push(data)
+      if (data.length < OUTBOX_PAGE) break
+    }
+    const after = await this.getOutboxScope()
+    if (!before.equals(after)) throw new Error("GET_OUTBOX: the record changed while it was read")
+    return Buffer.concat(parts)
+  }
   async getNonce() { return this.send(encode.getNonce(), "GET_NONCE") }
 
   /** SPEND_ALL_BEGIN: the payment's places; answers what they are worth. */
@@ -675,7 +713,7 @@ class CardSim {
 }
 
 const constants = Object.freeze({
-  CLA, INS, SW, PACKAGE_AID, APPLET_AID, SELECT_AIDS, OLD_AIDS, VERSION, MAX_PROOFS, PROOF_SIZE, DLEQ_LEN, HEADER_LEN, OUTPUT_LEN,
+  CLA, INS, SW, PACKAGE_AID, APPLET_AID, SELECT_AIDS, OLD_AIDS, VERSION, OUTBOX_SCOPE_LEN, OUTBOX_PAGE, MAX_PROOFS, PROOF_SIZE, DLEQ_LEN, HEADER_LEN, OUTPUT_LEN,
   LOCK_CONFIRM_BYTE, MAX_SLOT_AMOUNT, PIN_MIN_LEN, PIN_MAX_LEN, ROLL_BUDGET_DEFAULT, ROLL_BUDGET_MOST, STATUS_NAMES,
   PIN_STATE_NAMES, LABEL, TEST_OWNER_PRIVATE,
 })

@@ -22,6 +22,7 @@ import {sha256} from '@noble/hashes/sha2';
 
 import {
   CARD_AID,
+  CARD_VERSION,
   CASHU_PACKAGE_AID,
   HELLO_AID,
   HELLO_PACKAGE_AID,
@@ -153,8 +154,8 @@ export function cashuPlan(loadFile: LoadFileAsset): Plan {
     sweep: [TAG_AID, CARD_AID, OPENER_AID, CASHU_PACKAGE_AID],
     guard: CARD_AID,
     checks: [
-      // the whole AID, never the package AID (D25): 02 01
-      {apdu: selectAid(CARD_AID), data: [0x02, 0x01]},
+      // the whole AID, never the package AID (D25): the tracked CAP's version, 02 02
+      {apdu: selectAid(CARD_AID), data: [...CARD_VERSION]},
       {apdu: GET_INFO, length: 30},
       {apdu: GET_PUBKEY, length: 33},
       {apdu: selectAid(TAG_AID)},

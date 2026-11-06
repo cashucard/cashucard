@@ -1,7 +1,8 @@
 # Hardware Deployment Guide
 
-GlobalPlatform packaging and deployment for the Cashu card applet, protocol 2.1
-([D18](DECISIONS.md#d18), [D19](DECISIONS.md#d19), [D26](DECISIONS.md#d26)).
+GlobalPlatform packaging and deployment for the Cashu card applet, protocol 2.2
+([D18](DECISIONS.md#d18), [D19](DECISIONS.md#d19), [D26](DECISIONS.md#d26),
+[D175](DECISIONS.md#d175)).
 
 ---
 
@@ -59,7 +60,13 @@ ls -lh target/cashu-javacard-2.1.0.cap
 The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
 keeps nothing of it) and checks the load file's size against what the J3R180 has
 been seen to install (`tools/refcheck.py`, from
-[FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.1 build is **20,068 bytes**
+[FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.2 build ([D175](DECISIONS.md#d175):
+`GET_OUTBOX` and the 4,321 bytes of persistent memory its record reserves at install)
+is **21,540 bytes** by refcheck's measure (36 past a multiple of 256). **It has not
+been installed on a J3R180 yet**: refcheck reports it as a size not yet tried, and
+neither that size nor a constructor asking for 4,321 bytes more has been measured on
+the chip (ENG-818). Install it on a bench card, and record the answer in refcheck's
+table, before any card that holds money gets it. The 2.1 build was 20,068 bytes
 by refcheck's measure (100 past a multiple of 256). It installed on a J3R180 with
 the opener first, in the three steps below, on 2026-10-14, and refcheck's table has
 it as a size that installs ([D26](DECISIONS.md#d26),
@@ -105,8 +112,8 @@ gp --list
 
 ## Install
 
-The CAP tracked in this repo is **applet version 2.1**, sha256
-`f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5`
+The CAP tracked in this repo is **applet version 2.2**, sha256
+`51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37`
 (`applet/target/cashu-javacard-2.1.0.cap`). A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
 timestamp into `META-INF/MANIFEST.MF`. Every other entry is byte-identical when
@@ -125,7 +132,7 @@ diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built && echo "same CAP as the 
 ```
 
 Any output from `diff` means the two CAPs differ; do not install. After
-installing, `SELECT` must answer `02 01` for the card's applet's whole AID (below).
+installing, `SELECT` must answer `02 02` for the card's applet's whole AID (below).
 
 ```bash
 # Load the file and instantiate the opener (gp installs one applet of a file at a time)...
@@ -176,7 +183,7 @@ holder's phone (flash-mobile's "Set up this card").
 # SELECT the card's applet by its whole AID, F0 CASHUCARD 01
 gp --apdu 00A404000BF043415348554341524401
 
-# Response: 0201 9000  (applet version 2.1 + SW_OK = applet responding)
+# Response: 0202 9000  (applet version 2.2 + SW_OK = applet responding)
 # A card that answers 6A82 has no 2.x applet: it is a 0.x or Foxy 1.x card and needs an update.
 # Do not SELECT the package AID alone (00A404000AF0434153485543415244): on the chip that
 # partial name reaches the opener, instantiated first, which answers 9000 with no version
@@ -185,8 +192,8 @@ gp --apdu 00A404000BF043415348554341524401
 # GET_INFO (INS 0x01)
 gp --apdu B0010000
 
-# Response: 02 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-#   v2.1 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change grant
+# Response: 02 02 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+#   v2.2 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change grant
 # SW: 9000
 
 # GET_PUBKEY (INS 0x10)
@@ -195,7 +202,7 @@ gp --apdu B0100000
 # Response: 33-byte compressed secp256k1 public key + SW 9000
 ```
 
-`cardctl selftest` passes a card answering `02 01` (or a later 2.x) and fails any
+`cardctl selftest` passes a card answering `02 01` or `02 02` (or a later 2.x) and fails any
 other: a card on v2.0.0 is swept and reinstalled ([D26](DECISIONS.md#d26)). cardctl
 selects the whole AID first and takes a `9000` without a version as no answer.
 

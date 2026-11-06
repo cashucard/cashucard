@@ -83,6 +83,7 @@ test('a blank card needs only identity and applet selection; unknown versions st
   for (const selected of [
     [0x6a, 0x82],
     [2, 0, 0x90, 0],
+    [2, 3, 0x90, 0],
   ]) {
     const commands: number[][] = [];
     const result = await readCardStatus(async a => {
@@ -95,5 +96,28 @@ test('a blank card needs only identity and applet selection; unknown versions st
     });
     expect(result.state).toBe(selected[0] === 0x6a ? 'blank' : 'unsupported');
     expect(commands.map(a => a[1])).toEqual([0xa4, 0xca, 0xa4]);
+  }
+});
+test('a 2.1 card and a 2.2 card (D175: GET_OUTBOX added) are both read past the version', async () => {
+  const cplc = fromHex(
+    '9f7f2a4790d32147000000000030410933632055470000000000000000048c2337323937360000000000000000',
+  );
+  for (const minor of [1, 2]) {
+    const commands: number[][] = [];
+    await readCardStatus(async a => {
+      commands.push(a);
+      if (a[1] === 0xca) {
+        return [...cplc, 0x90, 0];
+      }
+      if (commands.length === 1) {
+        return [0x90, 0];
+      }
+      if (commands.length === 3) {
+        return [2, minor, 0x90, 0];
+      }
+      return [0x6d, 0];
+    }).catch(() => undefined);
+    // past SELECT's version, the reset review reads the card (and stops here at the fake's 6D00)
+    expect(commands.length).toBeGreaterThan(3);
   }
 });

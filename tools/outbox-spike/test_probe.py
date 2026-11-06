@@ -12,7 +12,7 @@ s.loader.exec_module(m)
 
 class ProbeTest(unittest.TestCase):
     def test_control_constructor_unchanged_and_pool_is_the_only_install_addition(self):
-        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        original = (m.CONTROL / 'CashuApplet.java').read_text()
         def constructor(source):
             start = source.index('    private CashuApplet() {')
             return source[start:source.index('\n    /**', start)]
@@ -32,7 +32,7 @@ class ProbeTest(unittest.TestCase):
             m.source_probe(original.replace('schnorrHW.init();', 'changed();'), 16384)
 
     def test_segmented_pool_preserves_constructor_work_and_transient_demand(self):
-        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        original = (m.CONTROL / 'CashuApplet.java').read_text()
         generated = m.source_probe(original, 16384, segments=4)
         self.assertEqual(generated.count('new byte[(short) 4096]'), 4)
         self.assertEqual(original.count('JCSystem.makeTransient'), generated.count('JCSystem.makeTransient'))
@@ -52,7 +52,7 @@ class ProbeTest(unittest.TestCase):
             self.assertEqual('JCSystem.abortTransaction()' in process, size != 0)
 
     def test_post_install_profile_preserves_constructor_and_guards_one_reservation(self):
-        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        original = (m.CONTROL / 'CashuApplet.java').read_text()
         generated = m.source_probe(original, 0, post_install=True)
         def constructor(source):
             start = source.index('    private CashuApplet() {')
@@ -70,7 +70,7 @@ class ProbeTest(unittest.TestCase):
 
     def test_fixed_padding_changes_only_the_unreachable_method(self):
         import re
-        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        original = (m.CONTROL / 'CashuApplet.java').read_text()
         baseline = m.source_probe(original, 0, post_install=True)
         pattern = r'    private static void sizeTheFile\(byte\[\] a\) \{.*?\n    }'
         for name in ['padding-a', 'padding-b']:
@@ -83,7 +83,7 @@ class ProbeTest(unittest.TestCase):
 
     def test_existing_state_profile_preserves_all_fields_and_constructor(self):
         import re
-        original = (m.ROOT / 'applet/src/main/java/me/flashapp/cashu/CashuApplet.java').read_text()
+        original = (m.CONTROL / 'CashuApplet.java').read_text()
         baseline = m.source_probe(original,0)
         generated = m.source_probe(original,0,post_install=True,state_storage='existing-fields')
         pattern = r'    public void process\(APDU apdu\) \{.*?\n    }'
