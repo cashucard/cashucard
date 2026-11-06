@@ -76,8 +76,11 @@ record's two large arrays at the first `SET_CARD` instead (D176): its load file 
 **21,631 bytes** (127 past a multiple of 256), sha256 `86839ccf…`. It installed on
 the same J3R180 on 2026-11-06, opener first, in the three steps below (the card
 applet created in 2.17 s; `cardctl info` says 2.2), and refcheck's table has it as a
-size that installs. Whether its first `SET_CARD` is given the record's 4,285 bytes is
-the next bench answer (D176). The 2.1 build was 20,068 bytes
+size that installs. Its first `SET_CARD` was given the record's 4,285 bytes, and the
+assisted settlement ran end to end the same morning: an offline till's 7 sat
+payment, the packet read from the card, relayed by the phone, recovered once by the
+till ([the end-to-end report](reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-assisted-settlement.md)).
+The 2.1 build was 20,068 bytes
 by refcheck's measure (100 past a multiple of 256). It installed on a J3R180 with
 the opener first, in the three steps below, on 2026-10-14, and refcheck's table has
 it as a size that installs ([D26](DECISIONS.md#d26),
