@@ -1,5 +1,5 @@
 /** Read-only installation evidence; no authentication, mutation or retry. */
-import {CARD_AID, TAG_AID} from './aids';
+import {CARD_AID, TAG_AID, supportedCardVersion} from './aids';
 import {equal, toHex} from './bytes';
 import {notEmpty} from './provision';
 import {CardError, selectAid, transmit, type Transceiver} from './scp02';
@@ -33,10 +33,10 @@ export async function inspectInstallation(
   const selected = await transmit(tx, selectAid(CARD_AID));
   if (selected.sw === 0x6a82) return {state: 'absent'};
   if (selected.sw !== 0x9000) throw new CardError(selected.sw, 0xa4);
-  if (!equal(selected.data, [2, 1])) throw new InspectionError();
+  if (!supportedCardVersion(selected.data)) throw new InspectionError();
   const info = await transmit(tx, [0xb0, 1, 0, 0, 0]);
   if (info.sw !== 0x9000) throw new CardError(info.sw, 1);
-  if (info.data.length !== 30 || info.data[0] !== 2 || info.data[1] !== 1)
+  if (info.data.length !== 30 || !equal(info.data.slice(0, 2), selected.data))
     throw new InspectionError();
   const pubkey = await transmit(tx, [0xb0, 0x10, 0, 0, 0x21]);
   if (pubkey.sw !== 0x9000) throw new CardError(pubkey.sw, 0x10);

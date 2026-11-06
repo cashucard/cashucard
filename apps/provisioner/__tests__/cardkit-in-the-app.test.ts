@@ -25,11 +25,11 @@ test('the smoke test installs the hello applet, hears HELLO and removes it', asy
   expect(card.instances.size + card.packages.size).toBe(0);
 });
 
-test('the Cashu card installs in 82 blocks, and a second run without Replace is guarded', async () => {
+test('the Cashu card installs in 88 blocks, and a second run without Replace is guarded', async () => {
   const card = new FakeCard();
   const r = await provision(card.transceive, CASHU_PLAN, options());
   expect(r.ok).toBe(true);
-  expect(r.blocks).toEqual({at: 82, of: 82});
+  expect(r.blocks).toEqual({at: 88, of: 88});
   expect(card.instanceAids()).toEqual([
     'F04341534855434152444D',
     'F043415348554341524401',

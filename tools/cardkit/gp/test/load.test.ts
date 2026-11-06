@@ -12,17 +12,17 @@ function reassemble(apdus: number[][]): number[] {
 }
 
 describe('splitLoad', () => {
-  it('cuts the card load file into 82 blocks of 247 bytes, the last 61, which reassemble to it', () => {
+  it('cuts the card load file into 88 blocks of 247 bytes, the last 51, which reassemble to it', () => {
     const file = fromHex(CASHU_LOAD_FILE.hex);
-    assert.equal(file.length, 20068);
+    assert.equal(file.length, 21540);
     assert.equal(
       createHash('sha256').update(Buffer.from(file)).digest('hex'),
       CASHU_LOAD_FILE.sha256,
     );
     const apdus = splitLoad(file);
-    assert.equal(apdus.length, 82);
-    assert.equal(apdus[81][4], 61);
-    assert.ok(apdus.slice(0, 81).every(a => a[4] === 247));
+    assert.equal(apdus.length, 88);
+    assert.equal(apdus[87][4], 51);
+    assert.ok(apdus.slice(0, 87).every(a => a[4] === 247));
     assert.deepEqual(reassemble(apdus), file);
   });
 
@@ -48,10 +48,10 @@ describe('splitLoad', () => {
     assert.deepEqual(reassemble(apdus), file);
   });
 
-  it('takes a smaller block size (128: 157 blocks for the card)', () => {
+  it('takes a smaller block size (128: 169 blocks for the card)', () => {
     const file = fromHex(CASHU_LOAD_FILE.hex);
     const apdus = splitLoad(file, 128);
-    assert.equal(apdus.length, 157);
+    assert.equal(apdus.length, 169);
     assert.deepEqual(reassemble(apdus), file);
   });
 

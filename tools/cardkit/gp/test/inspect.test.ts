@@ -38,6 +38,11 @@ test('inspection reads the full applet identity and tag without authentication',
     '00A4040007D276000085010100',
   ]);
 });
+test('a 2.2 card (D175: GET_OUTBOX added) is inspected as a 2.1 card is', async () => {
+  const info22 = [2, 2, ...Array(28).fill(0)];
+  const {tx} = script([ok([2, 2]), ok(info22), ok(fromHex(key)), ok()]);
+  assert.equal((await inspectInstallation(tx)).state, 'present');
+});
 test('absence, nonempty state and a missing tag remain distinct inspection evidence', async () => {
   const absent = script([[0x6a, 0x82]]);
   assert.deepEqual(await inspectInstallation(absent.tx), {state: 'absent'});
@@ -66,7 +71,11 @@ test('absence, nonempty state and a missing tag remain distinct inspection evide
 });
 test('unknown versions, malformed responses and card refusal stop without retries', async () => {
   for (const replies of [
-    [ok([2, 2])],
+    [ok([2, 0])],
+    [ok([2, 3])],
+    [ok([2, 1, 0])],
+    // GET_INFO's version not SELECT's
+    [ok([2, 2]), ok(info)],
     [ok([2, 1]), ok(info.slice(1))],
     [ok([2, 1]), ok(info), ok([4, ...Array(32).fill(1)])],
   ]) {

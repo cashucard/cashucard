@@ -5,6 +5,7 @@ import {
   readChipIdentity,
   readResetReview,
   selectAid,
+  supportedCardVersion,
   transmit,
   type ResetReview,
   type Transceiver,
@@ -29,7 +30,8 @@ export async function readCardStatus(tx: Transceiver): Promise<CardReadout> {
   if (reply.sw !== 0x9000) {
     throw new CardError(reply.sw, 0xa4);
   }
-  if (reply.data.length !== 2 || reply.data[0] !== 2 || reply.data[1] !== 1) {
+  // 2.1, or 2.2 (D175), which only adds a public read: the cardkit's CARD_VERSIONS
+  if (!supportedCardVersion(reply.data)) {
     return {
       state: 'unsupported',
       chipId: chip.id,

@@ -260,7 +260,8 @@ export class FakeCard {
     }
     const inst = this.instances.get(target)!;
     if (inst.module === CARD_MODULE) {
-      return sw(0x9000, [0x02, 0x01]);
+      // the tracked CAP's version (CARD_VERSION): 2.2
+      return sw(0x9000, [0x02, 0x02]);
     }
     return sw(0x9000);
   }
@@ -271,7 +272,7 @@ export class FakeCard {
       const s = inst.state;
       const info = [
         0x02,
-        0x01,
+        0x02,
         0x80,
         s.unspent,
         s.spent,
