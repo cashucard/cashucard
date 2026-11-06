@@ -3792,23 +3792,26 @@ public class CashuApplet extends Applet implements TagSwitch {
         freeSpent();
         // and the mint's proofs that were kept with them (1.20): none is a place's now, and none is for the next owner to read
         if (dleq != null) Util.arrayFillNonAtomic(dleq, (short) 0, (short)(MAX_PROOFS * DLEQ_LEN), (byte) 0);
-        // nothing of the last owner's taps: the log, the receipts, the change openings and the last signature (the burn list is the places of a payment finished, and nothing reads it)
-        Util.arrayFillNonAtomic(cardLog, (short) 0, LOG_LEN, (byte) 0);
-        Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);
-        Util.arrayFillNonAtomic(changeOpen, (short) 0, (short)(CHANGE_MOST * OPEN_LEN), (byte) 0);
-        Util.arrayFillNonAtomic(openState, (short) 0, CHANGE_MOST, (byte) 0);
-        Util.arrayFillNonAtomic(lastSig, (short) 0, (short) 65, (byte) 0);
-        /* and the last payment's assisted-settlement record (2.2, D175), whose key is about to go: none is left (its status
+        /* The last payment's assisted-settlement record (2.2, D175), whose key is about to go: none is left (its status
          * byte first, one byte and so whole), and the next is of a new generation, so that its payment id (the receipt count,
-         * which begins again) is not taken for an old one's. The generation is worked out in RAM and written with the atomic
-         * copy, so a tear leaves the old one or the new one; a reset sent again after a tear steps it again, which is only a
-         * larger number. It stops at FFFFFFFF, where no record is written. The installation's bytes stay: it is the same card. */
+         * which begins again) is not taken for an old one's. The generation is stepped BEFORE the receipts are zeroed below:
+         * a card torn anywhere after this has at worst a larger generation, never a receipt count of 0 under the old one,
+         * which would give a later record the (payment id, generation) pair an earlier one had. It is worked out in RAM and
+         * written with the atomic copy, so a tear leaves the old one or the new one; a reset sent again after a tear steps
+         * it again, which is only a larger number. It stops at FFFFFFFF, where no record is written. The installation's
+         * bytes stay: it is the same card. */
         outbox[0] = (byte) 0;
         outbox[1] = (byte) 0;
         outStage[0] = (byte) 0;
         Util.arrayCopyNonAtomic(outGen, (short) 0, scratch, X_NUM, (short) 4);
         addUint32Stop(scratch, X_NUM, ONE, (short) 0);
         Util.arrayCopy(scratch, X_NUM, outGen, (short) 0, (short) 4);
+        // nothing of the last owner's taps: the log, the receipts, the change openings and the last signature (the burn list is the places of a payment finished, and nothing reads it)
+        Util.arrayFillNonAtomic(cardLog, (short) 0, LOG_LEN, (byte) 0);
+        Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);
+        Util.arrayFillNonAtomic(changeOpen, (short) 0, (short)(CHANGE_MOST * OPEN_LEN), (byte) 0);
+        Util.arrayFillNonAtomic(openState, (short) 0, CHANGE_MOST, (byte) 0);
+        Util.arrayFillNonAtomic(lastSig, (short) 0, (short) 65, (byte) 0);
         /* The record, but for the clock: the time and the header's hash stay (the
          * bits before the hash, the ratchet, go with the rest). */
         Util.arrayFillNonAtomic(cardRecord, (short) 0, CARD_HEADER_OFFSET, (byte) 0);

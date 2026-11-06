@@ -30,8 +30,8 @@ from refcheck import LOADED, components  # noqa: E402
 
 CAP = 'applet/target/cashu-javacard-2.1.0.cap'
 HELLO_CAP = 'applet/target/hello-1.0.cap'
-CAP_SHA256 = '035811ae33341775e6e6bb17d2acd173bf74e1e7f2272175f67b4caf94ceb75a'
-LOAD_FILE_SHA256 = 'a46691d1edde57e85b7a85a8eeafbe34f0d8afa6d808e36bc852c711a188d49a'
+CAP_SHA256 = '51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37'
+LOAD_FILE_SHA256 = '11dee5d728142d56178cdfd33a0e552207c80d13a7c08dba33f3d123b9eed2b3'
 LOAD_FILE_SIZE = 21540
 ASSETS = 'apps/provisioner/src/assets'
 

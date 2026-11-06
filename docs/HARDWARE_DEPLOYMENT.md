@@ -113,7 +113,7 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 2.2**, sha256
-`035811ae33341775e6e6bb17d2acd173bf74e1e7f2272175f67b4caf94ceb75a`
+`51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37`
 (`applet/target/cashu-javacard-2.1.0.cap`). A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
 timestamp into `META-INF/MANIFEST.MF`. Every other entry is byte-identical when

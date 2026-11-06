@@ -24,14 +24,11 @@ export const CARD_VERSIONS: readonly (readonly [number, number])[] = [
 ];
 /** The version the tracked CAP installs (applet/target/cashu-javacard-2.1.0.cap), which provisioning verifies. */
 export const CARD_VERSION: readonly [number, number] = [2, 2];
-/** Whether `v` (two bytes, or more of which the first two are read) is a version in CARD_VERSIONS. */
-export function supportedCardVersion(
-  v: readonly number[],
-  exact = true,
-): boolean {
-  if (exact ? v.length !== 2 : v.length < 2) return false;
-  return CARD_VERSIONS.some(
-    ([major, minor]) => v[0] === major && v[1] === minor,
+/** Whether `v` is exactly two bytes and a version in CARD_VERSIONS. */
+export function supportedCardVersion(v: readonly number[]): boolean {
+  return (
+    v.length === 2 &&
+    CARD_VERSIONS.some(([major, minor]) => v[0] === major && v[1] === minor)
   );
 }
 /** The NFC tag's class, listed last in the package. */

@@ -442,6 +442,16 @@ class OutboxTest {
         assertEquals(2, readUint32(scope().getData(), 9), "generation 2");
         assertEquals(1, readUint32(scope().getData(), 5), "payment id 1 again: unique with the generation");
         assertEquals(2, readUint32(body, 89 + MINT.length() + 2), "each input's generation is the card's: the first input's, after the count and its place");
+
+        // in the source the generation is stepped before the receipt count goes back to 0: a reset torn between them leaves
+        // a larger generation, never payment id 1 again under the old one
+        String code = new String(java.nio.file.Files.readAllBytes(SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), StandardCharsets.UTF_8);
+        int from = code.indexOf("private void processResetCard(");
+        assertTrue(from >= 0, "RESET_CARD's handler");
+        String reset = code.substring(from, code.indexOf("\n    }\n", from));
+        int stepped = reset.indexOf("Util.arrayCopy(scratch, X_NUM, outGen, (short) 0, (short) 4);");
+        int zeroed = reset.indexOf("Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);");
+        assertTrue(stepped > 0 && zeroed > 0 && stepped < zeroed, "the generation is written before the receipts are zeroed");
     }
 
     @Test
@@ -487,6 +497,54 @@ class OutboxTest {
         assertTrue(sign.substring(record, answer).contains("Util.arrayCopyNonAtomic(lastSig, (short) 1, buf, (short) 0, (short) 64);"), "and the signature put back for the answer");
         String dispatch = code.substring(code.indexOf("public void process("), code.indexOf("private void processGetInfo("));
         assertFalse(dispatch.contains("!= INS_GET_OUTBOX"), "not a step of a payment: a read drops one begun");
+    }
+
+    private void setOutbox(byte[] a) throws Exception {
+        java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("outbox");
+        f.setAccessible(true);
+        f.set(runtime.appletAt(AIDUtil.create(AID_HEX)), a);
+    }
+
+    /** The count of payments ever, as GET_LOG P1 = 1 answers it to the owner's grant (given here, in this tap). */
+    private long receiptCount() {
+        byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
+        assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_ALLOW_LOAD, 0, 0, ownerData(ownerProof(L_LOAD, OWNER, n, new byte[0]), new byte[0]))).getSW(), "the owner's grant");
+        ResponseAPDU r = tx(new CommandAPDU(CLA, INS_GET_LOG, 1, 0, 256));
+        assertEquals(SW_OK, r.getSW(), "the receipts");
+        return readUint32(r.getData(), 0);
+    }
+
+    /** A payment whose record write throws (`what`): answered, burned and receipted as ever, and no transaction left open. */
+    private void paidDespiteAFault(String what, long receiptsBefore) throws Exception {
+        Payment p = twoByTwo();
+        assertEquals(64, p.signature.length, what + ": SIGN answers the signature");
+        assertTrue(schnorrVerify(extractPubkeyX(cardKey()), sha256(allMessage(cardKey(), REFUND, slotData(p), p.outputs).getBytes(StandardCharsets.UTF_8)), p.signature),
+            what + ": the signature is over the payment's message");
+        ResponseAPDU again = tx(new CommandAPDU(CLA, INS_SPEND_ALL_AGAIN, 0, 0, 64));
+        assertEquals(SW_OK, again.getSW(), what + ": SPEND_ALL_AGAIN");
+        assertArrayEquals(p.signature, again.getData(), what + ": the same signature again");
+        byte[] status = tx(new CommandAPDU(CLA, INS_GET_SLOT_STATUS, 0, 0, 256)).getData();
+        for (int place : p.places) assertEquals(CashuApplet.STATUS_SPENT, status[place], what + ": place " + place + " spent");
+        assertEquals(receiptsBefore + 1, receiptCount(), what + ": the receipt count stepped");
+        assertEquals(0, runtime.getTransactionDepth(), what + ": no transaction left open");
+        assertEquals(SW_SLOT_EMPTY, scope().getSW(), what + ": and no record");
+    }
+
+    @Test
+    @DisplayName("a fault in the record never fails the payment: a record write that throws outside a transaction, or inside one, leaves SIGN's answer, the burn and the receipt as they are, no transaction open, and the next payment recording again")
+    void recordFaultNeverFailsPayment() throws Exception {
+        byte[] real = field("outbox");
+        long count = receiptCount();
+        // outside: the first commit is made, then the body's first copy at outbox[4] is out of bounds
+        setOutbox(new byte[4]);
+        paidDespiteAFault("outside a transaction", count);
+        // inside: outbox[1] is out of bounds within the first transaction, which the catch aborts
+        setOutbox(new byte[1]);
+        paidDespiteAFault("inside a transaction", count + 1);
+        // a real record again: the next payment records, with its own payment id
+        setOutbox(real);
+        Payment p = twoByTwo();
+        assertRecord(expectedBody(p, MINT, count + 3, 1), packet());
     }
 
     @Test
