@@ -14,7 +14,7 @@ authorities. Do not generate replacement signing keys to make CI pass.
 | Firmware    | `applet/pom.xml`: 2.1.0; tracked CAP and APDU version remain 2.1 | `firmware-v2.1.0`            |
 | cardkit     | `tools/cardkit/package.json`: 0.2.0                              | `cardkit-v0.2.0`             |
 | Ops-service | `ops/package.json`: 0.1.0                                        | `ops-v0.1.0`                 |
-| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 10                  | `provisioner-v1.0.0-build.10` |
+| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 14                  | `provisioner-v1.0.0-build.14` |
 
 These examples identify source versions. Existing store build numbers remain
 reserved; use a new build number for a new upload. The next mobile release needs
