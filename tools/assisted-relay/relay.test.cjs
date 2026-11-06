@@ -190,9 +190,23 @@ test("partial capture resumes at the next saved page and refuses a changed scope
   assert.deepEqual(offsets, []);
 });
 
-function mint() {
+// Optional settings, each a no-op by default: `catalogue` is what /v1/keysets
+// returns, `ids` maps a packet's keyset id to the full id the mint knows it by
+// (swap, restore and the signatures use it), `states` gives each input's state.
+function mint({
+  catalogue = vector.keysets.map((id) => ({
+    id,
+    unit: "sat",
+    active: true,
+    input_fee_ppk: 0,
+  })),
+  ids = {},
+  states,
+} = {}) {
   const p = decodePacket(raw(), policy, crypto),
     calls = [];
+  const full = (id) => ids[id] ?? id;
+  const sent = p.outputs.map((o) => ({ ...o, id: full(o.id) }));
   const scalar = 0x1234567890abcdefn,
     K = cc.hexOf(cc.compressed(cc.mul(scalar)));
   const signatures = p.outputs.map((o) => {
@@ -207,7 +221,7 @@ function mint() {
       ),
     );
     return {
-      id: o.id,
+      id: full(o.id),
       amount: o.amount,
       C_,
       dleq: {
@@ -227,27 +241,23 @@ function mint() {
     async request(route, body) {
       calls.push({ route, body: structuredClone(body) });
       if (route === "/v1/keysets")
-        return {
-          keysets: vector.keysets.map((id) => ({
-            id,
-            unit: "sat",
-            active: true,
-            input_fee_ppk: 0,
-          })),
-        };
+        return { keysets: structuredClone(catalogue) };
       if (route.startsWith("/v1/keys/"))
         return { keysets: [{ id: route.slice(9), keys: { 4: K, 8: K } }] };
       if (route === "/v1/checkstate")
         return {
-          states: body.Ys.map((Y) => ({
+          states: body.Ys.map((Y, i) => ({
             Y,
-            state: m.pending ? "PENDING" : m.spent ? "SPENT" : "UNSPENT",
+            state:
+              states?.[i] ??
+              (m.pending ? "PENDING" : m.spent ? "SPENT" : "UNSPENT"),
           })).reverse(),
         };
       if (route === "/v1/restore") {
+        assert.deepEqual(body.outputs, sent);
         if (!m.spent) return { outputs: [], signatures: [] };
         const r = {
-          outputs: structuredClone(p.outputs).reverse(),
+          outputs: structuredClone(sent).reverse(),
           signatures: structuredClone(signatures).reverse(),
         };
         if (m.partial) {
@@ -258,7 +268,11 @@ function mint() {
         return r;
       }
       if (route === "/v1/swap") {
-        assert.deepEqual(body.outputs, p.outputs);
+        assert.deepEqual(body.outputs, sent);
+        assert.deepEqual(
+          body.inputs.map((i) => i.id),
+          p.inputs.map((i) => full(i.id)),
+        );
         m.spent = true;
         if (m.lose) throw Error("reply lost");
         return { signatures };
@@ -387,4 +401,216 @@ test("cached confirmed claims are reverified and foreign scope fails before HTTP
     }),
   );
   assert.equal(m.calls.length, 0);
+});
+
+const swaps = (m) => m.calls.filter((c) => c.route === "/v1/swap").length;
+const quiet = (m, j = journal(), save = async () => {}) => ({
+  journal: j,
+  policy,
+  crypto,
+  request: m.request,
+  save,
+});
+
+test("signatures beside inputs still PENDING wait as pending, then confirm without a swap", async () => {
+  const m = mint();
+  m.spent = true;
+  m.pending = true;
+  let disk = journal();
+  const r = await reconcilePayment(
+    quiet(m, disk, async (s) => {
+      disk = structuredClone(s);
+    }),
+  );
+  assert.equal(r.state, "pending");
+  assert.equal(r.evidence, undefined);
+  assert.equal(disk.state, "pending");
+  assert.equal(swaps(m), 0);
+  m.pending = false;
+  const done = await reconcilePayment(quiet(m, disk));
+  assert.equal(done.state, "outputs-confirmed");
+  assert.equal(done.evidence.signatures.length, 2);
+  assert.equal(swaps(m), 0);
+});
+
+test("signatures beside an UNSPENT input stay settlement-unresolved", async () => {
+  const m = mint({ states: ["PENDING", "UNSPENT"] });
+  m.spent = true;
+  await assert.rejects(reconcilePayment(quiet(m)), /settlement-unresolved/);
+  assert.equal(swaps(m), 0);
+});
+
+const SHORT = "0077010203040506";
+const V2 = SHORT + "a1".repeat(25);
+const v2Catalogue = (extra = [], over = {}) => [
+  ...vector.keysets.map((id) => ({
+    id: id === SHORT ? V2 : id,
+    unit: "sat",
+    active: true,
+    input_fee_ppk: 0,
+    ...(id === SHORT ? over : {}),
+  })),
+  ...extra,
+];
+
+test("an 8-byte packet keyset resolves to the mint's full v2 id for swap and restore", async () => {
+  const m = mint({ catalogue: v2Catalogue(), ids: { [SHORT]: V2 } });
+  let disk = journal();
+  const saves = [];
+  const r = await reconcilePayment(
+    quiet(m, disk, async (s) => {
+      saves.push(structuredClone(s));
+      disk = structuredClone(s);
+    }),
+  );
+  assert.equal(r.state, "outputs-confirmed");
+  assert.equal(swaps(m), 1);
+  // The map is saved with the submitted intent, before the swap.
+  const submittedSave = saves.find((s) => s.state === "submitted");
+  assert.deepEqual(submittedSave.keysetIds, { [SHORT]: V2 });
+  assert.deepEqual(r.keysetIds, { [SHORT]: V2 });
+  assert.deepEqual(r.evidence.keysetIds, { [SHORT]: V2 });
+  // Evidence keeps the packet's outputs, so the packet id still links them.
+  assert.deepEqual(r.evidence.outputs, m.p.outputs);
+  const short = m.p.outputs.findIndex((o) => o.id === SHORT);
+  assert.equal(r.evidence.signatures[short].id, V2);
+  for (const c of m.calls.filter((c) => c.route.startsWith("/v1/keys/")))
+    assert.notEqual(c.route, "/v1/keys/" + SHORT);
+  // A replay reuses the saved map and never submits again.
+  const again = await reconcilePayment(quiet(m, disk));
+  assert.equal(again.state, "outputs-confirmed");
+  assert.equal(swaps(m), 1);
+});
+
+test("an 8-byte mint keeps identity ids and evidence carries no keyset map", async () => {
+  const m = mint();
+  const r = await reconcilePayment(quiet(m));
+  assert.equal(r.state, "outputs-confirmed");
+  assert.equal(r.keysetIds, undefined);
+  assert.equal(r.evidence.keysetIds, undefined);
+  assert.deepEqual(
+    r.evidence.signatures.map((s) => s.id),
+    m.p.outputs.map((o) => o.id),
+  );
+});
+
+test("an ambiguous, inactive or non-sat resolved keyset fails closed without a swap", async () => {
+  const cases = [
+    [
+      v2Catalogue([
+        {
+          id: SHORT + "b2".repeat(25),
+          unit: "sat",
+          active: true,
+          input_fee_ppk: 0,
+        },
+      ]),
+      /keyset-ambiguous/,
+    ],
+    [v2Catalogue([], { active: false }), /inactive-output-keyset/],
+    [v2Catalogue([], { unit: "usd" }), /input-keyset/],
+  ];
+  for (const [catalogue, code] of cases) {
+    const m = mint({ catalogue, ids: { [SHORT]: V2 } });
+    await assert.rejects(reconcilePayment(quiet(m)), code);
+    assert.equal(swaps(m), 0);
+  }
+});
+
+test("a submitted journal reuses its keyset map; a tampered map is refused", async () => {
+  const twin = {
+    id: SHORT + "b2".repeat(25),
+    unit: "sat",
+    active: true,
+    input_fee_ppk: 0,
+  };
+  const m = mint({ catalogue: v2Catalogue([twin]), ids: { [SHORT]: V2 } });
+  m.spent = true;
+  const j = { ...journal(), state: "submitted", keysetIds: { [SHORT]: V2 } };
+  const r = await reconcilePayment(quiet(m, j));
+  assert.equal(r.state, "outputs-confirmed");
+  assert.equal(swaps(m), 0);
+  for (const keysetIds of [
+    { [SHORT]: "ff".repeat(33) },
+    { [SHORT]: SHORT },
+    { ["0177010203040506"]: "0177010203040506" + "a1".repeat(25) },
+    { [SHORT]: SHORT + "c3".repeat(25) },
+    {},
+    [V2],
+  ]) {
+    const t = mint({ catalogue: v2Catalogue([twin]), ids: { [SHORT]: V2 } });
+    t.spent = true;
+    await assert.rejects(
+      reconcilePayment(quiet(t, { ...j, keysetIds })),
+      /journal/,
+    );
+    assert.equal(swaps(t), 0);
+  }
+});
+
+test("a 510-byte packet is captured after pages 0 and 255 and never read at its end", async () => {
+  const fixed = Array(32).fill(7);
+  const stub = {
+    hash: () => fixed,
+    verify: () => true,
+    point: () => true,
+  };
+  const key = "02" + "11".repeat(32);
+  const mintUrl = "https://mint.test/" + "a".repeat(144);
+  const u32 = (n) => [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+  const body = [
+    ...Buffer.from("CCP-AS\x01", "latin1"),
+    ...Buffer.from(key, "hex"),
+    ...Array(32).fill(0x31),
+    ...[0, 0, 0, 0, 0, 0, 0, 1],
+    0,
+    ...u32(1),
+    1,
+    ...[0, mintUrl.length],
+    ...Buffer.from(mintUrl),
+    0,
+    1,
+    ...[0, ...u32(1), ...u32(8), 8, ...Array(8).fill(9)],
+    ...Array(32).fill(5),
+    ...[2, ...Array(32).fill(3)],
+    1,
+    ...[...u32(8), 8, ...Array(8).fill(9), 2, ...Array(32).fill(4)],
+    ...Array(64).fill(1),
+  ];
+  const packet = [...body, ...Array(64).fill(2)];
+  assert.equal(mintUrl.length, 162);
+  assert.equal(packet.length, 510);
+  const stubPolicy = {
+    mint: mintUrl,
+    cardKey: key,
+    installation: "31".repeat(32),
+  };
+  const readScope = async () => [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    ...u32(1),
+    ...fixed,
+  ];
+  const reads = [];
+  const r = await capturePacket({
+    policy: stubPolicy,
+    crypto: stub,
+    readScope,
+    readPage: async (offset, count) => {
+      reads.push(offset);
+      if (offset >= packet.length) throw { sw: 0x6a83 };
+      return packet.slice(offset, offset + count);
+    },
+    save: async () => {},
+  });
+  assert.deepEqual(reads, [0, 255]);
+  assert.equal(r.state, "captured");
+  assert.equal(r.packet, Buffer.from(packet).toString("hex"));
 });
