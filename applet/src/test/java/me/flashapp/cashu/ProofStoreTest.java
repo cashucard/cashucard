@@ -725,7 +725,7 @@ class ProofStoreTest {
     }
 
     @Test
-    @DisplayName("The store is not made at install and is made by the first SET_CARD that goes through: null after install, after a PIN and after a SET_CARD that is refused; 12,288 zero bytes after one that is not, and the same array after every one that follows; and it is the only array the install leaves out")
+    @DisplayName("The store is not made at install and is made by the first SET_CARD that goes through: null after install, after a PIN and after a SET_CARD that is refused; 12,288 zero bytes after one that is not, and the same array after every one that follows; and it and the record (D176) are the only arrays the install leaves out")
     void theStoreIsNullAfterInstallAndNotNullAfterSetCard() throws Exception {
         Card c = new Card();
         assertNull(c.store(), "the chip refuses an applet whose constructor makes it: it is not made at install");
@@ -736,7 +736,8 @@ class ProofStoreTest {
             f.setAccessible(true);
             if (f.get(c.runtime.appletAt(c.aid)) == null) missing.add(f.getName());
         }
-        assertEquals(new TreeSet<>(Arrays.asList("dleq")), missing, "every other array of the applet is made at install, the store alone after it");
+        // and 2.2's assisted-settlement record and its staging (D176), refused in the constructor too
+        assertEquals(new TreeSet<>(Arrays.asList("dleq", "outStage", "outbox")), missing, "every other array of the applet is made at install, the store and the record after it");
         c.setPin();
         c.pin();
         assertNull(c.store(), "a PIN does not reserve it");

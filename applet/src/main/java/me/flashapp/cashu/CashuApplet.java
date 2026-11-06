@@ -958,10 +958,11 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The assisted-settlement record of the last SIG_ALL payment (2.2, D175): [0] 1 while it holds one whole packet, [1] 1
      * once its descriptor is signed, [2..3] the body's length, then the body and the descriptor. Permanent, and written after
      * the payment's receipt: [0] goes to 0 first, the body is written, and [0] goes to 1 last, so a read finds a whole
-     * record or none.
+     * record or none. Reserved at the first SET_CARD, not at install (D176): null until then, and for life on a card that
+     * refused the room, which keeps no record and answers GET_OUTBOX 6A88.
      */
     private byte[] outbox;
-    /** The outputs of the payment in hand (OUT_STAGE_LEN), kept apart from `outbox` so that a payment refused or dropped leaves the last record whole. */
+    /** The outputs of the payment in hand (OUT_STAGE_LEN), kept apart from `outbox` so that a payment refused or dropped leaves the last record whole. Reserved with `outbox`, after it (D176): null while it is. */
     private byte[] outStage;
     /** This installation's 32 random bytes, drawn once in the constructor and kept through RESET_CARD: the packet's installation. */
     private byte[] outInstall;
@@ -1050,8 +1051,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         rsaRoot         = fieldKey(RSA_D_ROOT);
         rsaEuler        = fieldKey(RSA_D_EULER);
         lastSig         = new byte[(short) 65];
-        outbox          = new byte[OUTBOX_LEN];
-        outStage        = new byte[OUT_STAGE_LEN];
+        // the record's two large arrays, `outbox` and `outStage`, are reserved at the first SET_CARD (D176): the J3R180 refused
+        // this constructor with them (6F00 at create); the installation and the generation are facts of the install, and stay
         outInstall      = new byte[(short) 32];
         outGen          = new byte[(short) 4];
         burnList        = new byte[(short)(MAX_PROOFS + 1)];
@@ -1701,7 +1702,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         allState[1] = (byte) n;
         allState[0] = (byte) 1;
         // the outputs this payment names are staged from nothing (2.2): the record of the last payment is not touched
-        outStage[0] = (byte) 0;
+        if (outStage != null) outStage[0] = (byte) 0;
         Util.arrayCopyNonAtomic(allSum, (short) 0, buf, (short) 0, (short) 4);
         apdu.setOutgoingAndSend((short) 0, (short) 4);
     }
@@ -1741,6 +1742,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * payment as not recordable (FF): it is still paid, and leaves no record.
      */
     private void stageOutput(byte[] amounts, short amountAt, byte[] points, short pointAt) {
+        // a card that has no room for a record (D176) stages nothing
+        if (outStage == null) return;
         short count = (short)(outStage[0] & 0xFF);
         if (count == (short) 0xFF) return;
         if (count >= OUT_OUT_MOST || isZero(amounts, amountAt, (short) 4)) {
@@ -2077,6 +2080,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * pulled away before that has no record, never a mix of two.
      */
     private void writeOutbox(byte[] buf, short n) {
+        // a card with no room for a record (D176) has none, and none of a payment before to let go
+        if (outbox == null || outStage == null) return;
         JCSystem.beginTransaction();
         outbox[0] = (byte) 0;
         outbox[1] = (byte) 0;
@@ -2155,7 +2160,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         byte[] buf = apdu.getBuffer();
         byte p1 = buf[ISO7816.OFFSET_P1];
         if (buf[ISO7816.OFFSET_P2] != (byte) 0 || (p1 != (byte) 0 && p1 != (byte) 1)) ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
-        if (outbox[0] != (byte) 1) ISOException.throwIt(SW_SLOT_EMPTY);
+        // no record, or no room for one (D176: a card not yet set up, or one that refused it), is the same 6A88
+        if (outbox == null || outbox[0] != (byte) 1) ISOException.throwIt(SW_SLOT_EMPTY);
         short bodyLen = Util.getShort(outbox, (short) 2);
         if (p1 == (byte) 0) {
             // a case 2 command: nothing is received, so a reader's Le is never taken for an Lc
@@ -2421,7 +2427,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             writeOutbox(buf, n);
         } catch (Exception e) {
             if (JCSystem.getTransactionDepth() != (byte) 0) JCSystem.abortTransaction();
-            outbox[0] = (byte) 0;
+            if (outbox != null) outbox[0] = (byte) 0;
         }
         // the signature again, from where the commit kept it: the record used the APDU buffer for its working room
         Util.arrayCopyNonAtomic(lastSig, (short) 1, buf, (short) 0, (short) 64);
@@ -2973,6 +2979,24 @@ public class CashuApplet extends Applet implements TagSwitch {
                 dleq = new byte[(short)(MAX_PROOFS * DLEQ_LEN)];
             } catch (SystemException e) {
                 dleq = null;
+            }
+        }
+        /* The room for the assisted-settlement record (2.2, D176), reserved the same way and for the same reason: the J3R180
+         * refused 2.2's constructor while it asked for these 4,285 bytes (6F00 at create, 2026-11-06). After the store of the
+         * mint's proofs, whose room matters more, and before the transaction. If either stays null the card is set up all the
+         * same and works as one that never keeps a record: GET_OUTBOX answers 6A88, and every use is safe while null. */
+        if (outbox == null) {
+            try {
+                outbox = new byte[OUTBOX_LEN];
+            } catch (SystemException e) {
+                outbox = null;
+            }
+        }
+        if (outbox != null && outStage == null) {
+            try {
+                outStage = new byte[OUT_STAGE_LEN];
+            } catch (SystemException e) {
+                outStage = null;
             }
         }
         JCSystem.beginTransaction();
@@ -3800,9 +3824,11 @@ public class CashuApplet extends Applet implements TagSwitch {
          * written with the atomic copy, so a tear leaves the old one or the new one; a reset sent again after a tear steps
          * it again, which is only a larger number. It stops at FFFFFFFF, where no record is written. The installation's
          * bytes stay: it is the same card. */
-        outbox[0] = (byte) 0;
-        outbox[1] = (byte) 0;
-        outStage[0] = (byte) 0;
+        if (outbox != null) {
+            outbox[0] = (byte) 0;
+            outbox[1] = (byte) 0;
+        }
+        if (outStage != null) outStage[0] = (byte) 0;
         Util.arrayCopyNonAtomic(outGen, (short) 0, scratch, X_NUM, (short) 4);
         addUint32Stop(scratch, X_NUM, ONE, (short) 0);
         Util.arrayCopy(scratch, X_NUM, outGen, (short) 0, (short) 4);
