@@ -5183,3 +5183,24 @@ reserving the arrays on the first `SPEND_ALL_SIGN` (an allocation on the payment
 path, and a record that appears on some payments and not others); dropping the
 staging array and staging in the record (D175 rejected it: a refused payment
 would erase the last record).
+
+## <a id="d177"></a>D177: cashucard/javacard is archived; `spec/` lives here alone
+
+**Decided (2026-11-06):** `cashucard/javacard`, the repository this one was
+copied from, is archived on GitHub: read-only, its history and releases kept for
+reference, its `spec/` left at protocol 2.1. `tools/mirror-spec.sh` and its test
+are removed with CI's `tools` job; `spec/` is made here and mirrored nowhere.
+
+**Why.** The mirror could not carry 2.2: that repository's CI requires its
+`spec/`, its own applet and its cardctl to agree, and its applet and cardctl are
+2.1 (cashucard/javacard#45, closed). Keeping two applets in step would have meant
+porting every applet change twice for a repository with no users of its own; the
+owner chose to archive it rather than port 2.2 there. One repository, one spec,
+one applet.
+
+**What stays.** Historical links to `cashucard/javacard` in reports, decisions,
+`FORK.md`, `docs/FOR-LNFLASH.md`, `docs/FOXY-CARD-SPEC.md` and `docs/PROVENANCE.md`
+are left as written: they describe what happened. The `cashu-javacard-*.cap` file
+name and package name are unchanged. An issue still open there at archiving
+(cashucard/javacard#27, CLEAR_SPENT in the 0.2 top-up flow) is read-only with the
+rest and is tracked here if it still applies.

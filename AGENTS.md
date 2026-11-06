@@ -8,29 +8,19 @@ reasons in [`docs/DECISIONS.md`](docs/DECISIONS.md), and the words in
 [`docs/GLOSSARY.md`](docs/GLOSSARY.md). Read the first two before a change to
 how the card behaves.
 
-## What this repo is, and what cashucard/javacard is now
+## What this repo is, and what cashucard/javacard was
 
 `cashucard/cashucard` is the working repository of the shared Cashu card
 (protocol 2.2, one wire for Flash and for Foxy's wallet): the JavaCard applet,
 its host tools and simulator, the command reference in `spec/`, the TypeScript card
 library with the bench-spike app that installs the card from a phone, the provisioning app and its ops-service. It began as a copy of
-`cashucard/javacard` main with its whole history. `cashucard/javacard`
-is a read-only mirror of this repo's `spec/`: every PR that touches `spec/` here
-is mirrored there with `tools/mirror-spec.sh` after it merges, and
-cashucard/javacard takes no direct spec edits, so a change to `spec/` is always a
-PR here. The protocol's core, NUT-CCP, is `CCP.md` in
+`cashucard/javacard` main with its whole history. `cashucard/javacard` is
+archived since 2026-11-06 ([D177](docs/DECISIONS.md#d177)): read-only, its
+`spec/` stopped at protocol 2.1, its releases and history kept for reference.
+Nothing is mirrored there any more; a change to `spec/` is a PR here and ends
+here. The protocol's core, NUT-CCP, is `CCP.md` in
 [cashucard/nut](https://github.com/cashucard/nut), with its test vectors: a change to
 the core starts there, before this repo implements it.
-
-```bash
-tools/mirror-spec.sh <path-to-javacard-checkout>          # dry run: the diff; exit 0 identical, 1 differs
-tools/mirror-spec.sh <path-to-javacard-checkout> --apply  # copy spec/ as committed at HEAD, then git status there
-# Either exits 2, changing nothing, while that checkout's spec/ or this one's has uncommitted changes.
-# --apply also exits 2 unless HEAD is in origin/main (as last fetched) and its spec/ is origin/main's,
-# and its history has the spec/ that checkout has committed: run it from main after the merge and a
-# pull, never from a ticket's worktree. The dry run says when --apply would refuse.
-# Nothing outside spec/ is touched. The commit and the push in cashucard/javacard are the operator's.
-```
 
 ## Layout
 
@@ -41,9 +31,9 @@ tools/mirror-spec.sh <path-to-javacard-checkout> --apply  # copy spec/ as commit
 | `tools/cardctl/`                                    | The reference host driver, Python over PC/SC: `cardctl.py`, the BIP-340 verifier `bip340.py`, the owner's P-256 `p256.py`, and seven test files that need no reader, no card and no pyscard. `read_registry.py` reads a card's registry listing with an allowlist that refuses every non-read command; on a card that holds a package the plain channel answers `6982`, so it needs the authenticated channel the phased install opens, not a wider allowlist. Its venv is the one [`tools/cardctl/README.md`](tools/cardctl/README.md) documents: a Homebrew Python, `.venv` in `tools/cardctl/`, never the macOS system Python 3.9 (pyscard installs there and fails at import).                       |
 | `tools/cardsim/`                                    | The real applet in jCardSim on `http://127.0.0.1:9876`, for the apps' end-to-end runs: the HTTP bridge, its Node client `client.cjs`, the Cashu arithmetic `cashu-crypto.cjs` and the mint e2e `e2e-swap.test.cjs`. flash-pos and flash-mobile pin it by `CASHU_JAVACARD_REF`, so its routes, fixtures and client are a contract with both apps ([`tools/cardsim/README.md`](tools/cardsim/README.md)). `run.sh` and `ctl.sh` are Foxy's line-protocol simulator on port 47431.                                                                                                                                                                                                                          |
 | `tools/chip/`                                       | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below).                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `tools/`                                            | Also: `stripcap.py` and `refcheck.py`, which the CAP build runs; `e2e-melt.cjs` and `e2e-redeem.cjs`, 0.x tools that drive a 0.x card and a mint, kept for the sweep of 0.x field cards; `mirror-spec.sh` and its test `mirror-spec.test.sh`.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `tools/`                                            | Also: `stripcap.py` and `refcheck.py`, which the CAP build runs; `e2e-melt.cjs` and `e2e-redeem.cjs`, 0.x tools that drive a 0.x card and a mint, kept for the sweep of 0.x field cards.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `tools/outbox-spike/recover-installed.cjs`          | The only reader-facing launcher for `recover-compact.cjs`: `--read-key` reads the chip id and the applet's public key through `recovery_key_bridge.py`; `--recover` runs the cleanup to blank through `compact_recovery_bridge.py`. This card answers CPLC **only from the ISD applet** (`6A86` otherwise), so both passes select the ISD first. The chip id is `cardkit.parseCplc`'s, never a byte slice — the flow matches on that id.                                                                                                                                                                                                                                                                 |
-| `spec/`                                             | The command reference, mirrored to cashucard/javacard: `APDU.md` (the wire, byte for byte, with the profiles NUT-CCP leaves to implementations: the owner, the clock and the limits, the NFC tag), `CARD-FILE.md` (the 0.x interchange format) and `vectors/` (`headers.json`, `owner.json`, `secret.json`, `transcript.json`).                                                                                                                                                                                                                                                                                                                                                                          |
+| `spec/`                                             | The command reference, made here and nowhere else (cashucard/javacard, which mirrored it, is archived: [D177](docs/DECISIONS.md#d177)): `APDU.md` (the wire, byte for byte, with the profiles NUT-CCP leaves to implementations: the owner, the clock and the limits, the NFC tag), `CARD-FILE.md` (the 0.x interchange format) and `vectors/` (`headers.json`, `owner.json`, `secret.json`, `transcript.json`).                                                                                                                                                                                                                                                                                                                                                                          |
 | `docs/`                                             | `ARCHITECTURE.md`, `DECISIONS.md` (settled decisions and historical supersessions), `SECURITY-MODEL.md`, `HARDWARE_DEPLOYMENT.md` (build, install, reinstall, the AIDs), Foxy's design (`FOXY-CARD-*.md`), the provisioner's (`PROVISIONER-APP.md`), and, in `reports/`, one hardware report for each silicon milestone, named `HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md` (including the 2026-10-23 full E2E and mobile reset reports).                                                                                                                                                                                                                                                               |
 | `tools/cardkit/`                                    | Installs the card's applet and rotates the card manager's keys over GlobalPlatform SCP02, as environment-agnostic TypeScript (ENG-738, [D27](docs/DECISIONS.md#d27)): a vendored DES, the session, the commands and the recovering install, with no NFC, HTTP or platform import. The transport is injected as `type Transceiver = (apdu: number[]) => Promise<number[]>`, so the phone and Node run the same code and `gp/test/` runs it against a fake card. Also here: `make-assets.py`, which writes the provisioner's load files from the CAPs, and `hello/`, the smoke test's one-applet package (not the card's: `ant -f applet/build.xml hello-cap` builds it, `HelloTest` runs it in jCardSim). |
 | `apps/provisioner/`                                 | React Native operator app (bundle `com.islandbitcoin.provisioner`): authenticated batches, installation, recovery, card status and owned-card reset. It consumes `@cashu-card/cardkit` through `src/cardkit.ts`; demo mode is removed and bench tools are release-gated off. `src/assets/` is generated from the pinned CAP. Holder ownership/PIN/funding belongs in a wallet.                                                                                                                                                                                                                                                                                                                           |
@@ -138,12 +128,6 @@ cd tools/cardctl && .venv/bin/pip install -r requirements.txt && .venv/bin/pytho
 
 ```bash
 node --test 'tools/**/*.test.cjs'
-```
-
-`tools`, the spec mirror script:
-
-```bash
-sh tools/mirror-spec.test.sh
 ```
 
 `cap`, CAP conversion (JDK 17, Ant), with the JavaCard SDKs of

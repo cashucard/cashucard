@@ -37,7 +37,6 @@ jobs:
       cardsim: ${{ steps.select.outputs.cardsim }}
       cardctl: ${{ steps.select.outputs.cardctl }}
       e2e_tools: ${{ steps.select.outputs.e2e_tools }}
-      tools: ${{ steps.select.outputs.tools }}
       cap: ${{ steps.select.outputs.cap }}
       cardkit: ${{ steps.select.outputs.cardkit }}
       ops: ${{ steps.select.outputs.ops }}
@@ -341,24 +340,6 @@ jobs:
       # positional args as file paths, so a bare directory does not work).
       - name: Run tests
         run: node --test 'tools/**/*.test.cjs'
-
-  tools:
-    needs: changes
-    if: needs.changes.outputs.tools == 'true'
-    name: spec mirror script
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.ref || github.sha }}
-
-      # tools/mirror-spec.sh copies spec/ into a javacard checkout and
-      # deletes what is no longer here, so its test drives it against two
-      # throwaway git checkouts: the exit codes, the refusal of a target with
-      # uncommitted changes under spec/, and nothing outside spec/ touched.
-      # Needs only git, diff and tar; sh here is dash, the strict end of POSIX.
-      - name: Run tests
-        run: sh tools/mirror-spec.test.sh
 
   cap:
     needs: changes
