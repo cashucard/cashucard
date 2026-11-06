@@ -434,7 +434,11 @@ reads it before and after the pages and keeps the packet only if the two agree.
 **Response, P1 = `01`:** `min(count, total - offset)` bytes of the packet (body
 ‖ descriptor) from the offset, where total is the body's length and 64. A relay
 asks at offsets 0, 255, 510, … with a count of 255, and stops at the first page
-shorter than 255 (or at `6A83`, when the packet is a whole number of pages).
+shorter than 255 (or at `6A83`, when the packet is a whole number of pages). A
+relay that decodes the packet as it reads stops as soon as the packet verifies,
+and so never asks at an offset equal to total. A reader that does not decode
+takes `6A83` at a whole-page offset, after a full page of 255 bytes, as the end
+of the packet, never as a partial packet.
 
 **The packet**, in this order (all numbers big-endian):
 
@@ -457,6 +461,11 @@ shorter than 255 (or at `6A83`, when the packet is a whole number of pages).
 | 64 | the witness | the payment's signature, as `SPEND_ALL_SIGN` gave it (and `SPEND_ALL_AGAIN` gives it again) |
 | 64 | the descriptor | the card key's BIP-340 signature over SHA-256(tag ‖ tag ‖ body), tag = SHA-256(`CashuCard/assisted-settlement/v1`) |
 
+The installation is the 32 bytes at offset 40 of the first page (after the
+format, 7, and the card key, 33). It is public, it is kept through `RESET_CARD`,
+and no command returns it on its own: a relay reads it here and checks it
+against the installation it expects for the card before it trusts the packet.
+
 The body is everything before the descriptor. The inputs are in the order
 `SPEND_ALL_BEGIN` named them; the outputs are the till's (`SPEND_ALL_OUTPUTS`)
 and then the card's change (`SPEND_ALL_CHANGE`), in the order the message hashed
@@ -465,7 +474,11 @@ its nonce and the card key; the witness verifies over the NUT-11 SIG_ALL message
 of those inputs and outputs. In 2.2 every output carries the first input's 8-byte
 keyset, as the card's change always has, because `SPEND_ALL_OUTPUTS` carries no
 keyset: a till that blinds an output for another keyset gets a packet the mint
-refuses. Each input's generation is the card's. The payment id is unique only
+refuses. A mint that serves v2 keyset ids knows each keyset only by its 33-byte
+id, so a relay sends the full id that the packet's 8 bytes begin, from the mint's
+`/v1/keysets`, for the inputs and the outputs alike, and refuses a prefix that
+begins more than one id there. The id names the same keyset, and the NUT-11
+SIG_ALL message carries no keyset id, so the witness verifies either way. Each input's generation is the card's. The payment id is unique only
 together with the generation, since `RESET_CARD` sets the receipt count back to 0.
 
 **When.** The record is written by `SPEND_ALL_SIGN`, after the payment's receipt,
