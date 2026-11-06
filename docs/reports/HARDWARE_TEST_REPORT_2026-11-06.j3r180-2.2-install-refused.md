@@ -1,9 +1,9 @@
 # J3R180 refuses applet 2.2's constructor at create (2026-11-06)
 
 ENG-823, under ENG-818. The first 2.2 CAP ([D175](../DECISIONS.md#d175)) loaded on
-a J3R180, and the chip then refused to create the card's applet. The load file's
-size is not the cause; the constructor's 4,321 extra persistent bytes are
-([D176](../DECISIONS.md#d176)).
+a J3R180, and the chip then refused to create the card's applet. The likely
+cause is the constructor's 4,321 extra persistent bytes; the bench did not rule
+out the load file's size ([D176](../DECISIONS.md#d176)).
 
 ## Environment
 
@@ -32,10 +32,12 @@ no card applet.
 
 ## Reading
 
-- **The load file's size installs.** 21,540 bytes loaded, so refcheck's table now
-  records it as a size that installs (`tools/refcheck.py`).
-- **The constructor's allocation is what was refused.** 2.2's constructor asked
-  for 4,321 persistent bytes more than 2.1's. It is the install-time allocation
+- **The cause is inferred, not shown.** 21,540 bytes loaded, but the card applet's
+  INSTALL at that size went `6F00`, which is what refcheck's table counts as a
+  failure, so it records 21,540 as a size that failed (`tools/refcheck.py`).
+  Nothing here separates the size window refcheck tracks from the constructor.
+- **The constructor's allocation is the likely cause.** 2.2's constructor asked
+  for 4,321 persistent bytes more than 2.1's. That would be the install-time allocation
   limit [D17](../DECISIONS.md#d17) and [D10](../DECISIONS.md#d10) record (+300 B
   installed, +12,288 B refused, the same bytes granted by a command after the
   install), which `docs/HARDWARE_DEPLOYMENT.md` had flagged as unmeasured for 2.2.

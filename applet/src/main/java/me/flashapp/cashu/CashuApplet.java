@@ -958,8 +958,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The assisted-settlement record of the last SIG_ALL payment (2.2, D175): [0] 1 while it holds one whole packet, [1] 1
      * once its descriptor is signed, [2..3] the body's length, then the body and the descriptor. Permanent, and written after
      * the payment's receipt: [0] goes to 0 first, the body is written, and [0] goes to 1 last, so a read finds a whole
-     * record or none. Reserved at the first SET_CARD, not at install (D176): null until then, and for life on a card that
-     * refused the room, which keeps no record and answers GET_OUTBOX 6A88.
+     * record or none. Reserved at the first SET_CARD, not at install (D176): null until then, and on a card whose SET_CARD
+     * was refused the room, until a later SET_CARD is given it; while null the card keeps no record and answers GET_OUTBOX 6A88.
      */
     private byte[] outbox;
     /** The outputs of the payment in hand (OUT_STAGE_LEN), kept apart from `outbox` so that a payment refused or dropped leaves the last record whole. Reserved with `outbox`, after it (D176): null while it is. */

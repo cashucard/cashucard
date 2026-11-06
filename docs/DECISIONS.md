@@ -5132,11 +5132,14 @@ gp v25.10.20, factory keys, SCP02):**
 | 2.2 first build, sha256 `51ddeee44c2fabc369c115d69bd05594478f11867ea75ca1784698222d32ea37`, load file 21,540 B | ok: 88 LOAD blocks, 14.68 s, package LOADED, opener SELECTABLE | **`6F00` after 1.76 s** | not reached |
 | 2.1 release, sha256 `f27d92ba99581f4e42abda0efc038b2c31128f9b405bcec6de52f6a12ae4c7e5` (control, same card, 2 min later) | ok: 82 blocks, 13.79 s | ok, 2.19 s | ok, 1.02 s |
 
-The load file's size installs (refcheck's table now has 21,540 as one that
-does). What the chip refused is the constructor's 4,321 extra persistent bytes,
-the install-time allocation limit [D17](#d17) and [D10](#d10) already record:
+The cause of the refusal is inferred, not shown. The likely one is the
+constructor's 4,321 extra persistent bytes, the install-time allocation limit
+[D17](#d17) and [D10](#d10) already record:
 +300 bytes in a constructor installed, +12,288 did not, and the same bytes asked
-for by a command after the install were given. The same `6F00` came from card
+for by a command after the install were given. Nothing on the bench separated
+that from the size window refcheck tracks (the same code failing a few dozen
+bytes either side of a size that installs), so refcheck's table records 21,540
+as a size that failed, the only measurement there. The same `6F00` came from card
 07297620, but that card refused the compact image's main applet too
 (ENG-817), so it is no evidence
 either way. Full report:
@@ -5159,7 +5162,8 @@ constructor's persistent total is back to 29,842 bytes (1.19's 29,806 and the
 **Not yet shown.** The fixed build (load file 21,631 bytes, a size refcheck has
 not seen, 91 more than the one that loaded) has not been installed on a J3R180;
 whether its first `SET_CARD` is given the 4,285 bytes is the bench card's answer
-to record.
+to record. A `6F00` at create from that build would not tell the two causes
+apart either: it would be a new size and a smaller constructor at once.
 
 **Rejected:** shrinking `OUTBOX_MAX` (out of scope, and +300 bytes is the largest
 constructor growth measured to install, far below even a minimal record);

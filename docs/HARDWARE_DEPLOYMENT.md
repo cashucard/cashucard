@@ -63,12 +63,15 @@ been seen to install (`tools/refcheck.py`, from
 [FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.2 build ([D175](DECISIONS.md#d175):
 `GET_OUTBOX`) was first **21,540 bytes** by refcheck's measure, and on 2026-11-06 a
 J3R180 (09336320) loaded it (88 blocks, 14.68 s, opener selectable), then refused
-to create the card's applet, `6F00` after 1.76 s: its constructor asked for the
-record's 4,321 bytes of persistent memory, more than the chip gives at install. The
+to create the card's applet, `6F00` after 1.76 s. The cause is inferred, not shown:
+its constructor asked for the record's 4,321 bytes of persistent memory, likely more
+than the chip gives at install, but the bench did not separate that from the size
+window refcheck exists to catch. The
 2.1 CAP, re-created on the same card two minutes later, installed all three applets
 ([D176](DECISIONS.md#d176),
 [the report](reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)).
-refcheck's table has 21,540 as a size that installs. The tracked build reserves the
+refcheck's table records 21,540 as a size that failed (the only measurement there is a
+refusal). The tracked build reserves the
 record's two large arrays at the first `SET_CARD` instead (D176): its load file is
 **21,631 bytes** (127 past a multiple of 256), sha256 `86839ccf…`, a size refcheck has
 not seen. **It has not been installed on a J3R180 yet**: install it on a bench card,
