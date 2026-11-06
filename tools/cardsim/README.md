@@ -1,8 +1,8 @@
 <a id="cardsim-the-20-card-over-loopback-http"></a>
 
-# cardsim: the 2.1 card over loopback HTTP
+# cardsim: the 2.2 card over loopback HTTP
 
-The real `CashuApplet` (protocol 2.1, AID `F0 43 41 53 48 55 43 41 52 44 01`) in
+The real `CashuApplet` (protocol 2.2, AID `F0 43 41 53 48 55 43 41 52 44 01`) in
 jCardSim, behind a small HTTP API. flash-pos and flash-mobile run it in their e2e
 jobs, pinned by `CASHU_JAVACARD_REF`. **This file is that contract**: the four
 routes, the `/fixture` schema, the `/state` fields and the Node client. A change to
@@ -146,7 +146,7 @@ Read through commands that need no PIN and change nothing (`GET_INFO P1 = 2`,
 |---|---|
 | `generation` | goes up on every reset and fixture, so a test can tell its card from one another run left |
 | `deterministicKey` | always `true` |
-| `version` | `"2.1"` |
+| `version` | `"2.2"` |
 | `pubkey` | the card key, 33 bytes compressed |
 | `balance` | sats in unspent pieces |
 | `pinState`, `tries`, `locked` | `0` no PIN, `1` set, `2` blocked; tries left; the owner's lock |
@@ -193,7 +193,7 @@ curl -s -X POST localhost:9876/fixture -d '{
 }' | jq '{balance, rollBudget, counts}'
 # {"balance": 32, "rollBudget": 7, "counts": {"unspent": 1, "spent": 0, "empty": 127}}
 curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'
-# {"hex":"02019000","sw":"9000"}
+# {"hex":"02029000","sw":"9000"}
 ```
 
 **SELECT the applet's whole AID** (`F0 CASHUCARD 01`, [D25](../../docs/DECISIONS.md#d25)).

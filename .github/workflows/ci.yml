@@ -154,12 +154,12 @@ jobs:
           echo "::error::cardsim did not answer /state within 30 s"
           exit 1
 
-      # The card's applet's whole AID (F0 CASHUCARD 01) answers version 02 00. The package AID alone
+      # The card's applet's whole AID (F0 CASHUCARD 01) answers version 02 02. The package AID alone
       # reaches the opener, as on a J3R180 (D25): 9000 with no version.
       - name: Smoke-test SELECT over HTTP
         run: |
           curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}' \
-            | grep -q '"hex":"02019000"'
+            | grep -q '"hex":"02029000"'
           curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
             | grep -q '"hex":"9000"'
 
@@ -168,6 +168,11 @@ jobs:
       # cases alone, so that job stays jar-free.
       - name: Client tests against the bridge
         run: CARDSIM_URL=http://127.0.0.1:9876 node --test tools/cardsim/client.test.cjs
+
+      # ENG-819 (D175): a 2-in/2-out payment's GET_OUTBOX packet, read through the bridge and
+      # decoded by the portable relay, against the recorded fixture.
+      - name: GET_OUTBOX through the bridge, decoded by the relay
+        run: CARDSIM_URL=http://127.0.0.1:9876 node --test tools/cardsim/outbox.test.cjs
 
       # The architect's decision 6 (ENG-673): a real SIG_ALL swap at a mint, with
       # DLEQ checked and the keyset id the mint uses. Nutshell 0.20.3 is the public
