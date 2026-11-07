@@ -46,6 +46,9 @@ Recheck these at submission time; dated requirements are not evergreen policy.
   explicitly reconcile existing enrollment rather than create a replacement
   identity automatically.
   [Android signing](https://developer.android.com/studio/publish/app-signing).
+  The upload key was rotated once, for build 14, after its password was lost
+  ([D178](DECISIONS.md#d178)); the Play Console upload-key reset for the new
+  certificate must complete before that bundle can be uploaded.
 - Apple requires accessible privacy policy information and sufficient reviewer
   access. Hardware-dependent apps need a video of the app interacting with
   hardware on a physical Apple device; prepare an approved device/video plan
