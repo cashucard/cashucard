@@ -335,6 +335,19 @@ state and certificate continuity have been reviewed. This setup does not grant
 store access or authorize a signed upload. See the
 [store release plan](../../docs/PROVISIONER-STORE-RELEASE.md).
 
+The current upload key (since build 14, [D178](../../docs/DECISIONS.md#d178))
+lives outside every checkout at `~/.cashucard-android/cashucard-upload.jks`,
+alias `cashucard-upload`, with its password in the macOS Keychain under service
+`cashucard-android-upload`, account `cashucard-upload`. A local release build
+loads it like this, so the password never reaches a file or the shell history:
+
+```sh
+export CASHU_ANDROID_UPLOAD_KEYSTORE=$HOME/.cashucard-android/cashucard-upload.jks
+export CASHU_ANDROID_UPLOAD_KEY_ALIAS=cashucard-upload
+export CASHU_ANDROID_UPLOAD_STORE_PASSWORD=$(security find-generic-password -s cashucard-android-upload -a cashucard-upload -w)
+export CASHU_ANDROID_UPLOAD_KEY_PASSWORD=$CASHU_ANDROID_UPLOAD_STORE_PASSWORD
+```
+
 
 ### Cards home and shared phones
 

@@ -5204,3 +5204,32 @@ are left as written: they describe what happened. The `cashu-javacard-*.cap` fil
 name and package name are unchanged. An issue still open there at archiving
 (cashucard/javacard#27, CLEAR_SPENT in the 0.2 top-up flow) is read-only with the
 rest and is tracked here if it still applies.
+
+## <a id="d178"></a>D178: the Android upload key was rotated for build 14
+
+**Decided (2026-11-07):** build 14's AAB is signed with a new upload key, a
+4096-bit RSA key under `CN=Cashu Provisioner, OU=LNFlash, O=Island Bitcoin LLC`
+with certificate SHA-256
+`06:FF:95:3B:AC:96:E7:46:5B:2F:00:C9:42:9C:CB:2D:3F:B0:E1:96:CD:7C:FB:05:81:2E:65:D5:C8:AA:C5:FF`.
+The owner requested a Play Console upload-key reset for that certificate; until
+Google completes it, the build 14 bundle is published on GitHub but cannot be
+uploaded to Play.
+
+**Why.** The key that signed builds 9 through 13 (same subject, certificate
+`D1:C1:DE:8B:…:3D:1B:5E`, made 2026-10-19) exists only as a PKCS12 file whose
+password was never recorded anywhere: not in the macOS Keychain, not in an
+environment file, not in any agent transcript on either Mac. The sessions that
+built with it read the password from the shell they were launched from. With
+Play App Signing the upload key is replaceable and the app signing key is not,
+so a reset costs a day of waiting and nothing else; guessing or waiting for the
+password to turn up had no end.
+
+**What changes.** The replacement follows the convention the Foxy and
+Fedimint provisioners already use: the keystore lives outside every repository
+at `~/.cashucard-android/cashucard-upload.jks` (alias `cashucard-upload`), its
+random password is a Keychain item (service `cashucard-android-upload`, account
+`cashucard-upload`), and Gradle receives both through the `CASHU_ANDROID_UPLOAD_*`
+variables (README § Android upload signing). The old `release.keystore` under
+`apps/provisioner/android/app/` in a local checkout is dead and may be deleted
+once the reset is complete. The README's rule against generating a replacement
+key stands for the normal case; this entry is the one reviewed exception.
