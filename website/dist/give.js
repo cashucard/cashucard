@@ -13,7 +13,7 @@
   var ONCHAIN_HINT = 100000;
   var MIN = 1000, MAX = 10000000;
 
-  var state = { rail: "lightning", sats: 21000, price: null, invoice: null, address: null,
+  var state = { rail: "lightning", sats: 21000, price: null, invoice: null, address: null, request: null,
                 poll: null, tick: null, baseline: null, step: "amount" };
 
   function $(sel, ctx) { return (ctx || root).querySelector(sel); }
@@ -79,6 +79,8 @@
     $("[data-continue-usd]").textContent = valid ? usd(n) : "";
     var hint = $("[data-onchain-hint]");
     if (hint) hint.hidden = !(state.rail === "onchain" && valid && n < ONCHAIN_HINT);
+    var ehint = $("[data-ecash-hint]");
+    if (ehint) ehint.hidden = state.rail !== "ecash";
   }
   function setRail(rail) {
     state.rail = rail;
@@ -133,6 +135,62 @@
     }).catch(function () {});
   }
 
+  /* ---------- Cashu eCash ---------- */
+  function startCashu() {
+    show("cashu");
+    var box = $("[data-cu-qr]");
+    box.innerHTML = ""; box.classList.add("is-loading");
+    $("[data-cu-amount]").textContent = fmt(state.sats) + " sats";
+    $("[data-cu-usd]").textContent = usd(state.sats);
+    $("[data-cu-actions]").hidden = true;
+    cashuError("");
+    setStatus("cu", "loading", "Creating your payment request");
+    getJSON("/api/cashu/request?site=" + encodeURIComponent(SITE) + "&sats=" + state.sats).then(function (req) {
+      state.request = req;
+      box.innerHTML = qrSVG(req.creq, "L");
+      box.classList.remove("is-loading");
+      $("[data-cu-actions]").hidden = false;
+      setStatus("cu", "waiting", "Waiting for your wallet");
+      announce("Payment request ready for " + fmt(req.sats) + " sats. Scan it with a Cashu wallet, or paste a token.");
+      state.poll = setInterval(checkCashu, 2000);
+    }).catch(function (e) {
+      box.classList.remove("is-loading");
+      setStatus("cu", "error", "The request could not be created. " + e.message + ". Pasting a token still works.");
+      $("[data-cu-paste]").open = true;
+    });
+  }
+  function checkCashu() {
+    if (document.hidden || !state.request) return;
+    if (state.request.expires_at && Date.now() / 1000 > state.request.expires_at) {
+      stopWatching(); setStatus("cu", "error", "This request expired. Choose an amount again for a new one."); return;
+    }
+    getJSON("/api/cashu/status?id=" + state.request.id).then(function (s) {
+      if (s.received) thanks("cashu", s.amount_sat, s.id);
+    }).catch(function () {});
+  }
+  function cashuError(msg) {
+    var el = $("[data-cu-error]");
+    el.textContent = msg; el.hidden = !msg;
+  }
+  function redeemToken() {
+    var field = $("[data-cu-token]"), btn = $("[data-cu-redeem]");
+    var token = field.value.replace(/\s+/g, "");
+    if (!/^(cashu:)?cashu[AB]/.test(token)) { cashuError("A Cashu token starts with cashuA or cashuB."); field.focus(); return; }
+    cashuError("");
+    btn.disabled = true; btn.textContent = "Receiving";
+    fetch(API + "/api/cashu/redeem", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ site: SITE, token: token })
+    }).then(function (r) {
+      return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ("HTTP " + r.status)); return d; });
+    }).then(function (g) {
+      field.value = "";
+      if (g.received) thanks("cashu", g.amount_sat, g.id);
+      else cashuError("The mint has not confirmed this token yet. Try again in a minute.");
+    }).catch(function (e) { cashuError(e.message); field.focus(); })
+      .then(function () { btn.disabled = false; btn.textContent = "Give this token"; });
+  }
+
   /* ---------- on-chain ---------- */
   function startOnchain() {
     show("onchain");
@@ -183,7 +241,9 @@
     $("[data-thanks-amount]").textContent = fmt(sats) + " sats";
     $("[data-thanks-detail]").textContent = rail === "onchain"
       ? (pending ? "We see your transaction in the mempool. It joins the ledger once it confirms." : "Your transaction confirmed and joins the ledger shortly.")
-      : "It arrived just now and joins the public ledger within a few minutes.";
+      : rail === "cashu"
+        ? "Your eCash was received. It joins the public ledger once it settles to Lightning, usually within a minute."
+        : "It arrived just now and joins the public ledger within a few minutes.";
     var subject = encodeURIComponent("Gift of " + fmt(sats) + " sats");
     var body = encodeURIComponent("Please list this gift as:\n\n\nReference: " + String(ref).slice(0, 16));
     $("[data-thanks-name]").href = "mailto:" + CONTACT + "?subject=" + subject + "&body=" + body;
@@ -194,6 +254,7 @@
   function copy(btn) {
     var target = btn.getAttribute("data-copy"), value;
     if (target === "invoice") value = state.invoice && state.invoice.pr;
+    else if (target === "request") value = state.request && state.request.creq;
     else {
       var el = document.querySelector(target);
       value = el && (el.getAttribute("data-copy-value") || el.textContent.trim());
@@ -225,7 +286,7 @@
       if (!p.donations || !p.donations.length) return;
       body.innerHTML = p.donations.slice(0, 50).map(function (d) {
         var date = d.date ? new Date(d.date * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Pending";
-        var rail = d.rail === "onchain" ? "On-chain" : "Lightning";
+        var rail = d.rail === "onchain" ? "On-chain" : d.rail === "cashu" ? "Cashu" : "Lightning";
         return "<tr><td>" + date + "</td><td class=\"num\">" + fmt(d.amount_sat) + " sats</td><td>" + rail +
           (d.confirmed ? "" : ", unconfirmed") + "</td></tr>";
       }).join("");
@@ -277,10 +338,12 @@
 
   $("[data-continue]").addEventListener("click", function () {
     if (state.sats < MIN || state.sats > MAX) return;
-    if (state.rail === "onchain") startOnchain(); else startLightning();
+    if (state.rail === "onchain") startOnchain();
+    else if (state.rail === "ecash") startCashu();
+    else startLightning();
   });
   $all("[data-back]").forEach(function (b) {
-    b.addEventListener("click", function () { stopWatching(); state.invoice = null; show("amount"); });
+    b.addEventListener("click", function () { stopWatching(); state.invoice = state.request = null; show("amount"); });
   });
   $all("[data-again]").forEach(function (b) { b.addEventListener("click", function () { show("amount"); }); });
   document.addEventListener("click", function (e) {
@@ -288,13 +351,14 @@
     if (btn) copy(btn);
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && (state.step === "lightning" || state.step === "onchain")) {
+    if (e.key === "Escape" && (state.step === "lightning" || state.step === "onchain" || state.step === "cashu")) {
       stopWatching(); show("amount");
     }
   });
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden && state.step === "lightning") checkInvoice();
     if (!document.hidden && state.step === "onchain") checkAddress();
+    if (!document.hidden && state.step === "cashu") checkCashu();
   });
 
   // Lightning address and offer QR codes, rendered on demand.
@@ -307,6 +371,11 @@
       btn.setAttribute("aria-expanded", String(!open));
       btn.textContent = open ? "Show QR" : "Hide QR";
     });
+  });
+
+  $("[data-cu-redeem]").addEventListener("click", redeemToken);
+  $("[data-cu-token]").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); redeemToken(); }
   });
 
   root.classList.add("is-ready");

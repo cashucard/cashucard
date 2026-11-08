@@ -186,7 +186,7 @@
   .fund { padding: 0 16px 32px; }
   .give { padding: 16px; border-radius: var(--f-r-md); }
   .give-head { flex-direction: column; align-items: stretch; }
-  .give-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .give-tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
   .give-tabs button { justify-content: center; }
   .give-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .jobs li { gap: 12px; padding: 12px 14px; }
@@ -198,3 +198,14 @@
   .give-more .row-actions .give-btn { flex: 1; }
 }
 .give-cta, .give-cta:hover, .give-btn.primary, .give-btn.primary:hover { color: var(--f-accent-ink); }
+
+/* Cashu: payment request note and the paste fallback */
+.give-note { margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: var(--f-dim); text-align: center; }
+.give-paste .give-label { margin-top: 14px; }
+.give-token { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; resize: vertical; min-height: 84px; border: 1px solid var(--f-accent-line); background: var(--f-well); color: var(--f-ink); border-radius: var(--f-r-sm); padding: 12px 14px; font: 500 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+.give-token:focus { outline: 0; border-color: var(--f-accent); box-shadow: 0 0 0 3px var(--f-accent-ghost); }
+.give-error { margin: 10px 0 0; font-size: 13px; color: var(--f-error); }
+.give-error[hidden] { display: none; }
+[data-cu-actions] .give-btn { flex: 1; justify-content: center; }
+.give-redeem { margin-top: 12px; width: 100%; justify-content: center; }
+.give-redeem:disabled { opacity: .6; cursor: progress; }

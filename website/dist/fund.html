@@ -47,6 +47,7 @@
       <h2 class="give-title" id="give-title">Send a gift</h2>
       <div class="give-tabs" role="tablist" aria-label="Payment method">
         <button type="button" role="tab" data-rail="lightning" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg>Lightning</button>
+        <button type="button" role="tab" data-rail="ecash" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg>eCash</button>
         <button type="button" role="tab" data-rail="onchain" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>On-chain</button>
       </div>
     </div>
@@ -59,6 +60,7 @@
       <label class="give-field"><input data-custom-input id="give-custom-amount" name="amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Amount" aria-label="Amount in sats" autocomplete="off"><span>sats</span></label>
       <small data-custom-usd></small>
     </div>
+    <p class="give-hint" data-ecash-hint hidden>Cashu eCash from any mint. Your wallet pays a request on the next step, or you paste a token.</p>
     <p class="give-hint" data-onchain-hint hidden>On-chain fees make small gifts costly. Lightning suits amounts under 100,000 sats.</p>
     <button type="button" class="give-cta" data-continue><span><span data-continue-label>Continue with 21,000 sats</span><br><small data-continue-usd>about $16</small></span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
     <p class="give-fine">Gifts go directly to the maintainers, toward work on Cashu Card. They buy no goods, services, or equity, and they are not tax deductible.</p>
@@ -86,6 +88,25 @@
       <a class="give-btn primary" data-ln-open href="#"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h12v4"/><path d="M4 7v11a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg>Open in wallet</a>
       <button type="button" class="give-btn" data-copy="invoice"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg><span data-copy-label>Copy invoice</span></button>
     </div>
+  </div>
+
+  <div data-step="cashu" tabindex="-1" hidden>
+    <div class="give-bar"><button type="button" class="give-back" data-back><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Change amount</button>
+      <div class="give-amount"><b data-cu-amount></b><span data-cu-usd></span></div></div>
+    <div class="give-qr" data-cu-qr></div>
+    <p class="give-status" data-cu-status data-kind="loading"><span class="pulse"></span><span class="give-status-text">Creating your payment request</span></p>
+    <div class="give-actions" data-cu-actions hidden>
+      <button type="button" class="give-btn primary" data-copy="request"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg><span data-copy-label>Copy request</span></button>
+    </div>
+    <p class="give-note">Scan with a Cashu wallet that pays requests, such as Cashu.me or Minibits.</p>
+    <details class="give-more give-paste" data-cu-paste>
+      <summary>Paste a token instead</summary>
+      <label class="give-label" for="give-cu-token">Cashu token</label>
+      <textarea class="give-token" id="give-cu-token" data-cu-token rows="3" placeholder="cashuB..." spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <p class="give-error" data-cu-error role="alert" hidden></p>
+      <button type="button" class="give-btn primary give-redeem" data-cu-redeem>Give this token</button>
+      <p>The token carries its own amount, so the amount above does not apply.</p>
+    </details>
   </div>
 
   <div data-step="onchain" tabindex="-1" hidden>
@@ -117,7 +138,7 @@
         <div><dt>Raised so far</dt><dd><span data-raised>0</span> sats<small data-raised-usd></small></dd></div>
         <div><dt>Gifts</dt><dd data-gifts>0</dd></div>
       </dl>
-      <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Any wallet works.</b> Pay by Lightning, BOLT12, or on-chain from the wallet you already use.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>Every gift is public.</b> Amounts and dates appear in the ledger below. Names appear only when you ask.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
+      <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Any wallet works.</b> Pay by Lightning, BOLT12, Cashu eCash, or on-chain from the wallet you already use.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>Every gift is public.</b> Amounts and dates appear in the ledger below. Names appear only when you ask.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
     </div>
   </div>
 
