@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#10271e" />
+    <meta name="description" content="What a donation to Cashu Card pays for, how to send one, and where every sat went." />
+    <meta property="og:title" content="Fund the work | Cashu Card" />
+    <meta property="og:description" content="What a donation to Cashu Card pays for, how to send one, and where every sat went." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cashucard.org/fund" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://cashucard.org/fund" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/guide.css" />
+    <script src="/guide.js" defer></script>
+    <title>Fund the work | Cashu Card</title>
+  <style>
+.give{margin:16px 0 20px}
+.give-label{margin:0 0 10px}
+.give-amounts{display:flex;flex-wrap:wrap;gap:8px}
+.give-amounts button{font:inherit;color:inherit;background:transparent;border:1px solid rgba(128,128,128,.45);border-radius:10px;padding:9px 14px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;min-width:112px}
+.give-amounts button b{font-weight:600}
+.give-amounts button .give-usd{font-size:.8em;opacity:.7;min-height:1em}
+.give-amounts button[aria-pressed="true"]{outline:2px solid currentColor;outline-offset:1px}
+.give-custom{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}
+.give-custom input{font:inherit;color:inherit;background:transparent;border:1px solid rgba(128,128,128,.45);border-radius:10px;padding:9px 12px;width:230px;max-width:100%}
+.give-custom button{min-width:0;justify-content:center}
+.give-result{margin-top:16px;display:grid;gap:10px;justify-items:start}
+.give-result[hidden]{display:none}
+.give-qr svg{width:220px;height:220px;max-width:100%;background:#fff;border-radius:12px;padding:10px;box-sizing:content-box}
+.give-sats{margin:0;font-weight:600}
+.give-actions{margin:0;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.give-actions button{font:inherit;color:inherit;background:transparent;border:1px solid rgba(128,128,128,.45);border-radius:8px;padding:6px 10px;cursor:pointer}
+.give-pr{font-size:.75em;word-break:break-all;opacity:.8;max-width:100%}
+.give-status{margin:8px 0 0;min-height:1.4em;opacity:.85}
+</style>
+</head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
+      <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers">Developers</a><a href="/fund">Fund</a></nav>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main" class="guide">
+      <section class="guide-hero" aria-labelledby="fund-title">
+        <div class="guide-hero-inner">
+          <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> FUND</div>
+          <h1 id="fund-title">Fund <em>the work</em></h1>
+          <p class="guide-lead">Cashu Card is built by a very small team and paid for out of pocket. Here is what the next stretch needs, how to send sats toward it, and where every sat went.</p>
+          <ul class="guide-facts" aria-label="At a glance"><li>Lightning, on-chain, or a grant</li><li>Every receipt listed below</li><li>MIT, whatever happens</li></ul>
+        </div>
+      </section>
+
+      <div class="guide-layout">
+        <nav class="guide-rail" aria-label="On this page">
+          <span class="rail-label">On this page</span>
+          <ol><li><a href="#what">What it pays for</a></li><li><a href="#send">How to send</a></li><li><a href="#grants">Grants and larger gifts</a></li><li><a href="#ledger">Where it went</a></li><li><a href="#other">Other ways to help</a></li></ol>
+        </nav>
+        <article class="guide-doc">
+          <section id="what" aria-labelledby="what-title">
+            <h2 id="what-title">What it pays for</h2>
+            <p>The card works on real hardware today. The gap between a working prototype and a card people can trust is a list of specific jobs, each with a price. Donations go to the first unfunded item on this list, in order.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Job</th><th>Why it comes first</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td>Independent security review of the applet, NUT-CCP, and the host tools</td><td>No one outside the project has reviewed the design yet. The first review will change it, so it comes before cards reach more hands.</td><td>Unfunded</td></tr>
+                  <tr><td>Silicon tests: tear-off, timing, and skimming range</td><td>These attacks are untested on real chips. They need lab time, a few dozen cards, and someone whose job is to break them.</td><td>Unfunded</td></tr>
+                  <tr><td>Printed card runs for pilots</td><td>Blank cards cost $6 to $12 each in small lots. A run of 500 printed cards puts the card in the hands that will find the next problem.</td><td>Unfunded</td></tr>
+                  <tr><td>Field pilots with community mints</td><td>Tills, cards, and operator support for the first communities that issue cards on their own mint.</td><td>Unfunded</td></tr>
+                  <tr><td>Development time</td><td>The protocol, applet, apps, and ops service are maintained by people who need to eat. A month of funded time is a month of fixes shipped.</td><td>Unfunded</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="note">Costs are posted here as quotes come in. When an item is funded, its row says so and the receipts appear in <a href="#ledger">Where it went</a>.</p>
+          </section>
+
+          <section id="send" aria-labelledby="send-title">
+            <h2 id="send-title">How to send</h2>
+            <p>Donations are received by Island Bitcoin LLC, which runs cashucard.org, ops.cashucard.org, and the Provisioner app. They are gifts toward the work on this page, with no goods, services, or equity in return, and they are not tax deductible.</p>
+<div class="give" data-site="cashucard">
+  <p class="give-label">Pick an amount and scan the code with any Lightning wallet.</p>
+  <div class="give-amounts" role="group" aria-label="Donation amounts"><button type="button" data-sats="2100"><b>2,100 sats</b><span class="give-usd"></span></button><button type="button" data-sats="21000"><b>21,000 sats</b><span class="give-usd"></span></button><button type="button" data-sats="100000"><b>100,000 sats</b><span class="give-usd"></span></button><button type="button" data-sats="500000"><b>500,000 sats</b><span class="give-usd"></span></button><button type="button" data-sats="2100000"><b>2,100,000 sats</b><span class="give-usd"></span></button>
+    <form class="give-custom"><input type="number" inputmode="numeric" min="1000" max="10000000" step="1" placeholder="Other amount in sats" aria-label="Other amount in sats" required><button type="submit">Create invoice</button></form>
+  </div>
+  <div class="give-result" hidden>
+    <div class="give-qr" aria-hidden="true"></div>
+    <p class="give-sats"></p>
+    <p class="give-actions"><a class="give-open" href="#">Open in wallet</a> <button type="button" class="give-copy">Copy invoice</button></p>
+    <code class="give-pr"></code>
+  </div>
+  <p class="give-status" role="status" aria-live="polite"></p>
+</div>
+            <ul>
+              <li><strong>Lightning address:</strong> <code>ecashcard@islandbitcoin.com</code></li>
+              <li><strong>BOLT12:</strong> the same address, <code>ecashcard@islandbitcoin.com</code>, resolves over DNS (BIP 353, DNSSEC signed) to this offer: <code style="word-break:break-all">lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0q0gsqx3j445ynpk7nfjzdzqnl9zj8vw2cqjyhmkvdcyu62efg5njyqsrggl23h65zv9500zu399ju6p55qah7kyg8zqs9nsl9thpa3guvfxsqv7cgxhpf7h8rawu9kwajz4xpksvnyq46ehjm6fr5fpkx5vtd2lgnzmwa3306ms647jl8tjamg0070xla32wqwj0xvpk7r377pttart5mf75y9ddcnfwlwrw7ehuk4gwmmgj9d5ewqqsnzsmn2gehgn4vr2su9hlvfseeg</code></li>
+              <li><strong>On-chain:</strong> <code id="onchain-address" data-site="cashucard">Loading the current address.</code> Each address is used once and replaced after it receives funds. <a id="onchain-link" href="https://donate.islandbitcoin.com/api/address?site=cashucard">The current address as JSON</a>, if it does not appear above.<br><img src="https://donate.islandbitcoin.com/api/address.svg?site=cashucard" alt="QR code of the current on-chain donation address" width="180" height="180" loading="lazy" style="margin-top:8px;background:#fff;border-radius:8px;padding:6px"></li>
+            </ul>
+            <p>If you want your gift listed by name below, say so in the Lightning message or email <a href="mailto:hello@cashucard.org">hello@cashucard.org</a> after sending. Gifts are listed as anonymous unless you ask otherwise.</p>
+          </section>
+
+          <section id="grants" aria-labelledby="grants-title">
+            <h2 id="grants-title">Grants and larger gifts</h2>
+            <p>Foundations and companies that want to fund a whole line item, such as the security review, can write to <a href="mailto:hello@cashucard.org">hello@cashucard.org</a>. We will send a one-page scope with the deliverable, the reviewer or vendor, the timeline, and what gets published at the end. Reviews and test reports funded this way are published in full in the repository.</p>
+            <p>The work so far was carried by grants from The Reynolds Foundation and the Human Rights Foundation under Project Island Resilience, and by Flash and Island Bitcoin.</p>
+          </section>
+
+          <section id="ledger" aria-labelledby="ledger-title">
+            <h2 id="ledger-title">Where it went</h2>
+            <p>Every donation and every payment it funded is listed here, newest first. The list is updated by hand when funds move.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>In or out</th><th>Amount</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td colspan="4">No donations received yet. This page went up in November 2026.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="other" aria-labelledby="other-title">
+            <h2 id="other-title">Other ways to help</h2>
+            <ul>
+              <li><strong>Break it.</strong> Audit the <a href="https://github.com/cashucard/cashucard">applet and host code</a> or the <a href="https://github.com/cashucard/nut/blob/main/CCP.md">draft NUT</a>, and report what you find to <a href="mailto:security@cashucard.org">security@cashucard.org</a>.</li>
+              <li><strong>Build on it.</strong> Add card support to your wallet or till. The <a href="/developers">developer page</a> has the protocol, the simulator, and the test vectors.</li>
+              <li><strong>Issue cards.</strong> Run cards on your own mint with the <a href="/guide">install guide</a> and an operator account on <a href="https://ops.cashucard.org">ops.cashucard.org</a>, load small amounts, and tell us what fails.</li>
+              <li><strong>Talk about it.</strong> Questions and ideas go in <a href="https://github.com/cashucard/cashucard/discussions">GitHub Discussions</a>.</li>
+            </ul>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="/fund">Fund the work</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
+  <script>(function(){var c=document.getElementById("onchain-address");if(!c)return;fetch("https://donate.islandbitcoin.com/api/address?site="+c.dataset.site,{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){if(d.address){c.textContent=d.address;}else{throw d;}}).catch(function(){c.textContent="The address did not load. Open the JSON link below.";});})();</script>
+<script>
+(function(){
+  var api="https://donate.islandbitcoin.com", box=document.querySelector(".give"); if(!box) return;
+  var site=box.dataset.site, status=box.querySelector(".give-status"), result=box.querySelector(".give-result");
+  var buttons=box.querySelectorAll(".give-amounts > button");
+  fetch(api+"/api/presets",{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){
+    (d.presets||[]).forEach(function(p){ buttons.forEach(function(b){ if(+b.dataset.sats===p.sats && p.usd!=null){ b.querySelector(".give-usd").textContent="about $"+(p.usd<10?p.usd.toFixed(2):Math.round(p.usd).toLocaleString("en-US")); } }); });
+  }).catch(function(){});
+  function invoice(sats, pressed){
+    buttons.forEach(function(b){ b.setAttribute("aria-pressed", b===pressed ? "true" : "false"); });
+    status.textContent="Creating an invoice for "+sats.toLocaleString("en-US")+" sats."; result.hidden=true;
+    fetch(api+"/api/invoice?site="+encodeURIComponent(site)+"&sats="+sats,{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){
+      if(!d.pr){ throw new Error(d.error||"no invoice"); }
+      box.querySelector(".give-qr").innerHTML=d.qr_svg;
+      box.querySelector(".give-sats").textContent=d.sats.toLocaleString("en-US")+" sats to ecashcard@islandbitcoin.com";
+      box.querySelector(".give-open").href="lightning:"+d.pr;
+      box.querySelector(".give-pr").textContent=d.pr;
+      result.hidden=false; status.textContent="The invoice is valid for 24 hours.";
+    }).catch(function(e){ status.textContent="The invoice could not be created ("+e.message+"). Pay the Lightning address below instead."; });
+  }
+  buttons.forEach(function(b){ b.addEventListener("click", function(){ invoice(+b.dataset.sats, b); }); });
+  box.querySelector(".give-custom").addEventListener("submit", function(e){ e.preventDefault(); var v=parseInt(e.target.querySelector("input").value,10); if(v>=1000&&v<=10000000){ invoice(v,null); } else { status.textContent="Enter an amount between 1,000 and 10,000,000 sats."; } });
+  box.querySelector(".give-copy").addEventListener("click", function(){ var pr=box.querySelector(".give-pr").textContent; navigator.clipboard.writeText(pr).then(function(){ status.textContent="Invoice copied."; }, function(){ status.textContent="Select the invoice text below and copy it."; }); });
+})();
+</script>
+</body>
+</html>
