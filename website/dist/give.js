@@ -226,9 +226,8 @@
       body.innerHTML = p.donations.slice(0, 50).map(function (d) {
         var date = d.date ? new Date(d.date * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Pending";
         var rail = d.rail === "onchain" ? "On-chain" : "Lightning";
-        var site = SITE_NAMES[d.site] || "Both cards";
-        return "<tr><td>" + date + "</td><td>In</td><td class=\"num\">" + fmt(d.amount_sat) + " sats</td><td>" + rail + ", for " + site +
-          (d.confirmed ? "" : " (unconfirmed)") + "</td></tr>";
+        return "<tr><td>" + date + "</td><td class=\"num\">" + fmt(d.amount_sat) + " sats</td><td>" + rail +
+          (d.confirmed ? "" : ", unconfirmed") + "</td></tr>";
       }).join("");
     }).catch(function () {});
   }

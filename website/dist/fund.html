@@ -36,7 +36,7 @@
     <div class="fund-intro">
       <p class="fund-eyebrow"><span class="dot"></span> Experimental <span aria-hidden="true">/</span> Fund</p>
       <h1>Fund <em>the work</em></h1>
-      <p class="fund-lede">Cashu Card is built by a very small team and paid for out of pocket. Each gift goes to the next job on the list, and every sat appears in the public ledger on this page.</p>
+      <p class="fund-lede">Cashu Card is built by a very small team and paid for out of pocket. Gifts pay for development, testing, and security work, and every sat appears in the public ledger on this page.</p>
     </div>
     <div class="fund-card-wrap">
 <div class="give" data-give data-api="https://donate.islandbitcoin.com" data-site="cashucard" data-contact="hello@cashucard.org" data-address="ecashcard@islandbitcoin.com" aria-labelledby="give-title">
@@ -61,7 +61,7 @@
     </div>
     <p class="give-hint" data-onchain-hint hidden>On-chain fees make small gifts costly. Lightning suits amounts under 100,000 sats.</p>
     <button type="button" class="give-cta" data-continue><span><span data-continue-label>Continue with 21,000 sats</span><br><small data-continue-usd>about $16</small></span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-    <p class="give-fine">Gifts go to Island Bitcoin LLC, which runs cashucard.org, ops.cashucard.org, and the Provisioner app, toward the work on this page. They buy no goods, services, or equity, and they are not tax deductible.</p>
+    <p class="give-fine">Gifts go directly to the maintainers, toward work on Cashu Card. They buy no goods, services, or equity, and they are not tax deductible.</p>
     <noscript><p class="give-noscript">This card needs JavaScript. Any Lightning wallet can still pay <b>ecashcard@islandbitcoin.com</b>.</p></noscript>
     <details class="give-more">
       <summary>Pay from your wallet directly</summary>
@@ -116,36 +116,29 @@
       <dl class="fund-stats">
         <div><dt>Raised so far</dt><dd><span data-raised>0</span> sats<small data-raised-usd></small></dd></div>
         <div><dt>Gifts</dt><dd data-gifts>0</dd></div>
-        <div><dt>Next job</dt><dd class="text">Security review<small>Unfunded</small></dd></div>
       </dl>
       <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Any wallet works.</b> Pay by Lightning, BOLT12, or on-chain from the wallet you already use.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>Every gift is public.</b> Amounts and dates appear in the ledger below. Names appear only when you ask.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
     </div>
   </div>
 
-  <section class="fund-section" id="what" aria-labelledby="what-title">
-    <div class="side"><p class="kicker">01 / The list</p><h2 id="what-title">What it pays for</h2>
-      <p>The gap between a working prototype and a card people can trust is a list of specific jobs. Gifts go to the first unfunded job, in order. Costs are posted as quotes come in.</p></div>
-    <ol class="jobs"><li><div><h3>Independent security review of the applet, NUT-CCP, and the host tools</h3><p>No one outside the project has reviewed the design yet. The first review will change it, so it comes before cards reach more hands.</p></div><span class="pill next">Next</span></li><li><div><h3>Silicon tests: tear-off, timing, and skimming range</h3><p>These attacks are untested on real chips. They need lab time, a few dozen cards, and someone whose job is to break them.</p></div><span class="pill">Unfunded</span></li><li><div><h3>Printed card runs for pilots</h3><p>Blank cards cost $6 to $12 each in small lots. A run of 500 printed cards puts the card in the hands that will find the next problem.</p></div><span class="pill">Unfunded</span></li><li><div><h3>Field pilots with community mints</h3><p>Tills, cards, and operator support for the first communities that issue cards on their own mint.</p></div><span class="pill">Unfunded</span></li><li><div><h3>Development time</h3><p>The protocol, applet, apps, and ops service are maintained by people who need to eat. A month of funded time is a month of fixes shipped.</p></div><span class="pill">Unfunded</span></li></ol>
-  </section>
-
   <section class="fund-section" id="ledger" aria-labelledby="ledger-title">
-    <div class="side"><p class="kicker">02 / The receipts</p><h2 id="ledger-title">Where it went</h2>
-      <p>Every gift appears here on its own, newest first. Spending is added by hand with a receipt when funds move. Gifts to Cashu Card and Fedimint Card share one fund.</p></div>
-    <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>In or out</th><th>Amount</th><th>Detail</th></tr></thead>
-      <tbody data-ledger><tr><td class="empty" colspan="4">No gifts yet. This page went up in November 2026.</td></tr></tbody></table></div>
+    <div class="side"><p class="kicker">01 / The receipts</p><h2 id="ledger-title">Where it went</h2>
+      <p>Every gift, newest first.</p></div>
+    <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Amount</th><th>Via</th></tr></thead>
+      <tbody data-ledger><tr><td class="empty" colspan="3">No gifts yet.</td></tr></tbody></table></div>
   </section>
 
   <section class="fund-section" id="grants" aria-labelledby="grants-title">
-    <div class="side"><p class="kicker">03 / Larger gifts</p><h2 id="grants-title">Grants and larger gifts</h2></div>
+    <div class="side"><p class="kicker">02 / Larger gifts</p><h2 id="grants-title">Grants and larger gifts</h2></div>
     <div class="fund-contact">
-      <p>Foundations and companies that want to fund a whole job, such as the security review, can write to us. We send a one-page scope with the deliverable, the reviewer or vendor, the timeline, and what gets published at the end. Reviews and test reports funded this way are published in full in the repository.</p>
-      <a class="give-cta" href="mailto:hello@cashucard.org?subject=Funding%20a%20job%20on%20the%20Cashu%20Card%20list"><span>Write to hello@cashucard.org</span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+      <p>Foundations and companies that want to fund a specific piece of work, such as an independent security review, can write to us. We send a one-page scope with the deliverable, the reviewer or vendor, the timeline, and what gets published at the end. Reviews and test reports funded this way are published in full in the repository.</p>
+      <a class="give-cta" href="mailto:hello@cashucard.org?subject=Funding%20Cashu%20Card"><span>Write to hello@cashucard.org</span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
       <p class="thanks-to">The work so far was carried by grants from The Reynolds Foundation and the Human Rights Foundation under Project Island Resilience, and by Flash and Island Bitcoin.</p>
     </div>
   </section>
 
   <section class="fund-section" id="other" aria-labelledby="other-title">
-    <div class="side"><p class="kicker">04 / Beyond sats</p><h2 id="other-title">Other ways to help</h2>
+    <div class="side"><p class="kicker">03 / Beyond sats</p><h2 id="other-title">Other ways to help</h2>
       <p>Gifts pay for time on the work. Scrutiny, code, and real use in the field help just as much.</p></div>
     <ul class="helps"><li><a href="https://github.com/cashucard/cashucard"><b>Break it</b><span>Audit the applet, the host code, and the draft NUT, and report what you find to security@cashucard.org.</span></a></li><li><a href="/developers"><b>Build on it</b><span>Add card support to your wallet or till. The developer page has the protocol, the simulator, and the test vectors.</span></a></li><li><a href="/guide"><b>Issue cards</b><span>Run cards on your own mint with the install guide and an operator account, load small amounts, and tell us what fails.</span></a></li><li><a href="https://github.com/cashucard/cashucard/discussions"><b>Talk about it</b><span>Questions and ideas go in GitHub Discussions.</span></a></li></ul>
   </section>

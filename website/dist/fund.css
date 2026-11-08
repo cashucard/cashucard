@@ -23,7 +23,7 @@
 .fund h1 { font-size: var(--f-h1-size, clamp(48px, 6.4vw, 92px)); line-height: .95; letter-spacing: var(--f-h1-track); font-weight: 800; margin: 26px 0 22px; color: var(--f-ink); text-wrap: balance; }
 .fund h1 em { font-style: normal; color: var(--f-accent); }
 .fund-lede { font-size: clamp(18px, 1.6vw, 21px); line-height: 1.45; color: var(--f-mist); max-width: 30em; margin: 0; }
-.fund-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 40px 0 0; background: var(--f-line); border: 1px solid var(--f-line); border-radius: var(--f-r-md); overflow: hidden; max-width: 560px; }
+.fund-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 40px 0 0; background: var(--f-line); border: 1px solid var(--f-line); border-radius: var(--f-r-md); overflow: hidden; max-width: 560px; }
 .fund-stats div { background: var(--f-bg-soft); padding: 18px 20px 16px; min-width: 0; }
 .fund-stats dt { font: var(--f-label-font); letter-spacing: .14em; text-transform: uppercase; color: var(--f-dim); }
 .fund-stats dd { margin: 8px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--f-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -141,17 +141,17 @@
 .give:not(.is-ready) [data-step="amount"] .give-cta { opacity: .6; }
 
 /* sections */
-.fund-section { border-top: 1px solid var(--f-line); padding: clamp(48px, 7vw, 88px) 0; display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: start; }
+.fund-section { border-top: 1px solid var(--f-line); padding: clamp(40px, 5vw, 64px) 0; display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: start; }
 .fund-section h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.05; letter-spacing: var(--f-h2-track); font-weight: 800; margin: 0; color: var(--f-ink); text-wrap: balance; }
 .fund-section .side p { color: var(--f-mist); font-size: 16px; line-height: 1.55; margin: 14px 0 0; }
 .fund-section .kicker { font: var(--f-eyebrow-font); letter-spacing: .16em; text-transform: uppercase; color: var(--f-eyebrow); margin: 0 0 14px; }
 .jobs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: job; }
-.jobs li { counter-increment: job; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 20px; border-radius: var(--f-r-md); background: var(--f-bg-soft); border: 1px solid var(--f-line); }
+.jobs li { counter-increment: job; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 18px; border-radius: var(--f-r-md); background: var(--f-bg-soft); border: 1px solid var(--f-line); }
 .jobs li::before { content: counter(job, decimal-leading-zero); font: 800 15px/1 var(--f-font); color: var(--f-accent-ink); background: var(--f-cta); width: 36px; height: 36px; border-radius: var(--f-r-sm); display: grid; place-items: center; }
 .jobs li:not(:first-child)::before { background: var(--f-well); color: var(--f-mist); border: 1px solid var(--f-line); }
-.jobs h3 { font-size: 18px; font-weight: 700; margin: 6px 0 6px; color: var(--f-ink); letter-spacing: -.01em; }
+.jobs h3 { font-size: 17px; font-weight: 700; margin: 0; line-height: 1.25; color: var(--f-ink); letter-spacing: -.01em; }
 .jobs p { margin: 0; color: var(--f-mist); font-size: 15.5px; line-height: 1.5; }
-.pill { font: var(--f-label-font); letter-spacing: .1em; text-transform: uppercase; padding: 6px 9px; border-radius: var(--f-r-pill); border: 1px solid var(--f-line-strong); color: var(--f-dim); white-space: nowrap; margin-top: 6px; }
+.pill { font: var(--f-label-font); letter-spacing: .1em; text-transform: uppercase; padding: 6px 9px; border-radius: var(--f-r-pill); border: 1px solid var(--f-line-strong); color: var(--f-dim); white-space: nowrap; }
 .pill.next { border-color: var(--f-accent); color: var(--f-accent); }
 .ledger { width: 100%; border-collapse: collapse; font-size: 15px; }
 .ledger-wrap { border: 1px solid var(--f-line); border-radius: var(--f-r-md); overflow-x: auto; background: var(--f-bg-soft); }
@@ -189,10 +189,8 @@
   .give-tabs { display: grid; grid-template-columns: 1fr 1fr; }
   .give-tabs button { justify-content: center; }
   .give-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fund-stats { grid-template-columns: 1fr 1fr; }
-  .fund-stats div:last-child { grid-column: 1 / -1; }
-  .jobs li { grid-template-columns: 36px minmax(0, 1fr); }
-  .jobs li .pill { grid-column: 2; justify-self: start; margin-top: 0; }
+  .jobs li { gap: 12px; padding: 12px 14px; }
+  .jobs h3 { font-size: 15.5px; }
   .helps { grid-template-columns: 1fr; }
   .give-actions { grid-template-columns: 1fr; }
   .give-more .give-row { grid-template-columns: 1fr; }
