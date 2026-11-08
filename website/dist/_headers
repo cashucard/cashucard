@@ -33,3 +33,8 @@ https://:worker.:subdomain.workers.dev/*
   Content-Type: application/yaml; charset=utf-8
   Content-Disposition: attachment; filename="compose.yaml"
   Cache-Control: public, max-age=0, must-revalidate, no-transform
+# The fund page runs the donation card: first-party scripts plus requests to the donations service.
+/fund
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; connect-src https://donate.islandbitcoin.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Cache-Control: public, max-age=0, must-revalidate, no-transform

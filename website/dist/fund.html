@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#10271e" />
+    <meta name="description" content="What a donation to Cashu Card pays for, how to send one, and where every sat went." />
+    <meta property="og:title" content="Fund the work | Cashu Card" />
+    <meta property="og:description" content="What a donation to Cashu Card pays for, how to send one, and where every sat went." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cashucard.org/fund" />
+    <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Cashu Card under the line “Cashu, now on a card.”" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://cashucard.org/fund" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/styles.css" />
+    <title>Fund the work | Cashu Card</title>
+<link rel="stylesheet" href="/fund.css">
+<link rel="preconnect" href="https://donate.islandbitcoin.com" crossorigin>
+</head>
+<body class="fund-backdrop">
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
+      <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers">Developers</a><a href="/fund">Fund</a></nav>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main id="main" class="fund">
+  <div class="fund-hero">
+    <div class="fund-intro">
+      <p class="fund-eyebrow"><span class="dot"></span> Experimental <span aria-hidden="true">/</span> Fund</p>
+      <h1>Fund <em>the work</em></h1>
+      <p class="fund-lede">Cashu Card is built by a very small team and paid for out of pocket. Gifts pay for development, testing, and security work, and every sat appears in the public ledger on this page.</p>
+    </div>
+    <div class="fund-card-wrap">
+<div class="give" data-give data-api="https://donate.islandbitcoin.com" data-site="cashucard" data-contact="hello@cashucard.org" data-address="ecashcard@islandbitcoin.com" aria-labelledby="give-title">
+  <div class="give-sr" aria-live="polite" data-live></div>
+
+  <div data-step="amount">
+    <div class="give-head">
+      <h2 class="give-title" id="give-title">Send a gift</h2>
+      <div class="give-tabs" role="tablist" aria-label="Payment method">
+        <button type="button" role="tab" data-rail="lightning" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg>Lightning</button>
+        <button type="button" role="tab" data-rail="onchain" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>On-chain</button>
+      </div>
+    </div>
+    <p class="give-label" id="give-amount-label">Amount in sats</p>
+    <div class="give-amounts" role="radiogroup" aria-labelledby="give-amount-label">
+      <button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="2100" aria-label="2,100 sats"><b>2,100</b><span data-usd>about $1.59</span></button><button type="button" class="give-chip" role="radio" aria-checked="true" data-sats="21000" aria-label="21,000 sats"><b>21,000</b><span data-usd>about $16</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="100000" aria-label="100,000 sats"><b>100,000</b><span data-usd>about $76</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="500000" aria-label="500,000 sats"><b>500,000</b><span data-usd>about $379</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="2100000" aria-label="2,100,000 sats"><b>2,100,000</b><span data-usd>about $1,593</span></button>
+      <button type="button" class="give-chip" role="radio" aria-checked="false" data-other><b>Other</b><span>Any amount</span></button>
+    </div>
+    <div class="give-custom" data-custom hidden>
+      <label class="give-field"><input data-custom-input id="give-custom-amount" name="amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Amount" aria-label="Amount in sats" autocomplete="off"><span>sats</span></label>
+      <small data-custom-usd></small>
+    </div>
+    <p class="give-hint" data-onchain-hint hidden>On-chain fees make small gifts costly. Lightning suits amounts under 100,000 sats.</p>
+    <button type="button" class="give-cta" data-continue><span><span data-continue-label>Continue with 21,000 sats</span><br><small data-continue-usd>about $16</small></span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
+    <p class="give-fine">Gifts go directly to the maintainers, toward work on Cashu Card. They buy no goods, services, or equity, and they are not tax deductible.</p>
+    <noscript><p class="give-noscript">This card needs JavaScript. Any Lightning wallet can still pay <b>ecashcard@islandbitcoin.com</b>.</p></noscript>
+    <details class="give-more">
+      <summary>Pay from your wallet directly</summary>
+      <div class="give-rows">
+        <div class="give-row"><div><span class="k">Lightning address</span><code id="ln-addr">ecashcard@islandbitcoin.com</code></div>
+          <div class="row-actions"><button type="button" class="give-btn" data-copy="#ln-addr"><span data-copy-label>Copy</span></button><button type="button" class="give-btn" data-qr-of="LIGHTNING:LNURL1DP68GURN8GHJ76TND3SKUERZD96XXMMFDCHXXMMD9UH8WETVDSKKKMN0WAHZ7MRWW4EXCUP0V43KZUMGVDSHYEQUPKSUW" aria-controls="qr-lnurl" aria-expanded="false">Show QR</button></div></div>
+        <div class="qr-pop" id="qr-lnurl" hidden></div>
+        <div class="give-row"><div><span class="k">BOLT12 offer</span><code class="offer" id="offer" data-copy-value="lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0q0gsqx3j445ynpk7nfjzdzqnl9zj8vw2cqjyhmkvdcyu62efg5njyqsrggl23h65zv9500zu399ju6p55qah7kyg8zqs9nsl9thpa3guvfxsqv7cgxhpf7h8rawu9kwajz4xpksvnyq46ehjm6fr5fpkx5vtd2lgnzmwa3306ms647jl8tjamg0070xla32wqwj0xvpk7r377pttart5mf75y9ddcnfwlwrw7ehuk4gwmmgj9d5ewqqsnzsmn2gehgn4vr2su9hlvfseeg">lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0q0gsqx3j445ynpk7nfjzdzqnl9zj8vw2cqjyhmkvdcyu62efg5njyqsrggl23h65zv9500zu399ju6p55qah7kyg8zqs9nsl9thpa3guvfxsqv7cgxhpf7h8rawu9kwajz4xpksvnyq46ehjm6fr5fpkx5vtd2lgnzmwa3306ms647jl8tjamg0070xla32wqwj0xvpk7r377pttart5mf75y9ddcnfwlwrw7ehuk4gwmmgj9d5ewqqsnzsmn2gehgn4vr2su9hlvfseeg</code></div>
+          <div class="row-actions"><button type="button" class="give-btn" data-copy="#offer"><span data-copy-label>Copy</span></button><button type="button" class="give-btn" data-qr-of="LNO1ZRXQ8PJW7QJLM68MTP7E3YVXEE4Y5XRGJHHYF2FXHLPHPCKRVEVH50U0Q0GSQX3J445YNPK7NFJZDZQNL9ZJ8VW2CQJYHMKVDCYU62EFG5NJYQSRGGL23H65ZV9500ZU399JU6P55QAH7KYG8ZQS9NSL9THPA3GUVFXSQV7CGXHPF7H8RAWU9KWAJZ4XPKSVNYQ46EHJM6FR5FPKX5VTD2LGNZMWA3306MS647JL8TJAMG0070XLA32WQWJ0XVPK7R377PTTART5MF75Y9DDCNFWLWRW7EHUK4GWMMGJ9D5EWQQSNZSMN2GEHGN4VR2SU9HLVFSEEG" aria-controls="qr-offer" aria-expanded="false">Show QR</button></div></div>
+        <div class="qr-pop" id="qr-offer" hidden></div>
+      </div>
+      <p>The address also resolves over DNS to the offer (BIP 353, DNSSEC signed), so wallets that support BOLT12 pay it directly.</p>
+    </details>
+  </div>
+
+  <div data-step="lightning" tabindex="-1" hidden>
+    <div class="give-bar"><button type="button" class="give-back" data-back><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Change amount</button>
+      <div class="give-amount"><b data-ln-amount></b><span data-ln-usd></span></div></div>
+    <div class="give-qr" data-ln-qr></div>
+    <p class="give-status" data-ln-status data-kind="loading"><span class="pulse"></span><span class="give-status-text">Creating your invoice</span><span class="expiry" data-ln-expiry></span></p>
+    <div class="give-actions" data-ln-actions hidden>
+      <a class="give-btn primary" data-ln-open href="#"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h12v4"/><path d="M4 7v11a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg>Open in wallet</a>
+      <button type="button" class="give-btn" data-copy="invoice"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg><span data-copy-label>Copy invoice</span></button>
+    </div>
+  </div>
+
+  <div data-step="onchain" tabindex="-1" hidden>
+    <div class="give-bar"><button type="button" class="give-back" data-back><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Change amount</button>
+      <div class="give-amount"><b data-oc-amount></b><span data-oc-usd></span></div></div>
+    <div class="give-qr" data-oc-qr></div>
+    <div class="give-rows">
+      <div class="give-row"><div><span class="k">Address</span><code data-oc-address></code></div><button type="button" class="give-btn" data-copy="[data-oc-address]"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg><span data-copy-label>Copy</span></button></div>
+      <div class="give-row"><div><span class="k">Amount in BTC</span><code data-oc-btc></code></div><button type="button" class="give-btn" data-copy="[data-oc-btc]"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg><span data-copy-label>Copy</span></button></div>
+    </div>
+    <p class="give-status" data-oc-status data-kind="loading"><span class="pulse"></span><span class="give-status-text">Getting a fresh address</span></p>
+    <div class="give-actions"><a class="give-btn primary" data-oc-open href="#"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h12v4"/><path d="M4 7v11a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg>Open in wallet</a><button type="button" class="give-btn" data-back>Done</button></div>
+  </div>
+
+  <div data-step="thanks" tabindex="-1" hidden>
+    <div class="give-thanks">
+      <svg class="give-check" viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="40"/><path d="M26 43l11 11 21-23"/></svg>
+      <h3>Thank you</h3>
+      <p class="amt" data-thanks-amount></p>
+      <p data-thanks-detail></p>
+      <p>Want your name on the ledger? Email us and we will list it.</p>
+      <div class="give-actions"><a class="give-btn primary" data-thanks-name href="mailto:hello@cashucard.org">Add your name</a><button type="button" class="give-btn" data-again>Give again</button></div>
+    </div>
+  </div>
+</div>
+</div>
+    <div class="fund-proof">
+      <dl class="fund-stats">
+        <div><dt>Raised so far</dt><dd><span data-raised>0</span> sats<small data-raised-usd></small></dd></div>
+        <div><dt>Gifts</dt><dd data-gifts>0</dd></div>
+      </dl>
+      <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Any wallet works.</b> Pay by Lightning, BOLT12, or on-chain from the wallet you already use.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>Every gift is public.</b> Amounts and dates appear in the ledger below. Names appear only when you ask.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
+    </div>
+  </div>
+
+  <section class="fund-section" id="ledger" aria-labelledby="ledger-title">
+    <div class="side"><p class="kicker">01 / The receipts</p><h2 id="ledger-title">Where it went</h2>
+      <p>Every gift, newest first.</p></div>
+    <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Amount</th><th>Via</th></tr></thead>
+      <tbody data-ledger><tr><td class="empty" colspan="3">No gifts yet.</td></tr></tbody></table></div>
+  </section>
+
+  <section class="fund-section" id="grants" aria-labelledby="grants-title">
+    <div class="side"><p class="kicker">02 / Larger gifts</p><h2 id="grants-title">Grants and larger gifts</h2></div>
+    <div class="fund-contact">
+      <p>Foundations and companies that want to fund a specific piece of work, such as an independent security review, can write to us. We send a one-page scope with the deliverable, the reviewer or vendor, the timeline, and what gets published at the end. Reviews and test reports funded this way are published in full in the repository.</p>
+      <a class="give-cta" href="mailto:hello@cashucard.org?subject=Funding%20Cashu%20Card"><span>Write to hello@cashucard.org</span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+      <p class="thanks-to">The work so far was carried by grants from The Reynolds Foundation and the Human Rights Foundation under Project Island Resilience, and by Flash and Island Bitcoin.</p>
+    </div>
+  </section>
+
+  <section class="fund-section" id="other" aria-labelledby="other-title">
+    <div class="side"><p class="kicker">03 / Beyond sats</p><h2 id="other-title">Other ways to help</h2>
+      <p>Gifts pay for time on the work. Scrutiny, code, and real use in the field help just as much.</p></div>
+    <ul class="helps"><li><a href="https://github.com/cashucard/cashucard"><b>Break it</b><span>Audit the applet, the host code, and the draft NUT, and report what you find to security@cashucard.org.</span></a></li><li><a href="/developers"><b>Build on it</b><span>Add card support to your wallet or till. The developer page has the protocol, the simulator, and the test vectors.</span></a></li><li><a href="/guide"><b>Issue cards</b><span>Run cards on your own mint with the install guide and an operator account, load small amounts, and tell us what fails.</span></a></li><li><a href="https://github.com/cashucard/cashucard/discussions"><b>Talk about it</b><span>Questions and ideas go in GitHub Discussions.</span></a></li></ul>
+  </section>
+</main>
+    <footer id="source" class="site-footer" aria-label="Protocol and code">
+      <div class="footer-groups">
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="/fund">Fund the work</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+      </div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+    </footer>
+  <script src="/qrcode.js" defer></script>
+<script src="/give.js" defer></script>
+</body>
+</html>
