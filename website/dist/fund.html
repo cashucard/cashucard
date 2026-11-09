@@ -41,6 +41,12 @@
     <div class="fund-card-wrap">
 <div class="give" data-give data-api="https://donate.islandbitcoin.com" data-site="cashucard" data-ecash-default="cashu" data-contact="hello@cashucard.org" data-address="ecashcard@islandbitcoin.com" aria-labelledby="give-title">
   <div class="give-sr" aria-live="polite" data-live></div>
+  <div class="give-scan" data-scan role="dialog" aria-label="Scan a QR code" hidden>
+    <video class="give-scan-video" data-scan-video playsinline muted></video>
+    <div class="give-scan-meter"><span data-scan-progress></span></div>
+    <p class="give-note" data-scan-status>Point the camera at the QR code in your wallet.</p>
+    <button type="button" class="give-btn" data-scan-cancel>Cancel</button>
+  </div>
 
   <div data-step="amount">
     <div class="give-head">
@@ -58,6 +64,7 @@
     <div class="give-fm" data-fm hidden>
       <label class="give-label" for="give-fm-notes">Fedimint eCash notes</label>
       <textarea class="give-token" id="give-fm-notes" data-fm-notes rows="4" placeholder="Paste the notes from your Fedimint wallet" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <button type="button" class="give-btn give-scan-open" data-scan-open="fm"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan QR code</button>
       <p class="give-error" data-fm-error role="alert" hidden></p>
       <p class="give-status" data-fm-status data-kind="loading" hidden><span class="pulse"></span><span class="give-status-text">Checking your notes with the federation</span></p>
       <button type="button" class="give-cta" data-fm-redeem><span>Give these notes</span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
@@ -117,6 +124,7 @@
       <summary>Paste a token instead</summary>
       <label class="give-label" for="give-cu-token">Cashu token</label>
       <textarea class="give-token" id="give-cu-token" data-cu-token rows="3" placeholder="cashuB..." spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <button type="button" class="give-btn give-scan-open" data-scan-open="cu"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>Scan a token</button>
       <p class="give-error" data-cu-error role="alert" hidden></p>
       <button type="button" class="give-btn primary give-redeem" data-cu-redeem>Give this token</button>
       <p>The token carries its own amount, so the amount above does not apply.</p>

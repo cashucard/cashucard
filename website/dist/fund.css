@@ -222,3 +222,12 @@
 .give-fm .give-status[hidden] { display: none; }
 .give-fm .give-cta { margin-top: 12px; }
 .give-fm .give-note { margin-top: 12px; }
+
+/* camera scan */
+.give-scan-open { margin-top: 10px; width: 100%; justify-content: center; }
+.give-scan { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; gap: 12px; padding: 22px; background: var(--f-card); border-radius: inherit; }
+.give-scan[hidden] { display: none; }
+.give-scan-video { width: 100%; flex: 1; min-height: 0; object-fit: cover; border-radius: var(--f-r-md); background: #000; }
+.give-scan-meter { height: 6px; border-radius: 999px; background: var(--f-well); border: 1px solid var(--f-line); overflow: hidden; }
+.give-scan-meter span { display: block; height: 100%; width: 0; background: var(--f-accent); transition: width .2s; }
+.give-scan .give-note { margin: 0; }
