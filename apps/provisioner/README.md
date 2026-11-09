@@ -65,7 +65,11 @@ so after a pull from Installing card on, the screen says to turn Replace on firs
   applet and its package. It never deletes the card manager. On a card that
   opens SCP03 (the J3R452) it reads the registry first and deletes none of the
   card's AIDs unless each one there is the card package's: that card comes with
-  the seller's NDEF tag at `D2760000850101`, and the install stops instead.
+  the seller's NDEF tag at `D2760000850101`, and the install stops instead. The
+  bench never deletes that tag; the installation tap does, when the registry
+  shows it is the seller's ([D182](../../docs/DECISIONS.md#d182)).
+- On a J3R452 at key version FF, as it ships, the bench's rotation makes first
+  contact: the card goes to version 01 and does not return to FF.
 - The bench refuses to remove a card applet that holds anything (an unspent or
   spent piece, an owner, a PIN or a record), with Replace on or off.
 - The readout never includes APDU bytes. It includes INS, lengths, SW and times.

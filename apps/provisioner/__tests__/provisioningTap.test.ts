@@ -13,9 +13,10 @@ import {
   fromHex,
   toHex,
   provision,
+  type RunEvent,
   type RunOptions,
 } from '../src/cardkit';
-import {FakeCard} from '@cashu-card/cardkit/testing';
+import {FakeCard, SELLER_APPLETS} from '@cashu-card/cardkit/testing';
 const key =
   '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
 const chip = 'cplc-v1:4790d3213180072976207515';
@@ -154,6 +155,114 @@ test("a J3R452 as the test card came, with the seller's NDEF tag at D27600008501
   expect(f.card.failedAuths).toBe(0);
   expect((await f.open()).snapshot().quarantine_reason).toBe(
     'verification-failed',
+  );
+});
+
+test("a J3R452 as it ships, at key version FF with the seller's NDEF tag, installs with replaceSellerTag and records the rotation at version 01 (first contact)", async () => {
+  const f = fixture(new FakeCard({scp: 3, sellerApplets: true, kvn: 0xff}));
+  const events: RunEvent[] = [];
+  const j = await f.open();
+  expect(
+    await runProvisioningTap(f.tx, j, SPIKE_KEYS, f.bind, {
+      ...options,
+      verifiedAt: () => 1700000000,
+      replaceSellerTag: true,
+      onEvent: event => events.push(event),
+    }),
+  ).toBe('record_pending');
+  expect(j.snapshot()).toMatchObject({
+    stage: 'record_pending',
+    installation_id: key,
+    gp_key_version: 1,
+  });
+  expect(JSON.parse(j.snapshot().frozen_record!)).toMatchObject({
+    gp_key_version: 1,
+    verified_stage: 'rotated',
+  });
+  expect(events.filter(e => e.type === 'sellerTagRemoved')).toHaveLength(1);
+  // one DELETE of the seller's tag before the strict read, the sweep's four, then first contact
+  const deletes = f.log.filter(c => c[1] === 0xe4);
+  expect(toHex(deletes[0].slice(7, 7 + deletes[0][6]))).toBe('D2760000850101');
+  expect(deletes).toHaveLength(5);
+  expect(f.log.filter(c => c[1] === 0xd8).map(c => c.slice(0, 4))).toEqual([
+    [0x84, 0xd8, 0x00, 0x81],
+  ]);
+  expect(f.card.kvn).toBe(1);
+  const seller = SELLER_APPLETS.map(a => a.instance);
+  expect(f.card.instanceAids()).toEqual([
+    ...seller.slice(0, 3),
+    'F04341534855434152444D',
+    'F043415348554341524401',
+    'D2760000850101',
+  ]);
+  expect(f.card.failedAuths).toBe(0);
+});
+
+test('a J3R452 that keeps its FF set beside ours at first contact is quarantined, never recorded at version 01', async () => {
+  const f = fixture(
+    new FakeCard({
+      scp: 3,
+      sellerApplets: true,
+      kvn: 0xff,
+      keepsShippedSet: 'new',
+    }),
+  );
+  expect(
+    await runProvisioningTap(f.tx, await f.open(), SPIKE_KEYS, f.bind, {
+      ...options,
+      verifiedAt: () => 1700000000,
+      replaceSellerTag: true,
+    }),
+  ).toBe('quarantined');
+  const saved = (await f.open()).snapshot();
+  expect(saved.quarantine_reason).toBe('verification-failed');
+  expect(saved.gp_key_version).toBeUndefined();
+  expect(saved.frozen_record).toBeUndefined();
+  // one PUT KEY; then the reopen read the key information (GET DATA E0), which still listed FF, and no login followed
+  expect(f.log.filter(c => c[1] === 0xd8)).toHaveLength(1);
+  expect(f.log.at(-1)).toEqual([0x80, 0xca, 0x00, 0xe0, 0x00]);
+  expect(f.card.shipped?.kvn).toBe(0xff);
+  expect(f.card.failedAuths).toBe(0);
+});
+
+test('without replaceSellerTag, a J3R452 at key version FF is quarantined before any DELETE, its key version left alone', async () => {
+  const f = fixture(new FakeCard({scp: 3, sellerApplets: true, kvn: 0xff}));
+  const seller = f.card.instanceAids();
+  expect(await f.tap(await f.open())).toBe('quarantined');
+  expect(destructive(f.log)).toEqual([]);
+  expect(f.card.instanceAids()).toEqual(seller);
+  expect(f.card.kvn).toBe(0xff);
+  expect((await f.open()).snapshot().quarantine_reason).toBe(
+    'verification-failed',
+  );
+});
+
+test("a J3R452 still on the seller's key set is quarantined as an authentication failure, with no login, DELETE or PUT KEY", async () => {
+  const f = fixture(
+    new FakeCard({
+      scp: 3,
+      sellerApplets: true,
+      kvn: 0xff,
+      keys: {
+        enc: Array.from(SPIKE_KEYS.mac),
+        mac: Array.from(SPIKE_KEYS.dek),
+        dek: Array.from(SPIKE_KEYS.enc),
+      },
+    }),
+  );
+  const seller = f.card.instanceAids();
+  expect(
+    await runProvisioningTap(f.tx, await f.open(), SPIKE_KEYS, f.bind, {
+      ...options,
+      verifiedAt: () => 1700000000,
+      replaceSellerTag: true,
+    }),
+  ).toBe('quarantined');
+  expect(f.log.filter(c => [0x82, 0xd8, 0xe4].includes(c[1]))).toEqual([]);
+  expect(f.card.instanceAids()).toEqual(seller);
+  expect(f.card.failedAuths).toBe(0);
+  expect((await f.open()).snapshot().quarantine_reason).toBe(
+    'authentication-failed',
   );
 });
 

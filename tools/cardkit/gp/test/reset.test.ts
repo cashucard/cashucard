@@ -3,7 +3,7 @@ import {randomBytes} from 'node:crypto';
 import test from 'node:test';
 import {resetOwnedCard, type ResetStage, type ResetOptions} from '../reset';
 import {cashuPlan, provision, rotateKeys} from '../provision';
-import {FACTORY_KEYS, SPIKE_KEYS} from '../scp02';
+import {FACTORY_KEYS, FACTORY_KVN, SHIPPED_KVN, SPIKE_KEYS} from '../scp02';
 import {ISD_AID} from '../aids';
 import {fromHex, toHex} from '../bytes';
 import {CPLC_09336120, FakeCard, pullAt} from '../../testing/fake-card';
@@ -124,9 +124,107 @@ test('an owned-card reset on a J3R452 (SCP03) ends on the public default 40..4F 
   assert.deepEqual([put[0][4], put[0][6]], [0x4e, 0x88]);
 });
 
+test('a reset stops guarded at key version FF, as at 00, with no login, DELETE or PUT KEY: only first contact moves a card off FF', async () => {
+  for (const scp of [2, 3] as const) {
+    const card = await installed(scp);
+    card.kvn = SHIPPED_KVN;
+    const saved: ResetStage[] = [];
+    const persist = async (s: ResetStage) => {
+      saved.push(s);
+    };
+    const result = await resetOwnedCard(card.transceive, options({persist}));
+    const where = `SCP0${scp}`;
+    assert.equal(result.ok, false, where);
+    assert.equal(result.kind, 'guarded', where);
+    // after the saved intent, as the version-00 guard: a retry stops in the same place
+    assert.deepEqual(saved, ['delete_intent'], where);
+    assert.equal(result.stage, 'delete_intent', where);
+    const sent = card.insLog();
+    assert.equal(
+      sent[sent.length - 1],
+      0x50,
+      `${where}: INITIALIZE UPDATE last`,
+    );
+    card.reset();
+    const retry = await resetOwnedCard(
+      card.transceive,
+      options({stage: 'delete_intent', persist}),
+    );
+    assert.equal(retry.kind, 'guarded', where);
+    assert.deepEqual(saved, ['delete_intent'], where);
+    assert.equal(
+      card.insLog().some(i => [0x82, 0xe4, 0xd8].includes(i)),
+      false,
+      `${where}: no 82, E4 or D8`,
+    );
+    assert.equal(card.instances.size, 3, where);
+    assert.equal(card.kvn, SHIPPED_KVN, where);
+    assert.equal(card.failedAuths, 0, where);
+  }
+});
+
+test('first contact, then an owned-card reset: a J3R452 that shipped at FF ends on the public default at 01, and installs and rotates again as a J3R180 does', async () => {
+  const card = new FakeCard({cplc: CPLC_09336120, scp: 3, kvn: SHIPPED_KVN});
+  const install = () =>
+    provision(card.transceive, cashuPlan(CASHU_LOAD_FILE), {
+      ...options(),
+      keys: FACTORY_KEYS,
+    });
+  assert.equal((await install()).ok, true);
+  const first = await rotateKeys(
+    card.transceive,
+    FACTORY_KEYS,
+    SPIKE_KEYS,
+    options(),
+  );
+  assert.equal(first.ok, true, first.reason);
+  assert.equal(first.firstContact, true);
+  assert.equal(card.kvn, FACTORY_KVN);
+  card.reset();
+  const reset = await resetOwnedCard(card.transceive, options());
+  assert.equal(reset.ok, true, reset.reason);
+  assert.equal(reset.keyVersion, FACTORY_KVN);
+  assert.equal(card.instances.size + card.packages.size, 0);
+  assert.equal(card.kvn, FACTORY_KVN);
+  assert.deepEqual(
+    [toHex(card.keys.enc), toHex(card.keys.mac), toHex(card.keys.dek)],
+    [toHex(FACTORY_KEYS.enc), toHex(FACTORY_KEYS.mac), toHex(FACTORY_KEYS.dek)],
+  );
+  // first contact's PUT KEY (P1 00), then the reset's, in place at 01
+  assert.deepEqual(
+    card.log.filter(a => a[1] === 0xd8).map(a => a.slice(0, 5)),
+    [
+      [0x84, 0xd8, 0x00, 0x81, 0x4e],
+      [0x84, 0xd8, 0x01, 0x81, 0x4e],
+    ],
+  );
+  card.reset();
+  const at = card.log.length;
+  assert.equal((await install()).ok, true);
+  const again = await rotateKeys(
+    card.transceive,
+    FACTORY_KEYS,
+    SPIKE_KEYS,
+    options(),
+  );
+  assert.equal(again.ok, true, again.reason);
+  assert.equal(again.firstContact, undefined);
+  assert.equal(again.keyVersion, FACTORY_KVN);
+  assert.deepEqual(
+    card.log
+      .slice(at)
+      .filter(a => a[1] === 0xd8)
+      .map(a => a.slice(0, 5)),
+    [[0x84, 0xd8, 0x01, 0x81, 0x4e]],
+    'in place at 01, as on a J3R180',
+  );
+  assert.equal(card.failedAuths, 0);
+});
+
 test('a reset takes the ISD alone: any other sdAid stops it guarded before its first APDU, with nothing saved', async () => {
-  // identity and the reset's registry read use the ISD until slice 2 (ENG-835);
-  // logged in elsewhere, a reset would save delete_intent and never get past the registry
+  // identity and the reset's registry read use the ISD until a security domain other
+  // than the ISD is needed (D182); logged in elsewhere, a reset would save
+  // delete_intent and never get past the registry
   const other = fromHex('A000000003000000');
   for (const scp of [2, 3] as const) {
     const card = await installed(scp);

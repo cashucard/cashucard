@@ -89,6 +89,21 @@ function exclusive<T>(
   return job;
 }
 
+/**
+ * What the operator is told when a run deleted a J3R452's seller tag, which
+ * cannot be undone (D182): removed when the card answered the DELETE with
+ * 9000, may have been when the answer never came.
+ */
+function sellerTagNote(
+  tag: 'removed' | 'unconfirmed' | undefined,
+): string | null {
+  return tag === 'removed'
+    ? "The seller's NFC tag on this card was removed, and it cannot be restored."
+    : tag === 'unconfirmed'
+    ? "The seller's NFC tag on this card may have been removed: the card did not confirm it."
+    : null;
+}
+
 export interface ProvisioningProviderOptions {
   storage?: JournalStorage;
   workspaces?: WorkspaceStorage;
@@ -332,6 +347,9 @@ function ProvisioningSession({
   });
   const busyRef = useRef(false);
   const cancelRequested = useRef(false);
+  // the seller-tag note of the operation's run, for the Stopped notice: a Stop
+  // turns off the run's own messages, and the tag is gone all the same (D182)
+  const stoppedTagNote = useRef<string | null>(null);
   const pausedByUser = useRef(false);
   const armedCancel = useRef<(() => Promise<void>) | null>(null);
   const actorGeneration = useRef(0);
@@ -463,6 +481,7 @@ function ProvisioningSession({
       const generation = actorGeneration.current;
       busyRef.current = true;
       cancelRequested.current = false;
+      stoppedTagNote.current = null;
       if (!resetOperation) {
         pausedByUser.current = false;
       }
@@ -525,13 +544,17 @@ function ProvisioningSession({
             setResetState(result.reset!);
           }
           if (cancelRequested.current) {
-            setNotice(
+            const stopped =
               resetOperation &&
-                'reset' in result &&
-                !result.snapshot.batch &&
-                (!result.reset || result.reset.journal.stage === 'complete')
+              'reset' in result &&
+              !result.snapshot.batch &&
+              (!result.reset || result.reset.journal.stage === 'complete')
                 ? 'Cancelled. You can check another card.'
-                : 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
+                : 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.';
+            setNotice(
+              stoppedTagNote.current
+                ? `${stopped} ${stoppedTagNote.current}`
+                : stopped,
             );
           } else if ('failure' in result) {
             setNotice(message(result.failure));
@@ -690,6 +713,12 @@ function ProvisioningSession({
     setInterruption(null);
     setLoadProgress(null);
     let lastPhase: string | undefined;
+    // a J3R452's seller tag that this run deleted, which cannot be undone (D182)
+    let sellerTag: 'removed' | 'unconfirmed' | undefined;
+    // true while the APDU in flight was refused by withCard's guard and never
+    // sent: cardkit reads that TransportError as a lost answer, and a seller-tag
+    // delete it then reports unconfirmed never went out
+    let unsentApdu = false;
     const actor = latest.current;
     const generation = actorGeneration.current;
     let inspection: {chipId: string; installationId: string} | undefined;
@@ -715,8 +744,10 @@ function ProvisioningSession({
       const guardedRun: typeof run = tx =>
         run(async apdu => {
           if (!allowed()) {
+            unsentApdu = true;
             throw new TransportError('Card session cancelled');
           }
+          unsentApdu = false;
           return tx(apdu);
         });
       const native = settings.withCard
@@ -747,6 +778,9 @@ function ProvisioningSession({
     };
     const outcome = await (settings.runCard ?? runReservedAttempt)(w, service, {
       withCard,
+      // a J3R452 ships with the seller's NDEF tag at the tag's AID: every tap
+      // deletes it, with no prompt, once the registry shows it is the seller's (D182)
+      replaceSellerTag: true,
       onReplacementRequired: value => {
         inspection = value;
       },
@@ -768,6 +802,17 @@ function ProvisioningSession({
       now: Date.now,
       verifiedAt: () => Math.floor(Date.now() / 1000),
       onEvent: event => {
+        if (event.type === 'sellerTagRemoved') {
+          // kept before the check below, which drops a stopped run's events:
+          // the tag is gone whether or not the operator pressed Stop, and the
+          // Stopped notice says so. Not so for an unconfirmed delete this
+          // phone refused to send after a Stop: the tag is still there, and
+          // the next run finds it.
+          if (event.confirmed === true || !unsentApdu) {
+            sellerTag = event.confirmed === true ? 'removed' : 'unconfirmed';
+            stoppedTagNote.current = sellerTagNote(sellerTag);
+          }
+        }
         if (!allowed()) {
           return;
         }
@@ -788,11 +833,21 @@ function ProvisioningSession({
         }
       },
     });
+    // an attempt that stops or loses the card says so beside its own message
+    // (operate adds it to the Stopped notice of a run the operator stopped)
+    const tagNote = sellerTagNote(sellerTag);
     if (allowed() && outcome === 'interrupted') {
       setInterruption(
         `Card connection lost. Last step: ${
           lastPhase ?? 'Not reported'
-        }. Keep this card with this phone. Choose Continue with the same card to check what finished. If it stops again, share support details with your administrator.`,
+        }. Keep this card with this phone. Choose Continue with the same card to check what finished. If it stops again, share support details with your administrator.${
+          tagNote ? ` ${tagNote}` : ''
+        }`,
+      );
+    }
+    if (allowed() && outcome === 'quarantined' && tagNote) {
+      setNotice(
+        `${tagNote} Mention it when you share support details with your administrator.`,
       );
     }
     if (allowed() && outcome === 'reset-required' && inspection) {

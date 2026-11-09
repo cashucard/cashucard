@@ -32,11 +32,13 @@ import {
   FACTORY_KEYS,
   SPIKE_KEYS,
   deleteAid,
+  getKeyInformation,
   installAndSelectable,
   installForLoad,
   parseCommand,
   parseFreeMemory,
   parseInitializeUpdate,
+  parseKeyInformation,
   parseReply,
   putKeys,
   splitLoad,
@@ -48,7 +50,6 @@ import {nodeScp03Kdf} from '../../testing/node-aes';
 import {
   formatGpExchange,
   parseGpLog,
-  parseKeyInformation,
   replay,
   type Exchange,
   type Replay,
@@ -216,6 +217,31 @@ describe('the gp -d log reader', () => {
       () => parseKeyInformation(fromHex('E00AC0080101FF8800100000')),
       /extended/,
     );
+    // a length form other than one byte or 81 and one is refused, not read as a short length
+    assert.throws(
+      () => parseKeyInformation(fromHex(`E082${'00'.repeat(130)}`)),
+      /length form/,
+    );
+    assert.throws(() => parseKeyInformation(fromHex('E080')), /length form/);
+    assert.deepEqual(parseKeyInformation(fromHex('E08100')), []);
+  });
+
+  it("reads the J3R452 test card's key information before and after first contact: AES keys 01 to 03 at FF, then at 01 (D182)", () => {
+    // the owner's gp runs of 2026-11-08 (not in the repository): GET DATA E0 with no secure channel
+    const aes = (kvn: number) =>
+      [1, 2, 3].map(id => ({
+        id,
+        kvn,
+        components: [{type: 0x88, length: 16}],
+      }));
+    assert.deepEqual(
+      parseKeyInformation(fromHex('E012C00401FF8810C00402FF8810C00403FF8810')),
+      aes(0xff),
+    );
+    assert.deepEqual(
+      parseKeyInformation(fromHex('E012C00401018810C00402018810C00403018810')),
+      aes(0x01),
+    );
   });
 });
 
@@ -238,6 +264,8 @@ describe('gate H0: the spare card through gp v25.10.20', () => {
             parseReply(x.reply).sw === 0x9000,
         );
       assert.ok(e, 'a GET DATA 00E0 the card answered with 9000');
+      // plain, no secure channel: the command first contact reads the key information with (D182)
+      assert.deepEqual(e!.command, getKeyInformation());
       assert.deepEqual(
         parseKeyInformation(parseReply(e!.reply!).data),
         [1, 2, 3].map(id => ({

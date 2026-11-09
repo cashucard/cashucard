@@ -20,7 +20,9 @@
  * - on an SCP03 card, the J3R452, a sweep of the Cashu AIDs deletes nothing
  *   until the registry shows every Cashu object there as the Cashu package's
  *   (registry.ts): that card ships with the seller's NDEF tag at
- *   D2760000850101, the AID the card's tag takes;
+ *   D2760000850101, the AID the card's tag takes. With `replaceSellerTag`
+ *   on, that tag is deleted first, and only when the registry shows it in the
+ *   seller's shape (readForeignTag, D182);
  * - DELETE names only the six AIDs of the whitelist, never the ISD (scp02.ts).
  */
 import {sha256} from '@noble/hashes/sha2';
@@ -37,14 +39,21 @@ import {
   TAG_CLASS_AID,
 } from './aids';
 import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
-import {RegistryEvidenceError, readCashuRegistry} from './registry';
+import {
+  RegistryEvidenceError,
+  readCashuRegistry,
+  readForeignTag,
+} from './registry';
 import {
   CardError,
   FACTORY_KEYS,
+  FACTORY_KVN,
   type FreeMemory,
+  type KeyInformation,
   type KeySet,
   type Random,
   type Reply,
+  SHIPPED_KVN,
   type SecureSession,
   type Transceiver,
   TransportError,
@@ -52,11 +61,13 @@ import {
   deleteAid,
   externalAuthenticate,
   getFreeMemory,
+  getKeyInformation,
   initializeUpdate,
   installAndSelectable,
   installForLoad,
   openSession,
   parseFreeMemory,
+  parseKeyInformation,
   putKeys,
   selectAid,
   sessionIfMatches,
@@ -217,7 +228,14 @@ export type RunEvent =
   | {type: 'phase'; phase: string}
   /** Emitted only after the LOAD response confirms this block. */
   | {type: 'block'; index: number; of: number}
-  | {type: 'apdu'; record: ApduRecord};
+  | {type: 'apdu'; record: ApduRecord}
+  /**
+   * The run sent DELETE of the seller's NDEF tag at TAG_AID (replaceSellerTag,
+   * D182), the one step of an install that cannot be undone: `confirmed` when
+   * the card answered 9000, false when its answer never came, so the tag may
+   * be gone. A refusal emits nothing: the tag is still there.
+   */
+  | {type: 'sellerTagRemoved'; confirmed: boolean};
 
 export interface RunOptions {
   random: Random;
@@ -232,8 +250,9 @@ export interface RunOptions {
    * card challenge is made over it, so a wrong one stops at WrongKeys, and an
    * SCP03 install reads the registry for it. resetOwnedCard takes the ISD
    * alone and stops guarded, before its first APDU, at any other: its
-   * identity read (identity.ts) and its registry read select the ISD until
-   * slice 2 (ENG-835) threads this through them.
+   * identity read (identity.ts) and its registry read select the ISD, and
+   * nothing threads this through them until a security domain other than the
+   * ISD is needed (D182).
    */
   sdAid?: Bytes;
 }
@@ -243,6 +262,15 @@ export interface ProvisionOptions extends RunOptions {
   replace?: boolean;
   /** The card manager's keys; the factory set by default. */
   keys?: KeySet;
+  /**
+   * On an SCP03 card, delete the seller's NDEF tag at TAG_AID before the
+   * sweep, when GET STATUS shows it in the seller's shape (readForeignTag:
+   * its own load file, in this security domain, selectable, no privileges).
+   * Off by default, and then such a card stops guarded with nothing deleted.
+   * The delete cannot be undone: the tag's NDEF data goes, and its package,
+   * D276000085, stays (D182).
+   */
+  replaceSellerTag?: boolean;
 }
 
 export interface RunResult<P extends string> {
@@ -261,7 +289,15 @@ export interface RunResult<P extends string> {
   blocks?: {at: number; of: number};
 }
 
-export type ProvisionResult = RunResult<Phase>;
+export interface ProvisionResult extends RunResult<Phase> {
+  /**
+   * True only when this run sent DELETE of the seller's NDEF tag at TAG_AID
+   * and the card answered 9000 (replaceSellerTag, D182). A DELETE whose answer
+   * never came leaves it false; the `sellerTagRemoved` event, unconfirmed,
+   * says the tag may be gone.
+   */
+  sellerTagRemoved: boolean;
+}
 
 /** How a run ended, before the bookkeeping is added. */
 interface Outcome {
@@ -279,6 +315,11 @@ export interface RotateResult extends RunResult<RotatePhase> {
   active?: 'from' | 'to';
   /** False when the card was already on `to` (a PUT KEY whose reply was lost). */
   rotated?: boolean;
+  /**
+   * True when this run made first contact (D182): PUT KEY P1 00 moved an SCP03
+   * card from SHIPPED_KVN to `to` at FACTORY_KVN, and the reopen proved it there.
+   */
+  firstContact?: boolean;
 }
 
 /** A refusal of this module's own, before the card is touched further. */
@@ -509,6 +550,7 @@ export async function provision(
   };
   let session: SecureSession | null = null;
   let blocks: number[][] = [];
+  let sellerTagRemoved = false;
   const open = (): SecureSession => {
     if (!session) {
       throw new Error('no secure channel');
@@ -573,19 +615,54 @@ export async function provision(
       const channel = open();
       // SCP03 is the J3R452's, which ships with the seller's NDEF tag at the
       // tag's AID (scp03-07): before a Cashu AID is deleted, the registry must
-      // show each Cashu object on the card as the package's. SCP02, the
-      // J3R180's, sends what it always has. What the seller's tag becomes is
-      // slice 2's (ENG-835).
+      // show each Cashu object on the card as the package's. With
+      // replaceSellerTag, the seller's tag goes first, and only when the
+      // registry shows that instance in the seller's shape; the strict read
+      // that follows then proves the delete (D182). SCP02, the J3R180's,
+      // sends what it always has.
       if (
         channel.scp === 3 &&
         plan.sweep.some(aid => CASHU_OBJECTS.some(o => equal(o, aid)))
       ) {
+        const send = (command: number[]) => channel.send(run.timed, command);
+        const noEvidence = `the card's registry does not show every Cashu AID as the card package's (a J3R452 ships with the seller's NDEF tag at ${toHex(TAG_AID)}): nothing was deleted`;
+        if (
+          options.replaceSellerTag &&
+          plan.sweep.some(aid => equal(aid, TAG_AID))
+        ) {
+          let foreign: boolean;
+          try {
+            foreign = await readForeignTag(send, sdAid);
+          } catch (e) {
+            if (e instanceof RegistryEvidenceError) {
+              throw new Guard(noEvidence);
+            }
+            throw e;
+          }
+          if (foreign) {
+            let reply: Reply;
+            try {
+              reply = await send(deleteAid(TAG_AID));
+            } catch (e) {
+              if (e instanceof TransportError) {
+                // sent, and no answer: the card may have deleted it before the field went
+                run.emit({type: 'sellerTagRemoved', confirmed: false});
+              }
+              throw e;
+            }
+            expectOk(reply, 0xe4);
+            sellerTagRemoved = true;
+            run.emit({type: 'sellerTagRemoved', confirmed: true});
+          }
+        }
         try {
-          await readCashuRegistry(c => channel.send(run.timed, c), sdAid);
+          await readCashuRegistry(send, sdAid);
         } catch (e) {
           if (e instanceof RegistryEvidenceError) {
             throw new Guard(
-              `the card's registry does not show every Cashu AID as the card package's (a J3R452 ships with the seller's NDEF tag at ${toHex(TAG_AID)}): nothing was deleted`,
+              sellerTagRemoved
+                ? `the seller's NDEF tag at ${toHex(TAG_AID)} was removed, and nothing else was: the card's registry still does not show every Cashu AID as the card package's`
+                : noEvidence,
             );
           }
           throw e;
@@ -654,6 +731,10 @@ export async function provision(
     done: async () => undefined,
   };
 
+  const result = (r: RunResult<Phase>): ProvisionResult => ({
+    ...r,
+    sellerTagRemoved,
+  });
   try {
     // the bytes first: a file that is not the build's sends nothing at all
     blocks = splitLoad(loadFileBytes(plan.loadFile), plan.blockSize);
@@ -663,22 +744,98 @@ export async function provision(
         await steps[phase]();
       }
     }
-    return run.finish({ok: true});
+    return result(run.finish({ok: true}));
   } catch (e) {
     if (e instanceof RangeError && blocks.length === 0) {
-      return run.fail(
-        new Guard(
-          `the ${plan.loadFile.name} load file cannot be sent: ${e.message}`,
+      return result(
+        run.fail(
+          new Guard(
+            `the ${plan.loadFile.name} load file cannot be sent: ${e.message}`,
+          ),
         ),
       );
     }
-    return run.fail(e);
+    return result(run.fail(e));
   }
 }
 
 export interface RotateOptions extends RunOptions {
-  /** PUT KEY's P1 and the new set's version; by default the active set's version for both (in place, as gp --lock does). */
+  /**
+   * PUT KEY's P1 and the new set's version. By default the active set's
+   * version for both (in place, as gp --lock does). P1 00 stops guarded on
+   * any card but one at first contact, and there this option is refused
+   * whatever it holds: first contact sends P1 00 and FACTORY_KVN only, and a
+   * run that finds the card at SHIPPED_KVN with `putKey` set stops guarded
+   * before EXTERNAL AUTHENTICATE.
+   */
   putKey?: {p1?: number; newKvn?: number};
+}
+
+/** The three keys PUT KEY put at first contact, as the key information lists them. */
+const FIRST_CONTACT_KEYS: readonly KeyInformation[] = [1, 2, 3].map(id => ({
+  id,
+  kvn: FACTORY_KVN,
+  components: [{type: 0x88, length: 16}],
+}));
+
+/** A key information listing in words, for a guard's reason. */
+function describeKeys(keys: readonly KeyInformation[]): string {
+  if (keys.length === 0) {
+    return 'no key';
+  }
+  return keys
+    .map(
+      k =>
+        `key ${toHex([k.id])} at version ${toHex([k.kvn])} (${k.components
+          .map(c => `type ${toHex([c.type])}, ${c.length} bytes`)
+          .join('; ')})`,
+    )
+    .join(', ');
+}
+
+/**
+ * Throws Guard unless GET DATA E0's answer after first contact is what the
+ * test card gave after its own (D182): 9000 and a key information template
+ * that lists no key at SHIPPED_KVN and holds the three AES-128 keys PUT KEY
+ * put at FACTORY_KVN, IDs 01 to 03, and nothing else.
+ */
+function checkFirstContactKeys(reply: Reply): void {
+  if (reply.sw !== 0x9000) {
+    throw new Guard(
+      `after first contact the card answered GET DATA E0 (its key information) with ${swHex(reply.sw)}, not 9000: whether it still holds the version-FF set is unknown`,
+    );
+  }
+  let keys: KeyInformation[];
+  try {
+    keys = parseKeyInformation(reply.data);
+  } catch {
+    throw new Guard(
+      `after first contact the card's key information did not parse (${toHex(reply.data)}): whether it still holds the version-FF set is unknown`,
+    );
+  }
+  if (keys.some(k => k.kvn === SHIPPED_KVN)) {
+    throw new Guard(
+      `after first contact the card still lists key version FF (${describeKeys(keys)}): its shipped set may still open it, beside ours at 01`,
+    );
+  }
+  const expected = (k: KeyInformation) =>
+    FIRST_CONTACT_KEYS.some(
+      e =>
+        e.id === k.id &&
+        e.kvn === k.kvn &&
+        k.components.length === 1 &&
+        k.components[0].type === e.components[0].type &&
+        k.components[0].length === e.components[0].length,
+    );
+  if (
+    keys.length !== FIRST_CONTACT_KEYS.length ||
+    !keys.every(expected) ||
+    new Set(keys.map(k => k.id)).size !== keys.length
+  ) {
+    throw new Guard(
+      `after first contact the card lists ${describeKeys(keys)}, where PUT KEY put keys 01 to 03 at version 01, AES-128, and nothing else`,
+    );
+  }
 }
 
 /**
@@ -687,6 +844,25 @@ export interface RotateOptions extends RunOptions {
  * was lost leaves the card on `to`, and that is found without a failed login.
  * EXTERNAL AUTHENTICATE goes out only for a set the card proved; then PUT KEY,
  * and a fresh secure channel under `to` to show the card took it.
+ *
+ * An SCP03 card at SHIPPED_KVN (FF, a J3R452 as it ships) gets first contact
+ * (D182): PUT KEY with P1 00 puts `to` at FACTORY_KVN (01), and the card
+ * should drop the FF set, as the test card did. The reopen checks both: it
+ * reads the key information with GET DATA E0, which needs no key, so no login
+ * is counted, and must find what the test card listed after its first
+ * contact: ours at 01 and nothing else, no key at FF among them. Then it must
+ * prove `to` at 01. Any other answer to the first, or `to` at another
+ * version, stops the run guarded, so a card that kept the FF set, or put ours
+ * elsewhere, is not reported rotated by this run. A pull after the PUT KEY and
+ * before those answers leaves the next run to find `to` at 01, as after any
+ * lost reply, and that run does not read the key information: it cannot tell
+ * the card from one rotated in place. Any other card has its set replaced in
+ * place, with the APDUs this sent before. Each of these stops guarded with
+ * nothing sent after INITIALIZE UPDATE: `to` proved at FF (only an in-place
+ * rotation of a shipped card puts it there, and the reset refuses FF), FF
+ * under SCP02 (never measured), a caller's `putKey` at first contact, and
+ * P1 00 on any card but one at first contact (it would add a set beside the
+ * one in place).
  */
 export async function rotateKeys(
   tx: Transceiver,
@@ -705,6 +881,9 @@ export async function rotateKeys(
     expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     run.enter('auth');
     const hs = await initializeUpdate(run.timed, options.random, 0, sdAid);
+    const kvn = hs.reply.kvn;
+    // a J3R452 as it ships: our set goes in at 01 and its FF set goes (D182)
+    const first = hs.reply.scp === 3 && kvn === SHIPPED_KVN;
     const fromKeys = sessionIfMatches(from, hs);
     const toKeys = fromKeys ? null : sessionIfMatches(to, hs);
     if (!fromKeys && !toKeys) {
@@ -713,14 +892,36 @@ export async function rotateKeys(
       );
     }
     if (toKeys) {
+      if (kvn === SHIPPED_KVN) {
+        throw new Guard(
+          'the card proved the new key set at version FF, where only an in-place rotation of a shipped card puts it and a reset refuses it: EXTERNAL AUTHENTICATE was not sent',
+        );
+      }
       await externalAuthenticate(run.timed, toKeys, hs, sessionOptions);
       run.enter('done');
       return {
         ...run.finish({ok: true}),
         active: 'to',
         rotated: false,
-        keyVersion: hs.reply.kvn,
+        keyVersion: kvn,
       };
+    }
+    if (first && options.putKey !== undefined) {
+      throw new Guard(
+        "first contact takes P1 00 and version 01 only, never a caller's putKey: EXTERNAL AUTHENTICATE was not sent",
+      );
+    }
+    const p1 = first ? 0x00 : (options.putKey?.p1 ?? kvn);
+    const newKvn = first ? FACTORY_KVN : (options.putKey?.newKvn ?? kvn);
+    if (kvn === SHIPPED_KVN && !first) {
+      throw new Guard(
+        'the card is at key version FF under SCP02, where first contact was never measured: EXTERNAL AUTHENTICATE was not sent',
+      );
+    }
+    if (p1 === 0x00 && !first) {
+      throw new Guard(
+        `PUT KEY with P1 00 would add a key set beside version ${toHex([kvn])}: EXTERNAL AUTHENTICATE was not sent`,
+      );
     }
     const session = await externalAuthenticate(
       run.timed,
@@ -729,26 +930,34 @@ export async function rotateKeys(
       sessionOptions,
     );
     run.enter('putKey');
-    const kvn = hs.reply.kvn;
-    const command = putKeys(to, session, {
-      p1: options.putKey?.p1 ?? kvn,
-      newKvn: options.putKey?.newKvn ?? kvn,
-    });
+    const command = putKeys(to, session, {p1, newKvn});
     expectOk(await session.send(run.timed, command), 0xd8);
     run.enter('reopen');
     expectOk(await run.plain(selectAid(sdAid)), 0xa4);
+    if (first) {
+      // the test card dropped its FF set when PUT KEY P1 00 added ours: GET
+      // DATA E0, plain, then listed ours at 01 alone, where it had listed the
+      // three at FF before; one that kept that set would still open to it
+      checkFirstContactKeys(await run.plain(getKeyInformation()));
+    }
     const reopened = await openSession(
       run.timed,
       to,
       options.random,
       sessionOptions,
     );
+    if (first && reopened.keyVersion !== FACTORY_KVN) {
+      throw new Guard(
+        `after first contact the card proved the new key set at version ${toHex([reopened.keyVersion ?? 0])}; PUT KEY asked for 01`,
+      );
+    }
     run.enter('done');
     return {
       ...run.finish({ok: true}),
       active: 'to',
       rotated: true,
       keyVersion: reopened.keyVersion,
+      ...(first ? {firstContact: true} : {}),
     };
   } catch (e) {
     return run.fail(e);

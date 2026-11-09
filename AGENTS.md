@@ -283,6 +283,12 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   registry before its sweep deletes anything: the J3R452 comes with the
   seller's NDEF tag at `D2760000850101`, the tag's AID, and only a registry
   that shows every Cashu AID as the Cashu package's lets the sweep run.
+  **[D182](docs/DECISIONS.md#d182)** adds the J3R452's first contact: with
+  `replaceSellerTag`, which the provisioner's tap passes and the bench does
+  not, the install first deletes that tag, and only when the registry shows it
+  in the seller's shape; `rotateKeys` moves a card at key version FF to 01
+  with PUT KEY P1 `00`, then needs the key information (GET DATA `E0`, which
+  takes no key) to list ours at 01 alone, FF gone, and the reset refuses FF.
 
 ## Rules for agents
 

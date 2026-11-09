@@ -15,6 +15,7 @@ import {rotateKeys, type RunOptions, type StopKind} from './provision';
 import {
   CardError,
   FACTORY_KEYS,
+  SHIPPED_KVN,
   TransportError,
   WrongKeys,
   deleteAid,
@@ -99,9 +100,10 @@ export async function resetOwnedCard(
       !a.intentReceipt?.trim() ||
       a.eraseOwnerAndProofs !== true ||
       a.valueHandled !== true ||
-      // the ISD alone: identity (identity.ts) and the registry read below use it
-      // until slice 2 (ENG-835) threads sdAid through them, and a reset logged in
-      // to another domain would save delete_intent, then stop at the registry for good
+      // the ISD alone: identity (identity.ts) and the registry read below use it,
+      // and nothing threads sdAid through them until a security domain other than
+      // the ISD is needed (D182); a reset logged in to another domain would save
+      // delete_intent, then stop at the registry for good
       (options.sdAid !== undefined && !equal(options.sdAid, ISD_AID))
     )
       throw new ResetGuard();
@@ -138,7 +140,11 @@ export async function resetOwnedCard(
     const selected = await transmit(tx, selectAid(ISD_AID));
     if (selected.sw !== 0x9000) throw new CardError(selected.sw, 0xa4);
     const hs = await initializeUpdate(tx, options.random, 0, ISD_AID);
-    if (hs.reply.kvn === 0) throw new ResetGuard(); // PUT KEY P1=0 adds a set rather than replacing it.
+    // PUT KEY P1=0 adds a set rather than replacing it; FF is a J3R452's shipped
+    // set, which only first contact moves (rotateKeys, D182). Elsewhere the
+    // public default goes back in place, at the version observed: 01 on both chips.
+    if (hs.reply.kvn === 0 || hs.reply.kvn === SHIPPED_KVN)
+      throw new ResetGuard();
     const afterDeletion =
       stage === 'rotation_intent' || stage === 'factory_verified';
     const source =

@@ -10,7 +10,18 @@
  * (SCP02's moves at EXTERNAL AUTHENTICATE), C-MACs chained through the full
  * CMAC, replies with no R-MAC, and PUT KEY of AES keys only, decrypted under
  * the static DEK and refused (6A80) when a check value does not match, so a
- * wrong DEK shows. Under either protocol:
+ * wrong DEK shows. Its PUT KEY replaces the set in place (P1 the current
+ * version) and takes P1 00 only on a card at version FF (`kvn: 0xff`, a
+ * J3R452 as it ships), for a new version from 01 to 7F: the new set then
+ * replaces the FF set, as the test card did at first contact (GET DATA E0
+ * afterwards listed version 01 alone). With `keepsShippedSet` it keeps the FF
+ * set beside the new one instead, which the test card did not do, so the
+ * guard against such a card has one to catch. GET DATA E0, plain or under the
+ * C-MAC, lists the keys of every set it holds (the key information template:
+ * C0 04, the key ID, the version, the type, 10), keys 01 to 03 of each,
+ * DES3 (80) under SCP02 and AES (88) under SCP03, the FF set a first contact
+ * kept first. INITIALIZE UPDATE that names a version the card does not hold
+ * answers 6A88. Under either protocol:
  *
  * - the opener rule: the INSTALL that is a package's first instantiation and
  *   runs a heavy constructor goes mute (the reader gives up) or answers 6F00,
@@ -100,6 +111,16 @@ export interface FakeCardOptions {
    * default, a blank card.
    */
   sellerApplets?: boolean;
+  /**
+   * What the test card did not do at first contact, for the guard that
+   * catches it: PUT KEY with P1 00 at version FF keeps the FF set beside the
+   * new one ({@link FakeCard.shipped}), so GET DATA E0 lists both sets,
+   * INITIALIZE UPDATE with P1 FF still opens under the FF set, and P1 00, the
+   * card's choice, then picks the new set (`'new'`) or the FF set
+   * (`'shipped'`). Unset, the new set replaces the FF set, as the test card's
+   * did.
+   */
+  keepsShippedSet?: 'new' | 'shipped';
 }
 
 /**
@@ -171,6 +192,8 @@ export class FakeCard {
   mute = false;
   keys: StaticKeys;
   kvn: number;
+  /** The FF set a first contact left beside the new one (`keepsShippedSet`); null when there is none. */
+  shipped: {keys: StaticKeys; kvn: number} | null = null;
   seq: number;
   readonly scp: 2 | 3;
   /** The card manager's AID, hex. */
@@ -194,6 +217,7 @@ export class FakeCard {
     dek: Bytes;
   } | null = null;
   private challengeCounter = 0;
+  private readonly keepsShippedSet: 'new' | 'shipped' | undefined;
   private readonly opts: Required<
     Omit<
       FakeCardOptions,
@@ -205,6 +229,7 @@ export class FakeCard {
       | 'freeNonVolatile'
       | 'cplc'
       | 'sellerApplets'
+      | 'keepsShippedSet'
     >
   >;
 
@@ -217,6 +242,7 @@ export class FakeCard {
     this.seq = options.seq ?? (this.scp === 3 ? 0 : 0x0009);
     this.free = options.freeNonVolatile ?? 164176;
     this.cplc = options.cplc ?? CPLC_09336320;
+    this.keepsShippedSet = options.keepsShippedSet;
     this.opts = {
       macOverModifiedApdu: options.macOverModifiedApdu ?? true,
       openerRule: options.openerRule ?? 'mute',
@@ -385,6 +411,24 @@ export class FakeCard {
     return sw(0x6d00);
   }
 
+  /**
+   * The key set INITIALIZE UPDATE's P1 names, 00 being the card's choice, or
+   * null for a version the card does not hold (6A88). Only a first contact
+   * with `keepsShippedSet` leaves a second set.
+   */
+  private keySet(p1: number): {keys: StaticKeys; kvn: number} | null {
+    const shipped = this.shipped;
+    if (
+      shipped &&
+      (p1 === shipped.kvn || (p1 === 0 && this.keepsShippedSet === 'shipped'))
+    ) {
+      return shipped;
+    }
+    return p1 === 0 || p1 === this.kvn
+      ? {keys: this.keys, kvn: this.kvn}
+      : null;
+  }
+
   private deriveSession(seq: number) {
     const s = [seq >> 8, seq & 0xff];
     const d = (key: Bytes, c: number[]) =>
@@ -402,7 +446,8 @@ export class FakeCard {
       if (this.lockedOut) {
         return sw(0x6983);
       }
-      if (p1 !== 0 && p1 !== this.kvn) {
+      const set = this.keySet(p1);
+      if (!set) {
         return sw(0x6a88);
       }
       if (apdu[4] !== 8 || apdu.length < 13) {
@@ -411,7 +456,7 @@ export class FakeCard {
       this.endSessions();
       const host = apdu.slice(5, 13);
       if (this.scp === 3) {
-        return this.initializeUpdate03(host);
+        return this.initializeUpdate03(host, set);
       }
       this.challengeCounter++;
       const card = [
@@ -526,10 +571,28 @@ export class FakeCard {
     if (cla === 0x80 && ins === 0xca && p1 === 0x9f && apdu[3] === 0x7f) {
       return sw(0x9000, fromHex(this.cplc));
     }
+    if (cla === 0x80 && ins === 0xca && p1 === 0x00 && apdu[3] === 0xe0) {
+      return this.keyInformation();
+    }
     if (ins === 0xe4 || ins === 0xe6 || ins === 0xe8 || ins === 0xd8) {
       return sw(0x6982);
     }
     return sw(0x6d00);
+  }
+
+  /**
+   * GET DATA E0, the key information template: keys 01 to 03 of every set
+   * the card holds, C0 04 <ID> <version> <type> 10, the FF set a first
+   * contact kept ({@link FakeCard.shipped}) first, as both chips answer it
+   * (E0 12 and three entries for one set).
+   */
+  private keyInformation(): Bytes {
+    const type = this.scp === 3 ? 0x88 : 0x80;
+    const versions = [...(this.shipped ? [this.shipped.kvn] : []), this.kvn];
+    const entries = versions.flatMap(kvn =>
+      [1, 2, 3].flatMap(id => [0xc0, 0x04, id, kvn, type, 0x10]),
+    );
+    return sw(0x9000, [0xe0, entries.length, ...entries]);
   }
 
   private freeMemory(): Bytes {
@@ -567,6 +630,9 @@ export class FakeCard {
   ): Bytes {
     if (ins === 0xca && p1 === 0xff && p2 === 0x21) {
       return this.freeMemory();
+    }
+    if (ins === 0xca && p1 === 0x00 && p2 === 0xe0) {
+      return this.keyInformation();
     }
     if (ins === 0xe4) {
       return this.delete(data);
@@ -782,25 +848,28 @@ export class FakeCard {
     return sw(0x9000, [data[0], ...kcvs[0], ...kcvs[1], ...kcvs[2]]);
   }
 
-  /** SCP03's INITIALIZE UPDATE: the counter moves first, then the challenge for it and this card's AID, then the cryptogram. */
-  private initializeUpdate03(host: Bytes): Bytes {
+  /** SCP03's INITIALIZE UPDATE under the set P1 named: the counter moves first, then the challenge for it and this card's AID, then the cryptogram. */
+  private initializeUpdate03(
+    host: Bytes,
+    set: {keys: StaticKeys; kvn: number},
+  ): Bytes {
     this.seq = (this.seq + 1) & 0xffffff;
     const seq = [
       (this.seq >> 16) & 0xff,
       (this.seq >> 8) & 0xff,
       this.seq & 0xff,
     ];
-    const card = nodeScp03Kdf(this.keys.enc, 0x02, 64, [
+    const card = nodeScp03Kdf(set.keys.enc, 0x02, 64, [
       ...seq,
       ...fromHex(this.isdAid),
     ]);
     const context = [...host, ...card];
-    const enc = nodeScp03Kdf(this.keys.enc, 0x04, 128, context);
-    const mac = nodeScp03Kdf(this.keys.mac, 0x06, 128, context);
-    this.handshake = {host, card, enc, mac, dek: this.keys.dek};
+    const enc = nodeScp03Kdf(set.keys.enc, 0x04, 128, context);
+    const mac = nodeScp03Kdf(set.keys.mac, 0x06, 128, context);
+    this.handshake = {host, card, enc, mac, dek: set.keys.dek};
     return sw(0x9000, [
       ...fromHex('0000936320C4A1B2C3D4'),
-      this.kvn,
+      set.kvn,
       0x03,
       0x10,
       ...card,
@@ -846,9 +915,20 @@ export class FakeCard {
     return sw(0x9000);
   }
 
-  /** SCP03's PUT KEY: three 88 11 10 <key under the static DEK> 03 <AES KCV> entries, in place. */
+  /**
+   * SCP03's PUT KEY: three 88 11 10 <key under the static DEK> 03 <AES KCV>
+   * entries, in place, or with P1 00 at version FF (first contact) to a new
+   * version from 01 to 7F, which then replaces the FF set, or with
+   * `keepsShippedSet` goes in beside it.
+   */
   private putKey03(s: Session, p1: number, p2: number, data: Bytes): Bytes {
-    if (p1 !== this.kvn || p2 !== 0x81 || data.length !== 1 + 3 * 23) {
+    const firstContact =
+      p1 === 0x00 && this.kvn === 0xff && data[0] >= 0x01 && data[0] <= 0x7f;
+    if (
+      (p1 !== this.kvn && !firstContact) ||
+      p2 !== 0x81 ||
+      data.length !== 1 + 3 * 23
+    ) {
       return sw(0x6a80);
     }
     const keys: Bytes[] = [];
@@ -872,6 +952,9 @@ export class FakeCard {
       }
       keys.push(key);
       kcvs.push(kcv);
+    }
+    if (firstContact && this.keepsShippedSet) {
+      this.shipped = {keys: this.keys, kvn: this.kvn};
     }
     this.keys = {enc: keys[0], mac: keys[1], dek: keys[2]};
     this.kvn = data[0];

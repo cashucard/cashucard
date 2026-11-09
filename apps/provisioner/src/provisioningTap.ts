@@ -36,6 +36,12 @@ export type TapOutcome =
 export interface TapOptions extends RunOptions {
   /** Legacy callers cannot authorize factory-key replacement; ignored. */
   replacementInstallationId?: string;
+  /**
+   * The install deletes a J3R452's seller NDEF tag at the tag's AID, on the
+   * registry's evidence that it is the seller's (cardkit's replaceSellerTag,
+   * D182). Off, such a card is quarantined with nothing deleted.
+   */
+  replaceSellerTag?: boolean;
   /** Public inspection only; caller must wait for session closure before review. */
   onReplacementRequired?: (inspection: {
     chipId: string;

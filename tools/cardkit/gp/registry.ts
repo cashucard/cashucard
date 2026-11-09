@@ -114,6 +114,27 @@ export function parseRegistryEntries(data: Bytes): RegistryEntry[] {
     };
   });
 }
+/** One GET STATUS listing through `send`, every page of it, parsed; none at all (6A88) is []. */
+async function readEntries(
+  send: (command: number[]) => Promise<Reply>,
+  kind: RegistryKind,
+): Promise<RegistryEntry[]> {
+  const data: number[] = [];
+  for (let page = 0; page < 16; page++) {
+    const reply = await send(registryCommand(kind, page > 0));
+    if (reply.sw === 0x6a88 && page === 0 && reply.data.length === 0) return [];
+    if (reply.sw !== 0x9000 && reply.sw !== 0x6310)
+      throw new CardError(reply.sw, 0xf2);
+    if (
+      data.length + reply.data.length > 65535 ||
+      (reply.sw === 0x6310 && reply.data.length === 0)
+    )
+      throw new RegistryEvidenceError();
+    data.push(...reply.data);
+    if (reply.sw === 0x9000) return parseRegistryEntries(data);
+  }
+  throw new RegistryEvidenceError();
+}
 /**
  * Which Cashu objects the card holds, from GET STATUS of the applications and
  * of the load files, sent through `send` (a secure channel). Each must be the
@@ -126,26 +147,8 @@ export async function readCashuRegistry(
   send: (command: number[]) => Promise<Reply>,
   domain: Bytes = ISD_AID,
 ): Promise<CashuRegistry> {
-  const read = async (kind: RegistryKind): Promise<RegistryEntry[]> => {
-    const data: number[] = [];
-    for (let page = 0; page < 16; page++) {
-      const reply = await send(registryCommand(kind, page > 0));
-      if (reply.sw === 0x6a88 && page === 0 && reply.data.length === 0)
-        return [];
-      if (reply.sw !== 0x9000 && reply.sw !== 0x6310)
-        throw new CardError(reply.sw, 0xf2);
-      if (
-        data.length + reply.data.length > 65535 ||
-        (reply.sw === 0x6310 && reply.data.length === 0)
-      )
-        throw new RegistryEvidenceError();
-      data.push(...reply.data);
-      if (reply.sw === 0x9000) return parseRegistryEntries(data);
-    }
-    throw new RegistryEvidenceError();
-  };
-  const applications = await read('applications');
-  const packages = await read('load-files');
+  const applications = await readEntries(send, 'applications');
+  const packages = await readEntries(send, 'load-files');
   const packageId = toHex(CASHU_PACKAGE_AID),
     domainId = toHex(domain);
   const instances = [toHex(TAG_AID), toHex(CARD_AID), toHex(OPENER_AID)];
@@ -182,4 +185,33 @@ export async function readCashuRegistry(
     opener: applications.some(e => e.aid === instances[2]),
     package: hasPackage,
   };
+}
+/**
+ * Whether the instance at the tag's AID, D2760000850101, is another vendor's
+ * NDEF tag (the seller's, on a J3R452 as it ships), from GET STATUS of the
+ * applications alone, sent through `send` (a secure channel). False when no
+ * instance is there, or when the Cashu package made it (readCashuRegistry
+ * holds that one to the rest of its bar). True only for the seller's shape
+ * (scp03-07): made from a load file, in `domain` (the ISD by default),
+ * selectable (07), with no privileges. Anything else there, or a reply that
+ * does not parse, throws RegistryEvidenceError, and the caller deletes
+ * nothing on that evidence (D182).
+ */
+export async function readForeignTag(
+  send: (command: number[]) => Promise<Reply>,
+  domain: Bytes = ISD_AID,
+): Promise<boolean> {
+  const tag = (await readEntries(send, 'applications')).find(
+    e => e.aid === toHex(TAG_AID),
+  );
+  if (!tag || tag.loadFile === toHex(CASHU_PACKAGE_AID)) return false;
+  if (
+    tag.loadFile === null ||
+    tag.domain !== toHex(domain) ||
+    tag.lifeCycle !== 7 ||
+    !tag.privileges ||
+    tag.privileges.some(v => v !== 0)
+  )
+    throw new RegistryEvidenceError();
+  return true;
 }

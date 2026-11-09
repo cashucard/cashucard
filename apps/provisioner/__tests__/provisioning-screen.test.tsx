@@ -18,7 +18,7 @@ import {
   type ReservedAttempt,
 } from '../src/provisioningWorkflow';
 import type {JournalStorage} from '../src/journal';
-import {SPIKE_KEYS, fromHex, toHex} from '../src/cardkit';
+import {SPIKE_KEYS, TransportError, fromHex, toHex} from '../src/cardkit';
 import {FakeCard} from '@cashu-card/cardkit/testing';
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -152,6 +152,247 @@ test('distributed defaults allow authenticated installation without laboratory c
   expect(runCard).toHaveBeenCalledTimes(1);
   expect(flow.drill).toBeUndefined();
 });
+
+test("every reserved tap asks for replaceSellerTag, so a J3R452's seller tag is replaced with no prompt (D182)", async () => {
+  const f = fixture();
+  let tapOptions:
+    | Parameters<NonNullable<ProvisioningProviderOptions['runCard']>>[2]
+    | undefined;
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w,
+    _s,
+    options,
+  ) => {
+    tapOptions = options;
+    return 'interrupted';
+  };
+  await mount({...f, runCard, serviceFor: () => f.service});
+  await signIn();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(true);
+  });
+  await act(async () => {
+    await flow.program();
+  });
+  expect(tapOptions).toMatchObject({replaceSellerTag: true});
+});
+
+test.each([
+  [
+    'interrupted',
+    true,
+    "The seller's NFC tag on this card was removed, and it cannot be restored.",
+  ],
+  [
+    'interrupted',
+    false,
+    "The seller's NFC tag on this card may have been removed: the card did not confirm it.",
+  ],
+  [
+    'quarantined',
+    true,
+    "The seller's NFC tag on this card was removed, and it cannot be restored. Mention it when you share support details with your administrator.",
+  ],
+] as const)(
+  "an attempt %s after its run deleted a J3R452's seller tag (confirmed: %s) tells the operator, and one with no delete says nothing of it (D182)",
+  async (outcome, confirmed, note) => {
+    const f = fixture();
+    let sellerTag = true;
+    const runCard: NonNullable<ProvisioningProviderOptions['runCard']> =
+      async (w, service, options) => {
+        options.onEvent?.({type: 'phase', phase: 'sweep'});
+        if (sellerTag) {
+          options.onEvent?.({type: 'sellerTagRemoved', confirmed});
+        }
+        if (outcome === 'quarantined') {
+          await w.withAttempt(service, async j => {
+            await j.bind('cplc-v1:4790d3213041093361205547');
+            await j.quarantine('verification-failed');
+          });
+        }
+        return outcome;
+      };
+    const tree = await mount({
+      ...f,
+      hardwareValidated: true,
+      serviceFor: () => f.service,
+      runCard,
+    });
+    await signIn();
+    await act(async () => {
+      await flow.create(config);
+    });
+    await act(async () => {
+      await flow.program();
+    });
+    expect(flow.notice).toContain(note);
+    expect(text(tree)).toContain(note);
+    if (outcome === 'interrupted') {
+      expect(flow.notice).toContain(
+        'Card connection lost. Last step: Removing the old install.',
+      );
+      sellerTag = false;
+      await act(async () => {
+        await flow.program();
+      });
+      expect(flow.notice).toContain('Card connection lost.');
+      expect(flow.notice).not.toContain('seller');
+    }
+  },
+);
+
+test.each(['before', 'after'] as const)(
+  "an operator's Stop after a run deleted a J3R452's seller tag says so beside Stopped, with the delete reported %s the Stop (D182)",
+  async when => {
+    const f = fixture();
+    const removed =
+      "The seller's NFC tag on this card was removed, and it cannot be restored.";
+    let sellerTag = true;
+    let release!: () => void;
+    const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+      _w,
+      _s,
+      options,
+    ) => {
+      const stopped = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      options.onEvent?.({type: 'phase', phase: 'sweep'});
+      if (sellerTag && when === 'before') {
+        options.onEvent?.({type: 'sellerTagRemoved', confirmed: true});
+      }
+      // the LOAD that follows the delete takes seconds: the operator stops it here
+      await stopped;
+      if (sellerTag && when === 'after') {
+        options.onEvent?.({type: 'sellerTagRemoved', confirmed: true});
+      }
+      return 'interrupted';
+    };
+    const tree = await mount({
+      ...f,
+      hardwareValidated: true,
+      serviceFor: () => f.service,
+      runCard,
+    });
+    await signIn();
+    await act(async () => {
+      await flow.create(config);
+    });
+    const stopRun = async () => {
+      let running!: Promise<boolean>;
+      await act(async () => {
+        running = flow.program();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        flow.cancel();
+      });
+      expect(flow.notice).toBe('Stopping. Saved work stays on this phone.');
+      await act(async () => {
+        release();
+        await running;
+      });
+    };
+    await stopRun();
+    expect(flow.notice).toContain(
+      'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
+    );
+    expect(flow.notice).toContain(removed);
+    expect(text(tree)).toContain(removed);
+    // the Stop replaces the lost-card message: no interruption is shown for it
+    expect(flow.notice).not.toContain('Card connection lost.');
+    // the next run deleted nothing: its Stop says nothing of the seller's tag
+    sellerTag = false;
+    await stopRun();
+    expect(flow.notice).toContain('Stopped.');
+    expect(flow.notice).not.toContain('seller');
+  },
+);
+
+test.each([
+  ['refused by this phone before it went out', 'unsent', false],
+  ['sent, with the card gone before it answered', 'sent', true],
+] as const)(
+  "an operator's Stop while a J3R452's seller-tag DELETE is %s: the Stopped notice says the tag may be gone only when the DELETE went out (D182)",
+  async (_how, when, noted) => {
+    const f = fixture();
+    const mayBe =
+      "The seller's NFC tag on this card may have been removed: the card did not confirm it.";
+    let release!: () => void;
+    const stopped = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const sent: number[][] = [];
+    const withCard = jest.fn(async run =>
+      run(async (command: number[]) => {
+        sent.push(command);
+        if (when === 'sent') {
+          // the DELETE went out; the operator stops before the card answers
+          await stopped;
+        }
+        throw new TransportError('Tag connection lost');
+      }),
+    );
+    const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+      _w,
+      _s,
+      options,
+    ) => {
+      options.onEvent?.({type: 'phase', phase: 'sweep'});
+      return options.withCard(async tx => {
+        if (when === 'unsent') {
+          // readForeignTag's GET STATUS answered while the operator was
+          // stopping the run: the DELETE that follows is refused by this phone
+          await stopped;
+        }
+        try {
+          await tx([0x84, 0xe4, 0x00, 0x00, 0x00]);
+        } catch {
+          // cardkit's provision emits this from the catch of that same send
+          options.onEvent?.({type: 'sellerTagRemoved', confirmed: false});
+        }
+        return 'interrupted' as const;
+      });
+    };
+    const tree = await mount({
+      ...f,
+      hardwareValidated: true,
+      serviceFor: () => f.service,
+      runCard,
+      withCard,
+    });
+    await signIn();
+    await act(async () => {
+      await flow.create(config);
+    });
+    let running!: Promise<boolean>;
+    await act(async () => {
+      running = flow.program();
+      for (let i = 0; i < 20 && sent.length < (when === 'sent' ? 1 : 0); i++) {
+        await Promise.resolve();
+      }
+    });
+    await act(async () => {
+      flow.cancel();
+    });
+    expect(flow.notice).toBe('Stopping. Saved work stays on this phone.');
+    await act(async () => {
+      release();
+      await running;
+    });
+    expect(flow.notice).toContain(
+      'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
+    );
+    expect(sent).toHaveLength(when === 'sent' ? 1 : 0);
+    if (noted) {
+      expect(flow.notice).toContain(mayBe);
+      expect(text(tree)).toContain(mayBe);
+    } else {
+      expect(flow.notice).not.toContain('seller');
+      expect(text(tree)).not.toContain('seller');
+    }
+  },
+);
 
 test('unfinished batch requires confirmation to end and retains server closure', async () => {
   const f = fixture();
