@@ -38,7 +38,7 @@ import {
   TAG_AID,
   TAG_CLASS_AID,
 } from './aids';
-import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
+import {type Bytes, bytes, equal, fromHex, swHex, toHex} from './bytes';
 import {
   RegistryEvidenceError,
   readCashuRegistry,
@@ -61,6 +61,7 @@ import {
   externalAuthenticate,
   getFreeMemory,
   initializeUpdate,
+  initializeUpdateCommand,
   installAndSelectable,
   installForLoad,
   openSession,
@@ -227,11 +228,12 @@ export type RunEvent =
   | {type: 'block'; index: number; of: number}
   | {type: 'apdu'; record: ApduRecord}
   /**
-   * The run deleted the seller's NDEF tag at TAG_AID and the card answered
-   * 9000 (replaceSellerTag, D182): the one step of an install that cannot be
-   * undone.
+   * The run sent DELETE of the seller's NDEF tag at TAG_AID (replaceSellerTag,
+   * D182), the one step of an install that cannot be undone: `confirmed` when
+   * the card answered 9000, false when its answer never came, so the tag may
+   * be gone. A refusal emits nothing: the tag is still there.
    */
-  | {type: 'sellerTagRemoved'};
+  | {type: 'sellerTagRemoved'; confirmed: boolean};
 
 export interface RunOptions {
   random: Random;
@@ -288,7 +290,9 @@ export interface RunResult<P extends string> {
 export interface ProvisionResult extends RunResult<Phase> {
   /**
    * True only when this run sent DELETE of the seller's NDEF tag at TAG_AID
-   * and the card answered 9000 (replaceSellerTag, D182).
+   * and the card answered 9000 (replaceSellerTag, D182). A DELETE whose answer
+   * never came leaves it false; the `sellerTagRemoved` event, unconfirmed,
+   * says the tag may be gone.
    */
   sellerTagRemoved: boolean;
 }
@@ -634,9 +638,19 @@ export async function provision(
             throw e;
           }
           if (foreign) {
-            expectOk(await send(deleteAid(TAG_AID)), 0xe4);
+            let reply: Reply;
+            try {
+              reply = await send(deleteAid(TAG_AID));
+            } catch (e) {
+              if (e instanceof TransportError) {
+                // sent, and no answer: the card may have deleted it before the field went
+                run.emit({type: 'sellerTagRemoved', confirmed: false});
+              }
+              throw e;
+            }
+            expectOk(reply, 0xe4);
             sellerTagRemoved = true;
-            run.emit({type: 'sellerTagRemoved'});
+            run.emit({type: 'sellerTagRemoved', confirmed: true});
           }
         }
         try {
@@ -746,8 +760,11 @@ export async function provision(
 export interface RotateOptions extends RunOptions {
   /**
    * PUT KEY's P1 and the new set's version. By default the active set's
-   * version for both (in place, as gp --lock does), except at first contact,
-   * where they are 00 and FACTORY_KVN. P1 00 anywhere else stops guarded.
+   * version for both (in place, as gp --lock does). P1 00 stops guarded on
+   * any card but one at first contact, and there this option is refused
+   * whatever it holds: first contact sends P1 00 and FACTORY_KVN only, and a
+   * run that finds the card at SHIPPED_KVN with `putKey` set stops guarded
+   * before EXTERNAL AUTHENTICATE.
    */
   putKey?: {p1?: number; newKvn?: number};
 }
@@ -760,13 +777,22 @@ export interface RotateOptions extends RunOptions {
  * and a fresh secure channel under `to` to show the card took it.
  *
  * An SCP03 card at SHIPPED_KVN (FF, a J3R452 as it ships) gets first contact
- * (D182): PUT KEY with P1 00 puts `to` at FACTORY_KVN (01), the card drops
- * the FF set, and the reopen must prove `to` at 01. Any other card has its
- * set replaced in place, with the APDUs this sent before. Each of these stops
- * guarded with nothing sent after INITIALIZE UPDATE: `to` proved at FF (only
- * an in-place rotation of a shipped card puts it there, and the reset refuses
- * FF), FF under SCP02 (never measured), and P1 00 on any card but one at
- * first contact (it would add a set beside the one in place).
+ * (D182): PUT KEY with P1 00 puts `to` at FACTORY_KVN (01), and the card
+ * should drop the FF set, as the test card did. The reopen checks both: it
+ * names FF in an INITIALIZE UPDATE of its own, which must answer 6A88 (no
+ * such version; no EXTERNAL AUTHENTICATE follows it, so no login is counted),
+ * then it must prove `to` at 01. Any other answer to the first, or `to` at
+ * another version, stops the run guarded, so a card that kept the FF set, or
+ * put ours elsewhere, is not reported rotated by this run. A pull after the
+ * PUT KEY and before those answers leaves the next run to find `to` at 01, as
+ * after any lost reply, and that run does not ask for FF: it cannot tell the
+ * card from one rotated in place. Any other card has its set replaced in
+ * place, with the APDUs this sent before. Each of these stops guarded with
+ * nothing sent after INITIALIZE UPDATE: `to` proved at FF (only an in-place
+ * rotation of a shipped card puts it there, and the reset refuses FF), FF
+ * under SCP02 (never measured), a caller's `putKey` at first contact, and
+ * P1 00 on any card but one at first contact (it would add a set beside the
+ * one in place).
  */
 export async function rotateKeys(
   tx: Transceiver,
@@ -810,8 +836,13 @@ export async function rotateKeys(
         keyVersion: kvn,
       };
     }
-    const p1 = options.putKey?.p1 ?? (first ? 0x00 : kvn);
-    const newKvn = options.putKey?.newKvn ?? (first ? FACTORY_KVN : kvn);
+    if (first && options.putKey !== undefined) {
+      throw new Guard(
+        "first contact takes P1 00 and version 01 only, never a caller's putKey: EXTERNAL AUTHENTICATE was not sent",
+      );
+    }
+    const p1 = first ? 0x00 : (options.putKey?.p1 ?? kvn);
+    const newKvn = first ? FACTORY_KVN : (options.putKey?.newKvn ?? kvn);
     if (kvn === SHIPPED_KVN && !first) {
       throw new Guard(
         'the card is at key version FF under SCP02, where first contact was never measured: EXTERNAL AUTHENTICATE was not sent',
@@ -833,6 +864,20 @@ export async function rotateKeys(
     expectOk(await session.send(run.timed, command), 0xd8);
     run.enter('reopen');
     expectOk(await run.plain(selectAid(sdAid)), 0xa4);
+    if (first) {
+      // the test card dropped its FF set when PUT KEY P1 00 added ours; one
+      // that kept it would still open to that set, so name FF and need 6A88
+      const shipped = await run.plain(
+        initializeUpdateCommand(bytes(options.random(8)), SHIPPED_KVN),
+      );
+      if (shipped.sw !== 0x6a88) {
+        throw new Guard(
+          shipped.sw === 0x9000
+            ? 'the card still answers key version FF after first contact: its shipped set may still open it, beside ours at 01'
+            : `after first contact the card answered INITIALIZE UPDATE for key version FF with ${swHex(shipped.sw)}, not 6A88: whether it still holds that set is unknown`,
+        );
+      }
+    }
     const reopened = await openSession(
       run.timed,
       to,
@@ -841,7 +886,7 @@ export async function rotateKeys(
     );
     if (first && reopened.keyVersion !== FACTORY_KVN) {
       throw new Guard(
-        `after first contact the card proved the new key set at version ${toHex([reopened.keyVersion ?? 0])}, not 01: it may hold a set beside it`,
+        `after first contact the card proved the new key set at version ${toHex([reopened.keyVersion ?? 0])}; PUT KEY asked for 01`,
       );
     }
     run.enter('done');

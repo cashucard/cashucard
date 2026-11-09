@@ -5475,19 +5475,30 @@ rotates and resets as a J3R180 does:
   INITIALIZE UPDATE answers. On an SCP03 card at `SHIPPED_KVN` (FF) it sends
   PUT KEY with P1 `00` and new version `FACTORY_KVN` (01), as
   `gp --lock … --new-keyver 1` did to the test card, which answered with the
-  new version and three check values and then listed version 01 alone. The
-  reopen must prove the new set at 01, else the run stops `guarded`: a card
-  that kept both sets, or put ours elsewhere, never passes as rotated.
-  `RotateResult.firstContact` says so. Every other card has its set replaced
-  in place with the APDUs it got before, byte for byte (`rotate.test.ts` pins
-  them at 1382268). Each of these stops `guarded` with nothing sent after
-  INITIALIZE UPDATE: the new set already proved at FF (only an in-place
-  rotation of a shipped card puts it there), FF under SCP02 (never measured),
-  and P1 `00` on any card but one at first contact, a card at version 00
-  included. Wrong bytes for the shipped set stop at `wrongKeys`, as before,
-  because the card's proof is checked offline. A lost PUT KEY reply leaves the
-  card at 01 under the new set, which the next run finds with no second PUT
-  KEY; P1 `00` needs an observed FF, so it is never sent twice.
+  new version and three check values and then listed version 01 alone. A
+  caller does not steer that PUT KEY: a `putKey` option at first contact
+  stops the run `guarded` before EXTERNAL AUTHENTICATE. The reopen then checks
+  that the card did what the test card did. It names FF in an INITIALIZE
+  UPDATE of its own, which must answer `6A88`, referenced data not found,
+  GlobalPlatform's answer for a version the card does not hold; no EXTERNAL
+  AUTHENTICATE follows it, so it costs no login. Then it must prove the new
+  set at 01. Any other answer to the first, or the new set at another
+  version, stops the run `guarded`: a card that kept the FF set beside ours,
+  whichever set it then picks for P1 `00`, or put ours elsewhere, is not
+  reported rotated by that run. `RotateResult.firstContact` says when it was.
+  A pull after the PUT KEY and before those answers leaves the next run to
+  find the new set at 01, as after any lost reply, and that run does not name
+  FF: it cannot tell the card from one rotated in place. Every other card has
+  its set replaced in place with the APDUs it got before, byte for byte
+  (`rotate.test.ts` pins them at 1382268). Each of these stops `guarded` with
+  nothing sent after INITIALIZE UPDATE: the new set already proved at FF
+  (only an in-place rotation of a shipped card puts it there), FF under SCP02
+  (never measured), a caller's `putKey` at first contact, and P1 `00` on any
+  card but one at first contact, a card at version 00 included. Wrong bytes
+  for the shipped set stop at `wrongKeys`, as before, because the card's
+  proof is checked offline. A lost PUT KEY reply leaves the card at 01 under
+  the new set, which the next run finds with no second PUT KEY; P1 `00` needs
+  an observed FF, so a card that drops the FF set never gets it twice.
 - **The seller's tag goes inside the sweep, behind an option.**
   `ProvisionOptions.replaceSellerTag`, off by default, makes an SCP03 install
   whose sweep names the tag's AID read GET STATUS of the applications first
@@ -5500,14 +5511,22 @@ rotates and resets as a J3R180 does:
   [D181](#d181) then runs as before and proves the delete; when it still fails,
   the guard says the seller's tag went and nothing else did. The seller's
   package, `D276000085`, stays: it is not on the whitelist, and what it holds
-  in memory is unmeasured. The delete cannot be undone, so the run records it:
-  `ProvisionResult.sellerTagRemoved`, true only for a DELETE answered 9000,
-  and a `sellerTagRemoved` run event. A lost DELETE reply is found by the next
-  run, which sees no foreign tag. No phase, journal stage or service change.
+  in memory is unmeasured. The delete cannot be undone, so the run reports it
+  to its caller: `ProvisionResult.sellerTagRemoved`, true only for a DELETE
+  answered 9000, and a `sellerTagRemoved` run event, confirmed for that answer
+  and unconfirmed for a DELETE whose answer never came, after which the tag
+  may be gone. A lost DELETE reply is found by the next run, which sees no
+  foreign tag. No phase, journal stage or service change.
 - **The provisioner passes it on every reserved tap, with no prompt** (the
-  owner's decision). The bench, and every other caller of `provision`, sends
-  the APDUs it sent before. The bench's rotation makes first contact on a card
-  at FF, as any caller of `rotateKeys` does.
+  owner's decision), and tells the operator what went: when the attempt then
+  loses the card or stops for review, the screen says the seller's tag was
+  removed and cannot be restored, or may have been, beside the stop's own
+  message. The notice is held in memory only and goes when the screen moves
+  on or the app restarts: the attempt's journal does not hold it, and a
+  journal field is a schema change this slice does not make, so the support
+  details do not carry it either. The bench, and every other caller of
+  `provision`, sends the APDUs it sent before. The bench's rotation makes
+  first contact on a card at FF, as any caller of `rotateKeys` does.
 - **The reset refuses FF** before EXTERNAL AUTHENTICATE, as it refuses 00, so
   it never reaches first contact. Elsewhere it restores the public default in
   place at the version observed: 01 on a J3R180, and 01 on a J3R452 after first
@@ -5529,20 +5548,27 @@ rotation the tap already journals (`rotation_intent`), with the recovery that
 rotation already has: one INITIALIZE UPDATE checked offline against both sets.
 
 **Proven, and not yet.** The fake card models PUT KEY P1 `00` at FF as the test
-card behaved, and the tests run first contact, a pull at every APDU of it, the
-tag's delete with a pull at every APDU of the install, the guards, and first
-contact followed by a reset and a second install. Silicon is unmeasured for the
-DELETE (P2 `00`) of the seller's instance under SCP03 (only a package delete
-with P2 `80` is traced, `scp03-10`), for our tag installing beside the
-still-loaded `D276000085`, and for in-place PUT KEY at 01 on a J3R452. First
+card behaved, and, with `keepsShippedSet`, a card that keeps the FF set beside
+ours, which the reopen stops whichever set the card picks for P1 `00`. The
+tests run first contact, a pull at every APDU of it, the tag's delete with a
+pull at every APDU of the install, the guards, and first contact followed by a
+reset and a second install. Silicon is unmeasured for the DELETE (P2 `00`) of
+the seller's instance under SCP03 (only a package delete with P2 `80` is
+traced, `scp03-10`), for our tag installing beside the still-loaded
+`D276000085`, for in-place PUT KEY at 01 on a J3R452, and for the chip's answer
+to an INITIALIZE UPDATE naming FF after first contact: the test card's `gp`
+runs never sent one, and `6A88` is the GlobalPlatform answer the fake gives. A
+chip that answers anything else stops every first contact `guarded` after its
+PUT KEY, our set at 01, and the attempt is quarantined, never recorded. First
 contact rests on one `gp` run on one card, which is not in the repository, so
 no transcript test covers it, and an agent never writes a fixture. Slice 3
-(ENG-839) runs these on the owner's go and reads the key information after
-first contact. A J3R452 still on the seller's keys stops at `wrongKeys` and is
-quarantined (`authentication-failed`), its reservation used: importing the
-seller's key file waits until a seller-keyed batch is bought (the brief's D2).
-cardkit stays 0.2.0, as [D181](#d181) left it; the bump moves with the review
-of the outbox-spike runners.
+(ENG-839) runs these on the owner's go, reads the key information after first
+contact, and records the answer to INITIALIZE UPDATE P1 `FF` there. A J3R452
+still on the seller's keys stops at `wrongKeys` and is quarantined
+(`authentication-failed`), its reservation used: importing the seller's key
+file waits until a seller-keyed batch is bought (the brief's D2). cardkit stays
+0.2.0, as [D181](#d181) left it; the bump moves with the review of the
+outbox-spike runners.
 
 **Rejected.** Deleting the seller's tag by default in cardkit (the delete
 cannot be undone, so a caller asks for it); a `firstContact` flag from the

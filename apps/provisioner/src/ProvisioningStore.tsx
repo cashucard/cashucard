@@ -690,6 +690,8 @@ function ProvisioningSession({
     setInterruption(null);
     setLoadProgress(null);
     let lastPhase: string | undefined;
+    // a J3R452's seller tag that this run deleted, which cannot be undone (D182)
+    let sellerTag: 'removed' | 'unconfirmed' | undefined;
     const actor = latest.current;
     const generation = actorGeneration.current;
     let inspection: {chipId: string; installationId: string} | undefined;
@@ -788,14 +790,30 @@ function ProvisioningSession({
           event.index <= event.of
         ) {
           setLoadProgress({index: event.index, of: event.of});
+        } else if (event.type === 'sellerTagRemoved') {
+          sellerTag = event.confirmed === true ? 'removed' : 'unconfirmed';
         }
       },
     });
+    // an attempt that stops or loses the card says so beside its own message
+    const tagNote =
+      sellerTag === 'removed'
+        ? "The seller's NFC tag on this card was removed, and it cannot be restored."
+        : sellerTag === 'unconfirmed'
+        ? "The seller's NFC tag on this card may have been removed: the card did not confirm it."
+        : null;
     if (allowed() && outcome === 'interrupted') {
       setInterruption(
         `Card connection lost. Last step: ${
           lastPhase ?? 'Not reported'
-        }. Keep this card with this phone. Choose Continue with the same card to check what finished. If it stops again, share support details with your administrator.`,
+        }. Keep this card with this phone. Choose Continue with the same card to check what finished. If it stops again, share support details with your administrator.${
+          tagNote ? ` ${tagNote}` : ''
+        }`,
+      );
+    }
+    if (allowed() && outcome === 'quarantined' && tagNote) {
+      setNotice(
+        `${tagNote} Mention it when you share support details with your administrator.`,
       );
     }
     if (allowed() && outcome === 'reset-required' && inspection) {

@@ -198,6 +198,33 @@ test("a J3R452 as it ships, at key version FF with the seller's NDEF tag, instal
   expect(f.card.failedAuths).toBe(0);
 });
 
+test('a J3R452 that keeps its FF set beside ours at first contact is quarantined, never recorded at version 01', async () => {
+  const f = fixture(
+    new FakeCard({
+      scp: 3,
+      sellerApplets: true,
+      kvn: 0xff,
+      keepsShippedSet: 'new',
+    }),
+  );
+  expect(
+    await runProvisioningTap(f.tx, await f.open(), SPIKE_KEYS, f.bind, {
+      ...options,
+      verifiedAt: () => 1700000000,
+      replaceSellerTag: true,
+    }),
+  ).toBe('quarantined');
+  const saved = (await f.open()).snapshot();
+  expect(saved.quarantine_reason).toBe('verification-failed');
+  expect(saved.gp_key_version).toBeUndefined();
+  expect(saved.frozen_record).toBeUndefined();
+  // one PUT KEY; then the reopen named FF, the card answered under that set, and no login followed
+  expect(f.log.filter(c => c[1] === 0xd8)).toHaveLength(1);
+  expect(f.log.at(-1)!.slice(0, 3)).toEqual([0x80, 0x50, 0xff]);
+  expect(f.card.shipped?.kvn).toBe(0xff);
+  expect(f.card.failedAuths).toBe(0);
+});
+
 test('without replaceSellerTag, a J3R452 at key version FF is quarantined before any DELETE, its key version left alone', async () => {
   const f = fixture(new FakeCard({scp: 3, sellerApplets: true, kvn: 0xff}));
   const seller = f.card.instanceAids();

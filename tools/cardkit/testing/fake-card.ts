@@ -14,7 +14,10 @@
  * version) and takes P1 00 only on a card at version FF (`kvn: 0xff`, a
  * J3R452 as it ships), for a new version from 01 to 7F: the new set then
  * replaces the FF set, as the test card did at first contact (GET DATA E0
- * afterwards listed version 01 alone). Under either protocol:
+ * afterwards listed version 01 alone). With `keepsShippedSet` it keeps the FF
+ * set beside the new one instead, which the test card did not do, so the
+ * guard against such a card has one to catch. INITIALIZE UPDATE that names a
+ * version the card does not hold answers 6A88. Under either protocol:
  *
  * - the opener rule: the INSTALL that is a package's first instantiation and
  *   runs a heavy constructor goes mute (the reader gives up) or answers 6F00,
@@ -104,6 +107,15 @@ export interface FakeCardOptions {
    * default, a blank card.
    */
   sellerApplets?: boolean;
+  /**
+   * What the test card did not do at first contact, for the guard that
+   * catches it: PUT KEY with P1 00 at version FF keeps the FF set beside the
+   * new one ({@link FakeCard.shipped}), so INITIALIZE UPDATE with P1 FF still
+   * opens under it, and P1 00, the card's choice, then picks the new set
+   * (`'new'`) or the FF set (`'shipped'`). Unset, the new set replaces the FF
+   * set, as the test card's did.
+   */
+  keepsShippedSet?: 'new' | 'shipped';
 }
 
 /**
@@ -175,6 +187,8 @@ export class FakeCard {
   mute = false;
   keys: StaticKeys;
   kvn: number;
+  /** The FF set a first contact left beside the new one (`keepsShippedSet`); null when there is none. */
+  shipped: {keys: StaticKeys; kvn: number} | null = null;
   seq: number;
   readonly scp: 2 | 3;
   /** The card manager's AID, hex. */
@@ -198,6 +212,7 @@ export class FakeCard {
     dek: Bytes;
   } | null = null;
   private challengeCounter = 0;
+  private readonly keepsShippedSet: 'new' | 'shipped' | undefined;
   private readonly opts: Required<
     Omit<
       FakeCardOptions,
@@ -209,6 +224,7 @@ export class FakeCard {
       | 'freeNonVolatile'
       | 'cplc'
       | 'sellerApplets'
+      | 'keepsShippedSet'
     >
   >;
 
@@ -221,6 +237,7 @@ export class FakeCard {
     this.seq = options.seq ?? (this.scp === 3 ? 0 : 0x0009);
     this.free = options.freeNonVolatile ?? 164176;
     this.cplc = options.cplc ?? CPLC_09336320;
+    this.keepsShippedSet = options.keepsShippedSet;
     this.opts = {
       macOverModifiedApdu: options.macOverModifiedApdu ?? true,
       openerRule: options.openerRule ?? 'mute',
@@ -389,6 +406,24 @@ export class FakeCard {
     return sw(0x6d00);
   }
 
+  /**
+   * The key set INITIALIZE UPDATE's P1 names, 00 being the card's choice, or
+   * null for a version the card does not hold (6A88). Only a first contact
+   * with `keepsShippedSet` leaves a second set.
+   */
+  private keySet(p1: number): {keys: StaticKeys; kvn: number} | null {
+    const shipped = this.shipped;
+    if (
+      shipped &&
+      (p1 === shipped.kvn || (p1 === 0 && this.keepsShippedSet === 'shipped'))
+    ) {
+      return shipped;
+    }
+    return p1 === 0 || p1 === this.kvn
+      ? {keys: this.keys, kvn: this.kvn}
+      : null;
+  }
+
   private deriveSession(seq: number) {
     const s = [seq >> 8, seq & 0xff];
     const d = (key: Bytes, c: number[]) =>
@@ -406,7 +441,8 @@ export class FakeCard {
       if (this.lockedOut) {
         return sw(0x6983);
       }
-      if (p1 !== 0 && p1 !== this.kvn) {
+      const set = this.keySet(p1);
+      if (!set) {
         return sw(0x6a88);
       }
       if (apdu[4] !== 8 || apdu.length < 13) {
@@ -415,7 +451,7 @@ export class FakeCard {
       this.endSessions();
       const host = apdu.slice(5, 13);
       if (this.scp === 3) {
-        return this.initializeUpdate03(host);
+        return this.initializeUpdate03(host, set);
       }
       this.challengeCounter++;
       const card = [
@@ -786,25 +822,28 @@ export class FakeCard {
     return sw(0x9000, [data[0], ...kcvs[0], ...kcvs[1], ...kcvs[2]]);
   }
 
-  /** SCP03's INITIALIZE UPDATE: the counter moves first, then the challenge for it and this card's AID, then the cryptogram. */
-  private initializeUpdate03(host: Bytes): Bytes {
+  /** SCP03's INITIALIZE UPDATE under the set P1 named: the counter moves first, then the challenge for it and this card's AID, then the cryptogram. */
+  private initializeUpdate03(
+    host: Bytes,
+    set: {keys: StaticKeys; kvn: number},
+  ): Bytes {
     this.seq = (this.seq + 1) & 0xffffff;
     const seq = [
       (this.seq >> 16) & 0xff,
       (this.seq >> 8) & 0xff,
       this.seq & 0xff,
     ];
-    const card = nodeScp03Kdf(this.keys.enc, 0x02, 64, [
+    const card = nodeScp03Kdf(set.keys.enc, 0x02, 64, [
       ...seq,
       ...fromHex(this.isdAid),
     ]);
     const context = [...host, ...card];
-    const enc = nodeScp03Kdf(this.keys.enc, 0x04, 128, context);
-    const mac = nodeScp03Kdf(this.keys.mac, 0x06, 128, context);
-    this.handshake = {host, card, enc, mac, dek: this.keys.dek};
+    const enc = nodeScp03Kdf(set.keys.enc, 0x04, 128, context);
+    const mac = nodeScp03Kdf(set.keys.mac, 0x06, 128, context);
+    this.handshake = {host, card, enc, mac, dek: set.keys.dek};
     return sw(0x9000, [
       ...fromHex('0000936320C4A1B2C3D4'),
-      this.kvn,
+      set.kvn,
       0x03,
       0x10,
       ...card,
@@ -853,7 +892,8 @@ export class FakeCard {
   /**
    * SCP03's PUT KEY: three 88 11 10 <key under the static DEK> 03 <AES KCV>
    * entries, in place, or with P1 00 at version FF (first contact) to a new
-   * version from 01 to 7F, which then replaces the FF set.
+   * version from 01 to 7F, which then replaces the FF set, or with
+   * `keepsShippedSet` goes in beside it.
    */
   private putKey03(s: Session, p1: number, p2: number, data: Bytes): Bytes {
     const firstContact =
@@ -886,6 +926,9 @@ export class FakeCard {
       }
       keys.push(key);
       kcvs.push(kcv);
+    }
+    if (firstContact && this.keepsShippedSet) {
+      this.shipped = {keys: this.keys, kvn: this.kvn};
     }
     this.keys = {enc: keys[0], mac: keys[1], dek: keys[2]};
     this.kvn = data[0];

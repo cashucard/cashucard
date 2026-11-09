@@ -95,17 +95,22 @@ with a review of the `tools/outbox-spike` runners that pin it (D181). Migration:
   `isd` and `sellerApplets` (the J3R452 test card's four applets,
   `SELLER_APPLETS`).
 - `rotateKeys` makes first contact on an SCP03 card at `SHIPPED_KVN` (FF):
-  PUT KEY with P1 `00` and new version `FACTORY_KVN` (01), the reopen held to
-  01, and `RotateResult.firstContact` set. It now stops `guarded` before
-  EXTERNAL AUTHENTICATE where it used to go on: P1 `00` anywhere else (a
-  `putKey: {p1: 0}` at 01, or the default at version 00), FF under SCP02, and
-  the new set already at FF. At version 01 it sends the same APDUs as before.
+  PUT KEY with P1 `00` and new version `FACTORY_KVN` (01); the reopen sends
+  INITIALIZE UPDATE for version FF, which must answer `6A88`, then proves the
+  new set at 01; `RotateResult.firstContact` is set. It now stops `guarded`
+  before EXTERNAL AUTHENTICATE where it used to go on: P1 `00` anywhere else (a
+  `putKey: {p1: 0}` at 01, or the default at version 00), FF under SCP02, the
+  new set already at FF, and any `putKey` at first contact. At version 01 it
+  sends the same APDUs as before.
 - `ProvisionOptions.replaceSellerTag`, off by default, deletes the seller's
   NDEF tag at `D2760000850101` before an SCP03 sweep when the new
   `readForeignTag(send, domain)` shows it in the seller's shape.
   `ProvisionResult` is now an interface with `sellerTagRemoved`, so code that
-  builds one needs the field, and `RunEvent` gains `{type: 'sellerTagRemoved'}`,
-  so a switch over it that must be exhaustive needs that case.
+  builds one needs the field, and `RunEvent` gains
+  `{type: 'sellerTagRemoved', confirmed}` (false when the DELETE's answer never
+  came), so a switch over it that must be exhaustive needs that case.
 - `resetOwnedCard` stops `guarded` at key version FF, as at 00.
 - `FakeCard`'s SCP03 PUT KEY takes P1 `00` on a card at version FF, for a new
-  version from 01 to 7F, and drops the FF set, as the test card did.
+  version from 01 to 7F, and drops the FF set, as the test card did. With
+  `keepsShippedSet: 'new' | 'shipped'` it keeps that set instead, in
+  `FakeCard.shipped`, and P1 `00` then picks the set the option names.

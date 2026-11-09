@@ -134,6 +134,13 @@ The workflow stops on refusal and requires the prescribed operator action.
 An uncertain or partial installation is retained for reconciliation. Starting
 another batch does not clear its chip admission fence.
 
+A J3R452 ships with the seller's NFC tag where the card's tag goes, and the
+installation removes it with no prompt ([D182](DECISIONS.md#d182)). When that
+attempt then loses the card or stops for review, the screen says the seller's
+tag was removed and cannot be restored, or may have been when the card did not
+confirm it. The notice is held in memory only: saved work and support details
+do not carry it.
+
 <a id="s4-batch-summary-and-the-record"></a>
 
 ## Results and saved work

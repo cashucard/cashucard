@@ -177,6 +177,70 @@ test("every reserved tap asks for replaceSellerTag, so a J3R452's seller tag is 
   expect(tapOptions).toMatchObject({replaceSellerTag: true});
 });
 
+test.each([
+  [
+    'interrupted',
+    true,
+    "The seller's NFC tag on this card was removed, and it cannot be restored.",
+  ],
+  [
+    'interrupted',
+    false,
+    "The seller's NFC tag on this card may have been removed: the card did not confirm it.",
+  ],
+  [
+    'quarantined',
+    true,
+    "The seller's NFC tag on this card was removed, and it cannot be restored. Mention it when you share support details with your administrator.",
+  ],
+] as const)(
+  "an attempt %s after its run deleted a J3R452's seller tag (confirmed: %s) tells the operator, and one with no delete says nothing of it (D182)",
+  async (outcome, confirmed, note) => {
+    const f = fixture();
+    let sellerTag = true;
+    const runCard: NonNullable<ProvisioningProviderOptions['runCard']> =
+      async (w, service, options) => {
+        options.onEvent?.({type: 'phase', phase: 'sweep'});
+        if (sellerTag) {
+          options.onEvent?.({type: 'sellerTagRemoved', confirmed});
+        }
+        if (outcome === 'quarantined') {
+          await w.withAttempt(service, async j => {
+            await j.bind('cplc-v1:4790d3213041093361205547');
+            await j.quarantine('verification-failed');
+          });
+        }
+        return outcome;
+      };
+    const tree = await mount({
+      ...f,
+      hardwareValidated: true,
+      serviceFor: () => f.service,
+      runCard,
+    });
+    await signIn();
+    await act(async () => {
+      await flow.create(config);
+    });
+    await act(async () => {
+      await flow.program();
+    });
+    expect(flow.notice).toContain(note);
+    expect(text(tree)).toContain(note);
+    if (outcome === 'interrupted') {
+      expect(flow.notice).toContain(
+        'Card connection lost. Last step: Removing the old install.',
+      );
+      sellerTag = false;
+      await act(async () => {
+        await flow.program();
+      });
+      expect(flow.notice).toContain('Card connection lost.');
+      expect(flow.notice).not.toContain('seller');
+    }
+  },
+);
+
 test('unfinished batch requires confirmation to end and retains server closure', async () => {
   const f = fixture();
   const tree = await mount({

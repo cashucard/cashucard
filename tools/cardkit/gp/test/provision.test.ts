@@ -772,7 +772,7 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
     );
     assert.deepEqual(
       events.filter(e => e.type === 'sellerTagRemoved'),
-      [{type: 'sellerTagRemoved'}],
+      [{type: 'sellerTagRemoved', confirmed: true}],
     );
     assert.deepEqual(card.instanceAids(), SELLER_THEN_OURS);
     assert.equal(card.instances.get(TAG)?.pkg, PKG, 'the Cashu tag at its AID');
@@ -908,6 +908,34 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
     assert.ok(!events.some(e => e.type === 'sellerTagRemoved'));
     assert.deepEqual(card.insLog(), [0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2, 0xe4]);
     assert.deepEqual(card.instanceAids(), SELLER);
+  });
+
+  it("with replaceSellerTag, reports the seller's tag as maybe removed when the DELETE's answer never came, before or after the card acted, and the run ends pulled", async () => {
+    const at = INSTALL_ORDER_SELLER.indexOf(0xe4);
+    for (const when of ['before', 'after'] as const) {
+      const card = shipped();
+      const pull = pullAt(card, at, when);
+      const events: RunEvent[] = [];
+      const r = await provision(
+        pull.tx,
+        CASHU,
+        options({replaceSellerTag: true, onEvent: e => events.push(e)}),
+      );
+      assert.equal(r.kind, 'pulled', when);
+      assert.equal(r.phase, 'sweep', when);
+      // sellerTagRemoved holds a 9000 alone; the event says the DELETE went out unanswered
+      assert.equal(r.sellerTagRemoved, false, when);
+      assert.deepEqual(
+        events.filter(e => e.type === 'sellerTagRemoved'),
+        [{type: 'sellerTagRemoved', confirmed: false}],
+        when,
+      );
+      // the run's last record is that DELETE, with no SW
+      assert.equal(r.apdus.length, at + 1, when);
+      assert.equal(r.apdus[at].ins, 0xe4, when);
+      assert.equal(r.apdus[at].sw, undefined, when);
+      assert.equal(card.instances.has(TAG), when === 'before', when);
+    }
   });
 
   it("with replaceSellerTag, stops guarded after the seller's tag went when the registry still does not vouch for every Cashu AID, saying the tag went and nothing else did", async () => {
