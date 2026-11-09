@@ -53,6 +53,11 @@ export interface RouterDeps {
   readonly holderState: HolderIssueState;
   /** The mints the service serves (the registry the screens read). */
   readonly mints: readonly string[];
+  /**
+   * When set, `GET /mints` serves this instead of `mints`: the probed
+   * defaults (config.ts createMintList). Unset when OPS_MINTS overrides.
+   */
+  readonly availableMints?: () => Promise<readonly string[]>;
 }
 
 interface JsonBody {
@@ -281,8 +286,13 @@ export async function route(
 
     // ── mints ─────────────────────────────────────────────────────────────
     if (method === 'GET' && path === '/mints') {
+      // The session check runs first: an unauthenticated caller cannot
+      // trigger outbound mint probes.
       requireSession(deps, req);
-      sendJson(res, 200, {mints: [...deps.mints]});
+      const mints = deps.availableMints
+        ? await deps.availableMints()
+        : deps.mints;
+      sendJson(res, 200, {mints: [...mints]});
       return;
     }
 

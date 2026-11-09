@@ -24,7 +24,7 @@ import {HolderIssueState} from './issue';
 import {HttpError, RouterDeps} from './router';
 import {routeRequest} from './route-request';
 import {openSqlStorage} from './sql-do';
-import {DEFAULT_MINTS} from './config';
+import {createMintList, DEFAULT_MINTS} from './config';
 import {NativePwHash} from './pwhash';
 import {applyOperatorSetup} from './operator-setup';
 import {resolveSession} from './auth';
@@ -79,6 +79,10 @@ export class OpsStore extends DurableObject<Env> {
       anchor: new AnchorFeed(httpTipFetcher, undefined, db.tipStore()),
       holderState: new HolderIssueState(),
       mints: env.OPS_MINTS ? JSON.parse(env.OPS_MINTS) : DEFAULT_MINTS,
+      // The defaults are probed lazily on the first GET /mints, never here
+      // or in blockConcurrencyWhile: a slow mint would stall every request.
+      // An OPS_MINTS override is authoritative and served unprobed.
+      availableMints: env.OPS_MINTS ? undefined : createMintList(DEFAULT_MINTS),
     };
   }
 

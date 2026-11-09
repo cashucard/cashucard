@@ -11,7 +11,7 @@ import {OpsDb} from './db';
 import {HolderIssueState} from './issue';
 import {route, RouterDeps} from './router';
 import {openSqliteFile} from './sqlite-file';
-import {DEFAULT_MINTS} from './config';
+import {createMintList, DEFAULT_MINTS} from './config';
 import {independentBackupHealth} from './recovery-evidence';
 
 export {DEFAULT_MINTS} from './config';
@@ -49,6 +49,8 @@ export function serve(options: ServeOptions): http.Server {
     anchor: new AnchorFeed(httpTipFetcher, undefined, db.tipStore()),
     holderState: new HolderIssueState(),
     mints: options.mints ?? DEFAULT_MINTS,
+    // Probed lazily on the first GET /mints; an explicit list is unprobed.
+    availableMints: options.mints ? undefined : createMintList(DEFAULT_MINTS),
   };
   const server = http.createServer((req, res) => {
     if (
