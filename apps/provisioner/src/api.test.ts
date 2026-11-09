@@ -464,3 +464,94 @@ test.each(['headers', 'body'])(
     );
   },
 );
+
+test('mintInfo keeps well-formed entries and drops the rest (D180)', async () => {
+  const {fetcher} = scriptedFetcher([
+    url => {
+      expect(url).toBe('https://ops.test/mints');
+      return {
+        status: 200,
+        json: {
+          mints: ['https://a.test', 'https://b.test'],
+          mint_info: {
+            'https://a.test': {name: 'Mint A', reviews: 3},
+            'https://b.test': {reviews: 1},
+            'https://long.test': {name: 'x'.repeat(41), reviews: 4},
+            'https://forty.test': {name: 'y'.repeat(40), reviews: 4},
+            'https://neg.test': {name: 'Neg', reviews: -1},
+            'https://frac.test': {reviews: 2.5},
+            'https://str.test': {reviews: '3'},
+            'https://num-name.test': {name: 7, reviews: 3},
+            'https://null.test': null,
+            'https://arr.test': [3],
+          },
+        },
+      };
+    },
+  ]);
+  const client = new ApiClient({baseUrl: 'https://ops.test', fetcher});
+  expect(await client.mintInfo('t')).toEqual({
+    'https://a.test': {name: 'Mint A', reviews: 3},
+    'https://b.test': {reviews: 1},
+    'https://forty.test': {name: 'y'.repeat(40), reviews: 4},
+  });
+});
+
+test.each([undefined, null, [], 'x', 3])(
+  'mintInfo with a missing or malformed mint_info (%p) is {}',
+  async mintInfo => {
+    const {fetcher} = scriptedFetcher([
+      () => ({
+        status: 200,
+        json: {mints: ['https://a.test'], mint_info: mintInfo},
+      }),
+    ]);
+    const client = new ApiClient({baseUrl: 'https://ops.test', fetcher});
+    expect(await client.mintInfo('t')).toEqual({});
+  },
+);
+
+test('probeMint asks the service with the URL encoded and reads its answer', async () => {
+  const urls: string[] = [];
+  const {fetcher} = scriptedFetcher([
+    url => {
+      urls.push(url);
+      return {status: 200, json: {ok: true, name: 'Good Mint'}};
+    },
+    url => {
+      urls.push(url);
+      return {status: 200, json: {ok: false, reason: 'keysets: no active sat'}};
+    },
+    () => ({status: 200, json: {ok: true, name: 'z'.repeat(41)}}),
+    () => ({status: 200, json: {}}),
+  ]);
+  const client = new ApiClient({baseUrl: 'https://ops.test', fetcher});
+  expect(await client.probeMint('t', 'https://mint.test/a?b')).toEqual({
+    ok: true,
+    name: 'Good Mint',
+  });
+  expect(urls[0]).toBe(
+    'https://ops.test/mints/probe?url=https%3A%2F%2Fmint.test%2Fa%3Fb',
+  );
+  expect(await client.probeMint('t', 'https://usd.test')).toEqual({
+    ok: false,
+    reason: 'keysets: no active sat',
+  });
+  expect(await client.probeMint('t', 'https://long.test')).toEqual({ok: true});
+  expect(await client.probeMint('t', 'https://odd.test')).toEqual({
+    ok: false,
+    reason: 'probe failed',
+  });
+});
+
+test('probeMint surfaces a transport failure as a throw, not a pass', async () => {
+  const client = new ApiClient({
+    baseUrl: 'https://ops.test',
+    fetcher: async () => {
+      throw new TypeError('Network request failed');
+    },
+  });
+  await expect(
+    client.probeMint('t', 'https://mint.test'),
+  ).rejects.toBeInstanceOf(ApiUnreachableError);
+});
