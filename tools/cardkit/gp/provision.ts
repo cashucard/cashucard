@@ -41,10 +41,12 @@ import {RegistryEvidenceError, readCashuRegistry} from './registry';
 import {
   CardError,
   FACTORY_KEYS,
+  FACTORY_KVN,
   type FreeMemory,
   type KeySet,
   type Random,
   type Reply,
+  SHIPPED_KVN,
   type SecureSession,
   type Transceiver,
   TransportError,
@@ -279,6 +281,11 @@ export interface RotateResult extends RunResult<RotatePhase> {
   active?: 'from' | 'to';
   /** False when the card was already on `to` (a PUT KEY whose reply was lost). */
   rotated?: boolean;
+  /**
+   * True when this run made first contact (D182): PUT KEY P1 00 moved an SCP03
+   * card from SHIPPED_KVN to `to` at FACTORY_KVN, and the reopen proved it there.
+   */
+  firstContact?: boolean;
 }
 
 /** A refusal of this module's own, before the card is touched further. */
@@ -677,7 +684,11 @@ export async function provision(
 }
 
 export interface RotateOptions extends RunOptions {
-  /** PUT KEY's P1 and the new set's version; by default the active set's version for both (in place, as gp --lock does). */
+  /**
+   * PUT KEY's P1 and the new set's version. By default the active set's
+   * version for both (in place, as gp --lock does), except at first contact,
+   * where they are 00 and FACTORY_KVN. P1 00 anywhere else stops guarded.
+   */
   putKey?: {p1?: number; newKvn?: number};
 }
 
@@ -687,6 +698,15 @@ export interface RotateOptions extends RunOptions {
  * was lost leaves the card on `to`, and that is found without a failed login.
  * EXTERNAL AUTHENTICATE goes out only for a set the card proved; then PUT KEY,
  * and a fresh secure channel under `to` to show the card took it.
+ *
+ * An SCP03 card at SHIPPED_KVN (FF, a J3R452 as it ships) gets first contact
+ * (D182): PUT KEY with P1 00 puts `to` at FACTORY_KVN (01), the card drops
+ * the FF set, and the reopen must prove `to` at 01. Any other card has its
+ * set replaced in place, with the APDUs this sent before. Each of these stops
+ * guarded with nothing sent after INITIALIZE UPDATE: `to` proved at FF (only
+ * an in-place rotation of a shipped card puts it there, and the reset refuses
+ * FF), FF under SCP02 (never measured), and P1 00 on any card but one at
+ * first contact (it would add a set beside the one in place).
  */
 export async function rotateKeys(
   tx: Transceiver,
@@ -705,6 +725,9 @@ export async function rotateKeys(
     expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     run.enter('auth');
     const hs = await initializeUpdate(run.timed, options.random, 0, sdAid);
+    const kvn = hs.reply.kvn;
+    // a J3R452 as it ships: our set goes in at 01 and its FF set goes (D182)
+    const first = hs.reply.scp === 3 && kvn === SHIPPED_KVN;
     const fromKeys = sessionIfMatches(from, hs);
     const toKeys = fromKeys ? null : sessionIfMatches(to, hs);
     if (!fromKeys && !toKeys) {
@@ -713,14 +736,31 @@ export async function rotateKeys(
       );
     }
     if (toKeys) {
+      if (kvn === SHIPPED_KVN) {
+        throw new Guard(
+          'the card proved the new key set at version FF, where only an in-place rotation of a shipped card puts it and a reset refuses it: EXTERNAL AUTHENTICATE was not sent',
+        );
+      }
       await externalAuthenticate(run.timed, toKeys, hs, sessionOptions);
       run.enter('done');
       return {
         ...run.finish({ok: true}),
         active: 'to',
         rotated: false,
-        keyVersion: hs.reply.kvn,
+        keyVersion: kvn,
       };
+    }
+    const p1 = options.putKey?.p1 ?? (first ? 0x00 : kvn);
+    const newKvn = options.putKey?.newKvn ?? (first ? FACTORY_KVN : kvn);
+    if (kvn === SHIPPED_KVN && !first) {
+      throw new Guard(
+        'the card is at key version FF under SCP02, where first contact was never measured: EXTERNAL AUTHENTICATE was not sent',
+      );
+    }
+    if (p1 === 0x00 && !first) {
+      throw new Guard(
+        `PUT KEY with P1 00 would add a key set beside version ${toHex([kvn])}: EXTERNAL AUTHENTICATE was not sent`,
+      );
     }
     const session = await externalAuthenticate(
       run.timed,
@@ -729,11 +769,7 @@ export async function rotateKeys(
       sessionOptions,
     );
     run.enter('putKey');
-    const kvn = hs.reply.kvn;
-    const command = putKeys(to, session, {
-      p1: options.putKey?.p1 ?? kvn,
-      newKvn: options.putKey?.newKvn ?? kvn,
-    });
+    const command = putKeys(to, session, {p1, newKvn});
     expectOk(await session.send(run.timed, command), 0xd8);
     run.enter('reopen');
     expectOk(await run.plain(selectAid(sdAid)), 0xa4);
@@ -743,12 +779,18 @@ export async function rotateKeys(
       options.random,
       sessionOptions,
     );
+    if (first && reopened.keyVersion !== FACTORY_KVN) {
+      throw new Guard(
+        `after first contact the card proved the new key set at version ${toHex([reopened.keyVersion ?? 0])}, not 01: it may hold a set beside it`,
+      );
+    }
     run.enter('done');
     return {
       ...run.finish({ok: true}),
       active: 'to',
       rotated: true,
       keyVersion: reopened.keyVersion,
+      ...(first ? {firstContact: true} : {}),
     };
   } catch (e) {
     return run.fail(e);

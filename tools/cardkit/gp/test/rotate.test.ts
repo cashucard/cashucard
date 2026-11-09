@@ -4,14 +4,25 @@
  * card takes it, the active set found from one INITIALIZE UPDATE, and a card
  * on neither set left without a failed login. The lost-reply path is the one
  * that keeps a rotation from costing a failed login, so it runs under both.
+ * Then first contact (D182): a J3R452 as it ships, at version FF, moved to
+ * version 01 by PUT KEY P1 00, with its guards, and the rotation at version
+ * 01 held to the bytes it sent before first contact existed.
  */
 import assert from 'node:assert/strict';
-import {randomBytes} from 'node:crypto';
+import {createHash, randomBytes} from 'node:crypto';
 import {describe, it} from 'node:test';
 
 import {toHex} from '../bytes';
-import {rotateKeys, type RotateOptions} from '../provision';
-import {FACTORY_KEYS, SPIKE_KEYS, parseCommand, type KeySet} from '../scp02';
+import {confirmManagerKeys, rotateKeys, type RotateOptions} from '../provision';
+import {
+  FACTORY_KEYS,
+  FACTORY_KVN,
+  SHIPPED_KVN,
+  SPIKE_KEYS,
+  parseCommand,
+  type KeySet,
+  type Transceiver,
+} from '../scp02';
 import {FakeCard, pullAt} from '../../testing/fake-card';
 
 function options(extra: Partial<RotateOptions> = {}): RotateOptions {
@@ -265,6 +276,225 @@ for (const scp of [2, 3] as const) {
       assert.equal(confirmed.ok, true);
       assert.equal(confirmed.keyVersion, 1);
       assert.deepEqual(card.insLog().slice(at), [0xa4, 0x50, 0x82]);
+    });
+  });
+}
+
+/** The keys a fake card holds, as its options take them. */
+function holding(keys: KeySet) {
+  return {
+    enc: Array.from(keys.enc),
+    mac: Array.from(keys.mac),
+    dek: Array.from(keys.dek),
+  };
+}
+
+describe('first contact: an SCP03 card at key version FF, as a J3R452 ships (D182)', () => {
+  it('puts our set at version 01 with PUT KEY P1 00 and proves it there; the set it shipped with no longer opens it', async () => {
+    const card = new FakeCard({scp: 3, kvn: SHIPPED_KVN});
+    const r = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options(),
+    );
+    assert.equal(r.ok, true, r.reason);
+    assert.equal(r.rotated, true);
+    assert.equal(r.firstContact, true);
+    assert.equal(r.keyVersion, FACTORY_KVN);
+    assert.deepEqual(card.insLog(), ROTATE_ORDER);
+    // 84 D8 00 81 4E: P1 00, 70 bytes of entries and the C-MAC, the new version 01 first
+    assert.deepEqual(card.log[3].slice(0, 6), [
+      0x84,
+      0xd8,
+      0x00,
+      0x81,
+      0x4e,
+      FACTORY_KVN,
+    ]);
+    assert.equal(card.kvn, FACTORY_KVN);
+    assert.deepEqual(keysOf(card), hexKeys(SPIKE_KEYS));
+    card.reset();
+    const at = card.log.length;
+    const shipped = await confirmManagerKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      options(),
+    );
+    assert.equal(shipped.kind, 'wrongKeys');
+    assert.deepEqual(card.insLog().slice(at), [0xa4, 0x50]);
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it('comes back from a pull at any APDU, before or after the card acts, at version 01 with one PUT KEY in all and no failed login', async () => {
+    for (const when of ['before', 'after'] as const) {
+      for (let n = 0; n < ROTATE_ORDER.length; n++) {
+        const where = `${when} ${n}`;
+        const card = new FakeCard({scp: 3, kvn: SHIPPED_KVN});
+        const pull = pullAt(card, n, when);
+        const first = await rotateKeys(
+          pull.tx,
+          FACTORY_KEYS,
+          SPIKE_KEYS,
+          options(),
+        );
+        assert.equal(first.kind, 'pulled', where);
+        assert.equal(pull.state.late, 0, where);
+        card.reset();
+        const again = await rotateKeys(
+          card.transceive,
+          FACTORY_KEYS,
+          SPIKE_KEYS,
+          options(),
+        );
+        assert.equal(again.ok, true, `${where}: ${again.reason}`);
+        assert.equal(again.keyVersion, FACTORY_KVN, where);
+        // the run that sent PUT KEY made first contact; one that found our set at 01 says nothing of it
+        assert.equal(
+          again.firstContact,
+          again.rotated ? true : undefined,
+          where,
+        );
+        assert.equal(card.kvn, FACTORY_KVN, where);
+        assert.deepEqual(keysOf(card), hexKeys(SPIKE_KEYS), where);
+        assert.equal(
+          card.insLog().filter(i => i === 0xd8).length,
+          1,
+          `${where}: one PUT KEY reached the card`,
+        );
+        assert.equal(card.failedAuths, 0, where);
+      }
+    }
+  });
+
+  it("stops at wrongKeys after INITIALIZE UPDATE alone on a card that proves neither set (still on the seller's keys)", async () => {
+    const card = new FakeCard({
+      scp: 3,
+      kvn: SHIPPED_KVN,
+      keys: holding({
+        enc: randomBytes(16),
+        mac: randomBytes(16),
+        dek: randomBytes(16),
+      }),
+    });
+    const r = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options(),
+    );
+    assert.equal(r.kind, 'wrongKeys');
+    assert.equal(r.phase, 'auth');
+    assert.deepEqual(card.insLog(), [0xa4, 0x50], 'no 82, no D8');
+    assert.equal(card.kvn, SHIPPED_KVN);
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it('stops guarded before EXTERNAL AUTHENTICATE when the card proves the new set at version FF', async () => {
+    // only an in-place rotation of a shipped card puts our set at FF, and the reset refuses FF: quarantine, never record
+    const card = new FakeCard({
+      scp: 3,
+      kvn: SHIPPED_KVN,
+      keys: holding(SPIKE_KEYS),
+    });
+    const r = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options(),
+    );
+    assert.equal(r.ok, false);
+    assert.equal(r.kind, 'guarded');
+    assert.equal(r.phase, 'auth');
+    assert.match(r.reason!, /version FF/);
+    assert.deepEqual(card.insLog(), [0xa4, 0x50], 'no 82, no D8');
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it('stops guarded at the reopen when the card then proves our set at a version other than 01', async () => {
+    // a card that kept its set beside ours, or put ours elsewhere: never a silent success
+    const card = new FakeCard({scp: 3, kvn: SHIPPED_KVN});
+    const tx: Transceiver = async apdu => {
+      const reply = await card.transceive(apdu);
+      if (apdu[1] === 0xd8) {
+        card.kvn = 0x02;
+      }
+      return reply;
+    };
+    const r = await rotateKeys(tx, FACTORY_KEYS, SPIKE_KEYS, options());
+    assert.equal(r.ok, false);
+    assert.equal(r.kind, 'guarded');
+    assert.equal(r.phase, 'reopen');
+    assert.equal(r.firstContact, undefined);
+    assert.deepEqual(card.insLog(), ROTATE_ORDER);
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it('stops guarded before EXTERNAL AUTHENTICATE on an SCP02 card at version FF, where first contact was never measured', async () => {
+    const card = new FakeCard({kvn: SHIPPED_KVN});
+    const r = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options(),
+    );
+    assert.equal(r.kind, 'guarded');
+    assert.equal(r.phase, 'auth');
+    assert.deepEqual(card.insLog(), [0xa4, 0x50]);
+    assert.equal(card.kvn, SHIPPED_KVN);
+    assert.deepEqual(keysOf(card), hexKeys(FACTORY_KEYS));
+    assert.equal(card.failedAuths, 0);
+  });
+});
+
+/**
+ * sha256 over every APDU of a rotation from the public default to the spike
+ * set at version 01, one hex line each, with the host challenge fixed: what
+ * cardkit sent at 1382268, before first contact existed.
+ */
+const ROTATION_AT_01: Record<2 | 3, string> = {
+  2: 'c0bb9ed8abc77f89055f561de3f08f2a4fcc6538fbbf79a0e46c28f4a0a9bfe3',
+  3: 'e552e2362eab77f7040cd881c61655845c373ecaf9e8b4e987abe5233966cf9a',
+};
+
+for (const scp of [2, 3] as const) {
+  describe(`rotateKeys away from first contact (SCP0${scp})`, () => {
+    it('sends at version 01 the APDUs it sent before first contact existed, byte for byte', async () => {
+      const card = new FakeCard({scp});
+      const r = await rotateKeys(card.transceive, FACTORY_KEYS, SPIKE_KEYS, {
+        random: n => new Array(n).fill(0x5a),
+        now: () => 0,
+      });
+      assert.equal(r.ok, true, r.reason);
+      assert.equal(r.firstContact, undefined);
+      assert.deepEqual(card.log[3].slice(0, 4), [0x84, 0xd8, 0x01, 0x81]);
+      const sent = card.log.map(a => toHex(a)).join('\n');
+      assert.equal(
+        createHash('sha256').update(sent).digest('hex'),
+        ROTATION_AT_01[scp],
+      );
+    });
+
+    it('stops guarded before EXTERNAL AUTHENTICATE when PUT KEY would have P1 00 on a card not at FF: asked for at 01, or by default at 00', async () => {
+      for (const [kvn, putKey] of [
+        [0x01, {p1: 0x00}],
+        [0x00, undefined],
+      ] as const) {
+        const card = new FakeCard({scp, kvn});
+        const r = await rotateKeys(
+          card.transceive,
+          FACTORY_KEYS,
+          SPIKE_KEYS,
+          options({putKey}),
+        );
+        const where = `version ${kvn}`;
+        assert.equal(r.kind, 'guarded', where);
+        assert.equal(r.phase, 'auth', where);
+        assert.match(r.reason!, /P1 00/, where);
+        assert.deepEqual(card.insLog(), [0xa4, 0x50], `${where}: no 82, no D8`);
+        assert.deepEqual(keysOf(card), hexKeys(FACTORY_KEYS), where);
+        assert.equal(card.failedAuths, 0, where);
+      }
     });
   });
 }
