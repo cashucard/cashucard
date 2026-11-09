@@ -7,8 +7,9 @@
  * same probe as the defaults (config.ts probeMint, active sat keyset).
  *
  * Nothing here runs at construction, and a request never waits on a relay:
- * snapshot() returns the last-good set synchronously and, once that set is
- * past its TTL, starts one background refresh.
+ * ready() loads the stored set once, snapshot() returns the last-good set
+ * synchronously and, once that set is past its TTL, starts one background
+ * refresh.
  */
 import {schnorr} from '@noble/curves/secp256k1';
 import {sha256} from '@noble/hashes/sha2';
@@ -43,6 +44,11 @@ const MAX_URL_TAGS = 5;
 const MAX_URLS = 2000;
 const MAX_FRAME = 256 * 1024;
 const MAX_EVENTS_PER_RELAY = 2000;
+/** Retained event JSON per relay; the DO has 128 MB for everything. */
+const MAX_BYTES_PER_RELAY = 2 * 1024 * 1024;
+/** A NIP-87 event is small; a bigger one is dropped before it is kept. */
+const MAX_CONTENT = 4096;
+const MAX_TAGS = 64;
 const RELAY_TIMEOUT_MS = 6000;
 const RELAY_DEADLINE_MS = 8000;
 
@@ -77,20 +83,24 @@ function isEventShape(ev: unknown): ev is NostrEvent {
   );
 }
 
+/** NIP-01: sha256 of the canonical array, as hex. */
+function computeId(ev: NostrEvent): string {
+  const canonical = JSON.stringify([
+    0,
+    ev.pubkey,
+    ev.created_at,
+    ev.kind,
+    ev.tags,
+    ev.content,
+  ]);
+  return bytesToHex(sha256(new TextEncoder().encode(canonical)));
+}
+
 /** NIP-01: the id is sha256 of the canonical array; the sig is BIP-340. Never throws. */
 export function verifyEvent(ev: unknown): ev is NostrEvent {
   try {
     if (!isEventShape(ev)) return false;
-    const canonical = JSON.stringify([
-      0,
-      ev.pubkey,
-      ev.created_at,
-      ev.kind,
-      ev.tags,
-      ev.content,
-    ]);
-    const id = bytesToHex(sha256(new TextEncoder().encode(canonical)));
-    if (id !== ev.id) return false;
+    if (computeId(ev) !== ev.id) return false;
     return schnorr.verify(ev.sig, ev.id, ev.pubkey);
   } catch {
     return false;
@@ -109,7 +119,12 @@ function tagValues(ev: NostrEvent, name: string): string[] {
 /**
  * Group NIP-87 events by normalized mint URL. Pure apart from the signature
  * check. Cheap filters run before verification, so a malformed, stale or
- * off-topic event costs no curve work; duplicate ids are verified once.
+ * off-topic event costs no curve work. A copy whose content does not hash
+ * to its id is dropped before it can be remembered, and the rest are
+ * deduplicated on id and sig together: the id fixes the content, so equal
+ * keys are the same event and need one signature check, while one relay's
+ * altered or bad-sig copy of an id never shadows the genuine copy another
+ * relay returns.
  */
 export function parseNip87(
   events: readonly unknown[],
@@ -122,7 +137,8 @@ export function parseNip87(
   for (const raw of events) {
     if (!isEventShape(raw)) continue;
     const ev = raw;
-    if (seen.has(ev.id)) continue;
+    const copy = `${ev.id}:${ev.sig}`;
+    if (seen.has(copy)) continue;
     if (ev.created_at > nowS + FUTURE_SLACK_S) continue;
     let review: boolean;
     if (ev.kind === MINT_ANNOUNCEMENT) {
@@ -139,7 +155,12 @@ export function parseNip87(
       if (n) urls.add(n);
     }
     if (urls.size === 0) continue;
-    seen.add(ev.id);
+    try {
+      if (computeId(ev) !== ev.id) continue;
+    } catch {
+      continue;
+    }
+    seen.add(copy);
     if (!verify(ev)) continue;
     for (const url of urls) {
       let entry = out.get(url);
@@ -210,6 +231,7 @@ export function createRelayQuery(
     new Promise<RelayAnswer>(resolve => {
       const subId = `nip87-${Math.random().toString(36).slice(2, 10)}`;
       const events: unknown[] = [];
+      let bytes = 0;
       let answered = false;
       let done = false;
       let socket: SocketLike | undefined;
@@ -247,6 +269,12 @@ export function createRelayQuery(
           ws.addEventListener('message', e => {
             if (done) return;
             if (typeof e.data !== 'string' || e.data.length > MAX_FRAME) return;
+            // Every frame counts, kept or not: a flood ends the query early.
+            bytes += e.data.length;
+            if (bytes > MAX_BYTES_PER_RELAY) {
+              finish();
+              return;
+            }
             let msg: unknown;
             try {
               msg = JSON.parse(e.data);
@@ -255,7 +283,18 @@ export function createRelayQuery(
             }
             if (!Array.isArray(msg) || msg[1] !== subId) return;
             if (msg[0] === 'EVENT') {
-              if (events.length < MAX_EVENTS_PER_RELAY) events.push(msg[2]);
+              const ev = msg[2] as {content?: unknown; tags?: unknown} | null;
+              if (
+                typeof ev !== 'object' ||
+                ev === null ||
+                typeof ev.content !== 'string' ||
+                ev.content.length > MAX_CONTENT ||
+                !Array.isArray(ev.tags) ||
+                ev.tags.length > MAX_TAGS
+              )
+                return;
+              events.push(ev);
+              if (events.length >= MAX_EVENTS_PER_RELAY) finish();
             } else if (msg[0] === 'EOSE' || msg[0] === 'CLOSED') {
               answered = true;
               finish();
@@ -442,6 +481,11 @@ export interface DiscoveryOptions extends DiscoveryDeps {
 export interface Discovery {
   /** The last-good set, now; starts a coalesced refresh when stale. */
   snapshot(): readonly DiscoveredMint[];
+  /**
+   * Resolves once the stored set is loaded (DO storage only, never a
+   * relay), so the first snapshot() after a restart serves it.
+   */
+  ready(): Promise<void>;
   /** Runs a refresh now (the cron path and tests). Never throws. */
   refresh(): Promise<void>;
 }
@@ -459,9 +503,15 @@ export function createDiscovery(options: DiscoveryOptions): Discovery {
   let committedAt = 0;
   let inFlight: Promise<void> | undefined;
 
-  async function load(): Promise<void> {
-    if (loaded) return;
-    loaded = true;
+  let loading: Promise<void> | undefined;
+  function load(): Promise<void> {
+    if (loaded) return Promise.resolve();
+    return (loading ??= readStore().finally(() => {
+      loaded = true;
+    }));
+  }
+
+  async function readStore(): Promise<void> {
     try {
       const stored = parseStored(await options.store!.load());
       if (stored && stored.at > committedAt) {
@@ -478,12 +528,14 @@ export function createDiscovery(options: DiscoveryOptions): Discovery {
     const gen = ++started;
     try {
       const result = await discoverMints({...options, log, now});
-      if (gen < committed) return; // a newer refresh already landed
-      committed = gen;
       if (!result.answered) {
-        until = now() + ttlFailMs;
+        // A failure never supersedes: an older refresh that still answers
+        // may land after this one.
+        if (gen >= committed) until = now() + ttlFailMs;
         return;
       }
+      if (gen < committed) return; // a newer answer already landed
+      committed = gen;
       const at = now();
       mints = result.mints;
       committedAt = at;
@@ -519,6 +571,7 @@ export function createDiscovery(options: DiscoveryOptions): Discovery {
       }
       return mints;
     },
+    ready: load,
     async refresh() {
       await load();
       await run();
@@ -535,14 +588,16 @@ export type MintInfo = Record<string, {name?: string; reviews: number}>;
  */
 export function createCatalog(
   mintList: () => Promise<readonly string[]>,
-  discovery: Pick<Discovery, 'snapshot'>,
+  discovery: Pick<Discovery, 'snapshot' | 'ready'>,
 ): {
   availableMints: () => Promise<readonly string[]>;
   mintInfo: () => MintInfo;
 } {
   return {
     async availableMints() {
-      const defaults = await mintList();
+      // ready() reads DO storage, never a relay, so a restarted object
+      // serves its stored set on the first request (D180).
+      const [defaults] = await Promise.all([mintList(), discovery.ready()]);
       const listed = new Set(defaults);
       const extra = discovery
         .snapshot()

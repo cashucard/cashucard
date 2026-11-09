@@ -197,6 +197,28 @@ test('parseNip87 reads at most 5 u tags per event and verifies an id once', () =
   assert.equal(verified, 1);
 });
 
+test('one relay cannot shadow a genuine event with a forged copy of its id', () => {
+  const url = 'https://mint.example';
+  const reviews = [review(2, url), review(3, url), review(4, url)];
+  const badSig = reviews.map(r => ({...r, sig: 'cd'.repeat(64)}));
+  const altered = reviews.map(r => ({...r, content: 'tampered'}));
+  // relay 0's forged copies come first; relays 1 and 2 return the real ones
+  for (const forged of [badSig, altered]) {
+    let verified = 0;
+    const map = parseNip87(
+      [announce(1, url), ...forged, ...reviews, ...reviews],
+      NOW,
+      (ev): ev is NostrEvent => {
+        verified++;
+        return verifyEvent(ev);
+      },
+    );
+    assert.equal(map.get(url)?.reviewers.size, 3);
+    // each distinct (id, sig) is checked once; an altered copy never is
+    assert.equal(verified, forged === badSig ? 7 : 4);
+  }
+});
+
 // ── discoverMints ────────────────────────────────────────────────────────
 
 const answer = (events: unknown[]): RelayAnswer => ({answered: true, events});
@@ -518,7 +540,12 @@ test('the store round-trips the last-good set and a bad one is discarded', async
     log: () => {},
     store,
   });
-  d2.snapshot();
+  await d2.ready();
+  assert.deepEqual(
+    d2.snapshot().map(m => m.url),
+    ['https://one.example'],
+    'the first snapshot after ready() serves the stored set',
+  );
   await flush();
   assert.equal(relay.calls, before, 'a fresh stored set needs no relay');
   assert.deepEqual(
@@ -604,6 +631,7 @@ test('createCatalog lists probed defaults first, then the discovered set without
     async () => ['https://a.example', 'https://b.example'],
     {
       snapshot: () => snap,
+      ready: async () => {},
     },
   );
   assert.deepEqual(await c.availableMints(), [
@@ -617,6 +645,84 @@ test('createCatalog lists probed defaults first, then the discovered set without
     reviews: 7,
   });
   assert.deepEqual(c.mintInfo()['https://d2.example'], {reviews: 3});
+});
+
+test('after a restart the first GET /mints serves the stored set', async () => {
+  const stored = {
+    v: 1,
+    at: NOW,
+    mints: [{url: 'https://stored.example', reviews: 4, name: 'Stored'}],
+  };
+  let relayCalls = 0;
+  let releaseLoad!: () => void;
+  const d = createDiscovery({
+    query: async () => {
+      relayCalls++;
+      return {answered: false, events: []};
+    },
+    relays: ['r0'],
+    defaults: [],
+    now: () => NOW + 1000,
+    log: () => {},
+    store: {
+      // storage answers a tick later, as DO storage does
+      load: () =>
+        new Promise(r => {
+          releaseLoad = () => r(stored);
+        }),
+      save: async () => {},
+    },
+  });
+  const c = createCatalog(async () => ['https://a.example'], d);
+  const first = c.availableMints();
+  await flush();
+  releaseLoad();
+  assert.deepEqual(await first, [
+    'https://a.example',
+    'https://stored.example',
+  ]);
+  assert.deepEqual(c.mintInfo(), {
+    'https://stored.example': {name: 'Stored', reviews: 4},
+  });
+  await flush();
+  assert.equal(relayCalls, 0, 'the request never waited on, or asked, a relay');
+});
+
+test('a refresh where no relay answered cannot discard an older one that did', async () => {
+  let n = 0;
+  const gates: (() => void)[] = [];
+  let t = NOW;
+  const d = createDiscovery({
+    query: async () => {
+      const mine = ++n;
+      if (mine === 1) {
+        await new Promise<void>(r => gates.push(r));
+        return answer(mint('https://good.example', 3));
+      }
+      return {answered: false, events: []};
+    },
+    relays: ['r0'],
+    defaults: [],
+    probe: okProbe,
+    now: () => t,
+    log: () => {},
+  });
+  const first = d.refresh();
+  await flush();
+  await d.refresh(); // the newer refresh fails fast
+  gates[0]();
+  await first;
+  assert.deepEqual(
+    d.snapshot().map(m => m.url),
+    ['https://good.example'],
+    'the older answer lands',
+  );
+  // and it is cached for the full TTL, not the one-minute failure retry
+  t += 120_000;
+  const before = n;
+  d.snapshot();
+  await flush();
+  assert.equal(n, before);
 });
 
 test('parseDenylist reads a JSON array of strings and refuses anything else', () => {
@@ -744,4 +850,61 @@ test('the relay query ends on CLOSED, close, timeout and connect failure, never 
   assert.equal(lateQuery.answered, false);
   await new Promise(r => setTimeout(r, 50));
   assert.ok(late.closed);
+});
+
+test('the relay query bounds what it keeps: content, tags, count and bytes', async () => {
+  const ev = review(2, 'https://x.example');
+  // oversized content or tag lists are dropped; a 2000th event ends the query
+  const countSock = new FakeSocket((s, data) => {
+    const msg = JSON.parse(data);
+    if (msg[0] !== 'REQ') return;
+    queueMicrotask(() => {
+      const frame = (e: unknown) =>
+        s.emit('message', JSON.stringify(['EVENT', msg[1], e]));
+      frame({...ev, content: 'x'.repeat(4097)});
+      frame({...ev, tags: Array.from({length: 65}, () => ['t', 'x'])});
+      frame({...ev, content: 7});
+      frame(null);
+      for (let i = 0; i < 2100; i++) frame(ev);
+    });
+  });
+  const counted = await createRelayQuery(
+    async () => countSock,
+    60_000,
+  )('wss://r');
+  assert.equal(counted.answered, true);
+  assert.equal(counted.events.length, 2000);
+  assert.ok(countSock.closed, 'ended at the cap, not at the timeout');
+
+  // frames under the per-frame cap still add up: past 2 MiB the query ends
+  let emitted = 0;
+  const floodSock = new FakeSocket((s, data) => {
+    const msg = JSON.parse(data);
+    if (msg[0] !== 'REQ') return;
+    queueMicrotask(() => {
+      s.emit('message', JSON.stringify(['EVENT', msg[1], ev]));
+      const big = JSON.stringify([
+        'EVENT',
+        msg[1],
+        {...ev, content: 'y'.repeat(200_000)},
+      ]);
+      for (let i = 0; i < 50; i++) {
+        emitted++;
+        s.emit('message', big);
+      }
+      s.emit('message', JSON.stringify(['EVENT', msg[1], ev]));
+    });
+  });
+  const flooded = await createRelayQuery(
+    async () => floodSock,
+    60_000,
+  )('wss://r');
+  assert.equal(emitted, 50);
+  assert.equal(flooded.answered, true);
+  assert.deepEqual(flooded.events, [ev], 'nothing after the budget is kept');
+  assert.ok(floodSock.closed);
+  assert.deepEqual(JSON.parse(floodSock.sent.at(-1)!), [
+    'CLOSE',
+    floodSock.subId(),
+  ]);
 });

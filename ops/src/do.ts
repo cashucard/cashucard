@@ -126,8 +126,8 @@ export class OpsStore extends DurableObject<Env> {
     ctx.blockConcurrencyWhile(async () => {
       await applyOperatorSetup(db, env.OPS_OPERATOR_SETUP, passwordHasher);
     });
-    // Discovery does no I/O here: the stored set loads and the relays are
-    // asked on the first GET /mints, in the background (D180).
+    // Discovery does no I/O here: the first GET /mints awaits the stored set
+    // (DO storage only) and asks the relays in the background (D180).
     this.discovery = discoveryFor(env, ctx);
     const defaults = env.OPS_MINTS ? undefined : createMintList(DEFAULT_MINTS);
     const catalog =

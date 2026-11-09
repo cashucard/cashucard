@@ -51,8 +51,17 @@ export type FetchFn = (
   text(): Promise<string>;
   /** Present on a real Response; read for content-length only. */
   headers?: {get(name: string): string | null};
-  /** Present on a real Response; cancelled so a non-200 frees its slot. */
-  body?: {cancel(): Promise<void>} | null;
+  /**
+   * Present on a real Response: cancelled so a non-200 frees its slot, and
+   * read through getReader() so an undeclared body is capped as it streams.
+   */
+  body?: {
+    cancel(): Promise<void>;
+    getReader?(): {
+      read(): Promise<{done: boolean; value?: Uint8Array}>;
+      cancel(): Promise<void>;
+    };
+  } | null;
 }>;
 
 /** Calls the global fetch at call time (a detached `fetch` throws in workerd). */
@@ -89,6 +98,35 @@ export function sanitizeMintName(raw: unknown): string | undefined {
   return name === '' ? undefined : name;
 }
 
+/** The body as text, or undefined once it passes maxBytes (then cancelled). */
+async function readCapped(
+  res: Awaited<ReturnType<FetchFn>>,
+  maxBytes: number,
+): Promise<string | undefined> {
+  const reader = res.body?.getReader?.();
+  if (!reader) return res.text(); // fakes without a stream
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
 async function getJson(
   fetchFn: FetchFn,
   url: string,
@@ -107,14 +145,17 @@ async function getJson(
       return {ok: false, reason: `http ${res.status}`};
     }
     // A mint document is a few KB. A declared oversize body is refused
-    // unread; an undeclared one is refused after the read.
+    // unread; an undeclared one is read as a stream and cancelled the
+    // moment it passes the cap, so a hostile host that streams forever
+    // (/mints/probe takes any public URL) never fills the object's memory.
     const declared = Number(res.headers?.get('content-length') ?? NaN);
     if (Number.isFinite(declared) && declared > maxBytes) {
       await (res.body ? res.body.cancel() : Promise.resolve()).catch(() => {});
       return {ok: false, reason: 'too large'};
     }
-    const text = await res.text();
-    if (text.length > maxBytes) return {ok: false, reason: 'too large'};
+    const text = await readCapped(res, maxBytes);
+    if (text === undefined || text.length > maxBytes)
+      return {ok: false, reason: 'too large'};
     try {
       return {ok: true, body: JSON.parse(text)};
     } catch {

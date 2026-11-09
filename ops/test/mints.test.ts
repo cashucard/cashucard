@@ -470,6 +470,55 @@ test('probeMint refuses an oversized body, unread when content-length says so', 
   assert.equal((await probeMint('https://m.example', small)).ok, true);
 });
 
+test('probeMint cancels an undeclared body the moment it passes 64 KiB', async () => {
+  let pulled = 0;
+  let cancelled = 0;
+  let textRead = 0;
+  const endless: FetchFn = async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        pulled++;
+        c.enqueue(new Uint8Array(16 * 1024).fill(0x20));
+      },
+      cancel() {
+        cancelled++;
+      },
+    });
+    return {
+      status: 200,
+      headers: {get: () => null},
+      text: async () => {
+        textRead++;
+        return INFO;
+      },
+      body: stream,
+    };
+  };
+  const r = await probeMint('https://m.example', endless);
+  assert.equal(r.reason, 'info: too large');
+  assert.equal(cancelled, 2, 'both info and keysets streams cancelled');
+  assert.equal(textRead, 0, 'never buffered whole');
+  assert.ok(pulled <= 2 * 8, `stopped near the cap (${pulled} chunks)`);
+  // a small streamed body is decoded and parsed as usual
+  const enc = new TextEncoder();
+  const streamed: FetchFn = async url => ({
+    status: 200,
+    headers: {get: () => null},
+    text: async () => {
+      throw new Error('not used');
+    },
+    body: new ReadableStream<Uint8Array>({
+      start(c) {
+        const bytes = enc.encode(url.endsWith('/v1/info') ? INFO : KEYSETS);
+        c.enqueue(bytes.slice(0, 3));
+        c.enqueue(bytes.slice(3));
+        c.close();
+      },
+    }),
+  });
+  assert.equal((await probeMint('https://m.example', streamed)).ok, true);
+});
+
 // ── normalizeMintUrl ──────────────────────────────────────────────────────
 
 test('normalizeMintUrl accepts a public https mint and normalizes it', () => {
