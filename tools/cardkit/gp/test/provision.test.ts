@@ -3,7 +3,8 @@
  * APDU (before the card acts and after) followed by a run that sweeps and
  * installs, with Replace on and with it off, both guesses at what a torn LOAD
  * leaves, the opener rule, a mute INSTALL, refusals, the guards, a tampered
- * load file, and events that throw.
+ * load file, and events that throw. Then the same install on a fake J3R452,
+ * which opens SCP03, and the login guard under both protocols.
  */
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -26,11 +27,20 @@ import {
   helloPlan,
   mayLeaveGuardedApplet,
   provision,
+  rotateKeys,
   type Plan,
   type ProvisionOptions,
   type RunEvent,
 } from '../provision';
-import {SPIKE_KEYS, parseCommand, selectAid, type Transceiver} from '../scp02';
+import {
+  FACTORY_KEYS,
+  SPIKE_KEYS,
+  initializeUpdateCommand,
+  openSession,
+  parseCommand,
+  selectAid,
+  type Transceiver,
+} from '../scp02';
 import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
 import {FakeCard, ISD, pullAt} from '../../testing/fake-card';
 
@@ -576,6 +586,92 @@ describe('provision: the Cashu card', () => {
   });
 });
 
+describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
+  it('installs on a clean card in the same order, every card-manager command under the SCP03 C-MAC', async () => {
+    const card = new FakeCard({scp: 3});
+    const r = await provision(card.transceive, CASHU, options());
+    assert.equal(r.ok, true, r.reason);
+    assert.equal(r.phase, 'done');
+    assertInstalled(card);
+    assert.deepEqual(card.insLog(), INSTALL_ORDER);
+    // SCP03's 32-byte INITIALIZE UPDATE reply, and one login's counter
+    assert.equal(r.apdus.find(a => a.ins === 0x50)?.rlen, 32);
+    assert.equal(card.seq, 1);
+    for (const a of card.log.filter(x => (x[0] & 0x04) !== 0)) {
+      assert.equal(a[0], 0x84);
+      assert.equal(
+        parseCommand(a).le,
+        0x00,
+        `INS ${toHex([a[1]])} ends in Le 00`,
+      );
+    }
+    assert.deepEqual(r.blocks, {at: 88, of: 88});
+  });
+
+  it('comes back from a pull at any APDU, before or after the card acts, with a run that sweeps and installs', async () => {
+    const total = INSTALL_ORDER.length;
+    for (const partialLoad of ['discard', 'keep'] as const) {
+      for (const when of ['before', 'after'] as const) {
+        for (let n = 0; n < total; n++) {
+          const card = new FakeCard({scp: 3, partialLoad});
+          const pull = pullAt(card, n, when);
+          const first = await provision(
+            pull.tx,
+            CASHU,
+            options({replace: true}),
+          );
+          const where = `${partialLoad}/${when}/APDU ${n}`;
+          assert.equal(first.kind, 'pulled', where);
+          assert.equal(pull.state.late, 0, where);
+          card.reset();
+          const again = await provision(
+            card.transceive,
+            CASHU,
+            options({replace: true}),
+          );
+          assert.equal(
+            again.ok,
+            true,
+            `${where}: ${again.kind} ${again.reason}`,
+          );
+          assertInstalled(card);
+        }
+      }
+    }
+  });
+
+  for (const scp of [2, 3] as const) {
+    it(`stops before EXTERNAL AUTHENTICATE when probing with a key set the card no longer holds (SCP0${scp})`, async () => {
+      const card = new FakeCard({scp});
+      const rotated = await rotateKeys(
+        card.transceive,
+        FACTORY_KEYS,
+        SPIKE_KEYS,
+        options(),
+      );
+      assert.equal(rotated.ok, true, rotated.reason);
+      card.reset();
+      const before = card.log.length;
+      const r = await provision(card.transceive, CASHU, options());
+      assert.equal(r.kind, 'wrongKeys');
+      assert.equal(r.phase, 'auth');
+      const sent = card.log.slice(before).map(a => a[1]);
+      assert.deepEqual(sent, [0xa4, 0xa4, 0xca, 0x50]);
+      assert.ok(!sent.includes(0x82), 'no EXTERNAL AUTHENTICATE');
+      assert.equal(card.failedAuths, 0);
+      // the set it holds still opens it
+      card.reset();
+      const again = await provision(
+        card.transceive,
+        CASHU,
+        options({keys: SPIKE_KEYS}),
+      );
+      assert.equal(again.ok, true, again.reason);
+      assert.equal(card.failedAuths, 0);
+    });
+  }
+});
+
 describe('provision: the hello applet', () => {
   it('installs it, hears HELLO, and deletes it again, leaving the card as it found it', async () => {
     const card = new FakeCard();
@@ -666,5 +762,26 @@ describe('the fake card', () => {
     const r = await s.send(card.transceive, deleteAid(CASHU_PACKAGE_AID));
     assert.equal(r.sw, 0x6985);
     assert.equal(ISD, 'A000000151000000');
+  });
+
+  it("advances SCP03's 3-byte counter at every INITIALIZE UPDATE, with or without EXTERNAL AUTHENTICATE, and SCP02's only at EXTERNAL AUTHENTICATE", async () => {
+    const counter = (reply: number[]) =>
+      toHex(reply.slice(reply.length - 5, reply.length - 2));
+    const scp03 = new FakeCard({scp: 3, seq: 5});
+    const iu = () => initializeUpdateCommand(Array.from(randomBytes(8)));
+    assert.equal(counter(await scp03.transceive(iu())), '000006');
+    assert.equal(counter(await scp03.transceive(iu())), '000007');
+    scp03.reset();
+    assert.equal(counter(await scp03.transceive(iu())), '000008');
+    assert.equal(scp03.abandonedHandshakes, 2);
+    await openSession(scp03.transceive, FACTORY_KEYS, n => randomBytes(n));
+    assert.equal(scp03.seq, 9, 'the login took one more');
+    // SCP02's counter, bytes 12 and 13 of 28, stays until a login succeeds
+    const scp02 = new FakeCard();
+    const seq02 = (reply: number[]) => toHex(reply.slice(12, 14));
+    assert.equal(seq02(await scp02.transceive(iu())), '0009');
+    assert.equal(seq02(await scp02.transceive(iu())), '0009');
+    await openSession(scp02.transceive, FACTORY_KEYS, n => randomBytes(n));
+    assert.equal(seq02(await scp02.transceive(iu())), '000A');
   });
 });
