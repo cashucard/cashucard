@@ -46,7 +46,12 @@ validateDefaultMints(DEFAULT_MINTS);
 export type FetchFn = (
   input: string,
   init?: {signal?: AbortSignal; redirect?: 'manual'},
-) => Promise<{status: number; text(): Promise<string>}>;
+) => Promise<{
+  status: number;
+  text(): Promise<string>;
+  /** Present on a real Response; cancelled so a non-200 frees its slot. */
+  body?: {cancel(): Promise<void>} | null;
+}>;
 
 /** Calls the global fetch at call time (a detached `fetch` throws in workerd). */
 const globalFetch: FetchFn = (input, init) =>
@@ -69,7 +74,12 @@ async function getJson(
       signal: AbortSignal.timeout(timeoutMs),
       redirect: 'manual',
     });
-    if (res.status !== 200) return {ok: false, reason: `http ${res.status}`};
+    if (res.status !== 200) {
+      // An unread body holds one of workerd's 6 outbound connection slots
+      // until the runtime cancels it, which can starve the other probes.
+      await (res.body ? res.body.cancel() : res.text()).catch(() => {});
+      return {ok: false, reason: `http ${res.status}`};
+    }
     const text = await res.text();
     try {
       return {ok: true, body: JSON.parse(text)};

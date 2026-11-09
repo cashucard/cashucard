@@ -180,6 +180,50 @@ test('probeMint times out a hanging mint through its abort signal', async () => 
   assert.equal(r.reason, 'info: TimeoutError');
 });
 
+test('probeMint releases the body of every non-200 response', async () => {
+  // A stream-backed body (a real Response) is cancelled, not read.
+  let cancelled = 0;
+  let read = 0;
+  const streamed: FetchFn = async url => ({
+    status: url.endsWith('/v1/info') ? 404 : 500,
+    text: async () => {
+      read++;
+      return 'not found';
+    },
+    body: {
+      cancel: async () => {
+        cancelled++;
+      },
+    },
+  });
+  const r1 = await probeMint('https://m.example', streamed);
+  assert.equal(r1.reason, 'info: http 404');
+  assert.equal(cancelled, 2);
+  assert.equal(read, 0);
+
+  // Without a body handle the body is drained instead; a failing drain or
+  // cancel never turns into a throw or a different reason.
+  read = 0;
+  const plain: FetchFn = async () => ({
+    status: 301,
+    text: async () => {
+      read++;
+      throw new Error('drain failed');
+    },
+  });
+  const r2 = await probeMint('https://m.example', plain);
+  assert.equal(r2.reason, 'info: http 301');
+  assert.equal(read, 2);
+
+  const badCancel: FetchFn = async () => ({
+    status: 503,
+    text: async () => '',
+    body: {cancel: () => Promise.reject(new Error('boom'))},
+  });
+  const r3 = await probeMint('https://m.example', badCancel);
+  assert.equal(r3.reason, 'info: http 503');
+});
+
 // ── createMintList ────────────────────────────────────────────────────────
 
 const A = 'https://a.example';
