@@ -4,10 +4,24 @@
 afe = "afe"
 # triple DES's encrypt-decrypt-encrypt order (OpenSSL's des-ede3), in tools/cardkit
 ede = "ede"
+# Apple's device identifier, in the hardware reports
+udid = "udid"
+# the age library's class (age.Encrypter) and its instance
+encrypter = "encrypter"
+# an existing error message string in ops/src/route-request.ts
+unparseable = "unparseable"
+# HashiCorp, the company
+hashi = "hashi"
 
 [default.extend-identifiers]
 # a plural of the SELECT command, in the applet's tests
 SELECTs = "SELECTs"
+DELETEs = "DELETEs"
+PNGs = "PNGs"
+# short commit hashes quoted in reports
+"52307ba" = "52307ba"
+"5472ba9" = "5472ba9"
+"123ba99" = "123ba99"
 
 [files]
 # gp's APDU logs (H0 captures), the provisioner's load files and Xcode's object
@@ -16,4 +30,9 @@ extend-exclude = [
   "tools/cardkit/gp/test/fixtures/*.txt",
   "apps/provisioner/src/assets/",
   "*.pbxproj",
+  # patch-package diffs: index lines carry git object hashes
+  "apps/provisioner/patches/*.patch",
+  # signed Nostr events recorded from public relays (ENG-832): third-party
+  # text and hex that cannot be edited without breaking the signatures
+  "ops/test/fixtures/nip87/",
 ]
