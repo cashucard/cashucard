@@ -74,16 +74,16 @@ their original service and operator binding.
 
 ## Configuration
 
-| Setting                   | Purpose                                                                                                                                            |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OPS_MASTER_KEY_FILE`     | Read the issuer master from a mounted regular file. `OPS_MASTER_KEY` is an alternative for an existing secret-manager environment. Set one source. |
-| `OPS_OPERATOR_SETUP_FILE` | Optional private bootstrap/recovery JSON. `OPS_OPERATOR_SETUP` is the direct secret-manager alternative.                                           |
-| `OPS_OPERATOR_ADMINS`     | Required JSON array of existing administrator names; the example starts with `issuer-admin`.                                                       |
-| `OPS_DB`                  | SQLite path, default `/data/ops.sqlite`.                                                                                                           |
-| `OPS_HOST`, `OPS_PORT`    | Container listener, default `0.0.0.0:8821`. Keep the host publication behind HTTPS.                                                                |
-| `OPS_MINTS`               | Optional JSON array of HTTPS mint references offered to operators. Defaults are in `src/config.ts`.                                                |
-| `OPS_BACKUP_RECIPIENT`    | Public age recipient used by `backup`; keep its private recovery identity separately.                                                              |
-| `OPS_BACKUP_DIR`          | Encrypted export directory, default `/backups`.                                                                                                    |
+| Setting                   | Purpose                                                                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPS_MASTER_KEY_FILE`     | Read the issuer master from a mounted regular file. `OPS_MASTER_KEY` is an alternative for an existing secret-manager environment. Set one source.                              |
+| `OPS_OPERATOR_SETUP_FILE` | Optional private bootstrap/recovery JSON. `OPS_OPERATOR_SETUP` is the direct secret-manager alternative.                                                                        |
+| `OPS_OPERATOR_ADMINS`     | Required JSON array of existing administrator names; the example starts with `issuer-admin`.                                                                                    |
+| `OPS_DB`                  | SQLite path, default `/data/ops.sqlite`.                                                                                                                                        |
+| `OPS_HOST`, `OPS_PORT`    | Container listener, default `0.0.0.0:8821`. Keep the host publication behind HTTPS.                                                                                             |
+| `OPS_MINTS`               | Optional JSON array of HTTPS mint references offered to operators, served as given. Without it, the defaults in `src/config.ts` are probed and unreachable ones dropped (D179). |
+| `OPS_BACKUP_RECIPIENT`    | Public age recipient used by `backup`; keep its private recovery identity separately.                                                                                           |
+| `OPS_BACKUP_DIR`          | Encrypted export directory, default `/backups`.                                                                                                                                 |
 
 Mounted secret files are bounded regular files. Configure secret-file ownership
 so the container's `node` user (UID 1000) can read them. The named volume in
