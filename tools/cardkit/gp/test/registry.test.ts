@@ -6,12 +6,22 @@ import test from 'node:test';
 import {
   RegistryEvidenceError,
   readCashuRegistry,
+  readForeignTag,
   registryCommand,
   parseRegistryEntries,
 } from '../registry';
-import {FACTORY_KEYS, openSession, parseReply, type Reply} from '../scp02';
+import {
+  CardError,
+  FACTORY_KEYS,
+  openSession,
+  parseReply,
+  type Reply,
+} from '../scp02';
+import {TAG_AID} from '../aids';
 import {fromHex, toHex} from '../bytes';
+import {cashuPlan, provision} from '../provision';
 import {FakeCard} from '../../testing/fake-card';
+import {CASHU_LOAD_FILE} from './assets';
 import {parseGpLog, replay} from './transcript';
 
 const fixture = join(__dirname, 'fixtures/gp-list.txt');
@@ -244,4 +254,95 @@ test('unexpected status and non-progressing pagination stop without retry', asyn
     await assert.rejects(() => readCashuRegistry(send));
     assert.equal(commands.length, replies.length);
   }
+});
+
+/** The seller's tag's entry, with one field's bytes (hex) replaced, its E3 length set again. */
+function sellerTag(edit?: readonly [string, string]): number[] {
+  let fields = toHex(SELLER_TAG.slice(2));
+  if (edit) {
+    assert.ok(fields.includes(edit[0]), edit[0]);
+    fields = fields.replace(edit[0], edit[1]);
+  }
+  const bytes = fromHex(fields);
+  return [0xe3, bytes.length, ...bytes];
+}
+
+test(
+  "readForeignTag finds the seller's NDEF tag on the J3R452 as it came (scp03-07), from GET STATUS of the applications alone",
+  {skip: j3r452Pending},
+  async () => {
+    const card = fromJ3r452();
+    assert.equal(await readForeignTag(card.send), true);
+    assert.deepEqual(card.commands, [registryCommand('applications')]);
+  },
+);
+
+test(
+  'readForeignTag finds none where the Cashu card is installed (gp-list)',
+  {skip: pending},
+  async () => {
+    const {send, commands} = script([ok(apps)]);
+    assert.equal(await readForeignTag(send), false);
+    assert.deepEqual(commands, [registryCommand('applications')]);
+  },
+);
+
+test('readForeignTag finds none on a blank card, nor on a J3R452 the Cashu card is installed on', async () => {
+  const blank = script([{data: [], sw: 0x6a88}]);
+  assert.equal(await readForeignTag(blank.send), false);
+  assert.deepEqual(blank.commands, [registryCommand('applications')]);
+  const card = new FakeCard({scp: 3});
+  const installed = await provision(
+    card.transceive,
+    cashuPlan(CASHU_LOAD_FILE),
+    {
+      random: n => randomBytes(n),
+      now: () => 0,
+    },
+  );
+  assert.equal(installed.ok, true, installed.reason);
+  assert.ok(card.instanceAids().includes(toHex(TAG_AID)), 'our tag is there');
+  card.reset();
+  const session = await openSession(card.transceive, FACTORY_KEYS, n =>
+    randomBytes(n),
+  );
+  assert.equal(
+    await readForeignTag(c => session.send(card.transceive, c)),
+    false,
+  );
+});
+
+test("readForeignTag holds the instance at D2760000850101 to the seller's shape, its own load file in the security domain named, selectable, with no privileges: anything else is RegistryEvidenceError", async () => {
+  assert.equal(await readForeignTag(script([ok(sellerTag())]).send), true);
+  for (const [name, edit] of [
+    [
+      'another security domain',
+      ['CC08A000000151000000', 'CC08A000000003000000'],
+    ],
+    ['locked (life cycle 83)', ['9F700107', '9F700183']],
+    ['installed, not selectable (life cycle 03)', ['9F700107', '9F700103']],
+    ['a privilege (security domain)', ['C503000000', 'C503800000']],
+    ['no privileges listed', ['C503000000', '']],
+    ['no load file', ['C405D276000085', '']],
+  ] as const) {
+    await assert.rejects(
+      readForeignTag(script([ok(sellerTag(edit))]).send),
+      RegistryEvidenceError,
+      name,
+    );
+  }
+  // the seller's own bytes, held to another security domain than theirs
+  await assert.rejects(
+    readForeignTag(script([ok(sellerTag())]).send, fromHex('A000000003000000')),
+    RegistryEvidenceError,
+  );
+  // a reply that does not parse is no evidence, and a refusal is the card's
+  await assert.rejects(
+    readForeignTag(script([ok(sellerTag().slice(0, -1))]).send),
+    RegistryEvidenceError,
+  );
+  await assert.rejects(
+    readForeignTag(script([{data: [], sw: 0x6982}]).send),
+    CardError,
+  );
 });
