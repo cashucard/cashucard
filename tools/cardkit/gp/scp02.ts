@@ -76,8 +76,8 @@ export const FACTORY_KEYS: KeySet = {enc: K40, mac: K40, dek: K40};
 
 /**
  * The key set version the public default sits at: a J3R180 ships there, and a
- * J3R452 is moved there at first contact (D182). A reset restores the public
- * default at this version on both chips.
+ * J3R452 is moved there at first contact (D182). The reset puts the public
+ * default back in place, so a card the tap provisioned returns to it here.
  */
 export const FACTORY_KVN = 0x01;
 

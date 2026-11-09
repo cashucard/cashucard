@@ -325,6 +325,8 @@ test("readForeignTag holds the instance at D2760000850101 to the seller's shape,
     ['no privileges listed', ['C503000000', '']],
     ['no load file', ['C405D276000085', '']],
   ] as const) {
+    // a well-formed entry, so it is the shape that is refused
+    assert.equal(parseRegistryEntries(sellerTag(edit)).length, 1, name);
     await assert.rejects(
       readForeignTag(script([ok(sellerTag(edit))]).send),
       RegistryEvidenceError,
