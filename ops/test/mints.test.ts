@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   createMintList,
   DEFAULT_MINTS,
+  normalizeMintUrl,
   probeMint,
+  sanitizeMintName,
   validateDefaultMints,
   type FetchFn,
 } from '../src/config';
@@ -84,6 +86,7 @@ test('probeMint passes valid info plus non-empty keysets, without following redi
   assert.deepEqual(await probeMint('https://m.example/Bitcoin', f), {
     url: 'https://m.example/Bitcoin',
     ok: true,
+    name: 'test mint',
   });
   assert.deepEqual(f.calls.sort(), [
     'https://m.example/Bitcoin/v1/info',
@@ -337,4 +340,232 @@ test('createMintList drops a mint whose fetch throws synchronously', async () =>
   });
   assert.deepEqual(await list(), []);
   assert.equal(logs[0][0], 'mint dropped');
+});
+
+// ── the sat gate, the name and the size cap (D180) ───────────────────────
+
+const withKeysets =
+  (keysets: unknown) =>
+  (url: string): Reply =>
+    url.endsWith('/v1/info')
+      ? {status: 200, body: INFO}
+      : {status: 200, body: JSON.stringify({keysets})};
+
+test('probeMint requires an active sat keyset', async () => {
+  const usdOnly = await probeMint(
+    'https://m.example',
+    fakeFetch(withKeysets([{id: '00aa', unit: 'usd', active: true}])),
+  );
+  assert.deepEqual(usdOnly, {
+    url: 'https://m.example',
+    ok: false,
+    reason: 'keysets: no active sat',
+  });
+  const inactiveSat = await probeMint(
+    'https://m.example',
+    fakeFetch(
+      withKeysets([
+        {id: '00aa', unit: 'sat', active: false},
+        {id: '00bb', unit: 'usd', active: true},
+      ]),
+    ),
+  );
+  assert.equal(inactiveSat.reason, 'keysets: no active sat');
+  const noUnit = await probeMint(
+    'https://m.example',
+    fakeFetch(withKeysets([{id: '00aa'}, null, 'x'])),
+  );
+  assert.equal(noUnit.reason, 'keysets: no active sat');
+  const mixed = await probeMint(
+    'https://m.example',
+    fakeFetch(
+      withKeysets([
+        {id: '00aa', unit: 'usd', active: true},
+        {id: '00bb', unit: 'sat', active: true},
+      ]),
+    ),
+  );
+  assert.equal(mixed.ok, true);
+  // NUT-02 older mints omit `active`: absent counts as active.
+  const noActive = await probeMint(
+    'https://m.example',
+    fakeFetch(withKeysets([{id: '00bb', unit: 'sat'}])),
+  );
+  assert.equal(noActive.ok, true);
+});
+
+test('createMintList drops a default whose only keyset is usd', async () => {
+  const logs: unknown[][] = [];
+  const list = createMintList([A, B], {
+    fetchFn: fakeFetch(u =>
+      u.startsWith(B)
+        ? withKeysets([{id: '00aa', unit: 'usd', active: true}])(u)
+        : healthy(u),
+    ),
+    log: (...args) => logs.push(args),
+  });
+  assert.deepEqual(await list(), [A]);
+  assert.deepEqual(logs, [['mint dropped', B, 'keysets: no active sat']]);
+});
+
+test('probeMint passes a sanitized, truncated name and omits a missing one', async () => {
+  const named = (name: unknown) =>
+    fakeFetch(u =>
+      u.endsWith('/v1/info')
+        ? {status: 200, body: JSON.stringify({name})}
+        : {status: 200, body: KEYSETS},
+    );
+  const evil = '  Good\u202eMint\n\u0007\u2066x\u0085y  ';
+  assert.equal(
+    (await probeMint('https://m.example', named(evil))).name,
+    'GoodMintxy',
+  );
+  const long = 'A'.repeat(39) + '\u{1F600}' + 'B'.repeat(10);
+  const cut = (await probeMint('https://m.example', named(long))).name!;
+  assert.equal(Array.from(cut).length, 40);
+  assert.ok(cut.endsWith('\u{1F600}'), 'a surrogate pair is never split');
+  for (const bad of [undefined, 42, {x: 1}, '\u202e\n  '])
+    assert.ok(
+      !('name' in (await probeMint('https://m.example', named(bad)))),
+      String(bad),
+    );
+  assert.equal(sanitizeMintName('a\r\nb'), 'ab');
+  assert.equal(sanitizeMintName(''), undefined);
+});
+
+test('probeMint refuses an oversized body, unread when content-length says so', async () => {
+  let read = 0;
+  let cancelled = 0;
+  const declared: FetchFn = async () => ({
+    status: 200,
+    headers: {get: (h: string) => (h === 'content-length' ? '70000' : null)},
+    text: async () => {
+      read++;
+      return INFO;
+    },
+    body: {
+      cancel: async () => {
+        cancelled++;
+      },
+    },
+  });
+  const r1 = await probeMint('https://m.example', declared);
+  assert.equal(r1.reason, 'info: too large');
+  assert.equal(read, 0);
+  assert.equal(cancelled, 2);
+  const big = JSON.stringify({name: 'x', pad: 'p'.repeat(70_000)});
+  const undeclared = await probeMint(
+    'https://m.example',
+    fakeFetch(u =>
+      u.endsWith('/v1/info') ? {status: 200, body: big} : healthy(u),
+    ),
+  );
+  assert.equal(undeclared.reason, 'info: too large');
+  // a small declared length is read as usual
+  const small: FetchFn = async url => ({
+    status: 200,
+    headers: {get: () => '120'},
+    text: async () => (url.endsWith('/v1/info') ? INFO : KEYSETS),
+  });
+  assert.equal((await probeMint('https://m.example', small)).ok, true);
+});
+
+test('probeMint cancels an undeclared body the moment it passes 64 KiB', async () => {
+  let pulled = 0;
+  let cancelled = 0;
+  let textRead = 0;
+  const endless: FetchFn = async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        pulled++;
+        c.enqueue(new Uint8Array(16 * 1024).fill(0x20));
+      },
+      cancel() {
+        cancelled++;
+      },
+    });
+    return {
+      status: 200,
+      headers: {get: () => null},
+      text: async () => {
+        textRead++;
+        return INFO;
+      },
+      body: stream,
+    };
+  };
+  const r = await probeMint('https://m.example', endless);
+  assert.equal(r.reason, 'info: too large');
+  assert.equal(cancelled, 2, 'both info and keysets streams cancelled');
+  assert.equal(textRead, 0, 'never buffered whole');
+  assert.ok(pulled <= 2 * 8, `stopped near the cap (${pulled} chunks)`);
+  // a small streamed body is decoded and parsed as usual
+  const enc = new TextEncoder();
+  const streamed: FetchFn = async url => ({
+    status: 200,
+    headers: {get: () => null},
+    text: async () => {
+      throw new Error('not used');
+    },
+    body: new ReadableStream<Uint8Array>({
+      start(c) {
+        const bytes = enc.encode(url.endsWith('/v1/info') ? INFO : KEYSETS);
+        c.enqueue(bytes.slice(0, 3));
+        c.enqueue(bytes.slice(3));
+        c.close();
+      },
+    }),
+  });
+  assert.equal((await probeMint('https://m.example', streamed)).ok, true);
+});
+
+// ── normalizeMintUrl ──────────────────────────────────────────────────────
+
+test('normalizeMintUrl accepts a public https mint and normalizes it', () => {
+  const ok: [string, string][] = [
+    ['https://mint.example', 'https://mint.example'],
+    ['https://mint.example/', 'https://mint.example'],
+    ['https://MINT.Example/Bitcoin', 'https://mint.example/Bitcoin'],
+    ['https://mint.example/Bitcoin/', 'https://mint.example/Bitcoin'],
+    ['https://mint.example:443', 'https://mint.example'],
+  ];
+  for (const [raw, want] of ok) assert.equal(normalizeMintUrl(raw), want, raw);
+  for (const d of DEFAULT_MINTS) assert.equal(normalizeMintUrl(d), d);
+});
+
+test('normalizeMintUrl rejects IPs, internal names, ports, userinfo and http', () => {
+  const bad: unknown[] = [
+    'http://mint.example',
+    'https://127.0.0.1',
+    'https://10.0.0.1:443',
+    'https://[::1]',
+    'https://[2001:db8::1]/x',
+    'https://2130706433', // decimal 127.0.0.1
+    'https://0x7f000001', // hex 127.0.0.1
+    'https://0177.0.0.1', // octal
+    'https://localhost',
+    'https://mint.localhost',
+    'https://printer.local',
+    'https://svc.internal',
+    'https://abc.onion',
+    'https://intranet',
+    'https://mint.example.',
+    'https://mint.example:8443',
+    'https://user:pw@mint.example',
+    'https://user@mint.example',
+    'https://mint.example?x=1',
+    'https://mint.example/?',
+    'https://mint.example#x',
+    'https://mint.example//',
+    'https://mint.example/a b',
+    `https://mint.example/${'a'.repeat(200)}`,
+    'mint.example',
+    'wss://mint.example',
+    '',
+    42,
+    null,
+    undefined,
+  ];
+  for (const raw of bad)
+    assert.equal(normalizeMintUrl(raw), undefined, String(raw));
 });

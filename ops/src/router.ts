@@ -15,7 +15,8 @@ import {operatorAdminRequest} from './operator-admin';
  *   GET  /auth/operator/sessions  the operator's live sessions (operator only)
  *   POST /auth/operator/revoke    revoke a principal's live sessions (operator only)
  *   POST /keys/issue              {device_id, attempt_id}; owned active reservation
- *   GET  /mints                   active mint list
+ *   GET  /mints                   active mint list (+ mint_info for discovered mints)
+ *   GET  /mints/probe?url=        probe a written-in mint (D180)
  *   GET  /anchor/tip              PUBLIC: 80-byte header, 60 s cache, 503 with last-good
  *   POST /provisioning/*          operator-only durable reservations and receipts
  *   POST /registry/cards          retired: 410 reservation-required
@@ -42,6 +43,7 @@ import {ProvisioningError} from './provisioning';
 import {BackupFreshnessError} from './recovery-evidence';
 import {provisioningHttp, reservedKeys} from './provisioning-http';
 import {addCapRelease, listCapReleases, RegistryError} from './registry';
+import {normalizeMintUrl, probeMint, type MintProbe} from './config';
 
 const BODY_LIMIT = 1 << 20; // 1 MiB; a registry row is a few hundred bytes
 
@@ -58,6 +60,13 @@ export interface RouterDeps {
    * defaults (config.ts createMintList). Unset when OPS_MINTS overrides.
    */
   readonly availableMints?: () => Promise<readonly string[]>;
+  /**
+   * Review count and name for discovered mints (discovery.ts createCatalog,
+   * D180). Unset when OPS_MINTS overrides or discovery is off.
+   */
+  readonly mintInfo?: () => Record<string, {name?: string; reviews: number}>;
+  /** The write-in probe behind GET /mints/probe; config.ts probeMint by default. */
+  readonly probeMint?: (url: string) => Promise<MintProbe>;
 }
 
 interface JsonBody {
@@ -292,7 +301,40 @@ export async function route(
       const mints = deps.availableMints
         ? await deps.availableMints()
         : deps.mints;
-      sendJson(res, 200, {mints: [...mints]});
+      // mint_info is additive: builds that read only `mints` are unaffected.
+      const served = new Set(mints);
+      const info = Object.fromEntries(
+        Object.entries(deps.mintInfo ? deps.mintInfo() : {}).filter(([u]) =>
+          served.has(u),
+        ),
+      );
+      sendJson(
+        res,
+        200,
+        Object.keys(info).length > 0
+          ? {mints: [...mints], mint_info: info}
+          : {mints: [...mints]},
+      );
+      return;
+    }
+    if (method === 'GET' && path === '/mints/probe') {
+      // Session first, as above: no anonymous outbound probes.
+      requireSession(deps, req);
+      const target = normalizeMintUrl(url.searchParams.get('url'));
+      if (!target) {
+        sendJson(res, 200, {ok: false, reason: 'invalid url'});
+        return;
+      }
+      const probe = await (deps.probeMint ?? probeMint)(target);
+      sendJson(
+        res,
+        200,
+        probe.ok
+          ? probe.name
+            ? {ok: true, name: probe.name}
+            : {ok: true}
+          : {ok: false, reason: probe.reason ?? 'probe failed'},
+      );
       return;
     }
 

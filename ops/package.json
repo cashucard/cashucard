@@ -15,9 +15,11 @@
     "typecheck:workers": "tsc -p tsconfig.workers.json --noEmit",
     "test:workers": "vitest run --config vitest.workers.config.mts",
     "test:node": "node --import tsx --test 'test/*.test.ts'",
-    "probe:mints": "node --import tsx test/live/default-mints.live.ts"
+    "probe:mints": "node --import tsx test/live/default-mints.live.ts",
+    "probe:discovery": "node --import tsx test/live/discovery.live.ts"
   },
   "dependencies": {
+    "@noble/curves": "1.9.7",
     "@noble/hashes": "1.8.0",
     "age-encryption": "0.2.4",
     "better-sqlite3": "12.11.1",

@@ -49,8 +49,19 @@ export type FetchFn = (
 ) => Promise<{
   status: number;
   text(): Promise<string>;
-  /** Present on a real Response; cancelled so a non-200 frees its slot. */
-  body?: {cancel(): Promise<void>} | null;
+  /** Present on a real Response; read for content-length only. */
+  headers?: {get(name: string): string | null};
+  /**
+   * Present on a real Response: cancelled so a non-200 frees its slot, and
+   * read through getReader() so an undeclared body is capped as it streams.
+   */
+  body?: {
+    cancel(): Promise<void>;
+    getReader?(): {
+      read(): Promise<{done: boolean; value?: Uint8Array}>;
+      cancel(): Promise<void>;
+    };
+  } | null;
 }>;
 
 /** Calls the global fetch at call time (a detached `fetch` throws in workerd). */
@@ -62,12 +73,65 @@ export interface MintProbe {
   readonly ok: boolean;
   /** A status code or an error name; never a response body. */
   readonly reason?: string;
+  /** The mint's `/v1/info` name, sanitized (sanitizeMintName); untrusted. */
+  readonly name?: string;
+}
+
+/** The longest mint name the service passes on (D180). */
+export const MINT_NAME_MAX = 40;
+
+/**
+ * A mint's self-reported name is untrusted text: drop C0/C1 controls (which
+ * include newlines), line and paragraph separators and the bidi embedding,
+ * override and isolate controls, trim, and cut to MINT_NAME_MAX code points.
+ * Returns undefined when nothing printable is left.
+ */
+export function sanitizeMintName(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const cleaned = raw
+    .replace(
+      /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g,
+      '',
+    )
+    .trim();
+  const name = Array.from(cleaned).slice(0, MINT_NAME_MAX).join('').trim();
+  return name === '' ? undefined : name;
+}
+
+/** The body as text, or undefined once it passes maxBytes (then cancelled). */
+async function readCapped(
+  res: Awaited<ReturnType<FetchFn>>,
+  maxBytes: number,
+): Promise<string | undefined> {
+  const reader = res.body?.getReader?.();
+  if (!reader) return res.text(); // fakes without a stream
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
 }
 
 async function getJson(
   fetchFn: FetchFn,
   url: string,
   timeoutMs: number,
+  maxBytes = 65536,
 ): Promise<{ok: true; body: unknown} | {ok: false; reason: string}> {
   try {
     const res = await fetchFn(url, {
@@ -80,7 +144,18 @@ async function getJson(
       await (res.body ? res.body.cancel() : res.text()).catch(() => {});
       return {ok: false, reason: `http ${res.status}`};
     }
-    const text = await res.text();
+    // A mint document is a few KB. A declared oversize body is refused
+    // unread; an undeclared one is read as a stream and cancelled the
+    // moment it passes the cap, so a hostile host that streams forever
+    // (/mints/probe takes any public URL) never fills the object's memory.
+    const declared = Number(res.headers?.get('content-length') ?? NaN);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      await (res.body ? res.body.cancel() : Promise.resolve()).catch(() => {});
+      return {ok: false, reason: 'too large'};
+    }
+    const text = await readCapped(res, maxBytes);
+    if (text === undefined || text.length > maxBytes)
+      return {ok: false, reason: 'too large'};
     try {
       return {ok: true, body: JSON.parse(text)};
     } catch {
@@ -96,8 +171,9 @@ async function getJson(
 
 /**
  * Probe one mint: `/v1/info` must be a JSON object and `/v1/keysets` must
- * carry a non-empty `keysets` array (NUT-02), both as a plain 200. Redirects
- * are not followed, so a 301 to a dead host fails. Never throws.
+ * carry a non-empty `keysets` array (NUT-02) with at least one active sat
+ * keyset (D180), both as a plain 200 of at most 64 KiB. Redirects are not
+ * followed, so a 301 to a dead host fails. Never throws.
  */
 export async function probeMint(
   url: string,
@@ -120,7 +196,53 @@ export async function probeMint(
   const list = (keysets.body as {keysets?: unknown} | null)?.keysets;
   if (!Array.isArray(list) || list.length === 0)
     return {url, ok: false, reason: 'keysets: empty'};
-  return {url, ok: true};
+  const sat = list.some(
+    k =>
+      typeof k === 'object' &&
+      k !== null &&
+      (k as {unit?: unknown}).unit === 'sat' &&
+      (k as {active?: unknown}).active !== false,
+  );
+  if (!sat) return {url, ok: false, reason: 'keysets: no active sat'};
+  const name = sanitizeMintName((info.body as {name?: unknown}).name);
+  return name === undefined ? {url, ok: true} : {url, ok: true, name};
+}
+
+const INTERNAL_SUFFIXES = ['.local', '.localhost', '.internal', '.onion'];
+
+/**
+ * The one shape a discovered or written-in mint URL may take (D180): https,
+ * at most 200 characters, no userinfo, query or fragment, port 443 or none,
+ * a dotted DNS name that is not an IP literal (URL canonicalises decimal and
+ * hex IPv4 forms, so they are caught too) or an internal name. The host is
+ * lowercased and one trailing slash is dropped. Returns undefined otherwise.
+ * Not a defence against DNS rebinding.
+ */
+export function normalizeMintUrl(raw: unknown): string | undefined {
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 200)
+    return undefined;
+  if (raw.includes('?') || raw.includes('#') || /\s/.test(raw))
+    return undefined;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return undefined;
+  }
+  if (u.protocol !== 'https:') return undefined;
+  if (u.username || u.password || u.search || u.hash) return undefined;
+  if (u.port !== '') return undefined; // URL drops an explicit :443
+  const host = u.hostname.toLowerCase();
+  if (!host.includes('.') || host.endsWith('.') || host.startsWith('['))
+    return undefined;
+  if (/^[\d.]+$/.test(host)) return undefined;
+  if (host === 'localhost' || INTERNAL_SUFFIXES.some(s => host.endsWith(s)))
+    return undefined;
+  let path = u.pathname;
+  if (path.endsWith('/')) path = path.slice(0, -1);
+  if (path.endsWith('/')) return undefined;
+  const out = `https://${host}${path}`;
+  return out.length > 200 ? undefined : out;
 }
 
 export interface MintListOptions {

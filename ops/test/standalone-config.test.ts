@@ -38,3 +38,23 @@ test('secret files are bounded regular files and errors exclude their contents',
     rmSync(dir, {recursive: true, force: true});
   }
 });
+
+test('standalone configuration reads the mint discovery switch and denylist (D180)', () => {
+  const env = {OPS_OPERATOR_ADMINS: '["issuer-admin"]'};
+  assert.equal(standaloneConfig(env).mintDiscovery, true);
+  assert.deepEqual(standaloneConfig(env).mintDenylist, []);
+  assert.equal(
+    standaloneConfig({...env, OPS_MINT_DISCOVERY: 'off'}).mintDiscovery,
+    false,
+  );
+  assert.deepEqual(
+    standaloneConfig({...env, OPS_MINT_DENYLIST: '["https://bad.example"]'})
+      .mintDenylist,
+    ['https://bad.example'],
+  );
+  for (const bad of ['{', '{}', '[1]'])
+    assert.throws(
+      () => standaloneConfig({...env, OPS_MINT_DENYLIST: bad}),
+      /Invalid OPS_MINT_DENYLIST/,
+    );
+});

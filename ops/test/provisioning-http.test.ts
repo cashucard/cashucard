@@ -418,3 +418,77 @@ test('GET /mints serves the static list when availableMints is unset', async () 
     db.close();
   }
 });
+
+test('GET /mints adds mint_info for listed discovered mints only, and omits it when empty', async () => {
+  const {db, call, alice} = await setup({
+    availableMints: async () => ['https://a.example', 'https://d.example'],
+    mintInfo: () => ({
+      'https://d.example': {name: 'Discovered', reviews: 4},
+      'https://not-served.example': {reviews: 9},
+    }),
+  });
+  try {
+    const served = await call('/mints', undefined, alice.token);
+    assert.equal(served.status, 200);
+    assert.deepEqual(served.body, {
+      mints: ['https://a.example', 'https://d.example'],
+      mint_info: {'https://d.example': {name: 'Discovered', reviews: 4}},
+    });
+  } finally {
+    db.close();
+  }
+  const empty = await setup({
+    availableMints: async () => ['https://a.example'],
+    mintInfo: () => ({}),
+  });
+  try {
+    assert.deepEqual(
+      (await empty.call('/mints', undefined, empty.alice.token)).body,
+      {mints: ['https://a.example']},
+    );
+  } finally {
+    empty.db.close();
+  }
+});
+
+test('GET /mints/probe needs a session, refuses a bad URL without echoing it, and returns the name', async () => {
+  const probed: string[] = [];
+  const {db, call, alice} = await setup({
+    probeMint: async url => {
+      probed.push(url);
+      return url === 'https://good.example/Bitcoin'
+        ? {url, ok: true, name: 'Good Mint'}
+        : {url, ok: false, reason: 'keysets: no active sat'};
+    },
+  });
+  try {
+    const q = (u: string) => `/mints/probe?url=${encodeURIComponent(u)}`;
+    const anonymous = await call(q('https://good.example'));
+    assert.equal(anonymous.status, 401);
+    assert.equal(probed.length, 0, 'no probe without a session');
+    for (const bad of [
+      'http://127.0.0.1:3338/<script>secret-input',
+      'https://localhost/secret-input',
+      'secret-input',
+    ]) {
+      const r = await call(q(bad), undefined, alice.token);
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.body, {ok: false, reason: 'invalid url'});
+      assert.ok(!JSON.stringify(r.body).includes('secret-input'));
+    }
+    const missing = await call('/mints/probe', undefined, alice.token);
+    assert.deepEqual(missing.body, {ok: false, reason: 'invalid url'});
+    assert.equal(probed.length, 0);
+    const good = await call(
+      q('https://GOOD.example/Bitcoin/'),
+      undefined,
+      alice.token,
+    );
+    assert.deepEqual(good.body, {ok: true, name: 'Good Mint'});
+    assert.deepEqual(probed, ['https://good.example/Bitcoin'], 'normalized');
+    const usd = await call(q('https://usd.example'), undefined, alice.token);
+    assert.deepEqual(usd.body, {ok: false, reason: 'keysets: no active sat'});
+  } finally {
+    db.close();
+  }
+});
