@@ -5380,8 +5380,9 @@ it at security level 01, C-MAC only, with AES-128 keys and i=10:
   reset's registry check (`inspectInstallation` selects applets by AID and has
   no domain to take), so `resetOwnedCard` takes the ISD alone: any other
   `sdAid` stops it `guarded` before its first APDU, where it would otherwise
-  save `delete_intent` and then stop at the registry on every retry. Slice 2
-  (ENG-835) takes them on with the rest of the J3R452's first contact.
+  save `delete_intent` and then stop at the registry on every retry. Nothing
+  threads `sdAid` through them until a security domain other than the ISD is
+  needed ([D182](#d182)).
 
 **Why.** The J3R452 opens SCP03 only, and both cardkits spoke SCP02 only. D27's
 revisit clause ("Revisit if a later chip ships a factory AES set") has fired: the
@@ -5451,9 +5452,10 @@ of an incompatible change, would stop `tools/outbox-spike/run-compact.cjs` and
 audit, so moving their pin fails that plan's admission. The owner decides the
 bump with the review of those runners. Also not here: protocol choice in the
 apps, first contact with a seller-keyed card (PUT KEY with P1 = 00 at version
-255) and what becomes of the seller's tag (slice 2; until then an install on a
-J3R452 that still holds it stops `guarded` with nothing deleted), R-MAC, S16
-and security levels above 01, AES-192 and AES-256.
+255) and what becomes of the seller's tag (slice 2, since decided in
+[D182](#d182) for a card whose shipped set is known; an install that does not
+ask for the tag's delete still stops `guarded` with nothing deleted on a J3R452
+that holds it), R-MAC, S16 and security levels above 01, AES-192 and AES-256.
 
 **Rejected.** A second entry point beside `openSession` for SCP03 (every caller
 would choose, and choose wrong on the other chip); accepting a random card
@@ -5462,3 +5464,93 @@ whose cryptogram proves the MAC key but not the ENC key or the security domain;
 `putKeys` taking a key type or a raw DEK from the caller; `@noble/ciphers` 2.x
 (ESM only, and a compiler upgrade for both consumers); an AES written here; a
 native cipher (D27's reasons stand).
+
+## <a id="d182"></a>D182: first contact moves a J3R452 from key version FF to 01, and the tap deletes the seller's tag
+
+**Decided (ENG-837, 2026-11-09):** a J3R452 ships at key version FF with the
+seller's NDEF tag at the tag's AID, `D2760000850101`. After one tap it installs,
+rotates and resets as a J3R180 does:
+
+- **First contact is the tap's rotation.** `rotateKeys` reads the version
+  INITIALIZE UPDATE answers. On an SCP03 card at `SHIPPED_KVN` (FF) it sends
+  PUT KEY with P1 `00` and new version `FACTORY_KVN` (01), as
+  `gp --lock … --new-keyver 1` did to the test card, which answered with the
+  new version and three check values and then listed version 01 alone. The
+  reopen must prove the new set at 01, else the run stops `guarded`: a card
+  that kept both sets, or put ours elsewhere, never passes as rotated.
+  `RotateResult.firstContact` says so. Every other card has its set replaced
+  in place with the APDUs it got before, byte for byte (`rotate.test.ts` pins
+  them at 1382268). Each of these stops `guarded` with nothing sent after
+  INITIALIZE UPDATE: the new set already proved at FF (only an in-place
+  rotation of a shipped card puts it there), FF under SCP02 (never measured),
+  and P1 `00` on any card but one at first contact, a card at version 00
+  included. Wrong bytes for the shipped set stop at `wrongKeys`, as before,
+  because the card's proof is checked offline. A lost PUT KEY reply leaves the
+  card at 01 under the new set, which the next run finds with no second PUT
+  KEY; P1 `00` needs an observed FF, so it is never sent twice.
+- **The seller's tag goes inside the sweep, behind an option.**
+  `ProvisionOptions.replaceSellerTag`, off by default, makes an SCP03 install
+  whose sweep names the tag's AID read GET STATUS of the applications first
+  (`readForeignTag`). Only an instance in the seller's shape (`scp03-07`) is
+  deleted: made from a load file other than the Cashu package, in the
+  security domain named, selectable (07), with no privileges. The DELETE names
+  that AID alone (P2 `00`, already on the whitelist) and must answer 9000;
+  `6985` ends the run `refused` with the tag in place. Any other shape stops
+  the run `guarded` with nothing deleted. The strict registry read of
+  [D181](#d181) then runs as before and proves the delete; when it still fails,
+  the guard says the seller's tag went and nothing else did. The seller's
+  package, `D276000085`, stays: it is not on the whitelist, and what it holds
+  in memory is unmeasured. The delete cannot be undone, so the run records it:
+  `ProvisionResult.sellerTagRemoved`, true only for a DELETE answered 9000,
+  and a `sellerTagRemoved` run event. A lost DELETE reply is found by the next
+  run, which sees no foreign tag. No phase, journal stage or service change.
+- **The provisioner passes it on every reserved tap, with no prompt** (the
+  owner's decision). The bench, and every other caller of `provision`, sends
+  the APDUs it sent before. The bench's rotation makes first contact on a card
+  at FF, as any caller of `rotateKeys` does.
+- **The reset refuses FF** before EXTERNAL AUTHENTICATE, as it refuses 00, so
+  it never reaches first contact. Elsewhere it restores the public default in
+  place at the version observed: 01 on a J3R180, and 01 on a J3R452 after first
+  contact. Like the 00 guard, this one follows the saved `delete_intent`, so a
+  card at FF that reaches a reset stops there on every retry; none is known
+  (the test card reports 01 since 2026-11-08).
+- **The reset stays on the ISD**, which both chips use. Nothing threads
+  `sdAid` through `readChipIdentity`, `inspectInstallation` or the reset's
+  registry read until a security domain other than the ISD is needed: the
+  J3R452 brief's D9, a card carrying both products, which is parked.
+
+**Why.** A J3R452 reaches the tap only when an operator reserved it for a Cashu
+card, and the seller's tag holds the AID the card's tag must take, so the card
+cannot be installed while it is there. The owner chose to delete it without a
+prompt. The strict shape keeps the delete to that one object: an instance in
+any other shape is not the tag the test card came with, and is left for a
+person to look at. First contact belongs in `rotateKeys` because it is the
+rotation the tap already journals (`rotation_intent`), with the recovery that
+rotation already has: one INITIALIZE UPDATE checked offline against both sets.
+
+**Proven, and not yet.** The fake card models PUT KEY P1 `00` at FF as the test
+card behaved, and the tests run first contact, a pull at every APDU of it, the
+tag's delete with a pull at every APDU of the install, the guards, and first
+contact followed by a reset and a second install. Silicon is unmeasured for the
+DELETE (P2 `00`) of the seller's instance under SCP03 (only a package delete
+with P2 `80` is traced, `scp03-10`), for our tag installing beside the
+still-loaded `D276000085`, and for in-place PUT KEY at 01 on a J3R452. First
+contact rests on one `gp` run on one card, which is not in the repository, so
+no transcript test covers it, and an agent never writes a fixture. Slice 3
+(ENG-839) runs these on the owner's go and reads the key information after
+first contact. A J3R452 still on the seller's keys stops at `wrongKeys` and is
+quarantined (`authentication-failed`), its reservation used: importing the
+seller's key file waits until a seller-keyed batch is bought (the brief's D2).
+cardkit stays 0.2.0, as [D181](#d181) left it; the bump moves with the review
+of the outbox-spike runners.
+
+**Rejected.** Deleting the seller's tag by default in cardkit (the delete
+cannot be undone, so a caller asks for it); a `firstContact` flag from the
+caller (the card's answer to INITIALIZE UPDATE is the evidence, and a flag
+would let a caller send P1 `00` to a card that is not at FF); a new phase for
+the tag's delete (it is part of clearing the card before the load, so the
+phase table, the screens' labels and the phase-order tests stay as they are);
+first contact as its own step before the install (it would need a journal
+stage of its own, where the tap's last rotation already has one); a reset that
+accepts version 01 alone (it would strand a card recorded at any other
+version, and the app records the version it observes).

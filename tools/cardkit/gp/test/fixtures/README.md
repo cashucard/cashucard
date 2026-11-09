@@ -113,5 +113,5 @@ be: they serve shapes only, and they were made under keys no test may hold.
 
 `registry.test.ts` reads `scp03-07`'s GET STATUS: the seller's NDEF tag at
 `D2760000850101`, made from `D276000085`, is no Cashu tag, so the registry
-vouches for nothing on that card, and the fake card's `sellerApplets` layout
-answers the same bytes.
+vouches for nothing on that card, `readForeignTag` finds the seller's tag
+there, and the fake card's `sellerApplets` layout answers the same bytes.

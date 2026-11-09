@@ -222,8 +222,9 @@ test('first contact, then an owned-card reset: a J3R452 that shipped at FF ends 
 });
 
 test('a reset takes the ISD alone: any other sdAid stops it guarded before its first APDU, with nothing saved', async () => {
-  // identity and the reset's registry read use the ISD until slice 2 (ENG-835);
-  // logged in elsewhere, a reset would save delete_intent and never get past the registry
+  // identity and the reset's registry read use the ISD until a security domain other
+  // than the ISD is needed (D182); logged in elsewhere, a reset would save
+  // delete_intent and never get past the registry
   const other = fromHex('A000000003000000');
   for (const scp of [2, 3] as const) {
     const card = await installed(scp);

@@ -60,13 +60,15 @@ checks supported exports/private-path rejection, and scans app/ops imports.
 GP tests use fake cards and do not authorize a real reader or phone action.
 See [component releases](../../docs/COMPONENT-RELEASES.md).
 
-## Unreleased: SCP03 beside SCP02
+## Unreleased: SCP03 beside SCP02, and the J3R452's first contact
 
 `openSession` reads the protocol from INITIALIZE UPDATE's reply and opens SCP02
 (the J3R180) or SCP03 (the J3R452) behind one interface
-([D181](../../docs/DECISIONS.md#d181)). Two signatures change, so the next
-release is a minor one. The version stays 0.2.0 until the owner moves it with a
-review of the `tools/outbox-spike` runners that pin it (D181). Migration:
+([D181](../../docs/DECISIONS.md#d181)), and a J3R452 as it ships, at key
+version FF with the seller's NDEF tag, is moved to the state a J3R180 starts in
+([D182](../../docs/DECISIONS.md#d182)). Signatures and types change, so the
+next release is a minor one. The version stays 0.2.0 until the owner moves it
+with a review of the `tools/outbox-spike` runners that pin it (D181). Migration:
 
 - `putKeys(keys, sessionDek, options)` is now `putKeys(keys, session, options)`:
   pass the open session where `session.keys.dek` went. Its protocol picks the
@@ -92,3 +94,18 @@ review of the `tools/outbox-spike` runners that pin it (D181). Migration:
   runtime dependency on `@noble/ciphers` 1.3.0. `FakeCard` takes `scp: 3`,
   `isd` and `sellerApplets` (the J3R452 test card's four applets,
   `SELLER_APPLETS`).
+- `rotateKeys` makes first contact on an SCP03 card at `SHIPPED_KVN` (FF):
+  PUT KEY with P1 `00` and new version `FACTORY_KVN` (01), the reopen held to
+  01, and `RotateResult.firstContact` set. It now stops `guarded` before
+  EXTERNAL AUTHENTICATE where it used to go on: P1 `00` anywhere else (a
+  `putKey: {p1: 0}` at 01, or the default at version 00), FF under SCP02, and
+  the new set already at FF. At version 01 it sends the same APDUs as before.
+- `ProvisionOptions.replaceSellerTag`, off by default, deletes the seller's
+  NDEF tag at `D2760000850101` before an SCP03 sweep when the new
+  `readForeignTag(send, domain)` shows it in the seller's shape.
+  `ProvisionResult` is now an interface with `sellerTagRemoved`, so code that
+  builds one needs the field, and `RunEvent` gains `{type: 'sellerTagRemoved'}`,
+  so a switch over it that must be exhaustive needs that case.
+- `resetOwnedCard` stops `guarded` at key version FF, as at 00.
+- `FakeCard`'s SCP03 PUT KEY takes P1 `00` on a card at version FF, for a new
+  version from 01 to 7F, and drops the FF set, as the test card did.

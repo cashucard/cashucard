@@ -100,9 +100,12 @@ installation key; old proofs cannot be recovered by replacing the applet. See
 
 The card's full applet AID is `F043415348554341524401`; the package AID reaches
 an opener on hardware. Installation orders opener, Cashu applet, then tag;
-deletion reverses references before deleting the package. CAP/load-file pins
-and deployment instructions are checked together. Host package releases do not
-change those pinned bytes.
+deletion reverses references before deleting the package. A J3R452 ships with
+the seller's NDEF tag at the tag's AID. The provisioner's install deletes that
+tag first, and only when the registry shows it in the seller's shape; the tap's
+rotation then moves the card from key version FF to 01
+([D182](DECISIONS.md#d182)). CAP/load-file pins and deployment instructions are
+checked together. Host package releases do not change those pinned bytes.
 
 ## Versions, builds and deployments
 
