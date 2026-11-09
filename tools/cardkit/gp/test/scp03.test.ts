@@ -1,0 +1,379 @@
+/**
+ * SCP03 as GlobalPlatformPro v25.10.20 runs it on the J3R452 (i=10, level
+ * 01): AES-128 against FIPS 197, CMAC against NIST SP 800-38B, both and the
+ * KDF against node:crypto (testing/node-aes.ts) on random input, and the
+ * handshake and C-MAC chain against the bytes of the owner's capture
+ * scp03-07 (gp/test/fixtures), inlined here so they hold with no fixture.
+ */
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {describe, it} from 'node:test';
+
+import {ISD_AID} from '../aids';
+import {concat, fromHex, toHex} from '../bytes';
+import {
+  CardError,
+  FACTORY_KEYS,
+  externalAuthenticateCommand,
+  type Reply,
+} from '../scp02';
+import {
+  Scp03Session,
+  aesEcb,
+  aesKcv,
+  cmac,
+  parseScp03Reply,
+  scp03CardChallenge,
+  scp03CardCryptogram,
+  scp03HostCryptogram,
+  scp03Kdf,
+  scp03KeysIfMatches,
+  scp03SessionKeys,
+} from '../scp03';
+import {nodeAesEcb, nodeCmac, nodeScp03Kdf} from '../../testing/node-aes';
+
+function rnd(n: number): number[] {
+  return Array.from(randomBytes(n));
+}
+
+/**
+ * The first login of scp03-07 (`gp -d --key-ver 1 --list`), under the public
+ * default 40..4F at key version 01: the host challenge, the card's 32-byte
+ * reply, EXTERNAL AUTHENTICATE and the first GET STATUS, as on the wire.
+ */
+const T07 = {
+  host: fromHex('2BA5B21E11215635'),
+  reply: fromHex(
+    '00005339367991214559' + // diversification: CPLC date, serial, batch
+      '01' + // key version
+      '03' + // SCP03
+      '10' + // i: pseudo-random challenge, no R-MAC
+      '86C8BD65FA1044EE' + // card challenge
+      '176B3CB5B20C6617' + // card cryptogram
+      '000001', // sequence counter
+  ),
+  externalAuthenticate: fromHex(
+    '8482010010' + 'CDB1E7EE99DF534D' + '8E457A5C3CF8C7A2' + '00',
+  ),
+  getStatus: fromHex('84F280020A4F00' + 'D0C82BCA7D2B4A11' + '00'),
+};
+
+const ok = (data: number[]) => ({data, sw: 0x9000});
+
+describe('SCP03: AES-128 and CMAC', () => {
+  it('encrypts FIPS 197 C.1 and Appendix B, and decrypts them back', () => {
+    for (const [key, plain, cipher] of [
+      [
+        '000102030405060708090A0B0C0D0E0F',
+        '00112233445566778899AABBCCDDEEFF',
+        '69C4E0D86A7B0430D8CDB78070B4C55A',
+      ],
+      [
+        '2B7E151628AED2A6ABF7158809CF4F3C',
+        '3243F6A8885A308D313198A2E0370734',
+        '3925841D02DC09FBDC118597196A0B32',
+      ],
+    ]) {
+      assert.equal(toHex(aesEcb(fromHex(key), fromHex(plain))), cipher);
+      assert.equal(toHex(aesEcb(fromHex(key), fromHex(cipher), true)), plain);
+    }
+  });
+
+  it('holds AES-ECB to node:crypto on random keys and data, and takes whole blocks of a 16-byte key only', () => {
+    for (let i = 0; i < 50; i++) {
+      const key = rnd(16);
+      const data = rnd(16 * (1 + (i % 4)));
+      assert.deepEqual(aesEcb(key, data), nodeAesEcb(key, data));
+      assert.deepEqual(aesEcb(key, data, true), nodeAesEcb(key, data, true));
+    }
+    assert.throws(() => aesEcb(rnd(16), rnd(15)), RangeError);
+    assert.throws(() => aesEcb(rnd(16), []), RangeError);
+    assert.throws(() => aesEcb(rnd(24), rnd(16)), RangeError);
+    assert.throws(() => aesEcb(rnd(8), rnd(16)), RangeError);
+  });
+
+  it("gives SP 800-38B's four AES-128 CMAC examples: 0, 16, 40 and 64 bytes", () => {
+    const key = fromHex('2B7E151628AED2A6ABF7158809CF4F3C');
+    const m = fromHex(
+      '6BC1BEE22E409F96E93D7E117393172A' +
+        'AE2D8A571E03AC9C9EB76FAC45AF8E51' +
+        '30C81C46A35CE411E5FBC1191A0A52EF' +
+        'F69F2445DF4F9B17AD2B417BE66C3710',
+    );
+    assert.equal(toHex(cmac(key, [])), 'BB1D6929E95937287FA37D129B756746');
+    assert.equal(
+      toHex(cmac(key, m.slice(0, 16))),
+      '070A16B46B4D4144F79BDD9DD04A287C',
+    );
+    assert.equal(
+      toHex(cmac(key, m.slice(0, 40))),
+      'DFA66747DE9AE63030CA32611497C827',
+    );
+    assert.equal(toHex(cmac(key, m)), '51F0BEBF7E3B9D92FC49741779363CFE');
+  });
+
+  it('holds CMAC to node:crypto at every length from 0 to 80 bytes, and never writes to its input', () => {
+    const key = rnd(16);
+    for (let n = 0; n <= 80; n++) {
+      const data = rnd(n);
+      const copy = toHex(data);
+      assert.deepEqual(cmac(key, data), nodeCmac(key, data), `${n} bytes`);
+      assert.equal(toHex(data), copy);
+    }
+  });
+
+  it("makes an AES key's check value from sixteen 01 bytes: 504A77 for the public default", () => {
+    assert.equal(toHex(aesKcv(FACTORY_KEYS.enc)), '504A77');
+    for (let i = 0; i < 20; i++) {
+      const key = rnd(16);
+      assert.deepEqual(
+        aesKcv(key),
+        nodeAesEcb(key, new Array(16).fill(1)).slice(0, 3),
+      );
+    }
+  });
+});
+
+describe("SCP03: Amendment D's KDF", () => {
+  it('holds the KDF to node:crypto for the five constants this module uses, at 64 and 128 bits', () => {
+    for (let i = 0; i < 20; i++) {
+      const key = rnd(16);
+      const context = rnd(16);
+      for (const constant of [0x00, 0x01, 0x02, 0x04, 0x06]) {
+        for (const bits of [64, 128] as const) {
+          assert.deepEqual(
+            scp03Kdf(key, constant, bits, context),
+            nodeScp03Kdf(key, constant, bits, context),
+          );
+        }
+      }
+    }
+    const unsupported = 192 as number;
+    assert.throws(
+      () => scp03Kdf(rnd(16), 0x06, unsupported as 128, rnd(16)),
+      RangeError,
+    );
+  });
+
+  it("makes scp03-07's card challenge from the static ENC key, the counter and the ISD AID (constant 02)", () => {
+    assert.equal(
+      toHex(scp03CardChallenge(FACTORY_KEYS.enc, fromHex('000001'), ISD_AID)),
+      '86C8BD65FA1044EE',
+    );
+    assert.equal(
+      toHex(
+        scp03Kdf(
+          FACTORY_KEYS.enc,
+          0x02,
+          64,
+          concat(fromHex('000001'), ISD_AID),
+        ),
+      ),
+      '86C8BD65FA1044EE',
+    );
+  });
+
+  it("makes scp03-07's card cryptogram (00) and host cryptogram (01) under S-MAC (06) over both challenges", () => {
+    const card = fromHex('86C8BD65FA1044EE');
+    const s = scp03SessionKeys(FACTORY_KEYS, T07.host, card);
+    const context = concat(T07.host, card);
+    assert.deepEqual(s.mac, nodeScp03Kdf(FACTORY_KEYS.mac, 0x06, 128, context));
+    assert.equal(
+      toHex(scp03CardCryptogram(s.mac, T07.host, card)),
+      '176B3CB5B20C6617',
+    );
+    assert.equal(
+      toHex(scp03HostCryptogram(s.mac, T07.host, card)),
+      'CDB1E7EE99DF534D',
+    );
+  });
+
+  it('derives S-ENC by constant 04 and keeps the static DEK, neither of which a level-01 capture can prove', () => {
+    const host = rnd(8);
+    const card = rnd(8);
+    const keys = {enc: rnd(16), mac: rnd(16), dek: rnd(16)};
+    const s = scp03SessionKeys(keys, host, card);
+    assert.deepEqual(
+      s.enc,
+      nodeScp03Kdf(keys.enc, 0x04, 128, concat(host, card)),
+    );
+    assert.deepEqual(s.dek, keys.dek);
+  });
+});
+
+describe("SCP03: INITIALIZE UPDATE's reply", () => {
+  it("parses scp03-07's 32 bytes", () => {
+    assert.deepEqual(parseScp03Reply(ok(T07.reply)), {
+      diversification: fromHex('00005339367991214559'),
+      kvn: 0x01,
+      scp: 0x03,
+      i: 0x10,
+      cardChallenge: fromHex('86C8BD65FA1044EE'),
+      cardCryptogram: fromHex('176B3CB5B20C6617'),
+      seq: fromHex('000001'),
+    });
+  });
+
+  it("refuses, as the card's fault, an error status, 28 or 29 bytes, another protocol and a random challenge", () => {
+    const with12 = (i: number) => {
+      const r = T07.reply.slice();
+      r[12] = i;
+      return r;
+    };
+    const with11 = T07.reply.slice();
+    with11[11] = 0x02;
+    const refused: [Reply, RegExp][] = [
+      [{data: [], sw: 0x6a88}, /6A88/],
+      [ok(T07.reply.slice(0, 28)), /28 bytes/],
+      [ok(T07.reply.slice(0, 29)), /29 bytes/],
+      [ok(with11), /SCP02, not SCP03/],
+      [ok(with12(0x00)), /i=00, a random card challenge/],
+      [ok(with12(0x20)), /i=20, a random card challenge/],
+    ];
+    for (const [reply, why] of refused) {
+      assert.throws(
+        () => parseScp03Reply(reply),
+        (e: unknown) =>
+          e instanceof CardError && e.ins === 0x50 && why.test(e.message),
+      );
+    }
+    // R-MAC and R-ENC support do not matter at level 01
+    for (const i of [0x30, 0x70]) {
+      assert.equal(parseScp03Reply(ok(with12(i))).i, i);
+    }
+  });
+});
+
+describe('SCP03: the offline check of the card', () => {
+  const hs = (overrides: {sdAid?: number[]; reply?: number[]} = {}) => {
+    const reply = parseScp03Reply(ok(overrides.reply ?? T07.reply));
+    return {
+      hostChallenge: T07.host,
+      sdAid: overrides.sdAid ?? ISD_AID,
+      reply,
+    };
+  };
+
+  it("proves the public default on scp03-07's handshake, and gives S-ENC, S-MAC and the static DEK", () => {
+    const s = scp03KeysIfMatches(FACTORY_KEYS, hs());
+    assert.ok(s);
+    assert.deepEqual(
+      s,
+      scp03SessionKeys(FACTORY_KEYS, T07.host, fromHex('86C8BD65FA1044EE')),
+    );
+  });
+
+  it('refuses another key set, another security domain, and a cryptogram that matches over a challenge that does not', () => {
+    const other = {enc: rnd(16), mac: rnd(16), dek: rnd(16)};
+    assert.equal(scp03KeysIfMatches(other, hs()), null);
+    // the right MAC key with the wrong ENC key: the cryptogram holds, the challenge does not
+    assert.equal(
+      scp03KeysIfMatches({...FACTORY_KEYS, enc: rnd(16)}, hs()),
+      null,
+    );
+    assert.equal(
+      scp03KeysIfMatches(
+        FACTORY_KEYS,
+        hs({sdAid: fromHex('A000000003000000')}),
+      ),
+      null,
+    );
+    // a card that made its cryptogram over a challenge the counter and AID do not give
+    const card = rnd(8);
+    const s = scp03SessionKeys(FACTORY_KEYS, T07.host, card);
+    const forged = concat(
+      T07.reply.slice(0, 13),
+      card,
+      scp03CardCryptogram(s.mac, T07.host, card),
+      T07.reply.slice(29),
+    );
+    assert.equal(scp03KeysIfMatches(FACTORY_KEYS, hs({reply: forged})), null);
+  });
+});
+
+describe('SCP03: the C-MAC chain', () => {
+  const t07Keys = () =>
+    scp03SessionKeys(FACTORY_KEYS, T07.host, fromHex('86C8BD65FA1044EE'));
+
+  it("wraps scp03-07's EXTERNAL AUTHENTICATE and the GET STATUS after it byte for byte: chained from 16 zeros, then from the full CMAC", () => {
+    const session = new Scp03Session(t07Keys(), 0x01);
+    assert.equal(session.scp, 3);
+    assert.equal(session.keyVersion, 0x01);
+    assert.equal(
+      toHex(
+        session.wrap(externalAuthenticateCommand(fromHex('CDB1E7EE99DF534D'))),
+      ),
+      toHex(T07.externalAuthenticate),
+    );
+    assert.equal(
+      toHex(session.wrap(fromHex('80F28002024F0000'))),
+      toHex(T07.getStatus),
+    );
+  });
+
+  it("chains each command from the previous one's full 16-byte CMAC, over CLA|04 and Lc + 8, with Le outside it", () => {
+    const keys = {enc: rnd(16), mac: rnd(16), dek: rnd(16)};
+    const session = new Scp03Session(keys);
+    const commands = [
+      externalAuthenticateCommand(rnd(8)), // case 4: Le 00 after the MAC
+      fromHex('80CAFF2100'), // case 2: Le kept after the MAC
+      fromHex('80E40000094F07D2760000850101'), // case 3 stays case 3
+      fromHex('80F24002024F0000'),
+      fromHex('80E8000003010203' + '00'),
+    ];
+    let chain = new Array(16).fill(0);
+    for (const c of commands) {
+      const hasData = c.length > 5;
+      const lc = hasData ? c[4] : 0;
+      const data = hasData ? c.slice(5, 5 + lc) : [];
+      const le =
+        c.length === 5 ? [c[4]] : c.length > 5 + lc ? [c[c.length - 1]] : [];
+      const header = [c[0] | 0x04, c[1], c[2], c[3], lc + 8];
+      const full = nodeCmac(keys.mac, concat(chain, header, data));
+      assert.equal(
+        toHex(session.wrap(c)),
+        toHex(concat(header, data, full.slice(0, 8), le)),
+      );
+      chain = full;
+    }
+  });
+
+  it('refuses a command whose data leaves no room for the MAC, and a malformed one', () => {
+    const session = new Scp03Session({
+      enc: rnd(16),
+      mac: rnd(16),
+      dek: rnd(16),
+    });
+    assert.throws(
+      () =>
+        session.wrap(
+          concat([0x80, 0xe8, 0x00, 0x00, 248], new Array(248).fill(0)),
+        ),
+      RangeError,
+    );
+    assert.doesNotThrow(() =>
+      session.wrap(
+        concat([0x80, 0xe8, 0x00, 0x00, 247], new Array(247).fill(0)),
+      ),
+    );
+    assert.throws(
+      () => session.wrap([0x80, 0xe8, 0x00, 0x00, 0x05, 1, 2]),
+      RangeError,
+    );
+  });
+
+  it('never writes to the command or the keys it is given', () => {
+    const keys = {enc: rnd(16), mac: rnd(16), dek: rnd(16)};
+    const before = [toHex(keys.enc), toHex(keys.mac), toHex(keys.dek)];
+    const session = new Scp03Session(keys);
+    const c = fromHex('80E40000094F07D2760000850101');
+    const copy = toHex(c);
+    session.wrap(c);
+    session.wrap(c);
+    assert.equal(toHex(c), copy);
+    assert.deepEqual(
+      [toHex(keys.enc), toHex(keys.mac), toHex(keys.dek)],
+      before,
+    );
+  });
+});
