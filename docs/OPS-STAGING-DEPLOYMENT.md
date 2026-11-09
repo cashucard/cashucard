@@ -17,7 +17,7 @@ claim deployment or authorize Cloudflare access by itself.
 - Served mint reference: `http://127.0.0.1:3338`, metadata only. No mint, Bitcoin
   tip service, physical card, reader or phone is accessed in this scope.
   Because staging sets `OPS_MINTS`, it serves that list unprobed and never shows
-  the probed default list (D179).
+  the probed default list (D179) or discovered mints (D180).
 - New random test master, issued operator and age identity/recipient, retained
   in a separate protected local directory. No Pixel/Max database, credentials,
   card identity, assigned manager keys, wallet seed or owner key is imported.

@@ -5270,3 +5270,55 @@ every request, issuance included), probing `OPS_MINTS` (staging names a local
 `http://127.0.0.1:3338` that would always be dropped), running the live probe
 in pull-request CI (a third-party outage would block merges), and tightening
 the `OPS_MINTS` validation in the same change.
+
+## <a id="d180"></a>D180: the ops service discovers mints over NIP-87, gated like the defaults
+
+**Decided (2026-11-08):** when no `OPS_MINTS` is set, `GET /mints` serves the
+probed defaults (D179) in their order, then up to 10 mints discovered the way
+cashu.me finds them: kind 38172 announcements and kind 38000 reviews tagged
+`k=38172` from `wss://relay.damus.io`, `wss://nos.lol` and
+`wss://relay.primal.net` (`ops/src/discovery.ts`). Every event's id and BIP-340
+signature is checked; an event dated more than 10 minutes ahead, a review older
+than 24 months, an announcement whose `n` is not `mainnet` and a review without
+`k=38172` or a `u` are ignored. URLs are normalized (https, a public DNS name,
+no port, userinfo, query or fragment) before they are grouped. A discovered
+mint is offered only with an announcement and at least 3 distinct reviewing
+keys; an announcement with no reviews is never offered. Candidates are ranked by
+reviewer count, then URL; the top 15 are probed and the first 10 that pass are
+kept. The probe is the defaults' probe, which now also requires an active `sat`
+keyset, for the defaults too. Responses add `mint_info`, keyed by URL, with the
+review count and the mint's `/v1/info` name (control and bidi characters
+removed, 40 characters at most); reviewer text is never passed on, and `mints`
+stays a plain string array for older builds. A request never waits on a relay:
+the last-good set is served and, once it is an hour old, refreshed in the
+background; when no relay answers the old set stays and the refresh is retried
+after a minute. The set persists in the Durable Object's storage
+(`mint-discovery`), so a restarted object serves it at once; the Node server
+keeps it in memory. `GET /mints/probe?url=` runs the same probe on a written-in
+mint for the provisioner, behind a session; batch creation itself still accepts
+any http(s) reference, so staging's local mint keeps working.
+`OPS_MINT_DISCOVERY=off` turns discovery off; `OPS_MINT_DENYLIST` (a JSON array)
+removes a discovered mint without a code change, and an unreadable denylist
+turns discovery off rather than ignoring it. This extends D179 and supersedes
+what D133 still said about how the provisioner's mint choice is drawn.
+
+**Why.** With the holder wallet funding at any mint (ENG-831), four fixed URLs
+are too few, and the owner asked for cashu.me's method. Discovery runs in ops,
+not the app, because the probe gate already lives there and every operator
+sees the same list. A provisioner writes the chosen URL into every card in a
+batch, so the bar is higher than cashu.me's: signatures stop relay forgery,
+the reviewer floor and the cap limit cheap keys, the probe proves the mint is
+reachable and issues sats, and the denylist and the operator's own choice are
+the last defences. The sat gate applies to the defaults so every offered mint
+passes one rule; the four defaults passed it on 2026-11-08. A local workerd run
+(`wrangler dev`, no `OPS_MINTS`) received 72 relay events over the Durable
+Object's outbound WebSockets, so no cron fallback is needed. On that day the
+relays held two announcements and neither had three reviews, so the discovered
+set starts empty and grows as mints publish announcements.
+
+**Rejected:** discovery in the provisioner app (each operator would see a
+different list and the gate would be duplicated), the audit.8333.space auditor
+in v1 (a third-party single point of failure), passing on reviewer prose,
+counting unverified events, discovering in the Durable Object constructor (a
+relay stall would block every request), and probing discovered mints from the
+daily `ops-mint-probe` job (it stays a check of the code-owned list).

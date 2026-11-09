@@ -2,6 +2,8 @@ name: Ops default mint probe
 # The live check of ops/src/config.ts DEFAULT_MINTS (ENG-828, D179). It
 # reaches third-party mints, so it never runs on pull requests: a mint outage
 # must not block merges. On failure it opens, or comments on, one issue.
+# It probes the code-owned defaults only; NIP-87 discovered mints (D180) are
+# probed by the service before they are served, not here.
 on:
   schedule:
     - cron: "41 14 * * *"

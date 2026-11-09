@@ -264,6 +264,31 @@ installation history. Migrate clients to the new API before real provisioning.
 The app's current sign-in/mint reads remain available, but no real batch loop
 is claimed by this service change.
 
+## Mint list
+
+`GET /mints` (any session) returns `{mints: string[]}`. Without `OPS_MINTS` the
+list is the code-owned defaults that pass a live probe (D179), followed by up to
+10 mints discovered over NIP-87 (D180), and the body adds
+`mint_info: {[url]: {name?, reviews}}` for the discovered entries. A discovered
+mint needs an announcement, at least 3 distinct verified reviewers and a passing
+probe; every served mint has an active `sat` keyset. The request never waits on
+the relays; the set refreshes in the background at most hourly and persists in
+the Durable Object's storage. With `OPS_MINTS` set the list is served as given
+and `mint_info` is absent.
+
+`GET /mints/probe?url=` (any session) probes a written-in mint and returns
+`{ok: true, name?}` or `{ok: false, reason}`; a URL that is not a public https
+mint gets `reason: "invalid url"` without being probed or echoed.
+
+| Variable             | Effect                                                        |
+| -------------------- | ------------------------------------------------------------- |
+| `OPS_MINT_DISCOVERY` | `off` disables discovery (the kill switch); anything else, on |
+| `OPS_MINT_DENYLIST`  | JSON array of mint URLs never offered as discovered           |
+
+An unreadable `OPS_MINT_DENYLIST` turns discovery off in the Worker and stops
+the Node server at start-up. `yarn probe:mints` checks the defaults and
+`yarn probe:discovery` asks the live relays; neither runs in pull-request CI.
+
 ## First remote staging rehearsal
 
 The port/dry-run checks above do not deploy a service. A separately reviewed
