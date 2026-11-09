@@ -14,8 +14,14 @@ import {concat, fromHex, toHex} from '../bytes';
 import {
   CardError,
   FACTORY_KEYS,
+  SPIKE_KEYS,
+  WrongKeys,
   externalAuthenticateCommand,
+  openSession,
+  parseInitializeUpdate,
+  type KeySet,
   type Reply,
+  type Transceiver,
 } from '../scp02';
 import {
   Scp03Session,
@@ -375,5 +381,190 @@ describe('SCP03: the C-MAC chain', () => {
       [toHex(keys.enc), toHex(keys.mac), toHex(keys.dek)],
       before,
     );
+  });
+});
+
+/**
+ * A J3R452's card manager for one login, computed with node:crypto: it
+ * answers INITIALIZE UPDATE for `keys` with the pseudo-random challenge for
+ * `sdAid` and `seq`, EXTERNAL AUTHENTICATE with 9000 when its host cryptogram
+ * and C-MAC are right, and every later command with `after`.
+ */
+function scriptedCard(
+  options: {
+    keys?: KeySet;
+    sdAid?: number[];
+    seq?: number[];
+    challenge?: (made: number[]) => number[];
+    initializeUpdate?: (reply: number[]) => number[];
+    after?: number[];
+  } = {},
+) {
+  const keys = options.keys ?? FACTORY_KEYS;
+  const seq = options.seq ?? [0x00, 0x00, 0x2a];
+  const sent: number[][] = [];
+  let context: number[] = [];
+  const tx: Transceiver = async apdu => {
+    sent.push(apdu);
+    if (apdu[1] === 0x50) {
+      const host = apdu.slice(5, 13);
+      const made = nodeScp03Kdf(
+        keys.enc,
+        0x02,
+        64,
+        concat(seq, options.sdAid ?? ISD_AID),
+      );
+      const card = options.challenge ? options.challenge(made) : made;
+      context = concat(host, card);
+      const sMac = nodeScp03Kdf(keys.mac, 0x06, 128, context);
+      const reply = concat(
+        new Array(10).fill(0x11),
+        [0x01, 0x03, 0x10],
+        card,
+        nodeScp03Kdf(sMac, 0x00, 64, context),
+        seq,
+      );
+      return concat(
+        options.initializeUpdate ? options.initializeUpdate(reply) : reply,
+        [0x90, 0x00],
+      );
+    }
+    if (apdu[1] === 0x82) {
+      const sMac = nodeScp03Kdf(keys.mac, 0x06, 128, context);
+      const host = nodeScp03Kdf(sMac, 0x01, 64, context);
+      const mac = nodeCmac(
+        sMac,
+        concat(new Array(16).fill(0), apdu.slice(0, 13)),
+      ).slice(0, 8);
+      const good =
+        apdu.length === 22 &&
+        toHex(apdu.slice(5, 13)) === toHex(host) &&
+        toHex(apdu.slice(13, 21)) === toHex(mac);
+      return good ? [0x90, 0x00] : [0x63, 0x00];
+    }
+    return options.after ?? [0x90, 0x00];
+  };
+  return {tx, sent};
+}
+
+describe('SCP03 through openSession: one way in, the protocol read from byte 11', () => {
+  it('reads an SCP03 reply from byte 11 and logs in: INITIALIZE UPDATE, then EXTERNAL AUTHENTICATE 84 82 01 00 10 with the host cryptogram, its C-MAC and Le 00', async () => {
+    const card = scriptedCard();
+    const host = rnd(8);
+    const session = await openSession(card.tx, FACTORY_KEYS, () => host);
+    assert.ok(session instanceof Scp03Session);
+    assert.equal(session.scp, 3);
+    assert.equal(session.keyVersion, 0x01);
+    assert.equal(card.sent.length, 2);
+    assert.equal(toHex(card.sent[0]), '8050000008' + toHex(host) + '00');
+    assert.deepEqual(card.sent[1].slice(0, 5), [0x84, 0x82, 0x01, 0x00, 0x10]);
+    assert.equal(card.sent[1][21], 0x00, 'Le 00 after the MAC');
+    assert.deepEqual(
+      parseInitializeUpdate({data: T07.reply, sw: 0x9000}),
+      parseScp03Reply(ok(T07.reply)),
+    );
+  });
+
+  it('refuses 28 bytes with 03, 32 with 02, 29 bytes, an i without 10 and an error status, each as a CardError after the one APDU', async () => {
+    const replies: [string, (r: number[]) => number[], RegExp][] = [
+      ['28 bytes with 03', r => r.slice(0, 28), /28 bytes for SCP03, not 32/],
+      [
+        '32 bytes with 02',
+        r => concat(r.slice(0, 11), [0x02], r.slice(12)),
+        /32 bytes for SCP02, not 28/,
+      ],
+      ['29 bytes', r => r.slice(0, 29), /29 bytes for SCP03, not 32/],
+      [
+        'i 00',
+        r => concat(r.slice(0, 12), [0x00], r.slice(13)),
+        /i=00, a random card challenge/,
+      ],
+      [
+        'protocol 01',
+        r => concat(r.slice(0, 11), [0x01], r.slice(12)),
+        /SCP01, neither SCP02 nor SCP03/,
+      ],
+    ];
+    for (const [name, change, why] of replies) {
+      const card = scriptedCard({initializeUpdate: change});
+      await assert.rejects(
+        openSession(card.tx, FACTORY_KEYS, () => rnd(8)),
+        (e: unknown) =>
+          e instanceof CardError && e.ins === 0x50 && why.test(e.message),
+        name,
+      );
+      assert.equal(card.sent.length, 1, `${name}: only INITIALIZE UPDATE`);
+    }
+    const sent: number[][] = [];
+    await assert.rejects(
+      openSession(
+        async apdu => (sent.push(apdu), [0x69, 0x85]),
+        FACTORY_KEYS,
+        () => rnd(8),
+      ),
+      (e: unknown) => e instanceof CardError && e.sw === 0x6985,
+    );
+    assert.equal(sent.length, 1);
+  });
+
+  it('sends no EXTERNAL AUTHENTICATE for another key set, or for a security domain whose AID the challenge was not made over', async () => {
+    const wrongKeys = scriptedCard({keys: SPIKE_KEYS});
+    await assert.rejects(
+      openSession(wrongKeys.tx, FACTORY_KEYS, () => rnd(8)),
+      WrongKeys,
+    );
+    assert.deepEqual(
+      wrongKeys.sent.map(a => a[1]),
+      [0x50],
+    );
+    const otherDomain = fromHex('A000000003000000');
+    const wrongAid = scriptedCard({sdAid: otherDomain});
+    await assert.rejects(
+      openSession(wrongAid.tx, FACTORY_KEYS, () => rnd(8)),
+      WrongKeys,
+    );
+    assert.deepEqual(
+      wrongAid.sent.map(a => a[1]),
+      [0x50],
+    );
+    // the same card, told its security domain, opens
+    const rightAid = scriptedCard({sdAid: otherDomain});
+    const session = await openSession(rightAid.tx, FACTORY_KEYS, () => rnd(8), {
+      sdAid: otherDomain,
+    });
+    assert.equal(session.scp, 3);
+  });
+
+  it('sends no EXTERNAL AUTHENTICATE when the cryptogram matches but the challenge is not the one the keys, counter and AID make', async () => {
+    const card = scriptedCard({challenge: () => rnd(8)});
+    await assert.rejects(
+      openSession(card.tx, FACTORY_KEYS, () => rnd(8)),
+      WrongKeys,
+    );
+    assert.deepEqual(
+      card.sent.map(a => a[1]),
+      [0x50],
+    );
+  });
+
+  it('turns a refused EXTERNAL AUTHENTICATE into a CardError with its SW', async () => {
+    const card = scriptedCard();
+    const tx: Transceiver = async apdu =>
+      apdu[1] === 0x82 ? [0x63, 0x00] : card.tx(apdu);
+    await assert.rejects(
+      openSession(tx, FACTORY_KEYS, () => rnd(8)),
+      (e: unknown) =>
+        e instanceof CardError && e.sw === 0x6300 && e.ins === 0x82,
+    );
+  });
+
+  it('expects no R-MAC at level 01: a reply comes back as the card sent it, its last eight bytes neither stripped nor checked', async () => {
+    const data = rnd(20);
+    const card = scriptedCard({after: concat(data, [0x90, 0x00])});
+    const session = await openSession(card.tx, FACTORY_KEYS, () => rnd(8));
+    const reply = await session.send(card.tx, fromHex('80F24002024F0000'));
+    assert.deepEqual(reply, {data, sw: 0x9000});
+    const bare = await session.send(card.tx, fromHex('80CAFF2100'));
+    assert.deepEqual(bare, {data, sw: 0x9000});
   });
 });

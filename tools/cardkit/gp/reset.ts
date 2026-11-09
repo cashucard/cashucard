@@ -23,7 +23,7 @@ import {
   sessionIfMatches,
   transmit,
   type KeySet,
-  type Session,
+  type SecureSession,
   type Transceiver,
 } from './scp02';
 
@@ -140,7 +140,7 @@ export async function resetOwnedCard(
     const target =
       afterDeletion && !source ? sessionIfMatches(FACTORY_KEYS, hs) : null;
     if (!source && !target) throw new WrongKeys();
-    const session: Session = await externalAuthenticate(
+    const session: SecureSession = await externalAuthenticate(
       tx,
       source ?? target!,
       hs,

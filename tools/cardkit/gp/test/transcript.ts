@@ -1,7 +1,8 @@
 /**
  * GlobalPlatformPro's `-d` log, read back: the APDUs it sent and what came
- * back, and a replay of its secure channel through this module's Session, so
- * every byte gp sent under the MAC is checked against what this module sends.
+ * back, and a replay of its secure channel through this module's Session
+ * (SCP02) or Scp03Session (SCP03), so every byte gp sent under the MAC is
+ * checked against what this module sends.
  *
  * gp v25.10.20 logs through apdu4j's LoggingCardTerminal:
  *
@@ -11,7 +12,8 @@
  * ("A%s>> %s (4+%04d) %s" with the header, then Lc, data and Le; "A%s<<
  * (%04d+2) (%s)" with the time, then data and SW).
  */
-import {concat, toHex} from '../bytes';
+import {ISD_AID} from '../aids';
+import {type Bytes, bytes, concat, toHex} from '../bytes';
 import {
   Session,
   externalAuthenticateCommand,
@@ -22,7 +24,9 @@ import {
   sessionIfMatches,
   type Handshake,
   type KeySet,
+  type SecureSession,
 } from '../scp02';
+import {Scp03Session, scp03HostCryptogram} from '../scp03';
 
 export interface Exchange {
   command: number[];
@@ -74,7 +78,9 @@ export function unwrap(command: number[]): number[] {
 
 export interface Replay {
   handshake: Handshake;
-  session: Session;
+  session: SecureSession;
+  /** The host cryptogram this module computed, which gp's EXTERNAL AUTHENTICATE carried. */
+  hostCryptogram: number[];
   /** Every command gp sent under the MAC, unwrapped, in order. */
   commands: number[][];
   /** The replies to them, in the same order. */
@@ -82,16 +88,17 @@ export interface Replay {
 }
 
 /**
- * The first secure channel in `log`, opened with `keys` and replayed: the
- * card's cryptogram must prove the keys, this module's EXTERNAL AUTHENTICATE
- * must be gp's byte for byte, and so must every command gp wrapped after it,
- * re-wrapped by this module from its unwrapped form. Throws at the first
- * difference.
+ * The first secure channel in `log`, opened with `keys` and replayed under
+ * the protocol byte 11 of INITIALIZE UPDATE's reply names: the card must
+ * prove the keys (under SCP03, its challenge for `sdAid`, the ISD by default,
+ * and its cryptogram), this module's EXTERNAL AUTHENTICATE must be gp's byte
+ * for byte, and so must every command gp wrapped after it, re-wrapped by this
+ * module from its unwrapped form. Throws at the first difference.
  */
 export function replay(
   log: Exchange[],
   keys: KeySet,
-  options: {macOverModifiedApdu?: boolean} = {},
+  options: {macOverModifiedApdu?: boolean; sdAid?: Bytes} = {},
 ): Replay {
   const iu = log.findIndex(e => e.command[1] === 0x50);
   if (iu < 0 || !log[iu].reply) {
@@ -99,25 +106,35 @@ export function replay(
   }
   const handshake: Handshake = {
     hostChallenge: log[iu].command.slice(5, 13),
+    sdAid: bytes(options.sdAid ?? ISD_AID),
     reply: parseInitializeUpdate(parseReply(log[iu].reply!)),
   };
   const keysProved = sessionIfMatches(keys, handshake);
   if (!keysProved) {
     throw new Error('the card cryptogram in the log does not prove these keys');
   }
-  const session = new Session(keysProved, options);
+  const scp03 = handshake.reply.scp === 0x03;
+  const session: SecureSession = scp03
+    ? new Scp03Session(keysProved)
+    : new Session(keysProved, options);
   const ea = log[iu + 1];
   if (!ea || ea.command[1] !== 0x82) {
     throw new Error(
       'INITIALIZE UPDATE is not followed by EXTERNAL AUTHENTICATE',
     );
   }
-  const cryptogram = hostCryptogram(
-    keysProved.enc,
-    handshake.reply.seq,
-    handshake.reply.cardChallenge,
-    handshake.hostChallenge,
-  );
+  const cryptogram = scp03
+    ? scp03HostCryptogram(
+        keysProved.mac,
+        handshake.hostChallenge,
+        handshake.reply.cardChallenge,
+      )
+    : hostCryptogram(
+        keysProved.enc,
+        handshake.reply.seq,
+        handshake.reply.cardChallenge,
+        handshake.hostChallenge,
+      );
   const ours = session.wrap(externalAuthenticateCommand(cryptogram));
   if (toHex(ours) !== toHex(ea.command)) {
     throw new Error(
@@ -144,7 +161,7 @@ export function replay(
     commands.push(original);
     replies.push(e.reply);
   }
-  return {handshake, session, commands, replies};
+  return {handshake, session, hostCryptogram: cryptogram, commands, replies};
 }
 
 /** One key in a key information template. */

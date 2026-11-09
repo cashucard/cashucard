@@ -34,7 +34,14 @@ import {
   parseCommand,
   transmit,
 } from './apdu';
-import {type Bytes, bytes, concat, equalConstantTime, xor} from './bytes';
+import {
+  type Bytes,
+  bytes,
+  concat,
+  equalConstantTime,
+  toHex,
+  xor,
+} from './bytes';
 
 const BLOCK = 16;
 
@@ -228,7 +235,7 @@ export function parseScp03Reply(reply: Reply): Scp03Reply {
     throw new CardError(
       reply.sw,
       0x50,
-      `the card opens SCP0${d[11]}, not SCP03`,
+      `the card opens SCP${toHex([d[11]])}, not SCP03`,
     );
   }
   const i = d[12];
@@ -236,7 +243,7 @@ export function parseScp03Reply(reply: Reply): Scp03Reply {
     throw new CardError(
       reply.sw,
       0x50,
-      `the card opens SCP03 with i=${i.toString(16).padStart(2, '0')}, a random card challenge that cannot be checked before EXTERNAL AUTHENTICATE`,
+      `the card opens SCP03 with i=${toHex([i])}, a random card challenge that cannot be checked before EXTERNAL AUTHENTICATE`,
     );
   }
   return {
