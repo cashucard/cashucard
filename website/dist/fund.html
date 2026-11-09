@@ -39,7 +39,7 @@
       <p class="fund-lede">Cashu Card is built by a very small team and paid for out of pocket. Gifts pay for development, testing, and security work, and every sat appears in the public ledger on this page.</p>
     </div>
     <div class="fund-card-wrap">
-<div class="give" data-give data-api="https://donate.islandbitcoin.com" data-site="cashucard" data-contact="hello@cashucard.org" data-address="ecashcard@islandbitcoin.com" aria-labelledby="give-title">
+<div class="give" data-give data-api="https://donate.islandbitcoin.com" data-site="cashucard" data-ecash-default="cashu" data-contact="hello@cashucard.org" data-address="ecashcard@islandbitcoin.com" aria-labelledby="give-title">
   <div class="give-sr" aria-live="polite" data-live></div>
 
   <div data-step="amount">
@@ -51,6 +51,19 @@
         <button type="button" role="tab" data-rail="onchain" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>On-chain</button>
       </div>
     </div>
+    <div class="give-kind" role="radiogroup" aria-label="Kind of eCash" data-ecash-kinds hidden>
+      <button type="button" role="radio" data-kind="cashu" aria-checked="true">Cashu</button>
+      <button type="button" role="radio" data-kind="fedimint" aria-checked="false">Fedimint</button>
+    </div>
+    <div class="give-fm" data-fm hidden>
+      <label class="give-label" for="give-fm-notes">Fedimint eCash notes</label>
+      <textarea class="give-token" id="give-fm-notes" data-fm-notes rows="4" placeholder="Paste the notes from your Fedimint wallet" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <p class="give-error" data-fm-error role="alert" hidden></p>
+      <p class="give-status" data-fm-status data-kind="loading" hidden><span class="pulse"></span><span class="give-status-text">Checking your notes with the federation</span></p>
+      <button type="button" class="give-cta" data-fm-redeem><span>Give these notes</span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
+      <p class="give-note">Notes from any federation work, and they carry their own amount. In your Fedimint wallet, send eCash, then copy the notes it gives you.</p>
+    </div>
+    <div data-amount-area>
     <p class="give-label" id="give-amount-label">Amount in sats</p>
     <div class="give-amounts" role="radiogroup" aria-labelledby="give-amount-label">
       <button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="2100" aria-label="2,100 sats"><b>2,100</b><span data-usd>about $1.59</span></button><button type="button" class="give-chip" role="radio" aria-checked="true" data-sats="21000" aria-label="21,000 sats"><b>21,000</b><span data-usd>about $16</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="100000" aria-label="100,000 sats"><b>100,000</b><span data-usd>about $76</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="500000" aria-label="500,000 sats"><b>500,000</b><span data-usd>about $379</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="2100000" aria-label="2,100,000 sats"><b>2,100,000</b><span data-usd>about $1,593</span></button>
@@ -63,6 +76,7 @@
     <p class="give-hint" data-ecash-hint hidden>Cashu eCash from any mint. Your wallet pays a request on the next step, or you paste a token.</p>
     <p class="give-hint" data-onchain-hint hidden>On-chain fees make small gifts costly. Lightning suits amounts under 100,000 sats.</p>
     <button type="button" class="give-cta" data-continue><span><span data-continue-label>Continue with 21,000 sats</span><br><small data-continue-usd>about $16</small></span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
+    </div>
     <p class="give-fine">Gifts go directly to the maintainers, toward work on Cashu Card. They buy no goods, services, or equity, and they are not tax deductible.</p>
     <noscript><p class="give-noscript">This card needs JavaScript. Any Lightning wallet can still pay <b>ecashcard@islandbitcoin.com</b>.</p></noscript>
     <details class="give-more">
@@ -138,7 +152,7 @@
         <div><dt>Raised so far</dt><dd><span data-raised>0</span> sats<small data-raised-usd></small></dd></div>
         <div><dt>Gifts</dt><dd data-gifts>0</dd></div>
       </dl>
-      <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Any wallet works.</b> Pay by Lightning, BOLT12, Cashu eCash, or on-chain from the wallet you already use.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>Every gift is public.</b> Amounts and dates appear in the ledger below. Names appear only when you ask.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
+      <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Any wallet works.</b> Pay by Lightning, BOLT12, Cashu or Fedimint eCash, or on-chain from the wallet you already use.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>Every gift is public.</b> Amounts and dates appear in the ledger below. Names appear only when you ask.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
     </div>
   </div>
 
