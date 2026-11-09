@@ -2,7 +2,8 @@
  * cardkit as the app ships it: compiled by this app's Babel (the RN preset,
  * as Metro compiles it for the phone) rather than by tsx, and run end to end
  * against the fake card from tools/cardkit's tests, with this app's random
- * source and its plans.
+ * source and its plans: as a J3R180 (SCP02) and as a J3R452 (SCP03), whose
+ * AES comes from @noble/ciphers through the same compile.
  */
 import {
   CASHU_PLAN,
@@ -45,6 +46,30 @@ test('the keys go to the spike set and back', async () => {
   expect(
     (await rotateKeys(card.transceive, FACTORY_KEYS, SPIKE_KEYS, options())).ok,
   ).toBe(true);
+  expect(
+    (await rotateKeys(card.transceive, SPIKE_KEYS, FACTORY_KEYS, options())).ok,
+  ).toBe(true);
+  expect(card.failedAuths).toBe(0);
+});
+
+test('a J3R452 that opens SCP03 installs in 88 blocks and rotates to the spike set and back', async () => {
+  const card = new FakeCard({scp: 3});
+  const r = await provision(card.transceive, CASHU_PLAN, options());
+  expect(r.ok).toBe(true);
+  expect(r.blocks).toEqual({at: 88, of: 88});
+  // the card answered SCP03's 32-byte INITIALIZE UPDATE, not SCP02's 28
+  expect(r.apdus.find(a => a.ins === 0x50)?.rlen).toBe(32);
+  card.reset();
+  const there = await rotateKeys(
+    card.transceive,
+    FACTORY_KEYS,
+    SPIKE_KEYS,
+    options(),
+  );
+  expect(there.ok).toBe(true);
+  // AES keys: 88 11 10 entries, 70 bytes of data and the 8-byte C-MAC
+  expect(there.apdus.find(a => a.ins === 0xd8)?.lc).toBe(70 + 8);
+  card.reset();
   expect(
     (await rotateKeys(card.transceive, SPIKE_KEYS, FACTORY_KEYS, options())).ok,
   ).toBe(true);

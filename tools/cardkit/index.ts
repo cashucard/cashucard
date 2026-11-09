@@ -16,6 +16,7 @@ export {
   tdesEcb,
 } from './gp/des';
 export * from './gp/scp02';
+export * from './gp/scp03';
 export * from './gp/provision';
 export * from './gp/identity';
 
