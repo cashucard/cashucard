@@ -90,6 +90,17 @@ and count remain visible above the final actions. Creating the batch assigns
 manager keys for its slots. The mint reference is operator metadata;
 holder-wallet setup applies the card's mint, PIN and limits.
 
+The service lists its probed default mints first, then the mints it discovered
+over NIP-87 ([D180](DECISIONS.md#d180)). A discovered mint's cell carries a
+second line, "3 reviews · Name" ("1 review"), from the service's `mint_info`;
+the name is the mint's own and is shown as plain text. When `mint_info` cannot
+be read the grid shows the plain list. A written-in mint, one the service does
+not list, is checked through `GET /mints/probe` before the batch is created: a
+mint that is unreachable or issues no sats shows "This mint did not pass the
+check: it must be reachable and issue sats." and creates nothing, and a check
+the service cannot answer blocks with Retry Mint Check. The check is the app's;
+the service's batch creation still accepts any http(s) reference.
+
 Cancel Setup leaves an unsubmitted form. Once batch creation starts, Stop and
 Keep Saved Work retains the request ID and body so a lost response can be
 reconciled against the service.
