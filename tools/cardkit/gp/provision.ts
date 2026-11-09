@@ -17,6 +17,10 @@
  *   a card that holds anything is never swept;
  * - the card's proof of the keys is checked before EXTERNAL AUTHENTICATE
  *   (scp02.ts, and scp03.ts for an SCP03 card);
+ * - on an SCP03 card, the J3R452, a sweep of the Cashu AIDs deletes nothing
+ *   until the registry shows every Cashu object there as the Cashu package's
+ *   (registry.ts): that card ships with the seller's NDEF tag at
+ *   D2760000850101, the AID the card's tag takes;
  * - DELETE names only the six AIDs of the whitelist, never the ISD (scp02.ts).
  */
 import {sha256} from '@noble/hashes/sha2';
@@ -33,6 +37,7 @@ import {
   TAG_CLASS_AID,
 } from './aids';
 import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
+import {RegistryEvidenceError, readCashuRegistry} from './registry';
 import {
   CardError,
   FACTORY_KEYS,
@@ -141,6 +146,14 @@ export interface Plan {
 const GET_INFO = [0xb0, 0x01, 0x00, 0x00, 0x00];
 const GET_PUBKEY = [0xb0, 0x10, 0x00, 0x00, 0x21];
 
+/** The objects readCashuRegistry vouches for: a sweep that names one reads it first under SCP03. */
+const CASHU_OBJECTS: readonly Bytes[] = [
+  TAG_AID,
+  CARD_AID,
+  OPENER_AID,
+  CASHU_PACKAGE_AID,
+];
+
 /** The card: the opener first, then the card's applet, then the tag under the NFC Forum's name (HARDWARE_DEPLOYMENT.md). */
 export function cashuPlan(loadFile: LoadFileAsset): Plan {
   return {
@@ -216,7 +229,11 @@ export interface RunOptions {
   /**
    * The security domain a run selects, logs in to and loads into: the ISD's
    * AID by default (A000000151000000 on the J3R180 and the J3R452). SCP03's
-   * card challenge is made over it, so a wrong one stops at WrongKeys.
+   * card challenge is made over it, so a wrong one stops at WrongKeys, and an
+   * SCP03 install reads the registry for it. resetOwnedCard takes the ISD
+   * alone and stops guarded, before its first APDU, at any other: its
+   * identity, inspection and registry reads select the ISD until slice 2
+   * (ENG-835) threads this through them.
    */
   sdAid?: Bytes;
 }
@@ -553,8 +570,29 @@ export async function provision(
       );
     },
     sweep: async () => {
+      const channel = open();
+      // SCP03 is the J3R452's, which ships with the seller's NDEF tag at the
+      // tag's AID (scp03-07): before a Cashu AID is deleted, the registry must
+      // show each Cashu object on the card as the package's. SCP02, the
+      // J3R180's, sends what it always has. What the seller's tag becomes is
+      // slice 2's (ENG-835).
+      if (
+        channel.scp === 3 &&
+        plan.sweep.some(aid => CASHU_OBJECTS.some(o => equal(o, aid)))
+      ) {
+        try {
+          await readCashuRegistry(c => channel.send(run.timed, c), sdAid);
+        } catch (e) {
+          if (e instanceof RegistryEvidenceError) {
+            throw new Guard(
+              `the card's registry does not show every Cashu AID as the card package's (a J3R452 ships with the seller's NDEF tag at ${toHex(TAG_AID)}): nothing was deleted`,
+            );
+          }
+          throw e;
+        }
+      }
       for (const aid of plan.sweep) {
-        const r = await open().send(run.timed, deleteAid(aid));
+        const r = await channel.send(run.timed, deleteAid(aid));
         if (r.sw !== 0x9000 && r.sw !== 0x6a88) {
           throw new CardError(r.sw, 0xe4);
         }

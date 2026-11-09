@@ -24,6 +24,11 @@
  * - EXTERNAL AUTHENTICATE failures are counted, and lock the card manager at
  *   `failedAuthLimit`, as the chip does for good.
  *
+ * With `sellerApplets` it starts as the J3R452 test card came, with the
+ * seller's four applets (SELLER_APPLETS), the seller's NDEF tag among them at
+ * D2760000850101, the AID the Cashu card's tag takes. Nothing protects them:
+ * a DELETE that names one removes it, as it would on the chip.
+ *
  * `reset()` is the power going: whatever was selected, the session, a pending
  * handshake (counted in `abandonedHandshakes`) and a pending load go with it.
  */
@@ -89,7 +94,30 @@ export interface FakeCardOptions {
    * November 3 capture.
    */
   cplc?: string;
+  /**
+   * Start with {@link SELLER_APPLETS} installed, as the J3R452 test card came
+   * (scp03-07): the seller's NDEF tag then holds D2760000850101. Off by
+   * default, a blank card.
+   */
+  sellerApplets?: boolean;
 }
+
+/**
+ * The applets the J3R452 test card shipped with, as `gp --list` read them
+ * (gp/test/fixtures/scp03-07-list-default-keyver1.txt), in its order: each
+ * instance SELECTABLE, made from its own package, in the card manager's
+ * domain. The last is the seller's NDEF tag, at the NFC Forum's
+ * D2760000850101, made from D276000085, not from the Cashu package.
+ */
+export const SELLER_APPLETS: readonly {
+  readonly instance: string;
+  readonly pkg: string;
+}[] = [
+  {instance: 'A0000008466D656D6F727901', pkg: 'A0000008466D656D6F7279'},
+  {instance: 'A0000005272101014150455801', pkg: 'A00000052721010141504558'},
+  {instance: 'A0000006472F000101', pkg: 'A0000006472F0001'},
+  {instance: 'D2760000850101', pkg: 'D276000085'},
+];
 
 /** The default fake identity, `cplc-v1:4790d3213041093363205547`. */
 export const CPLC_09336320 =
@@ -169,7 +197,14 @@ export class FakeCard {
   private readonly opts: Required<
     Omit<
       FakeCardOptions,
-      'keys' | 'kvn' | 'scp' | 'isd' | 'seq' | 'freeNonVolatile' | 'cplc'
+      | 'keys'
+      | 'kvn'
+      | 'scp'
+      | 'isd'
+      | 'seq'
+      | 'freeNonVolatile'
+      | 'cplc'
+      | 'sellerApplets'
     >
   >;
 
@@ -189,6 +224,20 @@ export class FakeCard {
       heavyModules: options.heavyModules ?? [CARD_MODULE],
       failedAuthLimit: options.failedAuthLimit ?? 10,
     };
+    for (const {instance, pkg} of options.sellerApplets ? SELLER_APPLETS : []) {
+      this.packages.set(pkg, {
+        aid: pkg,
+        modules: [instance],
+        size: 0,
+        instancesMade: 1,
+      });
+      this.instances.set(instance, {
+        aid: instance,
+        module: instance,
+        pkg,
+        state: {unspent: 0, spent: 0, pin: 0, record: 0, owner: 0},
+      });
+    }
   }
 
   /** The card in the field: one APDU in, data and SW out, or a rejection when it does not answer. */

@@ -279,7 +279,10 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   `openSession` picks the protocol from INITIALIZE UPDATE's reply, so a caller
   never does. Under either, the card's proof of the keys is checked before
   EXTERNAL AUTHENTICATE goes out; a failed login counts towards a lock that is
-  for good, so nothing is retried.
+  for good, so nothing is retried. On an SCP03 card the install reads the
+  registry before its sweep deletes anything: the J3R452 comes with the
+  seller's NDEF tag at `D2760000850101`, the tag's AID, and only a registry
+  that shows every Cashu AID as the Cashu package's lets the sweep run.
 
 ## Rules for agents
 

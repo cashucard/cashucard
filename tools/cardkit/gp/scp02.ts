@@ -163,9 +163,11 @@ export function initializeUpdateCommand(
 
 /**
  * INITIALIZE UPDATE's reply, by the protocol in byte 11: 28 bytes with 02 is
- * SCP02's, 32 bytes with 03 is SCP03's (parseScp03Reply). Anything else, an
- * unknown protocol or a length that does not go with the one named, is the
- * card's fault: a CardError, and nothing more is sent.
+ * SCP02's; with 03 it is SCP03's, whose i (byte 12) sets its length and is
+ * read first (parseScp03Reply), so a random challenge or S16 is refused for
+ * that, and the one i taken, 10, gives 32 bytes. Anything else, an unknown
+ * protocol or a length that does not go with the one named, is the card's
+ * fault: a CardError, and nothing more is sent.
  */
 export function parseInitializeUpdate(reply: Reply): InitializeUpdateReply {
   if (reply.sw !== 0x9000) {
@@ -173,8 +175,10 @@ export function parseInitializeUpdate(reply: Reply): InitializeUpdateReply {
   }
   const d = reply.data;
   const scp = d.length > 11 ? d[11] : -1;
-  const length = scp === 0x02 ? 28 : scp === 0x03 ? 32 : 0;
-  if (length === 0) {
+  if (scp === 0x03) {
+    return parseScp03Reply(reply);
+  }
+  if (scp !== 0x02) {
     throw new CardError(
       reply.sw,
       0x50,
@@ -183,15 +187,12 @@ export function parseInitializeUpdate(reply: Reply): InitializeUpdateReply {
         : `INITIALIZE UPDATE answered ${d.length} bytes, not 28 (SCP02) or 32 (SCP03)`,
     );
   }
-  if (d.length !== length) {
+  if (d.length !== 28) {
     throw new CardError(
       reply.sw,
       0x50,
-      `INITIALIZE UPDATE answered ${d.length} bytes for SCP${toHex([scp])}, not ${length}`,
+      `INITIALIZE UPDATE answered ${d.length} bytes for SCP02, not 28`,
     );
-  }
-  if (scp === 0x03) {
-    return parseScp03Reply(reply);
   }
   return {
     diversification: d.slice(0, 10),

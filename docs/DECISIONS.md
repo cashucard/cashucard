@@ -5327,11 +5327,11 @@ daily `ops-mint-probe` job (it stays a check of the code-owned list).
 
 **Decided (ENG-836, 2026-11-09):** cardkit opens a secure channel through one
 `openSession`, which reads the protocol from byte 11 of INITIALIZE UPDATE's
-reply: 28 bytes with `02` is SCP02 (the J3R180, [D27](#d27)), 32 bytes with `03`
-is SCP03 (the NXP J3R452, JCOP 4.5), and anything else is refused as the card's
-fault with nothing more sent. `provision`, `rotateKeys` and `resetOwnedCard`
-never choose. SCP03 runs as GlobalPlatform Amendment D has it at security level
-01, C-MAC only, with AES-128 keys and i=10:
+reply: 28 bytes with `02` is SCP02 (the J3R180, [D27](#d27)), `03` is SCP03
+(the NXP J3R452, JCOP 4.5), 32 bytes at the one i taken, and anything else is
+refused as the card's fault with nothing more sent. `provision`, `rotateKeys`
+and `resetOwnedCard` never choose. SCP03 runs as GlobalPlatform Amendment D has
+it at security level 01, C-MAC only, with AES-128 keys and i=10:
 
 - The card proves the keys twice, and both are checked on the phone before
   EXTERNAL AUTHENTICATE goes out: its pseudo-random challenge (the static ENC
@@ -5340,7 +5340,13 @@ never choose. SCP03 runs as GlobalPlatform Amendment D has it at security level
   keys, or a challenge made for another security domain, throw WrongKeys after
   INITIALIZE UPDATE alone. A reply whose i reports a random challenge (bit
   `10` clear) is refused: nothing could be checked before the login, and a
-  failed login counts towards a lock that is for good.
+  failed login counts towards a lock that is for good. So is S16 (bit `01`),
+  whose 16-byte challenges, cryptograms and MACs are not written here. i is
+  read before the length, which follows it as Amendment D's Table 7-3 and
+  GlobalPlatformPro's GPSession have it (`scp03ReplyLength`: 29 bytes, 3 more
+  for the counter a pseudo-random challenge brings, 16 more in S16), so a card
+  that opens either is refused for that cause after its one APDU, not for a
+  byte count.
 - S-MAC (constant `06`) and S-ENC (`04`) come from the KDF over host ‖ card
   challenge; the static DEK is used as it is. EXTERNAL AUTHENTICATE is
   `84 82 01 00` with the host cryptogram (S-MAC's KDF, constant `01`), as under
@@ -5353,12 +5359,27 @@ never choose. SCP03 runs as GlobalPlatform Amendment D has it at security level
   `88 11 10 <AES-ECB under the static DEK> 03 <AES-ECB(key, 16 × 01)[0..3]>`
   under SCP03 (`504A77` is the public default's check value). The raw-DEK form
   is gone, so a caller cannot put DES3 entries on an SCP03 card.
+- On an SCP03 card the install's sweep reads the registry first (GET STATUS
+  of the applications and of the load files, `readCashuRegistry`) and deletes
+  nothing, stopping `guarded`, unless every Cashu object it lists is the Cashu
+  package's. The J3R452 test card came with the seller's NDEF tag at
+  `D2760000850101`, made from `D276000085` (`scp03-07`), which is the AID the
+  card's tag takes, and the sweep, whose job is clearing what a torn run left,
+  would otherwise delete it on the first install. A torn install of the card's
+  own still comes back: the registry shows its objects as the package's. SCP02's
+  sweep sends what it always has, byte for byte (the J3R180 comes blank, and
+  its transcripts stand), and a sweep that names no Cashu AID, the hello
+  plan's, reads nothing.
 - The security domain's AID is a run option, `sdAid`, the ISD's
-  `A000000151000000` by default, which both chips use: provision, rotation and
-  the reset select it, log in to it and name it in INSTALL [for load].
-  `readChipIdentity`, `inspectInstallation` and the registry check still read
-  the ISD; slice 2 (ENG-835) takes them on with the rest of the J3R452's first
-  contact.
+  `A000000151000000` by default, which both chips use: provision and rotation
+  select it, log in to it and name it in INSTALL [for load], and an SCP03
+  install reads the registry for it (`readCashuRegistry` takes the domain, the
+  ISD by default). `readChipIdentity` and `inspectInstallation` still read the
+  ISD, and so does the reset's registry check, so `resetOwnedCard` takes the
+  ISD alone: any other `sdAid` stops it `guarded` before its first APDU, where
+  it would otherwise save `delete_intent` and then stop at the registry on
+  every retry. Slice 2 (ENG-835) takes them on with the rest of the J3R452's
+  first contact.
 
 **Why.** The J3R452 opens SCP03 only, and both cardkits spoke SCP02 only. D27's
 revisit clause ("Revisit if a later chip ships a factory AES set") has fired: the
@@ -5371,7 +5392,9 @@ INSTALL [for load], the LOAD blocks and the INSTALL of a probe package. The
 fake card gained an SCP03 mode (the 32-byte reply, the counter every
 INITIALIZE UPDATE advances, the full-CMAC chain, AES PUT KEY with the check
 value enforced), so the install, the rotation with its lost-reply path, and the
-reset run under both protocols.
+reset run under both protocols, and the seller's four applets
+(`sellerApplets`), whose GET STATUS of the applications is the J3R452's own
+bytes in `scp03-07`, so the install also runs on the card as it came.
 
 **AES from a package, where D27 wrote its own DES.** D27 rejected unmaintained
 DES packages for a cipher that fits in a page of tables. AES is the other way
@@ -5426,8 +5449,9 @@ of an incompatible change, would stop `tools/outbox-spike/run-compact.cjs` and
 audit, so moving their pin fails that plan's admission. The owner decides the
 bump with the review of those runners. Also not here: protocol choice in the
 apps, first contact with a seller-keyed card (PUT KEY with P1 = 00 at version
-255) and the seller's tag (slice 2), R-MAC and security levels above 01,
-AES-192 and AES-256.
+255) and what becomes of the seller's tag (slice 2; until then an install on a
+J3R452 that still holds it stops `guarded` with nothing deleted), R-MAC, S16
+and security levels above 01, AES-192 and AES-256.
 
 **Rejected.** A second entry point beside `openSession` for SCP03 (every caller
 would choose, and choose wrong on the other chip); trusting a random card

@@ -4,7 +4,9 @@
  * installs, with Replace on and with it off, both guesses at what a torn LOAD
  * leaves, the opener rule, a mute INSTALL, refusals, the guards, a tampered
  * load file, and events that throw. Then the same install on a fake J3R452,
- * which opens SCP03, and the login guard under both protocols.
+ * which opens SCP03 and reads the registry before its sweep: blank, and as the
+ * test card came, with the seller's NDEF tag at D2760000850101, which no run
+ * deletes. Then the login guard under both protocols.
  */
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -42,7 +44,7 @@ import {
   type Transceiver,
 } from '../scp02';
 import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
-import {FakeCard, ISD, pullAt} from '../../testing/fake-card';
+import {FakeCard, ISD, SELLER_APPLETS, pullAt} from '../../testing/fake-card';
 
 const CASHU = cashuPlan(CASHU_LOAD_FILE);
 const HELLO = helloPlan(HELLO_LOAD_FILE);
@@ -89,6 +91,18 @@ const INSTALL_ORDER = [
   0xa4, // verify: 02 02, GET_INFO, GET_PUBKEY, the tag
   0xa4,
   0xca, // FF21 again
+];
+
+/**
+ * The same on a J3R452: under SCP03 the sweep reads the registry first, GET
+ * STATUS of the applications and of the load files, and deletes nothing
+ * unless every Cashu AID on the card is the Cashu package's.
+ */
+const INSTALL_ORDER_SCP03 = [
+  ...INSTALL_ORDER.slice(0, 5),
+  0xf2,
+  0xf2, // sweep: the registry
+  ...INSTALL_ORDER.slice(5),
 ];
 
 describe('provision: the Cashu card', () => {
@@ -587,13 +601,24 @@ describe('provision: the Cashu card', () => {
 });
 
 describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
-  it('installs on a clean card in the same order, every card-manager command under the SCP03 C-MAC', async () => {
+  it('installs on a clean card in the same order, the registry read before the sweep, every card-manager command under the SCP03 C-MAC', async () => {
     const card = new FakeCard({scp: 3});
     const r = await provision(card.transceive, CASHU, options());
     assert.equal(r.ok, true, r.reason);
     assert.equal(r.phase, 'done');
     assertInstalled(card);
-    assert.deepEqual(card.insLog(), INSTALL_ORDER);
+    assert.deepEqual(card.insLog(), INSTALL_ORDER_SCP03);
+    // GET STATUS of the applications, then of the load files, as readCashuRegistry sends them
+    assert.deepEqual(
+      card.log
+        .filter(a => a[1] === 0xf2)
+        .map(a => toHex(a.slice(0, 7)) + toHex(a.slice(-1))),
+      ['84F240020A4F0000', '84F220020A4F0000'],
+    );
+    assert.deepEqual(
+      r.apdus.filter(a => a.ins === 0xf2).map(a => a.phase),
+      ['sweep', 'sweep'],
+    );
     // SCP03's 32-byte INITIALIZE UPDATE reply, and one login's counter
     assert.equal(r.apdus.find(a => a.ins === 0x50)?.rlen, 32);
     assert.equal(card.seq, 1);
@@ -609,7 +634,7 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
   });
 
   it('comes back from a pull at any APDU, before or after the card acts, with a run that sweeps and installs', async () => {
-    const total = INSTALL_ORDER.length;
+    const total = INSTALL_ORDER_SCP03.length;
     for (const partialLoad of ['discard', 'keep'] as const) {
       for (const when of ['before', 'after'] as const) {
         for (let n = 0; n < total; n++) {
@@ -638,6 +663,76 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
         }
       }
     }
+  });
+
+  /** The seller's applets on a card, in the order they were made. */
+  const SELLER = SELLER_APPLETS.map(a => a.instance);
+
+  it("stops guarded before any DELETE on a J3R452 as the test card came, whose seller's NDEF tag holds D2760000850101 (scp03-07), Replace on or off", async () => {
+    const card = new FakeCard({scp: 3, sellerApplets: true});
+    assert.deepEqual(card.instanceAids(), SELLER);
+    assert.ok(card.instanceAids().includes(TAG), "the seller's tag is there");
+    for (const replace of [false, true]) {
+      const before = card.log.length;
+      const r = await provision(card.transceive, CASHU, options({replace}));
+      assert.equal(r.ok, false, `Replace ${replace}`);
+      assert.equal(r.kind, 'guarded');
+      assert.equal(r.phase, 'sweep');
+      assert.match(r.reason!, /D2760000850101/);
+      assert.match(r.reason!, /nothing was deleted/);
+      // the probe (6A82: no card applet), the card manager, FF21, the login, then the registry and no more
+      assert.deepEqual(
+        card.log.slice(before).map(a => a[1]),
+        [0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2, 0xf2],
+      );
+      card.reset();
+    }
+    assert.ok(!card.insLog().includes(0xe4), 'no DELETE');
+    assert.deepEqual(card.instanceAids(), SELLER, "the seller's applets stay");
+    assert.deepEqual(
+      [...card.packages.keys()],
+      SELLER_APPLETS.map(a => a.pkg),
+    );
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it("keeps the seller's applets through a pull at any APDU: every run after it stops guarded, and none sends a DELETE", async () => {
+    const clean = new FakeCard({scp: 3, sellerApplets: true});
+    await provision(clean.transceive, CASHU, options({replace: true}));
+    assert.equal(clean.log.length, 7);
+    for (const when of ['before', 'after'] as const) {
+      for (let n = 0; n < clean.log.length; n++) {
+        const card = new FakeCard({scp: 3, sellerApplets: true});
+        const pull = pullAt(card, n, when);
+        const first = await provision(pull.tx, CASHU, options({replace: true}));
+        const where = `${when}/APDU ${n}`;
+        assert.equal(first.kind, 'pulled', where);
+        card.reset();
+        const again = await provision(
+          card.transceive,
+          CASHU,
+          options({replace: true}),
+        );
+        assert.equal(again.kind, 'guarded', `${where}: ${again.reason}`);
+        assert.ok(!card.insLog().includes(0xe4), `${where}: no DELETE`);
+        assert.deepEqual(card.instanceAids(), SELLER, where);
+      }
+    }
+  });
+
+  it('reads the registry only on SCP03 and only for a sweep of the Cashu AIDs: the J3R180 sends what it always has, and the hello plan never reads it', async () => {
+    const j3r180 = new FakeCard();
+    assert.equal(
+      (await provision(j3r180.transceive, CASHU, options())).ok,
+      true,
+    );
+    assert.deepEqual(j3r180.insLog(), INSTALL_ORDER);
+    // the hello applet's sweep names none of the Cashu AIDs, so the seller's tag does not stop it
+    const j3r452 = new FakeCard({scp: 3, sellerApplets: true});
+    const hello = await provision(j3r452.transceive, HELLO, options());
+    assert.equal(hello.ok, true, hello.reason);
+    assert.ok(!j3r452.insLog().includes(0xf2));
+    assert.deepEqual(j3r452.instanceAids(), SELLER);
   });
 
   // the card manager's AID on Open Platform cards, which the SCP03 challenge is made over here
@@ -679,6 +774,29 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
     assert.equal(rotated.ok, true, rotated.reason);
     assert.equal(toHex(card.keys.mac), toHex(SPIKE_KEYS.mac));
     assert.equal(card.failedAuths, 0);
+  });
+
+  it('reads the registry for the security domain sdAid names, so a torn install there comes back', async () => {
+    const sdAid = fromHex(OTHER);
+    const total = INSTALL_ORDER_SCP03.length;
+    for (let n = 0; n < total; n++) {
+      const card = new FakeCard({scp: 3, isd: OTHER, partialLoad: 'keep'});
+      const pull = pullAt(card, n, 'after');
+      const first = await provision(
+        pull.tx,
+        CASHU,
+        options({replace: true, sdAid}),
+      );
+      assert.equal(first.kind, 'pulled', `APDU ${n}`);
+      card.reset();
+      const again = await provision(
+        card.transceive,
+        CASHU,
+        options({replace: true, sdAid}),
+      );
+      assert.equal(again.ok, true, `APDU ${n}: ${again.kind} ${again.reason}`);
+      assertInstalled(card);
+    }
   });
 
   it("stops at WrongKeys, before EXTERNAL AUTHENTICATE, when the card's challenge was made over another AID than sdAid", async () => {

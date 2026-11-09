@@ -110,3 +110,8 @@ and each login's shape. The probe is fedimintcard's (`tools/j3r180-probe`), not
 this card's applet, so only a new capture moves its hash. The owner's earlier
 captures of this card under the seller's key set are not here and never will
 be: they serve shapes only, and they were made under keys no test may hold.
+
+`registry.test.ts` reads `scp03-07`'s GET STATUS: the seller's NDEF tag at
+`D2760000850101`, made from `D276000085`, is no Cashu tag, so the registry
+vouches for nothing on that card, and the fake card's `sellerApplets` layout
+answers the same bytes.

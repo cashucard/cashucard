@@ -77,9 +77,18 @@ review of the `tools/outbox-spike` runners that pin it (D181). Migration:
 - `Handshake` carries `sdAid`, the security domain INITIALIZE UPDATE went to,
   so a handshake built by hand needs it.
   `initializeUpdate(tx, random, kvn, sdAid)`, `openSession`'s `sdAid` option and
-  `RunOptions.sdAid` (provision, rotation, confirmation and reset) take it; all
-  default to the ISD, `A000000151000000`, as before.
+  `RunOptions.sdAid` (provision, rotation and confirmation) take it; all
+  default to the ISD, `A000000151000000`, as before. `resetOwnedCard` takes the
+  ISD alone and stops `guarded`, before its first APDU, at any other `sdAid`.
+- On an SCP03 card, `provision`'s sweep of the Cashu AIDs reads the registry
+  first and stops `guarded`, deleting nothing, unless every Cashu object is the
+  Cashu package's: the J3R452 comes with the seller's NDEF tag at
+  `D2760000850101`. An SCP02 run sends the same APDUs as before.
+  `readCashuRegistry(send, domain)` takes the security domain to hold them to,
+  the ISD by default.
 - New: the SCP03 primitives (`aesEcb`, `cmac`, `scp03Kdf`, `aesKcv`,
-  `parseScp03Reply`, `scp03KeysIfMatches`, `scp03HostCryptogram`,
-  `Scp03Session` and the rest of `gp/scp03.ts`) and a runtime dependency on
-  `@noble/ciphers` 1.3.0. `FakeCard` takes `scp: 3` and `isd`.
+  `parseScp03Reply`, `scp03ReplyLength`, `scp03KeysIfMatches`,
+  `scp03HostCryptogram`, `Scp03Session` and the rest of `gp/scp03.ts`) and a
+  runtime dependency on `@noble/ciphers` 1.3.0. `FakeCard` takes `scp: 3`,
+  `isd` and `sellerApplets` (the J3R452 test card's four applets,
+  `SELLER_APPLETS`).

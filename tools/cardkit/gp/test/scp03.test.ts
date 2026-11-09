@@ -34,6 +34,7 @@ import {
   scp03HostCryptogram,
   scp03Kdf,
   scp03KeysIfMatches,
+  scp03ReplyLength,
   scp03SessionKeys,
 } from '../scp03';
 import {nodeAesEcb, nodeCmac, nodeScp03Kdf} from '../../testing/node-aes';
@@ -220,7 +221,21 @@ describe("SCP03: INITIALIZE UPDATE's reply", () => {
     });
   });
 
-  it("refuses, as the card's fault, an error status, 28 or 29 bytes, another protocol and a random challenge", () => {
+  it("sizes the reply from i as Amendment D's Table 7-3 and gp's GPSession do: 29, 3 more with the counter (10), 16 more in S16 (01)", () => {
+    for (const [i, length] of [
+      [0x00, 29], // a random challenge: no counter
+      [0x10, 32], // scp03-07's
+      [0x01, 45], // S16, random
+      [0x11, 48], // S16 with the counter
+      [0x30, 32], // R-MAC support adds nothing to the reply
+      [0x70, 32], // nor does R-ENC
+    ]) {
+      assert.equal(scp03ReplyLength(i), length, `i=${toHex([i])}`);
+    }
+    assert.equal(scp03ReplyLength(T07.reply[12]), T07.reply.length);
+  });
+
+  it("refuses, as the card's fault, an error status, a length i does not give, another protocol, a random challenge and S16", () => {
     const with12 = (i: number) => {
       const r = T07.reply.slice();
       r[12] = i;
@@ -228,19 +243,44 @@ describe("SCP03: INITIALIZE UPDATE's reply", () => {
     };
     const with11 = T07.reply.slice();
     with11[11] = 0x02;
+    // the lengths a card that opens these answers with (scp03ReplyLength)
+    const randomChallenge = concat(
+      T07.reply.slice(0, 12),
+      [0x00],
+      T07.reply.slice(13, 29),
+    );
+    const s16 = (i: number, counter: boolean) =>
+      concat(
+        T07.reply.slice(0, 12),
+        [i],
+        rnd(16),
+        rnd(16),
+        counter ? T07.reply.slice(29) : [],
+      );
+    assert.equal(randomChallenge.length, 29);
+    assert.equal(s16(0x11, true).length, 48);
+    assert.equal(s16(0x01, false).length, 45);
     const refused: [Reply, RegExp][] = [
       [{data: [], sw: 0x6a88}, /6A88/],
-      [ok(T07.reply.slice(0, 28)), /28 bytes/],
-      [ok(T07.reply.slice(0, 29)), /29 bytes/],
+      [ok(T07.reply.slice(0, 12)), /12 bytes, too few/],
+      [ok(T07.reply.slice(0, 28)), /28 bytes for SCP03, not 32/],
+      [ok(T07.reply.slice(0, 29)), /29 bytes for SCP03, not 32/],
       [ok(with11), /SCP02, not SCP03/],
+      // i is read before the length: refused for its cause at the length it comes in
+      [ok(randomChallenge), /i=00, a random card challenge/],
+      [ok(s16(0x11, true)), /i=11: S16 is not supported/],
+      [ok(s16(0x01, false)), /i=01, a random card challenge/],
+      // and at a length that does not go with it
       [ok(with12(0x00)), /i=00, a random card challenge/],
       [ok(with12(0x20)), /i=20, a random card challenge/],
+      [ok(with12(0x11)), /i=11: S16 is not supported/],
     ];
     for (const [reply, why] of refused) {
       assert.throws(
         () => parseScp03Reply(reply),
         (e: unknown) =>
           e instanceof CardError && e.ins === 0x50 && why.test(e.message),
+        why.source,
       );
     }
     // R-MAC and R-ENC support do not matter at level 01
@@ -465,7 +505,7 @@ describe('SCP03 through openSession: one way in, the protocol read from byte 11'
     );
   });
 
-  it('refuses 28 bytes with 03, 32 with 02, 29 bytes, an i without 10 and an error status, each as a CardError after the one APDU', async () => {
+  it('refuses 28 bytes with 03, 32 with 02, 29 bytes, an i without 10, S16 and an error status, each as a CardError after the one APDU', async () => {
     const replies: [string, (r: number[]) => number[], RegExp][] = [
       ['28 bytes with 03', r => r.slice(0, 28), /28 bytes for SCP03, not 32/],
       [
@@ -475,7 +515,17 @@ describe('SCP03 through openSession: one way in, the protocol read from byte 11'
       ],
       ['29 bytes', r => r.slice(0, 29), /29 bytes for SCP03, not 32/],
       [
-        'i 00',
+        'i 00 in 29 bytes, as a random challenge comes: no counter',
+        r => concat(r.slice(0, 12), [0x00], r.slice(13, 29)),
+        /i=00, a random card challenge/,
+      ],
+      [
+        'i 11 in 48 bytes, as S16 comes: 16-byte challenge and cryptogram, then the counter',
+        r => concat(r.slice(0, 12), [0x11], rnd(16), rnd(16), r.slice(29)),
+        /i=11: S16 is not supported/,
+      ],
+      [
+        'i 00 in 32 bytes',
         r => concat(r.slice(0, 12), [0x00], r.slice(13)),
         /i=00, a random card challenge/,
       ],

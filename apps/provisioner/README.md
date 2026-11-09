@@ -62,7 +62,10 @@ so after a pull from Installing card on, the screen says to turn Replace on firs
   button stays off until the app restarts. Failed logins lock a card for good.
 - The bench never retries a command.
 - The bench deletes only the card's three instances and package, plus the hello
-  applet and its package. It never deletes the card manager.
+  applet and its package. It never deletes the card manager. On a card that
+  opens SCP03 (the J3R452) it reads the registry first and deletes none of the
+  card's AIDs unless each one there is the card package's: that card comes with
+  the seller's NDEF tag at `D2760000850101`, and the install stops instead.
 - The bench refuses to remove a card applet that holds anything (an unspent or
   spent piece, an owner, a PIN or a record), with Replace on or off.
 - The readout never includes APDU bytes. It includes INS, lengths, SW and times.
@@ -347,7 +350,6 @@ export CASHU_ANDROID_UPLOAD_KEY_ALIAS=cashucard-upload
 export CASHU_ANDROID_UPLOAD_STORE_PASSWORD=$(security find-generic-password -s cashucard-android-upload -a cashucard-upload -w)
 export CASHU_ANDROID_UPLOAD_KEY_PASSWORD=$CASHU_ANDROID_UPLOAD_STORE_PASSWORD
 ```
-
 
 ### Cards home and shared phones
 

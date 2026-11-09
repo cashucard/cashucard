@@ -13,7 +13,8 @@
  * counter and the security domain's AID, and its cryptogram the KDF of S-MAC
  * over both challenges. Both are checked here, in constant time; a reply that
  * reports a random challenge (i without 10) cannot be checked before EXTERNAL
- * AUTHENTICATE, so it is refused rather than trusted.
+ * AUTHENTICATE, so it is refused rather than trusted, and so is S16 (i with
+ * 01), whose 16-byte challenges, cryptograms and MACs are not written here.
  *
  * At level 01 the card's replies carry data and SW only: no R-MAC is expected,
  * stripped or checked. S-ENC is derived (constant 04) as the specification
@@ -51,6 +52,10 @@ const HOST_CRYPTOGRAM = 0x01;
 const CARD_CHALLENGE = 0x02;
 const S_ENC = 0x04;
 const S_MAC = 0x06;
+
+/** The bits of i this module reads (Amendment D, Table 5-1). */
+const I_PSEUDO_RANDOM = 0x10;
+const I_S16 = 0x01;
 
 /** An AES-128 key as a fresh Uint8Array; any other length is a caller's fault. */
 function aesKey(key: Bytes): Uint8Array {
@@ -197,7 +202,18 @@ export function scp03SessionKeys(
   };
 }
 
-/** The 32 bytes INITIALIZE UPDATE answers with under SCP03. */
+/**
+ * How long INITIALIZE UPDATE's reply under SCP03 is for `i`, as Amendment D's
+ * Table 7-3 lays it out and GlobalPlatformPro v25.10.20's GPSession sizes it:
+ * 29 (diversification data, key information, and S8's challenge and
+ * cryptogram), 3 more for the counter a pseudo-random challenge (10) brings,
+ * and 16 more in S16 mode (01). The one i this module takes, 10, gives 32.
+ */
+export function scp03ReplyLength(i: number): number {
+  return 29 + (i & I_PSEUDO_RANDOM ? 3 : 0) + (i & I_S16 ? 16 : 0);
+}
+
+/** The 32 bytes INITIALIZE UPDATE answers with under SCP03 at i=10. */
 export interface Scp03Reply {
   diversification: number[];
   kvn: number;
@@ -215,20 +231,22 @@ export interface Scp03Reply {
  * INITIALIZE UPDATE's reply under SCP03: diversification data (10), key
  * version, 03, i, card challenge (8), card cryptogram (8), counter (3). What
  * the card sent is the card's, so every refusal is a CardError: a status
- * other than 9000, another length or protocol, and an i whose challenge is
- * random (bit 10 clear), which leaves nothing to check before EXTERNAL
- * AUTHENTICATE.
+ * other than 9000, another protocol, an i this module does not run, and a
+ * length that is not the one i gives (scp03ReplyLength). i is read before the
+ * length, so a card that opens a random challenge (bit 10 clear), which leaves
+ * nothing to check before EXTERNAL AUTHENTICATE, or S16 (bit 01) is refused
+ * for that, whatever length it answered with.
  */
 export function parseScp03Reply(reply: Reply): Scp03Reply {
   if (reply.sw !== 0x9000) {
     throw new CardError(reply.sw, 0x50);
   }
   const d = reply.data;
-  if (d.length !== 32) {
+  if (d.length < 13) {
     throw new CardError(
       reply.sw,
       0x50,
-      `INITIALIZE UPDATE answered ${d.length} bytes, not SCP03's 32`,
+      `INITIALIZE UPDATE answered ${d.length} bytes, too few for SCP03's key information`,
     );
   }
   if (d[11] !== 0x03) {
@@ -239,11 +257,26 @@ export function parseScp03Reply(reply: Reply): Scp03Reply {
     );
   }
   const i = d[12];
-  if ((i & 0x10) === 0) {
+  if ((i & I_PSEUDO_RANDOM) === 0) {
     throw new CardError(
       reply.sw,
       0x50,
       `the card opens SCP03 with i=${toHex([i])}, a random card challenge that cannot be checked before EXTERNAL AUTHENTICATE`,
+    );
+  }
+  if ((i & I_S16) !== 0) {
+    throw new CardError(
+      reply.sw,
+      0x50,
+      `the card opens SCP03 with i=${toHex([i])}: S16 is not supported`,
+    );
+  }
+  const length = scp03ReplyLength(i);
+  if (d.length !== length) {
+    throw new CardError(
+      reply.sw,
+      0x50,
+      `INITIALIZE UPDATE answered ${d.length} bytes for SCP03, not ${length}`,
     );
   }
   return {

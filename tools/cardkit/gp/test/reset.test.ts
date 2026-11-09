@@ -4,7 +4,8 @@ import test from 'node:test';
 import {resetOwnedCard, type ResetStage, type ResetOptions} from '../reset';
 import {cashuPlan, provision, rotateKeys} from '../provision';
 import {FACTORY_KEYS, SPIKE_KEYS} from '../scp02';
-import {toHex} from '../bytes';
+import {ISD_AID} from '../aids';
+import {fromHex, toHex} from '../bytes';
 import {CPLC_09336120, FakeCard, pullAt} from '../../testing/fake-card';
 import {CASHU_LOAD_FILE} from './assets';
 
@@ -121,6 +122,48 @@ test('an owned-card reset on a J3R452 (SCP03) ends on the public default 40..4F 
   const put = card.log.filter(a => a[1] === 0xd8);
   assert.equal(put.length, 1);
   assert.deepEqual([put[0][4], put[0][6]], [0x4e, 0x88]);
+});
+
+test('a reset takes the ISD alone: any other sdAid stops it guarded before its first APDU, with nothing saved', async () => {
+  // identity, inspection and the registry read the ISD until slice 2 (ENG-835);
+  // logged in elsewhere, a reset would save delete_intent and never get past the registry
+  const other = fromHex('A000000003000000');
+  for (const scp of [2, 3] as const) {
+    const card = await installed(scp);
+    for (const stage of [
+      'reviewed',
+      'delete_intent',
+      'deletion_observed',
+      'rotation_intent',
+      'factory_verified',
+    ] as const) {
+      const saved: ResetStage[] = [];
+      const result = await resetOwnedCard(
+        card.transceive,
+        options({
+          stage,
+          sdAid: other,
+          persist: async s => {
+            saved.push(s);
+          },
+        }),
+      );
+      const where = `SCP0${scp} at ${stage}`;
+      assert.equal(result.ok, false, where);
+      assert.equal(result.kind, 'guarded', where);
+      assert.equal(result.stage, stage, where);
+      assert.deepEqual(saved, [], `${where}: nothing saved`);
+      assert.deepEqual(card.log, [], `${where}: no APDU`);
+    }
+    // the ISD's AID, named, is the default
+    const result = await resetOwnedCard(
+      card.transceive,
+      options({sdAid: Array.from(ISD_AID)}),
+    );
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(card.instances.size + card.packages.size, 0);
+    assert.equal(card.failedAuths, 0);
+  }
 });
 
 test('lost DELETE or PUT KEY reply resumes from observed state, without a failed login', async () => {

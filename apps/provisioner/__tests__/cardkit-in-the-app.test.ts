@@ -3,7 +3,8 @@
  * as Metro compiles it for the phone) rather than by tsx, and run end to end
  * against the fake card from tools/cardkit's tests, with this app's random
  * source and its plans: as a J3R180 (SCP02) and as a J3R452 (SCP03), whose
- * AES comes from @noble/ciphers through the same compile.
+ * AES comes from @noble/ciphers through the same compile, blank and as the
+ * test card came, with the seller's NDEF tag at the tag's AID.
  */
 import {
   CASHU_PLAN,
@@ -14,7 +15,7 @@ import {
   rotateKeys,
 } from '../src/cardkit';
 import {randomBytes} from '../src/random';
-import {FakeCard} from '@cashu-card/cardkit/testing';
+import {FakeCard, SELLER_APPLETS} from '@cashu-card/cardkit/testing';
 
 let t = 0;
 const options = () => ({random: randomBytes, now: () => (t += 3)});
@@ -52,7 +53,7 @@ test('the keys go to the spike set and back', async () => {
   expect(card.failedAuths).toBe(0);
 });
 
-test('a J3R452 that opens SCP03 installs in 88 blocks and rotates to the spike set and back', async () => {
+test('a blank J3R452 that opens SCP03 installs in 88 blocks and rotates to the spike set and back', async () => {
   const card = new FakeCard({scp: 3});
   const r = await provision(card.transceive, CASHU_PLAN, options());
   expect(r.ok).toBe(true);
@@ -73,5 +74,28 @@ test('a J3R452 that opens SCP03 installs in 88 blocks and rotates to the spike s
   expect(
     (await rotateKeys(card.transceive, SPIKE_KEYS, FACTORY_KEYS, options())).ok,
   ).toBe(true);
+  expect(card.failedAuths).toBe(0);
+});
+
+test("a J3R452 as the test card came, with the seller's NDEF tag at D2760000850101, stops guarded before any DELETE, as the tap's install runs it", async () => {
+  const card = new FakeCard({scp: 3, sellerApplets: true});
+  const seller = SELLER_APPLETS.map(a => a.instance);
+  expect(card.instanceAids()).toEqual(seller);
+  // provisioningTap's install: the factory set, Replace off
+  const r = await provision(card.transceive, CASHU_PLAN, {
+    ...options(),
+    keys: FACTORY_KEYS,
+    replace: false,
+  });
+  expect(r.ok).toBe(false);
+  expect(r.kind).toBe('guarded');
+  expect(r.phase).toBe('sweep');
+  expect(r.reason).toMatch(/D2760000850101/);
+  // logged in and read the registry (GET STATUS twice), then nothing more
+  expect(r.apdus.map(a => a.ins)).toEqual([
+    0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2, 0xf2,
+  ]);
+  expect(card.insLog()).not.toContain(0xe4);
+  expect(card.instanceAids()).toEqual(seller);
   expect(card.failedAuths).toBe(0);
 });
