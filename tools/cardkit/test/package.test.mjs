@@ -104,6 +104,9 @@ test('the packed API works in ordinary Node and rejects private subpaths', () =>
       assert.equal(typeof new FakeCard().transceive, 'function');
       // SCP03's AES comes from the declared @noble/ciphers: 504A77 is the public default's check value
       assert.equal(api.toHex(api.aesKcv(api.FACTORY_KEYS.enc)), '504A77');
+      // first contact's two key versions: a J3R452 ships at FF, the public default sits at 01 (D182)
+      assert.equal(api.SHIPPED_KVN, 0xff);
+      assert.equal(api.FACTORY_KVN, 0x01);
       assert.equal(new api.Scp03Session({enc: [], mac: [], dek: []}).scp, 3);
       assert.equal(new FakeCard({scp: 3}).scp, 3);
       assert.equal(require('@cashu-card/cardkit/package.json').version, ${JSON.stringify(manifest.version)});

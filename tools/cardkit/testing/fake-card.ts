@@ -10,7 +10,11 @@
  * (SCP02's moves at EXTERNAL AUTHENTICATE), C-MACs chained through the full
  * CMAC, replies with no R-MAC, and PUT KEY of AES keys only, decrypted under
  * the static DEK and refused (6A80) when a check value does not match, so a
- * wrong DEK shows. Under either protocol:
+ * wrong DEK shows. Its PUT KEY replaces the set in place (P1 the current
+ * version) and takes P1 00 only on a card at version FF (`kvn: 0xff`, a
+ * J3R452 as it ships), for a new version from 01 to 7F: the new set then
+ * replaces the FF set, as the test card did at first contact (GET DATA E0
+ * afterwards listed version 01 alone). Under either protocol:
  *
  * - the opener rule: the INSTALL that is a package's first instantiation and
  *   runs a heavy constructor goes mute (the reader gives up) or answers 6F00,
@@ -846,9 +850,19 @@ export class FakeCard {
     return sw(0x9000);
   }
 
-  /** SCP03's PUT KEY: three 88 11 10 <key under the static DEK> 03 <AES KCV> entries, in place. */
+  /**
+   * SCP03's PUT KEY: three 88 11 10 <key under the static DEK> 03 <AES KCV>
+   * entries, in place, or with P1 00 at version FF (first contact) to a new
+   * version from 01 to 7F, which then replaces the FF set.
+   */
   private putKey03(s: Session, p1: number, p2: number, data: Bytes): Bytes {
-    if (p1 !== this.kvn || p2 !== 0x81 || data.length !== 1 + 3 * 23) {
+    const firstContact =
+      p1 === 0x00 && this.kvn === 0xff && data[0] >= 0x01 && data[0] <= 0x7f;
+    if (
+      (p1 !== this.kvn && !firstContact) ||
+      p2 !== 0x81 ||
+      data.length !== 1 + 3 * 23
+    ) {
       return sw(0x6a80);
     }
     const keys: Bytes[] = [];

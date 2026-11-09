@@ -37,9 +37,11 @@ import {
 import {
   FACTORY_KEYS,
   SPIKE_KEYS,
+  WrongKeys,
   initializeUpdateCommand,
   openSession,
   parseCommand,
+  putKeys,
   selectAid,
   type Transceiver,
 } from '../scp02';
@@ -964,5 +966,49 @@ describe('the fake card', () => {
     assert.equal(seq02(await scp02.transceive(iu())), '0009');
     await openSession(scp02.transceive, FACTORY_KEYS, n => randomBytes(n));
     assert.equal(seq02(await scp02.transceive(iu())), '000A');
+  });
+
+  it('takes PUT KEY P1 00 only on an SCP03 card at version FF, to a version from 01 to 7F, and keeps that set alone; any other P1 stays 6A80', async () => {
+    /** A login with the public default, then PUT KEY of the spike set with this P1 and new version. */
+    const put = async (card: FakeCard, p1: number, newKvn: number) => {
+      const s = await openSession(card.transceive, FACTORY_KEYS, n =>
+        randomBytes(n),
+      );
+      return s.send(card.transceive, putKeys(SPIKE_KEYS, s, {p1, newKvn}));
+    };
+    // a J3R452 as it ships, at version FF (here on the public default)
+    const shipped = new FakeCard({scp: 3, kvn: 0xff});
+    const r = await put(shipped, 0x00, 0x01);
+    assert.equal(r.sw, 0x9000);
+    assert.equal(r.data[0], 0x01, 'the new version, then the check values');
+    assert.equal(r.data.length, 1 + 3 * 3);
+    assert.equal(shipped.kvn, 0x01);
+    assert.equal(toHex(shipped.keys.mac), toHex(SPIKE_KEYS.mac));
+    // the version-FF set went with it, as on the test card (GET DATA E0 then listed version 1 alone)
+    shipped.reset();
+    await assert.rejects(
+      openSession(shipped.transceive, FACTORY_KEYS, n => randomBytes(n)),
+      WrongKeys,
+    );
+    const ours = await openSession(shipped.transceive, SPIKE_KEYS, n =>
+      randomBytes(n),
+    );
+    assert.equal(ours.keyVersion, 0x01);
+    assert.equal(shipped.failedAuths, 0);
+    for (const [scp, kvn, p1, newKvn] of [
+      [3, 0x01, 0x00, 0x01], // a set beside the one at 01
+      [3, 0xff, 0x00, 0x80], // a new version outside 01..7F
+      [3, 0xff, 0x00, 0xff],
+      [3, 0xff, 0x00, 0x00],
+      [3, 0xff, 0x01, 0x01], // a set the card does not hold
+      [2, 0xff, 0x00, 0x01], // SCP02 replaces in place only
+    ] as const) {
+      const card = new FakeCard({scp, kvn});
+      const refused = await put(card, p1, newKvn);
+      const where = `SCP0${scp} at ${kvn}: P1 ${p1}, new version ${newKvn}`;
+      assert.equal(refused.sw, 0x6a80, where);
+      assert.equal(card.kvn, kvn, where);
+      assert.equal(toHex(card.keys.mac), toHex(FACTORY_KEYS.mac), where);
+    }
   });
 });

@@ -74,6 +74,20 @@ const K40 = fromHex('404142434445464748494A4B4C4D4E4F');
 /** The keys the J3R180 ships with: 40..4F for all three, key set version 01. */
 export const FACTORY_KEYS: KeySet = {enc: K40, mac: K40, dek: K40};
 
+/**
+ * The key set version the public default sits at: a J3R180 ships there, and a
+ * J3R452 is moved there at first contact (D182). A reset restores the public
+ * default at this version on both chips.
+ */
+export const FACTORY_KVN = 0x01;
+
+/**
+ * The key set version a J3R452 ships at (255). Its first rotation is first
+ * contact: PUT KEY with P1 00 puts our set at FACTORY_KVN, and the card drops
+ * the version-FF set (D182).
+ */
+export const SHIPPED_KVN = 0xff;
+
 /** The spike's public test set for the rotation drill (never a card's real keys). */
 export const SPIKE_KEYS: KeySet = {
   enc: fromHex('101112131415161718191A1B1C1D1E1F'),
