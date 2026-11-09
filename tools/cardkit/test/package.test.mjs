@@ -81,7 +81,7 @@ test('the packed API works in ordinary Node and rejects private subpaths', () =>
       target,
     ]);
     mkdirSync(join(scratch, 'node_modules/@noble'), {recursive: true});
-    for (const dependency of ['hashes', 'curves']) {
+    for (const dependency of ['hashes', 'curves', 'ciphers']) {
       symlinkSync(
         join(root, 'node_modules/@noble', dependency),
         join(scratch, 'node_modules/@noble', dependency),
@@ -102,8 +102,12 @@ test('the packed API works in ordinary Node and rejects private subpaths', () =>
       assert.equal(typeof cleanup.readResetReview, 'function');
       assert.equal(typeof cleanup.cleanupSettledEntries, 'function');
       assert.equal(typeof new FakeCard().transceive, 'function');
+      // SCP03's AES comes from the declared @noble/ciphers: 504A77 is the public default's check value
+      assert.equal(api.toHex(api.aesKcv(api.FACTORY_KEYS.enc)), '504A77');
+      assert.equal(new api.Scp03Session({enc: [], mac: [], dek: []}).scp, 3);
+      assert.equal(new FakeCard({scp: 3}).scp, 3);
       assert.equal(require('@cashu-card/cardkit/package.json').version, ${JSON.stringify(manifest.version)});
-      for (const path of ['gp/scp02', 'gp/test/fake-card', 'dist/gp/reset.js']) {
+      for (const path of ['gp/scp02', 'gp/scp03', 'gp/apdu', 'gp/test/fake-card', 'dist/gp/reset.js']) {
         assert.throws(() => require('@cashu-card/cardkit/' + path), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
       }
       assert.equal(api.cleanupSettledEntries, undefined);

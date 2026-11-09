@@ -114,8 +114,17 @@ export function parseRegistryEntries(data: Bytes): RegistryEntry[] {
     };
   });
 }
+/**
+ * Which Cashu objects the card holds, from GET STATUS of the applications and
+ * of the load files, sent through `send` (a secure channel). Each must be the
+ * Cashu package's, in `domain`: the security domain the package was loaded
+ * into, the ISD by default. Anything else at a Cashu AID, such as another
+ * vendor's NDEF tag at D2760000850101, or a reply that does not parse, throws
+ * RegistryEvidenceError: the caller deletes nothing on that evidence.
+ */
 export async function readCashuRegistry(
   send: (command: number[]) => Promise<Reply>,
+  domain: Bytes = ISD_AID,
 ): Promise<CashuRegistry> {
   const read = async (kind: RegistryKind): Promise<RegistryEntry[]> => {
     const data: number[] = [];
@@ -138,13 +147,13 @@ export async function readCashuRegistry(
   const applications = await read('applications');
   const packages = await read('load-files');
   const packageId = toHex(CASHU_PACKAGE_AID),
-    domain = toHex(ISD_AID);
+    domainId = toHex(domain);
   const instances = [toHex(TAG_AID), toHex(CARD_AID), toHex(OPENER_AID)];
   for (const entry of applications) {
     if (instances.includes(entry.aid)) {
       if (
         entry.loadFile !== packageId ||
-        entry.domain !== domain ||
+        entry.domain !== domainId ||
         entry.lifeCycle !== 7 ||
         !entry.privileges ||
         entry.privileges.some(v => v !== 0)
@@ -156,7 +165,7 @@ export async function readCashuRegistry(
   for (const entry of packages) {
     if (
       entry.aid === packageId &&
-      (entry.domain !== domain ||
+      (entry.domain !== domainId ||
         entry.lifeCycle !== 1 ||
         entry.loadFile !== null ||
         (entry.privileges !== null && entry.privileges.some(v => v !== 0)))

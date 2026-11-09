@@ -15,7 +15,12 @@
  * - a card applet already installed is removed only with `replace` on and
  *   GET_INFO empty (no unspent or spent piece, no owner, no PIN, no record):
  *   a card that holds anything is never swept;
- * - the card cryptogram is checked before EXTERNAL AUTHENTICATE (scp02.ts);
+ * - the card's proof of the keys is checked before EXTERNAL AUTHENTICATE
+ *   (scp02.ts, and scp03.ts for an SCP03 card);
+ * - on an SCP03 card, the J3R452, a sweep of the Cashu AIDs deletes nothing
+ *   until the registry shows every Cashu object there as the Cashu package's
+ *   (registry.ts): that card ships with the seller's NDEF tag at
+ *   D2760000850101, the AID the card's tag takes;
  * - DELETE names only the six AIDs of the whitelist, never the ISD (scp02.ts).
  */
 import {sha256} from '@noble/hashes/sha2';
@@ -32,6 +37,7 @@ import {
   TAG_CLASS_AID,
 } from './aids';
 import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
+import {RegistryEvidenceError, readCashuRegistry} from './registry';
 import {
   CardError,
   FACTORY_KEYS,
@@ -39,7 +45,7 @@ import {
   type KeySet,
   type Random,
   type Reply,
-  type Session,
+  type SecureSession,
   type Transceiver,
   TransportError,
   WrongKeys,
@@ -140,6 +146,14 @@ export interface Plan {
 const GET_INFO = [0xb0, 0x01, 0x00, 0x00, 0x00];
 const GET_PUBKEY = [0xb0, 0x10, 0x00, 0x00, 0x21];
 
+/** The objects readCashuRegistry vouches for: a sweep that names one reads it first under SCP03. */
+const CASHU_OBJECTS: readonly Bytes[] = [
+  TAG_AID,
+  CARD_AID,
+  OPENER_AID,
+  CASHU_PACKAGE_AID,
+];
+
 /** The card: the opener first, then the card's applet, then the tag under the NFC Forum's name (HARDWARE_DEPLOYMENT.md). */
 export function cashuPlan(loadFile: LoadFileAsset): Plan {
   return {
@@ -212,6 +226,16 @@ export interface RunOptions {
   /** Called synchronously, never awaited; whatever it throws is ignored. */
   onEvent?: (event: RunEvent) => void;
   macOverModifiedApdu?: boolean;
+  /**
+   * The security domain a run selects, logs in to and loads into: the ISD's
+   * AID by default (A000000151000000 on the J3R180 and the J3R452). SCP03's
+   * card challenge is made over it, so a wrong one stops at WrongKeys, and an
+   * SCP03 install reads the registry for it. resetOwnedCard takes the ISD
+   * alone and stops guarded, before its first APDU, at any other: its
+   * identity read (identity.ts) and its registry read select the ISD until
+   * slice 2 (ENG-835) threads this through them.
+   */
+  sdAid?: Bytes;
 }
 
 export interface ProvisionOptions extends RunOptions {
@@ -478,10 +502,14 @@ export async function provision(
 ): Promise<ProvisionResult> {
   const run = new Run<Phase>(tx, options, plan.guard ? 'probe' : 'selectIsd');
   const keys = options.keys ?? FACTORY_KEYS;
-  const sessionOptions = {macOverModifiedApdu: options.macOverModifiedApdu};
-  let session: Session | null = null;
+  const sdAid = options.sdAid ?? ISD_AID;
+  const sessionOptions = {
+    macOverModifiedApdu: options.macOverModifiedApdu,
+    sdAid,
+  };
+  let session: SecureSession | null = null;
   let blocks: number[][] = [];
-  const open = (): Session => {
+  const open = (): SecureSession => {
     if (!session) {
       throw new Error('no secure channel');
     }
@@ -526,7 +554,7 @@ export async function provision(
       }
     },
     selectIsd: async () => {
-      expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+      expectOk(await run.plain(selectAid(sdAid)), 0xa4);
       const free = await run.plain(getFreeMemory());
       run.freeBefore =
         free.sw === 0x9000
@@ -542,8 +570,29 @@ export async function provision(
       );
     },
     sweep: async () => {
+      const channel = open();
+      // SCP03 is the J3R452's, which ships with the seller's NDEF tag at the
+      // tag's AID (scp03-07): before a Cashu AID is deleted, the registry must
+      // show each Cashu object on the card as the package's. SCP02, the
+      // J3R180's, sends what it always has. What the seller's tag becomes is
+      // slice 2's (ENG-835).
+      if (
+        channel.scp === 3 &&
+        plan.sweep.some(aid => CASHU_OBJECTS.some(o => equal(o, aid)))
+      ) {
+        try {
+          await readCashuRegistry(c => channel.send(run.timed, c), sdAid);
+        } catch (e) {
+          if (e instanceof RegistryEvidenceError) {
+            throw new Guard(
+              `the card's registry does not show every Cashu AID as the card package's (a J3R452 ships with the seller's NDEF tag at ${toHex(TAG_AID)}): nothing was deleted`,
+            );
+          }
+          throw e;
+        }
+      }
       for (const aid of plan.sweep) {
-        const r = await open().send(run.timed, deleteAid(aid));
+        const r = await channel.send(run.timed, deleteAid(aid));
         if (r.sw !== 0x9000 && r.sw !== 0x6a88) {
           throw new CardError(r.sw, 0xe4);
         }
@@ -551,7 +600,7 @@ export async function provision(
     },
     installForLoad: async () => {
       expectOk(
-        await open().send(run.timed, installForLoad(plan.packageAid)),
+        await open().send(run.timed, installForLoad(plan.packageAid, sdAid)),
         0xe6,
       );
     },
@@ -584,7 +633,7 @@ export async function provision(
         }
       }
       if (plan.removeAfterChecks) {
-        expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+        expectOk(await run.plain(selectAid(sdAid)), 0xa4);
         const again = await openSession(
           run.timed,
           keys,
@@ -595,7 +644,7 @@ export async function provision(
           expectOk(await again.send(run.timed, deleteAid(aid)), 0xe4);
         }
       }
-      expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+      expectOk(await run.plain(selectAid(sdAid)), 0xa4);
       const free = await run.plain(getFreeMemory());
       run.freeAfter =
         free.sw === 0x9000
@@ -646,12 +695,16 @@ export async function rotateKeys(
   options: RotateOptions,
 ): Promise<RotateResult> {
   const run = new Run<RotatePhase>(tx, options, 'selectIsd');
-  const sessionOptions = {macOverModifiedApdu: options.macOverModifiedApdu};
+  const sdAid = options.sdAid ?? ISD_AID;
+  const sessionOptions = {
+    macOverModifiedApdu: options.macOverModifiedApdu,
+    sdAid,
+  };
   try {
     run.enter('selectIsd');
-    expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+    expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     run.enter('auth');
-    const hs = await initializeUpdate(run.timed, options.random, 0);
+    const hs = await initializeUpdate(run.timed, options.random, 0, sdAid);
     const fromKeys = sessionIfMatches(from, hs);
     const toKeys = fromKeys ? null : sessionIfMatches(to, hs);
     if (!fromKeys && !toKeys) {
@@ -677,13 +730,13 @@ export async function rotateKeys(
     );
     run.enter('putKey');
     const kvn = hs.reply.kvn;
-    const command = putKeys(to, session.keys.dek, {
+    const command = putKeys(to, session, {
       p1: options.putKey?.p1 ?? kvn,
       newKvn: options.putKey?.newKvn ?? kvn,
     });
     expectOk(await session.send(run.timed, command), 0xd8);
     run.enter('reopen');
-    expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+    expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     const reopened = await openSession(
       run.timed,
       to,
@@ -709,12 +762,14 @@ export async function confirmManagerKeys(
   options: RunOptions,
 ): Promise<RotateResult> {
   const run = new Run<RotatePhase>(tx, options, 'selectIsd');
+  const sdAid = options.sdAid ?? ISD_AID;
   try {
     run.enter('selectIsd');
-    expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+    expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     run.enter('auth');
     const session = await openSession(run.timed, keys, options.random, {
       macOverModifiedApdu: options.macOverModifiedApdu,
+      sdAid,
     });
     run.enter('done');
     return {

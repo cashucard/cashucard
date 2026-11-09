@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
 import {existsSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import test from 'node:test';
 import {
+  RegistryEvidenceError,
   readCashuRegistry,
   registryCommand,
   parseRegistryEntries,
 } from '../registry';
-import {FACTORY_KEYS, parseReply, type Reply} from '../scp02';
+import {FACTORY_KEYS, openSession, parseReply, type Reply} from '../scp02';
 import {fromHex, toHex} from '../bytes';
+import {FakeCard} from '../../testing/fake-card';
 import {parseGpLog, replay} from './transcript';
 
 const fixture = join(__dirname, 'fixtures/gp-list.txt');
@@ -116,6 +119,118 @@ test(
         readCashuRegistry(script([ok(invalid), ok(packages)]).send),
       );
     }
+  },
+);
+
+test(
+  'the Cashu objects must be in the security domain named, the ISD by default',
+  {skip: pending},
+  async () => {
+    const isd = await readCashuRegistry(
+      script([ok(apps), ok(packages)]).send,
+      fromHex('A000000151000000'),
+    );
+    assert.deepEqual(isd, {tag: true, card: true, opener: true, package: true});
+    await assert.rejects(
+      readCashuRegistry(
+        script([ok(apps), ok(packages)]).send,
+        fromHex('A000000003000000'),
+      ),
+      RegistryEvidenceError,
+    );
+  },
+);
+
+/**
+ * The J3R452 test card as it came (`gp --list` under the public default,
+ * scp03-07): the seller's four applets, the NDEF tag among them at
+ * D2760000850101, made from D276000085.
+ */
+const j3r452Fixture = join(
+  __dirname,
+  'fixtures/scp03-07-list-default-keyver1.txt',
+);
+const j3r452 = existsSync(j3r452Fixture)
+  ? replay(parseGpLog(readFileSync(j3r452Fixture, 'utf8')), FACTORY_KEYS)
+  : null;
+const j3r452Pending = j3r452
+  ? false
+  : 'pending H0 fixtures: scp03-07-list-default-keyver1.txt';
+/** The seller's NDEF tag's entry in the J3R452's GET STATUS of the applications. */
+const SELLER_TAG = fromHex(
+  'E3234F07D27600008501019F700107C503000000C405D276000085CC08A000000151000000',
+);
+
+/** Answers each command with the J3R452's reply to gp's same command, in the order gp sent them. */
+function fromJ3r452(
+  edit: (command: number[], reply: Reply) => Reply = (_, r) => r,
+) {
+  assert.ok(j3r452);
+  const used = new Set<number>();
+  const commands: number[][] = [];
+  return {
+    commands,
+    send: async (command: number[]): Promise<Reply> => {
+      commands.push(command);
+      const at = j3r452.commands.findIndex(
+        (c, i) => !used.has(i) && toHex(c) === toHex(command),
+      );
+      assert.notEqual(at, -1, `gp sent no ${toHex(command)}`);
+      used.add(at);
+      return edit(command, parseReply(j3r452.replies[at]!));
+    },
+  };
+}
+
+test(
+  "the J3R452 as it came (scp03-07): the seller's NDEF tag at D2760000850101 is no Cashu tag, so nothing is vouched for",
+  {skip: j3r452Pending},
+  async () => {
+    const card = fromJ3r452();
+    await assert.rejects(readCashuRegistry(card.send), RegistryEvidenceError);
+    // gp's own GET STATUS, the load files in two pages (6310, then 9000)
+    assert.deepEqual(card.commands, [
+      registryCommand('applications'),
+      registryCommand('load-files'),
+      registryCommand('load-files', true),
+    ]);
+    // without that one entry, the seller's other applets and the JCOP packages are no Cashu object
+    const without = fromJ3r452((command, reply) => {
+      if (command[2] !== 0x40) {
+        return reply;
+      }
+      const at = toHex(reply.data).indexOf(toHex(SELLER_TAG)) / 2;
+      assert.ok(at >= 0, "the seller's tag is in the capture");
+      const data = reply.data.slice();
+      data.splice(at, SELLER_TAG.length);
+      return {...reply, data};
+    });
+    assert.deepEqual(await readCashuRegistry(without.send), {
+      tag: false,
+      card: false,
+      opener: false,
+      package: false,
+    });
+  },
+);
+
+test(
+  "the fake card's seller layout answers GET STATUS of the applications with the J3R452's own bytes",
+  {skip: j3r452Pending},
+  async () => {
+    const card = new FakeCard({scp: 3, sellerApplets: true});
+    const session = await openSession(card.transceive, FACTORY_KEYS, n =>
+      randomBytes(n),
+    );
+    const command = registryCommand('applications');
+    assert.deepEqual(
+      await session.send(card.transceive, command),
+      await fromJ3r452().send(command),
+    );
+    await assert.rejects(
+      readCashuRegistry(c => session.send(card.transceive, c)),
+      RegistryEvidenceError,
+    );
   },
 );
 

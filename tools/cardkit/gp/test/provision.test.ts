@@ -3,7 +3,10 @@
  * APDU (before the card acts and after) followed by a run that sweeps and
  * installs, with Replace on and with it off, both guesses at what a torn LOAD
  * leaves, the opener rule, a mute INSTALL, refusals, the guards, a tampered
- * load file, and events that throw.
+ * load file, and events that throw. Then the same install on a fake J3R452,
+ * which opens SCP03 and reads the registry before its sweep: blank, and as the
+ * test card came, with the seller's NDEF tag at D2760000850101, which no run
+ * deletes. Then the login guard under both protocols.
  */
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -19,20 +22,29 @@ import {
   TAG_AID,
   TAG_CLASS_AID,
 } from '../aids';
-import {toHex} from '../bytes';
+import {fromHex, toHex} from '../bytes';
 import {
   PHASES,
   cashuPlan,
   helloPlan,
   mayLeaveGuardedApplet,
   provision,
+  rotateKeys,
   type Plan,
   type ProvisionOptions,
   type RunEvent,
 } from '../provision';
-import {SPIKE_KEYS, parseCommand, selectAid, type Transceiver} from '../scp02';
+import {
+  FACTORY_KEYS,
+  SPIKE_KEYS,
+  initializeUpdateCommand,
+  openSession,
+  parseCommand,
+  selectAid,
+  type Transceiver,
+} from '../scp02';
 import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
-import {FakeCard, ISD, pullAt} from '../../testing/fake-card';
+import {FakeCard, ISD, SELLER_APPLETS, pullAt} from '../../testing/fake-card';
 
 const CASHU = cashuPlan(CASHU_LOAD_FILE);
 const HELLO = helloPlan(HELLO_LOAD_FILE);
@@ -79,6 +91,18 @@ const INSTALL_ORDER = [
   0xa4, // verify: 02 02, GET_INFO, GET_PUBKEY, the tag
   0xa4,
   0xca, // FF21 again
+];
+
+/**
+ * The same on a J3R452: under SCP03 the sweep reads the registry first, GET
+ * STATUS of the applications and of the load files, and deletes nothing
+ * unless every Cashu AID on the card is the Cashu package's.
+ */
+const INSTALL_ORDER_SCP03 = [
+  ...INSTALL_ORDER.slice(0, 5),
+  0xf2,
+  0xf2, // sweep: the registry
+  ...INSTALL_ORDER.slice(5),
 ];
 
 describe('provision: the Cashu card', () => {
@@ -576,6 +600,259 @@ describe('provision: the Cashu card', () => {
   });
 });
 
+describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
+  it('installs on a clean card in the same order, the registry read before the sweep, every card-manager command under the SCP03 C-MAC', async () => {
+    const card = new FakeCard({scp: 3});
+    const r = await provision(card.transceive, CASHU, options());
+    assert.equal(r.ok, true, r.reason);
+    assert.equal(r.phase, 'done');
+    assertInstalled(card);
+    assert.deepEqual(card.insLog(), INSTALL_ORDER_SCP03);
+    // GET STATUS of the applications, then of the load files, as readCashuRegistry sends them
+    assert.deepEqual(
+      card.log
+        .filter(a => a[1] === 0xf2)
+        .map(a => toHex(a.slice(0, 7)) + toHex(a.slice(-1))),
+      ['84F240020A4F0000', '84F220020A4F0000'],
+    );
+    assert.deepEqual(
+      r.apdus.filter(a => a.ins === 0xf2).map(a => a.phase),
+      ['sweep', 'sweep'],
+    );
+    // SCP03's 32-byte INITIALIZE UPDATE reply, and one login's counter
+    assert.equal(r.apdus.find(a => a.ins === 0x50)?.rlen, 32);
+    assert.equal(card.seq, 1);
+    for (const a of card.log.filter(x => (x[0] & 0x04) !== 0)) {
+      assert.equal(a[0], 0x84);
+      assert.equal(
+        parseCommand(a).le,
+        0x00,
+        `INS ${toHex([a[1]])} ends in Le 00`,
+      );
+    }
+    assert.deepEqual(r.blocks, {at: 88, of: 88});
+  });
+
+  it('comes back from a pull at any APDU, before or after the card acts, with a run that sweeps and installs', async () => {
+    const total = INSTALL_ORDER_SCP03.length;
+    for (const partialLoad of ['discard', 'keep'] as const) {
+      for (const when of ['before', 'after'] as const) {
+        for (let n = 0; n < total; n++) {
+          const card = new FakeCard({scp: 3, partialLoad});
+          const pull = pullAt(card, n, when);
+          const first = await provision(
+            pull.tx,
+            CASHU,
+            options({replace: true}),
+          );
+          const where = `${partialLoad}/${when}/APDU ${n}`;
+          assert.equal(first.kind, 'pulled', where);
+          assert.equal(pull.state.late, 0, where);
+          card.reset();
+          const again = await provision(
+            card.transceive,
+            CASHU,
+            options({replace: true}),
+          );
+          assert.equal(
+            again.ok,
+            true,
+            `${where}: ${again.kind} ${again.reason}`,
+          );
+          assertInstalled(card);
+        }
+      }
+    }
+  });
+
+  /** The seller's applets on a card, in the order they were made. */
+  const SELLER = SELLER_APPLETS.map(a => a.instance);
+
+  it("stops guarded before any DELETE on a J3R452 as the test card came, whose seller's NDEF tag holds D2760000850101 (scp03-07), Replace on or off", async () => {
+    const card = new FakeCard({scp: 3, sellerApplets: true});
+    assert.deepEqual(card.instanceAids(), SELLER);
+    assert.ok(card.instanceAids().includes(TAG), "the seller's tag is there");
+    for (const replace of [false, true]) {
+      const before = card.log.length;
+      const r = await provision(card.transceive, CASHU, options({replace}));
+      assert.equal(r.ok, false, `Replace ${replace}`);
+      assert.equal(r.kind, 'guarded');
+      assert.equal(r.phase, 'sweep');
+      assert.match(r.reason!, /D2760000850101/);
+      assert.match(r.reason!, /nothing was deleted/);
+      // the probe (6A82: no card applet), the card manager, FF21, the login, then the registry and no more
+      assert.deepEqual(
+        card.log.slice(before).map(a => a[1]),
+        [0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2, 0xf2],
+      );
+      card.reset();
+    }
+    assert.ok(!card.insLog().includes(0xe4), 'no DELETE');
+    assert.deepEqual(card.instanceAids(), SELLER, "the seller's applets stay");
+    assert.deepEqual(
+      [...card.packages.keys()],
+      SELLER_APPLETS.map(a => a.pkg),
+    );
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it("keeps the seller's applets through a pull at any APDU: every run after it stops guarded, and none sends a DELETE", async () => {
+    const clean = new FakeCard({scp: 3, sellerApplets: true});
+    await provision(clean.transceive, CASHU, options({replace: true}));
+    assert.equal(clean.log.length, 7);
+    for (const when of ['before', 'after'] as const) {
+      for (let n = 0; n < clean.log.length; n++) {
+        const card = new FakeCard({scp: 3, sellerApplets: true});
+        const pull = pullAt(card, n, when);
+        const first = await provision(pull.tx, CASHU, options({replace: true}));
+        const where = `${when}/APDU ${n}`;
+        assert.equal(first.kind, 'pulled', where);
+        card.reset();
+        const again = await provision(
+          card.transceive,
+          CASHU,
+          options({replace: true}),
+        );
+        assert.equal(again.kind, 'guarded', `${where}: ${again.reason}`);
+        assert.ok(!card.insLog().includes(0xe4), `${where}: no DELETE`);
+        assert.deepEqual(card.instanceAids(), SELLER, where);
+      }
+    }
+  });
+
+  it('reads the registry only on SCP03 and only for a sweep of the Cashu AIDs: the J3R180 sends what it always has, and the hello plan never reads it', async () => {
+    const j3r180 = new FakeCard();
+    assert.equal(
+      (await provision(j3r180.transceive, CASHU, options())).ok,
+      true,
+    );
+    assert.deepEqual(j3r180.insLog(), INSTALL_ORDER);
+    // the hello applet's sweep names none of the Cashu AIDs, so the seller's tag does not stop it
+    const j3r452 = new FakeCard({scp: 3, sellerApplets: true});
+    const hello = await provision(j3r452.transceive, HELLO, options());
+    assert.equal(hello.ok, true, hello.reason);
+    assert.ok(!j3r452.insLog().includes(0xf2));
+    assert.deepEqual(j3r452.instanceAids(), SELLER);
+  });
+
+  // the card manager's AID on Open Platform cards, which the SCP03 challenge is made over here
+  const OTHER = 'A000000003000000';
+
+  it('selects, logs in to, loads into and rotates the security domain sdAid names', async () => {
+    const card = new FakeCard({scp: 3, isd: OTHER});
+    // the default AID is not this card manager's: its SELECT is refused, and nothing more is sent
+    const lost = await provision(card.transceive, CASHU, options());
+    assert.equal(lost.kind, 'refused');
+    assert.equal(lost.phase, 'selectIsd');
+    assert.equal(lost.sw, 0x6a82);
+    assert.deepEqual(card.insLog(), [0xa4, 0xa4]);
+    card.reset();
+    const before = card.log.length;
+    const sdAid = fromHex(OTHER);
+    const r = await provision(card.transceive, CASHU, options({sdAid}));
+    assert.equal(r.ok, true, r.reason);
+    assertInstalled(card);
+    const sent = card.log.slice(before);
+    assert.deepEqual(
+      sent.filter(a => a[1] === 0xa4).map(a => toHex(a.slice(5, 5 + a[4]))),
+      [CARD, OTHER, CARD, TAG, OTHER],
+      'the probe, the security domain, the checks, the security domain',
+    );
+    const forLoad = sent.find(a => a[1] === 0xe6 && a[2] === 0x02)!;
+    assert.equal(
+      toHex(forLoad.slice(16, 25)),
+      '08' + OTHER,
+      'INSTALL [for load] names it',
+    );
+    card.reset();
+    const rotated = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options({sdAid}),
+    );
+    assert.equal(rotated.ok, true, rotated.reason);
+    assert.equal(toHex(card.keys.mac), toHex(SPIKE_KEYS.mac));
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it('reads the registry for the security domain sdAid names, so a torn install there comes back', async () => {
+    const sdAid = fromHex(OTHER);
+    const total = INSTALL_ORDER_SCP03.length;
+    for (let n = 0; n < total; n++) {
+      const card = new FakeCard({scp: 3, isd: OTHER, partialLoad: 'keep'});
+      const pull = pullAt(card, n, 'after');
+      const first = await provision(
+        pull.tx,
+        CASHU,
+        options({replace: true, sdAid}),
+      );
+      assert.equal(first.kind, 'pulled', `APDU ${n}`);
+      card.reset();
+      const again = await provision(
+        card.transceive,
+        CASHU,
+        options({replace: true, sdAid}),
+      );
+      assert.equal(again.ok, true, `APDU ${n}: ${again.kind} ${again.reason}`);
+      assertInstalled(card);
+    }
+  });
+
+  it("stops at WrongKeys, before EXTERNAL AUTHENTICATE, when the card's challenge was made over another AID than sdAid", async () => {
+    // a card manager that answers to the usual ISD AID as well, but makes its challenge over its own
+    const card = new FakeCard({scp: 3, isd: OTHER});
+    const alias: Transceiver = apdu =>
+      apdu[1] === 0xa4 && toHex(apdu.slice(5, 5 + apdu[4])) === ISD
+        ? card.transceive(selectAid(fromHex(OTHER)))
+        : card.transceive(apdu);
+    const r = await provision(alias, CASHU, options());
+    assert.equal(r.kind, 'wrongKeys');
+    assert.equal(r.phase, 'auth');
+    assert.deepEqual(card.insLog(), [0xa4, 0xa4, 0xca, 0x50]);
+    assert.equal(card.failedAuths, 0);
+    // told the AID, the same card opens
+    card.reset();
+    const again = await provision(
+      alias,
+      CASHU,
+      options({sdAid: fromHex(OTHER)}),
+    );
+    assert.equal(again.ok, true, again.reason);
+  });
+
+  for (const scp of [2, 3] as const) {
+    it(`stops before EXTERNAL AUTHENTICATE when probing with a key set the card no longer holds (SCP0${scp})`, async () => {
+      const card = new FakeCard({scp});
+      const rotated = await rotateKeys(
+        card.transceive,
+        FACTORY_KEYS,
+        SPIKE_KEYS,
+        options(),
+      );
+      assert.equal(rotated.ok, true, rotated.reason);
+      card.reset();
+      const before = card.log.length;
+      const r = await provision(card.transceive, CASHU, options());
+      assert.equal(r.kind, 'wrongKeys');
+      assert.equal(r.phase, 'auth');
+      const sent = card.log.slice(before).map(a => a[1]);
+      assert.deepEqual(sent, [0xa4, 0xa4, 0xca, 0x50]);
+      assert.ok(!sent.includes(0x82), 'no EXTERNAL AUTHENTICATE');
+      assert.equal(card.failedAuths, 0);
+      // the set it holds still opens it
+      card.reset();
+      const again = await provision(
+        card.transceive,
+        CASHU,
+        options({keys: SPIKE_KEYS}),
+      );
+      assert.equal(again.ok, true, again.reason);
+      assert.equal(card.failedAuths, 0);
+    });
+  }
+});
+
 describe('provision: the hello applet', () => {
   it('installs it, hears HELLO, and deletes it again, leaving the card as it found it', async () => {
     const card = new FakeCard();
@@ -666,5 +943,26 @@ describe('the fake card', () => {
     const r = await s.send(card.transceive, deleteAid(CASHU_PACKAGE_AID));
     assert.equal(r.sw, 0x6985);
     assert.equal(ISD, 'A000000151000000');
+  });
+
+  it("advances SCP03's 3-byte counter at every INITIALIZE UPDATE, with or without EXTERNAL AUTHENTICATE, and SCP02's only at EXTERNAL AUTHENTICATE", async () => {
+    const counter = (reply: number[]) =>
+      toHex(reply.slice(reply.length - 5, reply.length - 2));
+    const scp03 = new FakeCard({scp: 3, seq: 5});
+    const iu = () => initializeUpdateCommand(Array.from(randomBytes(8)));
+    assert.equal(counter(await scp03.transceive(iu())), '000006');
+    assert.equal(counter(await scp03.transceive(iu())), '000007');
+    scp03.reset();
+    assert.equal(counter(await scp03.transceive(iu())), '000008');
+    assert.equal(scp03.abandonedHandshakes, 2);
+    await openSession(scp03.transceive, FACTORY_KEYS, n => randomBytes(n));
+    assert.equal(scp03.seq, 9, 'the login took one more');
+    // SCP02's counter, bytes 12 and 13 of 28, stays until a login succeeds
+    const scp02 = new FakeCard();
+    const seq02 = (reply: number[]) => toHex(reply.slice(12, 14));
+    assert.equal(seq02(await scp02.transceive(iu())), '0009');
+    assert.equal(seq02(await scp02.transceive(iu())), '0009');
+    await openSession(scp02.transceive, FACTORY_KEYS, n => randomBytes(n));
+    assert.equal(seq02(await scp02.transceive(iu())), '000A');
   });
 });

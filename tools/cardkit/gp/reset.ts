@@ -6,6 +6,7 @@ import {
   OPENER_AID,
   TAG_AID,
 } from './aids';
+import {equal} from './bytes';
 import {readChipIdentity} from './identity';
 import {inspectInstallation} from './inspect';
 import {assessResetPreflight} from './reset-preflight';
@@ -23,7 +24,7 @@ import {
   sessionIfMatches,
   transmit,
   type KeySet,
-  type Session,
+  type SecureSession,
   type Transceiver,
 } from './scp02';
 
@@ -97,7 +98,11 @@ export async function resetOwnedCard(
       !a.sourceRef?.trim() ||
       !a.intentReceipt?.trim() ||
       a.eraseOwnerAndProofs !== true ||
-      a.valueHandled !== true
+      a.valueHandled !== true ||
+      // the ISD alone: identity (identity.ts) and the registry read below use it
+      // until slice 2 (ENG-835) threads sdAid through them, and a reset logged in
+      // to another domain would save delete_intent, then stop at the registry for good
+      (options.sdAid !== undefined && !equal(options.sdAid, ISD_AID))
     )
       throw new ResetGuard();
     await readChipIdentity(tx, a.chipId);
@@ -129,9 +134,10 @@ export async function resetOwnedCard(
       )
         throw new ResetGuard();
     }
+    // the ISD, the one security domain a reset takes (above)
     const selected = await transmit(tx, selectAid(ISD_AID));
     if (selected.sw !== 0x9000) throw new CardError(selected.sw, 0xa4);
-    const hs = await initializeUpdate(tx, options.random, 0);
+    const hs = await initializeUpdate(tx, options.random, 0, ISD_AID);
     if (hs.reply.kvn === 0) throw new ResetGuard(); // PUT KEY P1=0 adds a set rather than replacing it.
     const afterDeletion =
       stage === 'rotation_intent' || stage === 'factory_verified';
@@ -140,7 +146,7 @@ export async function resetOwnedCard(
     const target =
       afterDeletion && !source ? sessionIfMatches(FACTORY_KEYS, hs) : null;
     if (!source && !target) throw new WrongKeys();
-    const session: Session = await externalAuthenticate(
+    const session: SecureSession = await externalAuthenticate(
       tx,
       source ?? target!,
       hs,

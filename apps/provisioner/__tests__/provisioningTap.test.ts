@@ -35,8 +35,7 @@ const identity = {
   load_sha256: CASHU_PLAN.loadFile.sha256,
 };
 const options: RunOptions = {random: n => Array(n).fill(0x55), now: () => 123};
-function fixture() {
-  const card = new FakeCard();
+function fixture(card = new FakeCard()) {
   let saved: string | null = null;
   const flags = {failInstalled: false, losePut: false, failRecord: false};
   const storage: JournalStorage = {
@@ -140,6 +139,21 @@ test('a crash before replacement DELETE never adopts the untouched old installat
   expect(f.log.slice(at).some(c => [0x50, 0x82].includes(c[1]))).toBe(false);
   expect((await f.open()).snapshot().quarantine_reason).toBe(
     'unsafe-partial-install',
+  );
+});
+
+test("a J3R452 as the test card came, with the seller's NDEF tag at D2760000850101, is quarantined before any DELETE and keeps the seller's applets", async () => {
+  const f = fixture(new FakeCard({scp: 3, sellerApplets: true}));
+  const seller = f.card.instanceAids();
+  expect(seller).toContain('D2760000850101');
+  expect(await f.tap(await f.open())).toBe('quarantined');
+  // logged in, read the registry, and stopped there
+  expect(f.log.filter(c => c[1] === 0xf2)).toHaveLength(2);
+  expect(destructive(f.log)).toEqual([]);
+  expect(f.card.instanceAids()).toEqual(seller);
+  expect(f.card.failedAuths).toBe(0);
+  expect((await f.open()).snapshot().quarantine_reason).toBe(
+    'verification-failed',
   );
 });
 

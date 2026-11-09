@@ -5322,3 +5322,143 @@ in v1 (a third-party single point of failure), passing on reviewer prose,
 counting unverified events, discovering in the Durable Object constructor (a
 relay stall would block every request), and probing discovered mints from the
 daily `ops-mint-probe` job (it stays a check of the code-owned list).
+
+## <a id="d181"></a>D181: cardkit speaks SCP03 beside SCP02, chosen from INITIALIZE UPDATE's reply
+
+**Decided (ENG-836, 2026-11-09):** cardkit opens a secure channel through one
+`openSession`, which reads the protocol from byte 11 of INITIALIZE UPDATE's
+reply: 28 bytes with `02` is SCP02 (the J3R180, [D27](#d27)), `03` is SCP03
+(the NXP J3R452, JCOP 4.5), 32 bytes at the one i taken, and anything else is
+refused as the card's fault with nothing more sent. `provision`, `rotateKeys`
+and `resetOwnedCard` never choose. SCP03 runs as GlobalPlatform Amendment D has
+it at security level 01, C-MAC only, with AES-128 keys and i=10:
+
+- The card proves the keys twice, and both are checked on the phone before
+  EXTERNAL AUTHENTICATE goes out: its pseudo-random challenge (the static ENC
+  key's KDF, constant `02`, over the 3-byte counter and the security domain's
+  AID) and its cryptogram (S-MAC's, constant `00`, over both challenges). Wrong
+  keys, or a challenge made for another security domain, throw WrongKeys after
+  INITIALIZE UPDATE alone. A reply whose i reports a random challenge (bit
+  `10` clear) is refused: its cryptogram would still prove the MAC key before
+  the login, which is all EXTERNAL AUTHENTICATE uses at level 01, but only the
+  pseudo-random challenge proves the ENC key and the security domain, and no
+  card here opens i=00, so none was captured. So is S16 (bit `01`), whose
+  16-byte challenges, cryptograms and MACs are not written here. i is
+  read before the length, which follows it as Amendment D's Table 7-3 and
+  GlobalPlatformPro's GPSession have it (`scp03ReplyLength`: 29 bytes, 3 more
+  for the counter a pseudo-random challenge brings, 16 more in S16), so a card
+  that opens either is refused for that cause after its one APDU, not for a
+  byte count.
+- S-MAC (constant `06`) and S-ENC (`04`) come from the KDF over host ‖ card
+  challenge; the static DEK is used as it is. EXTERNAL AUTHENTICATE is
+  `84 82 01 00` with the host cryptogram (S-MAC's KDF, constant `01`), as under
+  SCP02. Each C-MAC is the first 8 bytes of CMAC(S-MAC, chaining value ‖ the
+  header as sent ‖ data), chained through the previous command's full 16-byte
+  CMAC from 16 zeros, with Le outside it. At level 01 the card's replies carry
+  data and status only: no R-MAC is expected, stripped or checked.
+- `putKeys(keys, session, …)` takes the open session and follows its protocol,
+  never a caller's flag: `80 10 <3DES-ECB under S-DEK> 03 <KCV>` under SCP02,
+  `88 11 10 <AES-ECB under the static DEK> 03 <AES-ECB(key, 16 × 01)[0..3]>`
+  under SCP03 (`504A77` is the public default's check value). The raw-DEK form
+  is gone, so a caller cannot put DES3 entries on an SCP03 card.
+- On an SCP03 card the install's sweep reads the registry first (GET STATUS
+  of the applications and of the load files, `readCashuRegistry`) and deletes
+  nothing, stopping `guarded`, unless every Cashu object it lists is the Cashu
+  package's. The J3R452 test card came with the seller's NDEF tag at
+  `D2760000850101`, made from `D276000085` (`scp03-07`), which is the AID the
+  card's tag takes, and the sweep, whose job is clearing what a torn run left,
+  would otherwise delete it on the first install. A torn install of the card's
+  own still comes back: the registry shows its objects as the package's. SCP02's
+  sweep sends what it always has, byte for byte (the J3R180 comes blank, and
+  its transcripts stand), and a sweep that names no Cashu AID, the hello
+  plan's, reads nothing.
+- The security domain's AID is a run option, `sdAid`, the ISD's
+  `A000000151000000` by default, which both chips use: provision and rotation
+  select it, log in to it and name it in INSTALL [for load], and an SCP03
+  install reads the registry for it (`readCashuRegistry` takes the domain, the
+  ISD by default). `readChipIdentity` still reads the ISD, and so does the
+  reset's registry check (`inspectInstallation` selects applets by AID and has
+  no domain to take), so `resetOwnedCard` takes the ISD alone: any other
+  `sdAid` stops it `guarded` before its first APDU, where it would otherwise
+  save `delete_intent` and then stop at the registry on every retry. Slice 2
+  (ENG-835) takes them on with the rest of the J3R452's first contact.
+
+**Why.** The J3R452 opens SCP03 only, and both cardkits spoke SCP02 only. D27's
+revisit clause ("Revisit if a later chip ships a factory AES set") has fired: the
+J3R452 ships three AES-128 keys (key type `88`), and since 2026-11-08 the test
+card is on the public default `40` to `4F` at key version 01. The owner's
+`gp -d` captures of it under that key, `scp03-07` to `scp03-10` in
+`tools/cardkit/gp/test/fixtures`, fix the wire: every session key, both
+cryptograms and all 49 commands under the C-MAC replay byte for byte, as do the
+INSTALL [for load], the LOAD blocks and the INSTALL of a probe package. The
+fake card gained an SCP03 mode (the 32-byte reply, the counter every
+INITIALIZE UPDATE advances, the full-CMAC chain, AES PUT KEY with the check
+value enforced), so the install, the rotation with its lost-reply path, and the
+reset run under both protocols, and the seller's four applets
+(`sellerApplets`), whose GET STATUS of the applications is the J3R452's own
+bytes in `scp03-07`, so the install also runs on the card as it came.
+
+**AES from a package, where D27 wrote its own DES.** D27 rejected unmaintained
+DES packages for a cipher that fits in a page of tables. AES is the other way
+round on both counts: `@noble/ciphers` is maintained and was audited (Cure53,
+2024, by its README), pure JavaScript with no dependency and no native build,
+from the author of the `@noble/curves` and `@noble/hashes` cardkit already uses;
+and an AES of cardkit's own would be more code, and more ways to get a key
+schedule wrong, than the CMAC (NIST SP 800-38B) and the KDF (NIST SP 800-108 in
+counter mode, as Amendment D uses it) written on top of it in `gp/scp03.ts`. The
+tests hold the AES to FIPS 197, the CMAC to SP 800-38B's four AES-128 examples,
+and all three to node:crypto (`testing/node-aes.ts`, which shares no code with
+them). The pin is exact, `1.3.0`: the last 1.x, CommonJS, with types that build
+under the TypeScript 5.0.4 both consumers pin; 2.x is ESM-only and needs a newer
+compiler.
+
+**Proven, and not yet.** The captures prove the challenge (`02`), both
+cryptograms (`00`, `01`) and S-MAC (`06`, through every C-MAC). S-ENC (`04`) is
+the specification's alone: nothing at level 01 uses it. PUT KEY's AES-ECB under
+the static DEK rests on the specification and on the shape of the owner's one
+SCP03 PUT KEY, which was made under the seller's keys and is not in this
+repository: 70 bytes of data, three `88 11 10` entries, answered with the new
+version and three check values. In-place replace (P1 the current version), the
+path `rotateKeys` and the reset take, was never traced on a J3R452: slice 3 runs
+the rotation and the reset on the spare before any field card. A wrong DEK is as
+invisible before EXTERNAL AUTHENTICATE as under SCP02; the card's check value
+catches it at PUT KEY, and the fake card enforces that check.
+
+**The two cardkits (the J3R452 brief's D11).** cashu-card's and fedimintcard's
+copies of cardkit have drifted. As of cashu-card `69fd69c` and fedimintcard
+`4301b0a`: `gp/bytes.ts` and `gp/des.ts` are identical and `gp/scp02.ts` differs
+by one comment; `gp/provision.ts` differs in fedimintcard's multi-set key
+candidates (one INITIALIZE UPDATE checked against each set, `keySet` reported),
+checks that expect a status word, and `Guard`, `Run` and `expectOk` exported for
+its reset; `gp/reset.ts` is two designs (cashu-card's journaled owned-card reset
+with registry evidence, fedimintcard's level-triggered factory reset with a
+`beforeWrite` hook); `gp/identity.ts` is cashu-card's parse with fedimintcard's
+`CHIP_ID_PATTERN` and `getCplc`; each `gp/aids.ts` names its own applet. This
+change adds what fedimintcard's port (ENG-838) has to carry: `gp/apdu.ts`,
+`gp/scp03.ts`, the hub in `gp/scp02.ts`, `putKeys` from the session, `sdAid`,
+`testing/node-aes.ts`, the fake card's SCP03 mode and the replay's dispatch. It
+also adds `apps/provisioner/__tests__/cardkitCopy.test.ts`, fedimintcard's
+guard: the provisioner bundles yarn's copy of `tools/cardkit`, and the test
+fails when that copy is stale. The multi-set candidates and the rest of the
+alignment wait for ENG-838; a shared package waits for the dual card's key
+owner.
+
+**Not done here.** cardkit's version stays 0.2.0 although `putKeys` and
+`openSession`'s return type change. Moving it to 0.3.0, as cardkit's README asks
+of an incompatible change, would stop `tools/outbox-spike/run-compact.cjs` and
+`run-probe.cjs`, which refuse any cardkit but the reviewed 0.2.0, and
+`run-compact.cjs` is a protected source of the pending `recover-unset-up-v3`
+audit, so moving their pin fails that plan's admission. The owner decides the
+bump with the review of those runners. Also not here: protocol choice in the
+apps, first contact with a seller-keyed card (PUT KEY with P1 = 00 at version
+255) and what becomes of the seller's tag (slice 2; until then an install on a
+J3R452 that still holds it stops `guarded` with nothing deleted), R-MAC, S16
+and security levels above 01, AES-192 and AES-256.
+
+**Rejected.** A second entry point beside `openSession` for SCP03 (every caller
+would choose, and choose wrong on the other chip); accepting a random card
+challenge (i without `10`), which no card here opens and no capture covers, and
+whose cryptogram proves the MAC key but not the ENC key or the security domain;
+`putKeys` taking a key type or a raw DEK from the caller; `@noble/ciphers` 2.x
+(ESM only, and a compiler upgrade for both consumers); an AES written here; a
+native cipher (D27's reasons stand).

@@ -1,9 +1,16 @@
 /**
  * A J3R180 card manager in software, for the provisioner's tests: the card
- * side of SCP02 computed with node:crypto (gp/test/node-des.ts), sharing no
+ * side of SCP02 computed with node:crypto (testing/node-des.ts), sharing no
  * code with the host side under test, and the GlobalPlatform commands an
  * install uses, with what the chip is known or suspected to do when things go
- * wrong:
+ * wrong. With `scp: 3` it is a J3R452's card manager instead, the card side
+ * of SCP03 at level 01 by node:crypto as well (testing/node-aes.ts): the
+ * 32-byte INITIALIZE UPDATE reply with i=10 and the pseudo-random challenge
+ * for its own AID, a 3-byte counter that every INITIALIZE UPDATE advances
+ * (SCP02's moves at EXTERNAL AUTHENTICATE), C-MACs chained through the full
+ * CMAC, replies with no R-MAC, and PUT KEY of AES keys only, decrypted under
+ * the static DEK and refused (6A80) when a check value does not match, so a
+ * wrong DEK shows. Under either protocol:
  *
  * - the opener rule: the INSTALL that is a package's first instantiation and
  *   runs a heavy constructor goes mute (the reader gives up) or answers 6F00,
@@ -17,9 +24,15 @@
  * - EXTERNAL AUTHENTICATE failures are counted, and lock the card manager at
  *   `failedAuthLimit`, as the chip does for good.
  *
+ * With `sellerApplets` it starts as the J3R452 test card came, with the
+ * seller's four applets (SELLER_APPLETS), the seller's NDEF tag among them at
+ * D2760000850101, the AID the Cashu card's tag takes. Nothing protects them:
+ * a DELETE that names one removes it, as it would on the chip.
+ *
  * `reset()` is the power going: whatever was selected, the session, a pending
  * handshake (counted in `abandonedHandshakes`) and a pending load go with it.
  */
+import {nodeAesEcb, nodeCmac, nodeScp03Kdf} from './node-aes';
 import {nodeEcb, nodeFullMac, nodeRetailMac, nodeCbc} from './node-des';
 
 type Bytes = number[];
@@ -54,9 +67,22 @@ export interface CardAppletState {
 export interface FakeCardOptions {
   keys?: StaticKeys;
   kvn?: number;
+  /** The secure channel the card manager opens: 2 (the J3R180, the default) or 3 (the J3R452). */
+  scp?: 2 | 3;
+  /**
+   * The sequence counter. SCP02: its 2-byte value, which each EXTERNAL
+   * AUTHENTICATE advances (default 0009). SCP03: the 3-byte value before the
+   * first INITIALIZE UPDATE, each of which advances it (default 000000).
+   */
   seq?: number;
   /** How the card checks a C-MAC: over the modified header (gp's way) or the original. */
   macOverModifiedApdu?: boolean;
+  /**
+   * The card manager's AID, hex: {@link ISD} by default. It answers SELECT,
+   * names the security domain in GET STATUS and INSTALL [for load], and is
+   * what SCP03's pseudo-random challenge is made over.
+   */
+  isd?: string;
   openerRule?: 'mute' | '6F00';
   partialLoad?: 'discard' | 'keep';
   heavyModules?: string[];
@@ -68,7 +94,30 @@ export interface FakeCardOptions {
    * November 3 capture.
    */
   cplc?: string;
+  /**
+   * Start with {@link SELLER_APPLETS} installed, as the J3R452 test card came
+   * (scp03-07): the seller's NDEF tag then holds D2760000850101. Off by
+   * default, a blank card.
+   */
+  sellerApplets?: boolean;
 }
+
+/**
+ * The applets the J3R452 test card shipped with, as `gp --list` read them
+ * (gp/test/fixtures/scp03-07-list-default-keyver1.txt), in its order: each
+ * instance SELECTABLE, made from its own package, in the card manager's
+ * domain. The last is the seller's NDEF tag, at the NFC Forum's
+ * D2760000850101, made from D276000085, not from the Cashu package.
+ */
+export const SELLER_APPLETS: readonly {
+  readonly instance: string;
+  readonly pkg: string;
+}[] = [
+  {instance: 'A0000008466D656D6F727901', pkg: 'A0000008466D656D6F7279'},
+  {instance: 'A0000005272101014150455801', pkg: 'A00000052721010141504558'},
+  {instance: 'A0000006472F000101', pkg: 'A0000006472F0001'},
+  {instance: 'D2760000850101', pkg: 'D276000085'},
+];
 
 /** The default fake identity, `cplc-v1:4790d3213041093363205547`. */
 export const CPLC_09336320 =
@@ -104,6 +153,7 @@ interface PendingLoad {
 interface Session {
   mac: Bytes;
   dek: Bytes;
+  /** The chaining value: SCP02's last C-MAC, SCP03's last full CMAC. */
   lastMac: Bytes;
 }
 
@@ -122,6 +172,9 @@ export class FakeCard {
   keys: StaticKeys;
   kvn: number;
   seq: number;
+  readonly scp: 2 | 3;
+  /** The card manager's AID, hex. */
+  readonly isdAid: string;
   free: number;
   readonly cplc: string;
   override: Override | undefined;
@@ -131,7 +184,7 @@ export class FakeCard {
   /** Partial packages a torn LOAD left, in the 'keep' variant, with their bytes. */
   readonly partial = new Map<string, number>();
   private pending: PendingLoad | null = null;
-  private selected: string = ISD;
+  private selected: string;
   private session: Session | null = null;
   private handshake: {
     host: Bytes;
@@ -142,13 +195,26 @@ export class FakeCard {
   } | null = null;
   private challengeCounter = 0;
   private readonly opts: Required<
-    Omit<FakeCardOptions, 'keys' | 'kvn' | 'seq' | 'freeNonVolatile' | 'cplc'>
+    Omit<
+      FakeCardOptions,
+      | 'keys'
+      | 'kvn'
+      | 'scp'
+      | 'isd'
+      | 'seq'
+      | 'freeNonVolatile'
+      | 'cplc'
+      | 'sellerApplets'
+    >
   >;
 
   constructor(options: FakeCardOptions = {}) {
     this.keys = options.keys ?? {enc: K40, mac: K40, dek: K40};
     this.kvn = options.kvn ?? 0x01;
-    this.seq = options.seq ?? 0x0009;
+    this.scp = options.scp ?? 2;
+    this.isdAid = (options.isd ?? ISD).toUpperCase();
+    this.selected = this.isdAid;
+    this.seq = options.seq ?? (this.scp === 3 ? 0 : 0x0009);
     this.free = options.freeNonVolatile ?? 164176;
     this.cplc = options.cplc ?? CPLC_09336320;
     this.opts = {
@@ -158,6 +224,20 @@ export class FakeCard {
       heavyModules: options.heavyModules ?? [CARD_MODULE],
       failedAuthLimit: options.failedAuthLimit ?? 10,
     };
+    for (const {instance, pkg} of options.sellerApplets ? SELLER_APPLETS : []) {
+      this.packages.set(pkg, {
+        aid: pkg,
+        modules: [instance],
+        size: 0,
+        instancesMade: 1,
+      });
+      this.instances.set(instance, {
+        aid: instance,
+        module: instance,
+        pkg,
+        state: {unspent: 0, spent: 0, pin: 0, record: 0, owner: 0},
+      });
+    }
   }
 
   /** The card in the field: one APDU in, data and SW out, or a rejection when it does not answer. */
@@ -181,7 +261,7 @@ export class FakeCard {
   /** The power goes: the card leaves the field, or the reader resets it. */
   reset(): void {
     this.mute = false;
-    this.selected = ISD;
+    this.selected = this.isdAid;
     this.session = null;
     if (this.handshake) {
       this.abandonedHandshakes++;
@@ -220,7 +300,7 @@ export class FakeCard {
     if ((apdu[0] & 0xfc) === 0x00 && apdu[1] === 0xa4) {
       return this.select(apdu);
     }
-    if (this.selected === ISD) {
+    if (this.selected === this.isdAid) {
       return this.isd(apdu);
     }
     const inst = this.instances.get(this.selected);
@@ -242,8 +322,8 @@ export class FakeCard {
     const lc = apdu.length > 5 ? apdu[4] : 0;
     const aid = hex(apdu.slice(5, 5 + lc));
     let target: string | undefined;
-    if (lc === 0 || aid === ISD) {
-      target = ISD;
+    if (lc === 0 || aid === this.isdAid) {
+      target = this.isdAid;
     } else if (this.instances.has(aid)) {
       target = aid;
     } else {
@@ -255,8 +335,17 @@ export class FakeCard {
     }
     this.endSessions();
     this.selected = target;
-    if (target === ISD) {
-      return sw(0x9000, fromHex('6F108408A000000151000000A5049F6501FF'));
+    if (target === this.isdAid) {
+      // the FCI: 84 and the card manager's AID, then A5 with 9F65 FF
+      const isd = fromHex(this.isdAid);
+      return sw(0x9000, [
+        0x6f,
+        isd.length + 8,
+        0x84,
+        isd.length,
+        ...isd,
+        ...fromHex('A5049F6501FF'),
+      ]);
     }
     const inst = this.instances.get(target)!;
     if (inst.module === CARD_MODULE) {
@@ -321,6 +410,9 @@ export class FakeCard {
       }
       this.endSessions();
       const host = apdu.slice(5, 13);
+      if (this.scp === 3) {
+        return this.initializeUpdate03(host);
+      }
       this.challengeCounter++;
       const card = [
         0xc0,
@@ -348,6 +440,9 @@ export class FakeCard {
       this.handshake = null;
       if (!hs) {
         return sw(0x6985);
+      }
+      if (this.scp === 3) {
+        return this.externalAuthenticate03(hs, apdu);
       }
       const seq = [this.seq >> 8, this.seq & 0xff];
       const expectedHost = nodeFullMac(hs.enc, [
@@ -390,6 +485,24 @@ export class FakeCard {
       const data = apdu.slice(5, 5 + lc - 8);
       const mac = apdu.slice(5 + lc - 8, 5 + lc);
       const le = apdu.slice(5 + lc);
+      if (this.scp === 3) {
+        // the C-MAC over the chaining value and the header as sent, Le outside it
+        const full = nodeCmac(s.mac, [
+          ...s.lastMac,
+          cla,
+          ins,
+          p1,
+          apdu[3],
+          lc,
+          ...data,
+        ]);
+        if (hex(full.slice(0, 8)) !== hex(mac)) {
+          this.session = null;
+          return sw(0x6982);
+        }
+        s.lastMac = full;
+        return this.isdCommand(ins, p1, apdu[3], data, le);
+      }
       const original = cla & ~0x04;
       const header = this.opts.macOverModifiedApdu
         ? [cla, ins, p1, apdu[3], lc]
@@ -475,7 +588,7 @@ export class FakeCard {
           ...aid(0x4f, id),
           ...tlv([0x9f, 0x70], [pkg ? 7 : 1]),
           ...(pkg ? [...tlv([0xc5], [0, 0, 0]), ...aid(0xc4, pkg)] : []),
-          ...aid(0xcc, ISD),
+          ...aid(0xcc, this.isdAid),
         ];
         return tlv([0xe3], fields);
       };
@@ -507,7 +620,7 @@ export class FakeCard {
       return sw(0x6a80);
     }
     const aid = hex(data.slice(2));
-    if (aid === ISD) {
+    if (aid === this.isdAid) {
       return sw(0x6985);
     }
     const inst = this.instances.get(aid);
@@ -552,7 +665,7 @@ export class FakeCard {
     } catch {
       return sw(0x6a80);
     }
-    if (at !== data.length || (sd.length > 0 && hex(sd) !== ISD)) {
+    if (at !== data.length || (sd.length > 0 && hex(sd) !== this.isdAid)) {
       return sw(0x6a80);
     }
     const aid = hex(pkg);
@@ -616,7 +729,7 @@ export class FakeCard {
     if (!p || !p.modules.includes(module)) {
       return sw(0x6a88);
     }
-    if (this.instances.has(aid) || aid === ISD) {
+    if (this.instances.has(aid) || aid === this.isdAid) {
       return sw(0x6985);
     }
     if (this.opts.heavyModules.includes(module) && p.instancesMade === 0) {
@@ -639,6 +752,9 @@ export class FakeCard {
 
   private putKey(p1: number, p2: number, data: Bytes): Bytes {
     const s = this.session!;
+    if (this.scp === 3) {
+      return this.putKey03(s, p1, p2, data);
+    }
     if (p1 !== this.kvn || p2 !== 0x81 || data.length !== 1 + 3 * 22) {
       return sw(0x6a80);
     }
@@ -656,6 +772,102 @@ export class FakeCard {
       const key = nodeEcb(s.dek, data.slice(at + 2, at + 18), true);
       const kcv = data.slice(at + 19, at + 22);
       if (hex(nodeEcb(key, new Array(8).fill(0)).slice(0, 3)) !== hex(kcv)) {
+        return sw(0x6a80);
+      }
+      keys.push(key);
+      kcvs.push(kcv);
+    }
+    this.keys = {enc: keys[0], mac: keys[1], dek: keys[2]};
+    this.kvn = data[0];
+    return sw(0x9000, [data[0], ...kcvs[0], ...kcvs[1], ...kcvs[2]]);
+  }
+
+  /** SCP03's INITIALIZE UPDATE: the counter moves first, then the challenge for it and this card's AID, then the cryptogram. */
+  private initializeUpdate03(host: Bytes): Bytes {
+    this.seq = (this.seq + 1) & 0xffffff;
+    const seq = [
+      (this.seq >> 16) & 0xff,
+      (this.seq >> 8) & 0xff,
+      this.seq & 0xff,
+    ];
+    const card = nodeScp03Kdf(this.keys.enc, 0x02, 64, [
+      ...seq,
+      ...fromHex(this.isdAid),
+    ]);
+    const context = [...host, ...card];
+    const enc = nodeScp03Kdf(this.keys.enc, 0x04, 128, context);
+    const mac = nodeScp03Kdf(this.keys.mac, 0x06, 128, context);
+    this.handshake = {host, card, enc, mac, dek: this.keys.dek};
+    return sw(0x9000, [
+      ...fromHex('0000936320C4A1B2C3D4'),
+      this.kvn,
+      0x03,
+      0x10,
+      ...card,
+      ...nodeScp03Kdf(mac, 0x00, 64, context),
+      ...seq,
+    ]);
+  }
+
+  /** SCP03's EXTERNAL AUTHENTICATE: P1 01 only, the host cryptogram, and its C-MAC from a zero chaining value. */
+  private externalAuthenticate03(
+    hs: {host: Bytes; card: Bytes; mac: Bytes; dek: Bytes},
+    apdu: Bytes,
+  ): Bytes {
+    const [, , p1, p2] = apdu;
+    const host = apdu.slice(5, 13);
+    const mac = apdu.slice(13, 21);
+    const expectedHost = nodeScp03Kdf(hs.mac, 0x01, 64, [
+      ...hs.host,
+      ...hs.card,
+    ]);
+    const full = nodeCmac(hs.mac, [
+      ...new Array(16).fill(0),
+      0x84,
+      0x82,
+      p1,
+      p2,
+      0x10,
+      ...host,
+    ]);
+    if (
+      apdu[4] !== 0x10 ||
+      p1 !== 0x01 ||
+      hex(host) !== hex(expectedHost) ||
+      hex(mac) !== hex(full.slice(0, 8))
+    ) {
+      this.failedAuths++;
+      if (this.failedAuths >= this.opts.failedAuthLimit) {
+        this.lockedOut = true;
+      }
+      return sw(0x6300);
+    }
+    this.session = {mac: hs.mac, dek: hs.dek, lastMac: full};
+    return sw(0x9000);
+  }
+
+  /** SCP03's PUT KEY: three 88 11 10 <key under the static DEK> 03 <AES KCV> entries, in place. */
+  private putKey03(s: Session, p1: number, p2: number, data: Bytes): Bytes {
+    if (p1 !== this.kvn || p2 !== 0x81 || data.length !== 1 + 3 * 23) {
+      return sw(0x6a80);
+    }
+    const keys: Bytes[] = [];
+    const kcvs: Bytes[] = [];
+    for (let i = 0; i < 3; i++) {
+      const at = 1 + i * 23;
+      if (
+        data[at] !== 0x88 ||
+        data[at + 1] !== 0x11 ||
+        data[at + 2] !== 0x10 ||
+        data[at + 19] !== 0x03
+      ) {
+        return sw(0x6a80);
+      }
+      const key = nodeAesEcb(s.dek, data.slice(at + 3, at + 19), true);
+      const kcv = data.slice(at + 20, at + 23);
+      if (
+        hex(nodeAesEcb(key, new Array(16).fill(0x01)).slice(0, 3)) !== hex(kcv)
+      ) {
         return sw(0x6a80);
       }
       keys.push(key);
