@@ -11,10 +11,12 @@
  * counts towards a lock that is for good. Under SCP03 the card proves them
  * twice: its challenge is the KDF of the static ENC key over the sequence
  * counter and the security domain's AID, and its cryptogram the KDF of S-MAC
- * over both challenges. Both are checked here, in constant time; a reply that
- * reports a random challenge (i without 10) cannot be checked before EXTERNAL
- * AUTHENTICATE, so it is refused rather than trusted, and so is S16 (i with
- * 01), whose 16-byte challenges, cryptograms and MACs are not written here.
+ * over both challenges. Both are checked here, in constant time. A reply that
+ * reports a random challenge (i without 10) is refused: its cryptogram would
+ * still prove the MAC key, which is all EXTERNAL AUTHENTICATE uses at level 01,
+ * but only the pseudo-random challenge proves the ENC key and the security
+ * domain, and no card here opens i=00. So is S16 (i with 01), whose 16-byte
+ * challenges, cryptograms and MACs are not written here.
  *
  * At level 01 the card's replies carry data and SW only: no R-MAC is expected,
  * stripped or checked. S-ENC is derived (constant 04) as the specification
@@ -233,9 +235,10 @@ export interface Scp03Reply {
  * the card sent is the card's, so every refusal is a CardError: a status
  * other than 9000, another protocol, an i this module does not run, and a
  * length that is not the one i gives (scp03ReplyLength). i is read before the
- * length, so a card that opens a random challenge (bit 10 clear), which leaves
- * nothing to check before EXTERNAL AUTHENTICATE, or S16 (bit 01) is refused
- * for that, whatever length it answered with.
+ * length, so a card that opens a random challenge (bit 10 clear; its
+ * cryptogram proves the MAC key, but nothing then proves the ENC key or the
+ * security domain, and no card here opens it) or S16 (bit 01) is refused for
+ * that, whatever length it answered with.
  */
 export function parseScp03Reply(reply: Reply): Scp03Reply {
   if (reply.sw !== 0x9000) {
@@ -261,7 +264,7 @@ export function parseScp03Reply(reply: Reply): Scp03Reply {
     throw new CardError(
       reply.sw,
       0x50,
-      `the card opens SCP03 with i=${toHex([i])}, a random card challenge that cannot be checked before EXTERNAL AUTHENTICATE`,
+      `the card opens SCP03 with i=${toHex([i])}, a random card challenge, which this module does not take (only a pseudo-random one proves the ENC key and the security domain)`,
     );
   }
   if ((i & I_S16) !== 0) {

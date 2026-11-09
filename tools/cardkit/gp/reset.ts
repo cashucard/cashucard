@@ -99,9 +99,9 @@ export async function resetOwnedCard(
       !a.intentReceipt?.trim() ||
       a.eraseOwnerAndProofs !== true ||
       a.valueHandled !== true ||
-      // the ISD alone: identity, inspection and the registry read it until
-      // slice 2 (ENG-835) threads sdAid through them, and a reset logged in to
-      // another domain would save delete_intent, then stop at the registry for good
+      // the ISD alone: identity (identity.ts) and the registry read below use it
+      // until slice 2 (ENG-835) threads sdAid through them, and a reset logged in
+      // to another domain would save delete_intent, then stop at the registry for good
       (options.sdAid !== undefined && !equal(options.sdAid, ISD_AID))
     )
       throw new ResetGuard();

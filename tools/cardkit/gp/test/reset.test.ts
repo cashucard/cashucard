@@ -125,7 +125,7 @@ test('an owned-card reset on a J3R452 (SCP03) ends on the public default 40..4F 
 });
 
 test('a reset takes the ISD alone: any other sdAid stops it guarded before its first APDU, with nothing saved', async () => {
-  // identity, inspection and the registry read the ISD until slice 2 (ENG-835);
+  // identity and the reset's registry read use the ISD until slice 2 (ENG-835);
   // logged in elsewhere, a reset would save delete_intent and never get past the registry
   const other = fromHex('A000000003000000');
   for (const scp of [2, 3] as const) {

@@ -5339,9 +5339,11 @@ it at security level 01, C-MAC only, with AES-128 keys and i=10:
   AID) and its cryptogram (S-MAC's, constant `00`, over both challenges). Wrong
   keys, or a challenge made for another security domain, throw WrongKeys after
   INITIALIZE UPDATE alone. A reply whose i reports a random challenge (bit
-  `10` clear) is refused: nothing could be checked before the login, and a
-  failed login counts towards a lock that is for good. So is S16 (bit `01`),
-  whose 16-byte challenges, cryptograms and MACs are not written here. i is
+  `10` clear) is refused: its cryptogram would still prove the MAC key before
+  the login, which is all EXTERNAL AUTHENTICATE uses at level 01, but only the
+  pseudo-random challenge proves the ENC key and the security domain, and no
+  card here opens i=00, so none was captured. So is S16 (bit `01`), whose
+  16-byte challenges, cryptograms and MACs are not written here. i is
   read before the length, which follows it as Amendment D's Table 7-3 and
   GlobalPlatformPro's GPSession have it (`scp03ReplyLength`: 29 bytes, 3 more
   for the counter a pseudo-random challenge brings, 16 more in S16), so a card
@@ -5374,12 +5376,12 @@ it at security level 01, C-MAC only, with AES-128 keys and i=10:
   `A000000151000000` by default, which both chips use: provision and rotation
   select it, log in to it and name it in INSTALL [for load], and an SCP03
   install reads the registry for it (`readCashuRegistry` takes the domain, the
-  ISD by default). `readChipIdentity` and `inspectInstallation` still read the
-  ISD, and so does the reset's registry check, so `resetOwnedCard` takes the
-  ISD alone: any other `sdAid` stops it `guarded` before its first APDU, where
-  it would otherwise save `delete_intent` and then stop at the registry on
-  every retry. Slice 2 (ENG-835) takes them on with the rest of the J3R452's
-  first contact.
+  ISD by default). `readChipIdentity` still reads the ISD, and so does the
+  reset's registry check (`inspectInstallation` selects applets by AID and has
+  no domain to take), so `resetOwnedCard` takes the ISD alone: any other
+  `sdAid` stops it `guarded` before its first APDU, where it would otherwise
+  save `delete_intent` and then stop at the registry on every retry. Slice 2
+  (ENG-835) takes them on with the rest of the J3R452's first contact.
 
 **Why.** The J3R452 opens SCP03 only, and both cardkits spoke SCP02 only. D27's
 revisit clause ("Revisit if a later chip ships a factory AES set") has fired: the
@@ -5454,8 +5456,9 @@ J3R452 that still holds it stops `guarded` with nothing deleted), R-MAC, S16
 and security levels above 01, AES-192 and AES-256.
 
 **Rejected.** A second entry point beside `openSession` for SCP03 (every caller
-would choose, and choose wrong on the other chip); trusting a random card
-challenge (i without `10`) and finding wrong keys at EXTERNAL AUTHENTICATE,
-which a lock that is for good forbids; `putKeys` taking a key type or a raw DEK
-from the caller; `@noble/ciphers` 2.x (ESM only, and a compiler upgrade for both
-consumers); an AES written here; a native cipher (D27's reasons stand).
+would choose, and choose wrong on the other chip); accepting a random card
+challenge (i without `10`), which no card here opens and no capture covers, and
+whose cryptogram proves the MAC key but not the ENC key or the security domain;
+`putKeys` taking a key type or a raw DEK from the caller; `@noble/ciphers` 2.x
+(ESM only, and a compiler upgrade for both consumers); an AES written here; a
+native cipher (D27's reasons stand).

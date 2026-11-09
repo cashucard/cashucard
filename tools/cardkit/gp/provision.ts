@@ -232,8 +232,8 @@ export interface RunOptions {
    * card challenge is made over it, so a wrong one stops at WrongKeys, and an
    * SCP03 install reads the registry for it. resetOwnedCard takes the ISD
    * alone and stops guarded, before its first APDU, at any other: its
-   * identity, inspection and registry reads select the ISD until slice 2
-   * (ENG-835) threads this through them.
+   * identity read (identity.ts) and its registry read select the ISD until
+   * slice 2 (ENG-835) threads this through them.
    */
   sdAid?: Bytes;
 }
