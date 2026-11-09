@@ -11,6 +11,9 @@ workers_dev = true
 routes = [{ pattern = "ops.cashucard.org", custom_domain = true }]
 
 [vars]
+# NIP-87 mint discovery behind GET /mints (D180): at most hourly to three relays.
+# "off" is the kill switch; OPS_MINT_DENYLIST (JSON array) pulls one mint.
+OPS_MINT_DISCOVERY = "on"
 OPS_OPERATOR_ADMINS = '["production-lead"]'
 OPS_RECOVERY_ADMINS = '["production-lead"]'
 OPS_RECOVERY_ISSUER_ID = '6d933aa4-b88b-402a-97fe-f0929a481b1e'

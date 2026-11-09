@@ -12,6 +12,12 @@ import {HolderIssueState} from './issue';
 import {route, RouterDeps} from './router';
 import {openSqliteFile} from './sqlite-file';
 import {createMintList, DEFAULT_MINTS} from './config';
+import {
+  createCatalog,
+  createDiscovery,
+  createRelayQuery,
+  parseDenylist,
+} from './discovery';
 import {independentBackupHealth} from './recovery-evidence';
 
 export {DEFAULT_MINTS} from './config';
@@ -24,6 +30,10 @@ export interface ServeOptions {
   readonly host?: string;
   readonly db?: OpsDb;
   readonly operatorAdmins?: () => string | undefined;
+  /** NIP-87 discovery (D180); default on, off under an explicit `mints`. */
+  readonly mintDiscovery?: boolean;
+  /** Mint URLs never offered as discovered (OPS_MINT_DENYLIST). */
+  readonly mintDenylist?: readonly string[];
 }
 
 export function serve(options: ServeOptions): http.Server {
@@ -40,6 +50,23 @@ export function serve(options: ServeOptions): http.Server {
           process.env.OPS_INDEPENDENT_BACKUP_ISSUER,
       });
     })();
+  const defaults = options.mints ? undefined : createMintList(DEFAULT_MINTS);
+  // Memory only here: after a restart the first GET /mints serves the
+  // defaults while the relays are asked in the background.
+  const catalog =
+    defaults &&
+    (options.mintDiscovery ?? process.env.OPS_MINT_DISCOVERY !== 'off')
+      ? createCatalog(
+          defaults,
+          createDiscovery({
+            query: createRelayQuery(),
+            defaults: DEFAULT_MINTS,
+            denylist:
+              options.mintDenylist ??
+              parseDenylist(process.env.OPS_MINT_DENYLIST),
+          }),
+        )
+      : undefined;
   const deps: RouterDeps = {
     db,
     operatorAdmins:
@@ -50,7 +77,8 @@ export function serve(options: ServeOptions): http.Server {
     holderState: new HolderIssueState(),
     mints: options.mints ?? DEFAULT_MINTS,
     // Probed lazily on the first GET /mints; an explicit list is unprobed.
-    availableMints: options.mints ? undefined : createMintList(DEFAULT_MINTS),
+    availableMints: catalog ? catalog.availableMints : defaults,
+    mintInfo: catalog?.mintInfo,
   };
   const server = http.createServer((req, res) => {
     if (

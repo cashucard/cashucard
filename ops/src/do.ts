@@ -25,6 +25,15 @@ import {HttpError, RouterDeps} from './router';
 import {routeRequest} from './route-request';
 import {openSqlStorage} from './sql-do';
 import {createMintList, DEFAULT_MINTS} from './config';
+import {
+  createCatalog,
+  createDiscovery,
+  createRelayQuery,
+  parseDenylist,
+  STORAGE_KEY,
+  type Discovery,
+  type SocketConnect,
+} from './discovery';
 import {NativePwHash} from './pwhash';
 import {applyOperatorSetup} from './operator-setup';
 import {resolveSession} from './auth';
@@ -40,14 +49,64 @@ export interface Env extends RecoveryBindings {
   OPS_DO: DurableObjectNamespace;
   /** Optional override of the served mint list, JSON array. */
   OPS_MINTS?: string;
+  /** NIP-87 mint discovery (D180): on unless "off"; ignored under OPS_MINTS. */
+  OPS_MINT_DISCOVERY?: string;
+  /** JSON array of mint URLs never offered as discovered (D180). */
+  OPS_MINT_DENYLIST?: string;
   /** Optional R2 binding: set with the export cron to ship nightly escrow backups. */
   OPS_BACKUPS?: R2Bucket;
   /** Optional age recipient (public key) the nightly export encrypts to. */
   OPS_BACKUP_RECIPIENT?: string;
 }
 
+/**
+ * workerd's outbound WebSocket: a fetch with `Upgrade: websocket` to the
+ * relay's https URL, then accept() (D180). Throws when the relay refuses.
+ */
+export const workersSocketConnect: SocketConnect = async relay => {
+  const res = await fetch(relay.replace(/^wss:/, 'https:'), {
+    headers: {Upgrade: 'websocket'},
+    signal: AbortSignal.timeout(5000),
+  });
+  const ws = res.webSocket;
+  if (!ws) {
+    await res.body?.cancel().catch(() => {});
+    throw new Error(`relay refused upgrade: ${res.status}`);
+  }
+  ws.accept();
+  return ws as unknown as Awaited<ReturnType<SocketConnect>>;
+};
+
+/** The discovery wiring, or undefined when OPS_MINTS or the kill switch rules it out. */
+function discoveryFor(
+  env: Env,
+  ctx: DurableObjectState,
+): Discovery | undefined {
+  if (env.OPS_MINTS || env.OPS_MINT_DISCOVERY === 'off') return undefined;
+  let denylist: readonly string[];
+  try {
+    denylist = parseDenylist(env.OPS_MINT_DENYLIST);
+  } catch {
+    // A denylist that cannot be read must not let a pulled mint back in:
+    // discovery stays off; the defaults are still served.
+    console.warn('OPS_MINT_DENYLIST unreadable: mint discovery is off');
+    return undefined;
+  }
+  return createDiscovery({
+    query: createRelayQuery(workersSocketConnect),
+    defaults: DEFAULT_MINTS,
+    denylist,
+    store: {
+      load: () => ctx.storage.get(STORAGE_KEY),
+      save: value => ctx.storage.put(STORAGE_KEY, value),
+    },
+    background: p => ctx.waitUntil(p),
+  });
+}
+
 export class OpsStore extends DurableObject<Env> {
   private readonly deps: RouterDeps;
+  private readonly discovery: Discovery | undefined;
   private readonly requestPolicy = new AsyncLocalStorage<{
     issuer: string | undefined;
     recoveryAdmins: string | undefined;
@@ -67,6 +126,14 @@ export class OpsStore extends DurableObject<Env> {
     ctx.blockConcurrencyWhile(async () => {
       await applyOperatorSetup(db, env.OPS_OPERATOR_SETUP, passwordHasher);
     });
+    // Discovery does no I/O here: the stored set loads and the relays are
+    // asked on the first GET /mints, in the background (D180).
+    this.discovery = discoveryFor(env, ctx);
+    const defaults = env.OPS_MINTS ? undefined : createMintList(DEFAULT_MINTS);
+    const catalog =
+      defaults && this.discovery
+        ? createCatalog(defaults, this.discovery)
+        : undefined;
     this.deps = {
       db,
       passwordHasher,
@@ -82,8 +149,14 @@ export class OpsStore extends DurableObject<Env> {
       // The defaults are probed lazily on the first GET /mints, never here
       // or in blockConcurrencyWhile: a slow mint would stall every request.
       // An OPS_MINTS override is authoritative and served unprobed.
-      availableMints: env.OPS_MINTS ? undefined : createMintList(DEFAULT_MINTS),
+      availableMints: catalog ? catalog.availableMints : defaults,
+      mintInfo: catalog?.mintInfo,
     };
+  }
+
+  /** Refreshes the discovered mint set now (the cron fallback path, D180). */
+  async refreshMintDiscovery(): Promise<void> {
+    await this.discovery?.refresh();
   }
 
   private backupPolicyIssuer(): string | undefined {

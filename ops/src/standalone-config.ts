@@ -2,6 +2,8 @@
 import {constants, openSync, readSync, fstatSync, closeSync} from 'node:fs';
 import {isIP} from 'node:net';
 
+import {parseDenylist} from './discovery';
+
 type Environment = Readonly<Record<string, string | undefined>>;
 
 export function secret(name: string, env: Environment): string | undefined {
@@ -24,6 +26,14 @@ export function secret(name: string, env: Environment): string | undefined {
     return bytes.subarray(0, size).toString('utf8').trim();
   } finally {
     closeSync(fd);
+  }
+}
+
+function parseMintDenylist(raw: string | undefined): readonly string[] {
+  try {
+    return parseDenylist(raw);
+  } catch {
+    throw new Error('Invalid OPS_MINT_DENYLIST');
   }
 }
 
@@ -74,5 +84,7 @@ export function standaloneConfig(env: Environment = process.env) {
     master: secret('OPS_MASTER_KEY', env),
     setup: secret('OPS_OPERATOR_SETUP', env),
     independentBackupIssuer: env.OPS_INDEPENDENT_BACKUP_ISSUER,
+    mintDiscovery: env.OPS_MINT_DISCOVERY !== 'off',
+    mintDenylist: parseMintDenylist(env.OPS_MINT_DENYLIST),
   };
 }

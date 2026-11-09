@@ -5,7 +5,16 @@ import {openSqlStorage} from '../../src/sql-do';
 import {handleOpsRequest} from '../../src/do';
 import {HolderIssueState} from '../../src/issue';
 import {AnchorFeed} from '../../src/anchor';
-import {createMintList} from '../../src/config';
+import {createMintList, type FetchFn} from '../../src/config';
+import {
+  createCatalog,
+  createDiscovery,
+  STORAGE_KEY,
+  type NostrEvent,
+} from '../../src/discovery';
+import {schnorr} from '@noble/curves/secp256k1';
+import {sha256} from '@noble/hashes/sha2';
+import {bytesToHex} from '@noble/hashes/utils';
 import {expect, it} from 'vitest';
 
 const DEVICE = '10000000-0000-4000-8000-000000000001';
@@ -373,5 +382,141 @@ it('the probed default list bundles and runs in workerd behind GET /mints', asyn
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({mints: ['https://good.example']});
     expect(probed.length).toBe(4);
+  });
+});
+
+function signed(n: number, kind: number, tags: string[][]): NostrEvent {
+  const priv = new Uint8Array(32);
+  priv[0] = 0x22;
+  priv[31] = n;
+  const pubkey = bytesToHex(schnorr.getPublicKey(priv));
+  const created_at = Math.floor(Date.now() / 1000) - 3600;
+  const id = bytesToHex(
+    sha256(
+      new TextEncoder().encode(
+        JSON.stringify([0, pubkey, created_at, kind, tags, '']),
+      ),
+    ),
+  );
+  return {
+    id,
+    pubkey,
+    created_at,
+    kind,
+    tags,
+    content: '',
+    sig: bytesToHex(schnorr.sign(id, priv)),
+  };
+}
+
+it('the discovery catalog runs in workerd behind GET /mints and its set round-trips DO storage', async () => {
+  const stub = env.OPS_DO.get(env.OPS_DO.idFromName('mints-discovered'));
+  const login = await stub.fetch('https://test/auth/operator/session', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'lead-setup',
+      password: 'correct horse battery',
+    }),
+  });
+  const {token} = (await login.json()) as {token: string};
+  const found = 'https://found.example';
+  const events = [
+    signed(1, 38172, [
+      ['u', found],
+      ['n', 'mainnet'],
+    ]),
+    ...[2, 3, 4].map(n =>
+      signed(n, 38000, [
+        ['k', '38172'],
+        ['u', found],
+      ]),
+    ),
+  ];
+  const fetchFn: FetchFn = async url => ({
+    status: 200,
+    text: async () =>
+      url.endsWith('/v1/info')
+        ? '{"name":"Found Mint"}'
+        : '{"keysets":[{"id":"00ad268c4d1f5826","unit":"sat","active":true}]}',
+  });
+  await runInDurableObject(stub, async (_instance, ctx) => {
+    const db = new OpsDb({
+      sql: openSqlStorage(ctx.storage),
+      master: {getMaster: () => Buffer.alloc(32, 90)},
+    });
+    let relayCalls = 0;
+    const store = {
+      load: () => ctx.storage.get(STORAGE_KEY),
+      save: (value: unknown) => ctx.storage.put(STORAGE_KEY, value),
+    };
+    const discovery = createDiscovery({
+      query: async () => {
+        relayCalls++;
+        return {answered: true, events};
+      },
+      relays: ['wss://r.example'],
+      defaults: ['https://default.example'],
+      probe: async url => {
+        const {probeMint} = await import('../../src/config');
+        return probeMint(url, fetchFn);
+      },
+      store,
+      log: () => {},
+    });
+    const catalog = createCatalog(
+      createMintList(['https://default.example'], {fetchFn, log: () => {}}),
+      discovery,
+    );
+    const deps = {
+      db,
+      holderState: new HolderIssueState(),
+      mints: [],
+      availableMints: catalog.availableMints,
+      mintInfo: catalog.mintInfo,
+      anchor: new AnchorFeed(async () => {
+        throw new Error('unused test feed');
+      }),
+    };
+    const get = async () => {
+      const res = await handleOpsRequest(
+        deps,
+        new Request('https://test/mints', {
+          headers: {authorization: 'Bearer ' + token},
+        }),
+      );
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+    // the first request never waits on relays: defaults only
+    expect(await get()).toEqual({mints: ['https://default.example']});
+    await discovery.refresh();
+    expect(await get()).toEqual({
+      mints: ['https://default.example', found],
+      mint_info: {[found]: {name: 'Found Mint', reviews: 3}},
+    });
+    const stored = (await ctx.storage.get(STORAGE_KEY)) as {
+      v: number;
+      mints: unknown[];
+    };
+    expect(stored.v).toBe(1);
+    expect(stored.mints).toEqual([
+      {url: found, reviews: 3, name: 'Found Mint'},
+    ]);
+    // a fresh instance over the same storage serves the stored set at once
+    const before = relayCalls;
+    const again = createDiscovery({
+      query: async () => {
+        relayCalls++;
+        return {answered: false, events: []};
+      },
+      relays: ['wss://r.example'],
+      defaults: [],
+      store,
+      log: () => {},
+    });
+    again.snapshot();
+    await new Promise(r => setTimeout(r, 10));
+    expect(again.snapshot().map(m => m.url)).toEqual([found]);
+    expect(relayCalls).toBe(before);
   });
 });
