@@ -213,6 +213,12 @@ export interface RunOptions {
   /** Called synchronously, never awaited; whatever it throws is ignored. */
   onEvent?: (event: RunEvent) => void;
   macOverModifiedApdu?: boolean;
+  /**
+   * The security domain a run selects, logs in to and loads into: the ISD's
+   * AID by default (A000000151000000 on the J3R180 and the J3R452). SCP03's
+   * card challenge is made over it, so a wrong one stops at WrongKeys.
+   */
+  sdAid?: Bytes;
 }
 
 export interface ProvisionOptions extends RunOptions {
@@ -479,7 +485,11 @@ export async function provision(
 ): Promise<ProvisionResult> {
   const run = new Run<Phase>(tx, options, plan.guard ? 'probe' : 'selectIsd');
   const keys = options.keys ?? FACTORY_KEYS;
-  const sessionOptions = {macOverModifiedApdu: options.macOverModifiedApdu};
+  const sdAid = options.sdAid ?? ISD_AID;
+  const sessionOptions = {
+    macOverModifiedApdu: options.macOverModifiedApdu,
+    sdAid,
+  };
   let session: SecureSession | null = null;
   let blocks: number[][] = [];
   const open = (): SecureSession => {
@@ -527,7 +537,7 @@ export async function provision(
       }
     },
     selectIsd: async () => {
-      expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+      expectOk(await run.plain(selectAid(sdAid)), 0xa4);
       const free = await run.plain(getFreeMemory());
       run.freeBefore =
         free.sw === 0x9000
@@ -552,7 +562,7 @@ export async function provision(
     },
     installForLoad: async () => {
       expectOk(
-        await open().send(run.timed, installForLoad(plan.packageAid)),
+        await open().send(run.timed, installForLoad(plan.packageAid, sdAid)),
         0xe6,
       );
     },
@@ -585,7 +595,7 @@ export async function provision(
         }
       }
       if (plan.removeAfterChecks) {
-        expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+        expectOk(await run.plain(selectAid(sdAid)), 0xa4);
         const again = await openSession(
           run.timed,
           keys,
@@ -596,7 +606,7 @@ export async function provision(
           expectOk(await again.send(run.timed, deleteAid(aid)), 0xe4);
         }
       }
-      expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+      expectOk(await run.plain(selectAid(sdAid)), 0xa4);
       const free = await run.plain(getFreeMemory());
       run.freeAfter =
         free.sw === 0x9000
@@ -647,12 +657,16 @@ export async function rotateKeys(
   options: RotateOptions,
 ): Promise<RotateResult> {
   const run = new Run<RotatePhase>(tx, options, 'selectIsd');
-  const sessionOptions = {macOverModifiedApdu: options.macOverModifiedApdu};
+  const sdAid = options.sdAid ?? ISD_AID;
+  const sessionOptions = {
+    macOverModifiedApdu: options.macOverModifiedApdu,
+    sdAid,
+  };
   try {
     run.enter('selectIsd');
-    expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+    expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     run.enter('auth');
-    const hs = await initializeUpdate(run.timed, options.random, 0);
+    const hs = await initializeUpdate(run.timed, options.random, 0, sdAid);
     const fromKeys = sessionIfMatches(from, hs);
     const toKeys = fromKeys ? null : sessionIfMatches(to, hs);
     if (!fromKeys && !toKeys) {
@@ -684,7 +698,7 @@ export async function rotateKeys(
     });
     expectOk(await session.send(run.timed, command), 0xd8);
     run.enter('reopen');
-    expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+    expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     const reopened = await openSession(
       run.timed,
       to,
@@ -710,12 +724,14 @@ export async function confirmManagerKeys(
   options: RunOptions,
 ): Promise<RotateResult> {
   const run = new Run<RotatePhase>(tx, options, 'selectIsd');
+  const sdAid = options.sdAid ?? ISD_AID;
   try {
     run.enter('selectIsd');
-    expectOk(await run.plain(selectAid(ISD_AID)), 0xa4);
+    expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     run.enter('auth');
     const session = await openSession(run.timed, keys, options.random, {
       macOverModifiedApdu: options.macOverModifiedApdu,
+      sdAid,
     });
     run.enter('done');
     return {

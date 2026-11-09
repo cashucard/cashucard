@@ -72,6 +72,12 @@ export interface FakeCardOptions {
   seq?: number;
   /** How the card checks a C-MAC: over the modified header (gp's way) or the original. */
   macOverModifiedApdu?: boolean;
+  /**
+   * The card manager's AID, hex: {@link ISD} by default. It answers SELECT,
+   * names the security domain in GET STATUS and INSTALL [for load], and is
+   * what SCP03's pseudo-random challenge is made over.
+   */
+  isd?: string;
   openerRule?: 'mute' | '6F00';
   partialLoad?: 'discard' | 'keep';
   heavyModules?: string[];
@@ -139,6 +145,8 @@ export class FakeCard {
   kvn: number;
   seq: number;
   readonly scp: 2 | 3;
+  /** The card manager's AID, hex. */
+  readonly isdAid: string;
   free: number;
   readonly cplc: string;
   override: Override | undefined;
@@ -148,7 +156,7 @@ export class FakeCard {
   /** Partial packages a torn LOAD left, in the 'keep' variant, with their bytes. */
   readonly partial = new Map<string, number>();
   private pending: PendingLoad | null = null;
-  private selected: string = ISD;
+  private selected: string;
   private session: Session | null = null;
   private handshake: {
     host: Bytes;
@@ -161,7 +169,7 @@ export class FakeCard {
   private readonly opts: Required<
     Omit<
       FakeCardOptions,
-      'keys' | 'kvn' | 'scp' | 'seq' | 'freeNonVolatile' | 'cplc'
+      'keys' | 'kvn' | 'scp' | 'isd' | 'seq' | 'freeNonVolatile' | 'cplc'
     >
   >;
 
@@ -169,6 +177,8 @@ export class FakeCard {
     this.keys = options.keys ?? {enc: K40, mac: K40, dek: K40};
     this.kvn = options.kvn ?? 0x01;
     this.scp = options.scp ?? 2;
+    this.isdAid = (options.isd ?? ISD).toUpperCase();
+    this.selected = this.isdAid;
     this.seq = options.seq ?? (this.scp === 3 ? 0 : 0x0009);
     this.free = options.freeNonVolatile ?? 164176;
     this.cplc = options.cplc ?? CPLC_09336320;
@@ -202,7 +212,7 @@ export class FakeCard {
   /** The power goes: the card leaves the field, or the reader resets it. */
   reset(): void {
     this.mute = false;
-    this.selected = ISD;
+    this.selected = this.isdAid;
     this.session = null;
     if (this.handshake) {
       this.abandonedHandshakes++;
@@ -241,7 +251,7 @@ export class FakeCard {
     if ((apdu[0] & 0xfc) === 0x00 && apdu[1] === 0xa4) {
       return this.select(apdu);
     }
-    if (this.selected === ISD) {
+    if (this.selected === this.isdAid) {
       return this.isd(apdu);
     }
     const inst = this.instances.get(this.selected);
@@ -263,8 +273,8 @@ export class FakeCard {
     const lc = apdu.length > 5 ? apdu[4] : 0;
     const aid = hex(apdu.slice(5, 5 + lc));
     let target: string | undefined;
-    if (lc === 0 || aid === ISD) {
-      target = ISD;
+    if (lc === 0 || aid === this.isdAid) {
+      target = this.isdAid;
     } else if (this.instances.has(aid)) {
       target = aid;
     } else {
@@ -276,8 +286,17 @@ export class FakeCard {
     }
     this.endSessions();
     this.selected = target;
-    if (target === ISD) {
-      return sw(0x9000, fromHex('6F108408A000000151000000A5049F6501FF'));
+    if (target === this.isdAid) {
+      // the FCI: 84 and the card manager's AID, then A5 with 9F65 FF
+      const isd = fromHex(this.isdAid);
+      return sw(0x9000, [
+        0x6f,
+        isd.length + 8,
+        0x84,
+        isd.length,
+        ...isd,
+        ...fromHex('A5049F6501FF'),
+      ]);
     }
     const inst = this.instances.get(target)!;
     if (inst.module === CARD_MODULE) {
@@ -520,7 +539,7 @@ export class FakeCard {
           ...aid(0x4f, id),
           ...tlv([0x9f, 0x70], [pkg ? 7 : 1]),
           ...(pkg ? [...tlv([0xc5], [0, 0, 0]), ...aid(0xc4, pkg)] : []),
-          ...aid(0xcc, ISD),
+          ...aid(0xcc, this.isdAid),
         ];
         return tlv([0xe3], fields);
       };
@@ -552,7 +571,7 @@ export class FakeCard {
       return sw(0x6a80);
     }
     const aid = hex(data.slice(2));
-    if (aid === ISD) {
+    if (aid === this.isdAid) {
       return sw(0x6985);
     }
     const inst = this.instances.get(aid);
@@ -597,7 +616,7 @@ export class FakeCard {
     } catch {
       return sw(0x6a80);
     }
-    if (at !== data.length || (sd.length > 0 && hex(sd) !== ISD)) {
+    if (at !== data.length || (sd.length > 0 && hex(sd) !== this.isdAid)) {
       return sw(0x6a80);
     }
     const aid = hex(pkg);
@@ -661,7 +680,7 @@ export class FakeCard {
     if (!p || !p.modules.includes(module)) {
       return sw(0x6a88);
     }
-    if (this.instances.has(aid) || aid === ISD) {
+    if (this.instances.has(aid) || aid === this.isdAid) {
       return sw(0x6985);
     }
     if (this.opts.heavyModules.includes(module) && p.instancesMade === 0) {
@@ -724,7 +743,7 @@ export class FakeCard {
     ];
     const card = nodeScp03Kdf(this.keys.enc, 0x02, 64, [
       ...seq,
-      ...fromHex(ISD),
+      ...fromHex(this.isdAid),
     ]);
     const context = [...host, ...card];
     const enc = nodeScp03Kdf(this.keys.enc, 0x04, 128, context);

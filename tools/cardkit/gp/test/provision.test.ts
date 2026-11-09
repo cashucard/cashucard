@@ -20,7 +20,7 @@ import {
   TAG_AID,
   TAG_CLASS_AID,
 } from '../aids';
-import {toHex} from '../bytes';
+import {fromHex, toHex} from '../bytes';
 import {
   PHASES,
   cashuPlan,
@@ -638,6 +638,69 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
         }
       }
     }
+  });
+
+  // the card manager's AID on Open Platform cards, which the SCP03 challenge is made over here
+  const OTHER = 'A000000003000000';
+
+  it('selects, logs in to, loads into and rotates the security domain sdAid names', async () => {
+    const card = new FakeCard({scp: 3, isd: OTHER});
+    // the default AID is not this card manager's: its SELECT is refused, and nothing more is sent
+    const lost = await provision(card.transceive, CASHU, options());
+    assert.equal(lost.kind, 'refused');
+    assert.equal(lost.phase, 'selectIsd');
+    assert.equal(lost.sw, 0x6a82);
+    assert.deepEqual(card.insLog(), [0xa4, 0xa4]);
+    card.reset();
+    const before = card.log.length;
+    const sdAid = fromHex(OTHER);
+    const r = await provision(card.transceive, CASHU, options({sdAid}));
+    assert.equal(r.ok, true, r.reason);
+    assertInstalled(card);
+    const sent = card.log.slice(before);
+    assert.deepEqual(
+      sent.filter(a => a[1] === 0xa4).map(a => toHex(a.slice(5, 5 + a[4]))),
+      [CARD, OTHER, CARD, TAG, OTHER],
+      'the probe, the security domain, the checks, the security domain',
+    );
+    const forLoad = sent.find(a => a[1] === 0xe6 && a[2] === 0x02)!;
+    assert.equal(
+      toHex(forLoad.slice(16, 25)),
+      '08' + OTHER,
+      'INSTALL [for load] names it',
+    );
+    card.reset();
+    const rotated = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options({sdAid}),
+    );
+    assert.equal(rotated.ok, true, rotated.reason);
+    assert.equal(toHex(card.keys.mac), toHex(SPIKE_KEYS.mac));
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it("stops at WrongKeys, before EXTERNAL AUTHENTICATE, when the card's challenge was made over another AID than sdAid", async () => {
+    // a card manager that answers to the usual ISD AID as well, but makes its challenge over its own
+    const card = new FakeCard({scp: 3, isd: OTHER});
+    const alias: Transceiver = apdu =>
+      apdu[1] === 0xa4 && toHex(apdu.slice(5, 5 + apdu[4])) === ISD
+        ? card.transceive(selectAid(fromHex(OTHER)))
+        : card.transceive(apdu);
+    const r = await provision(alias, CASHU, options());
+    assert.equal(r.kind, 'wrongKeys');
+    assert.equal(r.phase, 'auth');
+    assert.deepEqual(card.insLog(), [0xa4, 0xa4, 0xca, 0x50]);
+    assert.equal(card.failedAuths, 0);
+    // told the AID, the same card opens
+    card.reset();
+    const again = await provision(
+      alias,
+      CASHU,
+      options({sdAid: fromHex(OTHER)}),
+    );
+    assert.equal(again.ok, true, again.reason);
   });
 
   for (const scp of [2, 3] as const) {

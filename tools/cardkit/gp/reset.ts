@@ -129,9 +129,11 @@ export async function resetOwnedCard(
       )
         throw new ResetGuard();
     }
-    const selected = await transmit(tx, selectAid(ISD_AID));
+    // the security domain to log in to; identity, inspection and the registry still read the ISD (ENG-835 slice 2)
+    const sdAid = options.sdAid ?? ISD_AID;
+    const selected = await transmit(tx, selectAid(sdAid));
     if (selected.sw !== 0x9000) throw new CardError(selected.sw, 0xa4);
-    const hs = await initializeUpdate(tx, options.random, 0);
+    const hs = await initializeUpdate(tx, options.random, 0, sdAid);
     if (hs.reply.kvn === 0) throw new ResetGuard(); // PUT KEY P1=0 adds a set rather than replacing it.
     const afterDeletion =
       stage === 'rotation_intent' || stage === 'factory_verified';
