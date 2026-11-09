@@ -129,6 +129,14 @@ export interface MintInfo {
   readonly reviews: number;
 }
 
+/**
+ * The service truncates a mint name to 40 code points (MINT_NAME_MAX in
+ * ops/src/config.ts), so the check counts code points, not UTF-16 units: an
+ * emoji in a 40-point name must not drop the entry.
+ */
+const MINT_NAME_MAX = 40;
+const fitsMintName = (name: string) => Array.from(name).length <= MINT_NAME_MAX;
+
 /** The answer of GET /mints/probe. */
 export type MintProbeResult =
   | {readonly ok: true; readonly name?: string}
@@ -439,7 +447,7 @@ export class ApiClient {
       }
       if (
         name !== undefined &&
-        (typeof name !== 'string' || name.length > 40)
+        (typeof name !== 'string' || !fitsMintName(name))
       ) {
         continue;
       }
@@ -460,7 +468,7 @@ export class ApiClient {
       token,
     );
     if (json.ok === true) {
-      return typeof json.name === 'string' && json.name.length <= 40
+      return typeof json.name === 'string' && fitsMintName(json.name)
         ? {ok: true, name: json.name}
         : {ok: true};
     }

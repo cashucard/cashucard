@@ -11,6 +11,7 @@ import {ApiClient, ApiUnreachableError} from '../src/api';
 import {BatchSetupScreen} from '../src/screens/BatchSetupScreen';
 import {SETUP} from '../src/strings';
 import {useApp} from '../src/store';
+import {rememberBatchDefaults} from '../src/batchDefaults';
 jest.mock('../src/store', () => ({useApp: jest.fn()}));
 
 let tree: Renderer.ReactTestRenderer;
@@ -168,4 +169,68 @@ test('the start button is disabled while the probe runs', async () => {
   expect(byId('start-batch').props.title).toBe(SETUP.checkingMint);
   expect(byId('mint-custom-input').props.editable).toBe(false);
   await act(async () => finish({ok: true}));
+});
+
+test.each([
+  ['create only', false],
+  ['start and read', true],
+])(
+  'cancelling setup while the probe runs creates nothing when it then passes (%s)',
+  async (_label, fastStart) => {
+    if (fastStart) {
+      // A remembered mint the service no longer lists leaves the write-in
+      // field open on the fast-start screen.
+      await rememberBatchDefaults(
+        {service_origin: 'https://ops.test', operator_id: 1, key_env: 'issued'},
+        {mint: 'https://gone.test', count: 1},
+      );
+    }
+    let finish!: (v: {ok: true}) => void;
+    jest.spyOn(ApiClient.prototype, 'probeMint').mockReturnValue(
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+    );
+    const create = jest.fn(async () => true);
+    const startAndRead = jest.fn(async () => true);
+    const start = jest.fn();
+    const cancel = jest.fn();
+    await mount({
+      installationOnly: false,
+      onCreate: create,
+      onStartAndRead: fastStart ? startAndRead : undefined,
+      onStart: start,
+      onCancel: cancel,
+    });
+    await writeIn('https://slow.test');
+    act(() => {
+      byId('start-batch').props.onPress();
+    });
+    expect(byId('start-batch').props.title).toBe(SETUP.checkingMint);
+    await press('cancel-batch-setup');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    await act(async () => finish({ok: true}));
+    expect(create).not.toHaveBeenCalled();
+    expect(startAndRead).not.toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+    expect(tree.root.findAllByProps({testID: 'confirm-start-batch'})).toEqual(
+      [],
+    );
+  },
+);
+
+test('a written-in address the service refuses as invalid says what to fix', async () => {
+  jest
+    .spyOn(ApiClient.prototype, 'probeMint')
+    .mockResolvedValue({ok: false, reason: 'invalid url'});
+  const create = jest.fn(async () => true);
+  await mount({installationOnly: false, onCreate: create});
+  await writeIn('http://mint.example.com');
+  await press('start-batch');
+  expect(byId('mint-probe-note').props.children).toBe(SETUP.mintProbeInvalid);
+  expect(tree.root.findAllByProps({testID: 'retry-mint-probe'})).toEqual([]);
+  expect(create).not.toHaveBeenCalled();
+  // Editing the address clears the note.
+  await writeIn('https://mint.example.com');
+  expect(tree.root.findAllByProps({testID: 'mint-probe-note'})).toEqual([]);
 });

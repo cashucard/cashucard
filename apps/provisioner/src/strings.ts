@@ -46,6 +46,7 @@ export const SETUP = {
   checkingMint: 'CHECKING THE MINT…',
   mintProbeFailed:
     'This mint did not pass the check: it must be reachable and issue sats.',
+  mintProbeInvalid: 'Enter an https:// mint address with a public host name.',
   mintProbeUnreachable:
     'The mint could not be checked because the service did not answer. Check your connection and retry.',
   retryMintProbe: 'RETRY MINT CHECK',

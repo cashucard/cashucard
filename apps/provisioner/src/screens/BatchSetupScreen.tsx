@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 
-import {ApiClient, type MintInfo} from '../api';
+import {ApiClient, type MintInfo, type MintProbeResult} from '../api';
 import {SETUP} from '../strings';
 import {useApp, type BatchConfig} from '../store';
 import {readBatchDefaults} from '../batchDefaults';
@@ -245,11 +245,26 @@ export function BatchSetupScreen({
   const [previousMintMissing, setPreviousMintMissing] = useState(false);
   const fastStart = !!onStartAndRead;
   // The write-in gate (D180): a mint the service does not list is probed
-  // before the batch is submitted. 'failed' blocks; 'unreachable' blocks with
-  // a retry. Choosing another mint clears it.
+  // before the batch is submitted. 'failed' and 'invalid' (the service
+  // refused the address itself) block; 'unreachable' blocks with a retry.
+  // Choosing another mint clears it.
   const [probe, setProbe] = useState<
-    'idle' | 'checking' | 'failed' | 'unreachable'
+    'idle' | 'checking' | 'failed' | 'invalid' | 'unreachable'
   >('idle');
+  // Bumped when the operator leaves the screen (cancel, back, settings) or it
+  // unmounts, so a probe still in flight cannot go on to create a batch the
+  // operator walked away from.
+  const probeRun = useRef(0);
+  const abandonProbe = () => {
+    probeRun.current += 1;
+    setProbe(current => (current === 'checking' ? 'idle' : current));
+  };
+  useEffect(
+    () => () => {
+      probeRun.current += 1;
+    },
+    [],
+  );
   const lastReadFirst = useRef(true);
   const chooseMint = (value: string | null) => {
     editedMint.current = true;
@@ -316,19 +331,25 @@ export function BatchSetupScreen({
     // Batch creation needs a session, so without one there is nothing to
     // check against; the service's own creation stays permissive (D180).
     if (customMint && app.session) {
+      const run = ++probeRun.current;
       setProbe('checking');
-      let passed: boolean;
+      let result: MintProbeResult | null;
       try {
-        const result = await new ApiClient({
+        result = await new ApiClient({
           baseUrl: app.serviceUrl,
         }).probeMint(app.session.token, mint!);
-        passed = result.ok;
       } catch {
+        result = null;
+      }
+      if (run !== probeRun.current) {
+        return;
+      }
+      if (result === null) {
         setProbe('unreachable');
         return;
       }
-      if (!passed) {
-        setProbe('failed');
+      if (!result.ok) {
+        setProbe(result.reason === 'invalid url' ? 'invalid' : 'failed');
         return;
       }
       setProbe('idle');
@@ -498,11 +519,19 @@ export function BatchSetupScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen
         title={SETUP.title}
-        onBack={onCancel}
+        onBack={
+          onCancel
+            ? () => {
+                abandonProbe();
+                onCancel();
+              }
+            : undefined
+        }
         onStop={creating ? onStop : undefined}
         headerRight={
           <GearButton
             onPress={() => {
+              abandonProbe();
               if (creating) {
                 onStop?.();
               }
@@ -797,10 +826,14 @@ export function BatchSetupScreen({
           </ScrollView>
 
           <View style={s.footer} testID="setup-footer">
-            {probe === 'failed' || probe === 'unreachable' ? (
+            {probe === 'failed' ||
+            probe === 'invalid' ||
+            probe === 'unreachable' ? (
               <Text style={s.note} testID="mint-probe-note">
                 {probe === 'failed'
                   ? SETUP.mintProbeFailed
+                  : probe === 'invalid'
+                  ? SETUP.mintProbeInvalid
                   : SETUP.mintProbeUnreachable}
               </Text>
             ) : null}
@@ -853,6 +886,7 @@ export function BatchSetupScreen({
           title={creating ? 'STOP AND KEEP SAVED WORK' : 'CANCEL SETUP'}
           testID="cancel-batch-setup"
           onPress={() => {
+            abandonProbe();
             if (creating) {
               onStop?.();
             }

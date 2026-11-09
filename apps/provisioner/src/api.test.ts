@@ -555,3 +555,34 @@ test('probeMint surfaces a transport failure as a throw, not a pass', async () =
     client.probeMint('t', 'https://mint.test'),
   ).rejects.toBeInstanceOf(ApiUnreachableError);
 });
+
+test('a mint name is measured in code points, as the service truncates it (D180)', async () => {
+  // 1 emoji (2 UTF-16 units) + space + 38 letters = 40 code points, 41 units.
+  const forty = '\u{1F95C} ' + 'P'.repeat(38);
+  const fortyOne = forty + 'Q';
+  expect(Array.from(forty)).toHaveLength(40);
+  expect(forty.length).toBe(41);
+  const {fetcher} = scriptedFetcher([
+    () => ({
+      status: 200,
+      json: {
+        mints: [],
+        mint_info: {
+          'https://peanut.test': {name: forty, reviews: 2},
+          'https://over.test': {name: fortyOne, reviews: 2},
+        },
+      },
+    }),
+    () => ({status: 200, json: {ok: true, name: forty}}),
+    () => ({status: 200, json: {ok: true, name: fortyOne}}),
+  ]);
+  const client = new ApiClient({baseUrl: 'https://ops.test', fetcher});
+  expect(await client.mintInfo('t')).toEqual({
+    'https://peanut.test': {name: forty, reviews: 2},
+  });
+  expect(await client.probeMint('t', 'https://peanut.test')).toEqual({
+    ok: true,
+    name: forty,
+  });
+  expect(await client.probeMint('t', 'https://over.test')).toEqual({ok: true});
+});
