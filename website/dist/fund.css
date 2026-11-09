@@ -209,3 +209,16 @@
 [data-cu-actions] .give-btn { flex: 1; justify-content: center; }
 .give-redeem { margin-top: 12px; width: 100%; justify-content: center; }
 .give-redeem:disabled { opacity: .6; cursor: progress; }
+
+/* eCash kind: Cashu or Fedimint */
+.give-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; margin: -4px 0 16px; border-radius: var(--f-r-sm); background: var(--f-well); border: 1px solid var(--f-line); }
+.give-kind[hidden] { display: none; }
+.give-kind button { border: 0; background: transparent; color: var(--f-dim); font: 700 13.5px/1 var(--f-font); padding: 10px 12px; border-radius: calc(var(--f-r-sm) - 3px); cursor: pointer; transition: color .2s, background .2s; }
+.give-kind button[aria-checked="true"] { background: var(--f-chip-on); color: var(--f-ink); box-shadow: inset 0 0 0 1px var(--f-accent); }
+.give-kind button:focus-visible { outline: 2px solid var(--f-accent); outline-offset: 2px; }
+.give-fm[hidden], [data-amount-area][hidden] { display: none; }
+.give-fm .give-token { min-height: 112px; }
+.give-fm .give-status { margin: 10px 0 0; }
+.give-fm .give-status[hidden] { display: none; }
+.give-fm .give-cta { margin-top: 12px; }
+.give-fm .give-note { margin-top: 12px; }

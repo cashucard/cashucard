@@ -14,7 +14,8 @@
   var MIN = 1000, MAX = 10000000;
 
   var state = { rail: "lightning", sats: 21000, price: null, invoice: null, address: null, request: null,
-                poll: null, tick: null, baseline: null, step: "amount" };
+                poll: null, tick: null, baseline: null, step: "amount",
+                kind: root.getAttribute("data-ecash-default") === "fedimint" ? "fedimint" : "cashu", gift: null };
 
   function $(sel, ctx) { return (ctx || root).querySelector(sel); }
   function $all(sel, ctx) { return Array.prototype.slice.call((ctx || root).querySelectorAll(sel)); }
@@ -82,6 +83,15 @@
     var ehint = $("[data-ecash-hint]");
     if (ehint) ehint.hidden = state.rail !== "ecash";
   }
+  function setKind(kind) {
+    state.kind = kind;
+    $all("[data-kind]").forEach(function (b) { b.setAttribute("aria-checked", String(b.getAttribute("data-kind") === kind)); });
+    var ecash = state.rail === "ecash", fm = ecash && kind === "fedimint";
+    $("[data-ecash-kinds]").hidden = !ecash;
+    $("[data-fm]").hidden = !fm;
+    $("[data-amount-area]").hidden = fm;
+    root.setAttribute("data-ecash-kind", kind);
+  }
   function setRail(rail) {
     state.rail = rail;
     $all("[data-rail]").forEach(function (t) {
@@ -91,6 +101,7 @@
     });
     root.setAttribute("data-rail-current", rail);
     setSats(state.sats, !!$('[data-sats][aria-checked="true"]'));
+    setKind(state.kind);
   }
 
   /* ---------- lightning ---------- */
@@ -191,6 +202,45 @@
       .then(function () { btn.disabled = false; btn.textContent = "Give this token"; });
   }
 
+  /* ---------- Fedimint eCash ---------- */
+  function fmError(msg) {
+    var el = $("[data-fm-error]");
+    el.textContent = msg; el.hidden = !msg;
+  }
+  function fmBusy(on, text) {
+    var st = $("[data-fm-status]"), btn = $("[data-fm-redeem]");
+    st.hidden = !on;
+    if (text) $(".give-status-text", st).textContent = text;
+    btn.disabled = on;
+  }
+  function redeemNotes() {
+    var field = $("[data-fm-notes]");
+    var notes = field.value.replace(/\s+/g, "");
+    if (notes.length < 40) { fmError("Paste the notes your Fedimint wallet exported."); field.focus(); return; }
+    if (/^(cashu:)?cashu[AB]/.test(notes)) { fmError("That is a Cashu token. Switch to Cashu above to give it."); return; }
+    fmError("");
+    fmBusy(true, "Checking your notes with the federation");
+    announce("Checking your notes with the federation.");
+    fetch(API + "/api/fedimint/redeem", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ site: SITE, notes: notes })
+    }).then(function (r) {
+      return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ("HTTP " + r.status)); return d; });
+    }).then(function (g) {
+      if (g.received) { fmBusy(false); field.value = ""; return thanks("fedimint", g.amount_sat, g.id); }
+      state.gift = g.id;
+      fmBusy(true, "The federation is slow to answer. Keep this page open");
+      state.poll = setInterval(checkNotes, 3000);
+    }).catch(function (e) { fmBusy(false); fmError(e.message); field.focus(); });
+  }
+  function checkNotes() {
+    if (!state.gift) return;
+    getJSON("/api/fedimint/status?id=" + state.gift).then(function (s) {
+      if (s.received) { fmBusy(false); $("[data-fm-notes]").value = ""; thanks("fedimint", s.amount_sat, s.id); }
+      else if (s.state === "failed") { stopWatching(); fmBusy(false); fmError("The federation refused these notes."); }
+    }).catch(function () {});
+  }
+
   /* ---------- on-chain ---------- */
   function startOnchain() {
     show("onchain");
@@ -241,7 +291,7 @@
     $("[data-thanks-amount]").textContent = fmt(sats) + " sats";
     $("[data-thanks-detail]").textContent = rail === "onchain"
       ? (pending ? "We see your transaction in the mempool. It joins the ledger once it confirms." : "Your transaction confirmed and joins the ledger shortly.")
-      : rail === "cashu"
+      : rail === "cashu" || rail === "fedimint"
         ? "Your eCash was received. It joins the public ledger once it settles to Lightning, usually within a minute."
         : "It arrived just now and joins the public ledger within a few minutes.";
     var subject = encodeURIComponent("Gift of " + fmt(sats) + " sats");
@@ -286,7 +336,7 @@
       if (!p.donations || !p.donations.length) return;
       body.innerHTML = p.donations.slice(0, 50).map(function (d) {
         var date = d.date ? new Date(d.date * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Pending";
-        var rail = d.rail === "onchain" ? "On-chain" : d.rail === "cashu" ? "Cashu" : "Lightning";
+        var rail = { onchain: "On-chain", cashu: "Cashu", fedimint: "Fedimint" }[d.rail] || "Lightning";
         return "<tr><td>" + date + "</td><td class=\"num\">" + fmt(d.amount_sat) + " sats</td><td>" + rail +
           (d.confirmed ? "" : ", unconfirmed") + "</td></tr>";
       }).join("");
@@ -374,6 +424,10 @@
   });
 
   $("[data-cu-redeem]").addEventListener("click", redeemToken);
+  $("[data-fm-redeem]").addEventListener("click", redeemNotes);
+  $all("[data-kind]").forEach(function (b) {
+    b.addEventListener("click", function () { setKind(b.getAttribute("data-kind")); });
+  });
   $("[data-cu-token]").addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); redeemToken(); }
   });
