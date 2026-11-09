@@ -123,6 +123,25 @@ const TIMEOUT_MS = 10_000;
 // Deployed 600k PBKDF2 verification takes 8–12s; retain a bounded login.
 const SIGN_IN_TIMEOUT_MS = 30_000;
 
+/** A discovered mint's entry in GET /mints `mint_info` (D180). */
+export interface MintInfo {
+  readonly name?: string;
+  readonly reviews: number;
+}
+
+/**
+ * The service truncates a mint name to 40 code points (MINT_NAME_MAX in
+ * ops/src/config.ts), so the check counts code points, not UTF-16 units: an
+ * emoji in a 40-point name must not drop the entry.
+ */
+const MINT_NAME_MAX = 40;
+const fitsMintName = (name: string) => Array.from(name).length <= MINT_NAME_MAX;
+
+/** The answer of GET /mints/probe. */
+export type MintProbeResult =
+  | {readonly ok: true; readonly name?: string}
+  | {readonly ok: false; readonly reason: string};
+
 /** The transport, injectable so the tests never open a socket. */
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -398,6 +417,65 @@ export class ApiClient {
       throw new ApiServiceError('the mint list is malformed');
     }
     return mints as string[];
+  }
+
+  /**
+   * GET /mints `mint_info` (D180): the review count and mint-reported name of
+   * each discovered mint. The names are untrusted text from the mint; an entry
+   * whose name is not a string of 40 characters or fewer, or whose `reviews` is
+   * not a non-negative integer, is dropped, and a missing or malformed field
+   * is `{}`. A build that ignores the field still gets the plain list.
+   */
+  async mintInfo(token: string): Promise<Record<string, MintInfo>> {
+    const json = await this.call('GET', '/mints', token);
+    const raw = json.mint_info;
+    const out: Record<string, MintInfo> = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return out;
+    }
+    for (const [url, entry] of Object.entries(raw as Record<string, unknown>)) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        continue;
+      }
+      const {name, reviews} = entry as {name?: unknown; reviews?: unknown};
+      if (
+        typeof reviews !== 'number' ||
+        !Number.isSafeInteger(reviews) ||
+        reviews < 0
+      ) {
+        continue;
+      }
+      if (
+        name !== undefined &&
+        (typeof name !== 'string' || !fitsMintName(name))
+      ) {
+        continue;
+      }
+      out[url] = name === undefined ? {reviews} : {name, reviews};
+    }
+    return out;
+  }
+
+  /**
+   * GET /mints/probe (D180): the service checks a written-in mint is
+   * reachable and issues sats. A malformed answer is a failed check; a
+   * transport failure throws, so the caller can offer a retry.
+   */
+  async probeMint(token: string, url: string): Promise<MintProbeResult> {
+    const json = await this.call(
+      'GET',
+      `/mints/probe?url=${encodeURIComponent(url)}`,
+      token,
+    );
+    if (json.ok === true) {
+      return typeof json.name === 'string' && fitsMintName(json.name)
+        ? {ok: true, name: json.name}
+        : {ok: true};
+    }
+    return {
+      ok: false,
+      reason: typeof json.reason === 'string' ? json.reason : 'probe failed',
+    };
   }
 
   /** POST /registry/cards — idempotent on the service; unreachable throws. */

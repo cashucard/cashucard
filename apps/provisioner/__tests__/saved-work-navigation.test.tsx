@@ -126,6 +126,7 @@ test('canceling new-batch setup returns home without creating or ending anything
   jest
     .spyOn(ApiClient.prototype, 'mints')
     .mockResolvedValue(['https://mint.test']);
+  jest.spyOn(ApiClient.prototype, 'mintInfo').mockResolvedValue({});
   const tree = await signedIn();
   await act(async () =>
     tree.root.findByProps({testID: 'home-new'}).props.onPress(),
@@ -336,6 +337,7 @@ test('a card check opened during batch setup returns to that form', async () => 
   jest
     .spyOn(ApiClient.prototype, 'mints')
     .mockResolvedValue(['https://mint.test']);
+  jest.spyOn(ApiClient.prototype, 'mintInfo').mockResolvedValue({});
   const tree = await signedIn();
   await act(async () =>
     tree.root.findByProps({testID: 'home-new'}).props.onPress(),

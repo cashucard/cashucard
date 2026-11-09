@@ -20,6 +20,7 @@ beforeEach(() => {
   jest
     .spyOn(ApiClient.prototype, 'mints')
     .mockResolvedValue(['https://mint-a.test', 'https://mint-b.test']);
+  jest.spyOn(ApiClient.prototype, 'mintInfo').mockResolvedValue({});
 });
 afterEach(async () => {
   await act(async () => tree?.unmount());

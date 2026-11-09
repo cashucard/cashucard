@@ -38,6 +38,18 @@ export const SETUP = {
   mintsFailed:
     'The mint list could not be loaded. Retry or enter a batch reference.',
   buildLine: (sha8: string) => `Builds the 2.2 card. Load file ${sha8}…`,
+  /** The second line of a discovered mint's cell (D180). */
+  mintReviews: (reviews: number, name?: string) =>
+    `${reviews} ${reviews === 1 ? 'review' : 'reviews'}${
+      name ? ` · ${name}` : ''
+    }`,
+  checkingMint: 'CHECKING THE MINT…',
+  mintProbeFailed:
+    'This mint did not pass the check: it must be reachable and issue sats.',
+  mintProbeInvalid: 'Enter an https:// mint address with a public host name.',
+  mintProbeUnreachable:
+    'The mint could not be checked because the service did not answer. Check your connection and retry.',
+  retryMintProbe: 'RETRY MINT CHECK',
 };
 
 export const PHASES: Record<string, string> = {
