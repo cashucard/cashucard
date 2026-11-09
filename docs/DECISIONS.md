@@ -5233,3 +5233,40 @@ variables (README § Android upload signing). The old `release.keystore` under
 `apps/provisioner/android/app/` in a local checkout is dead and may be deleted
 once the reset is complete. The README's rule against generating a replacement
 key stands for the normal case; this entry is the one reviewed exception.
+
+## <a id="d179"></a>D179: the ops default mint list is probed, forge first, Minibits at /Bitcoin
+
+**Decided (2026-11-08):** the ops service's code-owned default mint list
+(`ops/src/config.ts` `DEFAULT_MINTS`) is, in order, `https://forge.flashapp.me`,
+`https://mint.minibits.cash/Bitcoin`, `https://mint.macadamia.cash` and
+`https://mint.cubabitcoin.org`. When no `OPS_MINTS` is set, `GET /mints` serves
+the defaults that pass a live probe (`/v1/info` answers a JSON object and
+`/v1/keysets` a non-empty `keysets` array, both a plain 200, redirects not
+followed). A failing mint is dropped and logged. The probe is lazy (the first
+`GET /mints` per Durable Object instance or Node process, after the session
+check), coalesced, and cached for 10 minutes; when every mint fails, the
+last-good list is served, or an empty list if there never was one, and the
+probe is retried after a minute. An `OPS_MINTS` override is served as given,
+unprobed. This supersedes D133's sentence on the default list's order and
+contents; the rest of D133 stands.
+
+**Why.** The list carried `https://mint.minibits.cash`, whose `/v1/info` answers
+404 (cashucard#239): Minibits serves its Cashu mint under `/Bitcoin`, so any
+batch set up with that reference named a mint no wallet can reach. Production
+sets no `OPS_MINTS`, so the code defaults are what operators see. Probing at
+serve time keeps a dead entry from reaching a batch again; the daily
+`ops-mint-probe` workflow opens a GitHub issue when an entry fails, so the list
+gets fixed in code rather than silently shrinking. All four mints stay because
+the holder-wallet fence that limited membership is gone (ENG-831): membership
+now means reachable and acceptable at the till. Forge is first because
+fast-start preselects the first entry for a new operator, and forge is the mint
+the holder wallet funds today; D133's concern about preselecting one issuer's
+mint is outweighed by a default a new card can actually be funded at.
+
+**Rejected:** serving the unprobed defaults or a 503 when every probe fails
+(the app already handles an empty list by letting the operator enter a batch
+reference), probing in the Durable Object constructor (a slow mint would stall
+every request, issuance included), probing `OPS_MINTS` (staging names a local
+`http://127.0.0.1:3338` that would always be dropped), running the live probe
+in pull-request CI (a third-party outage would block merges), and tightening
+the `OPS_MINTS` validation in the same change.

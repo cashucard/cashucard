@@ -18,6 +18,9 @@ export default defineConfig({
         // use; never a real secret in the tree.
         bindings: {
           OPS_MASTER_KEY: '5a'.repeat(32),
+          // An explicit list: the DO serves it unprobed, so no test reaches
+          // a real mint.
+          OPS_MINTS: JSON.stringify(['https://mint.example']),
           OPS_RECOVERY_ADMINS: JSON.stringify(['lead-setup']),
           OPS_RECOVERY_ISSUER_ID: '11111111-2222-4333-8444-555555555555',
           OPS_BACKUP_RECIPIENT:

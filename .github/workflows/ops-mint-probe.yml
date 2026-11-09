@@ -1,0 +1,68 @@
+name: Ops default mint probe
+# The live check of ops/src/config.ts DEFAULT_MINTS (ENG-828, D179). It
+# reaches third-party mints, so it never runs on pull requests: a mint outage
+# must not block merges. On failure it opens, or comments on, one issue.
+on:
+  schedule:
+    - cron: "41 14 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ops-mint-probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    name: Probe default mints
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    defaults:
+      run:
+        working-directory: ops
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: ops/yarn.lock
+
+      - uses: ./.github/actions/setup-cardkit
+
+      - name: Install
+        run: yarn install --frozen-lockfile --force
+
+      - name: Probe
+        id: probe
+        run: |
+          set -o pipefail
+          yarn -s probe:mints 2>&1 | tee "$RUNNER_TEMP/probe.txt"
+
+      - name: Report failure
+        if: failure() && steps.probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Ops default mint probe failing"
+          {
+            echo "The daily probe of \`ops/src/config.ts\` DEFAULT_MINTS failed: $RUN_URL"
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/probe.txt"
+            echo '```'
+            echo
+            echo "The service already drops a failing mint from GET /mints. Decide whether the list needs an edit (D179)."
+          } > "$RUNNER_TEMP/body.md"
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          fi

@@ -14,7 +14,8 @@
     "bootstrap-operator": "node --import tsx src/bootstrap.ts",
     "typecheck:workers": "tsc -p tsconfig.workers.json --noEmit",
     "test:workers": "vitest run --config vitest.workers.config.mts",
-    "test:node": "node --import tsx --test 'test/*.test.ts'"
+    "test:node": "node --import tsx --test 'test/*.test.ts'",
+    "probe:mints": "node --import tsx test/live/default-mints.live.ts"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",

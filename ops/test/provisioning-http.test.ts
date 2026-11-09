@@ -22,7 +22,7 @@ const batchBody = {
   load_sha256: 'ab'.repeat(32),
 };
 
-async function setup() {
+async function setup(extra: Partial<RouterDeps> = {}) {
   const db = testDb();
   for (const name of ['alice', 'bob'])
     db.db
@@ -38,6 +38,7 @@ async function setup() {
     holderState: new HolderIssueState(),
     mints: [],
     passwordHasher: {hash: async () => 'test', verify: async () => true},
+    ...extra,
   };
   async function call(path: string, body?: unknown, token?: string) {
     return routeRequest(
@@ -380,6 +381,39 @@ test('HTTP attempts enforce operator/device ownership and cannot bypass reservat
       (await call('/registry/batches', undefined, bob.token)).body,
       {batches: []},
     );
+  } finally {
+    db.close();
+  }
+});
+
+test('GET /mints serves the probed list when availableMints is set, and checks the session before probing', async () => {
+  let calls = 0;
+  const {db, call, alice} = await setup({
+    mints: ['https://a.example', 'https://b.example'],
+    availableMints: async () => {
+      calls++;
+      return ['https://b.example'];
+    },
+  });
+  try {
+    const anonymous = await call('/mints');
+    assert.equal(anonymous.status, 401);
+    assert.equal(calls, 0, 'an unauthenticated caller cannot trigger probes');
+    const served = await call('/mints', undefined, alice.token);
+    assert.equal(served.status, 200);
+    assert.deepEqual(served.body, {mints: ['https://b.example']});
+    assert.equal(calls, 1);
+  } finally {
+    db.close();
+  }
+});
+
+test('GET /mints serves the static list when availableMints is unset', async () => {
+  const {db, call, alice} = await setup({mints: ['https://a.example']});
+  try {
+    const served = await call('/mints', undefined, alice.token);
+    assert.equal(served.status, 200);
+    assert.deepEqual(served.body, {mints: ['https://a.example']});
   } finally {
     db.close();
   }

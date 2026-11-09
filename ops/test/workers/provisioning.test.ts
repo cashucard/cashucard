@@ -5,6 +5,7 @@ import {openSqlStorage} from '../../src/sql-do';
 import {handleOpsRequest} from '../../src/do';
 import {HolderIssueState} from '../../src/issue';
 import {AnchorFeed} from '../../src/anchor';
+import {createMintList} from '../../src/config';
 import {expect, it} from 'vitest';
 
 const DEVICE = '10000000-0000-4000-8000-000000000001';
@@ -300,4 +301,77 @@ it('each edge request supplies current policy even when the object retains an ol
   );
   expect(refused.status).toBe(503);
   expect(await refused.json()).toEqual({reason: 'independent-backup-stale'});
+});
+
+it('the DO serves an OPS_MINTS override from GET /mints as given, unprobed', async () => {
+  const stub = env.OPS_DO.get(env.OPS_DO.idFromName('mints-override'));
+  const anonymous = await stub.fetch('https://test/mints');
+  expect(anonymous.status).toBe(401);
+  const login = await stub.fetch('https://test/auth/operator/session', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'lead-setup',
+      password: 'correct horse battery',
+    }),
+  });
+  const {token} = (await login.json()) as {token: string};
+  const res = await stub.fetch('https://test/mints', {
+    headers: {authorization: 'Bearer ' + token},
+  });
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({mints: ['https://mint.example']});
+});
+
+it('the probed default list bundles and runs in workerd behind GET /mints', async () => {
+  const stub = env.OPS_DO.get(env.OPS_DO.idFromName('mints-probed'));
+  const login = await stub.fetch('https://test/auth/operator/session', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'lead-setup',
+      password: 'correct horse battery',
+    }),
+  });
+  const {token} = (await login.json()) as {token: string};
+  await runInDurableObject(stub, async (_instance, ctx) => {
+    const db = new OpsDb({
+      sql: openSqlStorage(ctx.storage),
+      master: {getMaster: () => Buffer.alloc(32, 90)},
+    });
+    const probed: string[] = [];
+    const availableMints = createMintList(
+      ['https://good.example', 'https://gone.example'],
+      {
+        log: () => {},
+        fetchFn: async url => {
+          probed.push(url);
+          if (url.startsWith('https://gone.example'))
+            return {status: 404, text: async () => ''};
+          return {
+            status: 200,
+            text: async () =>
+              url.endsWith('/v1/info')
+                ? '{"name":"good"}'
+                : '{"keysets":[{"id":"00ad268c4d1f5826"}]}',
+          };
+        },
+      },
+    );
+    const response = await handleOpsRequest(
+      {
+        db,
+        holderState: new HolderIssueState(),
+        mints: [],
+        availableMints,
+        anchor: new AnchorFeed(async () => {
+          throw new Error('unused test feed');
+        }),
+      },
+      new Request('https://test/mints', {
+        headers: {authorization: 'Bearer ' + token},
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({mints: ['https://good.example']});
+    expect(probed.length).toBe(4);
+  });
 });
