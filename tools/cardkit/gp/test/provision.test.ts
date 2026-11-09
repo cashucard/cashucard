@@ -5,8 +5,9 @@
  * leaves, the opener rule, a mute INSTALL, refusals, the guards, a tampered
  * load file, and events that throw. Then the same install on a fake J3R452,
  * which opens SCP03 and reads the registry before its sweep: blank, and as the
- * test card came, with the seller's NDEF tag at D2760000850101, which no run
- * deletes. Then the login guard under both protocols.
+ * test card came, with the seller's NDEF tag at D2760000850101, which only a
+ * run with replaceSellerTag deletes, on the registry's evidence that it is the
+ * seller's (D182). Then the login guard under both protocols.
  */
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -104,6 +105,20 @@ const INSTALL_ORDER_SCP03 = [
   ...INSTALL_ORDER.slice(0, 5),
   0xf2,
   0xf2, // sweep: the registry
+  ...INSTALL_ORDER.slice(5),
+];
+
+/**
+ * The tap's install on a J3R452 as it ships (replaceSellerTag, D182): GET
+ * STATUS of the applications shows the seller's tag at the tag's AID, its
+ * DELETE goes first, and the strict registry read and the sweep follow.
+ */
+const INSTALL_ORDER_SELLER = [
+  ...INSTALL_ORDER.slice(0, 5),
+  0xf2, // sweep: the instance at the tag's AID
+  0xe4, // the seller's tag
+  0xf2,
+  0xf2, // the registry
   ...INSTALL_ORDER.slice(5),
 ];
 
@@ -720,6 +735,218 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
         assert.deepEqual(card.instanceAids(), SELLER, where);
       }
     }
+  });
+
+  /** A J3R452 as it ships: the seller's applets, at key version FF. */
+  const shipped = () => new FakeCard({scp: 3, sellerApplets: true, kvn: 0xff});
+  /** The seller's applets but the tag. */
+  const SELLER_KEPT = SELLER.filter(aid => aid !== TAG);
+  /** The seller's applets but its tag, then the Cashu card's three. */
+  const SELLER_THEN_OURS = [...SELLER_KEPT, OPENER, CARD, TAG];
+  const deleted = (log: number[][]) =>
+    log.filter(a => a[1] === 0xe4).map(a => toHex(a.slice(7, 7 + a[6])));
+
+  it("with replaceSellerTag, deletes the seller's NDEF tag at D2760000850101 on the registry's evidence, before the strict read, then sweeps and installs; the seller's other applets and its packages stay, and the rotation makes first contact", async () => {
+    const card = shipped();
+    const events: RunEvent[] = [];
+    const r = await provision(
+      card.transceive,
+      CASHU,
+      options({replaceSellerTag: true, onEvent: e => events.push(e)}),
+    );
+    assert.equal(r.ok, true, r.reason);
+    assert.equal(r.sellerTagRemoved, true);
+    assert.deepEqual(card.insLog(), INSTALL_ORDER_SELLER);
+    // that DELETE names the tag's AID alone (P2 00), and the sweep's then find nothing
+    const first = card.log.find(a => a[1] === 0xe4)!;
+    assert.deepEqual(first.slice(0, 4), [0x84, 0xe4, 0x00, 0x00]);
+    assert.deepEqual(deleted(card.log), [TAG, TAG, CARD, OPENER, PKG]);
+    assert.deepEqual(
+      r.apdus.filter(a => a.ins === 0xe4).map(a => a.sw),
+      [0x9000, 0x6a88, 0x6a88, 0x6a88, 0x6a88],
+    );
+    assert.ok(
+      r.apdus
+        .filter(a => a.ins === 0xf2 || a.ins === 0xe4)
+        .every(a => a.phase === 'sweep'),
+    );
+    assert.deepEqual(
+      events.filter(e => e.type === 'sellerTagRemoved'),
+      [{type: 'sellerTagRemoved'}],
+    );
+    assert.deepEqual(card.instanceAids(), SELLER_THEN_OURS);
+    assert.equal(card.instances.get(TAG)?.pkg, PKG, 'the Cashu tag at its AID');
+    assert.deepEqual(
+      [...card.packages.keys()],
+      [...SELLER_APPLETS.map(a => a.pkg), PKG],
+      "the seller's packages, D276000085 among them, stay",
+    );
+    card.reset();
+    const rotated = await rotateKeys(
+      card.transceive,
+      FACTORY_KEYS,
+      SPIKE_KEYS,
+      options(),
+    );
+    assert.equal(rotated.ok, true, rotated.reason);
+    assert.equal(rotated.firstContact, true);
+    assert.equal(card.kvn, 0x01);
+    assert.equal(card.failedAuths, 0);
+  });
+
+  it("deletes no seller's tag where there is none, or without replaceSellerTag: a blank J3R452 reads its applications once more, a J3R180 sends what it always has", async () => {
+    const blank = new FakeCard({scp: 3});
+    const r = await provision(
+      blank.transceive,
+      CASHU,
+      options({replaceSellerTag: true}),
+    );
+    assert.equal(r.ok, true, r.reason);
+    assert.equal(r.sellerTagRemoved, false);
+    assert.deepEqual(blank.insLog(), [
+      ...INSTALL_ORDER_SCP03.slice(0, 5),
+      0xf2,
+      ...INSTALL_ORDER_SCP03.slice(5),
+    ]);
+    assertInstalled(blank);
+    const j3r180 = new FakeCard();
+    const s = await provision(
+      j3r180.transceive,
+      CASHU,
+      options({replaceSellerTag: true}),
+    );
+    assert.equal(s.ok, true, s.reason);
+    assert.equal(s.sellerTagRemoved, false);
+    assert.deepEqual(j3r180.insLog(), INSTALL_ORDER);
+    const off = await provision(shipped().transceive, CASHU, options());
+    assert.equal(off.kind, 'guarded');
+    assert.equal(off.sellerTagRemoved, false);
+  });
+
+  it("with replaceSellerTag, after a pull at any APDU, before or after the card acts, the next run finishes or stops having deleted nothing but the seller's tag, and the seller's other applets and packages stay", async () => {
+    for (const partialLoad of ['discard', 'keep'] as const) {
+      for (const when of ['before', 'after'] as const) {
+        for (let n = 0; n < INSTALL_ORDER_SELLER.length; n++) {
+          const where = `${partialLoad}/${when}/APDU ${n}`;
+          const card = new FakeCard({
+            scp: 3,
+            sellerApplets: true,
+            kvn: 0xff,
+            partialLoad,
+          });
+          const pull = pullAt(card, n, when);
+          const first = await provision(
+            pull.tx,
+            CASHU,
+            options({replaceSellerTag: true}),
+          );
+          assert.equal(first.kind, 'pulled', where);
+          assert.equal(pull.state.late, 0, where);
+          card.reset();
+          const before = card.log.length;
+          const again = await provision(
+            card.transceive,
+            CASHU,
+            options({replaceSellerTag: true}),
+          );
+          if (again.ok) {
+            assert.deepEqual(card.instanceAids(), SELLER_THEN_OURS, where);
+          } else {
+            // the card applet got on before the pull: Replace off, as the tap runs, stops at the probe
+            assert.equal(again.kind, 'guarded', `${where}: ${again.reason}`);
+            assert.equal(again.phase, 'probe', where);
+            assert.deepEqual(deleted(card.log.slice(before)), [], where);
+          }
+          for (const aid of SELLER_KEPT) {
+            assert.ok(card.instances.has(aid), `${where}: ${aid}`);
+          }
+          for (const {pkg} of SELLER_APPLETS) {
+            assert.ok(card.packages.has(pkg), `${where}: ${pkg}`);
+          }
+          assert.equal(card.failedAuths, 0, where);
+        }
+      }
+    }
+  });
+
+  it("with replaceSellerTag, stops guarded with nothing deleted when the instance at D2760000850101 is not in the seller's shape (here, a privilege)", async () => {
+    const card = shipped();
+    const plain = 'E3234F07D27600008501019F700107C503000000';
+    const privileged = 'E3234F07D27600008501019F700107C503800000';
+    const tx: Transceiver = async apdu => {
+      const reply = await card.transceive(apdu);
+      if (apdu[1] !== 0xf2 || apdu[2] !== 0x40) {
+        return reply;
+      }
+      assert.ok(toHex(reply).includes(plain));
+      return fromHex(toHex(reply).replace(plain, privileged));
+    };
+    const r = await provision(tx, CASHU, options({replaceSellerTag: true}));
+    assert.equal(r.kind, 'guarded');
+    assert.equal(r.phase, 'sweep');
+    assert.equal(r.sellerTagRemoved, false);
+    assert.match(r.reason!, /D2760000850101/);
+    assert.match(r.reason!, /nothing was deleted/);
+    assert.deepEqual(card.insLog(), [0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2]);
+    assert.deepEqual(card.instanceAids(), SELLER);
+  });
+
+  it("with replaceSellerTag, ends refused with the seller's tag in place when the card refuses its DELETE (6985)", async () => {
+    const card = shipped();
+    card.override = apdu => (apdu[1] === 0xe4 ? 0x6985 : undefined);
+    const events: RunEvent[] = [];
+    const r = await provision(
+      card.transceive,
+      CASHU,
+      options({replaceSellerTag: true, onEvent: e => events.push(e)}),
+    );
+    assert.equal(r.kind, 'refused');
+    assert.equal(r.phase, 'sweep');
+    assert.equal(r.ins, 0xe4);
+    assert.equal(r.sw, 0x6985);
+    assert.equal(r.sellerTagRemoved, false);
+    assert.ok(!events.some(e => e.type === 'sellerTagRemoved'));
+    assert.deepEqual(card.insLog(), [0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2, 0xe4]);
+    assert.deepEqual(card.instanceAids(), SELLER);
+  });
+
+  it("with replaceSellerTag, stops guarded after the seller's tag went when the registry still does not vouch for every Cashu AID, saying the tag went and nothing else did", async () => {
+    const card = shipped();
+    // a foreign instance at the opener's AID too: the tag is the seller's, the rest is not the package's
+    card.instances.set(OPENER, {
+      aid: OPENER,
+      module: OPENER,
+      pkg: 'D276000085',
+      state: {unspent: 0, spent: 0, pin: 0, record: 0, owner: 0},
+    });
+    const r = await provision(
+      card.transceive,
+      CASHU,
+      options({replaceSellerTag: true}),
+    );
+    assert.equal(r.kind, 'guarded');
+    assert.equal(r.phase, 'sweep');
+    assert.equal(r.sellerTagRemoved, true);
+    assert.match(r.reason!, /seller's NDEF tag at D2760000850101 was removed/);
+    assert.match(r.reason!, /nothing else/);
+    assert.deepEqual(
+      card.insLog(),
+      [0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2, 0xe4, 0xf2, 0xf2],
+    );
+    assert.deepEqual(card.instanceAids(), [...SELLER_KEPT, OPENER]);
+  });
+
+  it("with replaceSellerTag, the hello plan, whose sweep names no Cashu AID, reads nothing and leaves the seller's tag", async () => {
+    const card = shipped();
+    const r = await provision(
+      card.transceive,
+      HELLO,
+      options({replaceSellerTag: true}),
+    );
+    assert.equal(r.ok, true, r.reason);
+    assert.equal(r.sellerTagRemoved, false);
+    assert.ok(!card.insLog().includes(0xf2));
+    assert.deepEqual(card.instanceAids(), SELLER);
   });
 
   it('reads the registry only on SCP03 and only for a sweep of the Cashu AIDs: the J3R180 sends what it always has, and the hello plan never reads it', async () => {

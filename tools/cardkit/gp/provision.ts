@@ -20,7 +20,9 @@
  * - on an SCP03 card, the J3R452, a sweep of the Cashu AIDs deletes nothing
  *   until the registry shows every Cashu object there as the Cashu package's
  *   (registry.ts): that card ships with the seller's NDEF tag at
- *   D2760000850101, the AID the card's tag takes;
+ *   D2760000850101, the AID the card's tag takes. With `replaceSellerTag`
+ *   on, that tag is deleted first, and only when the registry shows it in the
+ *   seller's shape (readForeignTag, D182);
  * - DELETE names only the six AIDs of the whitelist, never the ISD (scp02.ts).
  */
 import {sha256} from '@noble/hashes/sha2';
@@ -37,7 +39,11 @@ import {
   TAG_CLASS_AID,
 } from './aids';
 import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
-import {RegistryEvidenceError, readCashuRegistry} from './registry';
+import {
+  RegistryEvidenceError,
+  readCashuRegistry,
+  readForeignTag,
+} from './registry';
 import {
   CardError,
   FACTORY_KEYS,
@@ -219,7 +225,13 @@ export type RunEvent =
   | {type: 'phase'; phase: string}
   /** Emitted only after the LOAD response confirms this block. */
   | {type: 'block'; index: number; of: number}
-  | {type: 'apdu'; record: ApduRecord};
+  | {type: 'apdu'; record: ApduRecord}
+  /**
+   * The run deleted the seller's NDEF tag at TAG_AID and the card answered
+   * 9000 (replaceSellerTag, D182): the one step of an install that cannot be
+   * undone.
+   */
+  | {type: 'sellerTagRemoved'};
 
 export interface RunOptions {
   random: Random;
@@ -245,6 +257,15 @@ export interface ProvisionOptions extends RunOptions {
   replace?: boolean;
   /** The card manager's keys; the factory set by default. */
   keys?: KeySet;
+  /**
+   * On an SCP03 card, delete the seller's NDEF tag at TAG_AID before the
+   * sweep, when GET STATUS shows it in the seller's shape (readForeignTag:
+   * its own load file, in this security domain, selectable, no privileges).
+   * Off by default, and then such a card stops guarded with nothing deleted.
+   * The delete cannot be undone: the tag's NDEF data goes, and its package,
+   * D276000085, stays (D182).
+   */
+  replaceSellerTag?: boolean;
 }
 
 export interface RunResult<P extends string> {
@@ -263,7 +284,13 @@ export interface RunResult<P extends string> {
   blocks?: {at: number; of: number};
 }
 
-export type ProvisionResult = RunResult<Phase>;
+export interface ProvisionResult extends RunResult<Phase> {
+  /**
+   * True only when this run sent DELETE of the seller's NDEF tag at TAG_AID
+   * and the card answered 9000 (replaceSellerTag, D182).
+   */
+  sellerTagRemoved: boolean;
+}
 
 /** How a run ended, before the bookkeeping is added. */
 interface Outcome {
@@ -516,6 +543,7 @@ export async function provision(
   };
   let session: SecureSession | null = null;
   let blocks: number[][] = [];
+  let sellerTagRemoved = false;
   const open = (): SecureSession => {
     if (!session) {
       throw new Error('no secure channel');
@@ -580,19 +608,44 @@ export async function provision(
       const channel = open();
       // SCP03 is the J3R452's, which ships with the seller's NDEF tag at the
       // tag's AID (scp03-07): before a Cashu AID is deleted, the registry must
-      // show each Cashu object on the card as the package's. SCP02, the
-      // J3R180's, sends what it always has. What the seller's tag becomes is
-      // slice 2's (ENG-835).
+      // show each Cashu object on the card as the package's. With
+      // replaceSellerTag, the seller's tag goes first, and only when the
+      // registry shows that instance in the seller's shape; the strict read
+      // that follows then proves the delete (D182). SCP02, the J3R180's,
+      // sends what it always has.
       if (
         channel.scp === 3 &&
         plan.sweep.some(aid => CASHU_OBJECTS.some(o => equal(o, aid)))
       ) {
+        const send = (command: number[]) => channel.send(run.timed, command);
+        const noEvidence = `the card's registry does not show every Cashu AID as the card package's (a J3R452 ships with the seller's NDEF tag at ${toHex(TAG_AID)}): nothing was deleted`;
+        if (
+          options.replaceSellerTag &&
+          plan.sweep.some(aid => equal(aid, TAG_AID))
+        ) {
+          let foreign: boolean;
+          try {
+            foreign = await readForeignTag(send, sdAid);
+          } catch (e) {
+            if (e instanceof RegistryEvidenceError) {
+              throw new Guard(noEvidence);
+            }
+            throw e;
+          }
+          if (foreign) {
+            expectOk(await send(deleteAid(TAG_AID)), 0xe4);
+            sellerTagRemoved = true;
+            run.emit({type: 'sellerTagRemoved'});
+          }
+        }
         try {
-          await readCashuRegistry(c => channel.send(run.timed, c), sdAid);
+          await readCashuRegistry(send, sdAid);
         } catch (e) {
           if (e instanceof RegistryEvidenceError) {
             throw new Guard(
-              `the card's registry does not show every Cashu AID as the card package's (a J3R452 ships with the seller's NDEF tag at ${toHex(TAG_AID)}): nothing was deleted`,
+              sellerTagRemoved
+                ? `the seller's NDEF tag at ${toHex(TAG_AID)} was removed, and nothing else was: the card's registry still does not show every Cashu AID as the card package's`
+                : noEvidence,
             );
           }
           throw e;
@@ -661,6 +714,10 @@ export async function provision(
     done: async () => undefined,
   };
 
+  const result = (r: RunResult<Phase>): ProvisionResult => ({
+    ...r,
+    sellerTagRemoved,
+  });
   try {
     // the bytes first: a file that is not the build's sends nothing at all
     blocks = splitLoad(loadFileBytes(plan.loadFile), plan.blockSize);
@@ -670,16 +727,18 @@ export async function provision(
         await steps[phase]();
       }
     }
-    return run.finish({ok: true});
+    return result(run.finish({ok: true}));
   } catch (e) {
     if (e instanceof RangeError && blocks.length === 0) {
-      return run.fail(
-        new Guard(
-          `the ${plan.loadFile.name} load file cannot be sent: ${e.message}`,
+      return result(
+        run.fail(
+          new Guard(
+            `the ${plan.loadFile.name} load file cannot be sent: ${e.message}`,
+          ),
         ),
       );
     }
-    return run.fail(e);
+    return result(run.fail(e));
   }
 }
 
