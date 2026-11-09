@@ -57,6 +57,7 @@ test.each(['start-batch', 'create-batch-only'])(
     jest
       .spyOn(ApiClient.prototype, 'mints')
       .mockResolvedValue(['https://mint.test']);
+    jest.spyOn(ApiClient.prototype, 'mintInfo').mockResolvedValue({});
     await act(async () => {
       tree = Renderer.create(
         <App

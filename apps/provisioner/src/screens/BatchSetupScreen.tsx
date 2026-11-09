@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 
-import {ApiClient} from '../api';
+import {ApiClient, type MintInfo} from '../api';
 import {SETUP} from '../strings';
 import {useApp, type BatchConfig} from '../store';
 import {readBatchDefaults} from '../batchDefaults';
@@ -244,9 +244,17 @@ export function BatchSetupScreen({
     editedCount = useRef(false);
   const [previousMintMissing, setPreviousMintMissing] = useState(false);
   const fastStart = !!onStartAndRead;
+  // The write-in gate (D180): a mint the service does not list is probed
+  // before the batch is submitted. 'failed' blocks; 'unreachable' blocks with
+  // a retry. Choosing another mint clears it.
+  const [probe, setProbe] = useState<
+    'idle' | 'checking' | 'failed' | 'unreachable'
+  >('idle');
+  const lastReadFirst = useRef(true);
   const chooseMint = (value: string | null) => {
     editedMint.current = true;
     setPreviousMintMissing(false);
+    setProbe('idle');
     setMint(value);
   };
   const chooseCount = (value: string) => {
@@ -257,7 +265,9 @@ export function BatchSetupScreen({
 
   const [creating, setCreating] = useState(false);
   const [review, setReview] = useState<BatchConfig | null>(null);
-  const editingLocked = creating || !canStart;
+  // The form holds still while a write-in is checked, so the batch is
+  // created for the mint that passed.
+  const editingLocked = creating || !canStart || probe === 'checking';
   const countNumber = Number(count);
   const validCount =
     /^\d+$/.test(count) &&
@@ -273,7 +283,12 @@ export function BatchSetupScreen({
         Number(daily) >= 0 &&
         Number.isFinite(Number(noPin)) &&
         Number(noPin) >= 0));
-  const ready = canStart && !creating && mint !== null && validNumbers;
+  const ready =
+    canStart &&
+    !creating &&
+    probe !== 'checking' &&
+    mint !== null &&
+    validNumbers;
 
   const submit = async (config: BatchConfig) => {
     if (onCreate) {
@@ -297,6 +312,27 @@ export function BatchSetupScreen({
     Keyboard.dismiss();
     editedMint.current = true;
     editedCount.current = true;
+    lastReadFirst.current = readFirst;
+    // Batch creation needs a session, so without one there is nothing to
+    // check against; the service's own creation stays permissive (D180).
+    if (customMint && app.session) {
+      setProbe('checking');
+      let passed: boolean;
+      try {
+        const result = await new ApiClient({
+          baseUrl: app.serviceUrl,
+        }).probeMint(app.session.token, mint!);
+        passed = result.ok;
+      } catch {
+        setProbe('unreachable');
+        return;
+      }
+      if (!passed) {
+        setProbe('failed');
+        return;
+      }
+      setProbe('idle');
+    }
     const config: BatchConfig = {
       mint: mint!,
       // Legacy API fields are inert metadata in installation-only batches.
@@ -326,6 +362,26 @@ export function BatchSetupScreen({
   const [serviceMints, setServiceMints] = useState<string[] | null>(null);
   const [mintsFailed, setMintsFailed] = useState(false);
   const [mintRequest, setMintRequest] = useState(0);
+  const [mintInfo, setMintInfo] = useState<Record<string, MintInfo>>({});
+  useEffect(() => {
+    setMintInfo({});
+    if (!app.session) {
+      return;
+    }
+    let alive = true;
+    // Review counts are decoration: a failure leaves the plain grid.
+    new ApiClient({baseUrl: app.serviceUrl})
+      .mintInfo(app.session.token)
+      .catch(() => ({}))
+      .then(info => {
+        if (alive) {
+          setMintInfo(info);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [app.session, app.serviceUrl, mintRequest]);
   useEffect(() => {
     setServiceMints(null);
     setMintsFailed(false);
@@ -502,6 +558,7 @@ export function BatchSetupScreen({
                   {mints.map((m, i) => {
                     const host = m.replace(/^https:\/\//, '');
                     const on = mint === m;
+                    const info = mintInfo[m];
                     return (
                       <Pressable
                         key={m}
@@ -526,6 +583,17 @@ export function BatchSetupScreen({
                           style={[s.mintName, on ? s.cellLabelOnAccent : null]}>
                           {host}
                         </Text>
+                        {info && info.reviews > 0 ? (
+                          <Text
+                            numberOfLines={1}
+                            testID={`mint-reviews-${m}`}
+                            style={[
+                              s.cardSub,
+                              on ? s.cellLabelOnAccent : null,
+                            ]}>
+                            {SETUP.mintReviews(info.reviews, info.name)}
+                          </Text>
+                        ) : null}
                       </Pressable>
                     );
                   })}
@@ -729,6 +797,21 @@ export function BatchSetupScreen({
           </ScrollView>
 
           <View style={s.footer} testID="setup-footer">
+            {probe === 'failed' || probe === 'unreachable' ? (
+              <Text style={s.note} testID="mint-probe-note">
+                {probe === 'failed'
+                  ? SETUP.mintProbeFailed
+                  : SETUP.mintProbeUnreachable}
+              </Text>
+            ) : null}
+            {probe === 'unreachable' ? (
+              <SecondaryButton
+                title={SETUP.retryMintProbe}
+                testID="retry-mint-probe"
+                disabled={!ready}
+                onPress={() => start(lastReadFirst.current)}
+              />
+            ) : null}
             {onStartAndRead ? (
               <>
                 <Text
@@ -746,6 +829,8 @@ export function BatchSetupScreen({
               title={
                 creating
                   ? 'CREATING BATCH…'
+                  : probe === 'checking'
+                  ? SETUP.checkingMint
                   : onStartAndRead
                   ? 'START & READ FIRST CARD'
                   : SETUP.start
