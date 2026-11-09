@@ -18,7 +18,7 @@ import {
   type ReservedAttempt,
 } from '../src/provisioningWorkflow';
 import type {JournalStorage} from '../src/journal';
-import {SPIKE_KEYS, fromHex, toHex} from '../src/cardkit';
+import {SPIKE_KEYS, TransportError, fromHex, toHex} from '../src/cardkit';
 import {FakeCard} from '@cashu-card/cardkit/testing';
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -306,6 +306,91 @@ test.each(['before', 'after'] as const)(
     await stopRun();
     expect(flow.notice).toContain('Stopped.');
     expect(flow.notice).not.toContain('seller');
+  },
+);
+
+test.each([
+  ['refused by this phone before it went out', 'unsent', false],
+  ['sent, with the card gone before it answered', 'sent', true],
+] as const)(
+  "an operator's Stop while a J3R452's seller-tag DELETE is %s: the Stopped notice says the tag may be gone only when the DELETE went out (D182)",
+  async (_how, when, noted) => {
+    const f = fixture();
+    const mayBe =
+      "The seller's NFC tag on this card may have been removed: the card did not confirm it.";
+    let release!: () => void;
+    const stopped = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const sent: number[][] = [];
+    const withCard = jest.fn(async run =>
+      run(async (command: number[]) => {
+        sent.push(command);
+        if (when === 'sent') {
+          // the DELETE went out; the operator stops before the card answers
+          await stopped;
+        }
+        throw new TransportError('Tag connection lost');
+      }),
+    );
+    const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+      _w,
+      _s,
+      options,
+    ) => {
+      options.onEvent?.({type: 'phase', phase: 'sweep'});
+      return options.withCard(async tx => {
+        if (when === 'unsent') {
+          // readForeignTag's GET STATUS answered while the operator was
+          // stopping the run: the DELETE that follows is refused by this phone
+          await stopped;
+        }
+        try {
+          await tx([0x84, 0xe4, 0x00, 0x00, 0x00]);
+        } catch {
+          // cardkit's provision emits this from the catch of that same send
+          options.onEvent?.({type: 'sellerTagRemoved', confirmed: false});
+        }
+        return 'interrupted' as const;
+      });
+    };
+    const tree = await mount({
+      ...f,
+      hardwareValidated: true,
+      serviceFor: () => f.service,
+      runCard,
+      withCard,
+    });
+    await signIn();
+    await act(async () => {
+      await flow.create(config);
+    });
+    let running!: Promise<boolean>;
+    await act(async () => {
+      running = flow.program();
+      for (let i = 0; i < 20 && sent.length < (when === 'sent' ? 1 : 0); i++) {
+        await Promise.resolve();
+      }
+    });
+    await act(async () => {
+      flow.cancel();
+    });
+    expect(flow.notice).toBe('Stopping. Saved work stays on this phone.');
+    await act(async () => {
+      release();
+      await running;
+    });
+    expect(flow.notice).toContain(
+      'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
+    );
+    expect(sent).toHaveLength(when === 'sent' ? 1 : 0);
+    if (noted) {
+      expect(flow.notice).toContain(mayBe);
+      expect(text(tree)).toContain(mayBe);
+    } else {
+      expect(flow.notice).not.toContain('seller');
+      expect(text(tree)).not.toContain('seller');
+    }
   },
 );
 

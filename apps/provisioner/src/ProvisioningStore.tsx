@@ -715,6 +715,10 @@ function ProvisioningSession({
     let lastPhase: string | undefined;
     // a J3R452's seller tag that this run deleted, which cannot be undone (D182)
     let sellerTag: 'removed' | 'unconfirmed' | undefined;
+    // true while the APDU in flight was refused by withCard's guard and never
+    // sent: cardkit reads that TransportError as a lost answer, and a seller-tag
+    // delete it then reports unconfirmed never went out
+    let unsentApdu = false;
     const actor = latest.current;
     const generation = actorGeneration.current;
     let inspection: {chipId: string; installationId: string} | undefined;
@@ -740,8 +744,10 @@ function ProvisioningSession({
       const guardedRun: typeof run = tx =>
         run(async apdu => {
           if (!allowed()) {
+            unsentApdu = true;
             throw new TransportError('Card session cancelled');
           }
+          unsentApdu = false;
           return tx(apdu);
         });
       const native = settings.withCard
@@ -799,9 +805,13 @@ function ProvisioningSession({
         if (event.type === 'sellerTagRemoved') {
           // kept before the check below, which drops a stopped run's events:
           // the tag is gone whether or not the operator pressed Stop, and the
-          // Stopped notice says so
-          sellerTag = event.confirmed === true ? 'removed' : 'unconfirmed';
-          stoppedTagNote.current = sellerTagNote(sellerTag);
+          // Stopped notice says so. Not so for an unconfirmed delete this
+          // phone refused to send after a Stop: the tag is still there, and
+          // the next run finds it.
+          if (event.confirmed === true || !unsentApdu) {
+            sellerTag = event.confirmed === true ? 'removed' : 'unconfirmed';
+            stoppedTagNote.current = sellerTagNote(sellerTag);
+          }
         }
         if (!allowed()) {
           return;
