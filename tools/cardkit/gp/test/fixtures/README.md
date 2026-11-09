@@ -83,3 +83,30 @@ differs between gp and cardkit; that is the answer the captures were for.
 sha256 (`H0_LOAD_FILE_SHA256` in `transcripts.test.ts`, the 2.1.0 CAP's), and
 not to the provisioner's asset, so a later CAP leaves it passing. A failure at
 that hash means step 6 installed another CAP, not that cardkit differs from gp.
+
+## The J3R452 under SCP03
+
+The `scp03-*.txt` logs are the owner's captures of a second card, taken on
+2026-11-08: a Dangerous Things J3R452 (NXP P71D600, JCOP 4.5, IC serial number
+36799121, in the CPLC) in the same ACR122U, through GlobalPlatformPro
+v25.10.20. That card opens SCP03 with i=10 (D181). Before these were taken its
+shipped key set was replaced with the public default `40` to `4F` at key
+version 01, so nothing in them is secret and every session key, cryptogram and
+C-MAC can be recomputed. The first line of each is the command that made it;
+the one local path was reduced to its file name.
+
+| Log                                      | What gp did                                                                 |
+| ---------------------------------------- | --------------------------------------------------------------------------- |
+| `scp03-07-list-default-keyver1.txt`      | `--list`, INITIALIZE UPDATE naming key version 01 (`--key-ver 1`)           |
+| `scp03-08-list-default-auto.txt`         | `--list`, INITIALIZE UPDATE letting the card choose (P1 00)                 |
+| `scp03-09-install-probe-default-key.txt` | `--install` of a probe package: INSTALL [for load], 7 LOAD blocks, INSTALL  |
+| `scp03-10-delete-probe-default-key.txt`  | `--delete -f` of the probe package: DELETE with P2 80, its instance with it |
+
+`transcripts.test.ts` replays all four under the public default: the challenge
+and both cryptograms, every session key against node:crypto, all 49 commands
+under the C-MAC byte for byte, the probe's INSTALLs and LOAD blocks against
+this module's builders and the load file's sha256 (`PROBE_LOAD_FILE_SHA256`),
+and each login's shape. The probe is fedimintcard's (`tools/j3r180-probe`), not
+this card's applet, so only a new capture moves its hash. The owner's earlier
+captures of this card under the seller's key set are not here and never will
+be: they serve shapes only, and they were made under keys no test may hold.

@@ -13,7 +13,7 @@ version and deployment contracts.
 | --- | --- | --- |
 | Protocol | [cashucard/nut](https://github.com/cashucard/nut), `spec/` | NUT-CCP in cashucard/nut defines the shared core. This repository maintains the applet command reference and implementation profiles; cashucard/javacard mirrors `spec/` after merge. |
 | Firmware | `applet/` | JavaCard 3.0.5 applet, on-card keys/proofs, spend protection and NFC tag. The tracked CAP and its hashes are release evidence. |
-| cardkit | `tools/cardkit/` | Environment-neutral TypeScript API for installation, SCP02 manager-key rotation, interrupted-install recovery and owned-card reset. It receives an APDU transceiver; it does not open NFC, call HTTP or decide operator authorization. |
+| cardkit | `tools/cardkit/` | Environment-neutral TypeScript API for installation, manager-key rotation over SCP02 or SCP03 (whichever the card opens), interrupted-install recovery and owned-card reset. It receives an APDU transceiver; it does not open NFC, call HTTP or decide operator authorization. |
 | Provisioner | `apps/provisioner/` | React Native operator app (`com.islandbitcoin.provisioner`): sign-in, batch setup, card installation, saved recovery, status and reset. Platform NFC and HTTP adapters surround cardkit. |
 | Ops-service | `ops/` | Operator sessions/administration, reservations, chip binding, manager-key escrow, durable installation/reset records, recovery fences and encrypted exports. The standalone Node/SQLite container and Workers/Durable Object SQLite host the same provisioning domain. The container runbook describes its configuration and recovery commands. |
 | Independent recovery copy | `tools/backup-copy/` | Copies and verifies encrypted R2 exports into independent storage and reports freshness. Its process uses scoped transfer credentials. The recovery identity stays with its custodian. StartOS/Atoll packaging lives separately. |
@@ -62,7 +62,9 @@ management. Holder ownership uses its own separate key. Issued keys are
 scoped/escrowed by the ops-service and used for the reserved installation or
 reset. Phone journals retain public identifiers, intents and receipts, never
 manager keys, PINs, session tokens or wallet recovery phrases. The SCP02
-implementation and vendored DES are justified in [D27](DECISIONS.md#d27); failed
+implementation and vendored DES are justified in [D27](DECISIONS.md#d27), SCP03
+and its AES from `@noble/ciphers` in [D181](DECISIONS.md#d181); under either,
+the card proves the keys before the phone authenticates, and failed
 authentication is not retried.
 
 Encrypted backup files and their private recovery identity have separate
