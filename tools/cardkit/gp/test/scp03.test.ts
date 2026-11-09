@@ -48,7 +48,7 @@ function rnd(n: number): number[] {
  * reply, EXTERNAL AUTHENTICATE and the first GET STATUS, as on the wire.
  */
 const T07 = {
-  host: fromHex('2BA5B21E11215635'),
+  host: fromHex('2B A5 B2 1E 11 21 56 35'),
   reply: fromHex(
     '00005339367991214559' + // diversification: CPLC date, serial, batch
       '01' + // key version

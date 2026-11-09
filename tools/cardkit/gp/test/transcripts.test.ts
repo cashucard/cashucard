@@ -498,7 +498,7 @@ describe('SCP03: the J3R452 test card through gp v25.10.20, under the public def
       const total = captures
         .map(c => replay(c.log(), FACTORY_KEYS))
         .reduce((n, r) => n + 1 + r.commands.length, 0);
-      assert.equal(total, 49, 'four EXTERNAL AUTHENTICATEs and 45 commands');
+      assert.equal(total, 49, 'four EXTERNAL AUTHENTICATE and 45 more');
     },
   );
 
