@@ -747,6 +747,9 @@ function ProvisioningSession({
     };
     const outcome = await (settings.runCard ?? runReservedAttempt)(w, service, {
       withCard,
+      // a J3R452 ships with the seller's NDEF tag at the tag's AID: every tap
+      // deletes it, with no prompt, once the registry shows it is the seller's (D182)
+      replaceSellerTag: true,
       onReplacementRequired: value => {
         inspection = value;
       },

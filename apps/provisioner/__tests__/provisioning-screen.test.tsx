@@ -153,6 +153,30 @@ test('distributed defaults allow authenticated installation without laboratory c
   expect(flow.drill).toBeUndefined();
 });
 
+test("every reserved tap asks for replaceSellerTag, so a J3R452's seller tag is replaced with no prompt (D182)", async () => {
+  const f = fixture();
+  let tapOptions:
+    | Parameters<NonNullable<ProvisioningProviderOptions['runCard']>>[2]
+    | undefined;
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w,
+    _s,
+    options,
+  ) => {
+    tapOptions = options;
+    return 'interrupted';
+  };
+  await mount({...f, runCard, serviceFor: () => f.service});
+  await signIn();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(true);
+  });
+  await act(async () => {
+    await flow.program();
+  });
+  expect(tapOptions).toMatchObject({replaceSellerTag: true});
+});
+
 test('unfinished batch requires confirmation to end and retains server closure', async () => {
   const f = fixture();
   const tree = await mount({

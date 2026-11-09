@@ -4,7 +4,8 @@
  * against the fake card from tools/cardkit's tests, with this app's random
  * source and its plans: as a J3R180 (SCP02) and as a J3R452 (SCP03), whose
  * AES comes from @noble/ciphers through the same compile, blank and as the
- * test card came, with the seller's NDEF tag at the tag's AID.
+ * test card came, with the seller's NDEF tag at the tag's AID, which the
+ * store's reserved run replaces (replaceSellerTag, D182).
  */
 import {
   CASHU_PLAN,
@@ -97,5 +98,41 @@ test("a J3R452 as the test card came, with the seller's NDEF tag at D27600008501
   ]);
   expect(card.insLog()).not.toContain(0xe4);
   expect(card.instanceAids()).toEqual(seller);
+  expect(card.failedAuths).toBe(0);
+});
+
+test("a J3R452 as it ships, at key version FF, installs as the store's reserved run has the tap do it (replaceSellerTag), and the rotation makes first contact", async () => {
+  const card = new FakeCard({scp: 3, sellerApplets: true, kvn: 0xff});
+  const seller = SELLER_APPLETS.map(a => a.instance);
+  // provisioningTap's install, with the option ProvisioningStore passes
+  const r = await provision(card.transceive, CASHU_PLAN, {
+    ...options(),
+    keys: FACTORY_KEYS,
+    replace: false,
+    replaceSellerTag: true,
+  });
+  expect(r.ok).toBe(true);
+  expect(r.sellerTagRemoved).toBe(true);
+  // the seller's tag went before the strict read; the seller's other applets stay beside ours
+  expect(r.apdus.map(a => a.ins).slice(0, 9)).toEqual([
+    0xa4, 0xa4, 0xca, 0x50, 0x82, 0xf2, 0xe4, 0xf2, 0xf2,
+  ]);
+  expect(card.instanceAids()).toEqual([
+    ...seller.slice(0, 3),
+    'F04341534855434152444D',
+    'F043415348554341524401',
+    'D2760000850101',
+  ]);
+  card.reset();
+  const rotated = await rotateKeys(
+    card.transceive,
+    FACTORY_KEYS,
+    SPIKE_KEYS,
+    options(),
+  );
+  expect(rotated.ok).toBe(true);
+  expect(rotated.firstContact).toBe(true);
+  expect(rotated.keyVersion).toBe(1);
+  expect(card.kvn).toBe(1);
   expect(card.failedAuths).toBe(0);
 });
