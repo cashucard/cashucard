@@ -351,7 +351,7 @@ it('the probed default list bundles and runs in workerd behind GET /mints', asyn
             text: async () =>
               url.endsWith('/v1/info')
                 ? '{"name":"good"}'
-                : '{"keysets":[{"id":"00ad268c4d1f5826"}]}',
+                : '{"keysets":[{"id":"00ad268c4d1f5826","unit":"sat","active":true}]}',
           };
         },
       },
