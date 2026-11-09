@@ -183,22 +183,25 @@
     var el = $("[data-cu-error]");
     el.textContent = msg; el.hidden = !msg;
   }
+  function submitCashu(token, onError) {
+    return fetch(API + "/api/cashu/redeem", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ site: SITE, token: token })
+    }).then(function (r) {
+      return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ("HTTP " + r.status)); return d; });
+    }).then(function (g) {
+      $("[data-cu-token]").value = "";
+      if (g.received) thanks("cashu", g.amount_sat, g.id);
+      else onError("The mint has not confirmed this token yet. Try again in a minute.");
+    }).catch(function (e) { onError(e.message); });
+  }
   function redeemToken() {
     var field = $("[data-cu-token]"), btn = $("[data-cu-redeem]");
     var token = field.value.replace(/\s+/g, "");
     if (!/^(cashu:)?cashu[AB]/.test(token)) { cashuError("A Cashu token starts with cashuA or cashuB."); field.focus(); return; }
     cashuError("");
     btn.disabled = true; btn.textContent = "Receiving";
-    fetch(API + "/api/cashu/redeem", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ site: SITE, token: token })
-    }).then(function (r) {
-      return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ("HTTP " + r.status)); return d; });
-    }).then(function (g) {
-      field.value = "";
-      if (g.received) thanks("cashu", g.amount_sat, g.id);
-      else cashuError("The mint has not confirmed this token yet. Try again in a minute.");
-    }).catch(function (e) { cashuError(e.message); field.focus(); })
+    submitCashu(token, function (msg) { cashuError(msg); field.focus(); })
       .then(function () { btn.disabled = false; btn.textContent = "Give this token"; });
   }
 
@@ -239,6 +242,59 @@
       if (s.received) { fmBusy(false); $("[data-fm-notes]").value = ""; thanks("fedimint", s.amount_sat, s.id); }
       else if (s.state === "failed") { stopWatching(); fmBusy(false); fmError("The federation refused these notes."); }
     }).catch(function () {});
+  }
+
+  /* ---------- camera scan (scan.js, loaded on first use) ---------- */
+  var scanJob = null;
+  function loadScanner() {
+    if (window.GiveScan) return Promise.resolve();
+    var own = document.querySelector('script[src*="give.js"]');
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = (own ? own.src.replace(/give\.js.*$/, "") : "/") + "scan.js";
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error("Could not load the scanner. Paste the code instead.")); };
+      document.head.appendChild(s);
+    });
+  }
+  function openScan(from) {
+    var onError = from === "cu" ? cashuError : fmError;
+    onError("");
+    var box = $("[data-scan]"), bar = $("[data-scan-progress]"), status = $("[data-scan-status]");
+    box.hidden = false; bar.style.width = "0%";
+    status.textContent = "Point the camera at the QR code in your wallet.";
+    announce("Camera open. Point it at the QR code in your wallet.");
+    loadScanner().then(function () {
+      if (box.hidden) throw { cancelled: true };
+      scanJob = window.GiveScan.scan($("[data-scan-video]"), function (p) {
+        bar.style.width = Math.round(p * 100) + "%";
+        if (p > 0 && p < 1) status.textContent = "Reading an animated code: " + Math.round(p * 100) + "%. Keep it in view.";
+      });
+      return scanJob.promise;
+    }).then(function (text) {
+      closeScan();
+      giveScanned(text, onError);
+    }, function (e) {
+      if (e && !e.cancelled) onError(e.message);
+      closeScan();
+    });
+  }
+  function closeScan(cancelled) {
+    if (scanJob) { scanJob.cancelled = !!cancelled; scanJob.stop(); scanJob = null; }
+    $("[data-scan]").hidden = true;
+  }
+  function giveScanned(text, onError) {
+    if (/^cashu/i.test(text)) {
+      announce("Cashu token read. Sending it.");
+      $("[data-cu-token]").value = text;
+      submitCashu(text, onError);
+      return;
+    }
+    // Fedimint notes go through the Fedimint panel, which shows progress and errors.
+    if (state.step !== "amount") { stopWatching(); show("amount"); }
+    setRail("ecash"); setKind("fedimint");
+    $("[data-fm-notes]").value = text;
+    redeemNotes();
   }
 
   /* ---------- on-chain ---------- */
@@ -401,11 +457,13 @@
     if (btn) copy(btn);
   });
   document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("[data-scan]").hidden) { closeScan(true); return; }
     if (e.key === "Escape" && (state.step === "lightning" || state.step === "onchain" || state.step === "cashu")) {
       stopWatching(); show("amount");
     }
   });
   document.addEventListener("visibilitychange", function () {
+    if (document.hidden && !$("[data-scan]").hidden) closeScan(true);
     if (!document.hidden && state.step === "lightning") checkInvoice();
     if (!document.hidden && state.step === "onchain") checkAddress();
     if (!document.hidden && state.step === "cashu") checkCashu();
@@ -425,6 +483,10 @@
 
   $("[data-cu-redeem]").addEventListener("click", redeemToken);
   $("[data-fm-redeem]").addEventListener("click", redeemNotes);
+  $all("[data-scan-open]").forEach(function (b) {
+    b.addEventListener("click", function () { openScan(b.getAttribute("data-scan-open")); });
+  });
+  $("[data-scan-cancel]").addEventListener("click", function () { closeScan(true); });
   $all("[data-kind]").forEach(function (b) {
     b.addEventListener("click", function () { setKind(b.getAttribute("data-kind")); });
   });

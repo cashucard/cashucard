@@ -33,8 +33,10 @@ https://:worker.:subdomain.workers.dev/*
   Content-Type: application/yaml; charset=utf-8
   Content-Disposition: attachment; filename="compose.yaml"
   Cache-Control: public, max-age=0, must-revalidate, no-transform
-# The fund page runs the donation card: first-party scripts plus requests to the donations service.
+# The fund page runs the donation card: first-party scripts, requests to the donations service, and the camera for scanning a wallet's QR code.
 /fund
   ! Content-Security-Policy
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; connect-src https://donate.islandbitcoin.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Cache-Control: public, max-age=0, must-revalidate, no-transform
