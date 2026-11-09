@@ -169,15 +169,26 @@ test('probeMint fails each broken mint, never throws, never echoes a body', asyn
 });
 
 test('probeMint times out a hanging mint through its abort signal', async () => {
+  // AbortSignal.timeout's timer is unref'd, and a promise that never settles
+  // holds no handle, so without a ref'd timer the event loop can drain before
+  // the signal fires (the runner then cancels the test). Hold one until done.
+  const keepAlive = setTimeout(() => {}, 10_000);
+  let aborted = 0;
   const hanging: FetchFn = (_url, init) =>
     new Promise((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () =>
-        reject(init.signal!.reason),
-      );
+      init?.signal?.addEventListener('abort', () => {
+        aborted++;
+        reject(init.signal!.reason);
+      });
     });
-  const r = await probeMint('https://m.example', hanging, 20);
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'info: TimeoutError');
+  try {
+    const r = await probeMint('https://m.example', hanging, 20);
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, 'info: TimeoutError');
+    assert.equal(aborted, 2);
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
 
 test('probeMint releases the body of every non-200 response', async () => {
