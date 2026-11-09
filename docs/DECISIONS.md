@@ -5478,27 +5478,32 @@ rotates and resets as a J3R180 does:
   new version and three check values and then listed version 01 alone. A
   caller does not steer that PUT KEY: a `putKey` option at first contact
   stops the run `guarded` before EXTERNAL AUTHENTICATE. The reopen then checks
-  that the card did what the test card did. It names FF in an INITIALIZE
-  UPDATE of its own, which must answer `6A88`, referenced data not found,
-  GlobalPlatform's answer for a version the card does not hold; no EXTERNAL
-  AUTHENTICATE follows it, so it costs no login. Then it must prove the new
-  set at 01. Any other answer to the first, or the new set at another
-  version, stops the run `guarded`: a card that kept the FF set beside ours,
-  whichever set it then picks for P1 `00`, or put ours elsewhere, is not
-  reported rotated by that run. `RotateResult.firstContact` says when it was.
-  A pull after the PUT KEY and before those answers leaves the next run to
-  find the new set at 01, as after any lost reply, and that run does not name
-  FF: it cannot tell the card from one rotated in place. Every other card has
-  its set replaced in place with the APDUs it got before, byte for byte
-  (`rotate.test.ts` pins them at 1382268). Each of these stops `guarded` with
-  nothing sent after INITIALIZE UPDATE: the new set already proved at FF
-  (only an in-place rotation of a shipped card puts it there), FF under SCP02
-  (never measured), a caller's `putKey` at first contact, and P1 `00` on any
-  card but one at first contact, a card at version 00 included. Wrong bytes
-  for the shipped set stop at `wrongKeys`, as before, because the card's
-  proof is checked offline. A lost PUT KEY reply leaves the card at 01 under
-  the new set, which the next run finds with no second PUT KEY; P1 `00` needs
-  an observed FF, so a card that drops the FF set never gets it twice.
+  that the card did what the test card did. After its SELECT it reads the key
+  information with GET DATA `E0`, plain, the read the test card answered with
+  no secure channel before first contact (keys 01 to 03 at FF, AES, 16 bytes
+  each) and after it (the same three at 01, and nothing else); it needs no
+  key, so it costs no login. The answer must be 9000 and that second template:
+  no key at FF, our three at 01 alone. Then the reopen must prove the new set
+  at 01. Any other answer to the first, or the new set at another version,
+  stops the run `guarded`: a card that kept the FF set beside ours, whichever
+  set it then picks for P1 `00`, or put ours elsewhere, is not reported
+  rotated by that run. `RotateResult.firstContact` says when it was. A pull
+  after the PUT KEY and before those answers leaves the next run to find the
+  new set at 01, as after any lost reply, and that run does not read the key
+  information: it cannot tell the card from one rotated in place. GET DATA
+  `E0` and its reader are cardkit's `getKeyInformation` and
+  `parseKeyInformation`, which the H0 test holds to the J3R180's `gp -i`
+  capture. Every other card has its set replaced in place with the APDUs it
+  got before, byte for byte (`rotate.test.ts` pins them at 1382268). Each of
+  these stops `guarded` with nothing sent after INITIALIZE UPDATE: the new set
+  already proved at FF (only an in-place rotation of a shipped card puts it
+  there), FF under SCP02 (never measured), a caller's `putKey` at first
+  contact, and P1 `00` on any card but one at first contact, a card at version
+  00 included. Wrong bytes for the shipped set stop at `wrongKeys`, as before,
+  because the card's proof is checked offline. A lost PUT KEY reply leaves the
+  card at 01 under the new set, which the next run finds with no second PUT
+  KEY; P1 `00` needs an observed FF, so a card that drops the FF set never
+  gets it twice.
 - **The seller's tag goes inside the sweep, behind an option.**
   `ProvisionOptions.replaceSellerTag`, off by default, makes an SCP03 install
   whose sweep names the tag's AID read GET STATUS of the applications first
@@ -5519,12 +5524,14 @@ rotates and resets as a J3R180 does:
   foreign tag. No phase, journal stage or service change.
 - **The provisioner passes it on every reserved tap, with no prompt** (the
   owner's decision), and tells the operator what went: when the attempt then
-  loses the card or stops for review, the screen says the seller's tag was
-  removed and cannot be restored, or may have been, beside the stop's own
-  message. The notice is held in memory only and goes when the screen moves
-  on or the app restarts: the attempt's journal does not hold it, and a
-  journal field is a schema change this slice does not make, so the support
-  details do not carry it either. The bench, and every other caller of
+  loses the card or stops for review, or the operator stops it, the screen
+  says the seller's tag was removed and cannot be restored, or may have been,
+  beside the stop's own message; after a Stop that is the Stopped notice,
+  whether the delete was reported before the Stop or after it. The notice is
+  held in memory only and goes when the screen moves on or the app restarts:
+  the attempt's journal does not hold it, and a journal field is a schema
+  change this slice does not make, so the support details do not carry it
+  either. That record is ENG-846. The bench, and every other caller of
   `provision`, sends the APDUs it sent before. The bench's rotation makes
   first contact on a card at FF, as any caller of `rotateKeys` does.
 - **The reset refuses FF** before EXTERNAL AUTHENTICATE, as it refuses 00, so
@@ -5548,27 +5555,26 @@ rotation the tap already journals (`rotation_intent`), with the recovery that
 rotation already has: one INITIALIZE UPDATE checked offline against both sets.
 
 **Proven, and not yet.** The fake card models PUT KEY P1 `00` at FF as the test
-card behaved, and, with `keepsShippedSet`, a card that keeps the FF set beside
-ours, which the reopen stops whichever set the card picks for P1 `00`. The
-tests run first contact, a pull at every APDU of it, the tag's delete with a
-pull at every APDU of the install, the guards, and first contact followed by a
-reset and a second install. Silicon is unmeasured for the DELETE (P2 `00`) of
-the seller's instance under SCP03 (only a package delete with P2 `80` is
-traced, `scp03-10`), for our tag installing beside the still-loaded
-`D276000085`, for in-place PUT KEY at 01 on a J3R452, and for the chip's answer
-to an INITIALIZE UPDATE naming FF after first contact: the test card's `gp`
-runs never sent one, and `6A88` is the GlobalPlatform answer the fake gives. A
-chip that answers anything else stops every first contact `guarded` after its
-PUT KEY, our set at 01, and the attempt is quarantined, never recorded. First
-contact rests on one `gp` run on one card, which is not in the repository, so
-no transcript test covers it, and an agent never writes a fixture. Slice 3
-(ENG-839) runs these on the owner's go, reads the key information after first
-contact, and records the answer to INITIALIZE UPDATE P1 `FF` there. A J3R452
-still on the seller's keys stops at `wrongKeys` and is quarantined
-(`authentication-failed`), its reservation used: importing the seller's key
-file waits until a seller-keyed batch is bought (the brief's D2). cardkit stays
-0.2.0, as [D181](#d181) left it; the bump moves with the review of the
-outbox-spike runners.
+card behaved, and answers GET DATA `E0` from the sets it holds, in the bytes
+the test card gave, so with `keepsShippedSet`, a card that keeps the FF set
+beside ours, it lists both, and the reopen stops it whichever set the card
+picks for P1 `00`. The tests run first contact, a pull at every APDU of it, the
+other answers to the key information read, the tag's delete with a pull at
+every APDU of the install, the guards, and first contact followed by a reset
+and a second install. The reopen's check is a read the test card answered: GET
+DATA `E0` with no secure channel, the card manager selected, listed the three
+keys at FF before first contact and the three at 01 alone after it. Silicon is
+unmeasured for the DELETE (P2 `00`) of the seller's instance under SCP03 (only
+a package delete with P2 `80` is traced, `scp03-10`), for our tag installing
+beside the still-loaded `D276000085`, and for in-place PUT KEY at 01 on a
+J3R452. First contact rests on one `gp` run on one card, which is not in the
+repository, so no transcript test covers it, and an agent never writes a
+fixture. Slice 3 (ENG-839) runs these on the owner's go, first contact on an
+untouched card among them. A J3R452 still on the seller's keys stops at
+`wrongKeys` and is quarantined (`authentication-failed`), its reservation used:
+importing the seller's key file waits until a seller-keyed batch is bought (the
+brief's D2). cardkit stays 0.2.0, as [D181](#d181) left it; the bump moves with
+the review of the outbox-spike runners.
 
 **Rejected.** Deleting the seller's tag by default in cardkit (the delete
 cannot be undone, so a caller asks for it); a `firstContact` flag from the

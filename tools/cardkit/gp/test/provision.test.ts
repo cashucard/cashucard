@@ -39,6 +39,7 @@ import {
   FACTORY_KEYS,
   SPIKE_KEYS,
   WrongKeys,
+  getKeyInformation,
   initializeUpdateCommand,
   openSession,
   parseCommand,
@@ -1223,6 +1224,33 @@ describe('the fake card', () => {
     assert.equal(seq02(await scp02.transceive(iu())), '000A');
   });
 
+  it('answers GET DATA E0, plain or under the C-MAC, with keys 01 to 03 of the set it holds, in the bytes gp read from the J3R180 and the J3R452 test card', async () => {
+    const plain = async (card: FakeCard) =>
+      toHex(await card.transceive(getKeyInformation()));
+    // the J3R180 at 01 (gp-info.txt); the J3R452 as it ships, at FF (the owner's GET DATA of 2026-11-08)
+    assert.equal(
+      await plain(new FakeCard()),
+      'E012C00401018010C00402018010C00403018010' + '9000',
+    );
+    assert.equal(
+      await plain(new FakeCard({scp: 3, kvn: 0xff})),
+      'E012C00401FF8810C00402FF8810C00403FF8810' + '9000',
+    );
+    // under the C-MAC too, as gp --lock reads it before its PUT KEY (gp-lock-spike.txt on the J3R180)
+    for (const [scp, listed] of [
+      [2, 'E012C00401018010C00402018010C00403018010'],
+      [3, 'E012C00401018810C00402018810C00403018810'],
+    ] as const) {
+      const card = new FakeCard({scp});
+      const s = await openSession(card.transceive, FACTORY_KEYS, n =>
+        randomBytes(n),
+      );
+      const r = await s.send(card.transceive, getKeyInformation());
+      assert.equal(r.sw, 0x9000, `SCP0${scp}`);
+      assert.equal(toHex(r.data), listed, `SCP0${scp}`);
+    }
+  });
+
   it('takes PUT KEY P1 00 only on an SCP03 card at version FF, to a version from 01 to 7F, and keeps that set alone; any other P1 stays 6A80', async () => {
     /** A login with the public default, then PUT KEY of the spike set with this P1 and new version. */
     const put = async (card: FakeCard, p1: number, newKvn: number) => {
@@ -1250,6 +1278,23 @@ describe('the fake card', () => {
     );
     assert.equal(ours.keyVersion, 0x01);
     assert.equal(shipped.failedAuths, 0);
+    // and GET DATA E0 lists our three at 01 alone, the bytes the test card gave
+    shipped.reset();
+    assert.equal(
+      toHex(await shipped.transceive(getKeyInformation())),
+      'E012C00401018810C00402018810C00403018810' + '9000',
+    );
+    // one that keeps the FF set lists both, that set first
+    const keeps = new FakeCard({scp: 3, kvn: 0xff, keepsShippedSet: 'new'});
+    assert.equal((await put(keeps, 0x00, 0x01)).sw, 0x9000);
+    keeps.reset();
+    assert.equal(
+      toHex(await keeps.transceive(getKeyInformation())),
+      'E024' +
+        'C00401FF8810C00402FF8810C00403FF8810' +
+        'C00401018810C00402018810C00403018810' +
+        '9000',
+    );
     for (const [scp, kvn, p1, newKvn] of [
       [3, 0x01, 0x00, 0x01], // a set beside the one at 01
       [3, 0xff, 0x00, 0x80], // a new version outside 01..7F

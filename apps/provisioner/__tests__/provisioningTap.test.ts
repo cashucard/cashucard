@@ -218,9 +218,9 @@ test('a J3R452 that keeps its FF set beside ours at first contact is quarantined
   expect(saved.quarantine_reason).toBe('verification-failed');
   expect(saved.gp_key_version).toBeUndefined();
   expect(saved.frozen_record).toBeUndefined();
-  // one PUT KEY; then the reopen named FF, the card answered under that set, and no login followed
+  // one PUT KEY; then the reopen read the key information (GET DATA E0), which still listed FF, and no login followed
   expect(f.log.filter(c => c[1] === 0xd8)).toHaveLength(1);
-  expect(f.log.at(-1)!.slice(0, 3)).toEqual([0x80, 0x50, 0xff]);
+  expect(f.log.at(-1)).toEqual([0x80, 0xca, 0x00, 0xe0, 0x00]);
   expect(f.card.shipped?.kvn).toBe(0xff);
   expect(f.card.failedAuths).toBe(0);
 });

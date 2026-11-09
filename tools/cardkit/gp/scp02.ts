@@ -481,6 +481,81 @@ export function parseFreeMemory(data: Bytes): FreeMemory | null {
 }
 
 /**
+ * GET DATA 00E0, the key information template. Needs no key: gp -i sends it
+ * with no secure channel, and the J3R180 (gp-info.txt) and the J3R452 answer
+ * it after a SELECT of the card manager. First contact reads it (D182).
+ */
+export function getKeyInformation(): number[] {
+  return [0x80, 0xca, 0x00, 0xe0, 0x00];
+}
+
+/** One key in a key information template. */
+export interface KeyInformation {
+  id: number;
+  kvn: number;
+  /** Type and length of each of the key's components (one for a DES3 or an AES key). */
+  components: {type: number; length: number}[];
+}
+
+/** A BER-TLV of `data` at `at`: tag (one byte), length (one byte, or 81 and one), value. */
+function keyInformationTlv(
+  data: number[],
+  at: number,
+): {tag: number; value: number[]; end: number} {
+  const tag = data[at];
+  let length = data[at + 1];
+  let start = at + 2;
+  if (length === 0x81) {
+    length = data[at + 2];
+    start = at + 3;
+  } else if (length !== undefined && length >= 0x80) {
+    throw new Error(
+      `a TLV at ${at} with a length form this reader does not take`,
+    );
+  }
+  if (
+    tag === undefined ||
+    length === undefined ||
+    start + length > data.length
+  ) {
+    throw new Error(`a TLV at ${at} that runs past the data`);
+  }
+  return {tag, value: data.slice(start, start + length), end: start + length};
+}
+
+/**
+ * GET DATA 00E0's answer, the key information template, as gp -i reads it
+ * (GPKeyInfo.parseTemplate): E0, then for each key C0 with the key ID, the
+ * key set version and each component's type and length. Throws for anything
+ * else; the extended form (FF in place of a type) is refused, not guessed at.
+ */
+export function parseKeyInformation(data: Bytes): KeyInformation[] {
+  const d = bytes(data);
+  const template = keyInformationTlv(d, 0);
+  if (template.tag !== 0xe0 || template.end !== d.length) {
+    throw new Error(`not a key information template: ${toHex(d)}`);
+  }
+  const keys: KeyInformation[] = [];
+  for (let at = 0; at < template.value.length;) {
+    const entry = keyInformationTlv(template.value, at);
+    at = entry.end;
+    const v = entry.value;
+    if (entry.tag !== 0xc0 || v.length < 4 || v.length % 2 !== 0) {
+      throw new Error(`not a key information entry: ${toHex(v)}`);
+    }
+    if (v[2] === 0xff) {
+      throw new Error('extended key information is not read here');
+    }
+    const components: KeyInformation['components'] = [];
+    for (let i = 2; i < v.length; i += 2) {
+      components.push({type: v[i], length: v[i + 1]});
+    }
+    keys.push({id: v[0], kvn: v[1], components});
+  }
+  return keys;
+}
+
+/**
  * DELETE of one object (P2 00: not its dependents), with Le 00 as gp sends
  * it. Throws for the card manager and for any AID off the six-AID whitelist,
  * before anything is built: this module cannot be made to delete anything

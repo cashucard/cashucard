@@ -241,6 +241,74 @@ test.each([
   },
 );
 
+test.each(['before', 'after'] as const)(
+  "an operator's Stop after a run deleted a J3R452's seller tag says so beside Stopped, with the delete reported %s the Stop (D182)",
+  async when => {
+    const f = fixture();
+    const removed =
+      "The seller's NFC tag on this card was removed, and it cannot be restored.";
+    let sellerTag = true;
+    let release!: () => void;
+    const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+      _w,
+      _s,
+      options,
+    ) => {
+      const stopped = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      options.onEvent?.({type: 'phase', phase: 'sweep'});
+      if (sellerTag && when === 'before') {
+        options.onEvent?.({type: 'sellerTagRemoved', confirmed: true});
+      }
+      // the LOAD that follows the delete takes seconds: the operator stops it here
+      await stopped;
+      if (sellerTag && when === 'after') {
+        options.onEvent?.({type: 'sellerTagRemoved', confirmed: true});
+      }
+      return 'interrupted';
+    };
+    const tree = await mount({
+      ...f,
+      hardwareValidated: true,
+      serviceFor: () => f.service,
+      runCard,
+    });
+    await signIn();
+    await act(async () => {
+      await flow.create(config);
+    });
+    const stopRun = async () => {
+      let running!: Promise<boolean>;
+      await act(async () => {
+        running = flow.program();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        flow.cancel();
+      });
+      expect(flow.notice).toBe('Stopping. Saved work stays on this phone.');
+      await act(async () => {
+        release();
+        await running;
+      });
+    };
+    await stopRun();
+    expect(flow.notice).toContain(
+      'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
+    );
+    expect(flow.notice).toContain(removed);
+    expect(text(tree)).toContain(removed);
+    // the Stop replaces the lost-card message: no interruption is shown for it
+    expect(flow.notice).not.toContain('Card connection lost.');
+    // the next run deleted nothing: its Stop says nothing of the seller's tag
+    sellerTag = false;
+    await stopRun();
+    expect(flow.notice).toContain('Stopped.');
+    expect(flow.notice).not.toContain('seller');
+  },
+);
+
 test('unfinished batch requires confirmation to end and retains server closure', async () => {
   const f = fixture();
   const tree = await mount({

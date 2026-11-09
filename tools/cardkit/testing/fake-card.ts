@@ -16,8 +16,12 @@
  * replaces the FF set, as the test card did at first contact (GET DATA E0
  * afterwards listed version 01 alone). With `keepsShippedSet` it keeps the FF
  * set beside the new one instead, which the test card did not do, so the
- * guard against such a card has one to catch. INITIALIZE UPDATE that names a
- * version the card does not hold answers 6A88. Under either protocol:
+ * guard against such a card has one to catch. GET DATA E0, plain or under the
+ * C-MAC, lists the keys of every set it holds (the key information template:
+ * C0 04, the key ID, the version, the type, 10), keys 01 to 03 of each,
+ * DES3 (80) under SCP02 and AES (88) under SCP03, the FF set a first contact
+ * kept first. INITIALIZE UPDATE that names a version the card does not hold
+ * answers 6A88. Under either protocol:
  *
  * - the opener rule: the INSTALL that is a package's first instantiation and
  *   runs a heavy constructor goes mute (the reader gives up) or answers 6F00,
@@ -110,10 +114,11 @@ export interface FakeCardOptions {
   /**
    * What the test card did not do at first contact, for the guard that
    * catches it: PUT KEY with P1 00 at version FF keeps the FF set beside the
-   * new one ({@link FakeCard.shipped}), so INITIALIZE UPDATE with P1 FF still
-   * opens under it, and P1 00, the card's choice, then picks the new set
-   * (`'new'`) or the FF set (`'shipped'`). Unset, the new set replaces the FF
-   * set, as the test card's did.
+   * new one ({@link FakeCard.shipped}), so GET DATA E0 lists both sets,
+   * INITIALIZE UPDATE with P1 FF still opens under the FF set, and P1 00, the
+   * card's choice, then picks the new set (`'new'`) or the FF set
+   * (`'shipped'`). Unset, the new set replaces the FF set, as the test card's
+   * did.
    */
   keepsShippedSet?: 'new' | 'shipped';
 }
@@ -566,10 +571,28 @@ export class FakeCard {
     if (cla === 0x80 && ins === 0xca && p1 === 0x9f && apdu[3] === 0x7f) {
       return sw(0x9000, fromHex(this.cplc));
     }
+    if (cla === 0x80 && ins === 0xca && p1 === 0x00 && apdu[3] === 0xe0) {
+      return this.keyInformation();
+    }
     if (ins === 0xe4 || ins === 0xe6 || ins === 0xe8 || ins === 0xd8) {
       return sw(0x6982);
     }
     return sw(0x6d00);
+  }
+
+  /**
+   * GET DATA E0, the key information template: keys 01 to 03 of every set
+   * the card holds, C0 04 <ID> <version> <type> 10, the FF set a first
+   * contact kept ({@link FakeCard.shipped}) first, as both chips answer it
+   * (E0 12 and three entries for one set).
+   */
+  private keyInformation(): Bytes {
+    const type = this.scp === 3 ? 0x88 : 0x80;
+    const versions = [...(this.shipped ? [this.shipped.kvn] : []), this.kvn];
+    const entries = versions.flatMap(kvn =>
+      [1, 2, 3].flatMap(id => [0xc0, 0x04, id, kvn, type, 0x10]),
+    );
+    return sw(0x9000, [0xe0, entries.length, ...entries]);
   }
 
   private freeMemory(): Bytes {
@@ -607,6 +630,9 @@ export class FakeCard {
   ): Bytes {
     if (ins === 0xca && p1 === 0xff && p2 === 0x21) {
       return this.freeMemory();
+    }
+    if (ins === 0xca && p1 === 0x00 && p2 === 0xe0) {
+      return this.keyInformation();
     }
     if (ins === 0xe4) {
       return this.delete(data);

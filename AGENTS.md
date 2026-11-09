@@ -287,8 +287,8 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   `replaceSellerTag`, which the provisioner's tap passes and the bench does
   not, the install first deletes that tag, and only when the registry shows it
   in the seller's shape; `rotateKeys` moves a card at key version FF to 01
-  with PUT KEY P1 `00`, then needs FF gone (`6A88`) and ours at 01, and the
-  reset refuses FF.
+  with PUT KEY P1 `00`, then needs the key information (GET DATA `E0`, which
+  takes no key) to list ours at 01 alone, FF gone, and the reset refuses FF.
 
 ## Rules for agents
 

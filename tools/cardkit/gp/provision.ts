@@ -38,7 +38,7 @@ import {
   TAG_AID,
   TAG_CLASS_AID,
 } from './aids';
-import {type Bytes, bytes, equal, fromHex, swHex, toHex} from './bytes';
+import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
 import {
   RegistryEvidenceError,
   readCashuRegistry,
@@ -49,6 +49,7 @@ import {
   FACTORY_KEYS,
   FACTORY_KVN,
   type FreeMemory,
+  type KeyInformation,
   type KeySet,
   type Random,
   type Reply,
@@ -60,12 +61,13 @@ import {
   deleteAid,
   externalAuthenticate,
   getFreeMemory,
+  getKeyInformation,
   initializeUpdate,
-  initializeUpdateCommand,
   installAndSelectable,
   installForLoad,
   openSession,
   parseFreeMemory,
+  parseKeyInformation,
   putKeys,
   selectAid,
   sessionIfMatches,
@@ -769,6 +771,73 @@ export interface RotateOptions extends RunOptions {
   putKey?: {p1?: number; newKvn?: number};
 }
 
+/** The three keys PUT KEY put at first contact, as the key information lists them. */
+const FIRST_CONTACT_KEYS: readonly KeyInformation[] = [1, 2, 3].map(id => ({
+  id,
+  kvn: FACTORY_KVN,
+  components: [{type: 0x88, length: 16}],
+}));
+
+/** A key information listing in words, for a guard's reason. */
+function describeKeys(keys: readonly KeyInformation[]): string {
+  if (keys.length === 0) {
+    return 'no key';
+  }
+  return keys
+    .map(
+      k =>
+        `key ${toHex([k.id])} at version ${toHex([k.kvn])} (${k.components
+          .map(c => `type ${toHex([c.type])}, ${c.length} bytes`)
+          .join('; ')})`,
+    )
+    .join(', ');
+}
+
+/**
+ * Throws Guard unless GET DATA E0's answer after first contact is what the
+ * test card gave after its own (D182): 9000 and a key information template
+ * that lists no key at SHIPPED_KVN and holds the three AES-128 keys PUT KEY
+ * put at FACTORY_KVN, IDs 01 to 03, and nothing else.
+ */
+function checkFirstContactKeys(reply: Reply): void {
+  if (reply.sw !== 0x9000) {
+    throw new Guard(
+      `after first contact the card answered GET DATA E0 (its key information) with ${swHex(reply.sw)}, not 9000: whether it still holds the version-FF set is unknown`,
+    );
+  }
+  let keys: KeyInformation[];
+  try {
+    keys = parseKeyInformation(reply.data);
+  } catch {
+    throw new Guard(
+      `after first contact the card's key information did not parse (${toHex(reply.data)}): whether it still holds the version-FF set is unknown`,
+    );
+  }
+  if (keys.some(k => k.kvn === SHIPPED_KVN)) {
+    throw new Guard(
+      `after first contact the card still lists key version FF (${describeKeys(keys)}): its shipped set may still open it, beside ours at 01`,
+    );
+  }
+  const expected = (k: KeyInformation) =>
+    FIRST_CONTACT_KEYS.some(
+      e =>
+        e.id === k.id &&
+        e.kvn === k.kvn &&
+        k.components.length === 1 &&
+        k.components[0].type === e.components[0].type &&
+        k.components[0].length === e.components[0].length,
+    );
+  if (
+    keys.length !== FIRST_CONTACT_KEYS.length ||
+    !keys.every(expected) ||
+    new Set(keys.map(k => k.id)).size !== keys.length
+  ) {
+    throw new Guard(
+      `after first contact the card lists ${describeKeys(keys)}, where PUT KEY put keys 01 to 03 at version 01, AES-128, and nothing else`,
+    );
+  }
+}
+
 /**
  * Moves the card manager from `from` to `to`. One INITIALIZE UPDATE, whose
  * card cryptogram is checked offline against both sets: a PUT KEY whose reply
@@ -779,14 +848,15 @@ export interface RotateOptions extends RunOptions {
  * An SCP03 card at SHIPPED_KVN (FF, a J3R452 as it ships) gets first contact
  * (D182): PUT KEY with P1 00 puts `to` at FACTORY_KVN (01), and the card
  * should drop the FF set, as the test card did. The reopen checks both: it
- * names FF in an INITIALIZE UPDATE of its own, which must answer 6A88 (no
- * such version; no EXTERNAL AUTHENTICATE follows it, so no login is counted),
- * then it must prove `to` at 01. Any other answer to the first, or `to` at
- * another version, stops the run guarded, so a card that kept the FF set, or
- * put ours elsewhere, is not reported rotated by this run. A pull after the
- * PUT KEY and before those answers leaves the next run to find `to` at 01, as
- * after any lost reply, and that run does not ask for FF: it cannot tell the
- * card from one rotated in place. Any other card has its set replaced in
+ * reads the key information with GET DATA E0, which needs no key, so no login
+ * is counted, and must find what the test card listed after its first
+ * contact: ours at 01 and nothing else, no key at FF among them. Then it must
+ * prove `to` at 01. Any other answer to the first, or `to` at another
+ * version, stops the run guarded, so a card that kept the FF set, or put ours
+ * elsewhere, is not reported rotated by this run. A pull after the PUT KEY and
+ * before those answers leaves the next run to find `to` at 01, as after any
+ * lost reply, and that run does not read the key information: it cannot tell
+ * the card from one rotated in place. Any other card has its set replaced in
  * place, with the APDUs this sent before. Each of these stops guarded with
  * nothing sent after INITIALIZE UPDATE: `to` proved at FF (only an in-place
  * rotation of a shipped card puts it there, and the reset refuses FF), FF
@@ -865,18 +935,10 @@ export async function rotateKeys(
     run.enter('reopen');
     expectOk(await run.plain(selectAid(sdAid)), 0xa4);
     if (first) {
-      // the test card dropped its FF set when PUT KEY P1 00 added ours; one
-      // that kept it would still open to that set, so name FF and need 6A88
-      const shipped = await run.plain(
-        initializeUpdateCommand(bytes(options.random(8)), SHIPPED_KVN),
-      );
-      if (shipped.sw !== 0x6a88) {
-        throw new Guard(
-          shipped.sw === 0x9000
-            ? 'the card still answers key version FF after first contact: its shipped set may still open it, beside ours at 01'
-            : `after first contact the card answered INITIALIZE UPDATE for key version FF with ${swHex(shipped.sw)}, not 6A88: whether it still holds that set is unknown`,
-        );
-      }
+      // the test card dropped its FF set when PUT KEY P1 00 added ours: GET
+      // DATA E0, plain, then listed ours at 01 alone, where it had listed the
+      // three at FF before; one that kept that set would still open to it
+      checkFirstContactKeys(await run.plain(getKeyInformation()));
     }
     const reopened = await openSession(
       run.timed,

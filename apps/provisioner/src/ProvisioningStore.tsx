@@ -89,6 +89,21 @@ function exclusive<T>(
   return job;
 }
 
+/**
+ * What the operator is told when a run deleted a J3R452's seller tag, which
+ * cannot be undone (D182): removed when the card answered the DELETE with
+ * 9000, may have been when the answer never came.
+ */
+function sellerTagNote(
+  tag: 'removed' | 'unconfirmed' | undefined,
+): string | null {
+  return tag === 'removed'
+    ? "The seller's NFC tag on this card was removed, and it cannot be restored."
+    : tag === 'unconfirmed'
+    ? "The seller's NFC tag on this card may have been removed: the card did not confirm it."
+    : null;
+}
+
 export interface ProvisioningProviderOptions {
   storage?: JournalStorage;
   workspaces?: WorkspaceStorage;
@@ -332,6 +347,9 @@ function ProvisioningSession({
   });
   const busyRef = useRef(false);
   const cancelRequested = useRef(false);
+  // the seller-tag note of the operation's run, for the Stopped notice: a Stop
+  // turns off the run's own messages, and the tag is gone all the same (D182)
+  const stoppedTagNote = useRef<string | null>(null);
   const pausedByUser = useRef(false);
   const armedCancel = useRef<(() => Promise<void>) | null>(null);
   const actorGeneration = useRef(0);
@@ -463,6 +481,7 @@ function ProvisioningSession({
       const generation = actorGeneration.current;
       busyRef.current = true;
       cancelRequested.current = false;
+      stoppedTagNote.current = null;
       if (!resetOperation) {
         pausedByUser.current = false;
       }
@@ -525,13 +544,17 @@ function ProvisioningSession({
             setResetState(result.reset!);
           }
           if (cancelRequested.current) {
-            setNotice(
+            const stopped =
               resetOperation &&
-                'reset' in result &&
-                !result.snapshot.batch &&
-                (!result.reset || result.reset.journal.stage === 'complete')
+              'reset' in result &&
+              !result.snapshot.batch &&
+              (!result.reset || result.reset.journal.stage === 'complete')
                 ? 'Cancelled. You can check another card.'
-                : 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.',
+                : 'Stopped. Saved work stays on this phone. Continue with the same card, account and service.';
+            setNotice(
+              stoppedTagNote.current
+                ? `${stopped} ${stoppedTagNote.current}`
+                : stopped,
             );
           } else if ('failure' in result) {
             setNotice(message(result.failure));
@@ -773,6 +796,13 @@ function ProvisioningSession({
       now: Date.now,
       verifiedAt: () => Math.floor(Date.now() / 1000),
       onEvent: event => {
+        if (event.type === 'sellerTagRemoved') {
+          // kept before the check below, which drops a stopped run's events:
+          // the tag is gone whether or not the operator pressed Stop, and the
+          // Stopped notice says so
+          sellerTag = event.confirmed === true ? 'removed' : 'unconfirmed';
+          stoppedTagNote.current = sellerTagNote(sellerTag);
+        }
         if (!allowed()) {
           return;
         }
@@ -790,18 +820,12 @@ function ProvisioningSession({
           event.index <= event.of
         ) {
           setLoadProgress({index: event.index, of: event.of});
-        } else if (event.type === 'sellerTagRemoved') {
-          sellerTag = event.confirmed === true ? 'removed' : 'unconfirmed';
         }
       },
     });
     // an attempt that stops or loses the card says so beside its own message
-    const tagNote =
-      sellerTag === 'removed'
-        ? "The seller's NFC tag on this card was removed, and it cannot be restored."
-        : sellerTag === 'unconfirmed'
-        ? "The seller's NFC tag on this card may have been removed: the card did not confirm it."
-        : null;
+    // (operate adds it to the Stopped notice of a run the operator stopped)
+    const tagNote = sellerTagNote(sellerTag);
     if (allowed() && outcome === 'interrupted') {
       setInterruption(
         `Card connection lost. Last step: ${
