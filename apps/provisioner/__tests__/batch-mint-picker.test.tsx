@@ -6,12 +6,13 @@
  */
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
-import {Text} from 'react-native';
+import {Text, TextInput} from 'react-native';
 import {ApiClient, ApiUnreachableError} from '../src/api';
 import {BatchSetupScreen} from '../src/screens/BatchSetupScreen';
 import {SETUP} from '../src/strings';
 import {useApp} from '../src/store';
 import {rememberBatchDefaults} from '../src/batchDefaults';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 jest.mock('../src/store', () => ({useApp: jest.fn()}));
 
 let tree: Renderer.ReactTestRenderer;
@@ -233,4 +234,195 @@ test('a written-in address the service refuses as invalid says what to fix', asy
   // Editing the address clears the note.
   await writeIn('https://mint.example.com');
   expect(tree.root.findAllByProps({testID: 'mint-probe-note'})).toEqual([]);
+});
+
+// ENG-857: with a listed mint preselected the write-in field used to be
+// unreachable. The "Other mint…" cell, after the listed mints, opens it.
+describe('the Other mint… cell', () => {
+  const FOUR = [
+    'https://forge.test',
+    'https://mint-b.test',
+    'https://mint-c.test',
+    'https://mint-d.test',
+  ];
+  const WRITE_IN = 'https://example-mint.test';
+  const inputs = () => tree.root.findAllByProps({testID: 'mint-custom-input'});
+  // One entry per write-in field (findAllByProps also matches each host node).
+  const fields = () =>
+    tree.root.findAll(
+      n => n.type === TextInput && n.props.testID === 'mint-custom-input',
+    );
+  const customRow = () =>
+    tree.root.findAll(n => n.type === Text && n.props.children === 'Custom');
+  const flat = (style: unknown) =>
+    Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+  const lit = (id: string) => 'backgroundColor' in flat(byId(id).props.style);
+  const fastStart = () =>
+    mount({
+      installationOnly: false,
+      onCreate: async () => true,
+      onStartAndRead: async () => true,
+    });
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    jest.spyOn(ApiClient.prototype, 'mints').mockResolvedValue(FOUR);
+    jest.spyOn(ApiClient.prototype, 'mintInfo').mockResolvedValue({});
+  });
+
+  test('renders after the listed mints, and the write-in stays closed while forge is preselected', async () => {
+    await fastStart();
+    expect(cellOrder()).toEqual(FOUR.map(m => `mint-${m}`));
+    const ids = tree.root
+      .findAll(n => typeof n.props.testID === 'string' && n.type !== Text)
+      .map(n => n.props.testID as string)
+      .filter(id => id.startsWith('mint-') && !id.startsWith('mint-reviews-'))
+      .filter((id, i, all) => all.indexOf(id) === i);
+    expect(ids.slice(0, 5)).toEqual([
+      ...FOUR.map(m => `mint-${m}`),
+      'mint-other',
+    ]);
+    expect(lit(`mint-${FOUR[0]}`)).toBe(true);
+    expect(lit('mint-other')).toBe(false);
+    expect(
+      tree.root.findAll(
+        n => n.type === Text && n.props.children === SETUP.otherMint,
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(inputs()).toEqual([]);
+  });
+
+  test('pressing it opens and focuses the write-in, which is probed before the batch', async () => {
+    const probe = jest
+      .spyOn(ApiClient.prototype, 'probeMint')
+      .mockResolvedValue({ok: true});
+    const startAndRead = jest.fn(async () => true);
+    await mount({
+      installationOnly: false,
+      onCreate: async () => true,
+      onStartAndRead: startAndRead,
+    });
+    // The jest TextInput shares one focus mock across instances.
+    const focus = jest.requireActual('react-native/jest/MockNativeMethods')
+      .focus as jest.Mock;
+    focus.mockClear();
+    await press('mint-other');
+    expect(lit('mint-other')).toBe(true);
+    expect(lit(`mint-${FOUR[0]}`)).toBe(false);
+    const field = byId('mint-custom-input');
+    expect(field.props.placeholder).toBe('Or enter a mint URL…');
+    expect(field.instance.focus).toBe(focus);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(byId('start-batch').props.disabled).toBe(true);
+    await writeIn(WRITE_IN);
+    expect(customRow().length).toBeGreaterThan(0);
+    expect(byId('mint-custom-input').props.value).toBe(WRITE_IN);
+    // Typing swaps the empty field for the Custom row's; focus follows.
+    expect(focus).toHaveBeenCalledTimes(2);
+    expect(lit('mint-other')).toBe(true);
+    await press('start-batch');
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith('fixture', WRITE_IN);
+    expect(startAndRead).toHaveBeenCalledWith(
+      expect.objectContaining({mint: WRITE_IN}),
+    );
+  });
+
+  test('pressing it again keeps a write-in already typed', async () => {
+    await fastStart();
+    await press('mint-other');
+    await writeIn(WRITE_IN);
+    await press('mint-other');
+    expect(byId('mint-custom-input').props.value).toBe(WRITE_IN);
+    expect(customRow().length).toBeGreaterThan(0);
+  });
+
+  test('clearing a write-in returns to the single empty field, still on Other', async () => {
+    await fastStart();
+    await press('mint-other');
+    await writeIn(WRITE_IN);
+    await writeIn('');
+    expect(fields()).toHaveLength(1);
+    expect(byId('mint-custom-input').props.placeholder).toBe(
+      'Or enter a mint URL…',
+    );
+    expect(customRow()).toEqual([]);
+    expect(lit('mint-other')).toBe(true);
+    expect(byId('start-batch').props.disabled).toBe(true);
+  });
+
+  test('tapping a listed mint afterwards closes the write-in and clears it', async () => {
+    const probe = jest.spyOn(ApiClient.prototype, 'probeMint');
+    const startAndRead = jest.fn(async () => true);
+    await mount({
+      installationOnly: false,
+      onCreate: async () => true,
+      onStartAndRead: startAndRead,
+    });
+    await press('mint-other');
+    await writeIn(WRITE_IN);
+    await press(`mint-${FOUR[2]}`);
+    expect(inputs()).toEqual([]);
+    expect(customRow()).toEqual([]);
+    expect(lit('mint-other')).toBe(false);
+    expect(lit(`mint-${FOUR[2]}`)).toBe(true);
+    await press('start-batch');
+    expect(probe).not.toHaveBeenCalled();
+    expect(startAndRead).toHaveBeenCalledWith(
+      expect.objectContaining({mint: FOUR[2]}),
+    );
+  });
+
+  test.each([
+    [4, [false, true, false, true, false]],
+    [3, [false, true, false, true]],
+  ])(
+    'the grid edges count the Other cell (%i listed mints)',
+    async (n, rightEdge) => {
+      jest
+        .spyOn(ApiClient.prototype, 'mints')
+        .mockResolvedValue(FOUR.slice(0, n));
+      await fastStart();
+      const ids = [...FOUR.slice(0, n).map(m => `mint-${m}`), 'mint-other'];
+      const style = (id: string) => flat(byId(id).props.style);
+      expect(ids.map(id => style(id).borderRightWidth === 0)).toEqual(
+        rightEdge,
+      );
+      // An even total (3 + Other) closes the last row; an odd one leaves
+      // the bottom borders on.
+      const bottom = ids.map(id => style(id).borderBottomWidth === 0);
+      expect(bottom).toEqual(
+        ids.map((_, i) => ids.length % 2 === 0 && i >= ids.length - 2),
+      );
+    },
+  );
+
+  // Regression guards: behaviour that predates the cell.
+  test('an empty list still shows the write-in on its own, with no Other cell', async () => {
+    jest.spyOn(ApiClient.prototype, 'mints').mockResolvedValue([]);
+    await fastStart();
+    expect(tree.root.findAllByProps({testID: 'mint-other'})).toEqual([]);
+    expect(byId('mint-custom-input').props.placeholder).toBe(
+      'Or enter a mint URL…',
+    );
+  });
+
+  test('a saved mint the service no longer lists opens the write-in, unselected', async () => {
+    await rememberBatchDefaults(
+      {service_origin: 'https://ops.test', operator_id: 1, key_env: 'issued'},
+      {mint: 'https://gone.test', count: 1},
+    );
+    await fastStart();
+    expect(byId('mint-custom-input').props.placeholder).toBe(
+      'Or enter a mint URL…',
+    );
+    expect(FOUR.map(m => lit(`mint-${m}`))).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    await writeIn(WRITE_IN);
+    expect(customRow().length).toBeGreaterThan(0);
+  });
 });

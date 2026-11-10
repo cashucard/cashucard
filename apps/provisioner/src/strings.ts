@@ -35,6 +35,8 @@ export const SETUP = {
   noPin: 'No-PIN limit',
   count: 'Cards in the batch',
   start: 'START BATCH',
+  /** The last mint cell: opens the write-in field (D180). */
+  otherMint: 'Other mint…',
   mintsFailed:
     'The mint list could not be loaded. Retry or enter a batch reference.',
   buildLine: (sha8: string) => `Builds the 2.2 card. Load file ${sha8}…`,

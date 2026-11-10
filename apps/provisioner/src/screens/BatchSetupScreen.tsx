@@ -266,11 +266,26 @@ export function BatchSetupScreen({
     [],
   );
   const lastReadFirst = useRef(true);
+  // "Other mint…" was chosen: the write-in field is the selection, so the
+  // cell stays lit while the field is still empty. Tapping a listed mint
+  // drops it.
+  const [otherChosen, setOtherChosen] = useState(false);
+  const writeInRef = useRef<TextInput>(null);
+  const [focusWriteIn, setFocusWriteIn] = useState(0);
+  useEffect(() => {
+    if (focusWriteIn > 0) {
+      writeInRef.current?.focus();
+    }
+  }, [focusWriteIn]);
   const chooseMint = (value: string | null) => {
     editedMint.current = true;
     setPreviousMintMissing(false);
     setProbe('idle');
     setMint(value);
+  };
+  const chooseListed = (value: string) => {
+    setOtherChosen(false);
+    chooseMint(value);
   };
   const chooseCount = (value: string) => {
     editedCount.current = true;
@@ -449,6 +464,14 @@ export function BatchSetupScreen({
   const mints = serviceMints ?? [];
 
   const customMint = mint !== null && !mints.includes(mint);
+  const otherOn = customMint || (otherChosen && mint === null);
+  // The listed mints plus the "Other mint…" cell, two to a row: the right
+  // column and a full last row drop the borders the card edge already draws.
+  const cells = mints.length + 1;
+  const edges = (i: number) => [
+    i % 2 === 1 ? s.cellRowEdgeR : null,
+    i >= cells - 2 && cells % 2 === 0 ? s.cellRowEdgeB : null,
+  ];
 
   if (installationOnly && review) {
     return (
@@ -593,16 +616,13 @@ export function BatchSetupScreen({
                         key={m}
                         disabled={editingLocked}
                         accessibilityState={{disabled: editingLocked}}
-                        onPress={() => chooseMint(m)}
+                        onPress={() => chooseListed(m)}
                         testID={`mint-${m}`}
                         style={[
                           s.mintCell,
                           s.cellRow,
                           s.mintCellBorder,
-                          i % 2 === 1 && s.cellRowEdgeR,
-                          i >= mints.length - 2 && mints.length % 2 === 0
-                            ? s.cellRowEdgeB
-                            : null,
+                          ...edges(i),
                           on ? s.cellSelected : null,
                         ]}>
                         <Text
@@ -626,6 +646,40 @@ export function BatchSetupScreen({
                       </Pressable>
                     );
                   })}
+                  {mints.length > 0 ? (
+                    <Pressable
+                      disabled={editingLocked}
+                      accessibilityState={{
+                        disabled: editingLocked,
+                        selected: otherOn,
+                      }}
+                      onPress={() => {
+                        setOtherChosen(true);
+                        // A write-in already typed stays; only a listed
+                        // choice is cleared.
+                        if (!customMint) {
+                          chooseMint(null);
+                        }
+                        setFocusWriteIn(value => value + 1);
+                      }}
+                      testID="mint-other"
+                      style={[
+                        s.mintCell,
+                        s.cellRow,
+                        s.mintCellBorder,
+                        ...edges(mints.length),
+                        otherOn ? s.cellSelected : null,
+                      ]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          s.mintName,
+                          otherOn ? s.cellLabelOnAccent : null,
+                        ]}>
+                        {SETUP.otherMint}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
                 {customMint ? (
                   <>
@@ -634,9 +688,17 @@ export function BatchSetupScreen({
                       <Text style={s.cellDot}>●</Text>
                       <Text style={s.mintName}>Custom</Text>
                       <TextInput
+                        ref={writeInRef}
                         value={mint ?? ''}
                         editable={!editingLocked}
-                        onChangeText={chooseMint}
+                        onChangeText={v => {
+                          chooseMint(v || null);
+                          // Clearing it swaps this row for the bare field;
+                          // keep the keyboard on that one.
+                          if (!v) {
+                            setFocusWriteIn(value => value + 1);
+                          }
+                        }}
                         placeholder="Enter custom mint URL"
                         placeholderTextColor={t.dim}
                         keyboardType="url"
@@ -653,9 +715,17 @@ export function BatchSetupScreen({
                     <View style={s.divider} />
                     <View style={[s.cellRow, s.cellWide]}>
                       <TextInput
+                        ref={writeInRef}
                         value=""
                         editable={!editingLocked}
-                        onChangeText={v => chooseMint(v || null)}
+                        onChangeText={v => {
+                          chooseMint(v || null);
+                          // The first character swaps this field for the
+                          // Custom row's; keep the keyboard on it.
+                          if (v) {
+                            setFocusWriteIn(value => value + 1);
+                          }
+                        }}
                         placeholder="Or enter a mint URL…"
                         placeholderTextColor={t.dim}
                         keyboardType="url"
