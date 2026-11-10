@@ -691,7 +691,14 @@ export function BatchSetupScreen({
                         ref={writeInRef}
                         value={mint ?? ''}
                         editable={!editingLocked}
-                        onChangeText={chooseMint}
+                        onChangeText={v => {
+                          chooseMint(v || null);
+                          // Clearing it swaps this row for the bare field;
+                          // keep the keyboard on that one.
+                          if (!v) {
+                            setFocusWriteIn(value => value + 1);
+                          }
+                        }}
                         placeholder="Enter custom mint URL"
                         placeholderTextColor={t.dim}
                         keyboardType="url"

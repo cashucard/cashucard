@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
-import {Text} from 'react-native';
+import {Text, TextInput} from 'react-native';
 import {ApiClient, ApiUnreachableError} from '../src/api';
 import {BatchSetupScreen} from '../src/screens/BatchSetupScreen';
 import {SETUP} from '../src/strings';
@@ -247,6 +247,11 @@ describe('the Other mint… cell', () => {
   ];
   const WRITE_IN = 'https://example-mint.test';
   const inputs = () => tree.root.findAllByProps({testID: 'mint-custom-input'});
+  // One entry per write-in field (findAllByProps also matches each host node).
+  const fields = () =>
+    tree.root.findAll(
+      n => n.type === TextInput && n.props.testID === 'mint-custom-input',
+    );
   const customRow = () =>
     tree.root.findAll(n => n.type === Text && n.props.children === 'Custom');
   const flat = (style: unknown) =>
@@ -330,6 +335,20 @@ describe('the Other mint… cell', () => {
     await press('mint-other');
     expect(byId('mint-custom-input').props.value).toBe(WRITE_IN);
     expect(customRow().length).toBeGreaterThan(0);
+  });
+
+  test('clearing a write-in returns to the single empty field, still on Other', async () => {
+    await fastStart();
+    await press('mint-other');
+    await writeIn(WRITE_IN);
+    await writeIn('');
+    expect(fields()).toHaveLength(1);
+    expect(byId('mint-custom-input').props.placeholder).toBe(
+      'Or enter a mint URL…',
+    );
+    expect(customRow()).toEqual([]);
+    expect(lit('mint-other')).toBe(true);
+    expect(byId('start-batch').props.disabled).toBe(true);
   });
 
   test('tapping a listed mint afterwards closes the write-in and clears it', async () => {
