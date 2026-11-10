@@ -1,6 +1,6 @@
 {
   "name": "@cashu-card/ops",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "The ops service (ENG-740, D29): per-card GP key issuance from a master via HKDF, escrowed at issuance, the registries, the BTC anchor tip, operator sessions.",
   "license": "MIT",
