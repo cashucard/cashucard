@@ -315,6 +315,9 @@ and begins the first run in two presses. Create Batch Only saves the same
 configuration for later. The default count is one; approved defaults are scoped
 to the service and operator. Stop during creation preserves the original request
 and prevents a late card read. See [D124](../../docs/DECISIONS.md#d124).
+A mint the service does not list is entered through the "Other mint…" cell
+after the listed mints, and the service probes it before the batch can continue
+(see [D180](../../docs/DECISIONS.md#d180)).
 
 ### Android upload signing
 
