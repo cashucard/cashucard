@@ -277,8 +277,8 @@ hashes). This is the limit of the card's privacy against someone holding it
 
 | Byte | Field | Meaning |
 |---|---|---|
-| 0 | version major | `02` |
-| 1 | version minor | `03` |
+| 0 | version major | `03` |
+| 1 | version minor | `00` |
 | 2 | max slots | 128 (`0x80`) |
 | 3 | unspent | slots holding an unspent piece |
 | 4 | spent | slots spent and not yet freed |
