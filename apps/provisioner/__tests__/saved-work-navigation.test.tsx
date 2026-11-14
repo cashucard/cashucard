@@ -303,6 +303,8 @@ test('card check to reset returns through card check and then Cards, without sta
           sealed: false,
           mint: '',
           recordDigest: 'ab'.repeat(32),
+          changeOwed: false,
+          version: '2.2',
         },
       },
       source: {can_reset: true, lookup: {status: 'found'}},

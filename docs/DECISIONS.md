@@ -731,9 +731,18 @@ page a 2.0 card's tag opens is a product decision left open.
 
 ## <a id="d20"></a>D20: The clock walk is bounded: a rollover budget, REFRESH, an armed allowance, an anchored owner
 
+*Amended by [D200](#d200) (2.3): the anchor of the owner's reset or hand-over of an empty card
+sets the clock even where it is older than the card's. Amended by [D201](#d201) (2.3): `REFRESH`
+(and a claim's anchor) brings back a clock a weak header set, and the owner's `REFRESH` back form
+any clock; at a weak clock no day ends.*
+
 *Amended by [D26](#d26) (2.1): only a payment that moves value rolls the day, and
 a `SET_LIMIT` without the budget's byte leaves the budget as it is. The text
 below is 2.0's.*
+
+*Amended by [D186](#d186) (2.3): the no-PIN allowance has a window of its own,
+counts whole pieces, and is armed by a `VERIFY_PIN` only in a time in the field
+that signs no payment; the rollover budget is unchanged.*
 
 **Found (Foxy's reply, question 3; our shelved 0.7 plan, its decision 9),
 fixed (ENG-673, fix 4a).** In 1.20 the day's window rolls whenever a payment
@@ -860,16 +869,17 @@ item 5).
 256 on random input; the carry write is cheaper than the loop it replaces.
 Re-measure `cardctl --timing` on the J3R180 before release (`AUTH`, measured
 under ENG-681: 833 to 854 ms a signature on an ACR122U, against 814 ms for 0.4,
-about 3% more; [D25](#d25)). What this does not
-reach: the modular reductions on the same signing path, which still branch on
-values derived from the key and the nonce (`reduce512toModN` over e·d,
-`addModN` over k + e·d, `reduceModN` over k, the `sub32` and `cmp32` they
-call, and `mulSmallByDelta`'s overflow check; listed as open in SECURITY-MODEL item 5, and held to the source by
-`SchnorrHWMathTest`): so the signing path as a whole is not free of
-secret-dependent branches, and nothing in 2.0 says it is; the chip's own
-`KeyAgreement` and RSA engines, which do the point multiply and the field
-exponentiations, and whose timing is NXP's; and the JavaCard VM's own timing
-of a multiply, which is not specified constant.
+about 3% more; [D25](#d25)). What this did not
+reach at first: the modular reductions on the same signing path, which
+branched on values derived from the key and the nonce (`reduce512toModN` over
+e·d, `addModN` over k + e·d, `reduceModN` over k, the `sub32` and `cmp32` they
+called, and `mulSmallByDelta`'s overflow check). Since 2.3 those run the same
+instructions for every value too (SECURITY-MODEL item 5), and
+`SchnorrHWMathTest` scans their bodies as it scans the multiplies. What this
+does not reach: the chip's own `KeyAgreement` and RSA engines, which do the
+point multiply and the field exponentiations, and whose timing is NXP's; and
+the JavaCard VM's own timing of a multiply or an array access, which is not
+specified constant. Nothing is measured on silicon yet.
 
 ---
 
@@ -1020,6 +1030,10 @@ applet alone, where either SELECT reaches it.
 ---
 
 ## <a id="d26"></a>D26: Only a payment that moves value turns the day; a SET_LIMIT without the budget's byte leaves it (amends D20)
+
+*Amended by [D186](#d186) (2.3): the no-PIN allowance counts whole pieces in a window of
+its own, which only an arming renews, and a `VERIFY_PIN` arms it only in a time in the field
+that signs no payment. The text below is 2.1's.*
 
 **Found (Mike Greff's review of 2.0, ENG-699), fixed in 2.1.** Each finding was
 first written as a test that failed on 2.0; the names are `ClockWalkTest`'s.
@@ -1196,6 +1210,10 @@ closest is FIP-04, which describes the design being replaced. *(The FIP
 repository is internal to Flash.)*
 
 ## <a id="d28"></a>D28: 2.1 holds; the 1.21 gaps are kept, with triggers
+
+*Superseded in part by 2.3 ([D183](#d183) to [D190](#d190)): gaps 1 and 6 are
+closed by [D185](#d185), gaps 2 and 3 by [D183](#d183), gap 4 by [D186](#d186)
+and gap 5 by [D187](#d187). The text below is 2.1's.*
 
 **Decided (ENG-737, 2026-10-19):** the card stays at 2.1. The six gaps Foxy's 1.21
 (`06a9ea7` + `6e0b619`, 2026-10-17) closed and 2.1 has not are **kept on purpose**
@@ -5450,7 +5468,9 @@ of an incompatible change, would stop `tools/outbox-spike/run-compact.cjs` and
 `run-probe.cjs`, which refuse any cardkit but the reviewed 0.2.0, and
 `run-compact.cjs` is a protected source of the pending `recover-unset-up-v3`
 audit, so moving their pin fails that plan's admission. The owner decides the
-bump with the review of those runners. Also not here: protocol choice in the
+bump with the review of those runners. *2.3: cardkit is 0.3.0; the two runners keep
+their pin to the reviewed 0.2.0 and refuse 0.3.0 until they are reviewed against it
+(`tools/outbox-spike/reviewed-cardkit.test.cjs`).* Also not here: protocol choice in the
 apps, first contact with a seller-keyed card (PUT KEY with P1 = 00 at version
 255) and what becomes of the seller's tag (slice 2, since decided in
 [D182](#d182) for a card whose shipped set is known; an install that does not
@@ -5574,7 +5594,8 @@ untouched card among them. A J3R452 still on the seller's keys stops at
 `wrongKeys` and is quarantined (`authentication-failed`), its reservation used:
 importing the seller's key file waits until a seller-keyed batch is bought (the
 brief's D2). cardkit stays 0.2.0, as [D181](#d181) left it; the bump moves with
-the review of the outbox-spike runners.
+the review of the outbox-spike runners (2.3: it is 0.3.0; the runners keep their 0.2.0 pin, and refuse it,
+until that review).
 
 **Rejected.** Deleting the seller's tag by default in cardkit (the delete
 cannot be undone, so a caller asks for it); a `firstContact` flag from the
@@ -5586,3 +5607,2211 @@ first contact as its own step before the install (it would need a journal
 stage of its own, where the tap's last rotation already has one); a reset that
 accepts version 01 alone (it would strand a card recorded at any other
 version, and the app records the version it observes).
+
+---
+
+## <a id="d183"></a>D183: The card finishes its own change (2.3: GET_CHANGE bound to the mint's key, LOAD_CHANGE at 27)
+
+**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gaps 2 and 3).** Only the
+card can finish its own change, and it writes a change piece only when the mint's
+DLEQ proof holds under the key named at the payment.
+
+- **`SPEND_ALL_CHANGE` (`26`) names the mint's key.** The data is the amount (4),
+  the mint's key `K` for that amount (33, compressed) and the keyset the change is
+  signed in (8): 45 bytes, a keyset the card holds and was taught ([D194](#d194): the
+  37-byte form, which took the first input's keyset, is `6700`). The card keeps the
+  opening bound to `K`. The 4-byte form of 2.2 is `6700`.
+- **`GET_CHANGE` (`19`) lists what is owed, and nothing that finishes it.** Each
+  opening is 83 bytes: its number (1), amount (4), keyset (8), date (4), `B_` (33)
+  and `K` (33). The nonce and the blinding factor `r` stay on the card while the
+  change is owed.
+- **`LOAD_CHANGE` (`27`) takes the mint's answer.** P1 is the opening's number; the
+  data is `C_` and `K` uncompressed (65 each) and the mint's NUT-12 `e` and `s` (32
+  each), 194 bytes. The card checks `K` against the bound key before any arithmetic,
+  checks that both points are on the curve, checks the DLEQ proof against its own
+  `B_`, unblinds `C = C_ − r·K` with its own `r`, and writes the piece as `LOAD_PROOF`
+  does, the status byte last, with `e`, `s` and `r` kept as its proof. It answers the
+  slot, whether the proof was kept, and the piece's 81 bytes.
+- **Any reader, in any tap, with no PIN,** on a locked card and a blocked one too:
+  receiving what the card is owed changes no setting. No tap is "the tap after a
+  payment"; the change of an earlier payment goes on as well as the last's.
+- **While change is owed,** `SET_CARD`, `RESET_CARD` (P1 = 0), and on a card with no
+  owner `SET_PIN` and `SET_LIMIT_PIN`, answer `6A8D`: the mint, the unit and the
+  refund key stay as the change's secret was built with them.
+- **`RESET_CARD` P1 = 1 gives one opening up** (P2 its number), for an opening nothing
+  can load: the owner's proof over `CashuCard/reset` and the number, or on a card with
+  no owner the PIN in a held tap ([D189](#d189)). The money of that opening is gone,
+  so it is the holder's choice and never the card's. The log marks the tap (bit 4).
+- **`GET_INFO` byte 29** says whether change is owed, to anyone. In 2.2 it said
+  whether this tap might load the change with no PIN.
+
+**Why.** In 2.2 `GET_CHANGE` gave every reader each opening's nonce and `r`, so
+anyone who saw the mint's answer could finish the piece, and the card checked
+nothing when the change was written: a reader that wrote a wrong `C` left the holder
+without that change. With the opening bound to `K` and the proof checked on the card,
+the one piece a reader without the PIN can write is the one the mint signed for this
+opening, and a key made up after the payment is refused.
+
+**Why `27`.** `53` is `REFRESH` ([D20](#d20)); `27` is free and sits with the
+payment commands whose change it finishes.
+
+**What the card still cannot see.** That `K` is the mint's key. A reader that binds
+an opening to a key of its own makes change the mint's answer cannot fit; the opening
+stays owed until the holder mends it ([D190](#d190)) or gives it up. NUT-CCP's core
+says so, and leaves both to profiles.
+
+**Rejected.** Keeping 2.2's 80-byte openings beside the new ones: it keeps `r` on the
+wire for any reader that asks. Checking nothing and trusting the reader that writes
+the change: that is 2.2. Taking the proof at `LOAD_PROOF` with a flag: change is not
+an ordinary load, its gate is different (no PIN), and a separate instruction keeps
+`LOAD_PROOF`'s rule simple ([D185](#d185)).
+
+**Cost accepted.** A reader that pays with change sends the mint's key at the payment
+and, later, `C_`, `K`, `e` and `s` instead of a finished piece: two more fields it
+already has from the mint. A 2.2 reader cannot finish a 2.3 card's change ([D193](#d193)).
+The card keeps each opening's `B_` and `K` (66 bytes more for each of 8 openings),
+reserved at the first `SET_CARD`, and `LOAD_CHANGE` costs about two signatures'
+work on a chip.
+
+**Built (applet).** The openings' `B_` and `K` are `openKeys` (8 × 66 = 528 bytes; 8 × 67 = 536 with [D190](#d190)'s shown mark),
+reserved once at the first `SET_CARD` that goes through, outside any transaction and
+behind its own null guard, after the store of the mint's proofs and the settlement
+record ([D17](#d17), [D176](#d176)); the constructor is unchanged (29,841 persistent
+bytes, 940 cleared on deselect in 15 arrays). A card refused the room makes no change
+for itself (`SPEND_ALL_CHANGE` answers `6A84`) and is set up all the same, so an
+opening that is owed always has its `B_` and `K`. `SPEND_ALL_CHANGE` checks that `K`
+is a point of the curve (an x under p whose `x³ + 7` has a root, by the chip's RSA over
+p·p, as the change's own point is found), and `LOAD_CHANGE` checks `C_` and `K` (x and
+y under p, `x³ + 7` a square, y one of its roots) before the chip is given either. The
+change's piece is written by `loadOne`, as `LOAD_PROOF` writes one, with `e ‖ s ‖ r`
+as its proof. The payment's settlement record ([D175](#d175)) gives the card's own
+change its opening's keyset (found by its `B_` among the openings owed) and the till's
+outputs the first input's. `GET_INFO` byte 29 is `01` while any opening is owed
+(signed for and not let go). The let-go form on a card with no owner checks the PIN and
+the time in the field and then wants a held tap ([D189](#d189)).
+
+**Writes outside a transaction ([D23](#d23)), and why a tear is safe.**
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processSpendAllChange` | the opening's `K`, amount, keyset (the first input's or the one named) and date, then (after `blindChange`'s nonce and `r`) its `B_`, then its state byte `DRAFT` | The state byte is the opening's commit. Torn before it, the opening is `EMPTY` with bytes in it: `GET_CHANGE`, `LOAD_CHANGE`, the settlement record and the owed gates read only owed openings, and the next change writes every field before its state byte (`SlotWriteOrderTest.aTornChangeLeavesKeysThatAreNeverServed`). |
+| `letGo` | one byte, an opening `EMPTY` | One byte is whole. Called for a piece already on the card (`GET_CHANGE`, `LOAD_CHANGE`, the owed gates, a load's `clearOpening`) and, inside its transaction with the log entry, by the let-go form. |
+| `processLoadChange` | through `loadOne` (record, hex, data, status byte last), then the opening let go, then the log in a transaction | Torn before the status byte: the place is `EMPTY` and the opening owed, and the same answer goes on again into the same place. Torn after it and before the letting go: the piece is on the card, the opening owes nothing, and the next `GET_CHANGE`, `LOAD_CHANGE` (`6A94`) or owed gate lets it go (`SlotWriteOrderTest.aTornLoadChangeIsFinishedByTheSameAnswer`). Torn before the log: the piece is on the card with no entry, as for `LOAD_PROOF`. Nothing is written before the piece. |
+| `processLetGo` | none: the log entry with bit 4 and the opening let go are one transaction | All or nothing. |
+| `processSetCard` | one byte per opening, a draft let go, before the record's transaction | A draft is owed nothing; one left by a tear is let go by the next `SPEND_ALL_BEGIN` or `SET_CARD`. |
+| `processResetCard` | `openKeys` zeroed with the other bulk wipes | Before the four-byte transaction, as the openings already were: torn before it, the card is still its owner's, who resets it again. |
+| `SchnorrHW.addTo`, `mul` | the signer's temporary key's generator and scalar | Every use sets the generator and scalar it means before the chip is given the key; `sign` multiplies the point it is handed, not the key's generator. |
+
+`SlotWriteOrderTest.everyWriteOutsideATransactionIsReviewed` counts them;
+`SchnorrHWMathTest.ONCE_ONLY_ALLOCATIONS` lists the reservation.
+
+---
+
+## <a id="d184"></a>D184: Units in the core, two units on one card, and one SET_LIMIT layout
+
+**Decided (protocol 2.3, 2026-11-12).**
+
+- **Unit codes are core** (NUT-CCP, "Units"): `00` sat, `01` usd. On a usd card every
+  amount, the balance and every limit is in cents. Other codes are reserved.
+- **Two units on one card** is a profile: `sat` and `usd` pieces at the card's one
+  mint, told apart by keyset in a **keyset table** the first `SET_CARD` reserves (six
+  entries: the keyset's 8 bytes, a state byte with the unit, the holder's mark and
+  whether its keys are known, and the top of its keys' tree, [D190](#d190)). A card
+  whose table holds a keyset of the other unit says format `05` (`GET_INFO` byte 8,
+  `GET_CARD` byte 0), worked out at each asking; a reader that knows only format 4
+  refuses it, and so never reads cents as sats. A load names its pieces' unit
+  (`LOAD_PROOF` P2 = 1); one payment is of one unit (`6A9A`); a new keyset of the other
+  unit is the holder's to start (`6A9D`); at most two live entries lack the holder's
+  mark (`6A9C`). New forms: `GET_INFO` P1 = 3, `GET_CARD` P1 = 2, `GET_BALANCE` P1 = 1,
+  `GET_LOG` P1 = 2 and 3.
+- **Limits are in the card's unit.** A payment in the other unit is counted at a
+  **rate**, sats to the dollar, rounded up against the holder; with a limit set and no
+  rate it is refused (`6A99`), and so is a load of the other unit's pieces, and a
+  `SET_LIMIT` that would leave a limit and no rate on a card holding the other unit's
+  pieces (before anything is written), so that no card holds pieces no payment could
+  take off.
+- **One `SET_LIMIT` layout** for the owner's form (`34`) and the PIN form (`33`):
+  daily limit (4), payment limit (4), no-PIN allowance (4), rollover budget (1),
+  rate (4), and with [D186](#d186) the no-PIN window's switch (1). A value of 4, 8, 12,
+  13, 17 or 18 bytes sets the fields it carries and leaves the rest. 2.2's 13 bytes are a prefix of it, so every 2.2 write means on 2.3 what it
+  meant on 2.2.
+- **`GET_CARD`'s record offsets are settled for 2.x:** 76 rolls, 77 budget, 78 armed
+  ([D20](#d20)); 79 to 82 the rate, answered as zeros (`GET_INFO` P1 = 3 tells it to
+  whom the limit on one payment is told); 83 to 86 the no-PIN window's start
+  ([D186](#d186)); 87 the no-PIN window's switch ([D186](#d186)); 88 to 104 zeros. In
+  the card's record these are offsets 156 to 167, where 2.2 had zeros, so the
+  constructor asks for nothing more.
+
+**Why.** A holder who keeps dollars and sats wants one card. The keyset is the only
+thing on a piece that says its unit, so the card keeps the table and never chooses a
+unit itself. Limits in the card's unit keep a sat card's numbers what they were in
+2.2; the rate turns only the other unit's payments. One layout with the budget before
+the rate means no length means two things and no wallet's earlier writes change
+meaning: 13 bytes end with the budget, as in 2.0, and the rate only ever follows it.
+
+**Rejected.** Every limit in cents whatever the card's unit: it would
+make every sat card need a rate before any limit worked. A unit per piece in the slot:
+it moves the 82-byte slot that every reader parses. Two mints on one card: a record
+names one mint, and the change's secret is built with its refund key.
+
+**Cost accepted.** 267 bytes reserved at the first `SET_CARD`. A card of six live
+keysets takes no seventh until a reclaim frees one. The rate is only as fresh as the
+owner's phone made it; it is rounded against the holder.
+
+**Built (applet).** The table is `book` (6 × 41 + 1 + 4 + 16 = 267 bytes: each entry the
+keyset's 8 bytes, its state at 8 and the top of its keys' tree at 9 to 40; then the last
+payment's unit at 246, the other unit's count at 247 and the receipts' units at 251),
+reserved once at the first `SET_CARD` that goes through, outside any transaction and
+behind its own null guard, after the openings' keys ([D183](#d183)); the constructor is
+unchanged. Every use is safe while it is null: such a card is of one unit, its pieces
+its own unit's, and a load labelled the other unit is `6A9C`. The holder's say that
+marks an entry is the owner's grant; on a card with no owner it is the held tap
+([D189](#d189)). A payment in the other unit is turned into the card's unit at the
+rate by hand on bytes (`turn`: the product by shift and add, then sixty-four steps of
+shift and subtract, rounded up, past four bytes `FF FF FF FF`), in scratch the
+payment does not use while it signs, at the first `SIGN` and again at the last; the
+log, the counts and the receipt keep the payment's own unit. The settlement record's
+unit byte ([D175](#d175)) is the payment's. `SPEND_ALL_CHANGE`'s 45-byte keyset is
+entered without the mark where it is new, and runs no reclaim (the reclaim runs at
+`CLEAR_SPENT`, at a load and at `SET_CARD`). The rate is kept at record offset 159
+(`GET_CARD` 79), after the arming.
+
+**Writes outside a transaction ([D23](#d23)), and why a tear is safe.**
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `enter` (from `loadOne` and `processSpendAllChange`) | a free entry's keyset (8), then its state byte | The state byte is the entry's commit. Torn before it, the entry is still free (state `00`) and its bytes a keyset nothing reads. Torn after it, the entry is live and nothing names it: the piece's status byte or the opening's state byte comes later, and the next reclaim frees it (`UnitsTest.aTornEntryIsFreed`). |
+| `reclaim` (at `CLEAR_SPENT`, a load that finds no entry, `SET_CARD`) | one state byte `00` for each entry no unspent place and no opening (drafted or owed) names | One byte each is whole. Torn halfway, some dead entries are freed and the next reclaim frees the rest. A live entry is never freed: every place and opening that names it is looked at first. |
+| `processResetCard` | the table zeroed with the other bulk wipes | Before the four-byte transaction, as the log and the receipts are: torn before it, the card is still its owner's, who resets it again. |
+| `processSpendAllSign` | none new: the other unit's count, the last unit and the receipt's unit are written in the payment's and the receipt's transactions | All or nothing with the payment and its receipt. |
+| `processSetCard` | none new: the last unit is forgotten in the record's transaction; the reclaim before it is the reclaim's | A record and its last unit change together. |
+
+`SlotWriteOrderTest.everyWriteOutsideATransactionIsReviewed` counts them;
+`SchnorrHWMathTest.ONCE_ONLY_ALLOCATIONS` lists the reservation.
+
+---
+
+## <a id="d185"></a>D185: PIN before money; the core no longer asks that the tap after a payment may load
+
+**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gaps 1 and 6).** A card is
+given its PIN before anything goes on it or leaves it.
+
+- A card with no PIN refuses `LOAD_PROOF`, `CLEAR_SPENT`, `LOAD_CHANGE`, `KEYSET_KEYS`,
+  the payment commands `22` to `26`, an owner's claim and the let-go form of
+  `RESET_CARD`, with a word of its own, `6A97`. `SET_PIN` stays open on a card with no
+  owner and nothing on it.
+- `LOAD_PROOF` and `CLEAR_SPENT` want the PIN given in this tap, and nothing else opens
+  them: not the owner's grant (`ALLOW_LOAD` now grants reading, telling and binding,
+  never loading) and not the tap after a payment (the change grant is gone: the card's
+  own change comes back by `LOAD_CHANGE`, [D183](#d183)).
+- No card has an owner and no PIN: an owner is claimed only under the PIN
+  ([D187](#d187)), and `SET_PIN` on an owned card is `6A91` (2.2's ADD PIN under the
+  grant is gone).
+- The holder's numbers on a card with no owner (`SET_LIMIT_PIN`) are the PIN's, with
+  nothing unspent or owed.
+- NUT-CCP's core drops "A card SHOULD let the reader of a payment load that payment's
+  change in the same tap or the next one", and says instead that a card MAY want its
+  PIN for every `LOAD_PROOF`, and MUST NOT want anything for `LOAD_CHANGE` under the
+  bound key.
+
+**Why.** In 2.2 a card with no PIN took loads from any reader, and the tap after any
+payment opened loading and `CLEAR_SPENT` with no PIN: a reader could fill places, or
+free spent ones, with nothing the holder gave. A piece written by a stranger is not
+money the holder can trust, and a freed place loses the record of a payment that may
+still be settling (NUT-CCP's spent-slot rule). With the change its own business
+([D183](#d183)), nothing a reader legitimately does after a payment needs a load.
+
+**Rejected.** A card with no PIN that pays for whoever holds it, as 2.2 allows: it is
+cash, and a card that holds cash with no PIN cannot tell its holder from a finder. An
+issuer that wants that card sets an allowance instead ([D186](#d186)). Keeping the
+owner's grant as a load key: the grant says the owner's phone was in the tap, not
+that the holder chose what is written; the PIN is the holder's own.
+
+**Cost accepted.** Every top-up asks for the holder's PIN, Flash's and Foxy's alike.
+A card cannot be handed out with money on it and no PIN. A 2.2 reader that loads
+under the grant, or in the tap after a payment, is refused and writes nothing.
+
+**Writes (the tear review, [D23](#d23)).** This decision adds no write outside a
+transaction and takes one away:
+
+| Site | Writes outside | Why a tear there is safe |
+|---|---|---|
+| `loadOne` | the proof record, the hex text, the data, then the status byte | Status byte last ([D14](#d14), [D17](#d17)): a tear leaves an EMPTY place, which nothing serves. Nothing of the load is written after the status byte: the persistent note of a payment that opened the next tap (2.2's `changeDue`) is gone, and with it D23's tear that left it standing. |
+| `processSpendAllSign` | unchanged | The payment's transaction no longer sets that note: it holds the day, `burnPending`, the log and the last signature. |
+| `processResetCard` | unchanged | Its one transaction holds four bytes (the lock, the PIN state, the owner, the tag's switch), where 2.2's held five. |
+
+The constructor makes one persistent byte fewer (29,841 bytes in all) and one
+transient byte fewer (940 cleared on deselect, in 15 arrays):
+`SchnorrHWMathTest` and `CashuAppletTest` pin both. `OwnerPinRemovalTest` keeps its
+two concerns: its card with a PIN state of none, set by hand, now loads and pays
+nothing (`6A97`), and the owner gives it a PIN by `CHANGE_PIN`, `SET_PIN` being
+`6A91` on an owned card.
+
+---
+
+## <a id="d186"></a>D186: The no-PIN allowance counts whole pieces in a window of its own (amends D20 and D26)
+
+**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gap 4).**
+
+- **Whole pieces.** A payment signed with no PIN counts against the allowance as the
+  whole of its pieces, the card's own change included. The day's limit still counts
+  what leaves the card.
+- **A window of its own.** It begins at the first payment with no PIN while none runs,
+  at the card's clock (a card that has taken no header begins it at the first header it
+  takes), and `GET_INFO` P1 = 4 (bytes 51 to 54, a new 57-byte form) and `GET_CARD`
+  bytes 83 to 86 say when. It ends at the owner's next good proof, whatever the command
+  and even where the command is then refused for something else, and at a
+  `SET_LIMIT_PIN` that carries the allowance (in the card's first set-up only, since
+  [D195](#d195)); or at a payment with no PIN that finds the
+  allowance **armed** and, with the window of 24 hours, the clock 24 hours past the
+  window's start (with no window, the arming alone).
+- **Arming.** An owner's good proof, a `SET_LIMIT_PIN` that carries the allowance (in a first set-up, [D195](#d195)), or a
+  `VERIFY_PIN` in a time in the field in which no payment has been or is then signed: a
+  payment's commit takes back an arming a `VERIFY_PIN` gave earlier in the same time in
+  the field, and never one the allowance had from an earlier time in the field (a
+  `VERIFY_PIN` that finds the allowance armed arms nothing, and so has nothing to take back).
+  The payment with no PIN that begins a window, whether one ran before it or not, spends
+  the arming: one allowance for each arming. 2.2 armed on every `VERIFY_PIN`.
+- **The switch: the window of 24 hours, or none.** One byte of the record (offset 167,
+  `GET_CARD` 87), `SET_LIMIT`'s eighteenth byte in both forms: `00` the window of 24
+  hours, in which an arming brings the allowance back no sooner than 24 hours after the
+  window that runs began; `01` none, in which an arming brings it back at the next
+  payment with no PIN, whatever the clock says. `6A80` for any other value, with nothing
+  written. **Default `00`**: a new card's record and one after `RESET_CARD` are zeros,
+  every 2.2 wallet and every shorter `SET_LIMIT` leave the byte as it is, and of the two
+  it is the tighter (it renews no more often than `01` does), so a card whose wallet never
+  heard of the switch keeps the rule of this decision as first written. **Who sets it:**
+  the owner's proof on an owned card (`SET_LIMIT`, `34`); on a card with no owner the
+  PIN (`SET_LIMIT_PIN`, `33`, with that form's rules); never a till, which has neither.
+  `SET_CARD` never touches it. **A card with no owner** (a holder with no phone) keeps
+  the default until a phone with its PIN writes 18 bytes; with either setting its
+  allowance is armed only by a `SET_LIMIT_PIN` that carries it or by its PIN in a tap
+  that pays nothing, since it has no owner's proof. **What Foxy writes:** `01`, in an
+  18-byte value (daily limit ‖ payment limit ‖ allowance ‖ budget ‖ rate ‖ `01`), by the
+  owner's form on an owned card and by the PIN form on a card with no owner: its no-PIN
+  amount is what the card spends without a PIN before it is next seen by the holder's
+  phone or the holder's PIN, never renewed by time.
+- **The word.** Past the allowance a payment with no PIN is `6A9E`, "limit reached,
+  enter the PIN", written in the log as a refusal over a limit; with the PIN the same
+  payment goes through. An allowance of 0, or a blocked PIN, stays `6A94`.
+- `GET_INFO` bytes 38 to 41 are the running window's count; `GET_CARD` byte 78 is still
+  "armed".
+
+**Why.** Counted as what leaves the card, a reader with no PIN could name a large
+piece, take nearly all of it as change and never swap: the whole piece out of the
+holder's reach for the price of a few sats of allowance. Counted whole, what a reader
+with no PIN can put out of reach is the allowance and no more. And a PIN the holder
+types at a reader to pay opened the allowance again in 2.2 for whoever tapped the card
+next; now only the owner's phone, or the holder's own phone in a tap that pays nothing,
+opens it.
+
+**Rejected.** Renewing on the clock alone: a reader with no PIN that holds
+a card whose clock is behind the network can walk it with real headers and take the
+allowance for each day it walks. Keeping 2.2's window, shared with the day's: the
+holder's phone could not say when the no-PIN money comes back.
+
+**Cost accepted.** A holder who only ever pays with no PIN, and whose phone never sees
+the card, gets one allowance until the owner's phone or a PIN in a tap that pays
+nothing arms it again. A thief gets one allowance per arming, as in 2.2. With the
+switch at `01`, a holder who types the PIN in a tap that pays nothing gets a new
+allowance at once, without waiting a day: the PIN-holder could pay with the PIN anyway.
+
+**Built (applet).** The window's start is record offset 163 (`CARD_NOPIN_START_OFFSET`,
+`GET_CARD` 83, after the rate), the switch 167 (`CARD_NOPIN_DAY_OFFSET`); the count stays at 205 and alone
+says whether a window runs (0: none, and `GET_INFO` P1 = 4 answers zeros at 51 to 54).
+`requireAllowanceOrPin` is held to the whole of the pieces in the card's unit (`X_CONV`,
+[D184](#d184)) and answers `6A94` (allowance 0, a blocked PIN) with nothing written or
+`6A9E` through `refuseOverLimit`; `noPinBegins` says whether a payment with no PIN begins
+a window; the commit writes the start and spends the arming when it does, and takes an
+arming back when this time in the field's `VERIFY_PIN` gave it (`TAP_ARMED`, set only where
+`armAllowance` moved the byte from 0, a third byte
+of the CLEAR_ON_RESET `tapOpen`: 7 bytes on reset in all, under the 8 of D22's budget).
+The day's window is the daily limit's alone: a payment with no limit set begins none, and
+`SET_LIMIT` no longer clears the no-PIN count when the day's number changes. `SET_HEADER`
+anchors a window begun with no clock. `GET_INFO` P1 = 4 answers 57 bytes, the profile bits
+`FF 01` at 55 and 56, every profile of 2.3 (since [D196](#d196) 59 bytes, the loads left today
+after them, and `FF 03` with keys per load, [D197](#d197)). The constructor is unchanged.
+
+**Writes outside a transaction ([D23](#d23)), and why a tear is safe.**
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `endNoPinWindow` (from `requireOwnerProof` and `writeLimit`) | the count to 0, then the start to 0 (only where a window runs), then `armAllowance`'s one byte | The count alone says whether a window runs. Torn after it, none runs and the next window's beginning writes its own start; torn before the arming, the next payment with no PIN begins a window anyway (none runs) and finds nothing to spend. The owner's proof (or the PIN's `SET_LIMIT_PIN`) is what asked for the end, and asks again. |
+| `armAllowance` | one byte | Whole. |
+| `writeHeader` | the start of a window begun with no clock, beside the day's window | In the header's transaction (`SET_HEADER`, `REFRESH`, the anchor): every caller holds one. |
+| `processSpendAllSign` | none new: the start, the count and the arming are written in the payment's transaction | All or nothing with the payment. |
+
+`SlotWriteOrderTest.everyWriteOutsideATransactionIsReviewed` counts them.
+
+---
+
+## <a id="d187"></a>D187: An owner is claimed slowly, under the PIN
+
+**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gap 5).** `SET_OWNER` on a
+card with no owner is a claim (*amended by [D202](#d202): the claim may bring the owner's c,
+sealed in a `SET_OWNER` P1 = `01` just before it, and its check at the end of the data*): the PIN set and given in this tap, the card in its first
+set-up ([D196](#d196): a card set up with no owner is never claimed, `6A91`), no payment
+signed in this time in the field, an empty card (nothing unspent and no change owed,
+`6A8D`, as 2.2 had it; see [D195](#d195)), and the same data asked six times in a row.
+Each of the first five askings is answered `6A98`, keep holding, after a signature's
+work of the card's own, thrown away (some three seconds in all on a chip); the sixth
+sets the owner. Other data, or any other command between, begins the count again.
+After a claim, no payment command is taken for the rest of that time in the field
+(`6985`). The anchor of [D20](#d20) rides
+with the claim, checked before any asking counts. An owned card is handed over at once
+with the old owner's proof, as before.
+
+**Why.** In 2.2 an open card took an owner at once, from any reader: a reader that had
+just been handed a card, or its PIN for a payment, could make itself the owner in the
+same instant. Under the PIN, held for seconds, and never in a tap that paid, a claim is
+something the holder does on purpose. A time in the field ends when the reader's field
+does, so "never in a tap that paid" binds only a reader that keeps its field on; the claim
+wants an empty card as well, and since [D196](#d196) the card's first set-up, which only
+the card's first PIN or a reset begins. A holder with no phone who later wants a phone as
+owner moves the money to that phone, resets the empty card by the PIN, and sets it up again
+with the phone, which claims it there.
+
+**Rejected.** A claim with no PIN on a card with nothing on it: no card holds anything
+with no PIN ([D185](#d185)). `9000` with "not yet" bytes for the early askings, as a
+payment's wait: a phone that asks once would take `9000` for done.
+
+**Cost accepted.** Set-up takes three seconds more. A phone that sends `SET_OWNER` once
+and stops sees `6A98` and nothing set.
+
+**The owner's key is a point.** The card checks the owner's key itself, on a claim and on
+a handover alike, last of every check and before the key is written: `x` and `y` under
+P-256's `p` and `y² = x³ − 3x + b`, `6A80` otherwise. A chip's key object may take a key
+that is not on the curve without a word (the simulator does), and a card whose owner's
+key is no point could never be given the owner's proof again. The check is the chip's
+RSA, as the change's field arithmetic is ([D183](#d183)): its modulus is now
+`N = p₁ · p₂`, secp256k1's prime times P-256's (512 bits, as before), so one power mod
+`N` serves both fields. Three times the curve's equation is gathered mod `N` as
+`(y + 1)³ + (p₂ − y)³ + 3(p₂ − x)³ + 3(p₂ − y) + 9x − 1 − 3b`, which is 0 mod `p₂` exactly
+on the curve, then raised to `(p₁ − 1)/2`: on the curve the answer is 0 mod `p₂` and 0, 1
+or −1 mod `p₁`, that is `T` or `N − T`, where `T` is `p₂` raised to the same power (or 0,
+where the sum is 0 mod `p₁` as well: a chance of 2⁻²⁵⁶ that no key can be chosen to make,
+and refused).
+
+**Built (applet).** `CLAIM_ASKINGS = 6`. The count is a second byte of the
+CLEAR_ON_DESELECT `nonceLive` (941 bytes of deselect RAM in all, the figure of the build
+that installed on a slower chip), its top bit set while it counts a history's askings
+([D189](#d189)); `process` sets it to 0 before any command but the one it counts, a
+`SELECT` among them. The same data is a SHA-256 of the key and the anchor kept in
+`allSlots` between askings. Each early asking is `holdOn`: one signature's work thrown
+away (`work`, which the payment's wait shares), then `6A98`. The time in the field's marks
+are three bits of the CLEAR_ON_RESET `tapOpen[2]` beside D186's arming: `TAP_PAID` (set at
+a payment's commit), `TAP_CLAIMED` and `TAP_READ`; `RESET_CARD` clears none of them, so a
+time in the field that paid or claimed stays so through a reset. Every payment command
+answers `6985` while `TAP_CLAIMED` or `TAP_READ` is set. A claim checks the anchor at every
+asking (`6A93`, `6A80`, neither counting nor ending the count) and takes it at the sixth
+in the key's transaction with the rolls at 0. A claim asks for an empty card
+(`requireNothingOwed`: nothing unspent, then no change owed). No write is new outside a transaction:
+the key, the flag and the anchor are one transaction, as in 2.2.
+
+---
+
+## <a id="d188"></a>D188: Every payment waits a floor
+
+**Decided (protocol 2.3, 2026-11-12).** Every payment, within its limit or not, is at
+least four signatures of the card's work from `SPEND_ALL_BEGIN` to its signature, its
+own among them (`WAIT_FLOOR_SIGNS`): the card answers `00 01` to `SPEND_ALL_SIGN` until
+then. The change outputs the card made in the payment count toward it, two waits for
+every three, as they already do toward the limit on one payment. 2.2's waits for a
+payment over that limit, and for a second payment in a time in the field, come on top:
+
+    waits = max(0, (WAIT_FLOOR_SIGNS − 1) + W − ⌊2 × outputs / 3⌋)
+
+with W 2.2's wait.
+
+**Why.** In 2.2 a payment within the limit was signed at once, so a reader could take
+one in the moment a card passed near it. A floor of about two to three seconds is a
+time a holder notices, and a reader cannot shorten it, whatever it sends. NUT-CCP
+already requires every reader to send `SPEND_ALL_SIGN` again on `00 01`, so no reader
+breaks.
+
+**Rejected.** A second wait shape (two signatures for each further limit's worth, where
+2.2 has four): one wait shape is enough, and 2.2's is the one Flash's readers are timed
+for. A wait counted in the reader's clock: the card has no clock that runs.
+
+**Cost accepted.** Every payment takes about two seconds longer on a fast chip and
+three on a slower one.
+
+**Built (applet).** `WAIT_FLOOR_SIGNS = 4`. `waitsFor` answers W (2.2's wait, 0 within
+the limit; a sum that wraps is `WAIT_SIGNS_MOST`); `SPEND_ALL_SIGN` adds
+`WAIT_FLOOR_SIGNS − 1` and takes off two waits for every three of the card's change
+outputs, never below 0, at the first `SIGN`. The log's bit 1 ("waited past the floor")
+is set where W is above 0. The waits write nothing that lasts, as 2.2's did.
+
+---
+
+## <a id="d189"></a>D189: A holder with no phone: the PIN and a held tap stand for the owner
+
+**Decided (protocol 2.3, 2026-11-12).** A card with a PIN and no owner is the card of a
+holder with no phone of their own. It is set up, loaded and freed under its PIN
+(`LOAD_PROOF` no longer asks for an owner), and its numbers are set under its PIN
+(`SET_LIMIT_PIN`: in its first set-up, and after it none, [D196](#d196)). Its history is the PIN's, and **held for**: `GET_LOG` answers `6A98`,
+keep holding, to the first nine askings in a row, a signature's work each, and the
+history at the tenth; never in a time in the field in which a payment was signed, and no
+payment is taken for the rest of a time in the field that read it (a **held tap**). On
+such a card a held tap stands where the owner's grant or proof stands: to mark a new
+keyset, to bind an opening to another key, to give an opening up, to change a used card's
+PIN (`SET_PIN`; `SET_CARD` and `SET_LIMIT_PIN` go only in the first set-up, [D196](#d196)), to reset
+an empty card ([D196](#d196)), and to send `REFRESH`, whose new P1 = 1 takes
+the header with no proof and sets the rolls to 0. A set-up card keeps its PIN: a new one
+wants the PIN it has. The guest is told the limit on one payment and the rate in a held
+tap.
+
+**A factory record.** An issuer may write a record whose mint is `-` alone, to carry the
+card's design to it before a holder sets it up. It counts as no record: `LOAD_PROOF`
+answers `6A8C`. (Until [D196](#d196) a PIN set on such a card did not make it set up, and the
+holder's own `SET_PIN` replaced it with no PIN asked; since D196 the first PIN on a card
+begins its first set-up whatever its record, a factory record goes only on a card that has
+never had a PIN, and a card set up by someone else is reset by its holder.)
+
+**Why.** Some holders have no phone. Their card still needs someone's phone to load it,
+and that phone must not become its owner. The hold makes reading the history, or
+rewriting the card, something done on purpose and never in the tap a reader was handed
+the PIN to take a payment. `REFRESH` P1 = 1 gives such a card the way out of a spent
+rollover budget that an owned card has, under the same say. The factory record rule
+stops a PIN put on a card before its holder has it from locking the holder out.
+
+**Rejected.** Making the loading phone the owner: the holder would depend on a phone that
+is not theirs. Letting the PIN alone stand for the owner: a reader has the PIN.
+
+**Cost accepted.** A reader that keeps a holder's PIN can hold a tap of its own and do
+there what the holder can, the same as reading the history; what it writes is in the
+card's record for the holder's next phone to see. It loosens no number and claims no card
+([D196](#d196)). Reading the history takes five seconds.
+
+**The numbers go with a stranger's PIN** (until [D196](#d196), which took this out: a card set up
+by someone else keeps its numbers until its holder resets it). On a card with no record of the holder's (no
+record, or a factory record) a `SET_PIN` that replaces a PIN takes with it the numbers that
+PIN could write with `SET_LIMIT_PIN`: the limit on one payment, the no-PIN allowance and
+its count, the rate, the rollover budget and count, the arming and the no-PIN window's
+start and switch. The day's limit, which only tightens, stays. Otherwise a stranger who
+put a PIN on a card on its way to its holder could leave it a large allowance that the
+holder's own set-up, writing a shorter `SET_LIMIT`, would keep.
+
+**Built (applet).** `HISTORY_ASKINGS = 10`. `requireHistory` reads the history: on an owned
+card as 2.2 had it (the grant for both, or the PIN for the log), on a card with no owner the
+PIN, no `TAP_PAID`, then the held count with `HELD_HISTORY` in its top bit, `TAP_READ` at the
+tenth; a `GET_LOG` with a P1 over 3 is refused before it and leaves the count alone. The
+holder's say is `holderSays` (the grant, or the PIN in a held tap: `GET_INFO`'s limit on one
+payment and rate, a load's new keyset) and `requireSay` (`KEYSET_KEYS` with another key);
+the let-go and `REFRESH` P1 = 1 want `requireHeld` after the PIN (`6985` with `TAP_PAID`,
+`6982` without `TAP_READ`); a set-up card's `SET_PIN` wants a held tap once the log has taps in it (`SET_CARD` and
+`SET_LIMIT_PIN` wanted it too until [D196](#d196) held them to the first set-up), before anything
+is written. `holderRecord` says a
+record is the holder's (written, and its mint not `-` alone). `LOAD_PROOF` asks for no owner
+and answers `6A8C` to a factory record.
+
+**Writes outside a transaction ([D23](#d23)), and why a tear is safe.**
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processSetPin` | a blocked PIN's log and receipts zeroed (since [D196](#d196) the whole history, by `forget`); until D196, on a card with no record of the holder's, the record's 156 to 167 and 197 to 208 zeroed; all before the PIN's transaction | Torn anywhere among them, the PIN is as it was: blocked (nobody reads a blocked card's history: it wants the PIN), or a PIN on a card with no record of the holder's, which holds no piece (`LOAD_PROOF` wants such a record). The holder's `SET_PIN`, sent again, clears the rest and writes the PIN. |
+| `processSetOwner`, `processRefresh`, `processLetGo` | none new | The claim's key, flag and anchor, `REFRESH` P1 = 1's header and rolls, and the let-go's log and opening are each in one transaction. |
+
+`SlotWriteOrderTest.everyWriteOutsideATransactionIsReviewed` counts them.
+
+---
+
+## <a id="d190"></a>D190: The card holds the keys it writes change under to their keyset's ID
+
+**Decided (protocol 2.3, 2026-11-12).** `KEYSET_KEYS` (`38`) teaches the card a keyset's
+keys, under the PIN (the owner's grant alone since [D194](#d194) teaches nothing): P1 = 0 names the keyset (one in the card's
+keyset table) and the bytes NUT-02 hashes after the keys; P1 = 1 sends the keys in order
+of amount, six to a command, 64 at most; P1 = 2 finishes. The card works the keyset's ID
+out from the keys as NUT-02 says, and keeps the top of a hash tree of them (leaves
+`SHA-256(0x00 ‖ amount ‖ K)`, nodes `SHA-256(0x01 ‖ left ‖ right)`) in the keyset's entry
+only where the ID's first 8 bytes are the keyset's. P1 = 3 shows that an opening's key is
+one of its keyset's keys, by its path in the tree, from any reader; `LOAD_CHANGE` writes
+nothing under a key not shown (`6A9F`). P1 = 3 with another key binds the opening to that
+key and shows it, under the PIN, in a tap that paid nothing, with the holder's say: this
+is how a holder mends an opening a reader bound to a key that is not the mint's.
+
+**Why.** [D183](#d183) binds the change to the key named at the payment and checks the
+mint's proof under it, but the card cannot tell by itself that the key is the mint's: a
+proof holds for any key whose private key its maker knows. A piece on the card should be
+one the mint signed, since every payment that names it stands or falls with it. The
+keyset's ID is a hash of all its keys, so a key in the tree of keys that hash to the ID
+is one the mint published. A tree keeps 32 bytes
+a keyset on the card and a path of at most 192 bytes on the wire.
+
+**The bound.** The card holds a keyset by the 8 bytes a piece holds: 56 bits of the ID's
+hash; but any 8 bytes can name an entry (a piece of them loaded under the PIN), and keys
+whose ID begins with them are made with no search, so the 56 bits bound nothing against a
+reader that teaches. The gate is the PIN alone ([D194](#d194)); a reader with the PIN can
+already pay to the card's limits. Keeping the whole 33-byte ID would need it to come from the
+holder, since a piece names only 8 bytes; that is left until a load carries it.
+
+**Rejected.** Keeping every key of every keyset (about 2 KB a keyset). Checking the key
+at `SPEND_ALL_CHANGE`: a payment's tap is a reader's, and the keys may not be known yet;
+the check at writing is the one that matters, and it is made before anything is written.
+Mending through `LOAD_CHANGE` with another key: one place binds keys, and it checks them.
+
+**Cost accepted.** A phone that pays with change, or loads it, may first have to teach the
+keyset and show the key: a few commands, and the mint's keys, which it already fetches.
+Change in a keyset the card has not been taught waits for a phone with the PIN.
+
+**Built (applet).** `KEYSET_KEYS` keeps each keyset's top in its entry of the keyset table
+(the 32 bytes after the state byte, [D184](#d184)) and sets the state's bit 1 with it, in one
+transaction. NUT-02's two hashes are the ones Nutshell 0.20.3 and cashu-ts make: version
+`00`, `00` and the first 7 bytes of SHA-256 of the compressed keys end to end; version `01`,
+`01` and SHA-256 of `<amount>:<key in lowercase hex>` for each key, joined with `,`, then the
+tail (`|unit:<unit>`, then `|input_fee_ppk:<fee>` where the fee is not 0 and
+`|final_expiry:<time>` where the keyset has one). The CI's two Nutshell 0.20.3 mints' keysets
+(one of each version, the same 64 keys) are the tests' fixtures, and the card answers both
+IDs. Amounts are eight bytes and need not be powers of two. An amount of 0, one not above the
+one before, a 65th key and an ID version other than `00` and `01` are `6A80`; a tail after a
+version `00` keyset is `6700`. The tree is folded as the keys come, one pending node a height;
+its room is RAM a payment uses (four nodes in the places' list, two in the scratch beside the
+tail and a key's hex, the last amount and an amount's text in the first output's room), and the
+ID's hash is the payment's own SHA-256 object, the leaves' and nodes' the card's other one: a
+teaching and a payment give each other up, and the constructor is unchanged (no new object, no
+new RAM). An opening's shown mark is one byte after its `B_` and `K` (`openKeys` is 8 × 67 =
+536 bytes); `SPEND_ALL_CHANGE` takes it off before it writes `K`. On a card with no owner the
+holder's say for another key is the held tap ([D189](#d189)).
+
+**Writes outside a transaction ([D23](#d23)), and why a tear is safe.**
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processSpendAllChange` | the opening's shown mark off, before its `K` (one more write in D183's row) | The opening is `EMPTY` until its state byte, and nothing reads the mark of an opening not owed. |
+| `showKey` | an owed opening's mark off, its new `K`, then the mark on, last; with no new key, the mark alone | Torn after the mark is off, the opening is bound to the old key, the new one or a mix of the two, and is not shown: `LOAD_CHANGE` answers `6A9F` to any answer, and the holder's binding sent again finishes it (`KeysetKeysTest.aTornBindingIsNeverLoaded`). The mark alone is one byte. |
+| `processKeysetKeys` | none: the top and the state's bit 1 are one transaction | All or nothing. An entry entered again (`enter` writes the keyset and the state byte alone) has its old top ignored while its state lacks bit 1. |
+
+`SlotWriteOrderTest.everyWriteOutsideATransactionIsReviewed` counts them.
+
+---
+
+## <a id="d191"></a>D191: The paid list: a piece the card signed for is not signed again
+
+**Decided (protocol 2.3, 2026-11-12).** The card keeps the first 8 bytes of the nonce of
+each of the last 1,024 pieces it has signed for, in a ring of 8,192 bytes the first
+`SET_CARD` reserves. The rows are written for every place a payment burns, after the
+payment's commit, as the burn is (rows written twice are the same rows, so a tear is
+finished by the next command); the ring's next row moves in the payment's transaction.
+`LOAD_PROOF` refuses a piece whose nonce begins with a row (`6A94`, the word for a piece
+already on the card). The list outlasts `CLEAR_SPENT`, and `RESET_CARD` where the card
+keeps its key ([D192](#d192)).
+
+**Why.** A nonce refused only while a place holds it says nothing about a piece whose
+place has been freed. A reader that takes a card's payment offline, and any certificate
+scheme, rests on a promise that the card gives one signature for a piece, and the mint
+honours only one.
+
+**Rejected.** A list without a bound: memory is fixed at install. A list by date that frees
+rows as the clock passes them: the clock is a reader's to move ([D20](#d20)), and the
+list's job is not to free anything. 256 rows (2 KB): a card that pays in many small pieces
+goes round 256 in a few weeks; 1,024 rows fit the slower chip's memory with room to spare
+(about 8 KB of some 80 KB free on a blank card), to be confirmed in the hardware report. A
+shorter row (4 bytes of a hash): half the memory, for a refusal by chance 2^32 times as
+often.
+
+**Cost accepted.** 8,195 bytes. A piece signed for more than 1,024 pieces ago can come back.
+A holder with the PIN can push 1,024 made-up pieces through the list (no mint's proof is
+checked at `LOAD_PROOF`, and one would not help: the holder can teach keys of its own,
+[D194](#d194)), and since [D195](#d195) a card loads at most 300 pieces a day by its clock,
+so a flush takes a little over three days; the list stops a reader handed the PIN for one
+tap, and slows a holder who means to pay one piece twice. A list that never forgets was
+rejected: a card must never become unusable because a list is full. NUT-CCP's offline reader still checks each DLEQ
+proof and posts first. Closing the list's old way back (`CLEAR_SPENT` and a reload of a
+piece the mint still holds unspent) is paid for by the signatures kept beside the receipts
+([D194](#d194)). Two nonces that
+share 8 bytes cost a harmless refusal, once in 2^54 with a full list. A load looks at up to
+1,024 rows for each piece: on the bench J3R180 a `LOAD_PROOF` with its proof took about
+226 ms with the list nearly empty (2026-11-13); a full list's time is still to be measured.
+
+**Built (applet).** The list is the first 8,195 bytes of `paid`: 1,024 rows of 8
+(`PAID_ROWS`, `PAID_ROW`), then the next row (2, at `PAID_NEXT`), then a byte that is 1 once
+the ring has gone round (`PAID_ROUND`); the sixteen signatures kept beside the receipts
+([D194](#d194), 65 bytes each, at `PAID_SIGS`) follow in the same array, so `PAID_LEN` is
+9,235 bytes. The ring fills from row 0, so the rows in use are
+those before the next row until it goes round, and all of them after: a row the ring has
+not reached is never read, and a nonce that begins with eight zero bytes (what an unwritten
+row holds) is no piece signed for.
+
+- **Reserved** at the first `SET_CARD`, once, before the other stores, in the same guarded
+  form as [D176](#d176)'s record. A card refused the room takes no piece (`LOAD_PROOF` and
+  `LOAD_CHANGE` answer `6A84`), so every piece the card signs for is on the list.
+- **The payment.** `SPEND_ALL_SIGN`'s transaction moves the next row on by the number of
+  places, and sets the round byte when it passes the end: one short and one byte more in it.
+  `finishBurn`, after the commit and at the start of the next command after a tear, works
+  out the payment's rows as the `n` before the next row and writes each place's nonce there
+  before the place's status byte. A place in the list is never freed before `burnPending`
+  is cleared (`CLEAR_SPENT` and `RESET_CARD` run after `process` has finished the burn),
+  so its nonce is still in its place.
+- **The load.** `loadOne` reads the rows in use after the places (a nonce in any place) and
+  before anything is written.
+- **`RESET_CARD`** empties the list by putting the next row and the round back to 0, in its
+  last transaction, after the new key is made: torn before it, the card has the old list
+  with the new key, which refuses only pieces it need not. The rows are left as they were
+  and are not read. ([D192](#d192) keeps the list on a card whose certificate is sealed.)
+- **A hand-over** (`SET_OWNER` replacing an owner, [D197](#d197)) empties it the same way,
+  after its commit (`forgetOwed`), on every card: the new c means the card never signs for a
+  piece locked to the last c's keys again, so the list has nothing left to stop, and kept it
+  would tell the next owner which of the last owner's pieces the card paid.
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `finishBurn` | each place's row of the paid list, then its status byte (as before) | Only while `burnPending` is set, which the payment's commit set with the next row moved on: the rows are the `n` before it, and each is the nonce of its place, so writing them again after a tear writes the same bytes. Torn before the commit, nothing reads them and the next row has not moved. |
+| `processSpendAllSign`, `processResetCard` | none new | The next row and the round are written inside the payment's transaction and the reset's last one. |
+| `processSetCard` | none new | The reservation is an allocation, not a write; a refused one leaves `paid` null. |
+
+---
+
+## <a id="d192"></a>D192: The certificate profile; RESET_CARD keeps a certified card's key
+
+**Decided (protocol 2.3, 2026-11-12).** A certificate for the card key, kept on the card for any
+reader to fetch, in NUT-CCP's
+[certificate profile](https://github.com/cashucard/nut/blob/main/profiles/certificate.md) format.
+No single certifier: each card maker vouches for its own cards, and each reader decides whom it
+believes.
+
+- **On the card.** `CERT_WRITE` (`54`) writes a container in pieces and seals it, only on a
+  card that has never had a PIN (a mark the first `SET_PIN` sets for good), with no owner and
+  nothing on it. The seal checks that the container is well formed and names the card's own
+  key: its 33 bytes (form `01`), or a leaf made from it that folds up a path of at most 16
+  nodes to the container's top (form `02`). Then it commits the length and one byte in a
+  transaction. A sealed certificate is never written again. `CERT_READ` (`1C`) answers it to
+  anyone, in pages of 256 bytes, and P1 = `FF` says whether one is sealed.
+- **What the card does not do.** It reads neither the statement nor the signature, and checks
+  no signature; either may be empty, and so may the chain. Whether a reader trusts a key or a
+  top is the reader's certificate profile, outside this command set. The reader checks the
+  certificate and asks `AUTH` under the key it names in the same tap.
+- **`RESET_CARD` keeps a certified card's key.** A card whose certificate is sealed keeps its
+  card key, its certificate and its paid list through a reset ([D191](#d191)), and is given a
+  new PIN key; every other setting goes. A card with no certificate sealed (none, or one
+  written and never sealed) makes a new key and empties its paid list, as in 2.2 and D191.
+
+**Why a certifier.** Nothing a reader can do from outside shows what code a card runs or that
+its key never left the chip: `AUTH` shows only that the card holds a key now. Someone has to
+vouch for how the card was made, and a certificate on the card key, checked with a live
+signature under that key, is how that is carried to the reader; a copied certificate is
+useless on another chip. A reset is how a holder hands a card on, and a reset that made a new
+key would end the certificate, so the card could never be checked again. Keeping the paid list
+with the key keeps a piece signed under that key from being loaded and signed again by the next
+holder.
+
+**What a certifier takes on.** It vouches only for cards made by the process it states; it
+keeps the records that let it say which cards it vouched for; and it acts when a card or a
+batch it vouched for turns out bad, so that readers stop believing it. Its keys are what make
+its word checkable: whoever holds them can vouch as it, so a key that leaks puts every card
+it vouched for in doubt. [`CERTIFIER.md`](CERTIFIER.md) is the guide for someone who means
+to become one.
+
+**The risks of a card with no certificate, or one from a certifier the reader does not know or
+trust.** To the holder: whoever made the card may hold its key or have changed its code, and
+may spend what is loaded on it; its PIN and its limits may not hold. To a receiver offline:
+the pieces it is paid with may be copies, or may be taken back by whoever holds the key, and
+nothing on the card can show otherwise. A wallet weighs this before it loads a card or takes a
+payment from one offline.
+
+**Rejected.** A second permanent key that signs each new card key: a name for the card that
+every reader would see, for good. The card checking a signature: the scheme is the
+certifier's, and the card would carry code for every one. A certificate on uncertified cards'
+resets: nothing to keep.
+
+**Cost accepted.** A certified card keeps one key across its holders, so any reader of
+`GET_PUBKEY`, `AUTH` or the certificate can link one card across holders; and every card
+keeps its installation across a reset, which its payment records carry. A mint does not see
+that key: every piece is locked to the card's key for its date ([D197](#d197)), so a mint
+links the spends of one date to each other and to no other date or holder. Ecash locked to a
+certified card's date keys and not loaded before a hand-over is not the next holder's: the
+reset draws a new c, and the card builds other keys for that date, so it can never spend it.
+A dated piece comes back to the old holder's refund key after its date; an undated one is
+lost; so the holder refunds or loads what is owed before a hand-over. 1,027 bytes reserved at the first `CERT_WRITE` (1,024 for the
+container, three for the seal), only on a card that is written one. One persistent byte made
+at install. A certificate shows where a key was made, not that the chip is honest.
+
+**Built (applet).**
+
+- `hadPin` (1 byte, made in the constructor: 29,842 bytes of persistent arrays there when it
+  was built, one more than before; 30,052 with the rest of 2.3) is set in `SET_PIN`'s transaction, beside the PIN's state byte, and nothing
+  clears it.
+- `cert` is `CERT_LEN` = 1,027 bytes: the container at 0 to 1,023, the seal's byte at 1,024 and
+  the length at 1,025. It is reserved at the first `CERT_WRITE` that passes the checks of state
+  and length, guarded so that it happens once in a card's life, and listed in
+  `SchnorrHWMathTest.ONCE_ONLY_ALLOCATIONS`. A card refused the room answers `6A84`.
+- The seal's fold runs in the scratch's first 33 bytes (the node's `01`, then the node) with the
+  card's one `MessageDigest`, and reads nothing an earlier command left there.
+- 1,024 bytes hold a path of 16 nodes and a signed statement: such a container, with the
+  longest statement the profile allows and a 65-byte signature, is 890 bytes, which leaves 134
+  for the chain.
+- `RESET_CARD` asks `certSealed()` once: a sealed card skips the new card key and the emptying of
+  the paid list in its last transaction; the new PIN key and every other wipe are the same.
+
+**Tear review (D23).**
+
+| Site | Writes outside a transaction | Torn, the card is |
+|---|---|---|
+| `CERT_WRITE` P1 = 0 | one copy of 1 to 240 bytes into `cert` | a container with part of a write, which counts for nothing until the seal: the issuer writes it again |
+| `CERT_WRITE` P1 = 1 | none: the length and the seal's byte in one transaction | sealed or not, whole |
+| reservation of `cert` | the allocation, once, as D176's | a store or none; the next write reserves it |
+| `SET_PIN` | none new: `hadPin` in the PIN's transaction | the PIN and the mark together, or neither |
+| `RESET_CARD`, certified | none new: the new card key is not made; the paid list is not emptied | as any reset torn before its last transaction: still its owner's |
+
+---
+
+## <a id="d193"></a>D193: Version 2.3: SELECT answers 02 03; the instruction and status map
+
+**Decided (protocol 2.3, 2026-11-12).** `SELECT` and `GET_INFO` answer `02 03`. New
+instructions: `1C` `CERT_READ`, `1D` `GROUP_KEYS`, `1E` `INBOX` ([D199](#d199)), `27` `LOAD_CHANGE`, `38` `KEYSET_KEYS`, `54` `CERT_WRITE`; `2E`
+and `2F` kept for a later profile. New status words, in the `6A9X` range NUT-CCP leaves to
+profiles: `6A97` no PIN, `6A98` keep holding, `6A99` no rate, `6A9A` two units in one payment,
+`6A9B` the other unit, `6A9C` no room in the keyset table, `6A9D` the holder's say needed for a
+new keyset of the other unit, `6A9E` limit reached, enter the PIN, `6A9F` keys not shown. New
+forms: `GET_INFO` P1 = 3 (51 bytes) and P1 = 4 (59 bytes: two bytes of profile bits, `FF 03` for
+this card, then the loads left today), `GET_CARD` P1 = 2 and 3, `GET_BALANCE` P1 = 1, `GET_LOG` P1 = 2
+and 3, `LOAD_PROOF` P2 = 1 and 2, `RESET_CARD` P1 = 1, `REFRESH` P1 = 1, `SPEND_ALL_CHANGE` 45 bytes,
+`SET_LIMIT` 17 and 18 bytes. The core changes go to cashucard/nut first (`CCP.md`, the vectors and the
+certificate profile), as CONTRIBUTING requires.
+
+**What a 2.2 reader sees** ([`spec/APDU.md`](../spec/APDU.md#what-a-22-reader-sees)): a card it
+can read and not pay from (`SPEND_ALL_BEGIN` without P1 bit 1 is `6A86`, [D197](#d197)), nor load
+(`LOAD_PROOF` without P2 bit 1 is `6A86`, after a 2.2 loader has swapped to the card key: an
+undated top-up so swapped is lost); a 4-byte `SPEND_ALL_CHANGE` is `6700`, 83-byte openings it
+cannot finish, and a claim that answers `6A98`. Nothing it sends writes a wrong piece or burns one. flash-pos and flash-mobile,
+which check the major alone, must move to the 2.3 wire for change, set-up and top-up before
+2.3 cards are handed out.
+
+**The cards.** A 2.2 card moves to 2.3 as a 2.1 card moved to 2.2: swept, then a new
+install, which makes a new key.
+
+**The size.** A load file of 36,953 bytes by refcheck's measure (89 past a multiple of 256),
+against 21,631 for 2.2. On 2026-11-13 a J3R180 installed earlier 2.3 source padded to 33,647
+and 35,213 bytes and refused the card's applet padded to 32,777 (`6F00`, twice), so refcheck
+refuses a build from 32,700 to 32,850. This file is not padded. On the same day the same
+J3R180 installed the file this source made before [D200](#d200) (35,466 bytes, load file
+sha256 `48b8597c…`), and that file's chip run had real signatures and real change verified at
+a test mint ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md)): refcheck keeps its size and
+its hash. This file adds D200 to D204 and is not yet tried on a chip: its own chip run comes
+before it ships.
+The constructor asks for 30,056 bytes of persistent memory, 214 more than 2.2's 29,842
+(the PIN's marks and the day's loads, the receipt's figures kept with the last signature, c,
+the refund key's y and the count of the owners' c); the openings' keys, the keyset table and the paid list are
+reserved at the first `SET_CARD`, and the certificate's store at the first `CERT_WRITE`, as
+[D176](#d176) does for the settlement record. The install and a payment on a real card are
+recorded in a hardware report before the tag.
+
+**Rejected.** A major version 3: the AID, the slot, the secret and the signed message are 2.x's,
+and a reader that checks the major still reads and pays. Profile bits in the capabilities byte:
+all eight are taken.
+
+## <a id="d194"></a>D194: A payment and its change come back; the keyset table is the holder's; the day counts change; less to a stranger and to software of 2.2
+
+**Decided (protocol 2.3, 2026-11-13).** Amends [D175](#d175), [D183](#d183), [D184](#d184),
+[D185](#d185), [D186](#d186), [D190](#d190), [D191](#d191), [D192](#d192) and [D26](#d26).
+
+- **The signature of every kept receipt is asked for again.** The paid list closed 2.2's way
+  back for a payment whose answer was lost (`CLEAR_SPENT`, then a reload of the piece the mint
+  still holds unspent), and `SPEND_ALL_AGAIN` kept only the last signature, so a lost answer
+  followed by a payment elsewhere stranded the first payment's pieces. The card now keeps the
+  signature of each payment beside its receipt (16, the receipts' ring, 65 bytes each in
+  `lastSig`'s form, after the paid list in the same reservation), written in the receipt's
+  transaction and let go with the receipts by `RESET_CARD`. `SPEND_ALL_AGAIN` P1 = 1 takes the
+  SHA-256 of the payment's `SIG_ALL` message, the receipt's own hash, and answers that payment's
+  signature (`6A88` for none); P1 = 0 is the last, as before. Sixteen is the receipts' ring: a
+  signature exists exactly as long as its receipt, with no index of its own. Asked for by the
+  message and not by the receipt number: the till whose answer was lost holds its swap and can
+  always work the hash out, where it learns no receipt number; a holder's phone that reads the
+  receipts has the hash too. The PIN gate is the signature's own (`02`, given with no PIN, is
+  given again with none).
+- **A swap no mint takes is not signed.** The outputs and the card's change are added up as
+  they come (in `allNet`, until the last `SIGN` writes what leaves the card there) and an output
+  or a change that takes them past the pieces is `6A80`, the payment given up, at
+  `SPEND_ALL_OUTPUTS` (among `SIGN`'s waits as well) and `SPEND_ALL_CHANGE`.
+- **The change's keyset is named, held and taught.** `SPEND_ALL_CHANGE` takes the 45-byte form
+  only (`6700` for 37); the keyset named must be in the table with its keys taught (`6A9F`) and
+  of the payment's unit (`6A9B`); nothing is entered in the table there, so a reader with no PIN
+  writes nothing in it. A card with no table makes no change (`6A84`), and the first `SET_CARD`
+  reserves the table before the openings' keys.
+- **The holder's mend moves an opening.** `KEYSET_KEYS` P1 = 3 with another key may name a
+  keyset after it (41 bytes in all after the path): the path is folded to that keyset's top, one
+  of the opening's unit (`6A9B`) and taught (`6A9F`), and the opening's key and keyset and its
+  shown mark are written in one transaction. This takes back change the mint signed in another
+  keyset (posted after the mint moved on: the `SIG_ALL` message names no output's keyset).
+- **The till's outputs carry a keyset in the record.** `SPEND_ALL_OUTPUTS` P1 = 1 names the
+  keyset of the reader's outputs (8 bytes before them), staged after the outputs (`outStage`, 8
+  bytes more) and written for each of the reader's outputs in the payment's record; with none
+  named, the first input's, as in 2.2.
+- **Teaching is the PIN's.** The owner's grant alone teaches nothing: a keyset taught is a key
+  the card writes change under, and the grant alone never put a piece on the card ([D185](#d185)).
+  A version 01 ID's tail names its unit first and it must be the entry's; a version 00 ID hashes
+  the keys alone, so the n-th key's amount is held to 2^n (rather than refusing version 00, which
+  the CI's mint still serves).
+- **The day counts the change until it is back.** The day's limit is held to the pieces whole
+  (`SPEND_ALL_SIGN`), and `LOAD_CHANGE` gives the change back to the day's count, to no less than
+  nothing, in one atomic copy after the piece; change of the other unit stays counted until the
+  day ends. A reader handed the PIN that asks for nearly all of a large piece as change and keeps
+  the mint's answer strands at most a day's worth. The wait is still held to what leaves the card,
+  and the no-PIN allowance to the whole pieces ([D186](#d186)). A payment of nothing is still no
+  roll ([D26](#d26)).
+- **What software of 2.2 meets.** `ALLOW_LOAD` gives the grant and answers `6200`: ISO 7816-4's
+  warning that lasting memory is unchanged (the grant is the tap's alone), so a 2.2 wallet that
+  waits for `9000` before it swaps an owner's top-up to the card key stops before swapping, and a
+  2.3 wallet reads the warning as the grant given. A payment in the other unit than the card's is
+  begun only with `SPEND_ALL_BEGIN` P1 = 1 (`6A9B` otherwise), so a reader that reads no unit
+  never pays cents as sats. `LOAD_PROOF` checks that C is a point of the curve itself (`6A80`).
+- **The sealed PIN.** `unseal` checks the reader's point is on the curve before the agreement,
+  and sealed `CHANGE_PIN` and `SET_PIN` answer an envelope that does not open with the word of
+  one that opens (`6A91` and `6700`), so that the answer says nothing of the PIN key.
+- **History to a stranger.** `GET_OUTBOX` P1 = 1 is answered in the time in the field that
+  signed the payment and to the holder's say (`6982` otherwise); `GET_PROOF` answers a spent slot
+  as empty, and `GET_INFO` says zeros for 21 to 28, 50 and 51 to 54 (and, until [D196](#d196), counted
+  spent slots as empty: a wallet frees spent places by that count, and the slots' states say it
+  anyway), to a reader that has given neither the PIN nor the grant in its tap. Still visible to
+  anyone: the counts of places, the scope and receipt count (`GET_OUTBOX` P1 = 0), the slots'
+  states and the spent places whole (`GET_SLOT_STATUS`, `GET_PIECES`), the openings owed, the
+  keyset table, the no-PIN window's start (`GET_CARD`) and the card key; the installation is in
+  the payment's packet, which a stranger is not given. (Since [D198](#d198): the spent places
+  are not listed and answer as empty in `GET_PIECES` too, `GET_CARD` says zeros for the last
+  header's hash, the rolls, the arming and the no-PIN window's start, and the scope is the
+  paying reader's, the PIN's or the grant's. The counts and the slots' states stay.)
+- **The certificate and the claim.** The seal takes the container's SHA-256 after its length and
+  refuses a container that is not the one hashed (`6A80`). A claim wants a record of the holder's
+  (`6A8C` for none or a factory record).
+- **The PIN.** A locked card whose PIN is blocked takes its owner's `CHANGE_PIN` (it stays
+  locked). A card whose PIN's tries are all gone under a state of 1 (a last try torn before the
+  state byte) writes 2 before any command reads the state.
+- **Tears.** Every write outside a transaction is reviewed below, now with the settlement
+  record's arrays and with any NonAtomic copy or fill inside a transaction counted as outside one
+  (a chip does not roll it back); the three such sites (the log's new entry, `SET_CARD`'s design
+  and ratchet) and the receipt's empty output use the atomic copy now.
+- **Limits.** The same day's number sent again, in any form, begins no new day. `SET_CARD` to a
+  new unit turns the daily limit and count, the limit on one payment, the allowance and its count
+  into it at the rate, rounded up, and is `6A99` on a card with a limit and no rate: turning keeps
+  the holder's limits worth what they were, where clearing them would leave a card with none and
+  keeping the numbers would make 100,000 sats 100,000 cents.
+
+**Rejected.** A mint's proof checked at `LOAD_PROOF` against a taught keyset, to make the paid
+list cost a mint's signature per piece: any 8 bytes name an entry and the holder teaches keys of
+its own under the PIN, so the made-up pieces would come with good proofs, and the list would
+stop the same readers it stops now. It would also cost a second command (the key and its path do
+not fit beside the piece and its proof) and about the code of `unblind` and `blindChange`'s hash
+to the curve (JVM bytecode 493 and 479 bytes; 400 to 500 bytes of load file after sharing).
+Refusing version 00 keysets. Clearing the limits on a new unit. A receipt number for
+`SPEND_ALL_AGAIN`.
+
+**Cost accepted.** Change is made only in a keyset the holder's phone has taught, which needs a
+piece of it on the card: after a mint moves on, a till pays exactly until the phone loads and
+teaches the new keyset. 1,040 bytes more in the paid list's reservation and 8 in the staging.
+Two RSA powers more for each piece loaded (the curve check). A 2.2 wallet's top-up stops at
+`ALLOW_LOAD`; a 2.2 reader cannot pay pieces of the other unit. Load file: 963 bytes more
+(31,448; 665 left under 32,113).
+
+**Built (applet).** `PaymentRecoveryTest`, `ReaderChecksTest`, `HistoryPrivacyTest`; the
+tear harness (`TearLoader`, `TearHook`: the applet's bytecode rewritten so that every
+persistent write can be torn, with a chip's transactions) and its sweeps (`TearSweepTest`:
+every write of 21 commands and flows torn, then every read and the money checked) and the
+parser's (`ParserFuzzTest`: every instruction over P1, P2 and lengths in 21 life states: no
+`6F00`, no refusal that writes first, no transaction left open); the existing suites updated
+to the words and rules above.
+
+| Site | Writes outside | Why a tear there is safe |
+|---|---|---|
+| `process` | `pinState` 2 where the tries are 0 and the state 1 | One byte, written once, before any command reads the state; torn, the next command writes it. |
+| `processSpendAllBegin` | the staging's count and the reader's keyset to nothing (with the drafts let go) | Read only by this payment's `SIGN`; a tear drops the payment. |
+| `processSpendAllOutputs` | the reader's keyset into the staging, after every refusal | The same. |
+| `processSpendAllChange` | an opening's mark, `K`, amount, keyset and date, `B_`, then `DRAFT` (7; one fewer: the keyset is always the one named) | As [D183](#d183): the state byte is the opening's commit. |
+| `stageOutput` | an output's amount and `B_`, then the count | Read only by this payment's `SIGN`. |
+| `writeOutbox` | the record's body, after its status was cleared in a transaction of its own | Marked whole, with its length, only in the transaction that ends it: torn, no record, never a mix ([D175](#d175)). |
+| `ensureDescriptor` | the descriptor after the body | Its flag is set in a transaction of one byte after it: torn, it is signed again at the next read. |
+| `processSpendAllSign` | `burnList`; and the record's status byte where writing the record failed | As before; one byte. |
+| `processLoadChange` | the day's count with the change given back | One atomic copy after the piece: torn before it, the day still counts the change, which stops a payment early and loses nothing. |
+| `processResetCard` | as before, and the record's status bytes, the staging count, the generation (one atomic copy) and the signatures kept beside the receipts | As before: who the card is, last, in one transaction. |
+| `CashuApplet` | the generation set to 1 | Install time. |
+| `showKey` | none now: the key, the keyset and the mark in one transaction | Torn, the opening is as it was or as it is now. |
+
+---
+
+## <a id="d195"></a>D195: A claim wants an empty card; the PIN alone only tightens; a PIN with no owner waits and never blocks; 300 loads a day; eight pieces of change
+
+*Amended by [D200](#d200): a payment's change is counted in the day of loads when the payment is
+signed, and its `LOAD_CHANGE` is never refused for the count; `RESET_CARD` begins the day of loads
+again.*
+
+**Decided (protocol 2.3, 2026-11-13).** Amends [D186](#d186), [D187](#d187),
+[D189](#d189) and [D191](#d191).
+
+- **A claim wants an empty card, as 2.2 had it** (and, since [D196](#d196), a first set-up: a card
+  set up with no owner is never claimed, and the way to a phone owner is a reset by the PIN). `SET_OWNER` on a card with no owner answers
+  `6A8D` with anything unspent or any change owed, after the PIN, the record and the tap that
+  paid are asked. "Never in a time in the field that paid" is a mark in RAM, and a time in the
+  field ends when the reader's field does; on an empty card a claim moves nothing, whoever sends
+  it. A holder with no phone who later wants a phone as owner moves the money to the phone,
+  claims the empty card with it, and loads the money again.
+- **With the PIN alone a number only tightens** (superseded by [D196](#d196): after the first
+  set-up the PIN form sets nothing, `6A91`). `SET_LIMIT_PIN` checks each field the value
+  carries against the card's, before anything is written, and answers `6A91` (the owner's proof
+  is wanted) for one that is looser: a day's or payment limit above the card's, or `0` (none)
+  where the card has one; an allowance above the card's (`0` is none); a budget above the card's
+  (`0` on the card read as the default, 7); any other rate than the card's (the rate counts the
+  other unit, and a lower one on a sat card, or a higher one on a usd card, counts it for less;
+  the rate is set in the first set-up or by the owner); the no-PIN window's switch from `00` to
+  `01`.
+  With the PIN alone the no-PIN window and its count stay where they are: ending the window
+  would hand the allowance back sooner. The rule is still under the old ones: no owner, the PIN
+  given, nothing unspent or owed, a held tap on a used card.
+- **A first set-up sets any number.** The selection in which `SET_PIN` gave a PIN to a card with
+  no PIN or no record of the holder's (a new card, a card reset, a factory record) is the card's
+  first set-up (since [D196](#d196) a card with no PIN alone: a new card or a card reset; a factory
+  record no longer begins one): there `SET_LIMIT_PIN` takes any value, and one that carries the allowance ends
+  the no-PIN window and arms it, as before. It is told apart by a byte in lasting memory,
+  `pinMarks[PM_FIRST]`, set in `SET_PIN`'s transaction and set to 0 by the applet's `select()`,
+  which the runtime calls at every selection, a `SELECT` or the chip's own at power-up. Nothing in
+  RAM grants it: a reader that turns its field off and on, or selects again, ends a first set-up
+  and starts none. A `SET_PIN` that replaces a PIN on a card with the holder's record (a blocked
+  PIN, or one with three wrong tries in a row, below) starts none: that card's numbers stay, and
+  only tighten.
+- **The PIN of a card with no owner never blocks.** Each wrong `VERIFY_PIN` makes the next one
+  wait twice as long: after the w-th wrong try in a row the next try owes 2^(w−1) askings, each
+  a signature's work of the card's own answered `6A98` (about 0.7 s on a chip): 1, 2, 4, 8 and 16
+  askings, then 32, 64 ..., at most 16,384 (about three hours a try, from the fifteenth on). The
+  answer to a wrong try is `63CX`, X the wrong tries in a row (`F` for fifteen or more). The
+  count and what is owed are `pinMarks[PM_WRONG]` and `pinMarks[PM_OWED, +2)` in lasting memory.
+  The card counts a try as wrong and writes the next wait in one transaction **before** it
+  compares the PIN, as the chip takes a try before it compares; a right PIN sets both to 0 after.
+  A card taken out of the field at any point has the try counted or never made. The wait is
+  served in **stretches** of 16 askings (about ten seconds, what one tap is asked to hold): the
+  asking after a stretch writes what is still owed, less the stretch, in a transaction, and
+  answers `6A98` again while anything is owed. So the wait outlasts the power: a pull loses at
+  most the stretch under way, never a stretch done, and a long wait is served over as many taps
+  as it takes. The askings of a stretch are counted in RAM (`nonceLive[1]` with `HELD_PIN`, as a
+  claim's and a history's are), and any other command, a `SELECT` among them, begins the stretch
+  again. The chip's own counter is filled again before each try (`resetAndUnblock`), so it never
+  reaches 0. After three wrong tries in a row the card counts as not set up for `SET_PIN`, which
+  replaces the PIN with nothing unspent or owed (and the history goes with it), as it replaced a
+  blocked PIN: the way back for a forgotten PIN on an empty card. A `SET_PIN` sets the count and
+  the wait to 0.
+- **A card with an owner keeps three tries**, a blocked PIN and the owner's `CHANGE_PIN`, as
+  before. Its marks are never written. A card claimed has the count at 0 (a claim wants the PIN
+  given in the tap, and a wrong try after it ends that), and its chip counter full; a card reset
+  has no PIN, and its next holder's `SET_PIN` sets the count to 0.
+- **A card loads at most 300 pieces a day** by its own clock, `LOAD_PROOF` and `LOAD_CHANGE`
+  alike (`LOADS_A_DAY`), so the paid list's 1,024 rows ([D191](#d191)) take four days of loads to
+  go round: a flush takes a little over three days of the card's clock, where it took minutes.
+  A load past it is `6A8F` (the word of the day's limit: a reader already reads it as "come back
+  tomorrow"), asked after every other check of the piece, with nothing written. The count and
+  the day it began are `pinMarks[PM_LOADS, +2)` and `pinMarks[PM_LOAD_DAY, +4)`: a day of loads
+  begins at the first load at or past a day after the last began (`windowIsOver`, at the card's
+  `now`), and the count and its day are written in one atomic copy before anything of the piece,
+  so a tear leaves a load counted and not made, never a piece not counted. A card that has taken
+  no header (`now` = 0) begins no day: it loads 300 pieces and then nothing until its first
+  header, the safe end of "one day's pieces before the clock". `RESET_CARD` leaves the count, as
+  it leaves a certified card's list. `GET_INFO` P1 = 4 says the loads left today (bytes 57 and
+  58: 300 less the count, or 300 where a day has passed since the day began) to a reader told
+  the history (the PIN or the grant; zeros to anyone else), so that a wallet swaps for no more
+  than the card will take today (with the free places, byte 5): a top-up swapped past them
+  waits in the phone, locked to the card's keys, and is lost if the card is reset or lost first.
+  Four bytes of the answer, 52 of the load file. **`LOAD_CHANGE` counts**: change is not exempt, because a
+  payment's change, written back, is spent again, and a payment of eight pieces makes eight
+  openings: a holder online at the mint could push rows through the list by payments to itself
+  and their change alone, eight or more a payment, with no `LOAD_PROOF`. At the cap the change
+  stays owed, and goes on the next day (the mint's answer is restored from its `B_`, NUT-09,
+  where the reader that took it is gone). The days are the card's clock's, which a reader moves
+  only up to the real chain's tip: a card whose clock has fallen behind lets the days it missed
+  be loaded at once, so a reader that takes a payment offline sends the card a recent header
+  first. 128 places on the card loaded before a payment count too: the rows after a payment can
+  begin with up to 128 pieces already on the card.
+- **Eight pieces of change.** The card makes up to eight change outputs in a payment, one
+  `SPEND_ALL_CHANGE` each, as many as it has openings free (eight in all, those still owed among
+  them). Nothing in the applet held a payment to four; this is now said and tested. A reader may
+  make fewer: four, then the owed change of the rest by another payment.
+
+**Why.** The marks of a time in the field are RAM that the reader's field ends, so nothing
+a reader handed the PIN may do rests on them: a claim moves no money, and a number it writes
+only tightens. Money on a card with no owner stays within reach of its holder's PIN, whoever
+sends wrong tries: the waits keep guessing slow (a four-digit PIN takes years of contact) and
+leave the holder's right PIN working.
+
+**Rejected.** A paid list that never forgets: a card must never become unusable because a list is
+full. A cap per time in the field on a card with no clock: a reader cycles its field. A PUK or an eight-digit unblock code: one more secret for a holder with no
+phone to keep (the fallback if the waits had not fitted). A claim allowed under a day's limit
+of money: the limit is the owner's to lift. A clock: the card has none that runs. Tightening
+with money on the card: a day's limit under the smallest piece would strand it, with no owner
+to loosen it.
+
+**Cost accepted.** A holder with no phone cannot loosen a number after the first set-up
+without making a phone the owner (since [D196](#d196): the card emptied, reset by the PIN and set
+up again), nor change the rate (the rate of a value it sends must be the card's, `GET_INFO`
+P1 = 3 in a held tap). A holder who loads more than 300 pieces in a day waits for the next. A stranger may make a card with no owner wait before its holder's next try (a wait it
+has to hold for itself, 2^(w−1) askings for its own w wrong tries), and on an empty card may
+replace the PIN after three wrong tries, as it could block and replace it before. `GET_INFO`
+byte 9 on such a card is the chip's counter (2 or 3), not the wait. Ten bytes more of
+persistent memory at install (29,852). Load file: 641 bytes more (32,089; 24 left under 32,113).
+
+**Built (applet).** `ClaimWhenEmptyTest`, `TighterLimitsTest`, `PinWaitTest`,
+`ChangePiecesTest`, `LoadCapTest`; `TearSweepTest`'s sweeps of a load counted with its day (and a
+new day beginning) and of a wrong and a right `VERIFY_PIN` on a card with
+no owner and of a wait of two stretches pulled at every write.
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `select` | the first set-up's mark to 0 | One byte. Torn, the mark is still set and the next selection clears it; no command runs in a selection whose `select` did not return. |
+| `countTry` | the chip's counter filled again (`resetAndUnblock`), after the count and the next wait are written in a transaction | Torn before the transaction's commit, no try was made; after it, the try is counted, and a counter not filled is filled before the next check. |
+| `loadOne` | the day's loads and the day they began, one atomic copy of six bytes, before anything of the piece | Torn before it, nothing of the load was made; after it, the load is counted and its piece may be missing, which only brings the day's end nearer. |
+| `processVerifyPin` | the marks to 0 after a right PIN (one atomic copy) | Torn before it, a right PIN is counted as one wrong try more: the next try waits, nothing opens. |
+| `waitOwed`, `processSetPin` | none new: what is owed after a stretch, and the first set-up's mark and the marks' 0, are written in transactions | |
+
+
+---
+
+## <a id="d196"></a>D196: Simple cards; no load over the day's limit; the receipt from the payment's commit; change back to the day that counted it; GET_INFO's counts
+
+**Decided (protocol 2.3, 2026-11-13: simple cards).** Amends [D186](#d186),
+[D187](#d187), [D189](#d189), [D191](#d191), [D194](#d194) and [D195](#d195).
+
+- **A simple card.** A card with no owner has its limits, its no-PIN allowance and window
+  switch, its rollover budget, its rate, its mint, its unit and its refund key set once, in
+  its first set-up, and never again. After it `SET_LIMIT_PIN` and `SET_CARD` answer `6A91`
+  (the word 2.3 gives what the PIN alone may not do), with nothing written; the PIN form's
+  "only tighter" ([D195](#d195)) is gone with the rest. A claim (`SET_OWNER` on a card with no
+  owner) is made only in a first set-up (`6A91` after it), after the PIN (`6A97`, `6982`)
+  and the holder's record (`6A8C`), and, as before, never in a time in the field that paid
+  (`6985`) and only on an empty card (`6A8D`). An owned card is as it was.
+- **The first set-up, and how it is told apart.** It is opened by the `SET_PIN` that gives a
+  PIN to a card whose PIN state is 0, and by nothing else. The PIN state is 0 on a card that
+  has never had a PIN and on a card just reset; `RESET_CARD` is the one command that writes
+  it to 0. The first set-up is a byte in lasting memory, `pinMarks[PM_FIRST]`, written in that
+  `SET_PIN`'s transaction and set to 0 by the applet's `select()`, which the runtime calls at
+  every selection: a `SELECT`, or the chip's own at power-up. A reader that turns its field
+  off and on ends a first set-up, and nothing but a reset can begin another: a `SET_PIN` on a
+  card that has a PIN (under that PIN, or after three wrong tries in a row) begins none, and a
+  factory record no longer makes a card "not set up".
+- **The factory record.** A record whose mint is `-` alone goes only on a card that has never
+  had a PIN (`hadPin`) and holds no record of a holder's: `6A80` otherwise, on an owned card
+  too. Before its first PIN a card's record is written by whoever holds it (it takes and pays
+  nothing, [D185](#d185)); after its first set-up only a reset clears it.
+- **The way back: a reset by the PIN.** `RESET_CARD` P1 = 0 on a card with no owner takes no
+  data and no proof: the PIN given in this tap (`6A97` with none, `6982`), a held tap (`6985`
+  in a time in the field that paid, `6982` with no hold, [D189](#d189)), no data (`6700`) and
+  nothing unspent or owed (`6A8D`); then `RESET_ASKINGS` (60) askings of the same command in a
+  row, each a signature's work of the card's own answered `6A98` (some forty seconds on a
+  chip), counted in RAM as a claim's are (`nonceLive[1]` with both held marks, `HELD_RESET`);
+  any other command between, a `SELECT` among them, begins the count again. The sixtieth
+  resets the card as the owner's reset does: no PIN, no owner, no record, no limits, no
+  history, every opening and entry free, a new card key and an empty paid list, or, on a
+  certified card, the same key and the list kept ([D191](#d191), [D192](#d192)). The holder then
+  sets it up again in a new first set-up, with a phone that claims it, or by the PIN alone.
+- **The forgotten PIN** ([D195](#d195)) stays: three wrong tries in a row on an empty card with no
+  owner, then `SET_PIN`. It begins no first set-up, so the card's numbers stay, and the
+  history goes with the PIN it replaces: the log, the receipts, the last signature, the
+  signatures kept for `SPEND_ALL_AGAIN` P1 = 1, the last payment's packet (`GET_OUTBOX`), and the
+  keyset table's history (the last payment's unit, the other unit's count of what was signed for,
+  the receipts' units; the entries are settings and stay). `RESET_CARD` clears the same through
+  one helper, `forget`, which steps the packet's generation first, as the reset always did: the
+  receipt count begins again at 0, and the next packet's payment id and generation are a pair no
+  packet had.
+- **No load over the day's limit.** `LOAD_PROOF` refuses a piece whose amount is above the
+  day's limit, where one is set, with `6A8F` and nothing written: the day holds a payment's
+  pieces whole ([D194](#d194)), so such a piece could never be paid, and on a simple card
+  nothing could ever lift the limit. The amount is the card's unit's; a piece of the other
+  unit is turned at the rate and rounded up, as a payment's figures are (a card with a limit
+  and no rate takes none of the other unit, `6A99`). It is asked after the paid list, before
+  the day's loads, so a batch stops at the first such piece. A piece above the limit on one
+  payment goes on: it is paid with the wait ([D188](#d188)). `LOAD_CHANGE` is not refused: the
+  card's own change is of a payment whose pieces the day held whole, and is never above the
+  day's limit.
+- **The receipt from the payment's commit.** The payment's transaction keeps, beside the
+  signature in `lastSig` (now 101 bytes), what left the card (4) and the hash of the message
+  signed (32). The receipt, the unit beside it (the last payment's, which the same commit
+  writes in the table) and the signature kept for `SPEND_ALL_AGAIN` P1 = 1 are written from
+  them in one transaction with the clearing of `burnPending`, by `finishBurn`, at the end of
+  `SPEND_ALL_SIGN` or, where the card left the field first, at its next command, before
+  anything reads a place. So a payment committed always has its receipt and its kept
+  signature, and P1 = 1 finds it after a pull at any point and after other payments (up to
+  sixteen, the receipts' ring). A receipt finished by the next command has zeros where the
+  till's output and the time the terminal told were: they were RAM. What left the card and the
+  hash are written beside the signature just before the payment's transaction, outside it, and
+  the signature with its mark in it as one write: `finishBurn` reads them only while `burnPending`
+  is set, which the commit sets.
+- **Transactions a chip can hold.** A chip's commit buffer holds only so many writes and bytes
+  (the card this runs on refused a payment's transaction of about 30 writes). The payment's is
+  kept small: each count it adds to is worked out in RAM and written with one copy (not four
+  bytes one by one), a new log entry is made whole in RAM and written once, and the entry's
+  figures and flags are one write; at its worst (a day that rolls, a no-PIN payment that begins
+  a window and takes the arming, a new tap, the paid list going round, eight openings of
+  change, a payment that waited) it is 17 writes and 132 bytes, against 2.2's worst of about 27
+  and 112. Should a transaction not fit all the same: the payment's answers `6A96` with nothing
+  burned (as before); `SET_CARD`'s answers `6A96` with nothing of the record written; and the
+  receipt's is given up, the note that it is owed taken down in a transaction of one byte, so
+  the card works on: the payment stands, its pieces spent and on the paid list, the till has the
+  signature in the answer (and from `SPEND_ALL_AGAIN` P1 = 0 while no later payment is signed),
+  and only that payment's receipt, kept signature and settlement record are lost
+  (`SPEND_ALL_AGAIN` P1 = 1 and `GET_OUTBOX` answer `6A88`): the record's payment id is the
+  receipt count, which that payment did not step, so `SPEND_ALL_SIGN` leaves no record rather than
+  one with another payment's id (`finishBurn` answers whether the receipt was written). Without
+  that, a receipt that did not fit would have been asked for again at every command, `SELECT`
+  among them. `SET_OWNER`'s transaction (the owner's flag, a new c and the settlement record's status
+  set to none on a replacement, the anchor, the key last) answers `6A96` the same way, with nothing written, and a claim is asked again; the
+  key is written last, so that a chip whose key writes take no part in a transaction has not
+  written it where the rest did not fit.
+- **A forgotten PIN's history goes after the new PIN's commit.** The `SET_PIN` that replaces a
+  forgotten PIN marks the history owed (`pinMarks[PM_FORGET]`, one byte more at install) in the
+  PIN's transaction, and `forget` runs after the commit, here or at the card's next command
+  (`process`, after a payment's owed burn). Torn before the commit: the old PIN and all of the
+  history. After it: the new PIN, and the history gone before anything reads it.
+- **A simple card's numbers before its record.** In the first set-up, `SET_LIMIT_PIN` before
+  `SET_CARD`: a set-up cut between the two leaves a card with no record, which takes nothing
+  (`LOAD_PROOF` `6A8C`) until it is set up again. In the other order the cut leaves a card that
+  loads with no limits, for good. The numbers are in the unit the record names: `SET_CARD` on a
+  card with no record of a holder's (new, reset, or a factory record) turns nothing by the rate
+  and asks for none, so a usd card's limits are sent in cents and kept as sent. Then `SET_HEADER`
+  gives the card its clock in the same set-up, and the phone reads `GET_INFO` P1 = 4 and
+  `GET_CARD` back before the first load.
+- **The reset by the PIN takes the hold with the PIN.** It clears the held tap's mark and the
+  arming (`TAP_READ`, `TAP_ARMED`), keeping the marks that a payment was signed or an owner
+  claimed in the time in the field: a new PIN given in the same selection has no hold until it
+  holds for one.
+- **Change given back to the day that counted it.** `pinMarks[PM_COUNTED]` has a bit an
+  opening: set by the payment that made its change, in its transaction, on a card with a day's
+  limit; all cleared by a payment that begins a new day and by a day's limit that changes.
+  `LOAD_CHANGE` gives the change back to the day's count only where its opening's bit is set,
+  and its status byte, the opening let go and the give-back are one transaction, begun in
+  `loadOne` after every refusal and committed by `LOAD_CHANGE`. Change from an earlier day, or
+  made before the limit, gives nothing back. The bit stays after: it is read only for an
+  opening owed, and a payment that makes change in that opening sets it again.
+- **`GET_INFO` says the counts of places as they are** (bytes 3 to 5), to anyone: a wallet
+  frees spent places by byte 4, and `GET_SLOT_STATUS`, `GET_PROOF_COUNT` and `GET_PIECES` say as
+  much. The day's window and count (21 to 28), the last unit (50) and the no-PIN window's start
+  (51 to 54) stay zeros to a reader with neither the PIN nor the grant.
+
+**Why.** Every number the PIN alone could write after a card's first set-up was a number a
+reader handed the PIN for one payment could write too, on the card it had just emptied: a
+looser limit, a claim of the card, or a day's limit under the holder's next top-up. A simple
+card has no such number. The reset is the holder's way to change them, and it is slow, so
+that a reader that took one payment cannot do it in the moments the card is in its field.
+
+**Rejected.** A first set-up that lasts until the first load: a card set up and never loaded
+would stay open to whoever holds it next. Numbers that only tighten after the first set-up: a
+tight number set on an empty card strands what is loaded next. A reset by the PIN with no
+wait. Refusing a load above the limit on one payment: such a piece is paid with the wait, and a
+reader that may load would learn the limit, which is the holder's, by trying. The whole receipt
+in the payment's transaction: about 150 bytes more in a commit a chip holds only so much of.
+
+**Cost accepted.** A set-up cut short (the card out of the field before its numbers or its
+claim) is finished only after a reset by the PIN. A holder with no phone who wants other numbers
+empties the card, resets it and sets it up again. Whoever sets a new card up first has it: a
+card set up by someone else on its way to its holder answers its holder's `SET_PIN` with
+`6982`; the holder resets it (three wrong tries, `SET_PIN`, a held reset) unless it was claimed,
+and a card claimed is the claimer's (nothing was on it). A reader handed the PIN that holds an
+empty card for the reset's minute can set it up again with the holder's PIN and numbers of its
+own; the card it leaves has a new card key (unless certified), a new c, a generation one more and
+no history. **This is a risk accepted**: about 45 seconds of holding (the history's nine askings
+and the reset's sixty) with the PIN, on an empty card; no till takes that long to take a payment.
+The reader can set the card up with the holder's PIN and mint and with numbers, a refund key or
+an owner of its own, refund key included, and the holder's next top-up is under them. The
+holder's own phone sees it before a top-up: `GROUP_KEYS` for the next load's date answers other
+keys than the P + t·G and R + u·G it works out from what it keeps ([D197](#d197)). A guest wallet
+that has never seen the card cannot tell. Persistent memory at install: 37
+bytes more (29,889). Load file: 32,066 bytes (47 left under 32,113).
+
+**Built (applet).** `SimpleCardTest`, `LoadLimitTest`, `KeptSignatureTest`, `ChangeWindowTest`,
+`TearSweepMoreTest` (sweeps of a payment torn and another after it, the ring going round, the
+forgotten PIN, the first set-up, `LOAD_CHANGE` giving the day back, a reset by the PIN), and
+`HistoryPrivacyTest`'s counts.
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `forget` | first the packet's generation, worked out in RAM and written with one atomic copy; the keyset table's tail (the last unit, the other unit's count, the receipts' units); the log, the receipts, the last signature and the signatures kept, filled with zeros; then the last packet's status byte | The generation first: torn anywhere after it, a card has at worst a larger generation, never a receipt count of 0 under the old one; sent again after a tear it steps again, which is only a larger number. Torn later, part of the history is gone and the command, sent again (or `process`, for an owed forget), takes the rest; nothing is given that was not before, and the PIN or the reset that follows is in its own transaction. |
+| `processResetCard` | as before ([D23](#d23)), the generation and the history now by `forget` | Torn before the last transaction, the card is still its own (owner or PIN), and the reset is sent again. |
+| `loadOne` | for the card's own change, nothing new: its status byte is written in the transaction `LOAD_CHANGE` commits, with the opening let go and the day given back | Torn, the change is on the card with its opening let go and the day given back, or none of it. |
+| `finishBurn` | as before, the paid list's rows and the status bytes, then the receipt and the note's clearing in one transaction | Torn before that commit, the next command does it all again: the same rows, the same bytes, and the receipt once. A receipt the chip cannot hold: the note cleared alone, in a transaction of its own. |
+| `processSpendAllSign` | what left the card and the message's hash beside the last signature, before the payment's transaction | Read only by `finishBurn`, only while `burnPending` is set, which the commit after them sets; torn before it, they are a payment's that nothing reads, written again by the next payment. |
+| `logEntry` | a helper, as before ([D23](#d23)): the count of taps and the new entry, made whole in RAM, one copy each | Every caller holds a transaction around it. |
+| `processSetPin`, `forgetOwed` | the history (`forget`), now after the PIN's commit, then its mark (one byte) | Owed from the commit: torn before it, nothing of the history is gone; after it, `process` takes the rest down at the next command, before anything reads it. |
+
+## <a id="d197"></a>D197: Keys per load: every piece is locked to the card's key for its date
+
+**Decided (protocol 2.3, 2026-11-13: privacy from the mint).** Amends [D175](#d175),
+[D184](#d184) and [D192](#d192). *Amended by [D202](#d202): the owner's phone gives the card a c made
+from its words at the claim or the hand-over (`SET_OWNER` P1 = `01`, then the check), with the card's
+count of the owners' c in it; a card with no owner, a reset and a claim or hand-over that brings none
+draw or keep the card's own, as below.*
+
+- **The card's secret c.** 32 random bytes, drawn at install, at every `RESET_CARD` (written in
+  the reset's last transaction, with who the card is) and when `SET_OWNER` replaces an owner
+  (written in that command's transaction, with the new key; only with nothing unspent and no
+  change owed, `6A8D`, so nothing locked to the old c's keys is on the card or still to come to
+  it; the last owner's settlement record goes in the same transaction, so that no packet is
+  signed at its first read with t from the new c while it names the old date-0 key), kept in lasting memory beside the refund key's y. `GET_CARD` P1 = 3 gives it, never in the
+  clear, after `GET_NONCE` P1 = 1 (whose sixteen bytes it uses up):
+  - on a card with a refund key R, sealed to R: the card draws a fresh k and answers K = k·G and c
+    XOR block 1 of the seal's sum over the x of k·R (with K in E's place, the sixteen bytes and the
+    instruction). Only the holder of r opens it (r·K = k·R), so it is given at any tap to the
+    holder's say: the owner's grant, or on a card with no owner the PIN given in this tap. A phone
+    restored from its words, or one that missed the set-up tap, reads c again so.
+  - on a card with no refund key, sealed as a PIN comes to it: the reader sends its key for the
+    message, E, and the answer is c XOR block 1 of the seal's sum over the x the PIN key and E
+    share. Whoever runs that tap opens it, so it is given to the owner's grant, or on a card with no
+    owner to the PIN given in its first set-up ([D196](#d196)) and in no later tap; such a card
+    never gives c again until a reset.
+
+  `6982` otherwise. A listener on the air gets K (or E) and c XOR a block it cannot work out; a
+  relay in the tap after the holder's PIN or grant gets one more sealed answer, which it opens only
+  holding r, or, on a card with no refund key, being the reader of the first set-up. A wallet keeps
+  c with the refund key's private key r: a refund needs both.
+- **A date's keys.** For a date D, the four bytes every piece carries (`00000000` for an undated
+  piece): t = SHA-256("CashuCard/key" ‖ c ‖ D) mod n and the card's key for D, P + t·G; where the
+  record has a refund key R, u = SHA-256("CashuCard/refund-key" ‖ c ‖ D) mod n and the refund key
+  for D, R + u·G. The labels are distinct and c is of fixed length, so the two hashes never meet.
+  An undated piece's secret names no refund key, so for the date 0 the card answers R + u·G as
+  zeros (`SPEND_ALL_BEGIN`, `GROUP_KEYS`).
+- **The load date.** D is the pieces' NUT-11 locktime, from which the refund key can spend them:
+  a wallet picks it in the future, at the refund date it wants, never the time of the load (which
+  would open the refund at once, while the pieces are still on the card). Top-ups share one date
+  for 7 days: a wallet reuses the date of the week's first load for every load within 7 days of
+  it, then takes a new one; so D is at least 7 days and a margin ahead at its first use (for
+  example 30 days; *amended by [D203](#d203): at least 8 days and the time to move*). Nothing on the card changes for this: the card does not read dates, and its
+  change keeps the payment's date. The holder's wallet moves a date's pieces to a new date before
+  D (*amended by [D203](#d203): before D less a day, less the time the move takes*), and a reader, online or not, leaves out of a payment a dated piece whose locktime is less than a
+  day after its own time, which the refund key may spend first (*amended by [D203](#d203): a day's
+  margin, the owner taking back only a day after D*). A payment is of one date, so a week's pieces pay together;
+  the mint ties the spends of one week's money to each other, never across weeks nor to the card.
+  Undated pieces are one date, the date 0, for the card's life (until a reset or an owner
+  replaced); a card with no refund key takes only those (`6A8E`) and so gains nothing from keys
+  per load.
+- **Part of the 2.3 card format.** Keys per load is not a profile a card may leave out: every 2.3
+  card keeps it (`GET_INFO` byte 56 bit 1), and a reader of 2.3 cards loads and pays only this
+  way. Nobody may lock ecash to P itself, the key `GET_PUBKEY` answers and a certificate names:
+  the card signs a payment only with d + t, never with d alone, so such ecash is never the card's
+  to pay; undated it is lost, dated it is the refund key's after its date. The proof format byte
+  stays `04` (`05` with two units): a reader of 2.2 that reads it is stopped at `SPEND_ALL_BEGIN`
+  and `LOAD_PROOF` (`6A86`), and a 2.3 wallet checks the version and byte 56 before it swaps.
+- **The pieces and the payment.** A piece of date D is the card proof secret with `data` P + t·G
+  and, dated, `["refund", R + u·G]`; the card builds every secret of a payment so, signs it with
+  d + t mod n (BIP-340 sets the parity, as for d), and makes its own change in the payment's date,
+  so under the same keys. A payment is of one date already (`SPEND_ALL_BEGIN` refuses a place of
+  another date, `6A80`), so every input of a swap has one key, as NUT-11 `SIG_ALL` wants. No mint changes.
+- **The wire.** `SPEND_ALL_BEGIN` takes P1 bit 1 (`02`): the reader's word that it builds the
+  secrets with the keys per load. Without it the card answers `6A86` before it reads a place or
+  writes anything, so a reader that builds the secrets with P never has pieces burned for a swap
+  no mint takes. [D184](#d184)'s P1 = 1 is bit 0 beside it: a reader of 2.3 sends `03` where it
+  reads units, `02` otherwise. It is the bit `GET_INFO` byte 56 says keys per load with, so a
+  reader sends back the bit the card shows. `SPEND_ALL_BEGIN` answers 69 bytes: the worth (4), t
+  (32), R + u·G (33, zeros with no refund key or for the date 0). `LOAD_PROOF` and `LOAD_CHANGE`
+  take P2 bit 1 (`02`) the same way: the loader's word that each piece is locked to the keys of its
+  date. Without it the card answers `6A86` before the data is read, with nothing written, so a
+  loader that locked a piece to P never leaves a piece on the card that no payment could spend
+  (the card cannot check a lock itself). P2 bit 1 because `LOAD_CHANGE`'s P1 is the opening's
+  number and `LOAD_PROOF`'s P1 = 1 is read whole, while P2 bit 0 is already `LOAD_PROOF`'s unit
+  first: the same value, `02`, as `SPEND_ALL_BEGIN`'s bit, on every command that touches a date's
+  keys. `GROUP_KEYS` (`1D`, new) answers a date's t, P + t·G and R + u·G (98) to a reader with the
+  PIN given in its tap or the owner's grant (`6982` otherwise), worked out in working memory: it
+  writes nothing of the card's state (the chip's key object for the point addition is set, as at
+  every payment). A loader has the PIN in its tap ([D185](#d185)); a till has its
+  payment's t from `SPEND_ALL_BEGIN` and needs no other date's. `SET_CARD` takes only a
+  refund key whose x is a point of the curve (`6A80` otherwise), and keeps its y beside c in the
+  record's transaction. The settlement record names the card's key for the date 0 (its pieces are
+  undated) and its descriptor is by that key; the card works t for the date 0 out again from c
+  when it signs the descriptor, so a payment begun since changes nothing. `GET_INFO` byte 56 bit 1
+  says the card keeps keys per load.
+- **Certificates.** Unchanged: a certificate vouches for P. A reader checks it over P, then checks
+  the payment's key is P + t·G with the t the card answered. A known tweak weakens nothing: anyone
+  can work out P + t·G, only the card can sign for it. Ecash locked to a certified card's keys for a
+  date before a hand-over is not the next holder's: the reset draws a new c, so the card builds other
+  keys for that date and can never pay it; it is the old holder's to refund (r + u of the old c,
+  after its date), and an undated one is lost.
+- **The check before a top-up.** A wallet that keeps P, R and c compares `GROUP_KEYS` for the date
+  it is about to load with the keys it works out itself. A card reset since, or whose owner was
+  replaced, answers other keys (a new c). The generation (`GET_OUTBOX` P1 = 0) is not that check: it is the PIN's or the grant's,
+  and a card with no record answers it `6A88`.
+
+**Who can link what.**
+
+| Who | Before | With keys per load |
+|---|---|---|
+| The mint | every spend of the card, for its whole life, to one key P, and its refunds to R | the spends of one date to each other (a date is a week's loads); no date to another, nor to P or R, which it never sees, and it cannot work out t or u without c. Amounts, times and keyset ids remain patterns |
+| A till paid with no PIN | P, the certificate, every piece on the card | the same, and the t of every date with a piece on the card (`SPEND_ALL_BEGIN` answers it before any PIN): with the mint's help it ties those dates' spends to the card; not the dates no longer on it (`GROUP_KEYS` wants the PIN) |
+| A reader given the PIN (a loader, or a till handed it) | everything | P, every piece on the card, the history ([D198](#d198)), and the keys of any date (`GROUP_KEYS`): with the mint's list of the dates and keys it saw, every spent date of the card since its c was drawn; not c |
+| A stranger holding the card | everything a till learns, and the history | what a till paid with no PIN learns: P, the pieces on the card and the keys of every date among them (`SPEND_ALL_BEGIN`), and so, with the mint's help, every spend of those dates (a week's loads already spent, and every undated spend); r of each piece on the card (`GET_DLEQ`), which ties the swap that made it (a payment's change, or a top-up loaded with its proof); and the card's no-PIN payments among the last sixteen (`SPEND_ALL_AGAIN` P1 = 1). Not c, not the keys of dates no longer on the card, not the spent places ([D198](#d198)), not the payments under the PIN. This is the honest limit of the card's privacy against someone holding it: a till needs t and r before it has the PIN. Since [D199](#d199), also the inbox name of each week from the card's last header up to now (`INBOX`, on a card that is not locked, the clock moved by real headers), and so whether money waited for the card in those weeks |
+| The holder's phone | everything | everything: it holds c |
+| The mint and a till paid with no PIN, together | every spend of the card | the spends of every date with a piece on the card when the till held it |
+| The mint and a reader given the PIN, together | every spend of the card | every spend since the card's c was drawn (its last reset) |
+| A listener on the air at the set-up, or at a later reading of c | (c did not exist) | nothing of c: it leaves the card sealed to the refund key the record names now, or to the PIN key; after a hand-over, never to the last owner's refund key, which goes with it |
+| The reader of a first set-up, on a card with no refund key (a kiosk setting up a card for a holder with no phone, or a relay in that tap after the PIN) | (c did not exist) | c, and so every date's keys: what a reader given the PIN learns, for good, until a reset |
+| The last owner, after `SET_OWNER` replaced it | (c did not exist) | nothing of the new owner's spends, and no key to its money: <ul><li>the replacement draws a new c, or takes the next owner's, made from its words ([D202](#d202)), which the last owner cannot work out;</li><li>the record's refund key goes with the hand-over, so c is never sealed to the last owner's key, and no dated piece is taken until the new owner names its own (`SET_CARD`, `6A8E` before it);</li><li>the PIN the last owner knows opens nothing (`VERIFY_PIN` answers `6982`) until the new owner's `CHANGE_PIN` sets one of its own.</li></ul> |
+| The new owner, after `SET_OWNER` | (c did not exist) | nothing of the last owner's spends: <ul><li>the hand-over clears the history as a reset does: the log, the receipts, the kept signatures, the settlement record, the spent places and their kept proofs;</li><li>it clears the day's counts (the window and what it signed for, the no-PIN window's start and count, the day of loads), the clock's last header hash, the rolls and the arming, the paid list and every keyset entry nothing names;</li><li>c is new.</li></ul> |
+| The mint, for a card with no refund key | every spend, to P | every spend, to the date 0's key: undated pieces are one group, so such a card gains nothing |
+
+**Why.** A card's key was in every secret it ever spent, so the mint (and anyone the mint told)
+could list every payment of a card for its life. The date is already the one thing a payment's
+pieces share, so the key follows it: nothing new can stop a payment, and a mint is unchanged.
+
+**Rejected.** A key per piece: NUT-11 `SIG_ALL` takes one key a swap, and a signature per piece
+(`SIG_INPUTS`) would let a reader move the outputs, the card's change among them. The card key
+signing each date's key: a signature per payment, and it ties the date to the card as t does. A
+secret only the card holds: the phone could not refund a lost card's pieces. A counter instead of
+the date: a table on the card, and a payment could no longer take two loads' pieces of one date.
+`SPEND_ALL_BEGIN` as 2.2 had it, with no word from the reader: a reader of 2.2 would have the
+card sign and burn for secrets the mint refuses, and the money would wait for a reader of 2.3 or
+the date. `LOAD_PROOF` with no word: a loader of 2.2 locks to P, and the card would take a piece
+it could never pay. `GROUP_KEYS` to anyone: with the mint's list of dates and keys, one tap would
+tie every spent date to the card. `GROUP_KEYS` to the tap that paid: a payment within the no-PIN
+allowance would open every date. Gating `GROUP_KEYS` to dates the card holds now: 40 to 60 bytes
+more, and a reader with the PIN reads the spent pieces whole anyway. c in the clear: the set-up
+tap heard on the air would tie every payment of the card. c to the PIN in any held tap in a form
+the PIN's reader opens: a guest phone, or a till that learned the PIN, would keep it; sealed to the
+refund key, only the holder of r opens it. c kept across an owner replaced: the last owner and the
+next would each tie the other's spends to the card. A replacement that keeps the history and the
+PIN: the next owner would read the last owner's payments, and the last owner, who knows the PIN,
+would read every date's keys of the next. Telling the next owner to hand over with `RESET_CARD`
+instead: a card carries its owner's settings and its key through `SET_OWNER`, and the text must be
+true of the command as it is. A format byte for keys per load: the readers of
+2.2 that exist check the major version (and, in this repository's tools, the format only in a
+self-test), so it would stop none of them before a swap. A fresh date for each load: a payment of
+more than one load's pieces took one signature a date, each after the first slowed as a second
+payment in the tap.
+
+**Cost accepted.** A reader of 2.2 does not pay a 2.3 card: it sends `SPEND_ALL_BEGIN` with P1 =
+`00` and is refused (`6A86`) with nothing begun, written or burned. Nor does it load one: `LOAD_PROOF`
+with P2 = `00` or `01` is refused (`6A86`) before the data is read; but a 2.2 loader swaps to P
+first, so its undated top-up is lost (a dated one is the refund key's after its date): a 2.3 card
+is loaded by a 2.3 wallet. A reader given the PIN can link every date since the last reset with the
+mint's help (it reads the spent pieces whole as well). A wallet that loses c reads it again with r
+and the holder's say on a card with a refund key; on one with none it cannot refund a lost card's
+dated pieces (and that card takes none). A reader that sets bit 1 and
+still builds its secrets with P has the pieces burned and the swap refused; they are not lost (the
+signature is over the right message: the till and `SPEND_ALL_AGAIN` keep it, an undated
+payment's packet carries it, and a dated piece is refunded after its date). A wallet must read c again
+after any reset or owner replaced, and checks `GROUP_KEYS` before a top-up: pieces locked to an old c's keys are not
+the card's to pay, and are refunded with r + u after their date. c leaking ties a card's dates together; it moves no money. Undated
+pieces are all one date. Time: `SPEND_ALL_BEGIN` two SHA-256 and two point additions of the chip
+(one each with no refund key), some 0.2 s on a payment of about 3 s; `GROUP_KEYS` the same;
+`SET_CARD` with a refund key three powers of the chip's RSA, once. Persistent memory at install:
+162 bytes more (30,051: c and the refund key's y, 64; the payment's keys, 98). Deselect RAM: none.
+The P1 bit: 15 bytes of the load file, nothing in memory. The loads' P2 bit: 31 bytes. The gate on
+`GROUP_KEYS`, c sealed and given in the first set-up only, the date 0's refund key as zeros and
+`SPEND_ALL_AGAIN` by hash ([D198](#d198)): 192 bytes. `GET_CARD` P1 = 3 one key agreement of the
+chip's and one SHA-256 (two scalar multiplications and one SHA-256 sealed to the refund key: 127
+bytes of the load file). A new c when an owner is replaced: 33 bytes.
+
+**Built (applet).** `PerPaymentKeyTest` (among them a `SPEND_ALL_BEGIN` without bit 1 refused
+with nothing written, whatever it names); every test sends `SPEND_ALL_BEGIN` through one helper,
+`spendBegin`, which sets bit 1; every suite that rebuilds a payment's message does it
+through one helper, `DateKeys`, which works the keys out from c by the rule; the change vector of
+NUT-CCP (`testTheChangeVectorOfNutCcp`) is of a card with a known c.
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processSpendAllBegin` | the payment's keys (98 bytes) into `group`, after every refusal | Read only by the payment's own commands, which a tear drops (the payment in hand is RAM), and written again by every `SPEND_ALL_BEGIN` before anything reads them. |
+| `CashuApplet` (the constructor) | c's 32 random bytes | Install time: no card exists until install returns. |
+| `blindChange` | the opening's nonce (counted now with r: the inventory sees the random number generator's writes) | Before the opening's state byte, as r is ([D183](#d183)). |
+| `forgetOwed`, after an owner replaced | the spent places freed (`freeSpent`), the mint's proofs, the staged outputs' count and the openings filled with zeros; the record's refund key and its y, the day's window and count, the no-PIN window's start and count, the day of loads, its count and the change it counted, the clock's last header hash with the rolls (one fill) and the arming filled with zeros; the paid list's round byte and next row put back to 0; the keyset entries nothing names let go (`reclaim`); then `forget`, then the owed mark (one byte, the new PIN owed kept) | After the transaction that made the new owner and set the mark: torn anywhere, the card is the new owner's with the mark still set, and the next command (`process`, a `SELECT` among them) does it all again before anything reads; torn again inside that, the command after it does it all again (`SetUpAndResetTest`, every pair of cuts). Nothing unspent or owed is on the card (`6A8D` otherwise), so nothing of value is freed, and nothing reads the refund key, the counts, the clock's hash or the paid list before they are whole (`checkHeader` reads the time and the bits, never the hash). |
+
+**An owner replaced.** `SET_OWNER` on an owned card is a hand-over. It clears, for privacy and
+so that the last owner keeps no key to the next owner's money, what `RESET_CARD` clears, but for
+the card's key and its settings (the mint, the unit, the limits, the rate, the allowance, the
+budget, the design and the clock's time and hardest bits), which stay.
+
+- **In its one transaction:** the owner's flag, a new c, the settlement record's status, the owed
+  mark with `FORGET_HISTORY`, `FORGET_PLACES` and `PIN_OWED`, the anchor, and the key last; 9
+  writes and 138 bytes at the most, with a header (8 and 137 before [D201](#d201)'s byte).
+- **After it** (`forgetOwed`, here or at the next command, before anything reads):
+  - the history and the spent places, as a reset;
+  - the record's refund key and its y. Until the next owner's `SET_CARD` (its proof, on an empty
+    card) names its own, `GET_CARD` P1 = 3 seals c to the PIN key, to the next owner's grant, and
+    a dated piece is refused (`6A8E`). Undated pieces load and pay: their keys name no refund key;
+  - the day's counts: the window and what it signed for, the no-PIN window's start and count, the
+    day of loads, its count and the change it counted;
+  - the paid list (its next row and its round), on every card, a certified one too: the card
+    signs only with d + t of its c, so a piece locked to the last c's keys is never signed for
+    again whatever the list says (a piece the last owner paid can be loaded, and a payment of it
+    is signed under keys its secret does not name, which no mint or reader takes);
+  - every keyset entry nothing names (`reclaim`), so a dead entry of the other unit does not keep
+    the card in format 5;
+  - the clock's last header hash, the rolls and the arming ([D198](#d198)'s history). The
+    clock's time, its hardest bits and the roll budget stay, so a later header is taken and an
+    older one moves nothing; the rolls begin again as at a `REFRESH`; the no-PIN allowance waits
+    for the next owner's arming.
+- **The PIN.** `PIN_OWED` makes `VERIFY_PIN` answer `6982` before it looks at the PIN, so nothing
+  the PIN alone opens is open: the history (`GET_LOG`, `GET_PROOF` of a spent place, `GET_PIECES`'
+  spent places), the date keys (`GROUP_KEYS`), teaching a keyset (`KEYSET_KEYS`), the scope
+  (`GET_OUTBOX` P1 = 0), `GET_INFO`'s and `GET_CARD`'s history fields, a payment over the
+  allowance, loads, `CLEAR_SPENT` and `LOCK_CARD`. The tap's verified PIN and grant end with the
+  replacement. The next owner's `CHANGE_PIN` (its proof over the new PIN) takes the mark down in
+  the PIN's own transaction; `RESET_CARD` takes it down with the owner. It survives power cuts and
+  every `SELECT`.
+
+**Rejected, for the refund key.** A command that sets only the refund key: `SET_CARD` under the
+owner's proof already does it on an empty card, and a new instruction would cost load-file bytes
+for nothing `SET_CARD` cannot do. Keeping the last owner's key until the next owner's `SET_CARD`:
+c would be sealed to it, and a dated piece loaded first would be refundable by the last owner.
+Refusing undated loads until `SET_CARD`: nothing of an undated piece depends on the refund key.
+
+**Built (applet), the hand-over.** `HandOverTest` (the refund key and its y gone, c sealed to the
+PIN key, a dated piece refused with nothing written, an undated one loaded and paid, the next
+owner's own refund key; the day's counts; the clock's hash, rolls and arming, and a later header
+taken after them; the paid list; the dead entry); `SetUpAndResetTest`
+(the hand-over torn at each of its 51 writes, and torn twice: after the commit, then inside the
+next command's taking down, at each of its writes).
+
+c at a reset and the refund key's y at `SET_CARD` are written in the transactions those commands
+already end with, and c when an owner is replaced in `SET_OWNER`'s. The refusal of a
+`SPEND_ALL_BEGIN` without bit 1 writes nothing, nor that of a `LOAD_PROOF` or `LOAD_CHANGE` without
+P2 bit 1. `GET_CARD` P1 = 3 writes nothing of the card's state: the sixteen bytes it uses up are
+RAM, and sealed to the refund key it sets the chip's key object for k, as `LOAD_CHANGE` does.
+
+**Built (applet), the loads' word and the gates.** `LoadWordTest` (a load without P2 bit 1 refused
+with nothing written, a piece locked to P never taken, `LOAD_CHANGE` the same), `LinkingTest`
+(`GROUP_KEYS` to the PIN or the grant and not to the tap that paid with no PIN; `SPEND_ALL_AGAIN` by
+hash and zeros; c sealed, in the first set-up only on a card with no refund key, and to the
+refund key at any tap on one with a refund key; a new c when an owner is replaced, and the
+replacement only with no change owed; the date 0's refund key as zeros); `StrangerHoldingTheCardTest`
+(what a reader with no PIN and no grant learns: the keys of every date on the card from
+`SPEND_ALL_BEGIN`, r from `GET_DLEQ`, the no-PIN payments from `SPEND_ALL_AGAIN` P1 = 1, and the
+seal's point checks); every test loads through helpers that set P2 bit 1.
+
+## <a id="d198"></a>D198: History behind the PIN: spent places, the clock's last header, the rolls, the arming, the no-PIN window's start and the last payment's scope
+
+**Decided (protocol 2.3, 2026-11-13: privacy in 2.3).** Amends [D194](#d194) and
+[D196](#d196).
+
+To a reader that has given neither the PIN nor the owner's grant in its tap:
+
+- `GET_PIECES` P2 = 0 does not list a spent place (it lists the unspent ones, as before), and
+  P2 = 2 answers a spent place as an empty one, 82 zeros, as `GET_PROOF` answers it `6A88`.
+- `GET_CARD` P1 = 0 says zeros for the last header's hash and the rolls (44 to 76), the arming
+  (78) and the no-PIN window's start (83 to 86); the answer keeps its length.
+- `GET_OUTBOX` P1 = 0, the last payment's scope (its payment id, generation and hash), is answered
+  only in the time in the field that signed the payment or to a reader with the PIN or the grant
+  (`6982`), as P1 = 1, the packet, is to the paying tap or the holder's say. The `6982` comes
+  before the record is looked at, so a reader not told gets it whether a record is kept or not,
+  and learns nothing from it; `6A88` (no record) is said only to a reader that may read that form.
+- `SPEND_ALL_AGAIN` P1 = 1 with the PIN not given in this tap (on a card that has one) looks only
+  among the signatures given with no PIN, and answers `6A88` for every other hash: a payment under
+  the PIN, another card's swap and 32 zeros (an empty receipt) all answer alike, so a reader with
+  the mint's list of swaps learns of no payment under the PIN that it is the card's, nor how many
+  payments the card has kept. It does learn the card's no-PIN payments among the last sixteen:
+  their hashes answer `9000`. A till whose payment was under the PIN asks for it again with the PIN.
+- `GROUP_KEYS` ([D197](#d197)) is answered to the PIN or the grant (`6982`): a date's keys held
+  against the mint's swaps would tie them to the card.
+
+A hand-over ([D197](#d197)) takes the last header's hash, the rolls and the arming with the rest
+of the last owner's history; the clock's time and the hardest header's bits stay. A reset
+(`RESET_CARD`) takes them too, with the hardest header's bits; the clock's time stays.
+
+Left open, because a till or a loader needs them: the unspent pieces and their proofs, the
+balance, the card key and certificate, the record, the clock (`GET_INFO` 17 to 20), the hardest
+header's bits, the allowance and what is counted against it, the tag, the change owed
+(`GET_CHANGE`: any reader may write it back, [D183](#d183)), and the true counts of places and the
+slots' states ([D196](#d196): a wallet frees spent places by them, and a loader needs the free
+count).
+
+**Why.** A spent piece whole is the exact input the mint and the till saw: a stranger holding the
+card would read what was paid and, with the mint, which swap. The last header's hash and
+the window's start said when the card last paid.
+
+**Rejected.** Gating `GET_CHANGE` to the paying reader or the PIN: it breaks the change written back
+by any reader ([D183](#d183)). Hiding the counts: it broke loads and hid nothing ([D196](#d196)).
+
+**Cost accepted.** A stranger still learns how many places are spent and which, the change owed
+until it is loaded back, the clock and the allowance; and, with the mint's records, what a till
+needs before the PIN gives it ([D197](#d197)'s table): the keys of every date with a piece on the
+card, the swap that made each piece on it, and the card's last no-PIN payments. And where fewer than
+8 loads are left today, how many ([D200](#d200)): `SPEND_ALL_CHANGE` refuses change past them
+(`6A8F`) before any PIN is asked, and the payment, given up, owes nothing; eight or more reads only
+as eight or more, so near the day's 300 it tells about how much the holder loaded that day.
+`GET_INFO`'s bytes 57 and 58 stay zeros to such a reader, which MUST NOT read them as a number:
+they say it was not told, not that no load is left. No writes.
+
+**Built (applet).** `HistoryPrivacyTest` (the listing, the batch, `GET_CARD`, the scope), and the
+suites that read spent places or the rolls as a stranger read them with the PIN or from memory;
+`LinkingTest` (`SPEND_ALL_AGAIN` by hash without the PIN, `GROUP_KEYS`).
+
+
+## <a id="d199"></a>D199: The inbox: where money waits for the card, read with no PIN
+
+**Decided (protocol 2.3, 2026-11-13).**
+
+A new command, `INBOX` (`1E`), answers anyone, with no PIN and no grant, 36 bytes:
+SHA-256("CashuCard/inbox" ‖ c ‖ W) and W (4 bytes, big-endian), where c is the card's secret
+([D197](#d197)) and W = floor(time / 604800) is the week of the card's own clock, the time of the
+last block header it took. In order: P1 and P2 are `00` (`6B00`); a locked card answers `6986`,
+as every command a lock stops; a card with no holder's record answers `6A8C` (out of its packet,
+after a reset, or with a factory record: no holder has its c, and it takes no piece); a card whose
+clock has taken no header answers `6985`. It answers whatever else the record holds, a card with
+no refund key and a card with no owner too. The command's data is not read: the card answers the
+week of its clock and no other. It writes nothing and counts nothing, and works the week out by
+the same steps for every time.
+
+**Why.** A till finds what was sent to the card before the holder gives it the PIN: the owner,
+who keeps c, works out a week's name and has money waiting under it; the till reads the name from
+the card and asks whoever keeps it what waits. The money goes onto the card only by a load with
+the PIN (`LOAD_PROOF`), as any load. The PIN stays the holder's.
+
+**What waits MUST be locked to the card, dated, with its refund key.** The name is only an
+address: anyone who has it can find what waits, and it is the same to every reader for the whole
+week. So knowing the name MUST never be enough to collect, and money the card never collects MUST
+come back to the owner. Ecash that waits under a card's name MUST be:
+
+- dated, never undated (never the date 0), and locked (NUT-11) to the card's key for its date D,
+  P + t·G, with the card's refund key for D, R + u·G, which the owner works out from P, R and c as
+  for any top-up ([D197](#d197)); never to P alone, and never to a key the keeper of the name or a
+  till holds;
+- of a date D 14 days after the time it is filed (the card's usual date), never less. The owner's
+  phone gives no later date, and D is never moved at pickup: pickup stays open until 7 days before
+  D, and a till reads back only two weeks. A filing's D is its own, never the date the owner's
+  wallet shares among the week's top-ups ([D197](#d197));
+- the card's exact proof secret (NUT-CCP's card proofs): its serialization, its tags and their
+  order (`locktime`, `refund`, then `sigflag` `SIG_ALL`), as the card rebuilds it from the nonce,
+  the date and the date's keys.
+
+Only the card's owner's phone, which keeps c and the refund key's r, files under the name; a till
+never files, and nor does anyone else who has the name. The owner files each piece under the name
+of every week its pickup window touches (the week it files it in and the week of its day 7: two at
+most), so that a reader that moved the card's clock on without reading `INBOX` hides nothing; a
+piece found under two names is loaded once (`6A94`).
+
+**Which cards.** The card answers `INBOX` whatever its record holds. A phone MUST NOT file for a
+card with no owner (`GET_INFO` byte 16 `00`: no one keeps c and r for it) or with no refund key
+(`GET_CARD` bytes 7 to 39 zeros), and reads both before it files. A card with no refund key takes
+only undated pieces (`6A8E`), and an undated piece filed for it would be lost if the card were
+lost, reset or handed over first. The holder of either loads in person. Refusing `INBOX` on such
+cards was weighed and left out: it needs a change to the applet, and no money is lost by the
+answer, since no phone files under it.
+
+A keeper may then give what waits to whoever names the inbox: none of them can spend it, and only a
+load with the PIN puts it on the card. A lock stops the inbox as it stops loads: the lock is the
+owner's word that the card is out of the holder's hands, and a locked card takes no load, so
+nothing that waits could go onto it.
+
+**At pickup, a till checks each piece.** The till did not lock the waiting pieces, yet `LOAD_PROOF`
+asks for its word that they are locked to the card's keys (P2 bit 1), and the card stores only the
+nonce and the date and cannot check the lock. So before it gives that word for a waiting piece, a
+till or phone MUST rebuild the piece's secret from the card's keys for its date (`GROUP_KEYS`,
+under the PIN given in the tap) and its nonce, and check that it equals the filed secret byte for
+byte; check that the piece's keyset is a keyset of the mint `GET_CARD` names, in the card's unit,
+and that its DLEQ proof (NUT-12) verifies under that mint's key, never a key the filed token or
+the keeper names (`LOAD_PROOF` keeps 8 bytes of the keyset and checks no mint's proof, and under
+the PIN gives a new keyset a free entry: a piece of another mint would load, show in the balance,
+and burn the real pieces paid with it when the mint refuses the swap); check, by its own time,
+that at least 7 days are left before D (pickup closes then, so that the holder's wallet can move
+the pieces to a new date before the refund opens); where it is online, ask that mint the piece's
+state (NUT-07) and refuse a piece it does not answer `UNSPENT` for; and run a loader's checks
+(free places less up to 8 for change, the loads left today, the day's limit, room in the keyset
+table). It refuses the piece otherwise, and the piece waits, for a later pickup or until it comes
+back to the owner after D.
+
+**What the owner is told, and after D.** At the mint a piece on the card and a piece still waiting
+both read `UNSPENT`. So a till that loads waiting pieces SHOULD leave the owner a pickup proof where
+it found them, 20 seconds to 5 minutes after the tap at a random moment: k (1), the nonces it
+loaded (32 each, in the order loaded), 16 random bytes of its own (rand16) and the card's `AUTH`
+answer (80) to m = the first 16 bytes of SHA-256("CashuCard/pickup" ‖ the nonces ‖ rand16), in that
+tap (`spec/vectors/pickup.json`). It shows only that the card was in the till's field at a tap
+after those nonces were chosen: `AUTH` answers any reader with no PIN over any 16 bytes, so a pickup
+proof never shows that anything was loaded. It tells the owner's phone where to look; what is on
+the card, the card says (`GET_PROOF` lists the nonces). A picked-up piece reaches the card with 7 to
+14 days left before D; the owner's phone moves picked-up pieces to a new date at its next tap with
+the card, and nothing gives them a new date at pickup. Every reader, online or not, leaves a dated
+piece out of a payment once its D is less than a day after the reader's own time ([D197](#d197),
+[D203](#d203)), and an online reader asks the mint the state of every input before the card signs,
+so one bad piece never burns good ones. So from a day before D the card pays no piece of that date,
+and a day after D (by the network's tip the owner's phone has checked) the owner may take back by
+the refund key every piece of it, picked up or not, once its phone has read the card at a tap
+after that (and shown its holder which were on it), or at once where the card is lost: a day on
+each side, for a reader's clock slow and the owner's fast ([D203](#d203)). A piece taken back while it is on the card is
+one the card still shows and no reader pays; the owner's phone frees its place at its next tap, by
+a payment of it that it does not take to the mint.
+
+**What is lost, and what is not.** A card lost, broken, reset or handed over before a till picks
+up what waits for it strands nothing. The pieces stay locked to the card's date key: after a reset
+or a hand-over (each draws a new c) no card signs with it again, and a lost card signs for them only
+once they are loaded onto it with its PIN. So no one else can take them before D: not the keeper,
+not a till. After D they come back to the refund key, which the owner spends
+with r + u, u worked out from the c they were filed under; so the owner keeps that c with r until
+every piece filed under it is picked up or taken back. The same holds for a piece no till picks up
+before its pickup closes. What the owner loses is the time until D, not the money.
+
+**The week a holder can read.** The card answers the week of its own clock, and anyone holding
+the card moves the clock forward with real block headers, which are free (`SET_HEADER` takes them
+on a locked card too, and with no PIN). So a holder can read the name of every week from the card's
+last header up to now, one header at a time; never a week ahead of real time, since the network
+takes no block whose time is more than about two hours ahead (the one exception, a header made far
+ahead at the floor's work, is below). A till (or a phone) that looks for waiting money reads `INBOX`
+for every week from the later of the card's own week and the week two weeks before now, up to this
+week: it gives the card a real header of each week in order and reads `INBOX` after each, so that
+money filed in the week before, or at a week's edge (a block's time runs up to about two hours
+ahead of a clock, and an hour or more behind), is found; and last it gives the card the newest
+header it has. Two weeks cover the 14-day hold with pickup closing at day 7.
+
+**The clock's limits, for the inbox.** The clock takes any header with the floor's work
+([D24](#d24)) and moves back only as [D200](#d200) and [D201](#d201) say: to the anchor of an empty
+card's reset or hand-over, and in `REFRESH`. One header made for a time far in the future moves the
+clock there: from then on the card answers that far week, later real headers change nothing, and a
+reset or a hand-over with no anchor keeps it, so the next holder's card answers it too. Tills then
+find nothing under the names the card answers, so nothing waiting is picked up; what waits is not
+lost by it, and comes back to the owner by the refund key after its date D, as above. The owner
+reads the card's week back (W, the last four bytes of `INBOX`'s answer) at its own tap and so sees
+it. Where the header was weak (at the floor's work, a quarter of a block's: less than half the work
+of the hardest the card has taken), any `REFRESH` with a real header brings the clock back; where it
+was not, the owner's `REFRESH` back form does, or the anchor of the empty card's reset or hand-over
+([D201](#d201)).
+
+What the same header does to the card's days is [D201](#d201)'s: a weak one begins and ends no day,
+so it pauses the days until the `REFRESH`; one that is not weak begins a day that ends only when the
+clock passes it by a day (never for a time at or after `FFFEAE80`). Owed change is never stranded:
+a payment's change is counted when the payment is signed, and `LOAD_CHANGE` is never refused for the
+count ([D200](#d200)). A reader MUST NOT give a card a header more than two hours ahead of its own
+clock, and SHOULD give only headers of the best chain it checked itself; a reader told the loads
+left makes no more change outputs than they allow, since the card refuses the rest. That binds
+honest readers only, since `SET_HEADER` is open to anyone holding the card
+([SET_HEADER](../spec/APDU.md#set_header-0x36)).
+
+**What any holder of the card learns.** The name of the week of the card's clock, and so, from
+whoever keeps what was sent under it, whether money waits for the card that week and how much;
+by walking the clock, the same of each week since the card's last header, and, where a far header
+was brought back by `REFRESH` to an older one ([D201](#d201)), of each week from that one. Never the
+history, never a week ahead of real time but by a header made far ahead (above), nothing of c or of
+a date's keys. A hand-over and a reset draw a new c,
+so the last holder's names stop.
+
+**What a keeper of the name learns.** That the card was sent something that week (and how much,
+which it keeps), and, from any till that shows it the name, that the name is the card's: it ties
+to the card's key P, which any reader reads with no PIN (`GET_PUBKEY`). Ecash locked to a date's
+key also shows that key, which the mint sees when the card spends it ([D197](#d197)).
+
+**Rejected.** A name for any week asked: a stranger could list the names of weeks the clock has
+not reached. A name under the PIN: a till looks before the holder gives it.
+
+**Built (applet).** `InboxTest` (the owner's derivation, a new week and the old one no longer
+answered, no PIN, no write under the tear harness, a hand-over and a reset, a locked card, the
+refusals).
+
+---
+
+## <a id="d200"></a>D200: A header far ahead: change counted when it is made, and the owner's anchor brings the clock back on an empty card
+
+**Decided (protocol 2.3, 2026-11-13).** Amends [D20](#d20) (the clock moves only forward),
+[D195](#d195) (300 loads a day, `LOAD_CHANGE` among them) and [D199](#d199) (the clock's limits).
+*Amended by [D201](#d201): the far clock holds the day's limit too, and where no one can change the
+limit the card cannot be emptied by paying ("Why" below); D201 makes a header at the floor's work
+begin and end no day, and gives `REFRESH` the way back.*
+
+One header at the floor's work with a time far ahead, which anyone holding the card can give
+([D199](#d199)), moves the clock there, and every day the card counts begins at that time and ends
+only a day later by the clock: for a time at or after `FFFEAE80`, never. Two rules keep that from
+costing money, and give the owner a way back:
+
+- **Change is counted when it is made.** The change outputs a payment makes (`SPEND_ALL_CHANGE`)
+  count against the day of loads (300 pieces, [D195](#d195)) in `SPEND_ALL_SIGN`'s commit, the
+  transaction that makes their openings owed: an opening is owed exactly when its piece is counted.
+  A day of loads that is over begins again at `now` there, as at a load; a payment with no change
+  leaves the day of loads as it is. `LOAD_CHANGE` counts nothing and is never refused for the day's
+  count; everything else it checks, it checks as before. `SPEND_ALL_CHANGE` refuses change the day
+  has no room for, with the change before it in the payment (`6A8F`, last of its checks, the payment
+  given up, nothing written), and the last `SPEND_ALL_SIGN` asks again before it signs (`6A8F`, given
+  up). So no change is owed that the card cannot load, and owed change is never lost to the count.
+- **The owner's anchor brings the clock back on an empty card.** `RESET_CARD` P1 = 0 takes an
+  anchor: a block header after the owner's proof and under it, or, in the reset by the PIN of a card
+  with no owner, as its data. `SET_OWNER`'s hand-over takes one already. Both want an empty card,
+  nothing unspent and no change owed (`6A8D`), and there the anchor, held to `SET_HEADER`'s checks
+  (its own work, the floor, a quarter of the hardest taken) before anything is written, becomes the
+  clock even where it is older than the card's, with its bits and its hash. The day of loads begins
+  again: a hand-over clears it ([D197](#d197)), and a reset now does too, with its new c. A claim's
+  anchor, `SET_HEADER` and `REFRESH` move the clock only forward, as before.
+- **A day that cannot end is not over.** A window whose end is past what four bytes hold is not
+  read as over; the anchor is the way back from it.
+
+**Why.** Counted at the signature: the commit is the one place an opening becomes owed, so the count
+and the owing are one transaction, and a tear leaves both or neither. Counted at `SPEND_ALL_CHANGE`,
+the count would be a write outside any transaction, and a payment given up after its change (any
+reader can begin one and make change with no PIN: the PIN is asked only at `SIGN`) would spend the
+day's loads for change never made, a way to stop a card's loads for free. The anchor: the far clock
+stops only the days of what the card holds, and the owner can always empty the card (pay its pieces
+out, its change loaded first, which the first rule keeps possible). An empty card holds nothing those
+days count: a hand-over clears the day's counts, a reset clears the record, and both draw a new c,
+so no piece loaded under the far clock is one the card signs for again. The anchor is the owner's
+(its proof covers it) or, on a card with no owner, the holder's, under the PIN and the reset's hold;
+it carries the floor's work and a quarter of the hardest header's, so the clock goes back only to a
+recent real block. The reset's day of loads: [D195](#d195) counts loads so that the paid list goes
+round no faster than a little over three days; after a reset no piece loaded before it is one the
+card signs for, so the count has nothing of the last c's to guard, and its zeros are written in the
+reset's last transaction with the new c (torn before it, the card keeps the old c and its count).
+Not over when it cannot end: read as over, every load, payment and refusal at such a clock would
+begin a new day, and the day of loads would bound nothing (the paid list gone round in minutes, so a
+holder could pay one piece to two readers offline), the day's limit would roll its budget's days at
+once, and a run of refusals would never make three.
+
+**Rejected.** Counting change at `SPEND_ALL_CHANGE` (above). Any real header moving the clock back:
+a reader would walk it back and forth for new days. A reset that zeroes the clock: the card would
+spend a first day on trust, and its clock would be the next reader's to set. Back for a claim's
+anchor too: a claim follows a reset, whose anchor does it. A day past four bytes read as over (above).
+
+**Cost accepted.** What remains: a hostile reader with one such header (about 2^77 hashes; one serves
+every card) still stops a card's loads, and its change, until the owner empties the card and resets
+it or hands it over with an anchor; on a card with no owner, until the holder's reset by the PIN,
+and its day's limit stands the same way. A payment the day has no room for makes no change: the
+holder pays with pieces that need none, or waits a day. On the day change counted the day before is
+loaded, the card may take up to 8 pieces more than 300 (one for each opening), so the paid list still
+goes round in a little over three days. One write more in the payment's transaction where change is
+made (the change counted byte goes into it: the worst payment 17 writes and 138 bytes, from 17 and
+132). A reset with an anchor runs one transaction more (the time, the bits and the hash: 3 writes,
+40 bytes). An owner that sets the clock back hands the next holder a clock behind real time, which
+the next reader moves on with the newest header, as it does any clock.
+
+**Built (applet).** `roomToLoad` stages the day of loads, its count with the pieces asked and the
+change counted (`X_LOADS`, seven bytes as `pinMarks` has them from `PM_LOAD_DAY`), a new day's where
+the day is over; `loadOne` asks it for `LOAD_PROOF`'s pieces only; `processSpendAllChange` asks it for
+the change before and this one; `processSpendAllSign` asks it before it signs and writes the seven
+bytes in its transaction where change was made. `checkHeader` takes `back` (the anchor of a hand-over
+or a reset). `FarHeaderTest` (owed change on a frozen card, the run with real loads, the change
+refused at `SPEND_ALL_CHANGE` and at `SPEND_ALL_SIGN`, a day begun by change, the owner's reset and
+hand-over bringing the clock back, a clock past four bytes, the holder's reset by the PIN, no anchor
+taken on a card that holds money, the anchor's checks, nothing else moving the clock back),
+`LoadCapTest` (`changeCounts`, `aResetBeginsTheDayAgain`), `TransactionSizeTest` (printed).
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processSpendAllSign` | none new | The day of loads, its count and the change counted are one copy in the payment's transaction, with the openings made owed. |
+| `loadOne` | none new | As [D195](#d195): the day and the count in one atomic copy before the piece; `LOAD_CHANGE`'s piece writes neither. |
+| `processResetCard` | none new | The anchor (the time, the bits, the hash) is a transaction of its own after the record is cleared: torn after it, the card has its owner and c still, and a clock that ends no window sooner (the record's windows are cleared, and the day of loads is as it was). The day of loads goes with `PM_FORGET` in the last transaction. |
+| `processSetOwner` | none new | The anchor is in the transaction it was in. |
+
+---
+
+## <a id="d201"></a>D201: A weak header begins and ends no day; REFRESH brings a weak clock back, and the owner's REFRESH any clock
+
+**Decided (protocol 2.3, 2026-11-13).** Amends [D20](#d20) (`REFRESH` moves the clock only
+forward), [D186](#d186) (the no-PIN window), [D195](#d195) (the day of loads) and [D200](#d200) (the
+way back from a header far ahead).
+
+A header far ahead holds the day's limit as it holds the day of loads ([D200](#d200)). On a card
+whose limit no one can change (a card with no owner, past its first set-up; an owned card its owner
+has locked), the money above what that day has left could not otherwise be paid out, and the reset
+that brings the clock back wants an empty card. Three rules:
+
+- **Weak.** A header is weak when it carries less than half the work of the hardest the card has
+  taken (its target over twice that one's; before any, the floor's: *amended by [D203](#d203):
+  before any, twice the floor's work, and a weak header is never the hardest*). The card keeps whether the
+  header that set its clock was: one byte of the record, written with the clock in every header's
+  transaction, kept by a reset with the clock's time, and said as zero by `GET_CARD`. A header at the
+  floor's work is weak to any card that has taken the network's (the floor is a quarter of the
+  network's work, [D24](#d24)); the network's own are not, its difficulty never having fallen by half.
+- **At a weak clock no day ends, and none begins at it.** The day's limit's window, the no-PIN window
+  and the day of loads end only by a clock that is not weak. A day begun at a weak clock (an owner's
+  new number for the day, a no-PIN payment's window) begins with no clock (0), and the next header
+  that is not weak anchors it, as a day begun before any header is. So a far header at the floor's
+  work gives no one a day and freezes none: what each day counted stays counted, and the day ends by
+  the clock once the clock is back.
+- **`REFRESH` brings a weak clock back.** An older header that is not weak, in the owner's `REFRESH`,
+  in the holder's `REFRESH` P1 = `01` (the PIN in a held tap, [D189](#d189)) or in a claim's anchor,
+  becomes the clock, with its hash, and its bits where they are the hardest. The days stay where they
+  were. And the owner may ask more, with the byte `01` after the header, under its proof (the back
+  form): the clock goes back to any older header that is not weak, whatever the clock, and the day's
+  limit's window, where it began after that header, begins again at it, keeping what it counted. The
+  no-PIN window the owner's proof has already ended ([D186](#d186)). The day of loads is never moved
+  (*amended by [D203](#d203): the back form brings it back too, with its count*).
+
+**Why.** The card has no time but its headers. A far header with the network's own work is, to the
+card, the network's newest block; any rule that lets a holder with no owner begin the day again
+under such a clock lets a reader that has been given the PIN begin it again under a real one, at
+every tap, and the day's limit is there to stop that reader ([D20](#d20)). What a far header made
+by one party lacks is work: it costs a quarter of a block's at the floor, and the network's blocks
+carry four times that. So the card judges the clock by the work of the header that set it. A weak
+header begins and ends nothing, and the way back from it gives nobody anything: the clock comes back
+to a real header, and each day ends by the clock as it would have. Half and not the whole: the
+network's difficulty falls at times (by more than a quarter in one adjustment in 2021, by over
+two fifths across two), and a card whose clock a real block set must not stop its days. The owner's
+back form: the owner of a card that is not locked can move its limit anyway, and begins a day so
+([SET_LIMIT](../spec/APDU.md#set_limit-0x34)); on a locked card the owner is the one who locked it.
+The form is the owner's word, under its proof; a reader cannot give it, and the holder of a card
+with no owner has none. The day of loads is never moved (*the owner's back form moves it, [D203](#d203)*): it bounds how fast the paid list goes round
+([D191](#d191), [D195](#d195)); moved back, a reader could take the paid list round and a holder
+pay one piece to two readers offline. A clock brought back to an older header only makes the days end
+later, except where the owner's back form asks it.
+
+**Rejected.** `REFRESH` beginning the day's windows again at any older real header, the first form of
+this fix: a reader given the PIN, on a card with no owner, would walk the day back for a new one at
+every tap. With a mark that allows one such day a day: a card idle for a month gives a reader with
+the PIN the month's limits at once, and two far headers raise the mark past any real one. A day that
+cannot end read as over ([D200](#d200)). A weak header refused: it changes nothing a weak header may
+not do, and at a fall of half every card would refuse real headers. An older header raising the
+hardest: `SET_HEADER` changes nothing for an older header, and that stays.
+
+**Cost accepted.**
+
+- A far header that is not weak (at least half the work of the hardest header the card has taken:
+  twice the floor's, about 2^78 hashes at the floor's difficulty, a bar that falls against the network
+  as its difficulty rises, [D204](#d204); one header serves every card) is
+  what [D200](#d200) left. On a card with an owner, the owner's back form brings it back. On a card
+  with no owner and a day's limit, the money above what that day has left stays on the card until
+  the clock passes that time by a day (never, for a time at or after `FFFEAE80`), and its loads stop
+  until the empty card's reset. A card whose hardest header is old is weak to less: the bar is half
+  its own hardest, not the network's.
+- A weak far header pauses the card's days until the `REFRESH`: a day at its limit stays at it. A
+  wallet that finds the card's clock later than the newest header it has sends the `REFRESH`.
+- Should the network's difficulty ever fall by half, a card's days would stop ending until it rose
+  again (an empty card let the ratchet go with `SET_CARD`, which [D203](#d203) ends), as at a fall by three quarters every card
+  would stop taking headers ([D24](#d24)). It has not fallen by more than about two fifths.
+- Where a `REFRESH` brings a far clock back to an older header, the card answers `INBOX` for the
+  weeks from that header again.
+- One byte in the record, and one write more in every transaction that takes a header (in jCardSim:
+  `SET_HEADER` 4 writes and 41 bytes; the owner's `REFRESH` back form at its worst 6 and 46; a claim
+  with a header 7 and 108; the hand-over with a header 9 and 138, from 8 and 137). The payment's
+  transaction is as it was (17 writes and 138 bytes at the worst).
+
+**Built (applet).** `checkHeader` takes how a header may move the clock (`HEADER_ON`, `HEADER_LIFT`,
+`HEADER_OWNER`, `HEADER_BACK`) and answers what taking it does (`HOW_CLOCK`, `HOW_HARDEST`,
+`HOW_WEAK`, `HOW_WINDOWS`); `writeHeader` writes whether the clock is weak, anchors the days begun
+with no clock only at a header that is not weak, and brings back the day's window for the back
+form; `dayEnded` (the three days' ends) and `beginAtNow` (a day begun at a weak clock begins with
+none); `REFRESH`'s back form; `RESET_CARD` keeps the weakness with the clock's time; `GET_CARD`
+says it as zero. `WeakClockTest` (a card with no owner and one with an owner, locked and not, paid
+to empty past a far header at the floor's work; the owner's back form past one with the network's
+work; the day of loads never moved; the holder's `REFRESH` bringing back only a weak clock, and the
+cost above pinned; no day ending or beginning at a weak clock; weak and not weak headers; the
+weakness through a reset and a claim; no day gained from a weak header again and again),
+`TransactionSizeTest` (the back form's transaction), `HistoryPrivacyTest` (`GET_CARD`), the owner's
+vectors (the anchored reset and the back form, `spec/vectors/owner.json`).
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `writeHeader` | none new (one more inside its caller's transaction: whether the clock is weak) | The clock, its weakness, the days it anchors or brings back, the hardest bits and the hash are written in the caller's one transaction: all new or all old. |
+| `beginAtNow` | none new (a helper inside the payment's commit and `SET_LIMIT`'s transaction) | One atomic copy, the clock or zeros, as the copy it replaces. |
+| `processResetCard` | one fill more (the record cleared in three runs, stepping over the clock's time and its weakness) | The fills are the record's, outside any transaction as before; torn between them, the card still has its owner and c, and a clock that ends no day sooner. |
+| `processRefresh` | none new | The back form's writes are in `REFRESH`'s one transaction, with the rolls. |
+
+---
+
+## <a id="d202"></a>D202: The card's secret c comes from the owner's words
+
+**Decided (protocol 2.3, 2026-11-13).** Amends [D197](#d197) (c drawn at install, at every reset
+and when an owner is replaced) and [D187](#d187) (the claim).
+
+A wallet keeps nothing but its words. A phone restored from them has the refund key's private key r
+and the owner key of every card, but not c, which the card drew: with the card in hand it reads c
+again (`GET_CARD` P1 = `03`), but a lost card's dated money, which r + u spends after its date, would
+need a c that is nowhere. So the owner's phone gives the card a c made from its words when it becomes
+the owner, and a card with no owner still draws its own.
+
+- **s, the owner's for one card.** s = HMAC-SHA256(key = the 64-byte BIP-39 seed, message =
+  "CashuCard/c" ‖ `00` ‖ P (33, compressed)), P the card's key (`GET_PUBKEY`). It is made as the
+  owner key is ([The owner's proof](../spec/APDU.md#the-owners-proof)), under a label of its own: it
+  is no BIP-32 path and no key of the wallet's money, its messages or the owner's proofs, and none of
+  them is made with this label, so s gives none of them and none of them gives s. Two cards of one
+  owner have two s; two owners of one card have two s.
+- **c.** c = SHA-256("CashuCard/c" ‖ s ‖ n), n the number of owners' c the card has taken, this one
+  with them: four bytes, big-endian, 1 for the first. The card keeps n after c and the refund key's
+  y, in lasting memory that nothing clears (a reset, by the owner or by the PIN, and a hand-over keep
+  it), and writes it in the transaction that writes c.
+- **To the card.** `SET_OWNER` P1 = `01` carries s sealed to the card's PIN key Q, the key a PIN is
+  sealed to, which `GET_NONCE` P1 = `01` answers with the card key's signature over it: E (65, a key
+  the phone makes for this one message), s XOR block 1 (32), and block 0's first sixteen bytes, block
+  i = SHA-256("CashuCard/c" ‖ i (one byte) ‖ the x of e·Q ‖ E [‖ the 32 sealed bytes, for block 0]);
+  block 0's first sixteen bytes are the tag. The card
+  opens it with Q's private half (q·E = e·Q), refuses one whose tag is not block 0's (`6A80`,
+  nothing kept), and keeps s in working
+  memory for the `SET_OWNER` that comes next: any other command lets it go. That `SET_OWNER`, a claim
+  or a hand-over, ends its value with the first sixteen bytes of SHA-256("CashuCard/c" ‖ s): on a
+  hand-over under the last owner's proof, on a claim the same at every asking. `6985` where no s is
+  kept, `6A80` where the check is not the kept s's, both before a claim's askings count; then c and n
+  are written with the owner's key, in the command's one transaction.
+- **As before.** `GET_CARD` P1 = `03` gives c sealed, and only so. A card with no owner keeps the c it
+  drew at install or at its last reset. A claim that brings no check keeps the card's c, and a
+  hand-over that brings none draws one. `RESET_CARD`, the owner's and the PIN's, draws c: a reset ends
+  the ownership, and the next claim brings the next owner's c (the same owner's with a larger n).
+
+**Why.**
+
+- *The count is the card's.* The paid list ([D191](#d191)), the day of loads ([D195](#d195),
+  [D200](#d200)) and the hand-over that empties the paid list ([D197](#d197)) rest on one fact: no
+  piece the card signed for before a new c is one it signs for again. With c from the words alone, an
+  owner that handed the card away and back, or to itself, or reset it and claimed it again, would get
+  its old c back, and could load a piece the card had paid and pay it again offline. The card cannot
+  tell how a phone made a c, so a counter the phone chose would hold the phone to nothing; the
+  card's own n, which only goes up, makes every c it takes one it has not had, whatever a phone
+  sends. Four bytes: a chip's lasting memory wears out long before one place is written 2^32 times.
+- *A later owner never gets an earlier c*, nor works one out: an earlier c is of another s (other
+  words) or of a smaller n, and a c says nothing of its s (a preimage of SHA-256). The last owner
+  knows nothing of the next owner's s.
+- *Sealed to the PIN key, with no nonce in it.* The card key agrees with no one (it signs; the PIN
+  key is the one a sealed command is opened with, [VERIFY_PIN](../spec/APDU.md#verify_pin-0x40)), and the PIN key changes only at a reset, so
+  a phone that has seen the card, or been given Q with its signature, has it. The next owner's phone
+  makes the envelope where it is: a
+  hand-over is the last owner's tap, and the next owner gives its key, its envelope and its check to
+  the last owner's phone, which signs. Nothing in it is of one tap: a replayed envelope gives the same
+  s, no more than the owner's own, and n has moved on, so a replayed claim or hand-over never sets an
+  old c (and it still wants the PIN in its tap, or the last owner's proof over a fresh nonce). A
+  listener on the air gets E and s under a block only q or e makes. (In jCardSim the PIN key and the
+  card key are one pair, which the simulator draws twice the same; `OwnerCTest` makes them two.)
+- *A command of its own.* A command carries at most 255 bytes; a hand-over with its proof (73), the
+  key (65) and the anchor (80) is 218, and the envelope is 113. The check, under the proof, ties the
+  two: a reader in the tap that sends an envelope of its own has its s refused by the check, and one
+  that changes the check has the proof refused.
+- *The owner's phone checks.* After the claim or the hand-over the phone reads c (`GET_CARD` P1 =
+  `03` under its grant, sealed to its refund key once it names one) and checks that it is
+  SHA-256("CashuCard/c" ‖ s ‖ n) for an n from 1 up, which it learns so, s worked out from the
+  card's own key (`GET_PUBKEY` at its first tap, never a P it was handed: an envelope made away
+  from the card at a hand-over is made from the P the last owner gave). A reader in a claim's tap,
+  which has the PIN and can claim the card for itself anyway, could have the card take an envelope
+  and a check of its own; so could the last owner's phone at a hand-over, which signs the check
+  (and so would know every date key and inbox name of the next owner). The phone then finds no
+  n, **MUST NOT** lock dated money to the card's keys or file for it, and resets the card (it is
+  the owner) and claims it again.
+- *A reset draws.* After a reset the card has no owner: an owner's c would be a c of a card it no
+  longer owns, and the next claim, by anyone, brings its own.
+
+**A restored phone.** From the twelve words alone a phone works out the seed, each card's owner key
+and its s; with the card's key P and n it has c, every date's keys and, with r, the take-back key r +
+u of every date. With the card in hand it reads c, and so n. Without it, it tries n = 1, 2, … for the
+pieces it would take back (each names its date's keys, so a wrong n shows at once): n counts every
+owner's c the card has taken, all owners together, so a card claimed once has n = 1. To take a piece
+back the phone needs the piece itself (its secret and the mint's signature) and P: this decision
+gives it c, not those. So the words alone are never enough to take a lost card's money back, and
+every text that says what the words restore says so ([APDU.md](../spec/APDU.md#the-owners-proof),
+NUT-CCP): a wallet keeps P and the dated pieces where its restore reaches them, which is app design
+and not the card's.
+
+**Rejected.** The phone sending c itself, or a counter of its own: the card cannot hold a phone to a
+fresh c. c from the words with no count: the same owner gets an old c back (above). The record's
+generation (`GET_OUTBOX`) as the count: it moves at a reset and a forgotten PIN as well, so a
+restored phone has more to try, and not in a claim's transaction. Sealing under the tap's nonce:
+the next owner's phone would have to be in the last owner's tap. Sealing to the card key P: the card
+key would agree with readers, which nothing else asks of it. The envelope inside the claim or the
+hand-over: past 255 bytes. Keeping `GET_CARD` P1 = `03`'s sealed answer somewhere
+backed up: the wallet keeps nothing but its words. A reset taking an owner's c: the reset ends the
+ownership. A claim or hand-over refused without a c: the card's own c stays the safe default for a
+phone that reads c from the card, as before.
+
+**Cost accepted.**
+
+- Leaked words now give, with each card's key P, its c: every date's keys (with the mint's records,
+  every spend since that owner's c, what a reader given the PIN learns) and, with r from the same
+  words, the take-back of every dated piece after its date, from anywhere, with no card. The words
+  already gave the owner key (the card's PIN, its limits, its reset, and with the card in hand the
+  money on it) and r. Before its date a piece is still the card's alone: nobody pays it without the
+  card.
+- A card's c is no more secret than its owner's words. A phone that gives no c leaves the card's
+  own, as before.
+- Four bytes of lasting memory (30,056 bytes at install, within the +300 measured). One command more
+  in a claim or a hand-over: a key agreement and two SHA-256, and two more in `SET_OWNER` (not yet
+  measured on a chip). In jCardSim the claim's transaction, with a header and c, is 9 writes and 144
+  bytes at a clock that is not weak and 10 and 148 at its worst (a weak clock, a day's window begun
+  with no clock, a harder anchor) (7 and 108 with none), and the hand-over's 12 and 150 at its worst
+  (10 and 142 with a header and c at a clock that is not weak); [D203](#d203) takes the hand-over's
+  to 9 and 113 at its worst. The payment's, 17 and 138, is unchanged. Working memory: none new (s waits in the room a payment's first output uses,
+  and no payment is in hand then).
+
+**Built (applet).** `stageOwnerC` and `cBlock` (`SET_OWNER` P1 = `01`), `processSetOwner` (the check,
+c and n), `process` (a kept s let go, and zeroed, by any other command). `OwnerCTest` (the claim and
+the hand-over with the owner's c; a phone restored from the words alone, and its take-back key; the
+same owner never given an old c, through a hand-over to itself and a reset; a replayed claim; the
+kept s for the next `SET_OWNER` only; envelopes that do not open; the check bound to the envelope,
+and under the proof; claims and hand-overs with no check as before; the claim and the hand-over torn
+at every write; the vector, `spec/vectors/owner-c.json`), `TransactionSizeTest` (both
+transactions), `SchnorrHWMathTest` (the four bytes).
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processSetOwner` | none new (c on a claim that brings it, and n, inside the command's one transaction) | c, n and the owner's key are written together: all new or all old (`OwnerCTest`, torn at every write). |
+| `stageOwnerC` | none (working memory only; the curve check of E uses the room a claim's askings keep their data's hash in, so a new envelope begins the askings again twice over) | Nothing lasting is written: torn, the card has kept nothing, and a `SET_OWNER` with a check answers `6985`. |
+
+---
+
+## <a id="d203"></a>D203: No header lowers the bar: a card with no hardest holds a far header to twice the floor's work; the owner's back form brings back the day of loads; a day's margin around D
+
+**Decided (protocol 2.3, 2026-11-13); three of its choices are recommended and wait for the
+keeper's word:** the hardest kept through `SET_CARD` and every reset; no older header raising the
+hardest, the bar of a card with none fixed at twice the floor's work instead; and the owner's back
+form giving the card a new day of loads each time. Their costs are below. Amends the header ratchet let go at `SET_CARD` and
+`RESET_CARD` ([SET_CARD](../spec/APDU.md#set_card-0x32)), [D200](#d200) (the hand-over's anchor), [D201](#d201) (weak headers; the day of loads never moved by
+the back form) and [D202](#d202) (what the words give), and [D197](#d197) and [D199](#d199) on taking
+dated pieces back after their date.
+
+- **Before any hardest.** A header is weak, to a card that has taken no header that is not weak (a
+  fresh card), when it carries less than twice the floor's work: its target over half the floor's.
+  That is the bar of a card that holds the network's own block from when the floor was set (the
+  floor is a quarter of the network's work then, [D24](#d24)): half its work. With a hardest, the
+  bar is half the hardest's work, as before. **A weak header is never the hardest:** a card's
+  first hardest is the first header it takes that is not weak.
+- **The hardest stays.** `SET_CARD`, and `RESET_CARD` by the owner or by the PIN, with an anchor or
+  without, keep the hardest header's bits, as a hand-over keeps them. Nothing lowers them.
+- **The owner's back form brings back the day of loads.** In `REFRESH`'s back form the day of loads,
+  where it began after the owner's header, begins again at it, keeping its count and the change it
+  counted, as the day's limit's window does. Nothing else moves it, but the empty card's anchored
+  reset and hand-over, which begin it again ([D200](#d200)).
+- **A hand-over's anchor writes the clock alone:** its time, whether it is weak and its bits where
+  they are the hardest. The days it would anchor, its hash and the rolls are what the hand-over
+  clears after its transaction, so they are not written in it.
+- **P1 and P2.** `REFRESH` with a P1 other than `00` and `01`, and `SET_OWNER` with a P2 other than
+  `00`, are `6B00`, before anything is read.
+- **At set-up (readers).** A wallet reads the card's clock (`GET_INFO`, `GET_CARD`) before it sets the
+  card up. A clock more than two hours past the tip it has checked was set by a header far ahead. If
+  that header is weak, the claim's anchor or the holder's `REFRESH` brings it back; the card cannot
+  say whether it is, so the wallet brings the clock back on the empty card first, with the reset and
+  the tip as its anchor: by the PIN on a card with a PIN (a fresh card is given one in a first set-up
+  for it, [SET_PIN](../spec/APDU.md#set_pin-0x41)), by the owner's proof on an owned one. Then it sets
+  the card up. `cardctl setup` refuses such a card and names that way. (*Amended by [D204](#d204):
+  the first set-up's anchor brings the clock back, so no reset comes first, and every set-up gives
+  the tip.*)
+- **A day's margin around D (readers and the owner).** The card does not read dates; a reader's and
+  the owner's phone's clocks are their own. So a reader leaves out of a payment a dated piece whose
+  D is less than a day after its own time (D − 86,400 or later), and the owner's phone takes a piece
+  back by the refund key only once the network's tip it has checked is a day past D (D + 86,400).
+  So the holder's wallet, an honest reader too, ends the move of a date's pieces before D less a day,
+  starting it at least the time the move takes before that (a move begun later leaves them on the
+  card until the owner takes them back), and a date's first use is at least 8 days and the time to
+  move ahead: the week of loads, the readers' day, and the move.
+
+**Why.**
+
+- *Before any hardest.* The bar a header is held to was half the hardest's work, and the floor's
+  before any. So on a card that had taken no hardest (a fresh card, and, as `SET_CARD` and the reset
+  let the hardest go, every card after its set-up and after a reset with no anchor) a far header at
+  the floor's work was not weak, and became the hardest. The set-up's tip, older than that clock,
+  moved nothing, the holder's `REFRESH` could not bring back a clock that was not weak, and a card
+  with no owner kept its money above a day's limit for good: the case [D201](#d201) accepted at
+  half its cost. A second header at the floor's work did the same to a weak clock kept through a
+  reset. Twice the floor's work is what a card holding the network's needed then. A weak header
+  that became the hardest would set the floor's work as the bar for the next one, which would then
+  not be weak.
+- *The hardest stays.* `SET_CARD` let it go as a way out for a card whose network had fallen under a
+  quarter of its best. `SET_CARD` takes an empty card, so that way out freed no money, and it left
+  every set-up with a lower bar. Kept, the bar climbs with the network: half the card's own hardest,
+  which only rises.
+- *The day of loads.* [D201](#d201) left it where a far header began it, so that a reader could not
+  go round the paid list ([D191](#d191)). On an owned card the back form freed the day's limit and
+  left the day of loads at the far time: once 300 were counted, loads and change stopped until the
+  owner emptied the card and reset it. Brought back to the owner's header with its count, the day
+  ends a day after that header, never sooner than a day from when it began, and only at the owner's
+  word: a reader cannot ask it, and the holder's `REFRESH` moves no day.
+- *The hand-over's anchor.* Its anchor wrote the day's window and the no-PIN window it anchors, the
+  hash and the rolls, and the hand-over cleared them all just after: writes in the transaction for
+  nothing.
+- *The margin.* A reader whose clock is slow pays a piece the owner's phone, whose clock is fast,
+  has already taken back: the mint refuses the whole payment (one signature covers every input) and
+  the card has burned every piece in it. A day on each side is far more than two honest clocks
+  differ by, and a piece's date is weeks away when it is loaded.
+
+**Rejected.** An older header raising the hardest (as [D201](#d201) rejected it): a real block from
+before a fall of the network's difficulty, replayed, would raise any card's bar for nothing, and
+with the rules above nothing needs it. The hardest kept but none counted as the floor, as before: a
+fresh card would still take the floor's far header. The card judging the clock again when the
+hardest rises: it would need the bits of the header that set the clock, four bytes more in every
+header's transaction, for a case the rules above close. A far clock refused at `SET_CARD` by the card:
+the card cannot tell a far clock from a real one.
+
+**Cost accepted.**
+
+- A card whose network falls under a quarter of its hardest takes no header again, and an empty
+  one has no way to let the ratchet go: it is a card lost. It takes no header, so its clock never
+  passes a day: it pays one day's limit, then nothing until its owner sets a limit (`SET_LIMIT`
+  begins a new day); a card with no owner keeps the rest for good. The network's difficulty has never fallen by three quarters, and at
+  such a fall the floor would refuse its headers anyway ([D24](#d24)).
+- Should the network's difficulty fall under twice the floor's work, a fresh card would take every
+  header as weak (its days paused, [D201](#d201)) until it rose again: a fall by half from when the
+  floor was set, which it has not had.
+- A far header that is not weak still costs what [D201](#d201) says: at least half the work of the
+  card's hardest, and before any, twice the floor's. That last bar is fixed: about 2^78 hashes, half
+  a block's work when the floor was set, and a smaller part of a block's as the network's difficulty
+  rises, so it falls against the network ([D204](#d204) makes every set-up give the card the tip as
+  its hardest before it holds anything).
+- The owner's back form to an old header gives the card a new day of loads at once: 300 more each
+  time the owner sends it (each proof is the owner's, for one nonce), and only at the owner's word,
+  as `SET_LIMIT` gives a day's limit.
+- In jCardSim: the owner's back form at its worst 7 writes and 50 bytes (6 and 46 before); the
+  hand-over at its worst (a weak clock, a day's window begun with no clock, an anchor harder than
+  the hardest, the next owner's c) 9 and 113 (12 and 150 before; [D202](#d202) gave 10 and 142, a
+  case short of the worst), with an anchor and c at a clock that is not weak 8 and 109; the claim
+  at its worst 10 and 148 (D202 gave 9 and 144, the same claim at a clock that is not weak; *11 and
+  152 with a no-PIN window begun with no clock, which this count left out, and 12 and 156 with
+  [D204](#d204)*); the
+  payment's, 17 and 138, as it was. One fill more in `RESET_CARD`, outside its transactions.
+
+**Built (applet).** `checkHeader` (before any hardest, the target doubled against the floor's; a
+weak header never the hardest), `writeHeader` (`HOW_BARE`, and the day of loads brought back with
+`HOW_WINDOWS`), `processSetOwner` (the hand-over's anchor bare; P2), `processRefresh` (P1),
+`processSetCard` and `processResetCard` (the hardest kept). `NoHardestTest` (a fresh card's first
+header, weak and not, at the floor and at twice it, and the real network's; a simple card set up
+with no header and then given a far header at the floor's work; a fresh card given one before its
+set-up; the reset and `SET_CARD` keeping the hardest; a weak clock kept through a reset staying weak
+through a set-up and a second such header), `WeakClockTest` (the day of loads brought back by the
+back form and by nothing else; an owned card freed by it loading and making change a day later;
+`REFRESH` P1), `OwnerCTest` (`SET_OWNER` P2; the last owner's envelope at a hand-over, which the next
+owner's check finds), `TransactionSizeTest` (the worst hand-over and claim: a weak clock, a window
+begun with no clock, a harder anchor and the owner's c), the owner's vectors (`SET_LIMIT` of 8 and
+18 bytes, `SET_OWNER` with the check, 81 and 161).
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processResetCard` | one fill more (the record cleared in four runs, stepping over the hardest's bits, the clock's time and its weakness) | The fills are the record's, outside any transaction as before; torn between them, the card still has its owner and c, and the hardest and the clock as they were. |
+| `writeHeader` | none new (the day of loads, inside `REFRESH`'s transaction) | The clock, the day's window and the day of loads it brings back are written in one transaction: all new or all old. |
+| `processSetOwner` | none new (fewer writes in its transaction) | The hand-over's anchor writes the clock, its weakness and the hardest in the command's one transaction; what it no longer writes, `forgetOwed` clears after it, here or first at the next command. |
+
+## <a id="d204"></a>D204: The first set-up's anchor: the tip a card is set up with is its clock and its hardest
+
+**Decided (protocol 2.3, 2026-11-14).** Amends [D203](#d203) (a card with no hardest; set-up) and
+[D201](#d201) (the claim's anchor).
+
+- **The first set-up's anchor.** In a card's first set-up (the selection of the `SET_PIN` that
+  gives a card with no PIN its PIN, [D196](#d196)), while the card holds nothing (no unspent
+  piece and no change owed), the header it takes is an anchor as the empty card's reset's is
+  ([D200](#d200)): the claim's anchor (`SET_OWNER` on a card with no owner) and `SET_HEADER`. It
+  becomes the clock even where the clock is later, and the hardest where it is harder, and the
+  day's limit's window and the day of loads, where they began after it, begin again at it with
+  what they counted. Outside a first set-up, or on a card that holds a piece, `SET_HEADER` and the
+  claim are as before: an older header moves nothing (the claim of a card that holds a piece is
+  refused, `6A8D`, as before).
+- **Every set-up gives the tip (readers).** A wallet that sets a card up MUST give it, in its
+  first set-up and before any load, the newest header of the best chain it has checked: as the
+  claim's anchor on a card with an owner, with `SET_HEADER` on one with none. `cardctl setup`
+  refuses to run without `--anchor`. The wallet no longer needs the reset before a set-up on a
+  card whose clock a header far ahead set: the set-up's anchor brings it back.
+
+**Why.** Round 13 found a card that has never taken a real header frozen by one cheap header. Before
+any hardest a header is weak only under twice the floor's work ([D203](#d203)), a bar fixed when the
+floor was set: about half a block's work then, and less and less of one as the network's difficulty
+rises. Such a header, far ahead, set a clock that was not weak and became the hardest; the set-up's
+tip, older, moved nothing and raised nothing; and a header just over the floor's work was then not
+weak either. So a card set up with no owner after a stranger's header in its box held its money
+above a day's limit for good, and so did one whose stranger's header was within two hours of the
+tip (which the set-up's clock check let through), at the next cheap far header. With the anchor, a
+card set up by the text has the network's own block as its hardest and its clock before it holds
+anything: a far header then costs at least half that block's work, the keeper's option A, and a
+header that costs less is weak (its days pause, and `REFRESH` brings them back).
+
+**Rejected.**
+
+- A build-time ceiling on a first header's time (a card with no hardest refusing, or holding weak, a
+  header later than its build date and some years): a card that waits in a drawer past the ceiling
+  could never take a real header, and an honest card must never be left so.
+- The anchor lowering the hardest to its own bits: nothing needs it (the tip is harder than the cheap
+  header), and nothing lowers the bar ([D203](#d203)).
+- Refusing loads on a card with no hardest: it closes nothing a stranger's header does not open
+  (the stranger's header is a hardest), and changes every load path.
+
+**What is left.**
+
+- A far header with at least half the work of the tip a card was set up with, or of a later hardest
+  (option A, accepted): on a card with no owner it holds the money above what that day has left.
+- A card set up against the text, with no tip, keeps whatever a stranger's header gave it; and a
+  card whose stranger's header carried more than twice the tip's work (a far header of the
+  network's own work, twice over) is set up at a weak clock whose days wait for a header with half
+  that work.
+- In jCardSim: the claim's transaction at its worst is 12 writes and 156 bytes (a far clock, the
+  day's window and the day of loads begun at it, a no-PIN window begun with no clock, a harder anchor,
+  the owner's c), one write of four bytes more than before ([D203](#d203)'s 10 and 148 left out the
+  no-PIN window's write: 11 and 152). No set-up by the text reaches that state: the owner's limits
+  come after the claim, and nothing is loaded before it. A claim whose transaction a chip cannot hold
+  writes nothing (`6A96`), and an empty card is then reset by the PIN and set up again. `SET_HEADER`'s
+  transaction as the first set-up's anchor is at most 7 writes and 53 bytes. Not yet run on a chip.
+
+**Built (applet).** `processSetHeader` and `processSetOwner` (the claim) take `firstAnchor`
+(`checkHeader` with `HEADER_BACK`, and `HOW_WINDOWS`) in a first set-up of a card that
+`holdsNothing`. `FirstAnchorTest` (round 13a's probe: a card that never took a real header; round
+13b's: the claim's anchor from a clock that is not weak; a card set up by the text after the cheap
+header, with an owner and without, paid down to empty; the cheap header near the tip; what is left;
+only the first set-up's, only empty or owed change; a weak first anchor), `AnchorTearTest` (the
+first set-up's anchor in `SET_HEADER` and in a claim, and round 13a's hand-over with an anchor, each
+torn at every write), `TransactionSizeTest` (the claim with the first set-up's anchor at its worst),
+`CashuAppletTest` (the source read: the anchor only in a first set-up of an empty card),
+`ClockWalkTest`, `FarHeaderTest` and `NoHardestTest` (a claim's or a set-up's older tip now brings the
+clock back). `cardctl setup` wants `--anchor`, and says when the claim's anchor brought a clock back.
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processSetHeader` | none (the first set-up's anchor in `SET_HEADER`'s one transaction) | The clock, its weakness, the hardest, the window, the day of loads and the hash: all new or all old. |
+| `processSetOwner` | none new (the claim's anchor in the command's one transaction) | As above, with the owner's key and c. |

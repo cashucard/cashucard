@@ -147,11 +147,11 @@
             <div class="faq">
               <details class="more" id="found">
                 <summary>Can someone who finds my card spend it?</summary>
-                <div class="more-body"><p>Up to the limits the card's owner set. On a card with a PIN, a payment needs the PIN unless it fits the no-PIN allowance the owner chose. A card with no PIN pays whoever holds it, like cash, up to its daily limit and its limit on one payment.</p></div>
+                <div class="more-body"><p>Up to the limits the card's owner set. A payment needs the PIN unless it fits the no-PIN allowance the owner chose, and that allowance renews only when the PIN is typed in a tap that pays nothing or the owner's wallet visits the card. A card with no PIN holds nothing and pays nothing.</p></div>
               </details>
               <details class="more" id="pin">
                 <summary>What if I forget the PIN, or someone blocks it?</summary>
-                <div class="more-body"><p>Three wrong PINs block the card, and any reader in range can send them. The owner's wallet sets a new PIN with the card's owner key, which unblocks it. If the owner key is lost as well, a blocked card's balance is stranded.</p></div>
+                <div class="more-body"><p>On a card with an owner, three wrong PINs block the card, and any reader in range can send them. The owner's wallet sets a new PIN with the card's owner key, which unblocks it. If the owner key is lost as well, a blocked card's balance is stranded. A card with no owner never blocks: each wrong PIN makes the next try wait twice as long, and after three wrong tries in a row an empty card takes a new PIN.</p></div>
               </details>
               <details class="more" id="owner-key">
                 <summary>What is the owner key, and what if I lose my phone?</summary>
@@ -159,7 +159,7 @@
               </details>
               <details class="more" id="read">
                 <summary>Can someone read my card?</summary>
-                <div class="more-body"><p>Yes. Any reader can read the card's balance, its pieces and its payment history without the PIN. Spending takes a signature that only the card's chip can make, and the card makes it only within the limits above.</p></div>
+                <div class="more-body"><p>Yes. Any reader can read the card's balance and its unspent pieces without the PIN; its payment history and the pieces it has spent need the PIN or the owner's wallet. Spending takes a signature that only the card's chip can make, and the card makes it only within the limits above.</p></div>
               </details>
               <details class="more" id="skim">
                 <summary>Can a card be skimmed in my pocket or bag?</summary>

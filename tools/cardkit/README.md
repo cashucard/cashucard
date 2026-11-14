@@ -60,15 +60,48 @@ checks supported exports/private-path rejection, and scans app/ops imports.
 GP tests use fake cards and do not authorize a real reader or phone action.
 See [component releases](../../docs/COMPONENT-RELEASES.md).
 
-## Unreleased: SCP03 beside SCP02, and the J3R452's first contact
+## 0.3.0: protocol 2.3, and change owed
+
+0.3.0 reads and installs the 2.3 card (`CARD_VERSION` is `[2, 3]`) and holds
+every reset and every "empty" test to the change a card is owed. It also carries
+the SCP03 changes below. Migration:
+
+- **Change owed.** A card that paid and has not had its change back yet is not
+  empty, and nothing removes it: the change is lost with the applet. A 2.3 card
+  says so in `GET_INFO` byte 29; a 2.1 or 2.2 card is asked `GET_CHANGE` (its
+  byte 29 means something else). `InstallationInspection.publicState` gains
+  `changeOwed`, and `empty` is false while it is set; `assessResetPreflight`
+  refuses such a card ("the holder's wallet brings it home"); `resetOwnedCard`
+  stops `guarded` before it saves anything, fresh or resumed; `provision`'s
+  probe never sweeps one, Replace on or off. New: `readChangeOwed(ask, info)`,
+  `changeOwedByte(info)` and `GET_CHANGE`. `notEmpty` names change owed on a
+  2.3 card. Inspection, the probe and the reset send one more plain command
+  (`GET_CHANGE`, `B0 19 00 00 00`) to a 2.1 or 2.2 card, and none to a 2.3 card.
+- **Versions.** The probe removes only a card applet of a version this kit
+  knows (`CARD_VERSIONS`: 2.1, 2.2, 2.3), and only when its `GET_INFO` names
+  the version `SELECT` did; any other 2.x stops `guarded` after `SELECT`.
+  `holderCommands` throws `unsupported applet version` on a 2.3 card and the
+  settled-entry cleanup stops `unsupported-card` on one with spent entries
+  (`ADMINISTERED_CARD_VERSIONS`: their owner commands and secrets are 2.2's); a
+  2.3 card's holder wallet frees its spent places.
+- **`ResetReview`** (`@cashu-card/cardkit/cleanup`) gains `changeOwed` and
+  `version` (`'2.1'`, `'2.2'` or `'2.3'`). `readResetReview` reads a 2.3 card of
+  two units (format `05` in `GET_INFO` byte 8 and `GET_CARD` byte 0) and refuses
+  format `05` from any other version. A review saved by 0.2, without the two new
+  fields, still matches its card in `cleanupSettledEntries`.
+- **`FakeCard`** answers `02 03`, `GET_CHANGE`, and takes `change` (openings owed)
+  and `minor` (1, 2 or 3) in `setCardState`.
+- `tools/outbox-spike`'s runners require the reviewed 0.2.0 and refuse 0.3.0
+  until they are reviewed against it ([D181](../../docs/DECISIONS.md#d181)).
+
+## 0.3.0: SCP03 beside SCP02, and the J3R452's first contact
 
 `openSession` reads the protocol from INITIALIZE UPDATE's reply and opens SCP02
 (the J3R180) or SCP03 (the J3R452) behind one interface
 ([D181](../../docs/DECISIONS.md#d181)), and a J3R452 as it ships, at key
 version FF with the seller's NDEF tag, is moved to the state a J3R180 starts in
-([D182](../../docs/DECISIONS.md#d182)). Signatures and types change, so the
-next release is a minor one. The version stays 0.2.0 until the owner moves it
-with a review of the `tools/outbox-spike` runners that pin it (D181). Migration:
+([D182](../../docs/DECISIONS.md#d182)). Signatures and types change, so they
+ship in the minor release 0.3.0. Migration:
 
 - `putKeys(keys, sessionDek, options)` is now `putKeys(keys, session, options)`:
   pass the open session where `session.keys.dek` went. Its protocol picks the

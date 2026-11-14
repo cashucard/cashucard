@@ -28,11 +28,11 @@ test('the smoke test installs the hello applet, hears HELLO and removes it', asy
   expect(card.instances.size + card.packages.size).toBe(0);
 });
 
-test('the Cashu card installs in 88 blocks, and a second run without Replace is guarded', async () => {
+test('the Cashu card installs in 150 blocks, and a second run without Replace is guarded', async () => {
   const card = new FakeCard();
   const r = await provision(card.transceive, CASHU_PLAN, options());
   expect(r.ok).toBe(true);
-  expect(r.blocks).toEqual({at: 88, of: 88});
+  expect(r.blocks).toEqual({at: 150, of: 150});
   expect(card.instanceAids()).toEqual([
     'F04341534855434152444D',
     'F043415348554341524401',
@@ -54,11 +54,11 @@ test('the keys go to the spike set and back', async () => {
   expect(card.failedAuths).toBe(0);
 });
 
-test('a blank J3R452 that opens SCP03 installs in 88 blocks and rotates to the spike set and back', async () => {
+test('a blank J3R452 that opens SCP03 installs in 150 blocks and rotates to the spike set and back', async () => {
   const card = new FakeCard({scp: 3});
   const r = await provision(card.transceive, CASHU_PLAN, options());
   expect(r.ok).toBe(true);
-  expect(r.blocks).toEqual({at: 88, of: 88});
+  expect(r.blocks).toEqual({at: 150, of: 150});
   // the card answered SCP03's 32-byte INITIALIZE UPDATE, not SCP02's 28
   expect(r.apdus.find(a => a.ins === 0x50)?.rlen).toBe(32);
   card.reset();

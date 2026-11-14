@@ -133,10 +133,12 @@ test('invalid proof, wrong applet and refused owner command never retry', async 
     ),
   );
   assert.equal(malformed.log.length, 6);
-  // an applet version this kit does not know (2.1 and 2.2 it does: CARD_VERSIONS)
+  // an applet version whose holder commands this kit does not send (2.1 and 2.2 it does: ADMINISTERED_CARD_VERSIONS;
+  // a 2.3 card's grant opens no load and answers 6200)
   for (const unknown of [
     [2, 0],
     [2, 3],
+    [2, 4],
   ]) {
     const version = fixture();
     version.replies[2] = unknown;

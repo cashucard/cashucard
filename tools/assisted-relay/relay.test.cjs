@@ -641,3 +641,82 @@ test("a 510-byte packet is captured after pages 0 and 255 and never read at its 
   assert.equal(r.state, "captured");
   assert.equal(r.packet, Buffer.from(packet).toString("hex"));
 });
+
+// 2.3: the packet's unit is 00 sat or 01 usd, and the relay settles a usd payment
+// against the mint's usd keysets alone. (The body changed, so the descriptor is
+// not checked here: `trusting` verifies every signature.)
+const trusting = { ...crypto, verify: () => true };
+function withUnit(unit) {
+  const b = raw();
+  const mintLength = (b[86] << 8) | b[87];
+  b[88 + mintLength] = unit;
+  return b;
+}
+
+test("a usd packet (unit 01) decodes as usd, and any other unit byte is refused", () => {
+  assert.equal(decodePacket(withUnit(0), policy, trusting).unit, "sat");
+  assert.equal(decodePacket(withUnit(1), policy, trusting).unit, "usd");
+  assert.throws(() => decodePacket(withUnit(2), policy, trusting), /unit/);
+});
+
+test("a usd payment is settled against usd keysets, and refused against sat ones", async () => {
+  const usd = vector.keysets.map((id) => ({
+    id,
+    unit: "usd",
+    active: true,
+    input_fee_ppk: 0,
+  }));
+  const j = () => ({
+    ...journal(),
+    packet: Buffer.from(withUnit(1)).toString("hex"),
+    scope: decodePacket(withUnit(1), policy, trusting).scope,
+  });
+  const ok = mint({ catalogue: usd });
+  const r = await reconcilePayment({
+    journal: j(),
+    policy,
+    crypto: trusting,
+    request: ok.request,
+    save: async () => {},
+  });
+  assert.equal(r.state, "outputs-confirmed");
+  const sat = mint();
+  await assert.rejects(
+    reconcilePayment({
+      journal: j(),
+      policy,
+      crypto: trusting,
+      request: sat.request,
+      save: async () => {},
+    }),
+    /input-keyset/,
+  );
+});
+
+// 2.3: the packet names the card's key for the date 0, P + t*G, never the card
+// key P that GET_PUBKEY answers. The policy names it as `date0Key`; an older
+// policy's `cardKey` is read as the same key where no `date0Key` is given.
+test("the policy's date0Key is the key the packet must name", () => {
+  const key = vector.context.cardKey;
+  const { cardKey, ...rest } = policy;
+  assert.equal(
+    decodePacket(raw(), { ...rest, date0Key: key }, crypto).cardKey,
+    key,
+  );
+  assert.throws(
+    () =>
+      decodePacket(raw(), { ...rest, date0Key: "03" + key.slice(2) }, crypto),
+    /context/,
+  );
+  assert.throws(
+    () =>
+      decodePacket(raw(), { ...policy, date0Key: "03" + key.slice(2) }, crypto),
+    /context/,
+    "date0Key is read before an older cardKey",
+  );
+  assert.throws(
+    () => decodePacket(raw(), rest, crypto),
+    /context/,
+    "no key, no packet",
+  );
+});

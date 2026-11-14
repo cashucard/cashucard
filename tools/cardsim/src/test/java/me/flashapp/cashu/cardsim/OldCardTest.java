@@ -37,7 +37,7 @@ class OldCardTest {
     }
 
     @Test
-    @DisplayName("the 0.x AID and Foxy's 1.x AID select nothing on a 2.0 card: the needs-an-update signal")
+    @DisplayName("the 0.x AID and Foxy's 1.x AID select nothing on a 2.3 card: the needs-an-update signal")
     void oldAidsAreNotFound() {
         // A card's runtime answers 6A82. jCardSim, with no applet of that name, hands the SELECT to the applet already
         // selected, which refuses class 00 (6E00), or answers 6999 with none selected: an app reads any SELECT answer but
@@ -46,26 +46,26 @@ class OldCardTest {
             int sw = SimCard.sw(card.transmit(select));
             assertTrue(sw == 0x6A82 || sw == 0x6999 || sw == 0x6E00, "not found, got " + Hex.sw(sw));
         }
-        assertEquals("02029000", Hex.format(card.transmit(SimCard.SELECT)), "the 2.x AID answers 02 02");
+        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)), "the 2.x AID answers 02 03");
     }
 
     @Test
-    @DisplayName("GET_INFO answers version 2.2, thirty bytes, capabilities FF and format 4: no masked 8-byte answer")
-    void getInfoIsTwoZero() {
+    @DisplayName("GET_INFO answers version 2.3, thirty bytes, capabilities FF and format 4: no masked 8-byte answer")
+    void getInfoIsTwoThree() {
         byte[] info = data(card.transmit(GET_INFO));
         assertEquals(30, info.length);
         assertEquals(2, info[0]);
-        assertEquals(2, info[1]);
+        assertEquals(3, info[1]);
         assertEquals((byte) 0xFF, info[6]);
         assertEquals(4, info[8]);
-        assertEquals("2.2", card.state().get("version").getAsString());
+        assertEquals("2.3", card.state().get("version").getAsString());
         assertFalse(card.state().has("appletVersion"), "no masked version in state");
         assertFalse(card.state().has("realVersion"));
         assertFalse(card.state().has("pukState"));
     }
 
     @Test
-    @DisplayName("0x43, 0x44, 0x45 were CLEAR_PIN, SET_PUK, UNBLOCK_PIN; on 2.0 they refuse a 0.x reader's bytes and change nothing")
+    @DisplayName("0x43, 0x44, 0x45 were CLEAR_PIN, SET_PUK, UNBLOCK_PIN; on 2.x they refuse a 0.x reader's bytes and change nothing")
     void oldOpcodesChangeNothing() throws FixtureException {
         card.applyFixture(Fixture.parse("{\"pin\":\"1234\",\"mint\":\"http://m\",\"owner\":true}", card.context()));
         String before = card.state().toString();

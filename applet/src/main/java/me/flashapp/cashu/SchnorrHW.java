@@ -40,7 +40,26 @@ import javacard.security.*;
  *   mulModN uses schoolbook 256×256 → 512-bit product, then reduces via the
  *   identity  2^256 ≡ DELTA (mod n)  where DELTA = 2^256 − n (≈ 2^128).
  *   The reduction applies the identity twice (depth-2) to bring the result
- *   to < 2n, followed by a single conditional subtract.
+ *   to < 2^256 < 2n, followed by a single conditional subtract.
+ *
+ * --- The same work whatever the secret ---
+ *
+ *   Every step that combines the key and the nonce runs the same
+ *   instructions, the same number of times, whatever their values: the
+ *   multiplies have no skip for a zero byte (D21), and the rows the
+ *   reduction leaves out are left out by fixed bounds, the rows that are
+ *   zero for every value; the reduction folds its carries back in two fixed
+ *   passes and takes n off once, by a mask; the sum k + e·d, the reduction
+ *   of a hash and the choice of k or n − k are made by a mask over both
+ *   answers (`subIf`, `choose`). No branch and no loop count here depends on
+ *   d or k.
+ *
+ *   What is still not the same work: the virtual machine's own instructions
+ *   (a multiply or an array read may take a time, or draw a power, that
+ *   follows its operands); the chip's SHA-256 and its key agreement
+ *   (R = k·G); the parity of the card's own public key (`pyOdd`: public);
+ *   and the length getS answers (a property of the card's key, the same at
+ *   every signature).
  *
  * --- Memory discipline ---
  *
@@ -54,7 +73,13 @@ import javacard.security.*;
  *   No `new` may appear anywhere outside the constructor and init().
  *
  *   Transient footprint: `sc` (256 B scratchpad) + `work` (288 B arithmetic
- *   scratch, see WORK_LEN).
+ *   scratch, see WORK_LEN), and the temporary key's own room, where the chip
+ *   gives it (`keyInRam`).
+ *
+ *   A secret scalar is in a key object only for the call that uses it: the
+ *   nonce in sign(), the scalar addTo() and mul() are handed, and the key
+ *   agree() is handed. Each of them ends, however it ends, by `rest()`;
+ *   sign() first zeroes `sc` and `work`, which held d, k and e·d.
  *
  * ENG-182 — cashucard/javacard
  */
@@ -62,18 +87,9 @@ final class SchnorrHW {
 
     // ── secp256k1 group order n ────────────────────────────────────────────
     //
-    // This is the ONE value every modular helper in this class reduces against.
-    // The caller also hands the group order in through the constructor (see
-    // Nparam) because the EC key objects need it via setR(); init() asserts the
-    // two agree, so a typo in CashuApplet.SECP256K1_N fails `gp --install`
-    // rather than producing signatures that are well-formed and universally
-    // rejected.
-    private static final byte[] N = {
-        (byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,
-        (byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFE,
-        (byte)0xBA,(byte)0xAE,(byte)0xDC,(byte)0xE6,(byte)0xAF,(byte)0x48,(byte)0xA0,(byte)0x3B,
-        (byte)0xBF,(byte)0xD2,(byte)0x5E,(byte)0x8C,(byte)0xD0,(byte)0x36,(byte)0x41,(byte)0x41
-    };
+    // Every modular helper in this class reduces against CashuApplet.SECP256K1_N,
+    // the one copy of n the package holds; the key objects get the same array
+    // through CashuApplet.curve().
 
     /**
      * DELTA = 2^256 mod n = 2^256 − n
@@ -84,7 +100,7 @@ final class SchnorrHW {
      *
      * Derived from N, and therefore not independently editable: every reduction
      * below is only correct while N + DELTA == 2^256 exactly. init() asserts
-     * that identity at install time alongside the N/Nparam agreement check.
+     * that identity at install time.
      */
     private static final byte[] DELTA = {
         (byte)0x00,(byte)0x00,(byte)0x00,(byte)0x00,(byte)0x00,(byte)0x00,(byte)0x00,(byte)0x00,
@@ -139,32 +155,17 @@ final class SchnorrHW {
     private final MessageDigest sha256;
     private final KeyAgreement  ecdh;      // ALG_EC_SVDP_DH_PLAIN_XY
     private final KeyAgreement  gm;        // ALG_EC_PACE_GM: [s]G + H, the chip's point addition, for a change output's blinding (1.12)
-    private final ECPrivateKey  tmpPriv;   // reused temp key for k
+    private final ECPrivateKey  tmpPriv;   // the temporary key: k in sign(), the scalar of addTo() and mul()
+    private final boolean       keyInRam;  // the chip gave tmpPriv as a key cleared on deselect
     private final RandomData    rng;       // BIP-340 auxiliary randomness (step 2)
     // NB: there is deliberately no ECPublicKey for the generator. R = k*G is
     // computed by handing the raw 65-byte G to generateSecret(), so a key object
     // for G would be built, parameterised and then never read — dead weight in
     // EEPROM and one more thing to keep in sync with the curve parameters.
 
-    // ── secp256k1 curve parameters (shared with CashuApplet) ──────────────
-    // Passed in via constructor to avoid code duplication.
-    private final byte[] G;   // 65-byte uncompressed generator
-    private final byte[] P;   // 32-byte field prime
-    private final byte[] A;   // 32-byte a=0
-    private final byte[] B;   // 32-byte b=7
-    private final byte[] Nparam; // 32-byte group order (same as N above)
-
     // ── Constructor ───────────────────────────────────────────────────────
 
-    SchnorrHW(byte[] secp256k1G, byte[] secp256k1P,
-              byte[] secp256k1A, byte[] secp256k1B,
-              byte[] secp256k1N) {
-        G      = secp256k1G;
-        P      = secp256k1P;
-        A      = secp256k1A;
-        B      = secp256k1B;
-        Nparam = secp256k1N;
-
+    SchnorrHW() {
         tagHashAux       = new byte[32];
         tagHashNonce     = new byte[32];
         tagHashChallenge = new byte[32];
@@ -172,11 +173,6 @@ final class SchnorrHW {
         sc     = JCSystem.makeTransientByteArray((short)256, JCSystem.CLEAR_ON_DESELECT);
         work   = JCSystem.makeTransientByteArray(WORK_LEN,   JCSystem.CLEAR_ON_DESELECT);
         sha256 = MessageDigest.getInstance(MessageDigest.ALG_SHA_256, false);
-
-        // Temp private key slot for k (reused each sign call)
-        tmpPriv = (ECPrivateKey) KeyBuilder.buildKey(
-            KeyBuilder.TYPE_EC_FP_PRIVATE, KeyBuilder.LENGTH_EC_FP_256, false);
-        setECParams(tmpPriv, null);
 
         ecdh = KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false);
         gm   = KeyAgreement.getInstance(KeyAgreement.ALG_EC_PACE_GM, false);
@@ -192,34 +188,46 @@ final class SchnorrHW {
         // throws CryptoException at install. ALG_SECURE_RANDOM is present
         // everywhere this applet can run. Revisit only with a card in hand.
         rng = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
+
+        // The temporary key, built last, after every other object here, so that
+        // a chip short of room for it says so at this buildKey (or at its first
+        // use, the setS below), inside the fallback, and not at an object made
+        // after it: in RAM, cleared on deselect and at power loss, where the
+        // chip has such a key and the room for it; where it throws on the type,
+        // on the room or on its use, the persistent kind, and `keyInRam` says
+        // which, so that rest() knows how to wipe it. A key in RAM loses its
+        // curve with its scalar, so ready() sets the curve again before each
+        // use; the persistent one keeps it. It starts out holding G's x, a
+        // public number.
+        ECPrivateKey k = null;
+        byte type = KeyBuilder.TYPE_EC_FP_PRIVATE_TRANSIENT_DESELECT;
+        while (k == null) {
+            try {
+                k = (ECPrivateKey) KeyBuilder.buildKey(type, KeyBuilder.LENGTH_EC_FP_256, false);
+                CashuApplet.curve(k);
+                k.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32);
+            } catch (CardRuntimeException e) {
+                if (type == KeyBuilder.TYPE_EC_FP_PRIVATE) throw e;
+                type = KeyBuilder.TYPE_EC_FP_PRIVATE;
+                k = null;
+            }
+        }
+        tmpPriv  = k;
+        keyInRam = type != KeyBuilder.TYPE_EC_FP_PRIVATE;
     }
 
     /**
      * Must be called once during applet install (after constructor) to
-     * precompute and store the BIP-340 tag hashes in EEPROM, to verify that the
-     * curve constants this class reduces against agree with the ones the caller
-     * installs on the key objects, and to verify that this card's ECDH
-     * implementation frames its output the way sign() reads it.
+     * precompute and store the BIP-340 tag hashes in EEPROM, and to verify
+     * DELTA against n. The chip engines' framing is checked at every SET_CARD
+     * (checkFraming), not here.
      */
     void init() {
-        // ── Curve-constant agreement ─────────────────────────────────────
-        // Two representations of the group order exist: N, used by every
-        // modular helper here, and Nparam, handed to setR() on the EC key
-        // objects (and, in CashuApplet, to the card keypair). If they ever
-        // disagree — a typo in CashuApplet.SECP256K1_N, or this class reused
-        // for another curve — the ECDH scalar multiply runs on one order while
-        // addModN/mulModN/subtractFromN run on another, and every signature is
-        // well-formed and universally rejected. Fail `gp --install` instead.
-        if (Nparam.length != (short)32
-                || Util.arrayCompare(N, (short)0, Nparam, (short)0, (short)32) != (byte)0) {
-            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
-        }
-
         // DELTA is defined as 2^256 − N, i.e. N + DELTA must be exactly 2^256:
         // a 256-bit sum of zero with a carry out. mulModN's whole reduction
         // rests on that identity, so it is checked rather than commented.
         // Uses sc as scratch: allocated already, and nothing has signed yet.
-        if (add32(N, (short)0, DELTA, (short)0, sc, (short)0) != (short)1) {
+        if (add32(CashuApplet.SECP256K1_N, (short)0, DELTA, (short)0, sc, (short)0) != (short)1) {
             ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
         }
         // and DELTA's first bytes are zero, which the product by it (`mulByDelta`) leaves out
@@ -263,6 +271,32 @@ final class SchnorrHW {
     short sign(ECPrivateKey privKey, ECPublicKey pubKey,
                byte[] msg, short msgOff,
                byte[] out, short outOff) {
+        return sign(privKey, pubKey, null, (short)0, msg, msgOff, out, outOff);
+    }
+
+    /**
+     * BIP-340 under the card's key for a date (keys per load, D197): with `g` not null, the private key is d + t mod n, t the
+     * 32 bytes at g[gOff], and its public key the compressed point after them (33), P + t*G, which the caller worked out; with
+     * `g` null, the key itself. `g` is read before anything is written to `out`.
+     */
+    short sign(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,
+               byte[] msg, short msgOff,
+               byte[] out, short outOff) {
+        // d, k and e·d are in sc and work, and k in the temporary key, for this
+        // call and no longer: however it ends, the two are zeroed first and
+        // then the key is wiped, so a wipe the chip refuses leaves neither
+        try {
+            return signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff);
+        } finally {
+            Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
+            Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
+            rest();
+        }
+    }
+
+    private short signOnce(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,
+                           byte[] msg, short msgOff,
+                           byte[] out, short outOff) {
 
         // ── Step 1: Extract d, check P.y parity ──────────────────────
         // getS is specified to return the scalar's byte length, with the value
@@ -299,8 +333,14 @@ final class SchnorrHW {
             Util.arrayFillNonAtomic(sc, SC_D, pad, (byte)0);
         }
 
-        // Get public key point W (uncompressed 65 bytes or compressed 33 bytes)
-        short wLen = pubKey.getW(sc, SC_TMP);  // W at sc[96..]
+        // Get public key point W (uncompressed 65 bytes or compressed 33 bytes): the date's, P + t*G, with d + t for its key
+        short wLen = (short)33;
+        if (g != null) {
+            addModN(sc, SC_D, g, gOff, sc, SC_D);
+            Util.arrayCopyNonAtomic(g, (short)(gOff + 32), sc, SC_TMP, wLen);
+        } else {
+            wLen = pubKey.getW(sc, SC_TMP);  // W at sc[96..]
+        }
         boolean pyOdd;
         if (wLen == (short)65) {
             // Uncompressed: 04 || Px(32) || Py(32)
@@ -349,6 +389,7 @@ final class SchnorrHW {
 
         // ── Step 4: R = k·G via ECDH coprocessor ─────────────────────
         // Load k into temp private key, compute [k]G
+        ready();
         tmpPriv.setS(sc, SC_K, (short)32);
         ecdh.init(tmpPriv);
         // Result = 65-byte uncompressed point at sc[TMP]; we need 65 bytes
@@ -360,18 +401,15 @@ final class SchnorrHW {
         // unexpected framing would silently shift both by one byte and emit
         // well-formed signatures that no mint can verify.
         //
-        // A card that frames it otherwise is found out here, at its first
-        // signature, and signs nothing.
-        short rLen = ecdh.generateSecret(G, (short)0, (short)65, sc, SC_TMP);
-        if (rLen != (short)65 || sc[SC_TMP] != (byte)0x04) {
-            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
-        }
+        // A card that frames it otherwise is refused at its first SET_CARD
+        // (checkFraming), and is checked again here: it signs nothing.
+        framed(ecdh.generateSecret(CashuApplet.SECP256K1_G, (short) 0, (short)65, sc, SC_TMP), sc, SC_TMP);
 
         // ── Step 5: if R.y is odd, k = n − k ─────────────────────────
-        boolean ryOdd = (sc[(short)(SC_TMP + 64)] & 1) == 1;
-        if (ryOdd) {
-            subtractFromN(sc, SC_K, sc, SC_K);
-        }
+        // n − k is made either way, into SC_E (free until step 6), and a mask
+        // keeps k or takes it: no branch on R's parity
+        subtractFromN(sc, SC_K, sc, SC_E);
+        choose(sc, SC_K, sc, SC_E, (short)(sc[(short)(SC_TMP + 64)] & 1));
         // Rx is at sc[TMP+1..TMP+32]
 
         // ── Step 6: e = taggedHash("BIP0340/challenge", Rx ‖ Px ‖ msg) mod n
@@ -421,13 +459,21 @@ final class SchnorrHW {
     /**
      * The point a private key and a public point share (04 || X || Y), by this
      * class's own key agreement. For the applet's PIN key: one key agreement
-     * object on the card, and the one whose framing was checked at install.
-     * Signing sets its own key before every use, so nothing is left over
-     * from this.
+     * object on the card, and the one whose framing SET_CARD checks
+     * (checkFraming). The agreement is given G's x again on every way out
+     * (rest), so it keeps nothing of the PIN key after the call.
      */
     short agree(ECPrivateKey priv, byte[] pub, short pubOff, short pubLen, byte[] out, short outOff) {
-        ecdh.init(priv);
-        return ecdh.generateSecret(pub, pubOff, pubLen, out, outOff);
+        // the sender's point is 65 bytes (its caller has held it to the curve, CashuApplet.requireFullPoint); and the
+        // answer framed as the chip's key agreement must frame it
+        if (pubLen != (short)65) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+        try {
+            ecdh.init(priv);
+            framed(ecdh.generateSecret(pub, pubOff, pubLen, out, outOff), out, outOff);
+        } finally {
+            rest();
+        }
+        return (short)65;
     }
 
     /**
@@ -437,24 +483,254 @@ final class SchnorrHW {
      * bytes uncompressed. For a change output's blinding (1.12).
      */
     void addToG(byte[] s, short sOff, byte[] h, short hOff, byte[] out, short outOff) {
-        tmpPriv.setS(s, sOff, (short) 32);
-        gm.init(tmpPriv);
-        short len = gm.generateSecret(h, hOff, (short) 65, out, outOff);
-        if (len != (short) 65 || out[outOff] != (byte) 0x04) {
+        addTo(s, sOff, CashuApplet.SECP256K1_G, (short) 0, h, hOff, out, outOff);
+    }
+
+    /**
+     * out = [s]g + h by the chip: addToG with the key's generator set to the
+     * point g (65 bytes, uncompressed) first. The generic mapping multiplies
+     * whatever generator its key has, which is what makes it the addition of
+     * any two points. Every use of the mapping sets the generator it means,
+     * so none is left over from another. For LOAD_CHANGE (2.3, D183): a
+     * blinding factor taken off, and a mint's proof checked.
+     */
+    void addTo(byte[] s, short sOff, byte[] g, short gOff, byte[] h, short hOff, byte[] out, short outOff) {
+        // s may be a secret (a change output's blinding factor): it is in the key for this call only, however the call ends
+        try {
+            ready();
+            tmpPriv.setG(g, gOff, (short) 65);
+            tmpPriv.setS(s, sOff, (short) 32);
+            gm.init(tmpPriv);
+            framed(gm.generateSecret(h, hOff, (short) 65, out, outOff), out, outOff);
+        } finally {
+            rest();
+        }
+    }
+
+    /**
+     * out = [k]p by the chip's key agreement, 65 bytes (04 || x || y): `k` 32
+     * bytes under n, `p` a point on the curve, 65 bytes uncompressed. For
+     * LOAD_CHANGE (2.3, D183). The agreement multiplies the point it is
+     * given, and not the key's generator, so what addTo leaves there does not
+     * matter here or to sign().
+     */
+    void mul(byte[] k, short kOff, byte[] p, short pOff, byte[] out, short outOff) {
+        // k may be a secret (the sealing scalar): in the key for this call only, however the call ends
+        try {
+            ready();
+            tmpPriv.setS(k, kOff, (short) 32);
+            ecdh.init(tmpPriv);
+            framed(ecdh.generateSecret(p, pOff, (short) 65, out, outOff), out, outOff);
+        } finally {
+            rest();
+        }
+    }
+
+    /**
+     * The framing of both chip engines, which sign(), mul(), agree(), addTo()
+     * and addToG() read, and the point each answers. Seventeen asks, each
+     * answer 65 bytes, 04 || X || Y, held whole to the point it must be:
+     *
+     *   the key agreement (mul):   [11]G = 11G;  [n - 1](11G) = -11G;
+     *                              [2](-G) = -2G;  [n - 1](2G) = -2G;
+     *   the point addition (addTo): [13]G + (-2G) = 11G, the generator G;
+     *                              [n - 2](11G) + 11G = -11G, the generator 11G;
+     *                              [4](-G) + 2G = -2G, the generator -G;
+     *   G with a scalar of the full width: [n - 1]G = -G by the key agreement,
+     *                              [n - 2]G + G = -G by the point addition;
+     *   k = SHA-256("BIP0340/aux") (tagHashAux, made at install), a scalar of
+     *   256 bits whose digits nobody chose: [k](2G) by the key agreement, then
+     *   [k - 1](2G) + 2G (the generator 2G) and [2k - 2]G + 2G (the generator
+     *   G) by the point addition and [2k]G by the key agreement, each held to
+     *   the first: all four are [2k]G;
+     *   then the same four with m, BIP-340's tagged hash of nothing under
+     *   "BIP0340/nonce" (SHA-256(tagHashNonce || tagHashNonce)), all four
+     *   [2m]G. m is the one of twenty fixed hashes tried (the hashes of
+     *   BIP-340's nonce and challenge tags, the tagged hash of nothing under
+     *   each of its three tags, and SHA-256 applied one to five times to each
+     *   tag's hash) with which these scalars, on each path of each engine,
+     *   use every entry of a 5-bit fixed window aligned at bit 0 and of a
+     *   comb of 5 teeth on the bare scalar (the sweep's forms, below).
+     *
+     * Among the points given and answered, Y is odd and even, the root
+     * (x^3 + 7)^((p+1)/4) and not, and of X's parity and not (-G, 2G); the
+     * bases and generators are G and three others; the points added have an
+     * odd Y (-2G, 11G) and an even Y, the root (2G), and one is G. A wrong
+     * engine is a choice, for each part, of how it reads the base or
+     * generator's Y and the added point's Y (its own, p - Y, the even or odd
+     * root, the root or p less it, the root with X's parity or not, its own
+     * only where it is G), how it takes the scalar (s, or [n - s] above or
+     * below n/2), and how it gives the middle point's and the answer's Y (the
+     * same rules, or a parity taken from the scalar, its top bit, or a point
+     * given): every such engine, one fault or several at once (612 key
+     * agreements and 44,064 point additions in all), that answers otherwise
+     * at any input answers another point at one of these asks, each engine
+     * alone and both (SchnorrHWSignTest's family).
+     *
+     * The last ten reach the way each engine multiplies, on G (the base or generator of every
+     * signature, change blinding and date key) and on another point, with scalars of the full width. A
+     * fault of the multiplication itself is refused where one of these scalars, on its path, uses it:
+     * a G path that adds n to the scalar and loses the carry, and an entry stored wrong in a table of
+     * fixed windows aligned at bit 0, or of a comb or a NAF worked on the bare scalar, of 3 to 5 bits,
+     * on either path and either engine: in those forms every entry is used (SchnorrHWSignTest's
+     * sweep). A fault these asks do not reach is not refused: an entry none of these scalars uses in
+     * another form (a 5-bit window aligned from the top or at bits 1 to 4; a 5-bit window or comb
+     * worked on the fixed-length s + n or s + 2n; a table of 6 bits, of which 6 to 16 entries go
+     * unused, Booth recoding of 6 or 7 bits, or a NAF of 7 bits; a scalar blinded at random, which
+     * fixed asks reach only by chance), a case of the addition these points never meet (a point added
+     * to itself), a fault that shows for other scalars only, an engine outside these models, or one
+     * built to answer these points right and others wrong. The chip run's real signatures and real
+     * change are the last check. Each addition adds two distinct points, as the card adds them.
+     *
+     * `6F00` (SW_CRYPTO_ERROR) for a chip that answers any of them otherwise.
+     * Asked at every SET_CARD, before anything is written (not at install,
+     * where the chip takes as little work as it can): a card whose chip
+     * answers otherwise is never set up, and so never takes a piece. `out` is
+     * 65 bytes of working room; the scalars, all public, are made in
+     * sc[0..32), -G at sc[32..97), 2G at sc[97..162) and [2k]G, then
+     * [2m]G, at sc[162..227). The temporary key's generator is G again after it,
+     * however it ends.
+     */
+    void checkFraming(byte[] out, short outOff) {
+        // sc and G held in locals: one byte a use where a field or a static is three
+        byte[] s = sc, g = CashuApplet.SECP256K1_G;
+        try {
+            Util.arrayFillNonAtomic(s, (short)0, (short)32, (byte)0);
+            s[31] = (byte)11;
+            mul(s, (short)0, g, (short)0, out, outOff);
+            isPoint(out, outOff, ELEVEN_G, (short)0, false);
+            s[31] = (byte)13;
+            addToG(s, (short)0, MINUS_TWO_G, (short)0, out, outOff);
+            isPoint(out, outOff, ELEVEN_G, (short)0, false);
+            // n - 1, then n - 2: n's last byte is 41, so neither borrows
+            Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, s, (short)0, (short)32);
+            s[31]--;
+            mul(s, (short)0, ELEVEN_G, (short)0, out, outOff);
+            isPoint(out, outOff, ELEVEN_G, (short)0, true);
+            s[31]--;
+            addTo(s, (short)0, ELEVEN_G, (short)0, ELEVEN_G, (short)0, out, outOff);
+            isPoint(out, outOff, ELEVEN_G, (short)0, true);
+            // -G and 2G: G and -2G with Y made p - Y
+            negated(g, s, (short)32);
+            negated(MINUS_TWO_G, s, (short)97);
+            Util.arrayFillNonAtomic(s, (short)0, (short)32, (byte)0);
+            s[31] = (byte)2;
+            mul(s, (short)0, s, (short)32, out, outOff);
+            isPoint(out, outOff, MINUS_TWO_G, (short)0, false);
+            s[31] = (byte)4;
+            addTo(s, (short)0, s, (short)32, s, (short)97, out, outOff);
+            isPoint(out, outOff, MINUS_TWO_G, (short)0, false);
+            Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, s, (short)0, (short)32);
+            s[31]--;
+            mul(s, (short)0, s, (short)97, out, outOff);
+            isPoint(out, outOff, MINUS_TWO_G, (short)0, false);
+            // G with a scalar of the full width: [n - 1]G and [n - 2]G + G are -G
+            mul(s, (short)0, g, (short)0, out, outOff);
+            isPoint(out, outOff, g, (short)0, true);
+            s[31]--;
+            addTo(s, (short)0, g, (short)0, g, (short)0, out, outOff);
+            isPoint(out, outOff, g, (short)0, true);
+            // k = SHA-256("BIP0340/aux") (tagHashAux), then m = SHA-256(tagHashNonce || tagHashNonce): [k](2G) at
+            // s[162..227), then [k - 1](2G) + 2G, [2k - 2]G + 2G and [2k]G held to it, and the same with m. k is above n/2,
+            // so the sum makes 2k - 2 - n; k's last byte is 90 and that sum's DD, m's A8 and 2m - 2's 4E: neither k - 1
+            // nor 2k borrows or carries, nor m - 1 nor 2m
+            Util.arrayCopyNonAtomic(tagHashAux, (short)0, s, (short)0, (short)32);
+            for (short j = 0; ; j++) {
+                mul(s, (short)0, s, (short)97, s, (short)162);
+                s[31]--;
+                addTo(s, (short)0, s, (short)97, s, (short)97, out, outOff);
+                isPoint(out, outOff, s, (short)162, false);
+                addModN(s, (short)0, s, (short)0, s, (short)0);
+                addTo(s, (short)0, g, (short)0, s, (short)97, out, outOff);
+                isPoint(out, outOff, s, (short)162, false);
+                s[31] += 2;
+                mul(s, (short)0, g, (short)0, out, outOff);
+                isPoint(out, outOff, s, (short)162, false);
+                if (j != (short)0) break;
+                taggedHash(tagHashNonce, s, (short)0, (short)0, s, (short)0);
+            }
+        } finally {
+            tmpPriv.setG(g, (short)0, (short)65);
+        }
+    }
+
+    /** The 65-byte point p at out[off], with its Y made p - Y. */
+    private static void negated(byte[] p, byte[] out, short off) {
+        Util.arrayCopyNonAtomic(p, (short)0, out, off, (short)65);
+        sub32(CashuApplet.SECP256K1_P, (short)0, out, (short)(off + 33), out, (short)(off + 33));
+    }
+
+    /** X and Y of the point at want[wantOff] (04 || X || Y) at out[outOff + 1], or 6F00; where `negated`, of its negative (out's Y is made p - Y here, then held to want's). */
+    private static void isPoint(byte[] out, short outOff, byte[] want, short wantOff, boolean negated) {
+        if (negated) sub32(CashuApplet.SECP256K1_P, (short)0, out, (short)(outOff + 33), out, (short)(outOff + 33));
+        if (Util.arrayCompare(out, (short)(outOff + 1), want, (short)(wantOff + 1), (short)64) != (byte)0) {
             ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
         }
+    }
+
+    /** [11]G, 04 || X || Y, for checkFraming: Y odd, and not the root (x^3 + 7)^((p+1)/4). */
+    private static final byte[] ELEVEN_G = {
+        (byte)0x04,
+        (byte)0x77,(byte)0x4A,(byte)0xE7,(byte)0xF8,(byte)0x58,(byte)0xA9,(byte)0x41,(byte)0x1E,
+        (byte)0x5E,(byte)0xF4,(byte)0x24,(byte)0x6B,(byte)0x70,(byte)0xC6,(byte)0x5A,(byte)0xAC,
+        (byte)0x56,(byte)0x49,(byte)0x98,(byte)0x0B,(byte)0xE5,(byte)0xC1,(byte)0x78,(byte)0x91,
+        (byte)0xBB,(byte)0xEC,(byte)0x17,(byte)0x89,(byte)0x5D,(byte)0xA0,(byte)0x08,(byte)0xCB,
+        (byte)0xD9,(byte)0x84,(byte)0xA0,(byte)0x32,(byte)0xEB,(byte)0x6B,(byte)0x5E,(byte)0x19,
+        (byte)0x02,(byte)0x43,(byte)0xDD,(byte)0x56,(byte)0xD7,(byte)0xB7,(byte)0xB3,(byte)0x65,
+        (byte)0x37,(byte)0x2D,(byte)0xB1,(byte)0xE2,(byte)0xDF,(byte)0xF9,(byte)0xD6,(byte)0xA8,
+        (byte)0x30,(byte)0x1D,(byte)0x74,(byte)0xC9,(byte)0xC9,(byte)0x53,(byte)0xC6,(byte)0x1B
+    };
+
+    /** -[2]G, 04 || X || Y, for checkFraming: X odd, Y odd, and not the root. */
+    private static final byte[] MINUS_TWO_G = {
+        (byte)0x04,
+        (byte)0xC6,(byte)0x04,(byte)0x7F,(byte)0x94,(byte)0x41,(byte)0xED,(byte)0x7D,(byte)0x6D,
+        (byte)0x30,(byte)0x45,(byte)0x40,(byte)0x6E,(byte)0x95,(byte)0xC0,(byte)0x7C,(byte)0xD8,
+        (byte)0x5C,(byte)0x77,(byte)0x8E,(byte)0x4B,(byte)0x8C,(byte)0xEF,(byte)0x3C,(byte)0xA7,
+        (byte)0xAB,(byte)0xAC,(byte)0x09,(byte)0xB9,(byte)0x5C,(byte)0x70,(byte)0x9E,(byte)0xE5,
+        (byte)0xE5,(byte)0x1E,(byte)0x97,(byte)0x01,(byte)0x59,(byte)0xC2,(byte)0x3C,(byte)0xC6,
+        (byte)0x5C,(byte)0x3A,(byte)0x7B,(byte)0xE6,(byte)0xB9,(byte)0x93,(byte)0x15,(byte)0x11,
+        (byte)0x08,(byte)0x09,(byte)0xCD,(byte)0x9A,(byte)0xCD,(byte)0x99,(byte)0x2F,(byte)0x1E,
+        (byte)0xDC,(byte)0x9B,(byte)0xCE,(byte)0x55,(byte)0xAF,(byte)0x30,(byte)0x17,(byte)0x05
+    };
+
+    /** The key agreement's answer is 65 bytes, 04 || X || Y, or the card uses nothing of it. */
+    private static void framed(short len, byte[] b, short off) {
+        if (len != (short)65 || b[off] != (byte)0x04) {
+            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        }
+    }
+
+    /** The temporary key's curve, set again where the key is in RAM: a deselect or rest() clears it there. */
+    private void ready() {
+        if (keyInRam) CashuApplet.curve(tmpPriv);
+    }
+
+    /**
+     * The temporary key and both key agreements put back to a public scalar,
+     * G's x, after each call that gave them a secret one (a nonce, a blinding
+     * factor), on every way out: a key agreement may keep a copy of the key it
+     * was given, so the key alone is not enough. Where the key is in RAM it is
+     * then cleared (and the curve with it, which ready() sets again); where
+     * the chip gave only a persistent key, the curve is kept.
+     */
+    private void rest() {
+        ready();
+        tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32);
+        ecdh.init(tmpPriv);
+        gm.init(tmpPriv);
+        if (keyInRam) tmpPriv.clearKey();
     }
 
     /**
      * Compute a mod n in-place (a is 32 bytes, big-endian).
      *
-     * If a ≥ n, subtracts n (at most once, since callers guarantee a < 2n
-     * after the tagged-hash reduction step).
+     * If a ≥ n, subtracts n (at most once: a 256-bit number is under 2n), by
+     * a mask, the same work either way.
      */
     static void reduceModN(byte[] a, short aOff) {
-        if (cmp32(a, aOff, N, (short)0) >= 0) {
-            sub32(a, aOff, N, (short)0, a, aOff);
-        }
+        short atLeastN = (short)(under(a, aOff, CashuApplet.SECP256K1_N, (short)32) ^ 1);
+        subIf(a, aOff, CashuApplet.SECP256K1_N, atLeastN, (short)32);
     }
 
     /**
@@ -463,17 +739,58 @@ final class SchnorrHW {
      */
     static void addModN(byte[] a, short aOff, byte[] b, short bOff,
                         byte[] out, short outOff) {
-        short carry = 0;
+        // the sum and whether it is n or more in one pass (the carry of the sum, and the borrow of the sum less n), and n
+        // taken off by a mask: the same work for every a and b
+        short carry = 0, borrow = 0;
         for (short i = 31; i >= 0; i--) {
             short sum = (short)((a[(short)(aOff+i)] & 0xFF)
                               + (b[(short)(bOff+i)] & 0xFF)
                               + carry);
             out[(short)(outOff+i)] = (byte)sum;
-            carry = (short)((sum >>> 8) & 1);
+            carry = (short)((sum >> 8) & 1);
+            short d = (short)((sum & 0xFF) - (CashuApplet.SECP256K1_N[i] & 0xFF) - borrow);
+            borrow = (short)((d >> 8) & 1);
         }
-        // carry > 0 means sum ≥ 2^256 > n, so subtract n
-        if (carry != 0 || cmp32(out, outOff, N, (short)0) >= 0) {
-            sub32(out, outOff, N, (short)0, out, outOff);
+        // n off where the sum passed 2^256 (carry), or its low bytes are n or more (no borrow)
+        subIf(out, outOff, CashuApplet.SECP256K1_N, (short)(carry | (borrow ^ 1)), (short)32);
+    }
+
+    /**
+     * v −= m where `take` is 1, and nothing where it is 0: m under a mask of
+     * all ones or all zeros, so the same subtraction runs either way.
+     */
+    private static void subIf(byte[] v, short off, byte[] m, short take, short len) {
+        short mask = (short)(-take & 0xFF);
+        short borrow = 0;
+        for (short i = (short)(len - 1); i >= 0; i--) {
+            short d = (short)((v[(short)(off+i)] & 0xFF) - (m[i] & mask) - borrow);
+            v[(short)(off+i)] = (byte)d;
+            borrow = (short)((d >> 8) & 1);
+        }
+    }
+
+    /**
+     * 1 where the `len` bytes at v[off] are under the `len` of m, 0 where not:
+     * the borrow out of v − m, every column worked, no early answer.
+     */
+    private static short under(byte[] v, short off, byte[] m, short len) {
+        short borrow = 0;
+        for (short i = (short)(len - 1); i >= 0; i--) {
+            short d = (short)((v[(short)(off+i)] & 0xFF) - (m[i] & 0xFF) - borrow);
+            borrow = (short)((d >> 8) & 1);
+        }
+        return borrow;
+    }
+
+    /**
+     * a = b where `take` is 1, a kept where it is 0, 32 bytes, by a mask:
+     * every byte of both read and written either way.
+     */
+    private static void choose(byte[] a, short aOff, byte[] b, short bOff, short take) {
+        byte mask = (byte)(-take);
+        for (short i = 0; i < 32; i++) {
+            byte x = a[(short)(aOff+i)];
+            a[(short)(aOff+i)] = (byte)(x ^ ((x ^ b[(short)(bOff+i)]) & mask));
         }
     }
 
@@ -564,9 +881,12 @@ final class SchnorrHW {
      * signature makes are by DELTA. `init()` checks the zeros are there.
      */
     private static final short DELTA_FROM = (short) 15;
-    private static void mulByDelta(byte[] a, short aOff, byte[] out, short outOff) {
+    private static void mulByDelta(byte[] a, short aOff, byte[] out, short outOff, short from) {
+        // the rows from `from` to 31. `from` is fixed at each call, by how many
+        // leading bytes of `a` the reduction's bounds make zero for every
+        // value: 0 for p_hi, DELTA_FROM for t_hi, 31 for t2_hi
         Util.arrayFillNonAtomic(out, outOff, (short)64, (byte)0);
-        for (short i = 31; i >= 0; i--) {
+        for (short i = 31; i >= from; i--) {
             // no early way out for a zero byte of `a`, which is secret (D21): see mul256x256
             short ai = (short)(a[(short)(aOff+i)] & 0xFF);
             short carry = 0;
@@ -603,10 +923,12 @@ final class SchnorrHW {
         // p = p_hi * 2^256 + p_lo
         // Step 1: t = p_hi * DELTA  (256×32-eff → 256 bits after mod-n reduction)
         // t fits in 48 bytes worst-case, but we compute mod-n in two steps.
-        mulByDelta(p, pOff, work, tOff);
+        mulByDelta(p, pOff, work, tOff, (short)0);
         // t = (p_hi * DELTA)_hi * 2^256 + (p_hi * DELTA)_lo
-        // Apply identity again to t_hi part:
-        mulByDelta(work, tOff, work, t2Off);
+        // Apply identity again to t_hi part. t < 2^256 * 2^129 = 2^385, so
+        // t_hi < 2^129: its first DELTA_FROM bytes are zero for every p, and
+        // the rows of those bytes are not worked
+        mulByDelta(work, tOff, work, t2Off, DELTA_FROM);
         // t2_hi * DELTA < 2^128 * 2^128 = 2^256 < 2n → directly add, then subtract
         // Sum = t2_lo + t[32..63] + p[pOff+32..pOff+63]
         // But t2_hi is tiny (< 2^127), its contribution via DELTA:
@@ -620,20 +942,28 @@ final class SchnorrHW {
                 out, outOff);
         // The four-term sum can exceed 2^256. Each overflow unit is a dropped
         // 2^256, and 2^256 ≡ DELTA (mod n), so fold it back rather than losing
-        // it. Adding DELTA can itself overflow, hence the loop; carry shrinks
-        // rapidly (DELTA < 2^129) so this terminates after a couple of rounds.
-        while (carry != 0) {
-            short pending = carry;
-            carry = 0;
-            for (short i = 0; i < pending; i++) {
-                carry = (short)(carry
-                        + add32(out, outOff, DELTA, (short)0, out, outOff));
-            }
+        // it: carry·DELTA added (carry 0 to 3), and the one carry that can come
+        // of that added the same way. The second cannot carry: after an
+        // overflow the value is under 3·DELTA < 2^131, and DELTA more is far
+        // under 2^256. Two passes, every column, whatever the carries.
+        addDelta(out, outOff, addDelta(out, outOff, carry));
+        // Final reduction: the value is under 2^256 < 2n, so n is taken off
+        // once at most, by a mask
+        reduceModN(out, outOff);
+    }
+
+    /**
+     * v += m·DELTA over all 32 columns, m from 0 to 3: the carry out of the
+     * top (0 or 1 for the sums this is given).
+     */
+    private static short addDelta(byte[] v, short off, short m) {
+        short carry = 0;
+        for (short i = 31; i >= 0; i--) {
+            short s = (short)((v[(short)(off+i)] & 0xFF) + (short)(m * (DELTA[i] & 0xFF)) + carry);
+            v[(short)(off+i)] = (byte)s;
+            carry = (short)((s >> 8) & 0xFF);
         }
-        // Final reduction: at most 2–3 conditional subtracts
-        while (cmp32(out, outOff, N, (short)0) >= 0) {
-            sub32(out, outOff, N, (short)0, out, outOff);
-        }
+        return carry;
     }
 
     /**
@@ -650,7 +980,13 @@ final class SchnorrHW {
      * the 512-bit product are non-zero the value did not fit, and we throw
      * rather than hand a silently truncated result back into the reduction.
      *
-     * Unlike the ECDH framing check, this one cannot be hoisted to install time:
+     * The bound the reduction gives is far tighter: t2 < 2^129 · 2^129, so its
+     * high half is under 2^2 and only its last byte can be non-zero. That byte
+     * is the one row worked; the other 31 bytes of `a`, and the top half of
+     * the product, are OR-ed together over every byte whatever their values,
+     * and one check at the end refuses a value that is not zero.
+     *
+     * Unlike the engines' framing check, this one cannot be asked once ahead of use:
      * it is an assertion about an intermediate of <i>this</i> multiplication,
      * not a fixed property of the card. It is unreachable for every input the
      * depth-2 reduction can produce — reaching it means the arithmetic above is
@@ -663,13 +999,16 @@ final class SchnorrHW {
     private static void mulSmallByDelta(byte[] a, short aOff,
                                         byte[] out, short outOff,
                                         byte[] work, short workOff) {
-        mulByDelta(a, aOff, work, workOff);
+        mulByDelta(a, aOff, work, workOff, (short)31);
+        short over = 0;
+        for (short i = 0; i < 31; i++) {
+            over = (short)(over | (a[(short)(aOff + i)] & 0xFF));
+        }
         for (short i = 0; i < 32; i++) {
-            if (work[(short)(workOff + i)] != (byte)0) {
-                ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
-            }
+            over = (short)(over | (work[(short)(workOff + i)] & 0xFF));
         }
         Util.arrayCopy(work, (short)(workOff + 32), out, outOff, (short)32);
+        if (over != 0) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
     }
 
     /**
@@ -728,13 +1067,15 @@ final class SchnorrHW {
      * out = n − a  (modular negation in Z_n), 32 bytes each, big-endian.
      */
     static void subtractFromN(byte[] a, short aOff, byte[] out, short outOff) {
-        sub32(N, (short)0, a, aOff, out, outOff);
+        sub32(CashuApplet.SECP256K1_N, (short)0, a, aOff, out, outOff);
     }
 
     /**
-     * 256-bit subtraction: out = a − b.  Assumes a ≥ b (no underflow check).
+     * 256-bit subtraction: out = a − b, and the borrow out of the top (0 where
+     * a ≥ b). The borrow of each column is the sign of its difference, taken
+     * with a shift, not a branch.
      */
-    private static void sub32(byte[] a, short aOff,
+    static short sub32(byte[] a, short aOff,
                                byte[] b, short bOff,
                                byte[] out, short outOff) {
         short borrow = 0;
@@ -742,16 +1083,19 @@ final class SchnorrHW {
             short diff = (short)((a[(short)(aOff+i)] & 0xFF)
                                - (b[(short)(bOff+i)] & 0xFF)
                                - borrow);
-            if (diff < 0) { diff += 256; borrow = 1; } else { borrow = 0; }
             out[(short)(outOff+i)] = (byte)diff;
+            borrow = (short)((diff >> 8) & 1);
         }
+        return borrow;
     }
 
     /**
-     * Compare two 32-byte big-endian values.
+     * Compare two 32-byte big-endian values, for public values only (a header's
+     * work, a point's coordinates against p): it answers at the first byte
+     * that differs, and nothing on the signing path uses it.
      * @return negative / 0 / positive as a < b / a == b / a > b.
      */
-    private static short cmp32(byte[] a, short aOff, byte[] b, short bOff) {
+    static short cmp32(byte[] a, short aOff, byte[] b, short bOff) {
         for (short i = 0; i < 32; i++) {
             short ai = (short)(a[(short)(aOff+i)] & 0xFF);
             short bi = (short)(b[(short)(bOff+i)] & 0xFF);
@@ -760,26 +1104,4 @@ final class SchnorrHW {
         return (short)0;
     }
 
-    /**
-     * Set secp256k1 EC curve parameters on a private and/or public key.
-     * Either key may be null (only the non-null one is configured).
-     */
-    private void setECParams(ECPrivateKey priv, ECPublicKey pub) {
-        if (priv != null) {
-            priv.setFieldFP(P, (short)0, (short)32);
-            priv.setA(A, (short)0, (short)32);
-            priv.setB(B, (short)0, (short)32);
-            priv.setG(G, (short)0, (short)65);
-            priv.setR(Nparam, (short)0, (short)32);
-            priv.setK((short)1);
-        }
-        if (pub != null) {
-            pub.setFieldFP(P, (short)0, (short)32);
-            pub.setA(A, (short)0, (short)32);
-            pub.setB(B, (short)0, (short)32);
-            pub.setG(G, (short)0, (short)65);
-            pub.setR(Nparam, (short)0, (short)32);
-            pub.setK((short)1);
-        }
-    }
 }

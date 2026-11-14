@@ -7,7 +7,10 @@
  *   - NUT-00 hash_to_curve, blinding and unblinding;
  *   - NUT-12 DLEQ verification, of a blind signature (e, s) and of a proof (e, s, r) as the card keeps it;
  *   - BIP-340 verification, for the card's AUTH and payment signatures;
- *   - the format-4 secret the card signs (NUT-CCP's card proofs) and the NUT-11 SIG_ALL message.
+ *   - the keys per load (protocol 2.3, spec/APDU.md "Keys per load"): a date's tweak t, the card's key for the date
+ *     P + t*G and the refund key for the date R + u*G, worked out from the card's secret c;
+ *   - the format-4 secret the card signs (NUT-CCP's card proofs), which names the card's key for the piece's date, and
+ *     the NUT-11 SIG_ALL message.
  *
  * Speed is irrelevant: a test makes a few dozen points. Checked in cashu-crypto.test.cjs against NUT-00's vectors, the
  * card's own spec/vectors/secret.json, and (with CARDSIM_URL and MINT_URL set) a real Nutshell mint.
@@ -164,12 +167,58 @@ function schnorrVerify(pub, msg, sig) {
 }
 
 // ── the card ─────────────────────────────────────────────────────────────────
-/** The format-4 secret a 2.0 card signs (NUT-CCP's card proofs): its key, the nonce, and with a date the locktime and refund key; SIG_ALL last. */
-function cardSecret(nonceHex, cardKeyHex, date = 0, refundHex = null) {
-  const head = `["P2PK",{"nonce":"${nonceHex.toLowerCase()}","data":"${cardKeyHex.toLowerCase()}","tags":[`
+// Keys per load (2.3): t = SHA-256("CashuCard/key" || c || date (4, big-endian)) mod n, and the card's key for the date
+// is P + t*G; u = SHA-256("CashuCard/refund-key" || c || date) mod n, and the refund key for the date is R + u*G.
+const LABEL_KEY = "CashuCard/key"
+const LABEL_REFUND_KEY = "CashuCard/refund-key"
+
+function dateBytes(date) {
+  if (!Number.isInteger(date) || date < 0 || date >= 2 ** 32) throw new RangeError(`a date is 0 to 2^32 - 1, got ${date}`)
+  const d = Buffer.alloc(4)
+  d.writeUInt32BE(date)
+  return d
+}
+
+/** SHA-256(label || c (32) || date (4)) mod n: t with "CashuCard/key", u with "CashuCard/refund-key". */
+function dateTweak(label, c, date) {
+  const cc = buf(c)
+  if (cc.length !== 32) throw new RangeError(`the card's secret c is 32 bytes, got ${cc.length}`)
+  return mod(int(sha256(Buffer.from(label, "ascii"), cc, dateBytes(date))), N)
+}
+
+/** P + t*G: the card's key for the date whose tweak is t (32 bytes, as SPEND_ALL_BEGIN and GROUP_KEYS answer it). */
+function tweakedKey(key, t) {
+  const p = point(key)
+  if (!p) throw new Error("not a point of the curve")
+  const sum = add(p, mul(typeof t === "bigint" ? t : int(t)))
+  if (!sum) throw new Error("the tweak cancels the key")
+  return compressed(sum)
+}
+
+/**
+ * A date's keys from the card's secret c, as GROUP_KEYS answers them: { t (32), key: P + t*G (33), refund: R + u*G (33) }.
+ * The refund is 33 zeros for the date 0 (an undated piece names no refund key) and on a card with no refund key R.
+ */
+function dateKeys(c, cardKey, refundKey, date) {
+  const t = dateTweak(LABEL_KEY, c, date)
+  const key = tweakedKey(cardKey, t)
+  let refund = Buffer.alloc(33)
+  if (refundKey && buf(refundKey).some(b => b !== 0) && date !== 0) refund = tweakedKey(refundKey, dateTweak(LABEL_REFUND_KEY, c, date))
+  return { t: bytes32(t), key, refund }
+}
+
+/**
+ * The format-4 secret a card signs (NUT-CCP's card proofs), on 2.3 under the keys per load: `dateKey` is the card's key
+ * for the piece's date, P + t*G (never the card's key P itself: no 2.3 card signs with P alone), and a dated piece names
+ * the date's refund key, R + u*G, in its refund tag; SIG_ALL last. dateKeys() works both out.
+ */
+function cardSecret(nonce, dateKey, date = 0, dateRefund = null) {
+  // hex text as given, in lower case; bytes as their hex
+  const text = v => (typeof v === "string" ? v.toLowerCase() : hexOf(v))
+  const head = `["P2PK",{"nonce":"${text(nonce)}","data":"${text(dateKey)}","tags":[`
   if (!date) return head + '["sigflag","SIG_ALL"]]}]'
-  if (!refundHex) throw new Error("a dated piece names the card's refund key")
-  return head + `["locktime","${date}"],["refund","${refundHex.toLowerCase()}"],["sigflag","SIG_ALL"]]}]`
+  if (!dateRefund || !buf(dateRefund).some(b => b !== 0)) throw new Error("a dated piece names the refund key for its date")
+  return head + `["locktime","${date}"],["refund","${text(dateRefund)}"],["sigflag","SIG_ALL"]]}]`
 }
 
 /** The NUT-11 SIG_ALL message: every input's secret and C (hex), then every output's amount (decimal) and B_ (hex). */
@@ -180,7 +229,15 @@ function sigAllMessage(inputs, outputs) {
   return sha256(Buffer.from(m, "utf8"))
 }
 
-/** AUTH's message: SHA-256(T || T || reader (16) || card (16) || card key (33)), T = SHA-256("CashuCard/auth"). */
+/**
+ * A payment's signature checked as a mint checks it: BIP-340 under the key its secrets name, the card's key for the
+ * payment's date (P + t*G), over the SIG_ALL message.
+ */
+function verifyPayment(dateKey, inputs, outputs, signature) {
+  return schnorrVerify(dateKey, sigAllMessage(inputs, outputs), signature)
+}
+
+/** AUTH's message: SHA-256(T || T || reader (16) || card (16) || card key (33)), T = SHA-256("CashuCard/auth"). AUTH is under P. */
 function authMessage(reader, card, key) {
   return taggedHash("CashuCard/auth", Buffer.concat([buf(reader), buf(card), buf(key)]))
 }
@@ -188,5 +245,5 @@ function authMessage(reader, card, key) {
 module.exports = {
   P, N, G, add, neg, mul, point, compressed, uncompressed, sha256, buf, hexOf, int, bytes32,
   hashToCurve, blind, unblind, hashE, verifyBlindDleq, verifyProofDleq, taggedHash, schnorrVerify,
-  cardSecret, sigAllMessage, authMessage,
+  LABEL_KEY, LABEL_REFUND_KEY, dateTweak, tweakedKey, dateKeys, cardSecret, sigAllMessage, verifyPayment, authMessage,
 }

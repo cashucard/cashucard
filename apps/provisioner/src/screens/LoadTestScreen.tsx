@@ -29,7 +29,7 @@ import {
 import {randomBytes} from '../random';
 import {formatReadout, locksOut, makeReadout, type Readout} from '../readout';
 import {cancelCard, setCardMessage, withCard} from '../session';
-import {BENCH_RUNS_ENABLED} from '../releaseGates';
+import {BENCH_RUNS_ENABLED, benchActionAllowed} from '../releaseGates';
 import {FONT, useTheme, type Theme} from '../theme';
 import {Screen, SecondaryButton} from '../ui';
 
@@ -76,7 +76,7 @@ export function LoadTestScreen(): React.JSX.Element {
 
   const start = useCallback(
     async (action: Action) => {
-      if (!BENCH_RUNS_ENABLED || running || stopped) {
+      if (!benchActionAllowed(action) || running || stopped) {
         return;
       }
       setRunning(action);
@@ -146,17 +146,17 @@ export function LoadTestScreen(): React.JSX.Element {
         <View style={styles.buttons}>
           <SecondaryButton
             title={ACTION_NAMES.hello}
-            disabled={!idle}
+            disabled={!idle || !benchActionAllowed('hello')}
             onPress={() => start('hello')}
           />
           <SecondaryButton
             title={ACTION_NAMES.cashu}
-            disabled={!idle}
+            disabled={!idle || !benchActionAllowed('cashu')}
             onPress={() => start('cashu')}
           />
           <SecondaryButton
             title={ACTION_NAMES.rotate}
-            disabled={!idle}
+            disabled={!idle || !benchActionAllowed('rotate')}
             onPress={() => start('rotate')}
           />
           <SecondaryButton

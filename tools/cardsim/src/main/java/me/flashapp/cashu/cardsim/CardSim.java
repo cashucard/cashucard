@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 /**
- * cardsim: the real CashuApplet, protocol 2.0, in jCardSim, served over loopback HTTP.
+ * cardsim: the real CashuApplet, protocol 2.3, in jCardSim, served over loopback HTTP.
  *
  * <pre>
  *   java -jar tools/cardsim/target/cardsim.jar [--port 9876]
@@ -41,7 +41,7 @@ import java.util.function.Supplier;
  *
  * <dl>
  *   <dt>{@code POST /apdu}  {"hex": "00A404000BF043415348554341524401"}</dt>
- *   <dd>{@code 200 {"hex": "02029000", "sw": "9000"}} — the applet's answer,
+ *   <dd>{@code 200 {"hex": "02039000", "sw": "9000"}} — the applet's answer,
  *       data‖SW. A non-9000 status word is still a 200: the transport worked,
  *       the card refused. 400 for bad JSON or bad hex. A SELECT by the package
  *       AID alone reaches the opener, as on a chip ({@code "9000"}, no version;
@@ -53,39 +53,52 @@ import java.util.function.Supplier;
  *   <dt>{@code POST /reset}</dt>
  *   <dd>A brand-new card: fresh simulator, the opener, the card's applet and
  *       the NFC tag installed, SELECT, {@code generation + 1}. Answers
- *       {@code /state}. <b>The key does not change</b>: jCardSim draws every
- *       keypair from an unseeded generator, so each install yields the same
- *       pubkey. Proofs minted to it in an earlier run are already spent at the
- *       mint if that run redeemed them. Loaders mint per run, after reading
- *       {@code pubkey} from {@code /state}.</dd>
+ *       {@code /state}. <b>The card key P does not change</b>: jCardSim draws
+ *       every keypair from an unseeded generator, so each install yields the
+ *       same pubkey. The card's secret c, and so its key for each date
+ *       (P + t*G, protocol 2.3's keys per load), is new at every reset: pieces
+ *       are locked to the key GROUP_KEYS answers under the PIN, never to P, and
+ *       minted per run.</dd>
  *
  *   <dt>{@code POST /fixture}  {pin?, mint?, refundKey?, owner?, ownerKey?, anchor?, headers?, proofs?, spentSlots?, limits?, blockedPin?}</dt>
- *   <dd>Additive on the current card (so: {@code /reset}, read
- *       {@code /state.pubkey}, mint format-4 SIG_ALL pieces locked to it, then
- *       {@code /fixture}). Fully validated against the card as it is before
- *       the first APDU — 400 {@code {"error"}} with the card untouched,
- *       including for the 0.x keys {@code puk} and {@code appletVersion}. A step
- *       the applet refuses answers 409
+ *   <dd>Additive on the current card (so: {@code /reset}, a fixture with
+ *       {@code pin}, {@code mint} and {@code owner}, GROUP_KEYS under the PIN
+ *       over {@code /apdu}, mint format-4 SIG_ALL pieces locked to the key it
+ *       answers, then a fixture with {@code pin} and {@code proofs}). Fully
+ *       validated against the card as it is before the first APDU — 400
+ *       {@code {"error"}} with the card untouched, including for the 0.x keys
+ *       {@code puk} and {@code appletVersion}, for pieces with no {@code pin}
+ *       (a 2.3 card loads under the PIN given in the tap) and for a claim or a
+ *       record after the first set-up of a card with no owner. A step the
+ *       applet refuses answers 409
  *       {@code {"error": "<step>", "sw": "6985", "state": {...}}} and
  *       {@code /state.fixtureError} keeps the step until the next fixture or
- *       reset. On success, answers {@code /state}. Ends with a SELECT, so the
- *       app's first command finds a fresh session. {@code owner: true} sets the
+ *       reset. On success, answers {@code /state}. Ends with the card out of
+ *       the field and back and a SELECT, so the app's first command finds a
+ *       fresh tap in a fresh time in the field. {@code owner: true} sets the
  *       deterministic TEST owner key (OwnerKey.TEST, the same as cardctl's and
- *       client.cjs's), which the bridge then signs the owner's proofs with for
- *       {@code limits} and for loading. {@code spentSlots} are spent on the
- *       <i>card</i> only, by a payment of the piece with no outputs; the mint
- *       still holds those pieces live. See Fixture.java for the schema and
+ *       client.cjs's): on a card with no owner by the claim (six askings, in
+ *       the first set-up, under the PIN), after which the card is taken out of
+ *       the field and back; the bridge then signs the owner's proofs with it
+ *       for {@code limits}. {@code spentSlots} are spent on the <i>card</i>
+ *       only, by a payment of the piece with no outputs; the mint still holds
+ *       those pieces live. See Fixture.java for the schema and
  *       SimCard.applyFixture for the order.</dd>
  *
  *   <dt>{@code GET /state}</dt>
  *   <dd>{@code {generation, deterministicKey: true, version, pubkey, balance,
  *       pinState, tries, locked, hasOwner, ownerKey?, testOwner, recordSet,
- *       mint?, now, windowStart, spentToday, dailyLimit, allowance, nopinSpent,
- *       rolls, rollBudget, allowanceArmed, lastHeader, counts: {unspent, spent,
+ *       format, unit, changeOwed, noPinWindow, profiles, mint?, now,
+ *       windowStart, spentToday, dailyLimit, allowance, nopinSpent, rolls,
+ *       rollBudget, allowanceArmed, lastHeader, counts: {unspent, spent,
  *       empty}, slots: [{slot, status, keysetId?, amount?, nonce?, C?, date?,
  *       dleq?: {e, s, r}}] (128 of them), fixtureError?: {step, sw}}}, read
- *       through commands that need no PIN and change nothing, without touching
- *       the session. {@code generation} moves on every reset and fixture, so a
+ *       through commands that change nothing, in the tap as the app left it,
+ *       without touching the session. A 2.3 card says its history (the day's
+ *       window and count, the rolls, the arming, the last header, a spent
+ *       slot's piece) only to the PIN or the owner's grant given in the tap:
+ *       with neither, those read as zeros and a spent slot as its number and
+ *       status alone. {@code generation} moves on every reset and fixture, so a
  *       loader can tell a card it set up from one another run left behind.</dd>
  * </dl>
  *
@@ -94,10 +107,12 @@ import java.util.function.Supplier;
  *
  * <h2>Sessions</h2>
  *
- * SELECT starts a session. The applet's PIN-verified flag, the owner's nonce
- * and the owner's load grant are CLEAR_ON_DESELECT transients, so a re-SELECT
+ * SELECT starts a tap. The applet's PIN-verified flag, the owner's nonce
+ * and the owner's grant are CLEAR_ON_DESELECT transients, so a re-SELECT
  * drops them the way a new NFC tap does; the fake transport sends SELECT on
- * every tap and there is no "tap" endpoint. {@code /state} sends no SELECT while
+ * every tap and there is no "tap" endpoint. What 2.3 keeps for a time in the
+ * field (a payment signed, an owner claimed, a history read) outlasts a
+ * SELECT; a fixture ends it, taking the card out of the field and back. {@code /state} sends no SELECT while
  * the card's applet is selected; with another instance selected (the opener, by
  * the package AID) it selects the card's applet for its reads and the app's
  * instance again after (SimCard's class comment).

@@ -277,3 +277,43 @@ test('reader startup failure retains reviewed state and reports its safe phase',
     rmSync(directory, {recursive: true, force: true});
   }
 });
+
+test('a card owed change is not reset: the runner stops before authorization or keys, and says why', async () => {
+  for (const state of [
+    {owner: 1, pin: 1, record: 1, change: 1},
+    {owner: 1, pin: 1, record: 1, change: 2, minor: 2},
+  ]) {
+    const {directory, options, card, tx} = await fixture();
+    try {
+      card.setCardState(state);
+      card.log.length = 0;
+      await assert.rejects(
+        () =>
+          executeLocalReset(options, async () => ({tx, close: async () => {}})),
+        error =>
+          error instanceof Error &&
+          'phase' in error &&
+          'code' in error &&
+          error.phase === 'fresh-installation' &&
+          error.code === 'change-owed',
+      );
+      assert.equal(card.instances.size, 3, 'the applet and its openings stay');
+      assert.equal(
+        card.insLog().some(i => [0xe4, 0xd8].includes(i)),
+        false,
+      );
+      assert.equal(
+        JSON.parse(readFileSync(options.journal, 'utf8')).journal.stage,
+        'reviewed',
+      );
+      const db = new OpsDb({sql: openSqliteFile(options.db)});
+      assert.deepEqual(
+        db.db.prepare('SELECT count(*) AS count FROM reset_intents').get(),
+        {count: 0},
+      );
+      db.close();
+    } finally {
+      rmSync(directory, {recursive: true, force: true});
+    }
+  }
+});

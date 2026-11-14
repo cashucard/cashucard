@@ -41,7 +41,7 @@
           <p class="guide-lead">This guide puts the Cashu Card applet on a blank NXP J3R180 card from a computer with a card reader, then checks that the card answers. The first card takes about 20 minutes, most of it spent installing tools, and each card after that takes a few minutes. Cashu Card is experimental: read the <a href="/#risks">risks</a> before a card holds value.</p>
           <ul class="guide-facts" aria-label="At a glance">
             <li>Experimental</li>
-            <li>Applet 2.2</li>
+            <li>Applet 2.3</li>
             <li>NXP J3R180 cards</li>
             <li>GlobalPlatformPro</li>
             <li>About 20 minutes</li>
@@ -54,7 +54,7 @@
 <span class="out">APP: F043415348554341524401 (SELECTABLE)</span>
 <span class="out">APP: D2760000850101 (SELECTABLE)</span>
 <span class="prompt">$</span> gp --apdu 00A404000BF043415348554341524401
-<span class="out">0202 9000</span></code></pre>
+<span class="out">0203 9000</span></code></pre>
           </figure>
           </div>
           <ol class="guide-steps" aria-label="The six steps">
@@ -62,7 +62,7 @@
             <li><a href="#applet"><b>02</b><strong>Get the applet</strong><span>Download one CAP file and check its hash.</span></a></li>
             <li><a href="#check"><b>03</b><strong>Check the card</strong><span>Read it, then log in once.</span></a></li>
             <li><a href="#install"><b>04</b><strong>Install</strong><span>Install three applets in order.</span></a></li>
-            <li><a href="#verify"><b>05</b><strong>Check the install</strong><span>The card answers 02 02.</span></a></li>
+            <li><a href="#verify"><b>05</b><strong>Check the install</strong><span>The card answers 02 03.</span></a></li>
             <li><a href="#setup"><b>06</b><strong>Set the card up</strong><span>Set it up before you hand it over.</span></a></li>
           </ol>
         </div>
@@ -153,7 +153,8 @@ chmod +x /usr/local/bin/gp</code></pre>
 
           <section id="applet" aria-labelledby="applet-title">
             <h2 id="applet-title"><span class="step-no" aria-hidden="true">02</span>Get the applet</h2>
-            <p>The applet ships as one CAP file, applet version 2.2, at <code>applet/target/cashu-javacard-2.1.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
+            <p>The applet ships as one CAP file, applet version 2.3, at <code>applet/target/cashu-javacard-2.3.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
+            <p class="note"><b>On a card.</b> The 2.3 build: this exact file has run on a chip. It ran on the bench J3R180 of 2026-11-14, at a test mint. If the install in step 4 fails, stop.</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>git clone https://github.com/cashucard/cashucard
@@ -162,8 +163,8 @@ cd cashucard/applet</code></pre>
             <p>Check that the file is the published one before you install it:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-              <pre><code>sha256sum target/cashu-javacard-2.1.0.cap</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>86839ccf74d9b7a2aa7f7b8d8d47af1e1649ae14f30a4ac135f285e277e1f66d  target/cashu-javacard-2.1.0.cap</code></pre></div>
+              <pre><code>sha256sum target/cashu-javacard-2.3.0.cap</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>30c7bb8d98274da0953e2e90c93027fa2313391b05a2211a9489a2111dbaed83  target/cashu-javacard-2.3.0.cap</code></pre></div>
             </figure>
             <p>On a macOS release without <code>sha256sum</code>, <code>shasum -a 256</code> prints the same line.</p>
             <details class="more">
@@ -183,10 +184,10 @@ ant cap -Djc.sdk=/path/to/jc305u4_kit</code></pre>
                 <p>A CAP you build hashes differently from the published one, even from the same source, because the converter writes a timestamp into <code>META-INF/MANIFEST.MF</code>. Compare every other entry with the published file:</p>
                 <figure class="cmd">
                   <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-                  <pre><code>git show HEAD:applet/target/cashu-javacard-2.1.0.cap &gt; /tmp/tracked.cap
+                  <pre><code>git show HEAD:applet/target/cashu-javacard-2.3.0.cap &gt; /tmp/tracked.cap
 rm -rf /tmp/cap-tracked /tmp/cap-built
 unzip -q /tmp/tracked.cap -d /tmp/cap-tracked
-unzip -q target/cashu-javacard-2.1.0.cap -d /tmp/cap-built
+unzip -q target/cashu-javacard-2.3.0.cap -d /tmp/cap-built
 diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built &amp;&amp; echo "same CAP as the tracked one"</code></pre>
                   <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>same CAP as the tracked one</code></pre></div>
                 </figure>
@@ -223,7 +224,7 @@ GP SCP02 (i=55)</code></pre><p>It also lists key set version 01, with three DES3
             </ol>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-              <pre><code>gp --install target/cashu-javacard-2.1.0.cap --applet F04341534855434152444D
+              <pre><code>gp --install target/cashu-javacard-2.3.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454</code></pre>
             </figure>
@@ -239,18 +240,18 @@ APP: D2760000850101 (SELECTABLE)           ← the tag</code></pre></div>
 
           <section id="verify" aria-labelledby="verify-title">
             <h2 id="verify-title"><span class="step-no" aria-hidden="true">05</span>Check the install</h2>
-            <p>Select the card's applet by its whole AID. It answers with its version, 2.1, and <code>9000</code> for success:</p>
+            <p>Select the card's applet by its whole AID. It answers with its version, 2.3, and <code>9000</code> for success:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>gp --apdu 00A404000BF043415348554341524401</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0202 9000</code></pre></div>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0203 9000</code></pre></div>
             </figure>
             <p>Read its state with <code>GET_INFO</code>. A new card shows 128 empty slots, with its PIN, owner and record still unset:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>gp --apdu B0010000</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>02 02 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-SW: 9000</code></pre><p>Read in order: version 2.2, 128 slots, 0 unspent, 0 spent, 128 empty, capabilities FF, no PIN, card file format 4, 3 PIN tries, unlocked, and no record, limit, owner, clock, window or change grant.</p></div>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>02 03 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+SW: 9000</code></pre><p>Read in order: version 2.3, 128 slots, 0 unspent, 0 spent, 128 empty, capabilities FF, no PIN, card file format 4, 3 PIN tries, unlocked, and no record, limit, owner, clock, window or change owed.</p></div>
             </figure>
             <p>Read the card's public key with <code>GET_PUBKEY</code>:</p>
             <figure class="cmd">
@@ -282,25 +283,22 @@ brew install python@3.13
 python3.13 -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install -r requirements.txt</code></pre>
                 </figure>
-                <p>Then set the card up, owner last, with the tip block header as the anchor:</p>
+                <p>Then set the card up in one command, with the tip block header as the anchor. A 2.3 card takes its PIN, record, owner and first limits in one selection, so keep it on the reader until the command ends (the owner's claim takes a few seconds):</p>
                 <figure class="cmd">
                   <figcaption class="cmd-head">Terminal, in tools/cardctl</figcaption>
-                  <pre><code>python3 cardctl.py set-pin 1234
-python3 cardctl.py verify-pin 1234
-python3 cardctl.py set-card --mint &lt;your mint's URL&gt;
-python3 cardctl.py set-owner --owner-key &lt;32-byte hex&gt; --anchor &lt;the tip header, 80 bytes hex&gt;
-python3 cardctl.py set-limit --owner-key &lt;…&gt; --day 50000 --payment 0 --allowance 0 --budget 7
-python3 cardctl.py selftest</code></pre>
+                  <pre><code>python3 cardctl.py setup --pin 1234 --mint &lt;your mint's URL&gt; --owner-key &lt;32-byte hex&gt; --anchor &lt;the tip header, 80 bytes hex&gt; --day 50000 --payment 0 --allowance 0 --budget 7
+python3 cardctl.py selftest --pin 1234</code></pre>
                 </figure>
-                <p class="note"><b>Use this on bench cards.</b> When <code>--owner-key</code> is left out, cardctl signs with its TEST key, which anyone with the repository holds.</p>
-                <p><code>cardctl selftest</code> passes a card that answers <code>02 01</code>, <code>02 02</code> or a later 2.x version.</p>
+                <p class="note"><b>The owner key is required.</b> <code>--owner-key</code> is the holder's own key. On a bench card you may give <code>--test-owner-key</code> in its place: then the card is owned by cardctl's TEST key, which anyone with the repository holds, and anyone can change its PIN and spend it.</p>
+                <p>cardctl checks the mint, the refund key and the anchor before it writes to the card. If it stops after the PIN, it prints what the card holds and what to do next. A card left with a PIN and no owner holds nothing; reset it with <code>python3 cardctl.py reset --pin 1234</code>, which takes about 45 seconds on the reader, then run <code>setup</code> again.</p>
+                <p><code>cardctl selftest</code> passes a card that answers <code>02 01</code>, <code>02 02</code> or <code>02 03</code>, the versions it knows, and fails any other.</p>
               </div>
             </details>
           </section>
 
           <section id="reinstall" aria-labelledby="reinstall-title">
             <h2 id="reinstall-title">Reinstall or remove</h2>
-            <p class="note"><b>Spend the balance first.</b> Every piece on a card is locked to the card's key, and a reinstall makes a new key. Spend a card's balance before you delete its applet.</p>
+            <p class="note"><b>Spend the balance first.</b> Every piece on a card is locked to the card's key, and a reinstall makes a new key. Spend a card's balance before you delete its applet, and bring home any change it is owed: <code>GET_INFO</code> byte 29 is <code>01</code> on a 2.3 card while a payment's change has not come back to it. The holder's wallet brings it home; deleting the applet loses it.</p>
             <p>Delete the instances one at a time, the tag first and the package last. The chip refuses to delete an instance that something still refers to, which sets the order:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
@@ -312,7 +310,7 @@ gp --delete F0434153485543415244     # the package</code></pre>
             <p>Then install again, the opener first and the tag last:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-              <pre><code>gp --install target/cashu-javacard-2.1.0.cap --applet F04341534855434152444D
+              <pre><code>gp --install target/cashu-javacard-2.3.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454</code></pre>
             </figure>
@@ -321,7 +319,8 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
           <section id="troubleshooting" aria-labelledby="troubleshooting-title">
             <h2 id="troubleshooting-title">Troubleshooting</h2>
             <dl class="faults">
-              <div><dt><code>gp --install</code> fails with <code>6F00</code></dt><dd>Check the order in step 4: the chip takes the card's applet only after the opener. With the order right, suspect the size of the load file next, then the applet's install-time check of how the chip frames its ECDH output.</dd></div>
+              <div><dt><code>gp --install</code> fails with <code>6F00</code></dt><dd>Check the order in step 4: the chip takes the card's applet only after the opener. With the order right, suspect the chip next: this exact file has run on a chip, a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and report the answer.</dd></div>
+              <div><dt>The first <code>SET_CARD</code> answers <code>6F00</code></dt><dd>The card checks how the chip frames its ECDH output at every <code>SET_CARD</code>, and a chip that frames it otherwise is never set up. Suspect the chip's ECDH framing: stop and report the answer.</dd></div>
               <div><dt>SELECT answers <code>6A82</code></dt><dd>The card has an earlier applet, 0.x or 1.x, and needs an update.</dd></div>
               <div><dt>SELECT answers <code>9000</code> with no version</dt><dd>That SELECT named the package AID alone, <code>F0434153485543415244</code>, which reaches the opener, and the opener answers <code>6D00</code> to every command after it. Select the whole AID, <code>F043415348554341524401</code>, as in step 5.</dd></div>
               <div><dt>The card refuses gp's keys</dt><dd>Put the card aside, as step 3 explains.</dd></div>
@@ -352,7 +351,7 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
               <table class="ref">
                 <thead><tr><th scope="col">Card</th><th scope="col">Java Card</th><th scope="col">Status</th></tr></thead>
                 <tbody>
-                  <tr><td>NXP JCOP4 SmartMX3 P71 (J3R180), from any seller</td><td>3.0.5</td><td><span class="ok">Primary target</span>, with the secp256k1 custom curve supported</td></tr>
+                  <tr><td>NXP JCOP4 SmartMX3 P71 (J3R180)</td><td>3.0.5</td><td><span class="ok">Primary target</span>, with the secp256k1 custom curve supported, where its configuration has <code>ALG_EC_SVDP_DH_PLAIN_XY</code> and <code>ALG_EC_PACE_GM</code>: one that lacks either cannot run the card</td></tr>
                   <tr><td>Generic Java Card 3.0.5 or later</td><td>3.0.5</td><td><span class="maybe">May work</span>; check its custom EC-FP curve and <code>ALG_EC_SVDP_DH_PLAIN_XY</code> support first</td></tr>
                   <tr><td>Feitian's own Java Card 3.0.4 cards</td><td>3.0.4</td><td><span class="no">Cannot run it</span>: it lacks <code>ALG_EC_SVDP_DH_PLAIN_XY</code>, so the CAP will not convert or load</td></tr>
                   <tr><td>Java Card 3.0.4 or earlier</td><td>3.0.4 and earlier</td><td><span class="no">Cannot run it</span>: no ECDH plain-XY</td></tr>

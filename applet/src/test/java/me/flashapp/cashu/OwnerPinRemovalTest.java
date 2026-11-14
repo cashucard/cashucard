@@ -32,9 +32,11 @@ import java.util.List;
  *    which was CLEAR_PIN, is SET_OWNER on 2.0: a 0.5 reader's bytes there
  *    change nothing.)
  * 2. pinState 0 over a partly spent counter, set on the card directly, is
- *    harmless: no command reads the counter behind a card with no PIN, and a
- *    PIN added later starts with three fresh tries. And a successful
- *    OwnerPIN.check refills the counter by itself, which the applet leans on.
+ *    harmless: no command reads the counter behind a card with no PIN, such a
+ *    card takes and pays nothing (2.3, D185: 6A97), SET_PIN on an owned card
+ *    is refused (no card has an owner and no PIN), and the owner's CHANGE_PIN
+ *    starts a PIN with three fresh tries. And a successful OwnerPIN.check
+ *    refills the counter by itself, which the applet leans on.
  *
  * It was ClearPinTest (D15) until 2.0; it is named for what it tests now.
  */
@@ -42,6 +44,7 @@ class OwnerPinRemovalTest {
 
     private static final byte CLA = CashuAppletTest.CLA;
     private static final int SW_OK = CashuAppletTest.SW_OK;
+    static final int SW_GRANT = CashuAppletTest.SW_GRANT;
 
     // ── the shape, in the source ─────────────────────────────────────────────
 
@@ -163,7 +166,7 @@ class OwnerPinRemovalTest {
     }
 
     @Test
-    @DisplayName("a no-PIN card over a partly spent counter never reads it: VERIFY_PIN is 6984, and a PIN added later starts with three tries")
+    @DisplayName("a no-PIN card over a partly spent counter never reads it: VERIFY_PIN is 6984, it loads and pays nothing (6A97), SET_PIN is refused on the owned card, and the owner's CHANGE_PIN starts the PIN with three tries")
     void aNoPinCardNeverReadsThePartlySpentCounterBehindIt() throws Exception {
         readyCard();
         // Run the counter down to one try: a successful VERIFY_PIN refills it, so the two wrong tries come after it.
@@ -180,10 +183,16 @@ class OwnerPinRemovalTest {
         assertEquals(CashuAppletTest.SW_PIN_NOT_SET, verify(CashuAppletTest.WRONG_PIN), "and a wrong PIN never reaches the counter");
         assertEquals(0, infoPinState(), "so the card can never report itself blocked from here");
 
-        // ADD PIN (1.16): the owner's grant and SET_PIN on an owned card with no PIN. OwnerPIN.update starts it at three tries.
+        // and it takes and pays nothing (D185)
+        assertEquals(CashuAppletTest.SW_NO_PIN, send(CashuAppletTest.INS_LOAD_PROOF, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 8, 1)));
+        assertEquals(CashuAppletTest.SW_NO_PIN, sim.transmitCommand(CashuAppletTest.spendBegin(new byte[] { 0 })).getSW());
+        // SET_PIN is not the owner's way to a PIN, grant or none (2.2's ADD PIN is gone); CHANGE_PIN is, and OwnerPIN.update starts it at three tries
         byte[] proof = CashuAppletTest.ownerProof(CashuAppletTest.L_LOAD, CashuAppletTest.OWNER, nonce(), new byte[0]);
-        assertEquals(SW_OK, send(CashuAppletTest.INS_ALLOW_LOAD, 0, CashuAppletTest.ownerData(proof, new byte[0])));
-        assertEquals(SW_OK, send(CashuAppletTest.INS_SET_PIN, 0, CashuAppletTest.NEW_PIN));
+        assertEquals(SW_GRANT, send(CashuAppletTest.INS_ALLOW_LOAD, 0, CashuAppletTest.ownerData(proof, new byte[0])));
+        assertEquals(CashuAppletTest.SW_OWNER_PROOF, send(CashuAppletTest.INS_SET_PIN, 0, CashuAppletTest.NEW_PIN));
+        assertEquals(0, infoPinState());
+        byte[] change = CashuAppletTest.ownerProof(CashuAppletTest.L_PIN, CashuAppletTest.OWNER, nonce(), CashuAppletTest.NEW_PIN);
+        assertEquals(SW_OK, send(CashuAppletTest.INS_CHANGE_PIN, 0, CashuAppletTest.ownerData(change, CashuAppletTest.NEW_PIN)));
         assertEquals(1, infoPinState());
         assertEquals(0x63C2, verify(CashuAppletTest.WRONG_PIN), "three fresh tries, not one");
         assertEquals(0x63C1, verify(CashuAppletTest.WRONG_PIN));

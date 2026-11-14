@@ -20,6 +20,7 @@ export * from './gp/scp03';
 export * from './gp/provision';
 export * from './gp/identity';
 
+export * from './gp/change-owed';
 export * from './gp/inspect';
 export * from './gp/reset-preflight';
 export * from './gp/registry';

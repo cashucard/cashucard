@@ -7,7 +7,6 @@ import static me.flashapp.cashu.CashuAppletTest.INS_LOAD_PROOF;
 import static me.flashapp.cashu.CashuAppletTest.INS_LOCK_CARD;
 import static me.flashapp.cashu.CashuAppletTest.INS_RESET_CARD;
 import static me.flashapp.cashu.CashuAppletTest.INS_SET_TAG;
-import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_BEGIN;
 import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_SIGN;
 import static me.flashapp.cashu.CashuAppletTest.KEYSET;
 import static me.flashapp.cashu.CashuAppletTest.L_LOCK;
@@ -95,7 +94,7 @@ class TagTest {
 
     // ---- what a phone sends ---------------------------------------------------------------------------------------------
 
-    private ResponseAPDU send(CommandAPDU c) { return sim.transmitCommand(c); }
+    private ResponseAPDU send(CommandAPDU c) { return CashuAppletTest.held(sim::transmitCommand, c); }
     private int sw(CommandAPDU c) { return send(c).getSW(); }
     /** SELECT by name, as a phone sends it to the tag application: case 4, the name and a zero Le. */
     private ResponseAPDU selectTag() { return send(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(TAG_HEX), 256)); }
@@ -318,7 +317,7 @@ class TagTest {
     @DisplayName("There is nothing per card in the tag: two cards, one set up with an owner and money and one new, answer the phone's whole sequence in the same bytes")
     void testTheSameOnEveryCard() {
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)));
         byte[][] mine = aPhoneReadsTheTag();
         selectCard();
         byte[] myKey = send(new CommandAPDU(CLA, 0x10, 0, 0, 256)).getData();
@@ -481,7 +480,7 @@ class TagTest {
         assertTrue(tagIsSelectable(), "and its tag is on");
         sim = freshCardWithTheTag();
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)), "money on the card");
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)), "money on the card");
         assertEquals(SW_OK, switchTag(true), "the owner's proof, with money on the card");
         assertEquals(SW_OK, switchTag(false), "and again");
         assertEquals(SW_OK, switchTag(true));
@@ -503,7 +502,7 @@ class TagTest {
         assertEquals(0x6999, selectTag().getSW(), "the tag application refuses its name");
         ResponseAPDU card = selectCard();
         assertEquals(SW_OK, card.getSW(), "the card's own name is selected");
-        assertArrayEquals(new byte[] { 0x02, 0x02 }, card.getData(), "and answers its version, 2.2");
+        assertArrayEquals(new byte[] { 0x02, 0x03 }, card.getData(), "and answers its version, 2.3");
         assertEquals(1, infoTag().getData()[42], "and says the tag is off");
         assertEquals(0x6999, selectTag().getSW(), "the tag asks at each selection, and it is still off");
         selectCard();
@@ -570,7 +569,7 @@ class TagTest {
         // a reset that is refused leaves the tag as it was: money on the card
         sim = freshCardWithTheTag();
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)));
         assertEquals(SW_OK, switchTag(true));
         assertEquals(0x6A8D, sw(new CommandAPDU(CLA, INS_RESET_CARD, 0, RESET_CONFIRM, ownerData(ownerProof(L_RESET, OWNER, nonce(), new byte[0]), new byte[0]))), "a piece unspent: refused");
         assertEquals(1, tagOffInTheCard(), "and the tag is as it was");
@@ -595,7 +594,17 @@ class TagTest {
         assertArrayEquals(longOff, Arrays.copyOf(tagOff, 42), "P1 = 2 begins with them");
         assertEquals(1, tagOff[42], "and the tag is off");
         assertArrayEquals(thirtyOn, Arrays.copyOf(tagOff, 30), "the 30 are the first of the 43");
-        for (int p1 : new int[] { 3, 4, 0x10, 0x7F, 0x80, 0xFF }) {
+        // P1 = 3 (D184) is the 43 and eight more, the tag's byte as P1 = 2 says it
+        ResponseAPDU three = send(new CommandAPDU(CLA, INS_GET_INFO, 3, 0, 256));
+        assertEquals(51, three.getData().length);
+        assertArrayEquals(tagOff, Arrays.copyOf(three.getData(), 43), "P1 = 3 begins with the 43 of P1 = 2");
+        // P1 = 4 (D186) is the 51 and eight more: the no-PIN window's start, the profiles, FF 03, and the loads left today
+        ResponseAPDU four = send(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256));
+        assertEquals(59, four.getData().length);
+        assertArrayEquals(three.getData(), Arrays.copyOf(four.getData(), 51), "P1 = 4 begins with the 51 of P1 = 3");
+        assertEquals(0xFF, four.getData()[55] & 0xFF, "every profile of byte 55");
+        assertEquals(0x03, four.getData()[56], "and the certificate's (bit 0) and keys per load (bit 1, D197)");
+        for (int p1 : new int[] { 5, 0x10, 0x7F, 0x80, 0xFF }) {
             ResponseAPDU other = send(new CommandAPDU(CLA, INS_GET_INFO, p1, 0, 256));
             assertEquals(SW_OK, other.getSW(), "P1 = " + p1);
             assertArrayEquals(thirtyOff, other.getData(), "any other P1 is answered as it was: the thirty bytes (P1 = " + p1 + ")");
@@ -618,7 +627,7 @@ class TagTest {
         owned();
         byte[] limits = concat(CashuAppletTest.u32(1000), CashuAppletTest.u32(100), CashuAppletTest.u32(50));
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x34, 0, 0, ownerData(ownerProof("CashuCard/set-limit", OWNER, nonce(), limits), limits))), "the owner sets all three limits");
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x45, 0, 0, ownerData(ownerProof("CashuCard/load", OWNER, nonce(), new byte[0]), new byte[0]))), "and gives the grant, so that the limit on one payment is said");
+        assertEquals(CashuAppletTest.SW_GRANT, sw(new CommandAPDU(CLA, 0x45, 0, 0, ownerData(ownerProof("CashuCard/load", OWNER, nonce(), new byte[0]), new byte[0]))), "and gives the grant (6200, a warning: given, and no load opened by it), so that the limit on one payment is said");
         long[] on = readAsAWalletOf118Does(info().getData(), infoTap().getData());
         assertNotNull(on, "with the tag on, the long form is taken");
         assertArrayEquals(new long[] { 100, 50, 0 }, on, "the limit on one payment, the allowance, and nothing counted against it");
@@ -634,13 +643,13 @@ class TagTest {
     @DisplayName("A payment works with the tag off, and with money on the card the switch works")
     void testAPaymentWorksWithTheTagOff() {
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)));
         assertEquals(SW_OK, switchTag(true));
         // the PIN again (switching the tag is not a payment, and SELECTs end the tap), then one signature for the one piece
         selectCard();
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x40, 0, 0, TEST_PIN)));
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4)), "a payment begun");
-        ResponseAPDU signed = send(new CommandAPDU(CLA, INS_SPEND_ALL_SIGN, 0, 0, 64));
+        assertEquals(SW_OK, sw(CashuAppletTest.spendBegin(new byte[] { 0 })), "a payment begun");
+        ResponseAPDU signed = CashuAppletTest.signThrough(this::send);
         assertEquals(SW_OK, signed.getSW(), "signed, with the tag off");
         assertEquals(64, signed.getData().length, "one signature");
         assertEquals(1, tagOffInTheCard(), "and the tag is as it was");

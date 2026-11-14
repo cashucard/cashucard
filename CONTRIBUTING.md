@@ -135,8 +135,9 @@ for actual device/card behavior.
    unmarked. No APDU may exist that does so.
 3. **Spec alignment.** Commands must match NUT-CCP and `spec/APDU.md`. If the
    spec is ambiguous, raise it before implementing.
-4. **Portability.** Any JavaCard 3.0.5+ chip with secp256k1. Avoid
-   chip-specific APIs.
+4. **Portability.** Any JavaCard 3.0.5+ chip with secp256k1 whose
+   configuration has `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY` and
+   `KeyAgreement.ALG_EC_PACE_GM`. Avoid chip-specific APIs.
 5. **No allocation after install.** JavaCard Classic allocates `new` in
    persistent EEPROM and never collects it. Anything reachable from an APDU
    handler must use buffers allocated once at install

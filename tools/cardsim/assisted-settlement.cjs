@@ -83,8 +83,12 @@ async function capture(dir, mintOrigin, simOrigin) {
   const keys = (await request(mintOrigin, `/v1/keys/${keyset.id}`)).keysets[0].keys;
   const sim = new CardSim(simOrigin);
   await sim.waitReady();
-  const {pubkey} = await sim.reset();
+  await sim.reset();
   await sim.fixture({pin: '1234', mint: mintOrigin, owner: true});
+  // Protocol 2.3: pieces are locked to the card's key for their date (here the date 0), read under the PIN.
+  await sim.select();
+  await sim.verifyPin('1234');
+  const paymentKey = cc.hexOf((await sim.groupKeys(0)).key);
   const quote = await request(mintOrigin, '/v1/mint/quote/bolt11', {amount: 12, unit: 'sat'});
   let paid = false;
   for (let i = 0; i < 100; i++) {
@@ -95,7 +99,7 @@ async function capture(dir, mintOrigin, simOrigin) {
   assert.ok(paid, 'test mint must use FakeWallet');
   const funding = [8, 4].map(amount => {
     const nonce = crypto.randomBytes(32).toString('hex');
-    const secret = cc.cardSecret(nonce, pubkey);
+    const secret = cc.cardSecret(nonce, paymentKey);
     const b = cc.blind(secret);
     return {amount, nonce, secret, B_: cc.hexOf(b.B_), r: cc.hexOf(cc.bytes32(b.r))};
   });
@@ -105,22 +109,22 @@ async function capture(dir, mintOrigin, simOrigin) {
   const proofs = funding.map((o, i) => ({keysetId: keyset.id.slice(0, 16), amount: o.amount, nonce: o.nonce,
     C: cc.hexOf(cc.unblind(signatures[i].C_, o.r, keys[String(o.amount)])),
     dleq: {...signatures[i].dleq, r: o.r}}));
-  await sim.fixture({proofs});
+  await sim.fixture({pin: '1234', proofs});
   const inputs = funding.map((o, i) => ({amount: o.amount, id: keyset.id, secret: o.secret, C: proofs[i].C}));
   const feePpk = keyset.input_fee_ppk ?? 0;
   const merchantAmount = 12 - Math.ceil(feePpk * inputs.length / 1000);
   const openings = split(merchantAmount).map(newOutput);
   const outputs = openings.map(o => ({amount: o.amount, id: keyset.id, B_: o.B_}));
   // This survives a lost SIGN answer. Never put these openings in the relay packet.
-  save(dir, 'merchant-prepared.json', {mintOrigin, pubkey, inputs, outputs, openings, merchantAmount, feePpk});
+  save(dir, 'merchant-prepared.json', {mintOrigin, paymentKey, inputs, outputs, openings, merchantAmount, feePpk});
   await sim.select();
   await sim.verifyPin('1234');
-  assert.equal(await sim.spendAllBegin([0, 1]), 12);
+  assert.equal((await sim.spendAllBegin([0, 1])).total, 12);
   await sim.spendAllOutputs(outputs);
   const {signature} = await sim.spendAllSign();
   const witness = cc.hexOf(signature);
-  assert.ok(cc.schnorrVerify(pubkey, cc.sigAllMessage(inputs, outputs), witness));
-  const packet = {kind: 'local-rehearsal-only', mintOrigin, pubkey,
+  assert.ok(cc.schnorrVerify(paymentKey, cc.sigAllMessage(inputs, outputs), witness));
+  const packet = {kind: 'local-rehearsal-only', mintOrigin, paymentKey,
     inputs: inputs.map((p, i) => ({...p, ...(i ? {} : {witness: JSON.stringify({signatures: [witness]})})})), outputs};
   save(dir, 'relay-packet.json', packet);
   assert.deepEqual(await states(mintOrigin, inputs), ['UNSPENT', 'UNSPENT']);
@@ -130,7 +134,7 @@ async function capture(dir, mintOrigin, simOrigin) {
 async function relay(dir) {
   const packet = read(dir, 'relay-packet.json'); // No merchant opening read.
   const witness = JSON.parse(packet.inputs[0].witness).signatures[0];
-  assert.ok(cc.schnorrVerify(packet.pubkey, cc.sigAllMessage(packet.inputs, packet.outputs), witness));
+  assert.ok(cc.schnorrVerify(packet.paymentKey, cc.sigAllMessage(packet.inputs, packet.outputs), witness));
   assert.deepEqual(await states(packet.mintOrigin, packet.inputs), ['UNSPENT', 'UNSPENT']);
   // Intentionally discard the successful response. Recovery must use NUT-09.
   await request(packet.mintOrigin, '/v1/swap', {inputs: packet.inputs, outputs: packet.outputs});

@@ -158,6 +158,8 @@ test('reset-only migration keeps the original review and consent with its operat
     sealed: true,
     mint: 'https://mint.test',
     recordDigest: 'ab'.repeat(32),
+    changeOwed: false,
+    version: '2.2',
   };
   await workflow.begin(
     {

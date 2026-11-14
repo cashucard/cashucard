@@ -39,6 +39,8 @@ const review: ResetReview = {
   sealed: true,
   mint: 'https://mint.example.test',
   recordDigest: 'ab'.repeat(32),
+  changeOwed: false,
+  version: '2.2',
 };
 function fixture() {
   let raw: string | null = null;
@@ -111,6 +113,58 @@ test('wrong actor, retained value and unsupported provenance stop before intent,
     expect(f.service.authorize).not.toHaveBeenCalled();
     expect(f.service.keys).not.toHaveBeenCalled();
   }
+});
+test('a card owed change, a 2.3 card with spent entries, or a review without the change owed, is never begun', async () => {
+  const older: Partial<ResetReview> = {...review};
+  delete older.changeOwed;
+  delete older.version;
+  for (const observed of [
+    {...review, changeOwed: true},
+    {...review, version: '2.3', spent: 2},
+    older as ResetReview,
+  ]) {
+    const f = fixture();
+    const w = await OwnedResetWorkflow.open(f.storage);
+    await expect(
+      w.begin(f.service, uuid(1), uuid(2), observed, {
+        erase: true,
+        valueHandled: true,
+      }),
+    ).rejects.toThrow();
+    expect(f.raw()).toBeNull();
+    expect(f.service.lookup).not.toHaveBeenCalled();
+  }
+  // a 2.3 card with no spent entries and nothing owed begins
+  const f = fixture();
+  const w = await OwnedResetWorkflow.open(f.storage);
+  await w.begin(
+    f.service,
+    uuid(1),
+    uuid(2),
+    {...review, version: '2.3'},
+    {erase: true, valueHandled: true},
+  );
+  expect(JSON.parse(f.raw()!).review.changeOwed).toBe(false);
+});
+test('a reset saved by an earlier build, whose review has no change owed or version, still opens', async () => {
+  const f = fixture();
+  const w = await OwnedResetWorkflow.open(f.storage);
+  await w.begin(f.service, uuid(1), uuid(2), review, {
+    erase: true,
+    valueHandled: true,
+  });
+  const saved = JSON.parse(f.raw()!);
+  delete saved.review.changeOwed;
+  delete saved.review.version;
+  await f.storage.replace(JSON.stringify(saved));
+  const reopened = await OwnedResetWorkflow.open(f.storage);
+  expect(reopened.snapshot()?.journal.stage).toBe('reviewed');
+  // one of the two alone is not a review either build wrote
+  delete saved.review.recordDigest;
+  saved.review.recordDigest = 'ab'.repeat(32);
+  saved.review.version = '2.2';
+  await f.storage.replace(JSON.stringify(saved));
+  await expect(OwnedResetWorkflow.open(f.storage)).rejects.toThrow();
 });
 test('reset persists each boundary, then replays frozen completion after a lost reply without card work or keys', async () => {
   const f = fixture();

@@ -84,14 +84,21 @@ export function ResetCardScreen({
   };
   const card = pending ? visible.review : flow.resetReview?.card;
   const lookup = flow.resetReview?.source;
+  // a 2.3 card's spent entries are freed by its holder wallet, not by this app's settlement check
+  const cleanable = !!card && card.version !== '2.3';
   const allowed =
     !!card &&
     card.unspent === 0 &&
+    !card.changeOwed &&
     !card.locked &&
     !card.pinBlocked &&
     card.tag &&
     (card.spent === 0 ||
-      (card.pin && card.sealed && card.record && card.mint.length > 0)) &&
+      (cleanable &&
+        card.pin &&
+        card.sealed &&
+        card.record &&
+        card.mint.length > 0)) &&
     lookup?.can_reset === true &&
     lookup.lookup.status === 'found';
   useEffect(() => {
@@ -208,7 +215,9 @@ export function ResetCardScreen({
             {card ? (
               <View style={s.card}>
                 <Text style={s.title}>
-                  {card.unspent > 0
+                  {card.changeOwed
+                    ? 'Bring the change home first'
+                    : card.unspent > 0
                     ? 'Move the balance first'
                     : card.locked || card.pinBlocked
                     ? 'Holder recovery needed'
@@ -222,7 +231,22 @@ export function ResetCardScreen({
                 <Dim>{`Card key …${card.installationId.slice(-8)} · ${
                   card.unspent
                 } unspent · ${card.spent} retained spent entries`}</Dim>
-                {card.spent > 0 ? (
+                {card.changeOwed ? (
+                  <Dim>
+                    A payment from this card left change at the mint that has
+                    not come back to it yet. Hold the card to its holder wallet
+                    while online: the wallet brings the change home. This app
+                    will not erase a card that is owed change, because removing
+                    the applet would lose it.
+                  </Dim>
+                ) : null}
+                {card.spent > 0 && !cleanable ? (
+                  <Dim>
+                    The holder wallet frees this card’s spent entries once the
+                    mint has settled them. Reset is unavailable until they are
+                    freed.
+                  </Dim>
+                ) : card.spent > 0 ? (
                   <Dim>{`Settlement check: ${
                     card.mint || 'unsupported mint address'
                   }. Only derived proof identifiers go to this mint; the PIN is sent only to the card, encrypted.`}</Dim>

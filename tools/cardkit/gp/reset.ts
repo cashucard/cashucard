@@ -132,7 +132,8 @@ export async function resetOwnedCard(
         stage !== 'delete_intent' ||
         observed.installationId !== a.installationId ||
         observed.publicState.unspent !== 0 ||
-        observed.publicState.spent !== 0
+        observed.publicState.spent !== 0 ||
+        observed.publicState.changeOwed
       )
         throw new ResetGuard();
     }

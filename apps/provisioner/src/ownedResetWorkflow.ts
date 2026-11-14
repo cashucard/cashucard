@@ -166,8 +166,19 @@ const REVIEW = [
   'mint',
   'recordDigest',
 ];
+// cardkit 0.3 adds these to the review; a reset saved by an earlier build has neither
+const REVIEW_03 = ['changeOwed', 'version'];
 function validateReview(r: ResetReview) {
-  fields(r, REVIEW);
+  const saved02 =
+    !!r &&
+    typeof r === 'object' &&
+    REVIEW_03.every(k => !Object.prototype.hasOwnProperty.call(r, k));
+  fields(r, saved02 ? REVIEW : [...REVIEW, ...REVIEW_03]);
+  check(
+    saved02 ||
+      (typeof r.changeOwed === 'boolean' &&
+        ['2.1', '2.2', '2.3'].includes(r.version)),
+  );
   check(
     /^cplc-v1:[0-9a-f]{24}$/.test(r.chipId) &&
       /^0[23][0-9a-f]{64}$/.test(r.installationId) &&
@@ -195,6 +206,7 @@ function request(s: OwnedResetState): ResetRequest {
   check(
     s.review.unspent === 0 &&
       s.review.spent === 0 &&
+      s.review.changeOwed !== true &&
       s.review.tag &&
       !s.review.locked &&
       !s.review.pinBlocked,
@@ -347,6 +359,9 @@ export class OwnedResetWorkflow {
       consent.erase &&
         consent.valueHandled &&
         review.unspent === 0 &&
+        // change owed is lost with the applet; a 2.3 card's spent entries are its holder wallet's to free
+        review.changeOwed === false &&
+        !(review.version === '2.3' && review.spent > 0) &&
         !review.locked &&
         !review.pinBlocked &&
         review.tag,

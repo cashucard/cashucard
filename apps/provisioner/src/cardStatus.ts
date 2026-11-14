@@ -30,7 +30,7 @@ export async function readCardStatus(tx: Transceiver): Promise<CardReadout> {
   if (reply.sw !== 0x9000) {
     throw new CardError(reply.sw, 0xa4);
   }
-  // 2.1, or 2.2 (D175), which only adds a public read: the cardkit's CARD_VERSIONS
+  // 2.1, 2.2 (D175), which only adds a public read, or 2.3: the cardkit's CARD_VERSIONS
   if (!supportedCardVersion(reply.data)) {
     return {
       state: 'unsupported',
@@ -123,6 +123,15 @@ export function cardStatus(
       label: 'OPEN SETTINGS',
     };
   }
+  if (c.changeOwed) {
+    return {
+      title: 'Change is still owed to the card',
+      detail:
+        'A payment from this card left change at the mint that has not come back to it yet. Hold the card to its holder wallet while online: the wallet brings the change home. Reset is unavailable until then, because removing the applet would lose that change.',
+      action: 'holder',
+      label: 'HOLDER WALLET INSTRUCTIONS',
+    };
+  }
   if (c.unspent > 0) {
     return {
       title: 'Card has value',
@@ -132,12 +141,20 @@ export function cardStatus(
     };
   }
   if (c.spent > 0) {
-    return {
-      title: 'Check earlier payments',
-      detail: `${c.spent} spent entries remain. Finish pending merchant payments and change before reuse. Reset will independently check settlement; this read has not checked the mint.`,
-      action: 'holder',
-      label: 'HOLDER WALLET INSTRUCTIONS',
-    };
+    // the settlement cleanup is a 2.1 and 2.2 card's: a 2.3 card's holder wallet frees its spent places
+    return c.version === '2.3'
+      ? {
+          title: 'Check earlier payments',
+          detail: `${c.spent} spent entries remain. On this card the holder wallet frees spent entries once the mint has settled them; this app does not clear them. Reset is unavailable until they are freed.`,
+          action: 'holder',
+          label: 'HOLDER WALLET INSTRUCTIONS',
+        }
+      : {
+          title: 'Check earlier payments',
+          detail: `${c.spent} spent entries remain. Finish pending merchant payments and change before reuse. Reset will independently check settlement; this read has not checked the mint.`,
+          action: 'holder',
+          label: 'HOLDER WALLET INSTRUCTIONS',
+        };
   }
   if (c.owner) {
     return {

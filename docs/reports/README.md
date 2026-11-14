@@ -30,6 +30,7 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 | 2026-10-23 | [Owned-card reset](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md)                                     | USB reset of card 09336320 to factory manager keys                       |
 | 2026-10-23 | [Physical end-to-end run](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)                                 | Install, holder setup, funding, payments and settlement on card 09336320 |
 | 2026-10-23 | [Mobile reset and reuse](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)                              | Reset and reinstall of card 09336320 from a phone                        |
+| 2026-11-13 | [2.3 on J3R180](HARDWARE_TEST_REPORT_2026-11-13_J3R180_2.3.md)                                                | Protocol 2.3 pays and takes its change back at a test mint               |
 
 ## Hardware plans
 

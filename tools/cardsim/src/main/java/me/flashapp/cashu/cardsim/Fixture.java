@@ -15,38 +15,43 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * A {@code POST /fixture} body for a protocol 2.0 card, parsed and fully validated before a single APDU is sent.
+ * A {@code POST /fixture} body for a protocol 2.3 card, parsed and fully validated before a single APDU is sent.
  *
  * <pre>
  * {
- *   "pin":        "1234",                    // optional, 4–8 bytes: SET_PIN on a card with none, then VERIFY_PIN
+ *   "pin":        "1234",                    // optional, 4–8 bytes: SET_PIN on a card with none (its first set-up), then VERIFY_PIN
  *   "mint":       "http://127.0.0.1:3338",   // optional, 1–77 characters: the record (SET_CARD)
  *   "refundKey":  "02…",                     // optional, 33 bytes, with mint: the record's refund key (dated pieces need one)
  *   "owner":      true,                      // optional: SET_OWNER with the deterministic TEST owner key (OwnerKey.TEST)
  *   "ownerKey":   "…",                       // optional, 32 bytes: SET_OWNER with this P-256 private key instead
  *   "anchor":     "<80-byte header>",        // optional, needs an owner in this fixture: SET_OWNER's anchor (D20)
  *   "headers":    ["<80-byte header>", …],   // optional: SET_HEADER, in order (real mainnet headers: the floor is built in)
- *   "proofs":     [{ "keysetId", "amount", "nonce", "C", "date"?, "dleq"?: { "e", "s", "r" } }, …],   // optional, at most 128
+ *   "proofs":     [{ "keysetId", "amount", "nonce", "C", "date"?, "dleq"?: { "e", "s", "r" } }, …],   // optional, at most 128, needs "pin"
  *   "spentSlots": [1],                       // optional, indexes into "proofs": spent on the card by a payment of that piece
- *   "limits":     { "day", "payment", "allowance", "rollBudget" },   // optional, needs an owner: SET_LIMIT, always 13 bytes
- *   "blockedPin": true                       // optional, needs "pin": three wrong VERIFY_PINs
+ *   "limits":     { "day", "payment", "allowance", "rollBudget", "rate", "noPinWindow" },   // optional, needs an owner: SET_LIMIT, always 18 bytes
+ *   "blockedPin": true                       // optional, needs "pin" and an owner: three wrong VERIFY_PINs
  * }
  * </pre>
  *
- * {@code limits} always sends the owner's thirteen-byte SET_LIMIT: a key left out is 0 (no limit, no allowance), and
- * {@code rollBudget} left out is 7, the card's default (D20). The card leaves its budget as it is for a form without
- * the byte (D26); the fixture always sends it, so a fixture's card never keeps a budget from before. tools/cardsim/README.md
- * has the whole schema.
+ * {@code limits} always sends the owner's eighteen-byte SET_LIMIT: a key left out is 0 (no limit, no allowance, no rate,
+ * the no-PIN window of 24 hours), and {@code rollBudget} left out is 7, the card's default (D20). The card leaves a field
+ * as it is for a form without it (D26); the fixture always sends them all, so a fixture's card never keeps a number
+ * from before. tools/cardsim/README.md has the whole schema.
  *
- * The pieces are format-4 SIG_ALL pieces locked to the card key (NUT-CCP's card proofs), minted by the caller at a mint
- * after reading {@code /state.pubkey}; with {@code dleq} they are loaded with the mint's proof (LOAD_PROOF P1 = 1).
- * The 0.x keys {@code puk} and {@code appletVersion} are refused by name: there is no PUK and no version mask on 2.0
- * (D18). Unknown keys are refused at every level, for the reason CARD-FILE.md gives: a field silently dropped here is
- * a card that does not hold what the test believes it holds. Every refusal is an {@link IllegalArgumentException},
- * which the HTTP layer answers 400 with the card untouched.
+ * Protocol 2.3's rules, each checked here so the card refuses a fixture only for what it holds, never for its shape:
+ * a card with no PIN takes nothing, so {@code proofs} need {@code pin} (the PIN given in the tap opens a load; the
+ * owner's grant opens none); a card with no owner is set up once, in its first set-up, which the SET_PIN of a card with
+ * no PIN begins and the fixture's own SELECT ends, so on such a card {@code owner} (a claim) needs {@code pin} in the
+ * same fixture on a card that has no PIN yet and a record of the holder's, and {@code mint} is refused once it has a
+ * PIN; a card with no owner never blocks its PIN, so {@code blockedPin} needs an owner.
  *
- * The checks mirror what the applet would refuse, against the card as it is ({@link Context}), so that a fixture that
- * passes here is refused by the card only for what the card holds, never for its own shape.
+ * The pieces are format-4 SIG_ALL pieces locked to the card's key for their date, P + t*G (and a dated one's refund to
+ * R + u*G), never to the card key P (NUT-CCP's card proofs, spec/APDU.md "Keys per load"), minted by the caller at a mint
+ * after reading GROUP_KEYS under the PIN; LOAD_PROOF carries the caller's word on it (P2 02). With {@code dleq} they are
+ * loaded with the mint's proof (LOAD_PROOF P1 = 1). The 0.x keys {@code puk} and {@code appletVersion} are refused by
+ * name: there is no PUK and no version mask (D18). Unknown keys are refused at every level, for the reason CARD-FILE.md
+ * gives: a field silently dropped here is a card that does not hold what the test believes it holds. Every refusal is
+ * an {@link IllegalArgumentException}, which the HTTP layer answers 400 with the card untouched.
  */
 final class Fixture {
 
@@ -63,7 +68,7 @@ final class Fixture {
     private static final Set<String> PROOF_KEYS = new HashSet<>(Arrays.asList("keysetId", "amount", "nonce", "C", "date", "dleq"));
     private static final Set<String> PROOF_REQUIRED = new HashSet<>(Arrays.asList("keysetId", "amount", "nonce", "C"));
     private static final Set<String> DLEQ_KEYS = new HashSet<>(Arrays.asList("e", "s", "r"));
-    private static final Set<String> LIMIT_KEYS = new HashSet<>(Arrays.asList("day", "payment", "allowance", "rollBudget"));
+    private static final Set<String> LIMIT_KEYS = new HashSet<>(Arrays.asList("day", "payment", "allowance", "rollBudget", "rate", "noPinWindow"));
 
     /** What the card already is, read before a fixture is checked (SimCard.context()). */
     static final class Context {
@@ -111,23 +116,27 @@ final class Fixture {
     }
 
     static final class Limits {
-        final long day, payment, allowance;
-        final int rollBudget;
+        final long day, payment, allowance, rate;
+        final int rollBudget, noPinWindow;
 
-        Limits(long day, long payment, long allowance, int rollBudget) {
+        Limits(long day, long payment, long allowance, int rollBudget, long rate, int noPinWindow) {
             this.day = day;
             this.payment = payment;
             this.allowance = allowance;
             this.rollBudget = rollBudget;
+            this.rate = rate;
+            this.noPinWindow = noPinWindow;
         }
 
-        /** SET_LIMIT's thirteen bytes: day ‖ payment ‖ allowance ‖ rollover budget. */
+        /** SET_LIMIT's eighteen bytes (2.3's one layout): day ‖ payment ‖ allowance ‖ rollover budget ‖ rate ‖ the no-PIN window's switch. */
         byte[] value() {
-            byte[] v = new byte[13];
+            byte[] v = new byte[18];
             putUint32(v, 0, day);
             putUint32(v, 4, payment);
             putUint32(v, 8, allowance);
             v[12] = (byte) rollBudget;
+            putUint32(v, 13, rate);
+            v[17] = (byte) noPinWindow;
             return v;
         }
     }
@@ -168,14 +177,16 @@ final class Fixture {
         if (root == null || !root.isJsonObject()) throw new IllegalArgumentException("fixture must be a JSON object");
         JsonObject o = root.getAsJsonObject();
         for (String k : o.keySet()) {
-            if ("puk".equals(k)) throw new IllegalArgumentException("puk: there is no PUK on a 2.0 card (D18); the owner's change-pin unblocks a PIN");
-            if ("appletVersion".equals(k)) throw new IllegalArgumentException("appletVersion: the 0.x version masks are gone (D18); the bridge is the 2.0 applet");
+            if ("puk".equals(k)) throw new IllegalArgumentException("puk: there is no PUK on a 2.x card (D18); the owner's change-pin unblocks a PIN");
+            if ("appletVersion".equals(k)) throw new IllegalArgumentException("appletVersion: the 0.x version masks are gone (D18); the bridge is the 2.3 applet");
             if (!KEYS.contains(k)) throw new IllegalArgumentException("unknown fixture key: " + k);
         }
 
         byte[] pin = optionalSecret(o, "pin", PIN_MIN_LEN, PIN_MAX_LEN);
         boolean blockedPin = optionalBoolean(o, "blockedPin");
         if (blockedPin && pin == null) throw new IllegalArgumentException("blockedPin requires pin");
+        // the card's first set-up (2.3, D196): the SET_PIN of a card with no PIN begins it, the fixture's SELECT ends it
+        boolean firstSetUp = pin != null && !card.pinSet;
 
         byte[] mint = null;
         if (o.has("mint")) {
@@ -192,6 +203,9 @@ final class Fixture {
             refundKey = hexField(o, "refundKey", 33, "fixture");
             if (refundKey[0] != 0x02 && refundKey[0] != 0x03) throw new IllegalArgumentException("refundKey must be a compressed point (02/03)");
         }
+        if (mint != null && !card.owned && card.pinSet) {
+            throw new IllegalArgumentException("mint: a card with no owner takes its record in its first set-up alone, which is over (SET_CARD answers 6A91): /reset first");
+        }
 
         OwnerKey owner = null;
         if (o.has("ownerKey")) {
@@ -204,6 +218,13 @@ final class Fixture {
         if (o.has("owner") && o.has("ownerKey")) throw new IllegalArgumentException("give owner or ownerKey, not both");
         if (owner != null && card.owned && !card.ownerKnown) {
             throw new IllegalArgumentException("the card already has an owner whose key the bridge does not hold: /reset first");
+        }
+        if (owner != null && !card.owned) {
+            // a claim (2.3, D187): under the PIN, in the card's first set-up, onto a record of the holder's
+            if (!firstSetUp) {
+                throw new IllegalArgumentException("owner: a card with no owner is claimed in its first set-up, under the PIN: give pin in the same fixture as owner, on a card with no PIN (/reset first)");
+            }
+            if (mint == null && !card.recordSet) throw new IllegalArgumentException("owner: a claim needs a record of the holder's: give mint (SET_OWNER answers 6A8C without one)");
         }
         byte[] anchor = null;
         if (o.has("anchor")) {
@@ -237,6 +258,7 @@ final class Fixture {
             long day = optionalUint32(lo, "day", "limits.day");
             long payment = optionalUint32(lo, "payment", "limits.payment");
             long allowance = optionalUint32(lo, "allowance", "limits.allowance");
+            long rate = optionalUint32(lo, "rate", "limits.rate");
             int budget = ROLL_BUDGET_DEFAULT;
             if (lo.has("rollBudget")) {
                 JsonElement b = lo.get("rollBudget");
@@ -245,10 +267,18 @@ final class Fixture {
                 }
                 budget = (int) b.getAsLong();
             }
+            int window = 0;
+            if (lo.has("noPinWindow")) {
+                JsonElement w = lo.get("noPinWindow");
+                if (!isInteger(w) || (w.getAsLong() != 0 && w.getAsLong() != 1)) {
+                    throw new IllegalArgumentException("limits.noPinWindow is 0 (the no-PIN window of 24 hours) or 1 (none)");
+                }
+                window = (int) w.getAsLong();
+            }
             if (allowance != 0 && !pinAfter) {
                 throw new IllegalArgumentException("limits.allowance needs a PIN on the card: the applet refuses a no-PIN allowance on a card with none (6985)");
             }
-            limits = new Limits(day, payment, allowance, budget);
+            limits = new Limits(day, payment, allowance, budget, rate, window);
         }
 
         List<Proof> proofs = new ArrayList<>();
@@ -271,8 +301,8 @@ final class Fixture {
                 proofs.add(proof);
             }
             if (!proofs.isEmpty()) {
+                if (pin == null) throw new IllegalArgumentException("proofs need pin: a load wants the PIN given in this tap (2.3), and a card with no PIN takes nothing (6A97)");
                 if (mint == null && !card.recordSet) throw new IllegalArgumentException("proofs need a record: give mint (LOAD_PROOF answers 6A8C without one)");
-                if (!ownedAfter) throw new IllegalArgumentException("proofs need an owner: nothing is loaded onto a card with no owner (6A90)");
             }
         }
 
@@ -296,6 +326,10 @@ final class Fixture {
             if (spentSlots.length > 0 && card.pinSet && pin == null) {
                 throw new IllegalArgumentException("spentSlots on a card with a PIN need the pin in this fixture: a payment is signed under it");
             }
+        }
+
+        if (blockedPin && owner == null && !card.owned) {
+            throw new IllegalArgumentException("blockedPin needs an owner: a card with no owner never blocks its PIN (D195), each wrong try makes the next wait");
         }
 
         return new Fixture(pin, mint, refundKey, owner, anchor, Collections.unmodifiableList(headers),

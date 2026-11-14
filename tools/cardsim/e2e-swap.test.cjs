@@ -1,11 +1,14 @@
 // node --test tools/cardsim/e2e-swap.test.cjs
 //
-// The 2.0 card against a real mint (DECISIONS D18; the architect's decision 6): pieces minted at a Nutshell mint,
-// format-4 SIG_ALL secrets locked to the card's key, their DLEQ checked; loaded with the mint's proof; paid with one
-// card signature over the inputs, a till's outputs and the card's own change; the swap accepted by the mint; the
-// change unblinded, checked and loaded back. Runs only with both a bridge and a mint, and the keyset the mint is
-// expected to use, which the test asserts rather than accepts (the architect's decision 6: prove the keyset-id length
-// forge's active keyset uses):
+// The 2.3 card against a real mint (DECISIONS D18, D183, D190, D197): the card set up as a wallet sets it up (the PIN,
+// the record, the owner's claim); the card's key for the date 0 read under the PIN (GROUP_KEYS); pieces minted at a
+// Nutshell mint as format-4 SIG_ALL secrets locked to that key, their DLEQ checked; loaded under the PIN with the
+// mint's proof; the mint's keyset taught to the card (KEYSET_KEYS), checked by the card against its ID; paid with one
+// card signature by that key over the inputs, a till's outputs and the card's own change, bound to the mint's key; the
+// swap accepted by the mint; then, in a new tap with no PIN, each opening's key shown in the keyset's tree and the
+// mint's answer handed to LOAD_CHANGE, which checks its DLEQ and unblinds it on the card. Runs only with both a bridge
+// and a mint, and the keyset the mint is expected to use, which the test asserts rather than accepts (the architect's
+// decision 6: prove the keyset-id length forge's active keyset uses):
 //
 //   EXPECT_KEYSET_ID_BYTES   8 or 33: the length of the mint's active sat keyset id (required)
 //   EXPECT_INPUT_FEE_PPK     that keyset's input_fee_ppk (optional; asserted when given)
@@ -35,7 +38,7 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const nodeCrypto = require("node:crypto")
-const { CardSim, constants } = require("./client.cjs")
+const { CardSim, constants, keysetFromMint } = require("./client.cjs")
 const cc = require("./cashu-crypto.cjs")
 
 const CARDSIM = process.env.CARDSIM_URL
@@ -82,7 +85,7 @@ function expandKeyset(prefixHex, keysets) {
   return found[0]
 }
 
-test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with one card signature and the card's own change, load the change back", run, async () => {
+test("a SIG_ALL swap at a Nutshell mint: mint to the card's key for the date 0 with DLEQ, load under the PIN, teach the keyset, pay with one card signature and the card's own change, load the change back with LOAD_CHANGE", run, async () => {
   const sim = new CardSim(CARDSIM, { timeoutMs: 15000 })
   await sim.waitReady()
 
@@ -97,13 +100,23 @@ test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with on
   console.log(`# mint keyset ${keyset.id} (${keyset.id.length / 2} bytes), input_fee_ppk ${keyset.input_fee_ppk || 0}`)
   const stored = keyset.id.slice(0, 16)
   assert.equal(expandKeyset(stored, keysets).id, keyset.id, "the card's 8 bytes name exactly this keyset")
-  const keys = (await mint("GET", `/v1/keys/${keyset.id}`)).keysets[0].keys
+  const served = (await mint("GET", `/v1/keys/${keyset.id}`)).keysets[0]
+  const keys = served.keys
+  // the keyset as KEYSET_KEYS teaches it, its keys checked against its ID here first (the fee is in a v2 ID's tail)
+  const ks = keysetFromMint(served, { inputFeePpk: keyset.input_fee_ppk || 0, finalExpiry: keyset.final_expiry === null ? undefined : keyset.final_expiry })
+  assert.equal(ks.id.toString("hex"), keyset.id)
 
-  // a fresh card, set up as flash-mobile does it, and its key
-  const { pubkey } = await sim.reset()
+  // a fresh card, set up as a wallet sets it up: the PIN, the record and the owner's claim, in its first set-up
+  const { pubkey: P } = await sim.reset()
   await sim.fixture({ pin: "1234", mint: MINT, owner: true })
+  // the card's key for the date 0 (undated pieces), under the PIN: what the pieces are locked to, never P
+  await sim.select()
+  await sim.verifyPin("1234")
+  const { t, key, refund } = await sim.groupKeys(0)
+  assert.equal(cc.hexOf(cc.tweakedKey(P, t)), cc.hexOf(key), "GROUP_KEYS answers P + t*G")
+  assert.deepEqual(refund, Buffer.alloc(33), "an undated piece names no refund key")
 
-  // mint 64 sats to the card: format-4 SIG_ALL secrets locked to its key, each signature's DLEQ checked
+  // mint 64 sats to the card: format-4 SIG_ALL secrets locked to its key for the date 0, each signature's DLEQ checked
   const quote = await mint("POST", "/v1/mint/quote/bolt11", { amount: 64, unit: "sat" })
   for (let i = 0; i < 50; i++) {
     const q = await mint("GET", `/v1/mint/quote/bolt11/${quote.quote}`)
@@ -113,7 +126,7 @@ test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with on
   const amounts = [32, 16, 8, 4, 4]
   const blinded = amounts.map(amount => {
     const nonce = cc.hexOf(nodeCrypto.randomBytes(32))
-    const secret = cc.cardSecret(nonce, pubkey)
+    const secret = cc.cardSecret(nonce, key)
     return { amount, nonce, secret, ...cc.blind(secret) }
   })
   const minted = await mint("POST", "/v1/mint/bolt11", {
@@ -131,20 +144,28 @@ test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with on
     return { keysetId: stored, amount: sig.amount, nonce: b.nonce, C, dleq: { e: sig.dleq.e, s: sig.dleq.s, r } }
   })
 
-  // onto the card, each with the mint's proof (LOAD_PROOF P1 = 1)
-  const loaded = await sim.fixture({ proofs: pieces })
+  // onto the card under the PIN (P2 02, the word on keys per load), each with the mint's proof (P1 1)
+  const loaded = await sim.fixture({ pin: "1234", proofs: pieces })
   assert.equal(loaded.balance, 64)
 
   // a reader checks each piece offline from what the card gives back: the nonce, C and the mint's proof
   for (const slot of loaded.slots.filter(s => s.status === "unspent")) {
-    const secret = cc.cardSecret(slot.nonce, pubkey)
+    const secret = cc.cardSecret(slot.nonce, key)
     const K = keys[String(slot.amount)]
     assert.ok(slot.dleq, `slot ${slot.slot} keeps its proof`)
     assert.ok(cc.verifyProofDleq(secret, slot.C, slot.dleq.e, slot.dleq.s, slot.dleq.r, K), `slot ${slot.slot}: real, by the mint's key`)
     assert.equal(slot.keysetId, stored)
   }
 
-  // a till: pay 24 with the pieces of 32 and 16, its own outputs, the card's change, and the mint's fee
+  // the holder's phone teaches the card the mint's keyset (the PIN in the tap): change is made only in a taught one
+  await sim.select()
+  await sim.verifyPin("1234")
+  await assert.rejects(
+    (async () => { await sim.spendAllBegin([0, 1]); await sim.spendAllChange(16, keys["16"], ks.keyset8) })(),
+    e => e.sw === constants.SW.KEYS_NOT_SHOWN, "a keyset not taught: no change in it (6A9F)")
+  assert.deepEqual(await sim.teachKeyset(ks), ks.id, "the card works out the keyset's ID from its keys")
+
+  // a till: pay 24 with the pieces of 32 and 16, its own outputs, the card's change bound to the mint's keys, and the fee
   const fee = Math.ceil(((keyset.input_fee_ppk || 0) * 2) / 1000)
   const price = 24
   const changeTotal = 48 - price - fee
@@ -153,16 +174,18 @@ test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with on
     const b = cc.blind(secret)
     return { amount, secret, r: b.r, B_: cc.hexOf(b.B_) }
   })
-  await sim.select()
-  await sim.verifyPin("1234")
-  assert.equal(await sim.spendAllBegin([0, 1]), 48)
-  await sim.spendAllOutputs(tillOutputs.map(o => ({ amount: o.amount, B_: o.B_ })))
+  const begun = await sim.spendAllBegin([0, 1])
+  assert.equal(begun.total, 48)
+  assert.deepEqual(begun.t, t, "the payment's date is 0: the t GROUP_KEYS answered")
+  const paymentKey = cc.tweakedKey(P, begun.t)
+  await sim.spendAllOutputs(tillOutputs.map(o => ({ amount: o.amount, B_: o.B_ })), ks.keyset8)
   const change = []
-  for (const amount of split(changeTotal)) change.push({ amount, B_: cc.hexOf(await sim.spendAllChange(amount)) })
+  for (const amount of split(changeTotal)) change.push({ amount, B_: cc.hexOf(await sim.spendAllChange(amount, keys[String(amount)], ks.keyset8)) })
   const { signature } = await sim.spendAllSign()
-  const inputs = loaded.slots.slice(0, 2).map(s => ({ amount: s.amount, secret: cc.cardSecret(s.nonce, pubkey), C: s.C }))
+  const inputs = loaded.slots.slice(0, 2).map(s => ({ amount: s.amount, secret: cc.cardSecret(s.nonce, paymentKey), C: s.C }))
   const outputs = [...tillOutputs.map(o => ({ amount: o.amount, B_: o.B_ })), ...change]
-  assert.ok(cc.schnorrVerify(Buffer.from(pubkey, "hex"), cc.sigAllMessage(inputs, outputs), signature), "one SIG_ALL signature, checked here first")
+  assert.ok(cc.verifyPayment(paymentKey, inputs, outputs, signature), "one SIG_ALL signature by P + t*G, checked here first")
+  assert.ok(!cc.schnorrVerify(P, cc.sigAllMessage(inputs, outputs), signature), "and not by P")
 
   // the swap: the signature is the first input's witness, the others carry none, the outputs in the order signed
   const swapped = await mint("POST", "/v1/swap", {
@@ -185,27 +208,33 @@ test("a SIG_ALL swap at a Nutshell mint: mint to the card with DLEQ, pay with on
     assert.ok(cc.verifyBlindDleq(o.B_, sig.C_, sig.dleq.e, sig.dleq.s, keys[String(o.amount)]), `the till's ${o.amount}`)
   })
 
-  // the change: unblinded with the openings the card kept, checked, and loaded back in the tap after the payment (no PIN)
+  // the change, in a new tap with no PIN: each opening (no blinding factor in it), its key shown in the keyset's tree,
+  // then the mint's answer, which the card checks (DLEQ) and unblinds itself
   await sim.select()
-  const openings = []
-  for (let page = 0; ; page++) {
-    const got = await sim.getChange(page)   // three openings to a page
-    openings.push(...got)
-    if (got.length < 3) break
-  }
+  const openings = await sim.owedChange()
   assert.equal(openings.length, change.length)
   for (let i = 0; i < change.length; i++) {
     const sig = swapped.signatures[tillOutputs.length + i]
-    const o = openings[i]
-    const K = keys[String(o.amount)]
-    assert.ok(cc.verifyBlindDleq(change[i].B_, sig.C_, sig.dleq.e, sig.dleq.s, K), "the change's DLEQ")
-    const C = cc.hexOf(cc.unblind(sig.C_, Buffer.from(o.r, "hex"), K))
-    const slot = await sim.loadProof(o.keysetId, o.amount, o.nonce, C, o.date, { e: sig.dleq.e, s: sig.dleq.s, r: o.r })
-    assert.ok(slot < constants.MAX_PROOFS)
+    const o = openings.find(x => x.B_ === change[i].B_)
+    assert.ok(o, `the opening of the change's ${change[i].amount}`)
+    assert.equal(o.K, keys[String(o.amount)], "bound to the mint's key for its amount")
+    assert.equal(o.keysetId, stored)
+    assert.ok(cc.verifyBlindDleq(o.B_, sig.C_, sig.dleq.e, sig.dleq.s, o.K), "the change's DLEQ, checked here too")
+    await sim.showOpeningKey(o, ks)
+    const got = await sim.loadChange(o.number, sig.C_, o.K, sig.dleq.e, sig.dleq.s)
+    assert.equal(got.piece.amount, o.amount)
+    assert.equal(got.piece.keysetId, stored)
+    assert.equal(got.proofKept, true)
+    // the piece is the card's own: its secret names the payment's key, and the proof it kept holds as a wallet checks it
+    const secret = cc.cardSecret(got.piece.nonce, paymentKey, got.piece.date)
+    const dleq = await sim.getDleq(got.slot)
+    assert.ok(cc.verifyProofDleq(secret, got.piece.C, dleq.subarray(1, 33), dleq.subarray(33, 65), dleq.subarray(65, 97), o.K), "the change piece is real, by the mint's key")
+    const [state] = (await mint("POST", "/v1/checkstate", { Ys: [cc.hexOf(cc.compressed(cc.hashToCurve(Buffer.from(secret, "utf8"))))] })).states
+    assert.equal(state.state, "UNSPENT", "and unspent at the mint")
   }
   const after = await sim.state()
   assert.equal(after.balance, 64 - 48 + changeTotal, "the change is back on the card")
-  assert.deepEqual(await sim.getChange(0), [], "and its openings let go")
+  assert.deepEqual(await sim.owedChange(), [], "and its openings let go")
 })
 
 test("the run names the keyset it expects: EXPECT_KEYSET_ID_BYTES is 8 or 33, and a fee is a whole number", () => {

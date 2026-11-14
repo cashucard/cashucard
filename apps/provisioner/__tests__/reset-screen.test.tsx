@@ -52,6 +52,8 @@ const card: ResetReview = {
   sealed: true,
   mint: 'https://mint.test',
   recordDigest: 'ab'.repeat(32),
+  changeOwed: false,
+  version: '2.2',
 };
 let app: AppStateShape,
   flow: ReturnType<typeof useProvisioning>,
@@ -126,6 +128,8 @@ async function mount(overrides: Partial<ResetReview> = {}) {
           options={{
             storage,
             resetStorage,
+            // the build's own gate follows the tracked load file (releaseGates.ts); these tests are of the reset screen
+            hardwareValidated: true,
             uuid: () => uuid(++id),
             resetServiceFor: () => service,
             resetWithCard: async callback => {
@@ -221,6 +225,36 @@ test('a card with value offers holder recovery instructions and no reset prepara
   await press('reset-inspect');
   expect(tree.root.findAllByProps({testID: 'reset-prepare'})).toHaveLength(0);
   expect(f.service.authorize).not.toHaveBeenCalled();
+  expect(f.service.keys).not.toHaveBeenCalled();
+});
+
+test('a card owed change says how to bring it home and offers no reset preparation', async () => {
+  for (const [i, over] of [
+    {spent: 0, owner: true, changeOwed: true},
+    {spent: 0, owner: true, changeOwed: true, version: '2.3'},
+  ].entries()) {
+    if (i > 0) {
+      await act(async () => {
+        tree.unmount();
+      });
+    }
+    const f = await mount(over);
+    await press('reset-inspect');
+    const words = JSON.stringify(tree.toJSON());
+    expect(words).toContain('Bring the change home first');
+    expect(words).toContain('the wallet brings the change home');
+    expect(tree.root.findAllByProps({testID: 'reset-prepare'})).toHaveLength(0);
+    expect(f.service.authorize).not.toHaveBeenCalled();
+    expect(f.service.keys).not.toHaveBeenCalled();
+  }
+});
+test("a 2.3 card's spent entries are left to its holder wallet: no settlement check, no reset preparation", async () => {
+  const f = await mount({spent: 13, version: '2.3'});
+  await press('reset-inspect');
+  expect(JSON.stringify(tree.toJSON())).toContain(
+    'The holder wallet frees this card’s spent entries',
+  );
+  expect(tree.root.findAllByProps({testID: 'reset-prepare'})).toHaveLength(0);
   expect(f.service.keys).not.toHaveBeenCalled();
 });
 

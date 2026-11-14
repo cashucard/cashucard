@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * SimCard against the real 2.0 applet. Every assertion is about bytes the app would see over the bridge, so the
+ * SimCard against the real 2.3 applet. Every assertion is about bytes the app would see over the bridge, so the
  * raw-byte path (Simulator.transmitCommand on a byte[]) is checked against what the applet suite reports.
  */
 class SimCardTest {
@@ -26,9 +26,10 @@ class SimCardTest {
     static final String NONCE_A = "ab".repeat(32);
     static final String NONCE_B = "cd".repeat(32);
     static final String NONCE_C = "ef".repeat(32);
-    static final String C_A = "02" + "11".repeat(32);
-    static final String C_B = "03" + "22".repeat(32);
-    static final String C_C = "02" + "33".repeat(32);
+    // points of the curve, G, 2G and 3G: a 2.3 card checks a piece's C is one (6A80)
+    static final String C_A = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+    static final String C_B = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
+    static final String C_C = "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
     static final String MINT = "http://127.0.0.1:3338";
     static final String SETUP = "\"pin\":\"1234\",\"mint\":\"" + MINT + "\",\"owner\":true";
 
@@ -88,11 +89,12 @@ class SimCardTest {
     // ── fresh card ──────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("a fresh card answers SELECT by the card's applet's whole AID, F0 CASHUCARD 01, with 02 02 9000")
+    @DisplayName("a fresh card answers SELECT by the card's applet's whole AID, F0 CASHUCARD 01, with 02 03 9000")
     void selectAnswersVersion() {
-        assertEquals("02029000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
         assertEquals("00A404000BF043415348554341524401", Hex.format(SimCard.SELECT));
-        assertEquals("2.2", card.state().get("version").getAsString());
+        assertEquals("2.3", card.state().get("version").getAsString());
+        assertEquals("ff03", card.state().get("profiles").getAsString(), "every profile of 2.3, keys per load among them");
     }
 
     @Test
@@ -104,7 +106,7 @@ class SimCardTest {
         assertEquals("9000", Hex.format(card.transmit(Hex.parse("00A404000AF043415348554341524400"))), "with an Le as well");
         assertEquals("6D00", Hex.format(card.transmit(GET_PUBKEY_LE21)));
         // the whole AID then reaches the card's applet, and the card answers again
-        assertEquals("02029000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
         assertEquals(43, data(card.transmit(GET_INFO_LONG)).length);
         // the opener by its own whole AID is the same applet
         assertEquals("9000", Hex.format(card.transmit(Hex.parse("00A404000B" + SimCard.OPENER_HEX))));
@@ -117,13 +119,13 @@ class SimCardTest {
         assertEquals(SimCard.AID_HEX, card.selected());
         assertEquals("9000", Hex.format(card.transmit(SimCard.SELECT_PACKAGE)));
         assertEquals(SimCard.OPENER_HEX, card.selected(), "the package AID selected the opener");
-        assertEquals("2.2", card.state().get("version").getAsString());
+        assertEquals("2.3", card.state().get("version").getAsString());
         assertEquals(SimCard.OPENER_HEX, card.selected());
         assertEquals("6D00", Hex.format(card.transmit(GET_INFO_LONG)), "the opener is still what the app reaches");
 
         assertEquals(0x9000, SimCard.sw(card.transmit(Hex.parse("00A4040007" + SimCard.TAG_HEX + "00"))));
         assertEquals(SimCard.TAG_HEX, card.selected());
-        assertEquals("2.2", card.state().get("version").getAsString());
+        assertEquals("2.3", card.state().get("version").getAsString());
         assertEquals(SimCard.TAG_HEX, card.selected());
         // a SELECT that finds nothing leaves the selection where it was
         card.transmit(Hex.parse("00A4040007D2760000850102"));
@@ -143,7 +145,7 @@ class SimCardTest {
         assertEquals(0x9000, SimCard.sw(before));
         assertEquals(24, before.length, "the NDEF file's 22 bytes and the status word");
 
-        assertEquals("2.2", card.state().get("version").getAsString());
+        assertEquals("2.3", card.state().get("version").getAsString());
         assertEquals(SimCard.TAG_HEX, card.selected());
         assertArrayEquals(before, card.transmit(READ_NDEF), "the file the app chose is still chosen after /state");
 
@@ -168,7 +170,7 @@ class SimCardTest {
 
         // nor across a stay on another instance
         assertEquals("9000", Hex.format(card.transmit(SELECT_NDEF_FILE)));
-        assertEquals("02029000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
         assertEquals(0x9000, SimCard.sw(card.transmit(SELECT_TAG)));
         card.state();
         assertEquals("6986", Hex.format(card.transmit(READ_NDEF)));
@@ -190,7 +192,7 @@ class SimCardTest {
 
         FixtureException e = assertThrows(FixtureException.class, () -> apply("{\"pin\":\"9999\"}"), "VERIFY_PIN of another PIN");
         assertEquals("VERIFY_PIN", e.step);
-        assertEquals(0x63C2, e.sw);
+        assertEquals(0x63C1, e.sw, "a card with no owner: one wrong try in a row");
         assertEquals(SimCard.AID_HEX, card.selected(), "the fixture's SELECT moved the selection to the card's applet");
 
         byte[] before = card.transmit(READ_NDEF);
@@ -217,7 +219,7 @@ class SimCardTest {
         com.licel.jcardsim.smartcardio.CardSimulator raw = new com.licel.jcardsim.smartcardio.CardSimulator();
         raw.installApplet(com.licel.jcardsim.utils.AIDUtil.create(SimCard.OPENER_HEX), me.flashapp.cashu.Opener.class);
         raw.installApplet(com.licel.jcardsim.utils.AIDUtil.create(SimCard.AID_HEX), me.flashapp.cashu.CashuApplet.class);
-        assertEquals("02029000", Hex.format(raw.transmitCommand(SimCard.SELECT_PACKAGE)),
+        assertEquals("02039000", Hex.format(raw.transmitCommand(SimCard.SELECT_PACKAGE)),
             "if jCardSim ever gives the first instance the partial name itself, SimCard.resolveSelect can go");
         // the bridge, with the opener made first, answers as the chip does (a new SimCard: jCardSim's runtime is per
         // simulator, and the one made last is the current one)
@@ -279,13 +281,13 @@ class SimCardTest {
     @DisplayName("the NFC tag is installed beside the card: its name answers 9000 while the owner leaves it on")
     void theTagIsInstalled() {
         assertEquals(0x9000, SimCard.sw(card.transmit(Hex.parse("00A4040007D276000085010100"))));
-        assertEquals("02029000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
     }
 
     // ── pieces ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("{pin, mint, owner, proofs x3, spentSlots:[1]} → status 01 02 01, balance excludes slot 1, CLEAR_SPENT under the PIN frees 1")
+    @DisplayName("{pin, mint, owner, proofs x3, spentSlots:[1]}: the claim, then the payment in a new time in the field → status 01 02 01, balance excludes slot 1, the spent piece said to the PIN alone, CLEAR_SPENT under the PIN frees 1")
     void proofsAndSpentSlots() throws FixtureException {
         apply("{" + SETUP + ",\"proofs\":" + threeProofs() + ",\"spentSlots\":[1]}");
 
@@ -304,15 +306,20 @@ class SimCardTest {
         assertEquals(128, slots.size(), "/state shows 128 slots");
         JsonObject slot1 = slots.get(1).getAsJsonObject();
         assertEquals("spent", slot1.get("status").getAsString());
-        assertEquals(KEYSET, slot1.get("keysetId").getAsString());
+        assertFalse(slot1.has("nonce"), "a spent place is history: with no PIN in the tap, /state says no piece for it");
+        assertEquals(NONCE_A, slots.get(0).getAsJsonObject().get("nonce").getAsString(), "an unspent one is said to anyone");
+        assertFalse(slots.get(3).getAsJsonObject().has("nonce"), "empty slots carry no proof fields");
+        assertFalse(s.get("changeOwed").getAsBoolean(), "a payment with no outputs owes no change");
+
+        // 2.3: no tap is the tap after a payment; CLEAR_SPENT wants the PIN given in this tap
+        assertEquals(0x6982, SimCard.sw(card.transmit(CLEAR_SPENT)));
+        assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)));
+        slot1 = card.state().getAsJsonArray("slots").get(1).getAsJsonObject();
+        assertEquals(KEYSET, slot1.get("keysetId").getAsString(), "the PIN in the app's tap: /state says the spent piece");
         assertEquals(16, slot1.get("amount").getAsLong());
         assertEquals(NONCE_B, slot1.get("nonce").getAsString());
         assertEquals(C_B, slot1.get("C").getAsString());
         assertEquals(0, slot1.get("date").getAsLong());
-        assertFalse(slots.get(3).getAsJsonObject().has("nonce"), "empty slots carry no proof fields");
-
-        // the fixture's payment left the change note: the tap after a payment may load and free with no PIN (spec 8.2)
-        assertEquals(1, data(card.transmit(Hex.parse("B001000000")))[29], "GET_INFO byte 29: the change grant is in this tap");
         byte[] cleared = card.transmit(CLEAR_SPENT);
         assertEquals(0x9000, SimCard.sw(cleared));
         assertEquals(1, cleared[0], "CLEAR_SPENT frees the one spent slot");
@@ -326,6 +333,7 @@ class SimCardTest {
         apply("{\"pin\":\"1234\",\"proofs\":[" + proof(NONCE_B, C_B, 16) + "," + proof(NONCE_C, C_C, 32) + "],\"spentSlots\":[0]}");
 
         assertEquals("010201", Hex.format(data(card.transmit(GET_SLOT_STATUS)), 0, 3));
+        assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)), "the PIN, so that /state says the spent piece");
         JsonArray slots = card.state().getAsJsonArray("slots");
         assertEquals(NONCE_A, slots.get(0).getAsJsonObject().get("nonce").getAsString());
         assertEquals("unspent", slots.get(0).getAsJsonObject().get("status").getAsString());
@@ -335,12 +343,29 @@ class SimCardTest {
     }
 
     @Test
-    @DisplayName("a card with no PIN is loaded under the owner's grant, and its pieces are spent with no PIN")
+    @DisplayName("a card with no PIN takes and pays nothing: proofs without pin are a 400, and the card answers 6A97 to a load and a payment")
     void aNoPinCard() throws FixtureException {
-        apply("{\"mint\":\"" + MINT + "\",\"owner\":true,\"proofs\":" + threeProofs() + ",\"spentSlots\":[2]}");
-        JsonObject s = card.state();
-        assertEquals(0, s.get("pinState").getAsInt());
-        assertEquals(24, s.get("balance").getAsLong());
+        assertThrows(IllegalArgumentException.class, () -> fixture("{\"mint\":\"" + MINT + "\",\"owner\":true,\"proofs\":" + threeProofs() + "}"));
+        apply("{\"mint\":\"" + MINT + "\"}");
+        byte[] piece = Fixture.parse("{\"pin\":\"1234\",\"proofs\":[" + proof(NONCE_A, C_A, 8) + "]}", card.context()).proofs.get(0).payload();
+        assertEquals(0x6A97, SimCard.sw(card.transmit(SimCard.apdu(0x30, 0, 0x02, piece, 0x01))), "LOAD_PROOF on a card with no PIN");
+        assertEquals(0x6A97, SimCard.sw(card.transmit(SimCard.apdu(0x22, 0x02, 0, new byte[] { 0 }, 0x45))), "SPEND_ALL_BEGIN on a card with no PIN");
+        assertEquals(0, card.state().get("pinState").getAsInt());
+        // the record set before the first PIN, the first set-up then claims it: pin and owner in one fixture
+        apply("{\"pin\":\"1234\",\"owner\":true,\"proofs\":[" + proof(NONCE_A, C_A, 8) + "]}");
+        assertEquals(8, card.state().get("balance").getAsLong());
+    }
+
+    @Test
+    @DisplayName("after a fixture with an owner's claim the card pays: the fixture took it out of the field and back (a claim's time in the field pays nothing)")
+    void aClaimedCardPaysAfterTheFixture() throws FixtureException {
+        apply("{" + SETUP + ",\"proofs\":[" + proof(NONCE_A, C_A, 8) + "]}");
+        assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)));
+        byte[] begun = card.transmit(SimCard.apdu(0x22, 0x02, 0, new byte[] { 0 }, 0x45));
+        assertEquals(0x9000, SimCard.sw(begun), "SPEND_ALL_BEGIN, not 6985");
+        assertEquals(69, data(begun).length, "2.3: the worth, t and the date's refund key");
+        assertEquals(8, SimCard.readUint32(begun, 0));
+        assertEquals(0x6A86, SimCard.sw(card.transmit(SimCard.apdu(0x22, 0x00, 0, new byte[] { 0 }, 0x04))), "P1 00: no word on keys per load");
     }
 
     @Test
@@ -349,7 +374,7 @@ class SimCardTest {
         StringBuilder proofs = new StringBuilder("[");
         for (int i = 0; i < 128; i++) {
             if (i > 0) proofs.append(',');
-            proofs.append(proof(String.format("%02x", i).repeat(32), "02" + String.format("%02x", i).repeat(32), 1L << (i % 20)));
+            proofs.append(proof(String.format("%02x", i).repeat(32), C_A, 1L << (i % 20)));
         }
         proofs.append(']');
         apply("{" + SETUP + ",\"proofs\":" + proofs + "}");
@@ -359,8 +384,8 @@ class SimCardTest {
         assertEquals(128, card.state().getAsJsonObject("counts").get("unspent").getAsInt());
 
         assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)));
-        byte[] extra = fixture("{\"proofs\":[" + proof("ff".repeat(32), C_A, 2) + "]}").proofs.get(0).payload();
-        assertEquals(0x6A84, SimCard.sw(card.transmit(SimCard.apdu(0x30, 0, 0, extra, 0x01))));
+        byte[] extra = fixture("{\"pin\":\"1234\",\"proofs\":[" + proof("ff".repeat(32), C_A, 2) + "]}").proofs.get(0).payload();
+        assertEquals(0x6A84, SimCard.sw(card.transmit(SimCard.apdu(0x30, 0, 0x02, extra, 0x01))));
     }
 
     @Test
@@ -380,7 +405,7 @@ class SimCardTest {
     @DisplayName("a piece with the mint's proof is loaded with P1 = 1: /state and GET_DLEQ give the proof back; a dated piece with the record's refund key")
     void dleqAndDate() throws FixtureException {
         String e = "01".repeat(32), sProof = "02".repeat(32), r = "03".repeat(32);
-        apply("{" + SETUP + ",\"refundKey\":\"02" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\","
+        apply("{" + SETUP + ",\"refundKey\":\"" + C_A + "\","
             + "\"proofs\":[{\"keysetId\":\"" + KEYSET + "\",\"amount\":8,\"nonce\":\"" + NONCE_A + "\",\"C\":\"" + C_A
             + "\",\"date\":1900000000,\"dleq\":{\"e\":\"" + e + "\",\"s\":\"" + sProof + "\",\"r\":\"" + r + "\"}},"
             + proof(NONCE_B, C_B, 16) + "]}");
@@ -403,7 +428,7 @@ class SimCardTest {
     @DisplayName("{owner, anchor, headers, limits}: the TEST owner key, the clock at the anchor then the headers, the limits and the rollover budget")
     void ownerClockAndLimits() throws FixtureException {
         apply("{" + SETUP + ",\"anchor\":\"" + HEADERS.get(2) + "\",\"headers\":[\"" + HEADERS.get(3) + "\",\"" + HEADERS.get(4) + "\"],"
-            + "\"limits\":{\"day\":5000,\"payment\":1000,\"allowance\":250,\"rollBudget\":3}}");
+            + "\"limits\":{\"day\":5000,\"payment\":1000,\"allowance\":250,\"rollBudget\":3,\"rate\":95000,\"noPinWindow\":1}}");
         JsonObject s = card.state();
         assertTrue(s.get("hasOwner").getAsBoolean());
         assertTrue(s.get("testOwner").getAsBoolean());
@@ -413,8 +438,15 @@ class SimCardTest {
         assertEquals(250, s.get("allowance").getAsLong());
         assertEquals(3, s.get("rollBudget").getAsInt());
         assertEquals(0, s.get("rolls").getAsInt());
-        assertTrue(s.get("allowanceArmed").getAsBoolean(), "armed by the PIN and the owner's proofs");
+        assertEquals(1, s.get("noPinWindow").getAsInt(), "SET_LIMIT's eighteenth byte");
+        assertFalse(s.get("allowanceArmed").getAsBoolean(), "the arming is history: zeros to /state with no PIN in the tap");
         assertEquals(MINT, s.get("mint").getAsString());
+        // the PIN in the app's tap: the card says its history, the arming among it
+        assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)));
+        assertTrue(card.state().get("allowanceArmed").getAsBoolean(), "armed by the PIN and the owner's proofs");
+        byte[] info = data(card.transmit(Hex.parse("B001040000")));
+        assertEquals(59, info.length);
+        assertEquals(0, SimCard.readUint32(info, 44), "the rate is the holder's: the PIN alone on an owned card is told zeros");
     }
 
     @Test
@@ -453,7 +485,7 @@ class SimCardTest {
     @Test
     @DisplayName("blockedPin with PIN 0000 uses a different wrong PIN")
     void blockedPinZeroZeroZeroZero() throws FixtureException {
-        apply("{\"pin\":\"0000\",\"blockedPin\":true}");
+        apply("{\"pin\":\"0000\",\"mint\":\"" + MINT + "\",\"owner\":true,\"blockedPin\":true}");
         assertEquals(2, card.state().get("pinState").getAsInt());
     }
 
@@ -474,7 +506,7 @@ class SimCardTest {
         apply("{" + SETUP + ",\"proofs\":[" + proof(NONCE_A, C_A, 8) + "]}");
         long gen = card.generation();
 
-        FixtureException e = assertThrows(FixtureException.class, () -> apply("{\"proofs\":[" + proof(NONCE_A, C_A, 8) + "]}"));
+        FixtureException e = assertThrows(FixtureException.class, () -> apply("{\"pin\":\"1234\",\"proofs\":[" + proof(NONCE_A, C_A, 8) + "]}"));
         assertEquals("LOAD_PROOF", e.step);
         assertEquals(0x6A94, e.sw);
         assertEquals(gen + 1, card.generation(), "generation moves on failure too");
@@ -512,8 +544,13 @@ class SimCardTest {
             "{" + SETUP + ",\"proofs\":[" + proof(NONCE_A, C_A, 8) + "],\"spentSlots\":[7]}",      // slot 7 of 1
             "{" + SETUP + ",\"proofs\":" + threeProofs() + ",\"spentSlots\":[1,1]}",               // repeated slot
             "{\"spentSlots\":[0]}",                                                                // no proofs
-            "{\"mint\":\"" + MINT + "\",\"proofs\":" + threeProofs() + "}",                       // no owner
-            "{\"owner\":true,\"proofs\":" + threeProofs() + "}",                                  // no record
+            "{\"mint\":\"" + MINT + "\",\"proofs\":" + threeProofs() + "}",                       // no pin: a card with no PIN takes nothing
+            "{\"pin\":\"1234\",\"proofs\":" + threeProofs() + "}",                                // no record
+            "{\"pin\":\"1234\",\"owner\":true}",                                                // a claim needs a record of the holder's
+            "{\"mint\":\"" + MINT + "\",\"owner\":true}",                                       // a claim is under the PIN
+            "{\"pin\":\"1234\",\"blockedPin\":true}",                                            // a card with no owner never blocks
+            "{" + SETUP + ",\"limits\":{\"noPinWindow\":2}}",                                    // the switch is 0 or 1
+            "{" + SETUP + ",\"limits\":{\"rate\":-1}}",                                          // a rate is four bytes
             "{" + SETUP + ",\"proofs\":[{\"keysetId\":\"" + KEYSET + "\",\"amount\":8,\"nonce\":\"" + NONCE_A + "\",\"C\":\"" + C_A + "\",\"date\":5}]}", // dated, no refund key
             "{" + SETUP + ",\"proofs\":[{\"keysetId\":\"" + KEYSET + "\",\"amount\":8,\"nonce\":\"" + NONCE_A + "\",\"C\":\"" + C_A + "\",\"dleq\":{\"e\":\"" + "00".repeat(32) + "\",\"s\":\"" + "00".repeat(32) + "\",\"r\":\"" + "00".repeat(32) + "\"}}]}", // zero proof
             "{" + SETUP + ",\"proofs\":[{\"keysetId\":\"" + KEYSET + "\",\"amount\":8,\"nonce\":\"" + NONCE_A + "\",\"C\":\"" + C_A + "\",\"dleq\":{\"e\":\"" + "01".repeat(32) + "\"}}]}", // half a proof
@@ -548,12 +585,19 @@ class SimCardTest {
     }
 
     @Test
-    @DisplayName("a fixture is checked against the card as it is: a PIN set earlier lets an allowance through, an owner set earlier lets limits through")
+    @DisplayName("a fixture is checked against the card as it is: a PIN set earlier lets an allowance through, an owner set earlier lets limits through, a first set-up over refuses a record and a claim")
     void validationReadsTheCard() throws FixtureException {
         apply("{" + SETUP + "}");
         fixture("{\"limits\":{\"day\":100,\"allowance\":50}}");
         assertThrows(IllegalArgumentException.class, () -> fixture("{\"proofs\":[" + proof(NONCE_A, C_A, 8) + "],\"spentSlots\":[0]}"),
-            "spending on a card with a PIN needs the pin in the fixture");
+            "loading and spending need the pin in the fixture");
+        fixture("{\"pin\":\"1234\",\"mint\":\"" + MINT + "\"}");   // an owned card: SET_CARD under the owner's proof
+
+        card.reset();
+        apply("{\"pin\":\"1234\",\"mint\":\"" + MINT + "\"}");   // a card with no owner, its first set-up over
+        assertThrows(IllegalArgumentException.class, () -> fixture("{\"pin\":\"1234\",\"mint\":\"" + MINT + "\"}"), "its record is set once");
+        assertThrows(IllegalArgumentException.class, () -> fixture("{\"pin\":\"1234\",\"owner\":true}"), "and it is never claimed");
+        fixture("{\"pin\":\"1234\",\"proofs\":[" + proof(NONCE_A, C_A, 8) + "]}");   // a holder with no phone: loads under the PIN
     }
 
     @Test
@@ -604,7 +648,7 @@ class SimCardTest {
         for (int i = 0; i < 128; i++) {
             assertEquals("empty", s.getAsJsonArray("slots").get(i).getAsJsonObject().get("status").getAsString());
         }
-        assertEquals("02029000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
     }
 
     @Test

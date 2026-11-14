@@ -127,8 +127,9 @@ class SchnorrHWMathTest {
     void theRawProductsMatchBigInteger() throws Exception {
         java.lang.reflect.Method mul = SchnorrHW.class.getDeclaredMethod("mul256x256",
             byte[].class, short.class, byte[].class, short.class, byte[].class, short.class);
+        // mulByDelta works the rows from its last argument on (0: all of them)
         java.lang.reflect.Method byDelta = SchnorrHW.class.getDeclaredMethod("mulByDelta",
-            byte[].class, short.class, byte[].class, short.class);
+            byte[].class, short.class, byte[].class, short.class, short.class);
         mul.setAccessible(true);
         byDelta.setAccessible(true);
         BigInteger delta = BigInteger.ONE.shiftLeft(256).subtract(N);
@@ -144,7 +145,7 @@ class SchnorrHWMathTest {
             assertEquals(from32(a).multiply(from32(b)), new BigInteger(1, out), "a×b at " + i);
             byte[] d = new byte[64];
             java.util.Arrays.fill(d, (byte) 0xA5);
-            byDelta.invoke(null, a, (short) 0, d, (short) 0);
+            byDelta.invoke(null, a, (short) 0, d, (short) 0, (short) 0);
             assertEquals(from32(a).multiply(delta), new BigInteger(1, d), "a×DELTA at " + i);
         }
     }
@@ -177,20 +178,18 @@ class SchnorrHWMathTest {
     }
 
     /**
-     * D21's reach (review of PR #34). D21 took the branches out of the two multiplies and nothing else: the reductions on
-     * the same signing path still branch on values derived from the key and the nonce (e·d, k + e·d, k). An earlier
-     * spec sentence claimed the card's arithmetic had no secret-dependent branches at all, which a reviewer would read as
-     * "no timing analysis needed". This holds the documents to the source: every helper here that still branches is
-     * named as open in SECURITY-MODEL item 5, and neither the spec nor the threat table claims more than the multiplies.
-     * When a helper is made branch-free, this fails until it leaves the list and the documents.
+     * D21's reach. D21 took the branches out of the two multiplies; the reductions on the same signing path (e·d, k + e·d, k)
+     * branched on values derived from the key and the nonce, and were listed as open. They are branch-free now, held by
+     * branchyReductions below. This holds the documents to that: no document lists a reduction as still branching, and neither
+     * the spec nor the threat table claims more than the arithmetic in bytecode (the VM's own timing and the chip's engines are
+     * not covered, and nothing is measured on silicon).
      */
-    static final String[] OPEN_BRANCHING_REDUCTIONS = { "reduce512toModN", "addModN", "reduceModN", "sub32", "cmp32", "mulSmallByDelta" };
+    static final String[] FORMERLY_BRANCHING = { "reduce512toModN", "addModN", "reduceModN", "sub32", "cmp32", "mulSmallByDelta" };
 
     @Test
-    @DisplayName("D21's reach: the reductions that still branch are open in SECURITY-MODEL item 5, and no document claims the whole arithmetic is branch-free")
-    void theReductionsThatStillBranchAreListedAsOpen() throws Exception {
-        String src = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")),
-            java.nio.charset.StandardCharsets.UTF_8));
+    @DisplayName("D21's reach: the reductions that branched are branch-free in the source, SECURITY-MODEL item 5 and D21 no longer say they still branch, and no document claims the signing path is free of side channels as a whole or measured on silicon")
+    void theDocumentsSayWhatTheScanHolds() throws Exception {
+        String raw = new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8);
         java.nio.file.Path root = mainSourceDir().toAbsolutePath().normalize();
         for (int i = 0; i < 7; i++) root = root.getParent();   // <repo>/applet/src/main/java/me/flashapp/cashu -> <repo>
         String model = flat(root.resolve("docs").resolve("SECURITY-MODEL.md"));
@@ -200,27 +199,23 @@ class SchnorrHWMathTest {
         int to = model.indexOf("6. **", from);
         org.junit.jupiter.api.Assertions.assertTrue(from >= 0 && to > from, "SECURITY-MODEL has open item 5");
         String item5 = model.substring(from, to);
-        // Decision anchors are stable; editorial titles and punctuation may change.
         int d21 = decisions.indexOf("<a id=\"d21\"></a>");
         int d22 = decisions.indexOf("<a id=\"d22\"></a>", d21);
         org.junit.jupiter.api.Assertions.assertTrue(d21 >= 0 && d22 > d21, "DECISIONS retains the D21 and D22 anchors");
         String d21Text = decisions.substring(d21, d22);
-        java.util.List<String> problems = new java.util.ArrayList<>();
-        for (String name : OPEN_BRANCHING_REDUCTIONS) {
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("static\\s+\\w+\\s+" + name + "\\(").matcher(src);
-            if (!m.find()) { problems.add(name + " is not in SchnorrHW"); continue; }
-            int[] body = bodyRange(src, m.group());
-            String b = src.substring(body[0], body[1]);
-            boolean branches = java.util.regex.Pattern.compile("\\b(if|while|continue|break)\\b").matcher(b).find() || b.contains("?");
-            if (!branches) problems.add(name + " no longer branches: take it out of OPEN_BRANCHING_REDUCTIONS, SECURITY-MODEL item 5 and D21's reach");
-            if (!item5.contains("`" + name + "`")) problems.add(name + " branches and is not named in SECURITY-MODEL open item 5");
-            if (!d21Text.contains(name)) problems.add(name + " branches and is not named in D21's 'What this does not reach'");
+        java.util.List<String> problems = new java.util.ArrayList<>(branchyReductions(raw));
+        for (String name : FORMERLY_BRANCHING) {
+            if (!item5.contains("`" + name + "`")) problems.add(name + " is not named in SECURITY-MODEL open item 5, which says what became of it");
+            if (!d21Text.contains(name)) problems.add(name + " is not named in D21's reach");
         }
+        if (item5.contains("still branch")) problems.add("SECURITY-MODEL item 5 says a reduction still branches");
+        if (d21Text.contains("which still branch")) problems.add("D21 says the reductions still branch");
+        if (!item5.contains("silicon") || !d21Text.contains("silicon")) problems.add("item 5 and D21 say nothing is measured on silicon");
         if (apdu.contains("arithmetic on its key and nonces has no secret-dependent branches")) {
-            problems.add("spec/APDU.md claims the card's whole arithmetic has no secret-dependent branches; D21 covers the multiplies only");
+            problems.add("spec/APDU.md claims the card's whole arithmetic has no secret-dependent branches; the VM and the chip's engines are not covered");
         }
         if (model.contains("Mitigated in our arithmetic")) {
-            problems.add("SECURITY-MODEL #19 calls timing 'Mitigated in our arithmetic'; the reductions still branch");
+            problems.add("SECURITY-MODEL #19 calls timing 'Mitigated in our arithmetic'; nothing is measured on silicon");
         }
         org.junit.jupiter.api.Assertions.assertTrue(problems.isEmpty(), String.join("\n", problems));
     }
@@ -342,8 +337,9 @@ class SchnorrHWMathTest {
     /**
      * The allocations that are not install-time and are let through all the same (1.20), each by its file, by the method it is
      * in and by the whole statement it is, so that nothing else in that method, or anywhere else, goes through with it:
-     * { file, the method's declaration, the statement }. There are three: the room for the mint's proofs, and the two arrays of
-     * 2.2's assisted-settlement record (D176), which the chip refused in the constructor as well. The chip will not install an
+     * { file, the method's declaration, the statement }. There are seven: the room for the mint's proofs, the two arrays of
+     * 2.2's assisted-settlement record (D176), which the chip refused in the constructor as well, and 2.3's openings' keys, keyset
+     * table and paid list (D183, D184, D191) at SET_CARD and its certificate (D192) at the first CERT_WRITE. The chip will not install an
      * applet whose constructor asks for that much more (+300 bytes installs, +12,288 does not: docs/FOXY-CARD-HARDWARE.md), and gives the
      * same bytes asked for after the install, so SET_CARD reserves them. What this test exists to catch, an allocation that repeats on
      * every command until the card's persistent memory is gone, cannot come of it: it is guarded so that it happens once in a card's
@@ -358,6 +354,18 @@ class SchnorrHWMathTest {
           "if (outbox == null) { try { outbox = new byte[OUTBOX_LEN]; } catch (SystemException e) { outbox = null; } }" },
         { "CashuApplet.java", "private void processSetCard(",
           "if (outbox != null && outStage == null) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e) { outStage = null; } }" },
+        // 2.3's openings' B_ and K (D183) with their shown mark (D190), 536 bytes, for the same reason
+        { "CashuApplet.java", "private void processSetCard(",
+          "if (openKeys == null) { try { openKeys = new byte[(short)(CHANGE_MOST * OPEN_KEYS_ROW)]; } catch (SystemException e) { openKeys = null; } }" },
+        // 2.3's keyset table (D184), 267 bytes, for the same reason
+        { "CashuApplet.java", "private void processSetCard(",
+          "if (book == null) { try { book = new byte[BOOK_LEN]; } catch (SystemException e) { book = null; } }" },
+        // 2.3's paid list (D191) and the signatures kept beside the receipts (D194), 9,235 bytes, for the same reason
+        { "CashuApplet.java", "private void processSetCard(",
+          "if (paid == null) { try { paid = new byte[PAID_LEN]; } catch (SystemException e) { paid = null; } }" },
+        // 2.3's certificate (D192), 1,027 bytes, at the first CERT_WRITE: only a card an issuer certifies asks for it
+        { "CashuApplet.java", "private void processCertWrite(",
+          "if (cert == null) { try { cert = new byte[CERT_LEN]; } catch (SystemException e) { cert = null; } }" },
     };
 
     /**
@@ -593,10 +601,16 @@ class SchnorrHWMathTest {
      *
      * 2.2 (ENG-819, D175) added the assisted-settlement record's four arrays, 4,321 bytes (outbox 3,692, outStage 593, outInstall 32,
      * outGen 4), and a J3R180 refused that constructor at create (6F00, 2026-11-06, D176). The two large ones are reserved at the
-     * first SET_CARD now; the installation and the generation (36 bytes) stay: 29,842 in all.
+     * first SET_CARD now; the installation and the generation (36 bytes) stay: 29,842 in all. 2.3 (D185) has no note of a payment
+     * for the tap after it (1 byte): 29,841; and the mark that the card has had a PIN (D192, 1 byte): 29,842; and the PIN's marks
+     * (D195, 10 bytes: the wrong tries in a row on a card with no owner, the askings owed, the first set-up, the day's loads): 29,852;
+     * and D196's 37: what left the card and the message's hash kept beside the last signature (36), and the openings whose change
+     * the running day counted (1): 29,889; and D197's 162: the card's secret c and the refund key's y (64), and the keys of the
+     * payment in hand (98): 30,051; and the mark of a forgotten PIN's history owed (D196, 1): 30,052; and D202's count of the owners' c
+     * the card has taken (4, after c and the refund key's y): 30,056, within the +300 measured to install.
      */
     @Test
-    @DisplayName("the constructors make 29,842 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36): neither the 12,288 of the mint's proofs nor the record's 4,285 are among them, for the chip refuses a constructor that asks for that much more")
+    @DisplayName("the constructors make 30,056 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36), less 2.3's one byte of no change grant (D185) and with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195), and D196's 37, and D197's 162 (c, the refund key's y, the payment's keys), and the PIN's mark of a forgotten history (D196, 1), and D202's 4 (the count of the owners' c): neither the 12,288 of the mint's proofs nor the record's 4,293 are among them, for the chip refuses a constructor that asks for that much more")
     void theConstructorsAskForNoMorePersistentMemoryThanTheBuildThatInstalls() throws Exception {
         String applet = stripCommentsAndCharLiterals(new String(
             java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -614,10 +628,10 @@ class SchnorrHWMathTest {
                 arrays++;
             }
         }
-        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36, total,
+        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36 - 1 + 1 + 10 + 37 + 64 + 98 + 1 + 4, total,
             "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install) "
-            + "and 2.2's installation and generation, 36 (the record's 4,285 are made at SET_CARD, D176). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
-        org.junit.jupiter.api.Assertions.assertEquals(22, arrays, "the parse found the 19 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
+            + "and 2.2's installation and generation, 36 (the record's 4,293 are made at SET_CARD, D176), less 2.3's one byte of no change grant (D185), with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195) and D196's 37 (the receipt's figures kept with the last signature, the counted openings) and D197's 162 (c and the refund key's y, the payment's keys), and one byte more of the PIN's marks: a forgotten PIN's history owed (D196), and D202's count of the owners' c the card has taken (4). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
+        org.junit.jupiter.api.Assertions.assertEquals(25, arrays, "the parse found the 22 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
         org.junit.jupiter.api.Assertions.assertTrue(total + 12_288 > 29_806 + 300, "and the store is the kind of figure the chip refuses there");
     }
 
@@ -865,7 +879,7 @@ class SchnorrHWMathTest {
     }
 
     /** [openBraceIndex, closeBraceIndex] of the body following the given declaration. */
-    private static int[] bodyRange(String src, String declaration) {
+    static int[] bodyRange(String src, String declaration) {
         int decl = src.indexOf(declaration);
         if (decl < 0) throw new IllegalStateException("not found in source: " + declaration);
         int open = src.indexOf('{', decl);
@@ -997,7 +1011,7 @@ class SchnorrHWMathTest {
     }
 
     @Test
-    @DisplayName("RAM budget: the two constructors ask for no more than 941 bytes of CLEAR_ON_DESELECT, 8 of CLEAR_ON_RESET, in no more than 16 arrays: the figures of 1.12, which are 1.7's and a payment's change and net (1.15 asks for 6 on reset: the time the terminal told, 4, and the tap's two flags)")
+    @DisplayName("RAM budget: the two constructors ask for no more than 941 bytes of CLEAR_ON_DESELECT, 8 of CLEAR_ON_RESET, in no more than 16 arrays: the figures of 1.12, which are 1.7's and a payment's change and net (1.15 asks for 6 on reset: the time the terminal told, 4, and the tap's two flags; 2.3 adds a third, 7)")
     void transientMemoryIsWithinTheBuildThatInstallsOnTheChip() throws Exception {
         int[] asked = transientMemoryAskedFor();
         String why = " These are the figures of 1.12 (941 bytes that are cleared on deselect, 8 on reset, in 16 arrays: 1.7's 931 in 14, and the change and the net of a payment). "
@@ -1006,13 +1020,13 @@ class SchnorrHWMathTest {
         org.junit.jupiter.api.Assertions.assertTrue(asked[1] <= RAM_ON_RESET_MOST, "CLEAR_ON_RESET is " + asked[1] + " bytes, over " + RAM_ON_RESET_MOST + "." + why);
         org.junit.jupiter.api.Assertions.assertTrue(asked[2] <= RAM_ARRAYS_MOST, "transient arrays are " + asked[2] + ", over " + RAM_ARRAYS_MOST + "." + why);
         // a parse that found nothing would prove nothing
-        org.junit.jupiter.api.Assertions.assertEquals(16, asked[2], "the parse found the 14 of CashuApplet and the 2 of SchnorrHW");
-        org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 and SchnorrHW 544");
-        org.junit.jupiter.api.Assertions.assertEquals(6, asked[1], "1.15: the time the terminal told (4) and the tap's two flags (2); 1.14 kept six bytes for a clock told twice, and eight with the flags");
+        org.junit.jupiter.api.Assertions.assertEquals(15, asked[2], "the parse found the 13 of CashuApplet and the 2 of SchnorrHW (2.3 has no change grant, D185)");
+        org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 (2.3: a held tap's count, one byte, D187, D189) and SchnorrHW 544");
+        org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 2.3 adds TAP_ARMED, D186); 1.14 kept six bytes for a clock told twice, and eight with the flags");
     }
 
     @Test
-    @DisplayName("The parse of the RAM budget can say no: a source with a hundred bytes more, or another array, is over it")
+    @DisplayName("The parse of the RAM budget can say no: a source with a hundred bytes more, or two arrays more, is over it")
     void theRamBudgetCanSayNo() throws Exception {
         java.util.Map<String, String> k = constantExpressions("static final short X_LEN = (short) 196; static final short ALL = MAX; static final short MAX = (short) 128;");
         org.junit.jupiter.api.Assertions.assertEquals(196, evaluated("X_LEN", k));
@@ -1021,7 +1035,7 @@ class SchnorrHWMathTest {
         org.junit.jupiter.api.Assertions.assertEquals(129, evaluated("(short)(MAX + 1)", k));
         int[] asked = transientMemoryAskedFor();
         org.junit.jupiter.api.Assertions.assertTrue(asked[0] + 100 > RAM_ON_DESELECT_MOST, "a hundred bytes more is over");
-        org.junit.jupiter.api.Assertions.assertTrue(asked[2] + 1 > RAM_ARRAYS_MOST, "and so is one array more");
+        org.junit.jupiter.api.Assertions.assertTrue(asked[2] + 2 > RAM_ARRAYS_MOST, "and so are two arrays more");
     }
 
     /**
@@ -1050,6 +1064,249 @@ class SchnorrHWMathTest {
         }
         // and the EC key objects that exist: the card's pair, the PIN key's pair, the signer's temporary key, and the owner's key (the time signer's key went in 1.15: the clock is block headers)
         org.junit.jupiter.api.Assertions.assertEquals(1, java.util.regex.Pattern.compile("\\bnewP256Key\\(\\)").matcher(applet).results().count() - 1, "newP256Key is run for the owner key, and for no more: the time key is gone");
+    }
+
+    // ── The reductions: the edges, and the same work whatever the values ────
+
+    private static final BigInteger TWO_256 = BigInteger.ONE.shiftLeft(256);
+    private static final BigInteger DELTA_REF = TWO_256.subtract(N);
+
+    private static byte[] to64(BigInteger v) {
+        byte[] out = new byte[64];
+        byte[] raw = v.toByteArray();
+        int len = Math.min(raw.length, 64);
+        System.arraycopy(raw, raw.length - len, out, 64 - len, len);
+        return out;
+    }
+
+    private static java.lang.reflect.Method hidden(String name, Class<?>... types) throws Exception {
+        java.lang.reflect.Method m = SchnorrHW.class.getDeclaredMethod(name, types);
+        m.setAccessible(true);
+        return m;
+    }
+
+    @Test
+    @DisplayName("addModN at the edges: sums of n-1, n, n+1 and 2n-2, sums whose low 256 bits are just under, at and over n, and 0 + 0, each against BigInteger")
+    void addModNAtTheEdges() {
+        BigInteger one = BigInteger.ONE, nm1 = N.subtract(one);
+        BigInteger[][] pairs = {
+            { BigInteger.ZERO, BigInteger.ZERO }, { nm1, BigInteger.ZERO }, { BigInteger.ZERO, nm1 },
+            { nm1, one }, { one, nm1 },                                   // n
+            { nm1, BigInteger.valueOf(2) },                               // n + 1
+            { N.shiftRight(1), N.shiftRight(1) },                         // n - 1 (n is odd)
+            { N.shiftRight(1).add(one), N.shiftRight(1) },                // n
+            { N.shiftRight(1).add(one), N.shiftRight(1).add(one) },       // n + 1
+            { nm1, nm1 },                                                 // 2n - 2, past 2^256
+            { DELTA_REF, nm1 },                                           // 2^256 - 1
+            { DELTA_REF.add(one), nm1 },                                  // 2^256: carries, low bits zero
+            { N.subtract(DELTA_REF), DELTA_REF },                         // n exactly, from a small and a large
+            { N.subtract(DELTA_REF).add(one), DELTA_REF },                // n + 1
+            { N.subtract(DELTA_REF).subtract(one), DELTA_REF },           // n - 1
+        };
+        for (BigInteger[] p : pairs) {
+            BigInteger a = p[0], b = p[1];
+            org.junit.jupiter.api.Assertions.assertTrue(a.compareTo(N) < 0 && b.compareTo(N) < 0 && a.signum() >= 0 && b.signum() >= 0, "addModN is given numbers under n");
+            byte[] out = new byte[32];
+            java.util.Arrays.fill(out, (byte) 0x5A);
+            SchnorrHW.addModN(to32(a), (short) 0, to32(b), (short) 0, out, (short) 0);
+            assertEquals(a.add(b).mod(N), from32(out), "addModN(" + a.toString(16) + ", " + b.toString(16) + ")");
+        }
+        Random r = rng();
+        for (int i = 0; i < 2000; i++) {
+            BigInteger a = new BigInteger(256, r).mod(N), b = new BigInteger(256, r).mod(N);
+            if (i % 3 == 0) b = N.subtract(a).add(BigInteger.valueOf((i % 7) - 3)).mod(N);   // sums at n, either side
+            byte[] out = new byte[40];
+            SchnorrHW.addModN(to32(a), (short) 0, to32(b), (short) 0, out, (short) 4);
+            assertEquals(a.add(b).mod(N), new BigInteger(1, java.util.Arrays.copyOfRange(out, 4, 36)), "addModN at " + i);
+        }
+    }
+
+    @Test
+    @DisplayName("reduceModN at the edges: 0, 1, n-1, n, n+1, 2^256-1, DELTA and n+DELTA-1, against BigInteger, the answer under n")
+    void reduceModNAtTheEdges() {
+        BigInteger one = BigInteger.ONE;
+        for (BigInteger v : new BigInteger[] { BigInteger.ZERO, one, N.subtract(one), N, N.add(one), TWO_256.subtract(one), DELTA_REF, N.add(DELTA_REF).subtract(one) }) {
+            byte[] a = to32(v);
+            SchnorrHW.reduceModN(a, (short) 0);
+            assertEquals(v.mod(N), from32(a), "reduceModN(" + v.toString(16) + ")");
+        }
+    }
+
+    @Test
+    @DisplayName("reduce512toModN at the edges: n-1, n, n+1, 2n-1, 2^256-1, 2^512-1, q*n + r for r at the edges, and numbers built so that the four-term sum carries and the fold of that carry carries again, each against BigInteger")
+    void reduce512AtTheEdges() throws Exception {
+        java.lang.reflect.Method m = hidden("reduce512toModN", byte[].class, short.class, byte[].class, short.class, byte[].class, short.class);
+        BigInteger one = BigInteger.ONE, nm1 = N.subtract(one), two512 = BigInteger.ONE.shiftLeft(512);
+        java.util.List<BigInteger> values = new java.util.ArrayList<>(java.util.Arrays.asList(
+            BigInteger.ZERO, nm1, N, N.add(one), N.shiftLeft(1).subtract(one), N.shiftLeft(1), TWO_256.subtract(one), TWO_256, TWO_256.add(nm1),
+            two512.subtract(one), nm1.multiply(nm1), two512.subtract(N), two512.subtract(one).subtract(two512.subtract(one).mod(N))));
+        BigInteger q = new BigInteger("F3E2D1C0B9A8978675645342312F1E0D0C0B0A09080706050403020100FFEEDD", 16);
+        for (BigInteger r : new BigInteger[] { BigInteger.ZERO, one, nm1, N, N.add(one), N.shiftLeft(1).subtract(one) }) values.add(q.multiply(N).add(r));
+        // the sum the reduction makes from p's high half, worked here as it is there, and a low half chosen so the sum is
+        // 2^256 - 1 or 2^256 - 2 past a multiple of 2^256: its carry folded back as DELTA overflows again
+        Random rnd = rng();
+        int twice = 0;
+        for (int i = 0; i < 400; i++) {
+            BigInteger hi = new BigInteger(256, rnd);
+            if (i % 4 == 0) hi = TWO_256.subtract(one).subtract(BigInteger.valueOf(i));
+            BigInteger t = hi.multiply(DELTA_REF), tHi = t.shiftRight(256), tLo = t.mod(TWO_256);
+            BigInteger t2 = tHi.multiply(DELTA_REF), t2Hi = t2.shiftRight(256), t2Lo = t2.mod(TWO_256);
+            BigInteger part = t2Hi.multiply(DELTA_REF).add(t2Lo).add(tLo);
+            for (int eps = 1; eps <= 2; eps++) {
+                BigInteger lo = TWO_256.subtract(BigInteger.valueOf(eps)).subtract(part).mod(TWO_256);
+                BigInteger sum = part.add(lo);
+                BigInteger carry = sum.shiftRight(256);
+                if (carry.signum() > 0 && sum.mod(TWO_256).add(carry.multiply(DELTA_REF)).compareTo(TWO_256) >= 0) twice++;
+                values.add(hi.shiftLeft(256).add(lo));
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(twice > 100, "the fold's own carry was reached " + twice + " times");
+        for (BigInteger v : values) {
+            byte[] p = to64(v), out = new byte[32], w = work();
+            java.util.Arrays.fill(w, (byte) 0x5A);
+            m.invoke(null, p, (short) 0, out, (short) 0, w, (short) 0);
+            assertEquals(v.mod(N), from32(out), "reduce512toModN(" + v.toString(16) + ")");
+        }
+    }
+
+    @Test
+    @DisplayName("mulSmallByDelta still refuses what does not fit: an operand with any of its first 31 bytes not zero (the rows it does not work) is refused 6F00, and one of a single low byte is a*DELTA")
+    void mulSmallByDeltaStillRefusesAnOverflow() throws Exception {
+        java.lang.reflect.Method m = hidden("mulSmallByDelta", byte[].class, short.class, byte[].class, short.class, byte[].class, short.class);
+        for (int at = 0; at < 31; at++) {
+            for (int bit : new int[] { 0x01, 0x80 }) {
+                byte[] a = new byte[32];
+                a[at] = (byte) bit;
+                a[31] = 3;
+                try {
+                    m.invoke(null, a, (short) 0, new byte[32], (short) 0, new byte[64], (short) 0);
+                    org.junit.jupiter.api.Assertions.fail("an operand with byte " + at + " set was taken");
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    assertEquals(CashuApplet.SW_CRYPTO_ERROR, ((javacard.framework.ISOException) e.getCause()).getReason(), "byte " + at);
+                }
+            }
+        }
+        for (int v : new int[] { 0, 1, 2, 3, 0x7F, 0xFF }) {
+            byte[] a = new byte[32], out = new byte[32];
+            a[31] = (byte) v;
+            m.invoke(null, a, (short) 0, out, (short) 0, new byte[64], (short) 0);
+            assertEquals(BigInteger.valueOf(v).multiply(DELTA_REF), from32(out), "a = " + v);
+        }
+    }
+
+    @Test
+    @DisplayName("choose: a kept where take is 0, b taken where it is 1, every byte, at offsets")
+    void chooseByAMask() throws Exception {
+        java.lang.reflect.Method m = hidden("choose", byte[].class, short.class, byte[].class, short.class, short.class);
+        Random r = rng();
+        for (int i = 0; i < 50; i++) {
+            byte[] a = new byte[40], b = new byte[40];
+            r.nextBytes(a); r.nextBytes(b);
+            byte[] keep = a.clone();
+            m.invoke(null, a, (short) 3, b, (short) 5, (short) 0);
+            org.junit.jupiter.api.Assertions.assertArrayEquals(keep, a, "take 0 keeps a");
+            m.invoke(null, a, (short) 3, b, (short) 5, (short) 1);
+            org.junit.jupiter.api.Assertions.assertArrayEquals(java.util.Arrays.copyOfRange(b, 5, 37), java.util.Arrays.copyOfRange(a, 3, 35), "take 1 takes b");
+            org.junit.jupiter.api.Assertions.assertArrayEquals(java.util.Arrays.copyOfRange(keep, 0, 3), java.util.Arrays.copyOfRange(a, 0, 3), "and nothing before");
+            org.junit.jupiter.api.Assertions.assertArrayEquals(java.util.Arrays.copyOfRange(keep, 35, 40), java.util.Arrays.copyOfRange(a, 35, 40), "or after");
+        }
+    }
+
+    /** The arithmetic on the signing path that combines the key and the nonce: every body here is scanned by branchyReductions. */
+    static final String[] BRANCH_FREE = { "static void addModN(", "static void reduceModN(", "private static void subIf(",
+        "private static short under(", "private static void choose(", "static short sub32(", "static void subtractFromN(", "static void mul256x256(",
+        "private static void mulByDelta(", "private static short addDelta(", "private static short add4x32(", "private static void reduce512toModN(",
+        "private static void mulSmallByDelta(" };
+    /** mulSmallByDelta's one check, which tests a value that is zero for every input the reduction makes: allowed once, as its last statement. */
+    static final String OVERFLOW_CHECK = "if (over != 0) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);";
+
+    /**
+     * What, in the bodies of BRANCH_FREE, could make the time of a signature follow a value: `if`, `while`, `do`, `continue`,
+     * `break`, `switch`, `?:`, a compare to zero, a `return` before the end, a call of an early-exit compare (`cmp32`, kept for
+     * the applet's public values and called nowhere in the signer), and a `for` loop whose bounds are not constants (a length
+     * is LEN, the 32 every call gives; mulByDelta's first row is `from`, a constant at each of its three calls).
+     * mulSmallByDelta may end with OVERFLOW_CHECK, once.
+     */
+    static java.util.List<String> branchyReductions(String rawSrc) {
+        String src = stripCommentsAndCharLiterals(rawSrc);
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String decl : BRANCH_FREE) {
+            if (src.indexOf(decl) < 0) { out.add("no " + decl + " in the source"); continue; }
+            int[] r = bodyRange(src, decl);
+            String body = src.substring(r[0] + 1, r[1]).replaceAll("\\s+", " ").trim();
+            if (decl.equals("private static void mulSmallByDelta(")) {
+                if (!body.endsWith(OVERFLOW_CHECK) || body.indexOf(OVERFLOW_CHECK) != body.lastIndexOf(OVERFLOW_CHECK)) {
+                    out.add(decl + " does not end with its one overflow check");
+                } else {
+                    body = body.substring(0, body.length() - OVERFLOW_CHECK.length());
+                }
+            }
+            for (String w : new String[] { "if", "while", "do", "continue", "break", "switch", "cmp32" }) {
+                if (java.util.regex.Pattern.compile("\\b" + w + "\\b").matcher(body).find()) out.add(decl + " has `" + w + "`");
+            }
+            for (String w : new String[] { "?", "== 0", "!= 0", "&&", "||" }) {
+                if (body.contains(w)) out.add(decl + " has `" + w + "`");
+            }
+            int ret = body.indexOf("return");
+            if (ret >= 0 && (ret != body.lastIndexOf("return") || !body.substring(ret).matches("return [^;]*;"))) out.add(decl + " returns before its end");
+            java.util.regex.Matcher loop = java.util.regex.Pattern.compile("for \\(short (\\w+) = ([^;]+); \\1 (?:>=|<) ([^;]+);").matcher(body);
+            int loops = 0;
+            while (loop.find()) {
+                loops++;
+                String ends = (loop.group(2) + " " + loop.group(3)).replace("(short)", "").replace("len", "LEN");
+                if (decl.equals("private static void mulByDelta(")) ends = ends.replace("from", "FROM");
+                if (!ends.matches("[0-9A-Z_ ()+-]+")) out.add(decl + ": a loop from " + loop.group(2) + " to " + loop.group(3) + " does not count a constant");
+            }
+            if (loops != body.split("\\bfor \\(", -1).length - 1) out.add(decl + ": a loop the scan could not read");
+        }
+        String flat = src.replaceAll("\\s+", " ");
+        if (flat.split("cmp32\\(", -1).length - 1 != 1) out.add("an early-exit compare (cmp32) is called in the signer");
+        for (String call : new String[] { "mulByDelta(p, pOff, work, tOff, (short)0);", "mulByDelta(work, tOff, work, t2Off, DELTA_FROM);", "mulByDelta(a, aOff, work, workOff, (short)31);" }) {
+            if (!flat.contains(call)) out.add("mulByDelta is not called with a constant first row: " + call);
+        }
+        if (flat.split("mulByDelta\\(", -1).length - 2 != 3) out.add("mulByDelta is called other than three times");
+        long named = java.util.regex.Pattern.compile("\\b(?:subIf|under)\\(").matcher(flat).results().count();
+        long fixed = java.util.regex.Pattern.compile("\\b(?:subIf|under)\\((?:[^;()]|\\((?:[^()]|\\([^()]*\\))*\\))*,\\s*(?:\\(short\\)\\s*32|len)\\s*\\)").matcher(flat).results().count();
+        if (named - 2 != fixed) out.add("a call of subIf or under gives a length other than 32 or its caller's");
+        if (flat.indexOf("private short signOnce(") < 0) {
+            out.add("no signOnce in the source");
+        } else {
+            int[] sign = bodyRange(src, "private short signOnce(");
+            String body = src.substring(sign[0], sign[1]).replaceAll("\\s+", " ");
+            if (!body.contains("subtractFromN(sc, SC_K, sc, SC_E); choose(sc, SC_K, sc, SC_E, (short)(sc[(short)(SC_TMP + 64)] & 1));")) out.add("sign does not choose k or n - k by a mask");
+            if (body.contains("ryOdd")) out.add("sign branches on R's parity");
+        }
+        return out;
+    }
+
+    @Test
+    @DisplayName("The arithmetic that combines the key and the nonce has no branch and no loop that ends on a value: no if, while, continue, break, return before the end, ?:, compare to zero or early-exit compare in addModN, reduceModN, subIf, under, choose, sub32, subtractFromN, mul256x256, mulByDelta, addDelta, add4x32, reduce512toModN and mulSmallByDelta (its one overflow check at its end aside), every for loop counts a constant, and sign() chooses k or n - k by a mask")
+    void theCombiningArithmeticHasNoBranchOnAValue() throws Exception {
+        java.util.List<String> v = branchyReductions(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8));
+        org.junit.jupiter.api.Assertions.assertTrue(v.isEmpty(), String.join("\n", v));
+    }
+
+    @Test
+    @DisplayName("The reductions' scan can say no: each of the old branches put back into today's source (the carry fold's while, the final compare-and-subtract loop, addModN's if on its carry, reduceModN's if on cmp32, sub's if on the borrow, an early return in under, a second check in mulSmallByDelta, the branch on R's parity, a row count that follows a value) is found")
+    void theReductionScanCanSayNo() throws Exception {
+        String src = new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8);
+        org.junit.jupiter.api.Assertions.assertTrue(branchyReductions(src).isEmpty(), "today's source passes");
+        String[][] plants = {
+            { "addDelta(out, outOff, addDelta(out, outOff, carry));", "while (carry != 0) { carry = addDelta(out, outOff, carry); }" },
+            { "        reduceModN(out, outOff);\n    }\n\n    /**\n     * v += m", "        while (under(out, outOff, CashuApplet.SECP256K1_N, (short)32) == 0) { subIf(out, outOff, CashuApplet.SECP256K1_N, (short)1, (short)32); }\n    }\n\n    /**\n     * v += m" },
+            { "subIf(out, outOff, CashuApplet.SECP256K1_N, (short)(carry | (borrow ^ 1)), (short)32);", "if (carry != 0) subIf(out, outOff, CashuApplet.SECP256K1_N, (short)1, (short)32);" },
+            { "short atLeastN = (short)(under(a, aOff, CashuApplet.SECP256K1_N, (short)32) ^ 1);", "short atLeastN = (short)(cmp32(a, aOff, CashuApplet.SECP256K1_N, (short)0) >= 0 ? 1 : 0);" },
+            { "            borrow = (short)((diff >> 8) & 1);", "            if (diff < 0) { borrow = 1; } else { borrow = 0; }" },
+            { "            borrow = (short)((d >> 8) & 1);\n        }\n        return borrow;", "            borrow = (short)((d >> 8) & 1);\n            if (d < 0) return (short)1;\n        }\n        return borrow;" },
+            { "            over = (short)(over | (a[(short)(aOff + i)] & 0xFF));", "            if (a[(short)(aOff + i)] != 0) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);" },
+            { "choose(sc, SC_K, sc, SC_E, (short)(sc[(short)(SC_TMP + 64)] & 1));", "boolean ryOdd = (sc[(short)(SC_TMP + 64)] & 1) == 1; if (ryOdd) Util.arrayCopy(sc, SC_E, sc, SC_K, (short)32);" },
+            { "for (short i = 31; i >= from; i--) {", "for (short i = 31; i >= from && a[(short)(aOff+i)] != 0; i--) {" },
+        };
+        for (String[] p : plants) {
+            org.junit.jupiter.api.Assertions.assertEquals(1, src.split(java.util.regex.Pattern.quote(p[0]), -1).length - 1, "the plant's place is in the source once: " + p[0]);
+            String planted = src.replace(p[0], p[1]);
+            org.junit.jupiter.api.Assertions.assertFalse(branchyReductions(planted).isEmpty(), "the scan passed: " + p[1]);
+        }
     }
 
     @Test

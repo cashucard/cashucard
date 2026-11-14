@@ -34,6 +34,10 @@ export function assessResetPreflight(
     return fail(
       'the card has proof slots that require holder and mint reconciliation',
     );
+  if (card.publicState.changeOwed)
+    return fail(
+      "the card is owed change from a payment: the holder's wallet brings it home before any reset",
+    );
   if (input.unresolvedAttempt)
     return fail('an earlier attempt requires reconciliation');
   const source = input.provenance;

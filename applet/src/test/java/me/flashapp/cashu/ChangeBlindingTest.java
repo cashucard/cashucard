@@ -31,9 +31,12 @@ class ChangeBlindingTest {
         sim.installApplet(AIDUtil.create(CashuAppletTest.AID_HEX), CashuApplet.class);
         sim.selectApplet(AIDUtil.create(CashuAppletTest.AID_HEX));
         CashuAppletTest.readyOn(sim, 0);
-        assertEquals(0x9000, sim.transmitCommand(new CommandAPDU(0xB0, 0x30, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 1), 1)).getSW());
+        assertEquals(0x9000, sim.transmitCommand(new CommandAPDU(0xB0, 0x30, 0, 2, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 1), 1)).getSW());
         byte[] cardKey = sim.transmitCommand(new CommandAPDU(0xB0, 0x10, 0, 0, 256)).getData();
         Applet applet = fresh.appletAt(AIDUtil.create(CashuAppletTest.AID_HEX));
+        // a payment of the piece begun: the date's keys (D197), which every change secret names, are worked out at its beginning
+        assertEquals(0x9000, sim.transmitCommand(CashuAppletTest.spendBegin(new byte[] { 0 })).getSW());
+        DateKeys keys = DateKeys.of(applet);
         Method blind = CashuApplet.class.getDeclaredMethod("blindChange", short.class, short.class, byte[].class);
         blind.setAccessible(true);
         java.lang.reflect.Field openings = CashuApplet.class.getDeclaredField("changeOpen");
@@ -54,7 +57,7 @@ class ChangeBlindingTest {
             assertTrue(buf[0] == 0x02 || buf[0] == 0x03, "round " + i + ": a compressed point");
             byte[] made = Arrays.copyOfRange(buf, 0, 33);
             byte[] nonce = Arrays.copyOfRange(changeOpen, open + 16, open + 48), r = Arrays.copyOfRange(changeOpen, open + 48, open + 80);
-            byte[] secret = CashuAppletTest.secretText(nonce, cardKey, date, CashuAppletTest.REFUND).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] secret = keys.secret(nonce, date).getBytes(java.nio.charset.StandardCharsets.UTF_8);
             assertArrayEquals(made, CashuAppletTest.blindedFor(secret, r), "round " + i + ": the opening opens the point");
         }
     }

@@ -57,7 +57,7 @@ The campaign performs:
 3. A fresh payment where the phone and till both observe unspent inputs and
    wait at a barrier before concurrently submitting the same signed swap.
 
-A 2.2 packet names each keyset by its 8-byte prefix. When the mint knows that
+A packet names each keyset by its 8-byte prefix. When the mint knows that
 keyset only by a 33-byte (v2) id, `reconcilePayment` sends the one catalogue id
 the prefix begins, for inputs, outputs and restore, and refuses a prefix that
 begins more than one (`keyset-ambiguous`). The map is saved in the journal
@@ -85,7 +85,7 @@ are involved.
 no Node globals. Callers inject:
 
 - `crypto.hash(bytes)`: SHA-256 bytes; `crypto.verify(signature, message, key)`:
-  BIP-340 verification against the compressed card key; `crypto.point(bytes)`:
+  BIP-340 verification against the compressed key the packet names; `crypto.point(bytes)`:
   compressed secp256k1 point validation.
 - `crypto.proofY(secret)`: compressed Cashu hash-to-curve point, as hex;
   `crypto.dleq(output, signature, amountKey)`: blinded DLEQ verification.
@@ -97,8 +97,15 @@ no Node globals. Callers inject:
 
 `decodePacket(bytes, policy, crypto)` verifies the complete candidate envelope,
 both signatures, packet identity and the expected mint/card/installation.
-The private profile bounds packets to 32 KiB and 128 inputs/outputs; these are
-prototype limits. Format-4, date-zero, no-refund, exact sat payments are supported.
+`policy` is `{ mint, date0Key, installation }`. `date0Key` is the card's key for
+the date 0, P + t·G, which the packet names and both signatures are by: the
+holder's wallet works it out from the card's c, or asks the card for the keys of
+the date `00000000`. It is never the card key P that `GET_PUBKEY` answers, which
+verifies neither signature of a 2.3 packet. An older policy's `cardKey` is read as
+`date0Key` where that is not given. The private profile bounds packets to 32 KiB
+and 128 inputs/outputs; these are prototype limits. Format-4, date-zero,
+no-refund, exact payments in sat (unit `00`) or usd (unit `01`) are supported:
+a payment is settled against the mint's keysets of its own unit alone.
 
 `capturePacket({policy, crypto, readScope, readPage, save, journal?})` saves each
 read intent and received page before another page. The caller supplies an

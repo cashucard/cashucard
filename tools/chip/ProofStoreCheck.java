@@ -105,17 +105,17 @@ public final class ProofStoreCheck {
 
         // one piece with a proof, read back
         byte[] p0 = piece(2, 1), proof0 = proof(1);
-        byte[] loaded = send(0xB0, 0x30, 1, 0, cat(p0, proof0), 0);
+        byte[] loaded = send(0xB0, 0x30, 1, 2, cat(p0, proof0), 0);
         say("LOAD_PROOF with P1 = 1 answers the place and 01: the proof is kept (a 00 would be a card that was refused the room)",
             sw(loaded) == 0x9000 && Arrays.equals(data(loaded, 0x9000), new byte[] { 0, 1 }));
         say("GET_DLEQ gives 01 and the same 96 bytes back", Arrays.equals(data(send(0xB0, 0x1A, 0, 0xFF, null, 0), 0x9000), cat(new byte[] { 1 }, proof0)));
 
         // one piece with none, read back; two places in one command; the refusals
-        say("a plain piece goes into the next place", Arrays.equals(data(send(0xB0, 0x30, 0, 0, piece(3, 2), 0), 0x9000), new byte[] { 1 }));
+        say("a plain piece goes into the next place", Arrays.equals(data(send(0xB0, 0x30, 0, 2, piece(3, 2), 0), 0x9000), new byte[] { 1 }));
         say("GET_DLEQ for it reads 00", Arrays.equals(data(send(0xB0, 0x1A, 1, 0xFF, null, 0), 0x9000), NONE));
         say("two places in one GET_DLEQ: the proof, then 00", Arrays.equals(data(send(0xB0, 0x1A, 0, 1, null, 0), 0x9000), cat(new byte[] { 1 }, proof0, NONE)));
-        say("a proof of 96 zero bytes is 6A80", sw(send(0xB0, 0x30, 1, 0, cat(piece(4, 3), new byte[96]), 0)) == 0x6A80);
-        say("P1 = 1 with the 81 bytes of a plain piece is 6700", sw(send(0xB0, 0x30, 1, 0, piece(4, 4), 0)) == 0x6700);
+        say("a proof of 96 zero bytes is 6A80", sw(send(0xB0, 0x30, 1, 2, cat(piece(4, 3), new byte[96]), 0)) == 0x6A80);
+        say("P1 = 1 with the 81 bytes of a plain piece is 6700", sw(send(0xB0, 0x30, 1, 2, piece(4, 4), 0)) == 0x6700);
         say("nothing was written by either refusal: the count is two", Arrays.equals(data(send(0xB0, 0x12, 0, 0, null, 1), 0x9000), new byte[] { 2 }));
 
         // paid: the chip signs, the proofs of spent places are not given, CLEAR_SPENT frees them
@@ -125,9 +125,9 @@ public final class ProofStoreCheck {
         say("CLEAR_SPENT frees both", Arrays.equals(data(send(0xB0, 0x31, 0, 0, null, 1), 0x9000), new byte[] { 2 }));
 
         // a place used again serves only its own proof
-        say("a plain piece goes into the place that was freed", Arrays.equals(data(send(0xB0, 0x30, 0, 0, piece(5, 5), 0), 0x9000), new byte[] { 0 }));
+        say("a plain piece goes into the place that was freed", Arrays.equals(data(send(0xB0, 0x30, 0, 2, piece(5, 5), 0), 0x9000), new byte[] { 0 }));
         say("GET_DLEQ for it reads 00 and not the proof the place held", Arrays.equals(data(send(0xB0, 0x1A, 0, 0xFF, null, 0), 0x9000), NONE));
-        say("a piece with a new proof goes into the next place and is given back", Arrays.equals(data(send(0xB0, 0x30, 1, 0, cat(piece(6, 6), proof(7)), 0), 0x9000), new byte[] { 1, 1 })
+        say("a piece with a new proof goes into the next place and is given back", Arrays.equals(data(send(0xB0, 0x30, 1, 2, cat(piece(6, 6), proof(7)), 0), 0x9000), new byte[] { 1, 1 })
             && Arrays.equals(data(send(0xB0, 0x1A, 1, 0xFF, null, 0), 0x9000), cat(new byte[] { 1 }, proof(7))));
 
         // empty the card, with the owner's grant so that a second payment in this tap is not slowed, and reset it by the owner's proof
@@ -154,7 +154,8 @@ public final class ProofStoreCheck {
     private static byte[] pay(int[] places) throws Exception {
         byte[] list = new byte[places.length];
         for (int i = 0; i < places.length; i++) list[i] = (byte) places[i];
-        if (sw(send(0xB0, 0x22, 0, 0, list, 4)) != 0x9000) return null;
+        // P1 = 02: the keys per load (D197); this check builds no secret, it only has the places burned
+        if (sw(send(0xB0, 0x22, 0x02, 0, list, 0x45)) != 0x9000) return null;
         for (int i = 0; i < 1100; i++) {
             byte[] r = send(0xB0, 0x24, 0, 0, null, 64);
             if (sw(r) != 0x9000) return null;

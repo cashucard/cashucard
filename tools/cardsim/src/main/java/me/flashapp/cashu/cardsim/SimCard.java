@@ -11,7 +11,7 @@ import me.flashapp.cashu.Tag;
 import java.util.Arrays;
 
 /**
- * One simulated protocol 2.0 card: the package's three applets installed into a jCardSim {@link CardSimulator} as a
+ * One simulated protocol 2.3 card: the package's three applets installed into a jCardSim {@link CardSimulator} as a
  * chip has them (the opener, the card's applet, and the NFC tag under the NFC Forum's own name), driven with raw APDU
  * bytes so that the bytes the app sends are the bytes the applet sees.
  *
@@ -19,7 +19,7 @@ import java.util.Arrays;
  * first instance it made whose AID begins with the name: a SELECT by the package AID {@code F0 CASHUCARD} reaches the
  * opener, made first, which answers 9000 with no version and 6D00 to everything after (ENG-681, DECISIONS D25).
  * jCardSim instead keeps its applets in a map sorted by AID and gives a partial name to the lowest that matches, which
- * here is the card's applet ({@code …44 01} sorts before {@code …44 4D}); left alone it would answer 02 02 where the
+ * here is the card's applet ({@code …44 01} sorts before {@code …44 4D}); left alone it would answer 02 03 where the
  * chip does not. So {@link #transmit} resolves a partial SELECT by name itself, against {@link #INSTANCES} in the
  * order {@link #install()} made them, and hands jCardSim the whole AID of the instance the chip would pick. Only a
  * SELECT by name for the first or only occurrence (P1 04, P2's low bits 00) is resolved; a whole AID, a name that
@@ -39,13 +39,19 @@ import java.util.Arrays;
  * constructor included — must come from the same thread. {@link CardSim} guarantees that by building it lazily inside
  * its single-thread executor.
  *
- * <p><b>SELECT starts a session.</b> The applet's PIN-verified flag, the owner's nonce and the owner's load grant are
+ * <p><b>SELECT starts a tap.</b> The applet's PIN-verified flag, the owner's nonce and the owner's grant are
  * {@code CLEAR_ON_DESELECT} transients, so a re-SELECT drops them, as a new NFC tap does. A fake transport sends SELECT
- * on every tap; there is no separate "tap" operation here.
+ * on every tap; there is no separate "tap" operation here. What protocol 2.3 keeps for a <i>time in the field</i> (a
+ * payment signed, an owner claimed, a history read: {@code CLEAR_ON_RESET}) outlasts a SELECT and goes only when the
+ * card leaves the field, which here is jCardSim's reset ({@link #outOfTheFieldAndBack}). A fixture does that after an
+ * owner's claim, so that the card pays again, and at its end, so that the app's first command finds a fresh tap in a
+ * fresh time in the field.
  *
- * <p><b>The key is deterministic.</b> jCardSim's key generator draws from an unseeded generator, so every install —
- * every {@link #reset()} — yields the same keypair. A proof minted to this key in one run is spent at the mint after any
- * run that redeemed it. Loaders mint per run, after reading {@code pubkey} from {@link #state()}.
+ * <p><b>The card key is deterministic; its keys per date are not.</b> jCardSim's key generator draws from an unseeded
+ * generator, so every install, every {@link #reset()}, yields the same card key P. The card's secret c, from which it
+ * works out its key for each date (P + t*G, protocol 2.3's keys per load), is drawn by the applet's RandomData, which
+ * is seeded from the host (below): a new c at every reset, and so new keys for every date. A loader reads GROUP_KEYS
+ * under the PIN after each reset and mints per run; pieces are never locked to P itself.
  */
 final class SimCard {
 
@@ -56,7 +62,7 @@ final class SimCard {
     static final String TAG_HEX = "D2760000850101";
     /** The instances, in the order {@link #install()} makes them and a chip is given them: the opener first (D25). */
     static final String[] INSTANCES = { OPENER_HEX, AID_HEX, TAG_HEX };
-    /** SELECT by the card's applet's whole AID, as a reader sends it (D25): answers 02 02. */
+    /** SELECT by the card's applet's whole AID, as a reader sends it (D25): answers 02 03. */
     static final byte[] SELECT = Hex.parse("00A404000B" + AID_HEX);
     /** SELECT by the package AID alone: a partial name, which reaches the opener (9000, no version). */
     static final byte[] SELECT_PACKAGE = Hex.parse("00A404000A" + PACKAGE_HEX);
@@ -64,8 +70,13 @@ final class SimCard {
     private static final byte[] TAG_INSTALL = Hex.parse("07" + TAG_HEX + "0000");
 
     static final int SW_OK = 0x9000;
+    static final int SW_KEEP_HOLDING = 0x6A98;
+    static final int SW_SLOT_EMPTY = 0x6A88;
+    /** The most askings the bridge sends an owner's claim: the card takes six, the first five answered 6A98. */
+    static final int CLAIM_MOST = 10;
 
-    private static final byte[] GET_INFO = Hex.parse("B001020000");
+    /** GET_INFO P1 = 4: 59 bytes on 2.3 (the keyset table, the no-PIN window, the profiles, the loads left). */
+    private static final byte[] GET_INFO = Hex.parse("B001040000");
     private static final byte[] GET_CARD = Hex.parse("B016000000");
     private static final byte[] GET_PUBKEY = Hex.parse("B010000021");
     private static final byte[] GET_BALANCE = Hex.parse("B011000004");
@@ -253,19 +264,25 @@ final class SimCard {
     }
 
     /**
-     * Apply a fixture, additively, to the current card. The order is the one the applet's gates dictate:
+     * Apply a fixture, additively, to the current card. The order is the one the applet's gates dictate (protocol 2.3):
      * <ol>
-     *   <li>SET_PIN on a card with no PIN, then VERIFY_PIN (on a card that has one, the fixture's pin is the PIN to
-     *       verify); the session stays verified for the steps below;</li>
-     *   <li>SET_CARD with the mint and refund key (the owner's proof where the card already has an owner);</li>
-     *   <li>SET_OWNER with the key and the anchor (the old owner's proof where there is one);</li>
+     *   <li>SET_PIN on a card with no PIN, which begins the card's first set-up, then VERIFY_PIN (on a card that has one,
+     *       the fixture's pin is the PIN to verify); the tap stays verified for the steps below;</li>
+     *   <li>SET_CARD with the mint and refund key: the owner's proof where the card has an owner; on a card with none,
+     *       before its first PIN or in its first set-up, under the PIN;</li>
+     *   <li>SET_OWNER with the key and the anchor: on an owned card the old owner's proof; on a card with no owner the
+     *       claim, the same command six times, the first five answered 6A98, keep holding. After a claim the card pays
+     *       nothing in that time in the field, so the card is then taken out of the field and back, selected, and the
+     *       PIN given again;</li>
      *   <li>SET_HEADER for each header;</li>
-     *   <li>ALLOW_LOAD (the owner's grant) and LOAD_PROOF for each piece, with P1 = 1 where it has the mint's proof;</li>
-     *   <li>for each spent slot, a payment of that one piece and no outputs: SPEND_ALL_BEGIN, then SPEND_ALL_SIGN for as
-     *       long as it answers "not yet". Spent on the card only: the mint still holds the piece live;</li>
-     *   <li>SET_LIMIT, thirteen bytes, under the owner's proof;</li>
-     *   <li>three wrong VERIFY_PINs when blockedPin, expecting 63C2, 63C1, 6983;</li>
-     *   <li>SELECT, so the app's first command finds a fresh session.</li>
+     *   <li>LOAD_PROOF for each piece, under the PIN, P2 02 (the caller's word that the piece is locked to the card's
+     *       keys for its date), P1 1 where it has the mint's proof;</li>
+     *   <li>for each spent slot, a payment of that one piece and no outputs: SPEND_ALL_BEGIN P1 02, then SPEND_ALL_SIGN
+     *       for as long as it answers "not yet". Spent on the card only: the mint still holds the piece live;</li>
+     *   <li>SET_LIMIT, eighteen bytes, under the owner's proof;</li>
+     *   <li>three wrong VERIFY_PINs when blockedPin (an owned card), expecting 63C2, 63C1, 6983;</li>
+     *   <li>the card out of the field and back, and SELECT: the app's first command finds a fresh tap in a fresh time
+     *       in the field.</li>
      * </ol>
      * The generation moves on success and on failure. A refused step leaves the card as the steps before it left it,
      * with {@code fixtureError} set until the next fixture or reset.
@@ -301,25 +318,28 @@ final class SimCard {
                 byte[] value = f.anchor == null ? f.owner.pub : concat(f.owner.pub, f.anchor);
                 if (owner != null) {
                     expect("SET_OWNER", apdu(0x43, 0, 0, owner.data("CashuCard/set-owner", nonce(), value), -1), SW_OK);
+                    owner = f.owner;
                 } else {
-                    expect("SET_OWNER", apdu(0x43, 0, 0, value, -1), SW_OK);
+                    held("SET_OWNER", apdu(0x43, 0, 0, value, -1), CLAIM_MOST);
+                    owner = f.owner;
+                    // a card claimed in this time in the field pays nothing in it (6985): out of the field and back, and the PIN again
+                    outOfTheFieldAndBack();
+                    expect("VERIFY_PIN", apdu(0x40, 0, 0, f.pin, -1), SW_OK);
                 }
-                owner = f.owner;
             }
             for (byte[] header : f.headers) {
                 expect("SET_HEADER", apdu(0x36, 0, 0, header, 0x04), SW_OK);
             }
             int[] slotOf = new int[f.proofs.size()];
-            if (!f.proofs.isEmpty()) {
-                expect("ALLOW_LOAD", apdu(0x45, 0, 0, owner.data("CashuCard/load", nonce(), new byte[0]), -1), SW_OK);
-                for (int i = 0; i < f.proofs.size(); i++) {
-                    Fixture.Proof p = f.proofs.get(i);
-                    byte[] resp = expect("LOAD_PROOF", apdu(0x30, p.dleq != null ? 1 : 0, 0, p.payload(), p.dleq != null ? 0x02 : 0x01), SW_OK);
-                    slotOf[i] = resp[0] & 0xFF;
-                }
+            for (int i = 0; i < f.proofs.size(); i++) {
+                Fixture.Proof p = f.proofs.get(i);
+                // P2 = 02: the caller's word that the piece is locked to the card's keys for its date (D197); the PIN of step 1 opens the load
+                byte[] resp = expect("LOAD_PROOF", apdu(0x30, p.dleq != null ? 1 : 0, 0x02, p.payload(), p.dleq != null ? 0x02 : 0x01), SW_OK);
+                slotOf[i] = resp[0] & 0xFF;
             }
             for (int idx : f.spentSlots) {
-                expect("SPEND_ALL_BEGIN", apdu(0x22, 0, 0, new byte[] { (byte) slotOf[idx] }, 0x04), SW_OK);
+                // P1 = 02: this burns the place and builds no secret, so it names the keys per load (D197) as a reader of 2.3 does
+                expect("SPEND_ALL_BEGIN", apdu(0x22, 0x02, 0, new byte[] { (byte) slotOf[idx] }, 0x45), SW_OK);
                 byte[] signed;
                 int waits = 0;
                 do {
@@ -335,12 +355,33 @@ final class SimCard {
                 expect("VERIFY_PIN", apdu(0x40, 0, 0, wrong, -1), 0x63C1);
                 expect("VERIFY_PIN", apdu(0x40, 0, 0, wrong, -1), 0x6983);
             }
-            expect("SELECT", SELECT, SW_OK);
-            selected = AID_HEX;
-            tagFile = null;
+            outOfTheFieldAndBack();
         } catch (FixtureException e) {
             fixtureError = e;
             throw e;
+        }
+    }
+
+    /**
+     * The card out of the field and back: jCardSim's reset (power off and on), which ends the tap and the time in the
+     * field (a payment signed, an owner claimed, a history read), then SELECT of the card's applet. Lasting memory is
+     * kept.
+     */
+    private void outOfTheFieldAndBack() throws FixtureException {
+        sim.reset();
+        selected = null;
+        tagFile = null;
+        expect("SELECT", SELECT, SW_OK);
+        selected = AID_HEX;
+    }
+
+    /** A held command (2.3): the same command sent again while the card answers 6A98, keep holding, at most {@code most} times. */
+    private byte[] held(String step, byte[] command, int most) throws FixtureException {
+        for (int asked = 1; ; asked++) {
+            byte[] resp = raw(command);
+            int sw = sw(resp);
+            if (sw == SW_OK) return resp;
+            if (sw != SW_KEEP_HOLDING || asked >= most) throw new FixtureException(step, sw);
         }
     }
 
@@ -357,9 +398,11 @@ final class SimCard {
     }
 
     /**
-     * The card as the applet reports it, through reads that need no PIN and change nothing (GET_INFO P1 = 2, GET_CARD,
+     * The card as the applet reports it, through reads that need no PIN and change nothing (GET_INFO P1 = 4, GET_CARD,
      * GET_PUBKEY, GET_BALANCE, GET_SLOT_STATUS, and GET_PROOF and GET_DLEQ for each slot that is not empty). Reading never
-     * touches the session.
+     * touches the session. With neither the PIN nor the owner's grant, a 2.3 card says its history as zeros (the day's
+     * window and count, the rolls, the arming, the last header) and a spent slot as an empty one (6A88): a spent slot
+     * here is its number and status alone.
      */
     JsonObject state() {
         return onTheCard(this::readState);
@@ -386,6 +429,11 @@ final class SimCard {
         if (info[16] == 1 && owner != null) s.addProperty("ownerKey", Hex.formatLower(owner.pub));
         s.addProperty("testOwner", owner == OwnerKey.TEST);
         s.addProperty("recordSet", info[11] == 1);
+        s.addProperty("format", info[8] & 0xFF);
+        s.addProperty("unit", record[2] & 0xFF);
+        s.addProperty("changeOwed", info[29] == 1);
+        s.addProperty("noPinWindow", record[87] & 0xFF);
+        s.addProperty("profiles", Hex.formatLower(info, 55, 2));
         int mintLen = record[105] & 0xFF;
         if (info[11] == 1) s.addProperty("mint", new String(record, 106, mintLen, java.nio.charset.StandardCharsets.US_ASCII));
         s.addProperty("now", readUint32(info, 17));
@@ -412,8 +460,10 @@ final class SimCard {
             JsonObject slot = new JsonObject();
             slot.addProperty("slot", i);
             slot.addProperty("status", statusName(status[i]));
-            if (status[i] != 0) {
-                byte[] p = data(raw(apdu(0x13, i, 0, null, 0x52)), "GET_PROOF");
+            byte[] read = status[i] != 0 ? raw(apdu(0x13, i, 0, null, 0x52)) : null;
+            // a spent slot is history: 6A88 to a reader with neither the PIN nor the grant (2.3, D198); any other refusal is the bridge's error
+            if (read != null && !(status[i] == 2 && sw(read) == SW_SLOT_EMPTY)) {
+                byte[] p = data(read, "GET_PROOF");
                 slot.addProperty("keysetId", Hex.formatLower(p, 1, 8));
                 slot.addProperty("amount", readUint32(p, 9));
                 slot.addProperty("nonce", Hex.formatLower(p, 13, 32));

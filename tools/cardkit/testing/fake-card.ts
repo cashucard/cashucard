@@ -73,6 +73,13 @@ export interface CardAppletState {
   pin: number;
   record: number;
   owner: number;
+  /**
+   * Openings of change owed (0 by default): GET_CHANGE's count, and on a 2.3
+   * card GET_INFO byte 29 = 1 while any is owed.
+   */
+  change?: number;
+  /** The minor version SELECT and GET_INFO answer: 3 (the tracked CAP's) by default, 1 or 2 for an older card. */
+  minor?: number;
 }
 
 export interface FakeCardOptions {
@@ -375,8 +382,8 @@ export class FakeCard {
     }
     const inst = this.instances.get(target)!;
     if (inst.module === CARD_MODULE) {
-      // the tracked CAP's version (CARD_VERSION): 2.2
-      return sw(0x9000, [0x02, 0x02]);
+      // the tracked CAP's version (CARD_VERSION), 2.3, unless the state names another
+      return sw(0x9000, [0x02, inst.state.minor ?? 0x03]);
     }
     return sw(0x9000);
   }
@@ -385,9 +392,10 @@ export class FakeCard {
     const [cla, ins] = apdu;
     if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x01) {
       const s = inst.state;
+      const minor = s.minor ?? 0x03;
       const info = [
         0x02,
-        0x02,
+        minor,
         0x80,
         s.unspent,
         s.spent,
@@ -399,8 +407,16 @@ export class FakeCard {
         0x00,
         s.record,
       ];
-      info.push(0, 0, 0, 0, s.owner, ...new Array(13).fill(0));
+      info.push(0, 0, 0, 0, s.owner, ...new Array(12).fill(0));
+      // byte 29: on 2.3, change owed; 2.1 and 2.2 say something else there, 0 outside a tap that loads change
+      info.push(minor === 3 && (s.change ?? 0) > 0 ? 1 : 0);
       return sw(0x9000, info);
+    }
+    if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x19) {
+      // GET_CHANGE page 0: a count, then 83-byte openings on 2.3, 80-byte ones on 2.1 and 2.2
+      const owed = Math.min(inst.state.change ?? 0, 3);
+      const size = (inst.state.minor ?? 3) === 3 ? 83 : 80;
+      return sw(0x9000, [owed, ...new Array(owed * size).fill(0x0c)]);
     }
     if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x10) {
       return sw(0x9000, [0x03, ...new Array(32).fill(0x5a)]);

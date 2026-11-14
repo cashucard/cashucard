@@ -39,7 +39,7 @@ export const SETUP = {
   otherMint: 'Other mint…',
   mintsFailed:
     'The mint list could not be loaded. Retry or enter a batch reference.',
-  buildLine: (sha8: string) => `Builds the 2.2 card. Load file ${sha8}…`,
+  buildLine: (sha8: string) => `Builds the 2.3 card. Load file ${sha8}…`,
   /** The second line of a discovered mint's cell (D180). */
   mintReviews: (reviews: number, name?: string) =>
     `${reviews} ${reviews === 1 ? 'review' : 'reviews'}${
