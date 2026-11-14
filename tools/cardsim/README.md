@@ -232,13 +232,13 @@ the same bytes on the wire as `tools/cardctl/cardctl.py`.
 | `spendAllBegin(slots, {units})` | `SPEND_ALL_BEGIN` | P1 `02` (`03` with `units`), Le `45`; answers `{total, t, refund}`: the payment's key is `cashu-crypto.tweakedKey(P, t)` |
 | `spendAllOutputs(outputs, keyset?)` | `SPEND_ALL_OUTPUTS` | with a keyset, P1 `01` and the keyset first |
 | `spendAllChange(amount, K, keyset)` | `SPEND_ALL_CHANGE` | 45 bytes: the amount, the mint's key K for it (33), the keyset (8); Le `21` |
-| `spendAllSign()`, `spendAllAgain(hash?)` | `24`, `25` | every payment waits a floor (`00 01` answers); AGAIN P1 `01` by the message's hash |
+| `spendAllSign()`, `spendAllAgain(hash?)` | `24`, `25` | `00 01` answers only for a payment over its limit or a second one in the time in the field (no floor, D205); AGAIN P1 `01` by the message's hash |
 | `getChange(page)`, `owedChange()` | `GET_CHANGE` | 83-byte openings `{number, amount, keysetId, date, B_, K}`, no blinding factor |
 | `keysetKeysBegin/Keys/Finish/Show`, `teachKeyset(ks)`, `showOpeningKey(opening, ks)` | `KEYSET_KEYS` (`38`) | teach a keyset under the PIN (the card checks the keys against the ID); show an opening's key by its path, any reader |
 | `loadChange(k, C_, K, e, s)` | `LOAD_CHANGE` (`27`) | P2 `02`, Lc `C2`, C_ and K written in the `04` form (02/03 accepted), Le `53`; answers `{slot, proofKept, piece}` |
 | `loadProof(keyset, amount, nonce, C, date, dleq, {unit})` | `LOAD_PROOF` | P2 `02` (`03` with the unit first): the caller's word that the piece is locked to the card's keys for its date; the PIN in the tap |
 | `verifyPin(pin)` | `VERIFY_PIN` | sent again while the card answers `6A98` (a card with no owner serving the wait of wrong tries) |
-| `claimOwner(anchor?, key?)` | `SET_OWNER` on a card with no owner | the same data sent while the card answers `6A98` (six askings) |
+| `claimOwner(anchor?, key?)` | `SET_OWNER` on a card with no owner | the same data sent while the card answers `6A98` (four askings) |
 | `allowLoad()` | `ALLOW_LOAD` | `6200` is the grant (it opens no load); `9000`, a card of 2.2 or earlier, is refused |
 | `setLimit({day, payment, allowance, rollBudget, rate, noPinWindow})` | `SET_LIMIT` | 4, 8, 12, 13, 17 or 18 bytes (`limitValue`) |
 | `getPubkey`, `getBalance`, `getProofCount`, `getSlotStatus`, `getProof`, `auth`, `getDleq`, `getOutbox*`, `getNonce`, `clearSpent`, `setHeader`, `setPin`, `changePin`, `refresh` | as before | `getProof` of a spent slot, `clearSpent` and `getOutbox` outside the paying time in the field want the PIN (and the packet the owner's grant on an owned card) |
@@ -327,7 +327,7 @@ past this change (both pins move together, with the app changes below):
 - **Paying.** `SPEND_ALL_BEGIN` is P1 `02` and answers 69 bytes:
   `client.spendAllBegin` returns `{total, t, refund}`, not a number. Build each
   input's secret with P + t·G (`cashu-crypto.tweakedKey(P, t)`) and check the
-  signature under it. Every payment waits a floor: keep sending `SPEND_ALL_SIGN`
+  signature under it. A payment over its limit waits (a payment within it signs at the first send): keep sending `SPEND_ALL_SIGN`
   while it answers `00 01`.
 - **The card's own change.** `spendAllChange(amount, K, keyset)` names the mint's key
   and the keyset, which the card must have been taught (`teachKeyset`, under the

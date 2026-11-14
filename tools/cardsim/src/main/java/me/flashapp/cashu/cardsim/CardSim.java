@@ -77,7 +77,7 @@ import java.util.function.Supplier;
  *       the field and back and a SELECT, so the app's first command finds a
  *       fresh tap in a fresh time in the field. {@code owner: true} sets the
  *       deterministic TEST owner key (OwnerKey.TEST, the same as cardctl's and
- *       client.cjs's): on a card with no owner by the claim (six askings, in
+ *       client.cjs's): on a card with no owner by the claim (four askings, in
  *       the first set-up, under the PIN), after which the card is taken out of
  *       the field and back; the bridge then signs the owner's proofs with it
  *       for {@code limits}. {@code spentSlots} are spent on the <i>card</i>

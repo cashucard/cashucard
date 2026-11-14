@@ -266,7 +266,7 @@ class SimpleCardTest {
     // =========================================================================
 
     @Test
-    @DisplayName("A holder with no phone who wants one as owner empties the card, resets it by the PIN in a held tap (sixty askings), and sets it up again: the phone claims it in the new first set-up")
+    @DisplayName("A holder with no phone who wants one as owner empties the card, resets it by the PIN in a held tap (fifteen askings after the history's five), and sets it up again: the phone claims it in the new first set-up")
     void theWayBackToAPhone() throws Exception {
         UnitsTest.Card c = setUpWith(concat(u32(1000), u32(500), u32(100)));
         byte[] oldKey = c.send(new CommandAPDU(CLA, INS_GET_PUBKEY, 0, 0, 256)).getData();
@@ -277,7 +277,7 @@ class SimpleCardTest {
         HolderTest.hold(c);
         int[] r = resetByPin(c);
         assertEquals(SW_OK, r[1], "the reset");
-        assertEquals(CashuApplet.RESET_ASKINGS - 1, r[0], "held for");
+        assertEquals(CashuAppletTest.RESET_ASKINGS - 1, r[0], "held for");
         assertEquals(0, c.field("pinState")[0], "no PIN");
         assertEquals(0, c.field("ownerSet")[0]);
         assertEquals(0, c.record()[CashuApplet.CARD_SET_OFFSET], "no record");
@@ -328,10 +328,10 @@ class SimpleCardTest {
         assertEquals(SW_CONDITIONS_NOT_SATIS, raw(c, RESET_BY_PIN), "a tap that paid");
         c.tap();
         HolderTest.hold(c);
-        for (int k = 0; k < 30; k++) assertEquals(SW_KEEP_HOLDING, raw(c, RESET_BY_PIN), "asking " + k);
+        for (int k = 0; k < RESET_ASKINGS - HISTORY_ASKINGS; k++) assertEquals(SW_KEEP_HOLDING, raw(c, RESET_BY_PIN), "asking " + k);
         c.info(0);
         int[] r = resetByPin(c);
-        assertEquals(CashuApplet.RESET_ASKINGS - 1, r[0], "begun again");
+        assertEquals(CashuAppletTest.RESET_ASKINGS - 1, r[0], "begun again");
         assertEquals(SW_OK, r[1]);
     }
 

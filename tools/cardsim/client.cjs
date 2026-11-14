@@ -181,7 +181,7 @@ const KEYSET_UNITS = Object.freeze(["sat", "usd"])
 const CERT_STATE = 0xff, CERT_PAGE = 256, CERT_PAGES = 4
 /** GET_NONCE P1 = 1 (2.3): the nonce (16), the PIN key (33), the card key's signature over it (64). */
 const PIN_KEY_ANSWER_LEN = 113
-/** Held commands (2.3): a claim is six askings; a VERIFY_PIN on a card with no owner waits at most 16,384 askings, in stretches of 16, then the try. */
+/** Held commands (2.3): a claim is four askings (the bound is more); a VERIFY_PIN on a card with no owner waits at most 16,384 askings, in stretches of 16, then the try. */
 const CLAIM_MOST = 10
 const PIN_WAIT_MOST = 16384 + 16384 / 16 + 2
 /** GET_INFO P1 = 4, bytes 55 and 56: the profiles a card keeps, one bit each (spec/APDU.md, GET_INFO). */
@@ -1159,7 +1159,7 @@ class CardSim {
     if (b.length !== 33) throw new Error(`SPEND_ALL_CHANGE returned ${b.length} bytes, expected 33`)
     return b
   }
-  /** SPEND_ALL_SIGN, sent again for as long as the card answers "not yet" (00 01; 2.3: every payment waits a floor). Answers { signature, waits }. Not idempotent. */
+  /** SPEND_ALL_SIGN, sent again for as long as the card answers "not yet" (00 01; only over the limit or a second payment, 2.3 has no floor, D205). Answers { signature, waits }. Not idempotent. */
   async spendAllSign({ maxWaits = 1100 } = {}) {
     for (let waits = 0; waits <= maxWaits; waits++) {
       const b = await this.send(encode.spendAllSign(), "SPEND_ALL_SIGN")
@@ -1240,7 +1240,7 @@ class CardSim {
   /**
    * ALLOW_LOAD, the owner's grant for this tap. A 2.3 card answers 6200 where the grant is given: it opens no load (a load
    * wants the PIN) and signs nothing; under it the history is read, GET_INFO says the limit on one payment and the rate,
-   * and a second payment in the time in the field waits the floor alone. A 9000 is a card of 2.2 or earlier, whose grant
+   * and a second payment in the time in the field is not slowed. A 9000 is a card of 2.2 or earlier, whose grant
    * opens loads with no PIN: refused here.
    */
   async allowLoad(ownerKeyHex = TEST_OWNER_PRIVATE) {

@@ -74,8 +74,8 @@ import java.util.Arrays;
 
 /**
  * The owner claimed slowly (2.3, D187) and a holder with no phone (2.3, D189): SET_OWNER on a card with no owner is a claim of
- * six askings under the PIN, never in a time in the field that paid, after which that time in the field pays nothing; the
- * card of a holder with no phone is loaded and set under its PIN, its history held for over ten askings, and a held tap
+ * four askings under the PIN, never in a time in the field that paid, after which that time in the field pays nothing; the
+ * card of a holder with no phone is loaded and set under its PIN, its history held for over five askings, and a held tap
  * stands where the owner's grant or proof stands; a factory record is no record; REFRESH P1 = 1. And the owner's key is a
  * point of P-256, which the card checks itself.
  *
@@ -120,8 +120,8 @@ class HolderTest {
     // =========================================================================
 
     @Test
-    @DisplayName("A claim is six askings of the same data: the first five answered 6A98 with nothing, no owner set; the sixth sets it on the empty card; and no payment is taken for the rest of that time in the field, through a SELECT, until the card leaves the field")
-    void theClaimIsHeldForSixAskings() throws Exception {
+    @DisplayName("A claim is four askings of the same data: the first three answered 6A98 with nothing, no owner set; the fourth sets it on the empty card; and no payment is taken for the rest of that time in the field, through a SELECT, until the card leaves the field")
+    void theClaimIsHeldForFourAskings() throws Exception {
         UnitsTest.Card c = claimable();
         for (int k = 1; k < CLAIM_ASKINGS; k++) {
             ResponseAPDU r = raw(c, setOwnerOpenCommand(OWNER));
@@ -130,7 +130,7 @@ class HolderTest {
             assertEquals(0, c.field("ownerSet")[0], "no owner yet after asking " + k);
             assertEquals(k, c.field("nonceLive")[1], "the count, in RAM");
         }
-        assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW(), "the sixth");
+        assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW(), "the fourth");
         assertEquals(1, c.info(0)[16], "the owner is set");
         int place = c.put(-1, A.id8(), 64);
         assertEquals(64, readUint32(c.balance(0), 0), "a piece loaded under the PIN in the same time in the field");
@@ -146,48 +146,48 @@ class HolderTest {
     @DisplayName("Any other command between askings begins the count again (GET_INFO, an asking of the history, a SELECT with the PIN given again), and so does other data (another key, the same key with an anchor); a SET_OWNER refused for its own data neither counts nor ends the count")
     void theCountBeginsAgain() throws Exception {
         UnitsTest.Card c = claimable();
-        keepHolding(c, setOwnerOpenCommand(OWNER), 3, "three");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 2, "two");
         c.info(0);
-        keepHolding(c, setOwnerOpenCommand(OWNER), 5, "after GET_INFO, from the first");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 1, "after GET_INFO, from the first");
         assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW());
 
         c = claimable();
-        keepHolding(c, setOwnerOpenCommand(OWNER), 4, "four");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 1, "three");
         assertEquals(SW_KEEP_HOLDING, raw(c, logCommand(0)).getSW(), "an asking of the history");
-        keepHolding(c, setOwnerOpenCommand(OWNER), 5, "after the history's asking, from the first");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 1, "after the history's asking, from the first");
         assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW());
 
         c = claimable();
-        keepHolding(c, setOwnerOpenCommand(OWNER), 5, "five");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 1, "three");
         c.select();
         c.pin();
         assertEquals(SW_OWNER_PROOF, raw(c, setOwnerOpenCommand(OWNER)).getSW(), "a SELECT ends the first set-up, and the claim with it (D196)");
         assertEquals(0, c.field("ownerSet")[0]);
 
         c = claimable();
-        keepHolding(c, setOwnerOpenCommand(OWNER), 5, "five of one key");
-        keepHolding(c, setOwnerOpenCommand(OTHER_OWNER), 5, "another key, from the first");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 1, "three of one key");
+        keepHolding(c, setOwnerOpenCommand(OTHER_OWNER), CLAIM_ASKINGS - 1, "another key, from the first");
         assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OTHER_OWNER)).getSW());
         assertEquals(SW_GRANT, c.sw(new CommandAPDU(CLA, CashuAppletTest.INS_ALLOW_LOAD, 0, 0,
             ownerData(ownerProof(L_LOAD, OTHER_OWNER, c.send(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData(), new byte[0]), new byte[0]))),
-            "the owner is the key asked for six times");
+            "the owner is the key asked for four times");
 
         c = claimable();
         CommandAPDU anchored = new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, concat(OWNER.pub, blockAt(T0 + 60)));
-        keepHolding(c, setOwnerOpenCommand(OWNER), 5, "five with no anchor");
-        keepHolding(c, anchored, 5, "the same key with an anchor is other data");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 1, "three with no anchor");
+        keepHolding(c, anchored, CLAIM_ASKINGS - 1, "the same key with an anchor is other data");
         assertEquals(SW_OK, raw(c, anchored).getSW());
-        assertEquals(T0 + 60, readUint32(c.info(0), 17), "the anchor taken at the sixth");
+        assertEquals(T0 + 60, readUint32(c.info(0), 17), "the anchor taken at the last asking");
 
         c = claimable();
-        keepHolding(c, setOwnerOpenCommand(OWNER), 3, "three");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 2, "two");
         assertEquals(SW_WRONG_LENGTH, raw(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, new byte[64])).getSW(), "a key of 64 bytes");
         byte[] notUncompressed = OWNER.pub.clone();
         notUncompressed[0] = 0x02;
         assertEquals(SW_WRONG_DATA, raw(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, notUncompressed)).getSW(), "a key not beginning 04");
         assertEquals(SW_WRONG_DATA, raw(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, concat(OWNER.pub, new byte[80]))).getSW(), "an anchor whose bits no header carries");
-        keepHolding(c, setOwnerOpenCommand(OWNER), 2, "the count went on");
-        assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW(), "the sixth good asking");
+        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 3, "the count went on");
+        assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW(), "the last good asking");
     }
 
     @Test
@@ -265,13 +265,13 @@ class HolderTest {
     }
 
     @Test
-    @DisplayName("An owner's key that is not a point of P-256 is refused (6A80) and not written: a claim's sixth asking, and an owner's handover under a good proof; the card checks it itself, whatever the chip's key object would take")
+    @DisplayName("An owner's key that is not a point of P-256 is refused (6A80) and not written: a claim's last asking, and an owner's handover under a good proof; the card checks it itself, whatever the chip's key object would take")
     void anOwnerKeyOffTheCurveIsRefused() throws Exception {
         byte[] off = OWNER.pub.clone();
         off[64] ^= 0x02;   // y off by two: the same x, and no point
         UnitsTest.Card c = claimable();
         keepHolding(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, off), CLAIM_ASKINGS - 1, "a key off the curve is held for as any");
-        assertEquals(SW_WRONG_DATA, raw(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, off)).getSW(), "and refused at the sixth");
+        assertEquals(SW_WRONG_DATA, raw(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, off)).getSW(), "and refused at the last asking");
         assertEquals(0, c.info(0)[16], "no owner");
         keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 1, "a key of the curve, from the first");
         assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW());
@@ -379,7 +379,7 @@ class HolderTest {
     // =========================================================================
 
     @Test
-    @DisplayName("The history of a card with a PIN and no owner is held for: the PIN given (6982), never in a time in the field that paid (6985), nine askings answered 6A98 and the tenth the log; then the log and the receipts are open to the PIN for the rest of the time in the field, through a SELECT, and no payment is taken in it; any other command begins the count again, and a P1 over 3 neither counts nor ends it")
+    @DisplayName("The history of a card with a PIN and no owner is held for: the PIN given (6982), never in a time in the field that paid (6985), four askings answered 6A98 and the fifth the log; then the log and the receipts are open to the PIN for the rest of the time in the field, through a SELECT, and no payment is taken in it; any other command begins the count again, and a P1 over 3 neither counts nor ends it")
     void theHistoryIsHeldFor() throws Exception {
         UnitsTest.Card c = noOwner();
         int place = c.put(-1, A.id8(), 64);
@@ -390,9 +390,9 @@ class HolderTest {
         c.power();
         assertEquals(SW_SECURITY_NOT_SATIS, raw(c, logCommand(0)).getSW(), "the PIN not given");
         c.pin();
-        keepHolding(c, logCommand(0), HISTORY_ASKINGS - 1, "nine askings");
+        keepHolding(c, logCommand(0), HISTORY_ASKINGS - 1, "six askings");
         ResponseAPDU log = raw(c, logCommand(0));
-        assertEquals(SW_OK, log.getSW(), "the tenth");
+        assertEquals(SW_OK, log.getSW(), "the seventh");
         assertEquals(1, readUint32(log.getData(), 0), "the log: one tap, the loads and the payment");
         assertEquals(SW_OK, raw(c, logCommand(1)).getSW(), "the receipts at once: one hold");
         assertEquals(SW_OK, raw(c, logCommand(3)).getSW());
@@ -405,12 +405,12 @@ class HolderTest {
         assertEquals(SW_KEEP_HOLDING, raw(c, logCommand(0)).getSW(), "a new time in the field is held again");
         // the count: another command begins it again; a P1 over 3 neither counts nor ends it
         c.tap();
-        keepHolding(c, logCommand(0), 5, "five");
+        keepHolding(c, logCommand(0), HISTORY_ASKINGS - 4, "three");
         assertEquals(SW_INCORRECT_P1, raw(c, logCommand(4)).getSW(), "P1 = 4");
-        keepHolding(c, logCommand(1), 4, "the count went on, the receipts' askings with the log's");
-        assertEquals(SW_OK, raw(c, logCommand(1)).getSW(), "the tenth");
+        keepHolding(c, logCommand(1), HISTORY_ASKINGS - 4, "the count went on, the receipts' askings with the log's");
+        assertEquals(SW_OK, raw(c, logCommand(1)).getSW(), "the seventh");
         c.tap();
-        keepHolding(c, logCommand(0), 5, "five");
+        keepHolding(c, logCommand(0), HISTORY_ASKINGS - 1, "six");
         c.info(0);
         keepHolding(c, logCommand(0), HISTORY_ASKINGS - 1, "after GET_INFO, from the first");
         assertEquals(SW_OK, raw(c, logCommand(0)).getSW());

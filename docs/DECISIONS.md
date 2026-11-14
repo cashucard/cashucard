@@ -5952,9 +5952,9 @@ card with no owner is a claim (*amended by [D202](#d202): the claim may bring th
 sealed in a `SET_OWNER` P1 = `01` just before it, and its check at the end of the data*): the PIN set and given in this tap, the card in its first
 set-up ([D196](#d196): a card set up with no owner is never claimed, `6A91`), no payment
 signed in this time in the field, an empty card (nothing unspent and no change owed,
-`6A8D`, as 2.2 had it; see [D195](#d195)), and the same data asked six times in a row.
-Each of the first five askings is answered `6A98`, keep holding, after a signature's
-work of the card's own, thrown away (some three seconds in all on a chip); the sixth
+`6A8D`, as 2.2 had it; see [D195](#d195)), and the same data asked four times in a row
+(six until [D205](#d205)). Each of the first three askings is answered `6A98`, keep holding, after a signature's
+work of the card's own, thrown away (about three seconds in all on a J3R180, 0.59 to 0.66 s an asking; 2.94 s measured); the fourth
 sets the owner. Other data, or any other command between, begins the count again.
 After a claim, no payment command is taken for the rest of that time in the field
 (`6985`). The anchor of [D20](#d20) rides
@@ -5992,7 +5992,7 @@ or −1 mod `p₁`, that is `T` or `N − T`, where `T` is `p₂` raised to the 
 where the sum is 0 mod `p₁` as well: a chance of 2⁻²⁵⁶ that no key can be chosen to make,
 and refused).
 
-**Built (applet).** `CLAIM_ASKINGS = 6`. The count is a second byte of the
+**Built (applet).** `CLAIM_ASKINGS = 4` (6 until [D205](#d205)). The count is a second byte of the
 CLEAR_ON_DESELECT `nonceLive` (941 bytes of deselect RAM in all, the figure of the build
 that installed on a slower chip), its top bit set while it counts a history's askings
 ([D189](#d189)); `process` sets it to 0 before any command but the one it counts, a
@@ -6003,7 +6003,7 @@ are three bits of the CLEAR_ON_RESET `tapOpen[2]` beside D186's arming: `TAP_PAI
 a payment's commit), `TAP_CLAIMED` and `TAP_READ`; `RESET_CARD` clears none of them, so a
 time in the field that paid or claimed stays so through a reset. Every payment command
 answers `6985` while `TAP_CLAIMED` or `TAP_READ` is set. A claim checks the anchor at every
-asking (`6A93`, `6A80`, neither counting nor ending the count) and takes it at the sixth
+asking (`6A93`, `6A80`, neither counting nor ending the count) and takes it at the fourth
 in the key's transaction with the rolls at 0. A claim asks for an empty card
 (`requireNothingOwed`: nothing unspent, then no change owed). No write is new outside a transaction:
 the key, the flag and the anchor are one transaction, as in 2.2.
@@ -6011,6 +6011,9 @@ the key, the flag and the anchor are one transaction, as in 2.2.
 ---
 
 ## <a id="d188"></a>D188: Every payment waits a floor
+
+**Taken away by [D205](#d205) (the project owner, 2026-11-14):** a payment within its limit, the first of its time in
+the field, is signed at its first `SPEND_ALL_SIGN` again. What follows is what D188 decided, kept as it was.
 
 **Decided (protocol 2.3, 2026-11-12).** Every payment, within its limit or not, is at
 least four signatures of the card's work from `SPEND_ALL_BEGIN` to its signature, its
@@ -6050,8 +6053,8 @@ is set where W is above 0. The waits write nothing that lasts, as 2.2's did.
 holder with no phone of their own. It is set up, loaded and freed under its PIN
 (`LOAD_PROOF` no longer asks for an owner), and its numbers are set under its PIN
 (`SET_LIMIT_PIN`: in its first set-up, and after it none, [D196](#d196)). Its history is the PIN's, and **held for**: `GET_LOG` answers `6A98`,
-keep holding, to the first nine askings in a row, a signature's work each, and the
-history at the tenth; never in a time in the field in which a payment was signed, and no
+keep holding, to the first six askings in a row (nine until [D205](#d205)), a signature's work each, and the
+history at the seventh; never in a time in the field in which a payment was signed, and no
 payment is taken for the rest of a time in the field that read it (a **held tap**). On
 such a card a held tap stands where the owner's grant or proof stands: to mark a new
 keyset, to bind an opening to another key, to give an opening up, to change a used card's
@@ -6081,7 +6084,7 @@ is not theirs. Letting the PIN alone stand for the owner: a reader has the PIN.
 **Cost accepted.** A reader that keeps a holder's PIN can hold a tap of its own and do
 there what the holder can, the same as reading the history; what it writes is in the
 card's record for the holder's next phone to see. It loosens no number and claims no card
-([D196](#d196)). Reading the history takes five seconds.
+([D196](#d196)). Reading the history takes about four seconds (five until [D205](#d205), with seven askings now).
 
 **The numbers go with a stranger's PIN** (until [D196](#d196), which took this out: a card set up
 by someone else keeps its numbers until its holder resets it). On a card with no record of the holder's (no
@@ -6092,10 +6095,10 @@ start and switch. The day's limit, which only tightens, stays. Otherwise a stran
 put a PIN on a card on its way to its holder could leave it a large allowance that the
 holder's own set-up, writing a shorter `SET_LIMIT`, would keep.
 
-**Built (applet).** `HISTORY_ASKINGS = 10`. `requireHistory` reads the history: on an owned
+**Built (applet).** `HISTORY_ASKINGS = 7` (10 until [D205](#d205)). `requireHistory` reads the history: on an owned
 card as 2.2 had it (the grant for both, or the PIN for the log), on a card with no owner the
 PIN, no `TAP_PAID`, then the held count with `HELD_HISTORY` in its top bit, `TAP_READ` at the
-tenth; a `GET_LOG` with a P1 over 3 is refused before it and leaves the count alone. The
+fifth; a `GET_LOG` with a P1 over 3 is refused before it and leaves the count alone. The
 holder's say is `holderSays` (the grant, or the PIN in a held tap: `GET_INFO`'s limit on one
 payment and rate, a load's new keyset) and `requireSay` (`KEYSET_KEYS` with another key);
 the let-go and `REFRESH` P1 = 1 want `requireHeld` after the PIN (`6985` with `TAP_PAID`,
@@ -6379,15 +6382,17 @@ which check the major alone, must move to the 2.3 wire for change, set-up and to
 **The cards.** A 2.2 card moves to 2.3 as a 2.1 card moved to 2.2: swept, then a new
 install, which makes a new key.
 
-**The size.** A load file of 36,953 bytes by refcheck's measure (89 past a multiple of 256),
+**The size.** A load file of 36,950 bytes by refcheck's measure (86 past a multiple of 256),
 against 21,631 for 2.2. On 2026-11-13 a J3R180 installed earlier 2.3 source padded to 33,647
 and 35,213 bytes and refused the card's applet padded to 32,777 (`6F00`, twice), so refcheck
 refuses a build from 32,700 to 32,850. This file is not padded. On the same day the same
 J3R180 installed the file this source made before [D200](#d200) (35,466 bytes, load file
 sha256 `48b8597c…`), and that file's chip run had real signatures and real change verified at
 a test mint ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md)): refcheck keeps its size and
-its hash. This file adds D200 to D204 and is not yet tried on a chip: its own chip run comes
-before it ships.
+its hash. The file before [D205](#d205) (36,953 bytes, load file sha256 `f216644a…`, D200 to D204)
+ran on the same J3R180 on 2026-11-14 with real signatures and real change verified, and refcheck keeps
+its size and its hash too. This file adds D205 (no payment floor, shorter holds; 3 bytes fewer, the loader's y
+having been tried and taken out) and is not yet tried on a chip: its own chip run comes before it ships.
 The constructor asks for 30,056 bytes of persistent memory, 214 more than 2.2's 29,842
 (the PIN's marks and the day's loads, the receipt's figures kept with the last signature, c,
 the refund key's y and the count of the owners' c); the openings' keys, the keyset table and the paid list are
@@ -6687,10 +6692,10 @@ no owner and of a wait of two stretches pulled at every write.
 - **The way back: a reset by the PIN.** `RESET_CARD` P1 = 0 on a card with no owner takes no
   data and no proof: the PIN given in this tap (`6A97` with none, `6982`), a held tap (`6985`
   in a time in the field that paid, `6982` with no hold, [D189](#d189)), no data (`6700`) and
-  nothing unspent or owed (`6A8D`); then `RESET_ASKINGS` (60) askings of the same command in a
-  row, each a signature's work of the card's own answered `6A98` (some forty seconds on a
-  chip), counted in RAM as a claim's are (`nonceLive[1]` with both held marks, `HELD_RESET`);
-  any other command between, a `SELECT` among them, begins the count again. The sixtieth
+  nothing unspent or owed (`6A8D`); then `RESET_ASKINGS` (17; 60 until [D205](#d205)) askings of the same command in a
+  row, each a signature's work of the card's own answered `6A98` (about eleven seconds on a
+  J3R180, 0.59 to 0.66 s an asking; about fifteen with the history's seven before it), counted in RAM as a claim's are (`nonceLive[1]` with both held marks, `HELD_RESET`);
+  any other command between, a `SELECT` among them, begins the count again. The fifteenth
   resets the card as the owner's reset does: no PIN, no owner, no record, no limits, no
   history, every opening and entry free, a new card key and an empty paid list, or, on a
   certified card, the same key and the list kept ([D191](#d191), [D192](#d192)). The holder then
@@ -6711,7 +6716,7 @@ no owner and of a wait of two stretches pulled at every write.
   unit is turned at the rate and rounded up, as a payment's figures are (a card with a limit
   and no rate takes none of the other unit, `6A99`). It is asked after the paid list, before
   the day's loads, so a batch stops at the first such piece. A piece above the limit on one
-  payment goes on: it is paid with the wait ([D188](#d188)). `LOAD_CHANGE` is not refused: the
+  payment goes on: it is paid with the wait (2.2's, [D188](#d188), [D205](#d205)). `LOAD_CHANGE` is not refused: the
   card's own change is of a payment whose pieces the day held whole, and is never above the
   day's limit.
 - **The receipt from the payment's commit.** The payment's transaction keeps, beside the
@@ -6799,8 +6804,8 @@ card set up by someone else on its way to its holder answers its holder's `SET_P
 and a card claimed is the claimer's (nothing was on it). A reader handed the PIN that holds an
 empty card for the reset's minute can set it up again with the holder's PIN and numbers of its
 own; the card it leaves has a new card key (unless certified), a new c, a generation one more and
-no history. **This is a risk accepted**: about 45 seconds of holding (the history's nine askings
-and the reset's sixty) with the PIN, on an empty card; no till takes that long to take a payment.
+no history. **This is a risk accepted**: about 15 seconds of holding (the history's seven askings
+and the reset's seventeen, 24 askings at 0.59 to 0.66 s; 45 seconds until [D205](#d205)) with the PIN, on an empty card; no till takes that long to take a payment.
 The reader can set the card up with the holder's PIN and mint and with numbers, a refund key or
 an owner of its own, refund key included, and the holder's next top-up is under them. The
 holder's own phone sees it before a top-up: `GROUP_KEYS` for the next load's date answers other
@@ -7815,3 +7820,64 @@ clock back). `cardctl setup` wants `--anchor`, and says when the claim's anchor 
 |---|---|---|
 | `processSetHeader` | none (the first set-up's anchor in `SET_HEADER`'s one transaction) | The clock, its weakness, the hardest, the window, the day of loads and the hash: all new or all old. |
 | `processSetOwner` | none new (the claim's anchor in the command's one transaction) | As above, with the owner's key and c. |
+
+---
+
+## <a id="d205"></a>D205: No payment floor; shorter holds (the claim 3 s, the history 4 s, the reset by the PIN 15 s; the loader's y tried and taken out)
+
+**Decided (protocol 2.3, 2026-11-14, the project owner).** "Do not slow down payments for 'pickpocket'
+security. Those extra padding calculations should be removed." Then: "Reset pin should only be 15
+seconds", "History should take 4 seconds", "Owner claim should be brought down so it's 3 seconds."
+Supersedes [D188](#d188) and sets the counts of [D187](#d187), [D189](#d189) and [D196](#d196).
+
+- **The payment floor is gone.** A payment within its limit, the first in its time in the field,
+  is signed at its first `SPEND_ALL_SIGN`: no "not yet". `WAIT_FLOOR_SIGNS` is removed. 2.2's waits
+  stay exactly as they were, for a payment over the limit on one payment and for a second payment
+  in a time in the field, and so does the change outputs' credit against them (two waits for every
+  three outputs, never below none):
+
+      waits = max(0, W − ⌊2 × outputs / 3⌋)
+
+  with W 2.2's wait (0 within the limit; `WAIT_OVER_SIGNS` + `WAIT_MORE_SIGNS` × (N − 2) for N
+  limits' worth leaving the card; `WAIT_OVER_SIGNS` for a second payment in the time in the field,
+  unless the owner's grant is in the tap). The most a payment waits is 1,022 answers (D188's was
+  1,025). The log's bit 1 is set where W is above 0, as before.
+- **The holds are shorter.** The counts were first made from 0.75 s an asking (one held asking 0.68 to 0.86 s on a reset); the
+  chip run of 2026-11-14 measured 0.59 to 0.66 s an asking, and the claim came out at 2.94 s, the history at 2.4 s (target 4 s) and
+  the reset at 12.3 s in all (target 15 s). The counts below are made from the measured 0.6 s:
+
+  | Hold | Askings | Seconds on this chip | Before |
+  |---|---|---|---|
+  | The owner's claim (`CLAIM_ASKINGS`): `SET_OWNER` on a card with no owner | 4 (the fourth sets the owner) | about 3 | 6 |
+  | The history of a card with no owner (`HISTORY_ASKINGS`): `GET_LOG` | 7 (the seventh answers) | about 4 (4.2) | 10 |
+  | The reset by the PIN of a card with no owner (`RESET_ASKINGS`) | 17 (the seventeenth resets; 24 with the history's 7) | about 11 (15 with the history's) | 60 |
+
+  The reset by the PIN also wants a held tap, so a holder with no phone who resets a card holds
+  the history's 7 askings first: 24 askings, about 15 seconds in all (the project owner's "15 seconds"), where it was 70 askings (about 52 s).
+  A chip slower than the J3R180 holds longer for the same counts.
+
+- **The loader's y is not in this file.** A first build of D205 added `LOAD_PROOF` P2 bit 2 (`04`): each piece's C's y after
+  the piece, with the card showing C on the curve by y² = x³ + 7 (two cubes of the chip's RSA and additions) in place of the
+  square-root test, to save the 108 ms the test costs. The chip run of 2026-11-14 on a J3R180 showed two things. **It is slower:**
+  a piece with y took 310.8 ms against 204.6 ms without it (the two cubes cost more on the chip than the test they replace). And
+  **the file is too large**: the 37,573-byte load file's applet was refused at its first create (`6F00`) on two installs, where
+  the 36,953-byte file's is created at the first try. So the form, its code, its tests, `cardctl load --with-y` and its texts are
+  taken out, and `LOAD_PROOF` is as in the file before D205: P2 `02`/`03`, and any other bit `6B00`. The old square-root test stays.
+  The load file is back to the size of the file before D205 (see its size in the hardware report).
+
+**Kept as they are** (the project owner did not change them): the over-limit wait (`WAIT_OVER_SIGNS` 10,
+`WAIT_MORE_SIGNS` 4), the second payment in a time in the field, and the PIN's wait after wrong
+tries (`PIN_STRETCH`, [D195](#d195)).
+
+**What this gives up.** D188 was made so that no payment is had in a brush of a tap: a reader
+could not take one in the moment a card passed near it. A payment within the limit on one payment
+is no longer slowed, so a reader that has the PIN, or a card with no PIN's allowance, takes what
+the limits allow as fast as it asks. The limits are what hold: the day's limit, the limit on one
+payment, the no-PIN allowance and its window, the second-payment wait. A shorter claim, history
+and reset hold are a shorter time for a reader handed the PIN to hold an empty card, which
+[D196](#d196)'s accepted risk counted at about 45 seconds and is now about 15.
+
+**Built (applet).** `CLAIM_ASKINGS = 4`, `HISTORY_ASKINGS = 7`, `RESET_ASKINGS = 17` (the held
+count's low six bits hold 63 at the most). `SPEND_ALL_SIGN` no longer adds the floor: at the first
+`SIGN` it takes the change outputs' credit off W, never below 0. Every test and vector that pinned
+the old counts or the floor moved to the new ones.

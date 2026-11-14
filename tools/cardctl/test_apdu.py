@@ -579,12 +579,12 @@ def test_set_owner_with_and_without_the_anchor_and_the_old_owners_proof():
 
 
 def test_a_claim_is_sent_again_while_the_card_says_keep_holding():
-    """2.3 (D187): SET_OWNER on a card with no owner answers 6A98 to the first five askings; the claim is sent until it stops."""
+    """2.3 (D187): SET_OWNER on a card with no owner answers 6A98 to the first three askings (four in all, D205); the claim is sent until it stops."""
     with contextlib.redirect_stderr(io.StringIO()):  # the hold note
         pub = p256.public_key(OWNER)
-        card = make_card([(b"", 0x6A98)] * 5 + [(b"", 0x9000)])
+        card = make_card([(b"", 0x6A98)] * 3 + [(b"", 0x9000)])
         card.set_owner(pub)
-        assert card.connection.sent == [bytes.fromhex("B0430000") + bytes([65]) + pub] * 6, "the same data, six times"
+        assert card.connection.sent == [bytes.fromhex("B0430000") + bytes([65]) + pub] * 4, "the same data, four times"
         card = make_card([(b"", 0x6A98)] * 2 + [(b"", 0x6985)])
         try:
             card.set_owner(pub)
@@ -1500,7 +1500,7 @@ class FirstSetUpCard(Card23):
     """
     Card23, fresh from its install, as far as a first set-up goes (D196): SET_PIN begins the first set-up, which ends
     at the next selection; SET_CARD and the claim want it and the PIN given in this tap (6A91, 6982 otherwise); the
-    claim is held for (6A98 to the first five askings); the owner's SET_LIMIT is taken after a nonce.
+    claim is held for (6A98 to the first three askings); the owner's SET_LIMIT is taken after a nonce.
     """
 
     def __init__(self, factory=None, refuse=None, lift_at=None):
@@ -1559,7 +1559,7 @@ class FirstSetUpCard(Card23):
             if not (self.verified and self.first and self.record):
                 return b"", 0x6A91 if not self.first else 0x6982
             self.askings += 1
-            if self.askings < 6:
+            if self.askings < 4:
                 return b"", 0x6A98
             sw = self.take_c(data)
             if sw not in (None, 0x9000):
@@ -1579,7 +1579,7 @@ class FirstSetUpCard(Card23):
             if not self.verified:
                 return b"", 0x6982
             self.log_askings += 1
-            if self.log_askings < 10:
+            if self.log_askings < 5:
                 return b"", 0x6A98
             self.held_tap = True
             return bytes(16), 0x9000
@@ -1596,7 +1596,7 @@ class FirstSetUpCard(Card23):
             if len(data) not in (0, 80):
                 return b"", 0x6700
             self.reset_askings += 1
-            if self.reset_askings < 60:
+            if self.reset_askings < 15:
                 return b"", 0x6A98
             self.pin_state, self.record, self.limits, self.first, self.verified = 0, None, None, False, False
             self.askings = 0
@@ -1629,7 +1629,7 @@ def test_setup_is_one_selection_and_the_separate_commands_are_not():
                                "0", "--allowance", "0", "--budget", "7"])
     assert code == 0, out
     assert conn.record and conn.record[-17:] == b"https://mint.test", conn.record
-    assert conn.has_owner and conn.askings == 6
+    assert conn.has_owner and conn.askings == 4
     assert conn.limits and conn.limits.endswith((50000).to_bytes(4, "big") + bytes(8) + b"\x07"), conn.limits.hex()
     selects = [a for a in conn.sent if a[:2] == b"\x00\xA4"]
     assert len(selects) == 1, "one selection, the one the command began with"
@@ -2042,7 +2042,7 @@ def test_setup_on_a_2_2_card_that_stops_names_the_claim_not_the_reset():
             raise AssertionError("a stopped setup was not reported")
 
 
-def test_reset_by_the_pin_holds_the_history_then_sixty_askings_and_frees_the_card_for_setup():
+def test_reset_by_the_pin_holds_the_history_then_fifteen_askings_and_frees_the_card_for_setup():
     conn, card = _setup_card(refuse={cardctl.INS_SET_CARD: 0x6F00})
     try:
         _run(card, _setup_args())
@@ -2053,7 +2053,7 @@ def test_reset_by_the_pin_holds_the_history_then_sixty_askings_and_frees_the_car
     code, out, err = _run(card, ["reset", "--pin", "1234", "--yes"])
     assert code == 0 and conn.pin_state == 0 and conn.record is None, (out, err)
     ins = [a[1] for a in conn.sent[-80:] if a[:2] != b"\x00\xA4"]
-    assert ins.count(cardctl.INS_GET_LOG) == 10 and ins.count(cardctl.INS_RESET_CARD) == 60, ins
+    assert ins.count(cardctl.INS_GET_LOG) == 5 and ins.count(cardctl.INS_RESET_CARD) == 15, ins
     assert all(a[2:4] == b"\x00\xAD" and len(a) == 4 for a in conn.sent if a[1] == cardctl.INS_RESET_CARD)
     conn.refuse = {}
     card.select()
@@ -2082,7 +2082,7 @@ def test_reset_by_the_pin_takes_an_anchor_in_every_asking_and_checks_its_work_fi
     code, out, err = _run(card, ["reset", "--pin", "1234", "--yes", "--anchor", _ANCHOR.hex()])
     assert code == 0 and conn.pin_state == 0 and getattr(conn, "anchored_at", None) == _ANCHOR, (out, err)
     resets = [a for a in conn.sent if a[1] == cardctl.INS_RESET_CARD]
-    assert len(resets) == 60 and all(a[2:5] == b"\x00\xAD\x50" and a[5:85] == _ANCHOR for a in resets), resets[:1]
+    assert len(resets) == 15 and all(a[2:5] == b"\x00\xAD\x50" and a[5:85] == _ANCHOR for a in resets), resets[:1]
     bad_work = bytearray(_ANCHOR)
     bad_work[76] ^= 0x01
     for anchor, hardest, word in ((bytes(bad_work), bytes(4), "work"), (_ANCHOR, bytes.fromhex("00010017"), "quarter")):
@@ -2221,7 +2221,7 @@ def test_the_holders_refresh_gives_the_pin_holds_the_history_and_sends_the_heade
     code, out, err = _run(card, ["refresh", "--pin", "1234", "--header", _ANCHOR.hex()])
     assert code == 0 and getattr(conn, "refreshed", None) == _ANCHOR, (out, err)
     ins = [a[1] for a in conn.sent if a[:2] != b"\x00\xA4"]
-    assert ins[0] == cardctl.INS_VERIFY_PIN and ins.count(cardctl.INS_GET_LOG) == 10 and ins[-1] == cardctl.INS_REFRESH, ins
+    assert ins[0] == cardctl.INS_VERIFY_PIN and ins.count(cardctl.INS_GET_LOG) == 5 and ins[-1] == cardctl.INS_REFRESH, ins
     refresh = [a for a in conn.sent if a[1] == cardctl.INS_REFRESH][0]
     assert refresh[2:5] == b"\x01\x00\x50" and refresh[5:85] == _ANCHOR, refresh.hex()
 
@@ -2292,7 +2292,7 @@ def test_setup_brings_back_a_far_clock_on_2_3_and_refuses_it_on_an_older_card():
 
 
 def test_a_fresh_card_is_reset_with_an_anchor_its_pin_set_for_the_reset_alone():
-    """reset --pin --anchor on a fresh card (D203): SET_PIN, VERIFY_PIN, the history held for and the reset's sixty
+    """reset --pin --anchor on a fresh card (D203): SET_PIN, VERIFY_PIN, the history held for and the reset's fifteen
     askings with the anchor, in one selection, after which setup takes the card. Without --anchor a fresh card is not
     reset: nothing is sent, and setup is named."""
     conn, card = _setup_card()
@@ -2308,7 +2308,7 @@ def test_a_fresh_card_is_reset_with_an_anchor_its_pin_set_for_the_reset_alone():
     assert code == 0 and conn.pin_state == 0 and getattr(conn, "anchored_at", None) == _ANCHOR, (out, err)
     ins = [a[1] for a in conn.sent[sent:] if a[:2] != b"\x00\xA4"]
     assert ins.index(cardctl.INS_SET_PIN) < ins.index(cardctl.INS_VERIFY_PIN) < ins.index(cardctl.INS_GET_LOG), ins
-    assert ins.count(cardctl.INS_RESET_CARD) == 60, ins
+    assert ins.count(cardctl.INS_RESET_CARD) == 15, ins
     card.select()
     assert _run(card, _setup_args())[0] == 0 and conn.has_owner
 
@@ -2416,6 +2416,22 @@ def test_load_sends_p2_02_only_with_date_keys():
         assert card.connection.last[3] == p2, (flags, card.connection.last.hex())
 
 
+def test_the_loaders_y_is_gone():
+    """D205 took the loader's y out again (slower on the chip, and a file too large for the card's applet to be created): no
+    --with-y, no LOAD_WITH_Y, and a piece is sent as it was in fix 19, P2 02 and 81 bytes."""
+    assert not hasattr(cardctl, "y_of_c") and not hasattr(cardctl, "LOAD_WITH_Y")
+    card = make_card([(b"\x03", 0x9000)])
+    assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys"])[0] == 0
+    assert card.connection.last[3] == 0x02 and card.connection.last[4] == 81, card.connection.last.hex()
+    with contextlib.redirect_stderr(io.StringIO()):
+        try:
+            _run(make_card([(b"\x03", 0x9000)]), ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys", "--with-y"])
+        except SystemExit as exc:
+            assert exc.code != 0
+        else:
+            raise AssertionError("--with-y is still taken")
+
+
 def test_load_without_date_keys_explains_the_6a86():
     card = make_card([(b"", 0x6A86)])
     try:
@@ -2474,10 +2490,25 @@ def test_set_pin_with_the_owner_is_refused_on_a_2_3_card_before_anything_is_sent
 
 def test_set_owner_gives_the_pin_in_the_same_tap_before_the_held_claim():
     pub = p256.public_key(OWNER)
-    card = make_card([(b"", 0x9000)] + [(b"", 0x6A98)] * 5 + [(b"", 0x9000)])
+    card = make_card([(b"", 0x9000)] + [(b"", 0x6A98)] * 3 + [(b"", 0x9000)])
     assert _run(card, ["set-owner", "--pin", "1234", "--test-owner-key"])[0] == 0   # OWNER is cardctl's TEST key
     assert card.connection.sent == [bytes.fromhex("B040000004") + b"1234"] \
-        + [bytes.fromhex("B0430000") + bytes([65]) + pub] * 6, [a.hex() for a in card.connection.sent]
+        + [bytes.fromhex("B0430000") + bytes([65]) + pub] * 4, [a.hex() for a in card.connection.sent]
+
+
+def test_the_history_and_the_reset_are_asked_for_no_more_than_their_counts_of_askings():
+    """D205: the history's hold is seven askings and the reset's seventeen after it (the owner's 4 s and 15 s in all on a J3R180), and a card
+    that never stops holding is asked for no more than that: the bounds are the counts, not the old ten and sixty."""
+    for call, count in (("hold_history", 7), ("reset_by_pin", 17)):
+        card = make_card([(b"", 0x6A98)] * 100)
+        with contextlib.redirect_stderr(io.StringIO()):
+            try:
+                getattr(card, call)()
+            except cardctl.CardError as exc:
+                assert exc.sw == 0x6A98 and len(card.connection.sent) == count, (call, len(card.connection.sent))
+            else:
+                raise AssertionError(call + ": a card that never stops holding was asked for ever")
+    assert (cardctl.LOG_HOLD_MOST, cardctl.RESET_MOST) == (7, 17)
 
 
 def test_verify_pin_is_sent_again_while_the_card_says_keep_holding():
@@ -3564,14 +3595,14 @@ def test_a_claim_with_the_owners_c_sends_the_envelope_then_the_held_claim_with_t
         pub = p256.public_key(OWNER)
         header = bytes(range(80))
         pin_answer = NONCE + bytes.fromhex(v["pinKey"]) + bytes.fromhex(v["pinKeySig"])
-        card = make_card([(p, 0x9000), (pin_answer, 0x9000), (b"", 0x9000)] + [(b"", 0x6A98)] * 5 + [(b"", 0x9000)])
+        card = make_card([(p, 0x9000), (pin_answer, 0x9000), (b"", 0x9000)] + [(b"", 0x6A98)] * 3 + [(b"", 0x9000)])
         card.set_owner(pub, header, s=s)
         sent = card.connection.sent
         assert sent[0][:4] == bytes.fromhex("B0100000"), sent[0].hex()
         assert sent[1] == bytes.fromhex("B0440100") + bytes([113]), "GET_NONCE P1 1: the PIN key"
         assert sent[2][:5] == bytes.fromhex("B043010071") and len(sent[2]) == 5 + 113, sent[2][:5].hex()
         claim = bytes.fromhex("B0430000") + bytes([65 + 80 + 16]) + pub + header + bytes.fromhex(v["check"])
-        assert sent[3:] == [claim] * 6, "the claim, the same data six times"
+        assert sent[3:] == [claim] * 4, "the claim, the same data four times"
         env = sent[2][5:]
         assert env[0] == 4 and env[:65] != bytes.fromhex(v["E"]), "a fresh e"
         # a card whose PIN key is not signed by its key is sent no envelope

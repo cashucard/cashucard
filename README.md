@@ -41,7 +41,8 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > refund key it loaded dated pieces, paid under their date's key, took its dated
 > change back, and gave c sealed to the refund key. It has not yet run with a phone,
 > at a production mint, or torn on purpose, and no dated piece has yet been taken
-> back after its date by the refund key. The file tracked now adds D200 (a payment's
+> back after its date by the refund key. The file before D205 (36,953 bytes, load file
+> sha256 `f216644a…`) added D200 (a payment's
 > change counted when it is made, and the owner's anchor bringing back a clock moved
 > far ahead) and [D201](docs/DECISIONS.md#d201) (a header at the floor's work begins
 > and ends no day, and `REFRESH` brings the clock back), [D202](docs/DECISIONS.md#d202)
@@ -52,7 +53,11 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > J3R180 installed it and, at the same test mint, had real signatures and real change
 > verified on the chip, with the clock brought back by the set-up, the resets, the
 > hand-over and the owner's back form, and the owner's c read back
-> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The file
+> tracked now adds [D205](docs/DECISIONS.md#d205) (no payment floor, shorter holds; 36,950 bytes, load file
+> sha256 `075448e4…`); on 2026-11-14 a second bench J3R180 installed it at the first try and, at the same test mint, had real
+> signatures and real change verified on the chip, with the shorter holds timed
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)). The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The

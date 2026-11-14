@@ -128,12 +128,10 @@ class CashuAppletTest {
     static final int SW_ENTER_PIN           = 0x6A9E;
     /** 2.3 (D187, D189): keep holding, a held count not yet through (an owner's claim, a history of a card with no owner): ask again. */
     static final int SW_KEEP_HOLDING        = 0x6A98;
-    /** The askings of a claim (D187) and of a history of a card with no owner (D189): the last goes through. */
-    static final int CLAIM_ASKINGS = 6, HISTORY_ASKINGS = 10;
+    /** The askings of a claim (D187), of a history of a card with no owner (D189) and of the reset by the PIN of a card with no owner (D196), as D205 sets them (the project owner, 2026-11-14): the last goes through. About 0.75 s an asking on the J3R180: 3, 4 and 11 seconds (15 with the history's). */
+    static final int CLAIM_ASKINGS = 4, HISTORY_ASKINGS = 7, RESET_ASKINGS = 17;
     /** The wait (6a) in answers of SPEND_ALL_SIGN: the applet's two sizes, for the first limit's worth over the limit and for every further one. */
     static final int WAIT_OVER_SIGNS = 10, WAIT_MORE_SIGNS = 4;
-    /** 2.3 (D188): every payment is at least four signatures of the card's work, its own among them: three "not yet" answers before it, less what its change outputs took. */
-    static final int WAIT_FLOOR_SIGNS = 4, FLOOR = WAIT_FLOOR_SIGNS - 1;
     /** The most limits' worth a payment is counted for: the applet's WAIT_UNITS_MOST. */
     static final int WAIT_UNITS_MOST = 255;
     /**
@@ -148,18 +146,18 @@ class CashuAppletTest {
     static int changeCredit(int made) { return (2 * made) / 3; }
     /** The same, for a payment that is the `second` (or later) signed in its tap without the owner's grant: at least one over the limit, limit or no limit. */
     static int waitsRule(long limit, long net, int made, boolean second) {
-        return Math.max(0, FLOOR + pastTheFloor(limit, net, second) - changeCredit(made));
+        return Math.max(0, waitBeforeCredit(limit, net, second) - changeCredit(made));
     }
-    /** W of D188: 2.2's wait, before the floor and the change outputs: 0 within the limit, and none for a first payment with no limit. */
-    static int pastTheFloor(long limit, long net, boolean second) {
+    /** W: 2.2's wait, before the change outputs' credit (D205 took away 2.3's floor, D188): 0 within the limit, and none for a first payment with no limit. */
+    static int waitBeforeCredit(long limit, long net, boolean second) {
         if (limit <= 0) return second ? WAIT_OVER_SIGNS : 0;
         long units = net <= limit + limit / 32 ? 1 : Math.min(WAIT_UNITS_MOST, (net + limit - 1) / limit);
         if (second && units <= 1) units = 2;
         if (units <= 1) return 0;
         return WAIT_OVER_SIGNS + WAIT_MORE_SIGNS * (int)(units - 2);
     }
-    /** So the most a payment waits: 1025 answers before the signature (the floor's three, ten for the first limit's worth over, and four for each of the 253 after it). */
-    static final int WAITS_MOST = FLOOR + WAIT_OVER_SIGNS + WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 2);
+    /** So the most a payment waits: 1022 answers before the signature (ten for the first limit's worth over, and four for each of the 253 after it). */
+    static final int WAITS_MOST = WAIT_OVER_SIGNS + WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 2);
     // ten seconds of the card's own clock: how long a run of refusals is in the log (the applet's TAP_SECONDS).
     // It is no longer how long anything is signed for: the limit on one payment counts nothing by a clock.
     static final long TAP = 10L;
@@ -2428,7 +2426,7 @@ class CashuAppletTest {
             ResponseAPDU r = signAll();
             assertEquals(SW_OK, r.getSW(), what);
             assertEquals(64, r.getData().length, what + ": a signature");
-            assertEquals(waitsRule(0, 0, 0), waitsTaken(), what + ": the floor alone: there is no limit on a payment");
+            assertEquals(waitsRule(0, 0, 0), waitsTaken(), what + ": no wait: there is no limit on a payment (D205)");
             byte[] sig = r.getData();
             assertTrue(signedForAll(sig, named, outputs, REFUND), what + ": signed over secret and C of every place named, in order, and then the outputs");
             byte[][] swapped = named.clone();
@@ -2546,13 +2544,13 @@ class CashuAppletTest {
         ResponseAPDU begun = transmit(beginCommand(all));
         assertEquals(SW_OK, begun.getSW());
         assertEquals(1280, readUint32(begun.getData(), 0));
-        for (int k = 1; k <= 57; k++) {
-            assertNotYet(transmit(SIGN_ALL), "wait " + k + " of 57");
+        for (int k = 1; k <= 54; k++) {
+            assertNotYet(transmit(SIGN_ALL), "wait " + k + " of 54");
             assertArrayEquals(storage, field("proofStorage"), "nothing burned in wait " + k);
         }
         ResponseAPDU sig = transmit(SIGN_ALL);
         assertEquals(SW_OK, sig.getSW());
-        assertEquals(64, sig.getData().length, "the one signature, after the 57th (the floor's three and 54)");
+        assertEquals(64, sig.getData().length, "the one signature, after the 54th");
         assertTrue(signedForAll(sig.getData(), named, new byte[0][], REFUND));
         for (int p = 0; p < 128; p++) assertEquals(2, slot(p)[0], "place " + p + " is burned by the last SIGN");
         assertArrayEquals(new long[] { T0, 1280, 128, 0, 2 }, logTap(0), "128 pieces, 1280 sats, and the flag that it was waited for");
@@ -3818,25 +3816,25 @@ class CashuAppletTest {
         assertArrayEquals(seenA.get(2), bytesOf(transmit(new CommandAPDU(CLA, INS_GET_CARD, 0, 0, 256))), "GET_CARD, on a card with no limit at all");
         ResponseAPDU none = spendAll(new int[] { 0, 1, 2 }, new byte[0][]);
         assertEquals(SW_OK, none.getSW());
-        assertEquals(FLOOR, waitsTaken(), "and the payment waits the floor alone");
+        assertEquals(0, waitsTaken(), "and the payment does not wait");
     }
 
     @Test
-    @DisplayName("A payment that waits answers 00 01 every time it is asked, however many waits it has: 45 of them, and 1025, and never how many are left; the signature follows the last, and not before")
+    @DisplayName("A payment that waits answers 00 01 every time it is asked, however many waits it has: 42 of them, and 1022, and never how many are left; the signature follows the last, and not before")
     void testTheWaitNeverSaysHowManyAreLeft() throws Exception {
         readyWithLimit(0);
         assertEquals(SW_OK, setLimits(0, 100));
         assertEquals(SW_OK, load(buildProof(KEYSET, 1000, 1)).getSW());
         byte[] named = slot(0);
         newTap();
-        // the whole count, from a beginning: 45 answers of 00 01 (the floor's three and 42) and then the signature
+        // the whole count, from a beginning: 42 answers of 00 01 and then the signature
         assertEquals(SW_OK, sw(beginCommand(0)));
-        for (int i = 1; i <= 45; i++) assertNotYet(transmit(SIGN_ALL), "wait " + i + " of 45");
+        for (int i = 1; i <= 42; i++) assertNotYet(transmit(SIGN_ALL), "wait " + i + " of 42");
         ResponseAPDU sig = transmit(SIGN_ALL);
         assertEquals(SW_OK, sig.getSW());
-        assertEquals(64, sig.getData().length, "after the 45th, the signature");
+        assertEquals(64, sig.getData().length, "after the 42nd, the signature");
         assertTrue(signedForAll(sig.getData(), new byte[][] { named }, new byte[0][], REFUND));
-        // the most it can be asked to wait: 1025, each of them the same
+        // the most it can be asked to wait: 1022, each of them the same
         simulator = freshCard();
         readyWithLimit(0);
         assertEquals(SW_OK, setLimits(0, 1));
@@ -3844,7 +3842,7 @@ class CashuAppletTest {
         newTap();
         ResponseAPDU r = spend(0);
         assertEquals(SW_OK, r.getSW());
-        assertEquals(WAITS_MOST, waitsTaken(), "all 1025 were 00 01: signAll checks each");
+        assertEquals(WAITS_MOST, waitsTaken(), "all 1022 were 00 01: signAll checks each");
         assertEquals(64, r.getData().length);
     }
 
@@ -4544,7 +4542,7 @@ class CashuAppletTest {
         byte[][] outputs = { output(500, blinded(77)) };
         ResponseAPDU r = spendAll(all, outputs);
         assertEquals(SW_OK, r.getSW());
-        assertEquals(FLOOR, waitsTaken(), "no limit on a payment: the floor alone");
+        assertEquals(0, waitsTaken(), "no limit on a payment: no wait");
         assertTrue(signedForAll(r.getData(), slots, outputs, REFUND));
         assertEquals(0, balance());
         assertEquals(0, spentToday(), "no limit on the day: nothing counted");
@@ -6734,14 +6732,14 @@ class CashuAppletTest {
         reselect();
         assertEquals(SW_OK, verify(TEST_PIN));
         assertEquals(SW_OK, spend(1).getSW(), "64 is the limit, and is signed");
-        assertEquals(FLOOR, waitsTaken(), "the floor alone");
+        assertEquals(0, waitsTaken(), "no wait");
         newTap();
         assertEquals(SW_OK, spend(2).getSW(), "and then one sat in a payment of its own, in a tap of its own: the limit was not used up by the first");
-        assertEquals(FLOOR, waitsTaken());
+        assertEquals(0, waitsTaken());
         newTap();
         ResponseAPDU over = spendAll(new int[] { 4, 3 }, new byte[0][]);
         assertEquals(SW_OK, over.getSW(), "64 and 1 in one payment is not refused");
-        assertEquals(FLOOR, waitsTaken(), "one sat over a limit of 64 is within the thirty-second the limit allows a price pegged in another money: the floor alone");
+        assertEquals(0, waitsTaken(), "one sat over a limit of 64 is within the thirty-second the limit allows a price pegged in another money: no wait");
         byte[] large = slot(0);
         newTap();
         ResponseAPDU r = spend(0);
@@ -6768,7 +6766,7 @@ class CashuAppletTest {
         assertEquals(150, spentToday(), "and the whole of it is counted in the day, to the sat");
         newTap();
         assertEquals(SW_OK, spendAll(new int[] { 3, 4 }, new byte[0][]).getSW());
-        assertEquals(FLOOR, waitsTaken(), "100 is the limit exactly, in a tap of its own");
+        assertEquals(0, waitsTaken(), "100 is the limit exactly, in a tap of its own");
         assertEquals(250, spentToday());
         assertEquals(SW_OVER_LIMIT, spend(5).getSW(), "the limit on a payment has room; the day has none");
         assertEquals(0, waitsTaken(), "and a payment refused for the day is not waited for");
@@ -6894,7 +6892,7 @@ class CashuAppletTest {
         assertEquals(SW_CARD_IN_USE, ownerSetCard(MINT, REFUND), "not while it holds money");
         newTap();
         assertEquals(SW_OK, spendAll(new int[] { 3, 4 }, new byte[0][]).getSW());
-        assertEquals(FLOOR, waitsTaken(), "100 is the limit, in a tap of its own");
+        assertEquals(0, waitsTaken(), "100 is the limit, in a tap of its own");
         assertEquals(SW_OK, spend(5).getSW());
         assertEquals(SW_OK, ownerSetCard(MINT, REFUND));
         assertEquals(0, now());
@@ -7220,7 +7218,7 @@ class CashuAppletTest {
         assertEquals(SW_OK, sw(beginCommand(1)));
         assertEquals(SW_OK, change(40).getSW());
         assertEquals(SW_OK, signAll().getSW(), "50 whole: within the day");
-        assertEquals(FLOOR, waitsTaken(), "10 leaves the card, within the limit on a payment: the floor alone, change or no change");
+        assertEquals(0, waitsTaken(), "10 leaves the card, within the limit on a payment: no wait, change or no change");
         assertEquals(50, spentToday(), "the day counts the 50 whole, the 40 of change with it");
         assertEquals(1, openings().size(), "the change of the payment is pending");
         // the limit on a payment, by the net
@@ -7890,25 +7888,25 @@ class CashuAppletTest {
         for (int i = 0; i < 6; i++) assertEquals(SW_OK, load(buildProof(KEYSET, 10, i + 1)).getSW());
         newTap();
         assertEquals(SW_OK, spend(0).getSW());
-        assertEquals(FLOOR, waitsTaken(), "no limit: the first payment of the tap waits the floor alone");
+        assertEquals(0, waitsTaken(), "no limit: the first payment of the tap does not wait");
         assertEquals(SW_OK, spend(1).getSW());
-        assertEquals(FLOOR + WAIT_OVER_SIGNS, waitsTaken(), "and the second waits as one over the limit, with no limit set, on top of the floor");
+        assertEquals(WAIT_OVER_SIGNS, waitsTaken(), "and the second waits as one over the limit, with no limit set");
         reselect();
         assertEquals(SW_OK, verify(TEST_PIN));
         assertEquals(SW_OK, spend(2).getSW());
-        assertEquals(FLOOR + WAIT_OVER_SIGNS, waitsTaken(), "a new SELECT is the same time in the field");
+        assertEquals(WAIT_OVER_SIGNS, waitsTaken(), "a new SELECT is the same time in the field");
         newTap();
         assertEquals(SW_OK, sw(beginCommand(3)));
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_GET_BALANCE, 0, 0, 4)), "a payment begun and given up");
         assertEquals(SW_OK, spend(3).getSW());
-        assertEquals(FLOOR, waitsTaken(), "is not a payment: the first signed in the tap waits the floor alone");
+        assertEquals(0, waitsTaken(), "is not a payment: the first signed in the tap does not wait");
         // the owner's grant lifts it: a whole card taken off in more than one signature is the owner's phone's doing
         newTap();
         assertEquals(SW_GRANT, allowLoad());
         assertEquals(SW_OK, spend(4).getSW());
-        assertEquals(FLOOR, waitsTaken());
+        assertEquals(0, waitsTaken());
         assertEquals(SW_OK, spend(5).getSW());
-        assertEquals(FLOOR, waitsTaken(), "the second payment of a tap with the owner's grant in it is not slowed");
+        assertEquals(0, waitsTaken(), "the second payment of a tap with the owner's grant in it is not slowed");
         // with a limit: a second payment within it waits the seven; one over it waits its own count, which is at least that
         simulator = freshCard();
         readyWithLimit(0);
@@ -7917,20 +7915,20 @@ class CashuAppletTest {
         for (int i = 0; i < amounts.length; i++) assertEquals(SW_OK, load(buildProof(KEYSET, amounts[i], i + 1)).getSW());
         newTap();
         assertEquals(SW_OK, spend(0).getSW());
-        assertEquals(FLOOR, waitsTaken());
+        assertEquals(0, waitsTaken());
         assertEquals(SW_OK, spend(1).getSW());
         assertEquals(waitsRule(100, 50, 0, true), waitsTaken(), "50 within the limit, the tap's second: seven");
-        assertEquals(FLOOR + WAIT_OVER_SIGNS, waitsRule(100, 50, 0, true));
+        assertEquals(WAIT_OVER_SIGNS, waitsRule(100, 50, 0, true));
         assertEquals(SW_OK, spend(2).getSW());
         assertEquals(waitsRule(100, 250, 0, true), waitsTaken(), "250 is three limits' worth whether first or second: fourteen");
-        assertEquals(FLOOR + WAIT_OVER_SIGNS + WAIT_MORE_SIGNS, waitsRule(100, 250, 0, true));
+        assertEquals(WAIT_OVER_SIGNS + WAIT_MORE_SIGNS, waitsRule(100, 250, 0, true));
         // loading is not a payment, and the tap after a payment takes the change with no PIN as before
         assertEquals(SW_OK, load(buildProof(KEYSET, 7, 9)).getSW());
         assertEquals(SW_OK, spend(4).getSW());
         assertEquals(waitsRule(100, 7, 0, true), waitsTaken(), "a load between does not start the tap afresh");
         newTap();
         assertEquals(SW_OK, spend(3).getSW());
-        assertEquals(FLOOR, waitsTaken(), "a new tap");
+        assertEquals(0, waitsTaken(), "a new tap");
     }
 
     /**
@@ -8001,9 +7999,8 @@ class CashuAppletTest {
         for (long[] c : cases) {
             long[] pieces = Arrays.copyOfRange(c, 2, c.length);
             long worth = Arrays.stream(pieces).sum();
-            // the table's waits are past the floor (W of D188): every payment waits the floor's three as well
-            assertEquals(FLOOR + (int) c[1], waitsRule(c[0], worth, 0), "the table is the rule, for " + Arrays.toString(pieces) + " under " + c[0]);
-            assertEquals(FLOOR + (int) c[1], payWaits(c[0], pieces), "waits for pieces " + Arrays.toString(pieces) + " under a limit of " + c[0]);
+                        assertEquals((int) c[1], waitsRule(c[0], worth, 0), "the table is the rule, for " + Arrays.toString(pieces) + " under " + c[0]);
+            assertEquals((int) c[1], payWaits(c[0], pieces), "waits for pieces " + Arrays.toString(pieces) + " under a limit of " + c[0]);
         }
     }
 
@@ -8012,7 +8009,7 @@ class CashuAppletTest {
     void testTheWaitCountsDownAndTheSignatureComesLast() throws Exception {
         readyWithLimit(0);
         assertEquals(SW_OK, setLimits(0, 100));
-        long[] amounts = { 100, 100, 1 };    // 201: three limits' worth, which is fourteen waits past the floor's three
+        long[] amounts = { 100, 100, 1 };    // 201: three limits' worth, which is fourteen waits
         for (int i = 0; i < amounts.length; i++) assertEquals(SW_OK, load(buildProof(KEYSET, amounts[i], i + 1)).getSW());
         byte[][] named = { slot(0), slot(1), slot(2) };
         newTap();
@@ -8021,9 +8018,9 @@ class CashuAppletTest {
         assertEquals(69, begun.getData().length, "the beginning answers what the pieces are worth and the date's keys (D197), and says nothing of the wait");
         assertEquals(201, readUint32(begun.getData(), 0));
         byte[] storage = field("proofStorage").clone();
-        for (int left = 16; left >= 0; left--) {
+        for (int left = 13; left >= 0; left--) {
             ResponseAPDU r = transmit(SIGN_ALL);
-            assertNotYet(r, "wait " + (17 - left) + " of 17: 00 01 every time, whatever is left");
+            assertNotYet(r, "wait " + (14 - left) + " of 14: 00 01 every time, whatever is left");
             assertArrayEquals(storage, field("proofStorage"), "and it burned nothing");
         }
         ResponseAPDU sig = transmit(SIGN_ALL);
@@ -8047,7 +8044,7 @@ class CashuAppletTest {
         newTap();
         assertEquals(SW_OK, load(buildProof(KEYSET, 10, 9)).getSW());
         assertEquals(SW_OK, spend(4).getSW());
-        assertEquals(FLOOR, waitsTaken());
+        assertEquals(0, waitsTaken());
         long balance = balance(), today = spentToday(), taps = logTaps(), sats = logSats();
         byte[] logBefore = log();
         assertEquals(275, balance);
@@ -8168,7 +8165,7 @@ class CashuAppletTest {
         newTap();
         for (int i = 0; i < 4; i++) {
             assertEquals(SW_OK, spend(i).getSW());
-            assertEquals(i == 0 ? FLOOR : waitsRule(100, 100, 0, true), waitsTaken(), "payment " + (i + 1) + " of a limit's worth in one tap: the first the floor alone, each after it the five seconds more");
+            assertEquals(i == 0 ? 0 : waitsRule(100, 100, 0, true), waitsTaken(), "payment " + (i + 1) + " of a limit's worth in one tap: the first none, each after it the five seconds more");
         }
         assertNothingRemembered("four payments of a limit's worth");
         assertEquals(SW_OK, spend(4).getSW());
@@ -8187,7 +8184,7 @@ class CashuAppletTest {
         newTap();
         assertEquals(SW_OK, setTime(T0 + 3600));
         assertEquals(SW_OK, spend(9).getSW());
-        assertEquals(FLOOR, waitsTaken(), "a new tap, an hour on: the first of its tap");
+        assertEquals(0, waitsTaken(), "a new tap, an hour on: the first of its tap");
         assertEquals(0, balance());
         assertNothingRemembered("through all of it");
     }
@@ -8217,21 +8214,21 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("A limit of 0 is no limit on a payment: the floor alone for any size, a sum that wraps included, with or without a limit on the day")
+    @DisplayName("A limit of 0 is no limit on a payment: no wait for any size, a sum that wraps included, with or without a limit on the day")
     void testNoLimitMeansNoWait() throws Exception {
-        assertEquals(FLOOR, payWaits(0, 1));
-        assertEquals(FLOOR, payWaits(0, 1_000_000));
-        assertEquals(FLOOR, payWaits(0, 4294967295L));
-        assertEquals(FLOOR, payWaits(0, 4294967295L, 5), "a sum that wraps is past any limit that there is, but with none there is nothing to be past");
+        assertEquals(0, payWaits(0, 1));
+        assertEquals(0, payWaits(0, 1_000_000));
+        assertEquals(0, payWaits(0, 4294967295L));
+        assertEquals(0, payWaits(0, 4294967295L, 5), "a sum that wraps is past any limit that there is, but with none there is nothing to be past");
         long[] many = new long[32];
         Arrays.fill(many, 1_000_000L);
-        assertEquals(FLOOR, payWaits(0, many), "thirty-two pieces at once");
+        assertEquals(0, payWaits(0, many), "thirty-two pieces at once");
         // a limit on the day alone is not a limit on a payment
         simulator = freshCard();
         readyWithLimit(1000);
         assertEquals(SW_OK, load(buildProof(KEYSET, 900, 1)).getSW());
         assertEquals(SW_OK, spend(0).getSW());
-        assertEquals(FLOOR, waitsTaken(), "900 under a day of 1000 and no limit on a payment");
+        assertEquals(0, waitsTaken(), "900 under a day of 1000 and no limit on a payment");
         assertEquals(900, spentToday());
         assertEquals(0, paymentLimit());
     }
@@ -8292,7 +8289,7 @@ class CashuAppletTest {
         assertEquals(SW_OK, setLimits(0, 0));
         assertEquals(0, paymentLimit());
         assertEquals(SW_OK, spend(1).getSW());
-        assertEquals(FLOOR, waitsTaken(), "the same payment, with the limit taken off, waits the floor alone");
+        assertEquals(0, waitsTaken(), "the same payment, with the limit taken off, does not wait");
         // with a limit on the day
         assertEquals(SW_OK, setLimits(5000, 100));
         assertEquals(SW_OK, spend(2).getSW());
@@ -8302,7 +8299,7 @@ class CashuAppletTest {
         assertEquals(5000, limit());
         assertEquals(1000, spentToday(), "the day's number did not change, so the day's count is kept");
         assertEquals(SW_OK, spend(3).getSW());
-        assertEquals(FLOOR, waitsTaken(), "the day's limit stays, and the payment waits the floor alone");
+        assertEquals(0, waitsTaken(), "the day's limit stays, and the payment does not wait");
         assertEquals(2000, spentToday());
         assertEquals(0, balance());
     }
@@ -8317,7 +8314,7 @@ class CashuAppletTest {
         newTap();
         assertEquals(SW_OK, setTime(T0 + 5));
         assertEquals(SW_OK, spend(0).getSW());
-        assertEquals(FLOOR, waitsTaken());
+        assertEquals(0, waitsTaken());
         assertArrayEquals(new long[] { T0 + 5, 100, 1, 0, 0 }, logTap(0), "a payment within the limit: no flag");
         assertEquals(SW_OK, spend(1).getSW());
         assertEquals(waitsRule(100, 150, 0), waitsTaken());
@@ -8329,7 +8326,7 @@ class CashuAppletTest {
         newTap();
         assertEquals(SW_OK, setTime(T0 + 60));
         assertEquals(SW_OK, spend(3).getSW());
-        assertEquals(FLOOR, waitsTaken());
+        assertEquals(0, waitsTaken());
         assertArrayEquals(new long[] { T0 + 60, 100, 1, 0, 0 }, logTap(0), "no flag");
         assertArrayEquals(new long[] { T0 + 5, 350, 3, 0, 2 }, logTap(1), "and the tap before keeps its own");
         assertEquals(0, logRefused(), "nothing is refused for the limit on a payment");
@@ -8360,7 +8357,7 @@ class CashuAppletTest {
         long[] amounts = { 60, 100, 150, 250, 700 };
         for (int i = 0; i < amounts.length; i++) assertEquals(SW_OK, load(buildProof(KEYSET, amounts[i], i + 1)).getSW());
         newTap();
-        int[] waits = { FLOOR, waitsRule(100, 100, 0, true), waitsRule(100, 150, 0, true), waitsRule(100, 250, 0, true) };
+        int[] waits = { 0, waitsRule(100, 100, 0, true), waitsRule(100, 150, 0, true), waitsRule(100, 250, 0, true) };
         for (int i = 0; i < 4; i++) {
             assertEquals(SW_OK, spend(i).getSW());
             assertEquals(waits[i], waitsTaken(), "payment " + i);
@@ -8388,18 +8385,18 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("A payment is counted for 255 limits' worth at most: it never waits more than 1025 times (the floor's three among them), however large, and every wait says only 00 01")
+    @DisplayName("A payment is counted for 255 limits' worth at most: it never waits more than 1022 times, however large, and every wait says only 00 01")
     void testTheWaitHasAMost() throws Exception {
-        assertEquals(1025, WAITS_MOST, "the most a payment waits is pinned: the floor's three, ten for the first limit's worth over, and four for each of the 253 after it");
-        assertEquals(WAITS_MOST, CashuApplet.WAIT_FLOOR_SIGNS - 1 + CashuApplet.WAIT_SIGNS_MOST, "and it is the applet's own most past the floor, the wait of a sum that wraps, on top of the floor");
-        assertEquals(WAIT_FLOOR_SIGNS, CashuApplet.WAIT_FLOOR_SIGNS, "these tests count in the applet's floor: four signatures, its own among them (D188)");
+        assertEquals(1022, WAITS_MOST, "the most a payment waits is pinned: ten for the first limit's worth over, and four for each of the 253 after it");
+        assertEquals(WAITS_MOST, CashuApplet.WAIT_SIGNS_MOST, "and it is the applet's own most, the wait of a sum that wraps (D205: no floor on top of it)");
+        assertFalse(Arrays.stream(CashuApplet.class.getDeclaredFields()).anyMatch(x -> x.getName().equals("WAIT_FLOOR_SIGNS")), "2.3's payment floor is gone (D205)");
         assertEquals(waitsRule(1, 254, 0), payWaits(1, 254), "254 limits' worth");
         assertEquals(WAITS_MOST, payWaits(1, 255), "255 is the most");
         assertEquals(WAITS_MOST, payWaits(1, 256), "256 would be one more, and is not counted");
         assertEquals(WAITS_MOST, payWaits(1, 257), "256 would be one more, and is not counted");
         assertEquals(WAITS_MOST, payWaits(1, 1_000_000), "nor is a million");
         assertEquals(WAITS_MOST, payWaits(4294967295L, 4294967295L, 5), "a sum that wraps is past any limit, the largest included, and waits the most");
-        // and the first of the 1025 says no more than the first of three: 00 01
+        // and the first of the 1022 says no more than the first of three: 00 01
         simulator = freshCard();
         readyWithLimit(0);
         assertEquals(SW_OK, setLimits(0, 1));
@@ -8650,7 +8647,7 @@ class CashuAppletTest {
         assertEquals(120, spentToday());
         newTap();
         assertEquals(SW_OK, spendAll(new int[] { 2, 3 }, new byte[0][]).getSW());
-        assertEquals(FLOOR, waitsTaken(), "40 and 30 are within it, in a tap of their own, and the waited payment before left nothing against this one");
+        assertEquals(0, waitsTaken(), "40 and 30 are within it, in a tap of their own, and the waited payment before left nothing against this one");
         assertEquals(190, spentToday());
         assertEquals(0, logRefused(), "nothing has been refused");
         assertEquals(SW_OVER_LIMIT, spendAll(new int[] { 4, 5, 6 }, new byte[0][]).getSW(), "90 more would be 280, over a day of 250: refused whole, as over the day");
@@ -11079,9 +11076,9 @@ class CashuAppletTest {
 
     // ---- the transcript ------------------------------------------------------
 
-    /** The floor's waits (D188), each a SPEND_ALL_SIGN answered "not yet", written down. */
-    private void sayTheFloor(StringBuilder out, int waits) {
-        for (int k = 1; k <= waits; k++) assertNotYet(say(out, "the floor: wait " + k + ": not yet", "exact", SW_OK, SIGN_ALL), "wait " + k);
+    /** The waits (D205 took away 2.3's floor), each a SPEND_ALL_SIGN answered "not yet", written down. */
+    private void sayTheWaits(StringBuilder out, int waits) {
+        for (int k = 1; k <= waits; k++) assertNotYet(say(out, "the wait: " + k + ": not yet", "exact", SW_OK, SIGN_ALL), "wait " + k);
     }
 
     /** One command, written down with what it answered, and checked against what it was meant to answer. */
@@ -11604,9 +11601,9 @@ class CashuAppletTest {
         for (int i = 0; i < 9; i++) {
             say(out, "load 50, for the limit on a payment", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 50, 21 + i), 1));
         }
-        sayPay(out, "spend 50: within the limit: the floor alone", SW_OK, FLOOR, 0);
+        sayPay(out, "spend 50: within the limit: no wait", SW_OK, 0, 0);
         sayPay(out, "100 in two pieces: the limit exactly, the tap's second payment: slowed", SW_OK, -1, 1, 2);
-        sayPay(out, "150 in three pieces: over the limit, and waited for", SW_OK, FLOOR + WAIT_OVER_SIGNS, 3, 4, 5);
+        sayPay(out, "150 in three pieces: over the limit, and waited for", SW_OK, WAIT_OVER_SIGNS, 3, 4, 5);
         say(out, "the info: nothing of it is remembered", "exact", SW_OK, infoTap);
         told(out, "the terminal tells a time ten seconds on: a note, and the wait is the same", TIP_TIME + 10);
         say(out, "a payment begun: three places, 150 together", "exact", SW_OK, beginCommand(6, 7, 8));
@@ -11615,7 +11612,7 @@ class CashuAppletTest {
         say(out, "a command that is not its next step", "exact", SW_OK, info);
         say(out, "gives the payment and the waiting up: no signature", "exact", 0x6985, SIGN_ALL);
         say(out, "and the pieces are on the card", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_BALANCE, 0, 0, 4));
-        sayPay(out, "the same payment begun again waits the whole wait again", SW_OK, FLOOR + WAIT_OVER_SIGNS, 6, 7, 8);
+        sayPay(out, "the same payment begun again waits the whole wait again", SW_OK, WAIT_OVER_SIGNS, 6, 7, 8);
         // 1.12: the change a payment makes for itself, with the limit of 100 on one payment still on; a new tap, so that the payment is the tap's first
         sayReset(out, "the card is taken away and put back, for a payment with change");
         say(out, "select", "exact", SW_OK, select);
@@ -11636,11 +11633,9 @@ class CashuAppletTest {
         int changeAgainAt = out.length();
         changeA = say(out, "the card's own change: 40, a fresh output", "exact", SW_OK, changeCommand(40, mintKey()));
         changeB = say(out, "and 20, another", "exact", SW_OK, changeCommand(20, mintKey()));
-        // the floor (D188): four signatures of work, less two for the card's two change outputs: two "not yet" answers
-        for (int k = 1; k <= waitsRule(0, 90, 2); k++) {
-            assertNotYet(say(out, "the floor, less the two change outputs' work: wait " + k + ": not yet", "exact", SW_OK, SIGN_ALL), "wait " + k);
-        }
-        ResponseAPDU changeSigned = say(out, "90 leaves the card, within the limit: the floor alone; the signature, over the pieces, the terminal's output and the card's two", "sigall", SW_OK, SIGN_ALL);
+        // no floor (D205): within the limit, change or no change, the first SIGN is the signature
+        assertEquals(0, waitsRule(0, 90, 2));
+        ResponseAPDU changeSigned = say(out, "90 leaves the card, within the limit: no wait; the signature, over the pieces, the terminal's output and the card's two", "sigall", SW_OK, SIGN_ALL);
         assertEquals(64, changeSigned.getData().length);
         say(out, "the info: the day counted nothing, having no limit; the log says 90", "exact", SW_OK, infoTap);
         ResponseAPDU opened = say(out, "the openings of the change: two, owed, each with its B_ and the key it is bound to", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_CHANGE, 0, 0, 256));
@@ -11726,7 +11721,7 @@ class CashuAppletTest {
         say(out, "a payment begun: three places, in the order the swap will name them", "exact", SW_OK, beginCommand(2, 0, 1));
         say(out, "its outputs, the amount and the blinded message of each", "exact", SW_OK,
             new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, concat(output(32, blinded(1)), output(24, blinded(2)))));
-        sayTheFloor(out, waitsRule(0, 56, 0));
+        sayTheWaits(out, waitsRule(0, 56, 0));
         say(out, "one signature, and the three are burned", "sigall", SW_OK, SIGN_ALL);
         say(out, "the same signature, asked for again", "again", SW_OK, new CommandAPDU(CLA, INS_SPEND_ALL_AGAIN, 0, 0, 64));
         say(out, "a second signature needs a second beginning", "exact", 0x6985, SIGN_ALL);
@@ -11813,7 +11808,7 @@ class CashuAppletTest {
         byte[] r0 = buildProof(KEYSET, 60, 61), r1 = buildProof(KEYSET, 60, 62), r2 = buildProof(KEYSET, 30, 63);
         say(out, "three pieces put on in one command", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, concat(r0, r1, r2), 3));
         told(out, "the terminal tells its own clock before the payment: the receipt will have it, and the receipts of the payments before it will not", TIP_TIME + 300);
-        sayPayWith(out, "150 over a limit of 100, with three outputs in two commands", FLOOR + WAIT_OVER_SIGNS, new int[] { 0, 1, 2 },
+        sayPayWith(out, "150 over a limit of 100, with three outputs in two commands", WAIT_OVER_SIGNS, new int[] { 0, 1, 2 },
             new byte[][] { output(100, blinded(61)), output(40, blinded(62)), output(10, blinded(63)) }, 2, 1);
         say(out, "the receipts: the count, and the three newest receipts, that payment's first (each the card's clock, the time the terminal told, its worth, the digest of what was signed, and the first output given)", "receipt", SW_OK, receiptsAsked);
         say(out, "from 16 back: the count alone, one more than before", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_LOG, 1, 16, 256));
@@ -11943,7 +11938,7 @@ class CashuAppletTest {
         assertArrayEquals(new byte[] { 2 }, say(out, "a P1 that is not 1 is what it always was: P1 = 2 puts on a plain piece", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 2, 2, mp2, 1)).getData());
         assertArrayEquals(new byte[] { 3, 1 }, say(out, "a piece with a proof of its own", "exact", SW_OK, loadWithProofCommand(mp3, proofB)).getData());
         assertArrayEquals(concat(dleqHeld(proofA), dleqHeld(proofB)), say(out, "GET_DLEQ for places 0 and 3", "exact", SW_OK, getDleqCommand(0, 3)).getData());
-        sayPay(out, "pay the first and the last, in one payment", SW_OK, FLOOR, 0, 3);
+        sayPay(out, "pay the first and the last, in one payment", SW_OK, 0, 0, 3);
         assertArrayEquals(concat(none, none), say(out, "GET_DLEQ for the two that are spent: 00 each, the proof of a spent piece is not given", "exact", SW_OK, getDleqCommand(0, 3)).getData());
         say(out, "CLEAR_SPENT", "exact", SW_OK, clear);
         assertArrayEquals(new byte[] { 0 }, say(out, "a piece put on plain into the place that was freed", "exact", SW_OK, new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, mp4, 1)).getData());
@@ -11954,7 +11949,7 @@ class CashuAppletTest {
         say(out, "select", "exact", SW_OK, select);
         say(out, "the PIN", "exact", SW_OK, verifyOk);
         assertArrayEquals(concat(dleqHeld(proofC), none), say(out, "the proofs are kept through the power: place 3, then place 0", "exact", SW_OK, getDleqCommand(3, 0)).getData());
-        sayPay(out, "pay what is on the card, the pieces with a proof and without", SW_OK, FLOOR, 0, 1, 2, 3);
+        sayPay(out, "pay what is on the card, the pieces with a proof and without", SW_OK, 0, 0, 1, 2, 3);
         say(out, "CLEAR_SPENT: the card is empty again", "exact", SW_OK, clear);
 
         // the owner replaces itself, and locks
@@ -12074,7 +12069,7 @@ class CashuAppletTest {
         int nothingAt = out.length();
         ResponseAPDU nothingChange = say(out, "all of it back as the card's own change: 10, so that nothing leaves the card", "exact", SW_OK,
             changeCommand(10, mintKey()));
-        sayTheFloor(out, waitsRule(0, 0, 1));
+        sayTheWaits(out, waitsRule(0, 0, 1));
         say(out, "the signature, with no PIN, under the allowance: nothing leaves the card", "sigall", SW_OK, SIGN_ALL);
         say(out, "the info: the day's window is where it was, and the day counted nothing; the no-PIN window counts the whole piece (D186)", "exact", SW_OK, info);
         say(out, "the record: no roll spent by a payment that moves no value (D26)", "exact", SW_OK, getCard);
@@ -12282,7 +12277,7 @@ class CashuAppletTest {
         ResponseAPDU first = spend(0);
         assertEquals(SW_OK, first.getSW(), "40 of 100, with no PIN");
         assertTrue(signedFor(first.getData(), s0, REFUND));
-        assertEquals(FLOOR, waitsTaken());
+        assertEquals(0, waitsTaken());
         assertEquals(40, noPinSpent());
         assertEquals(T0, noPinStart(), "the first payment with no PIN begins the window at the clock");
         assertEquals(0, armedNow(), "and spends the arming");
@@ -12459,7 +12454,7 @@ class CashuAppletTest {
         assertEquals(0, noPinSpent(), "the owner's proof ended the no-PIN window");
         tap();
         assertEquals(SW_OK, spend(1).getSW());
-        assertEquals(FLOOR, waitsTaken(), "the tap's first payment: the floor alone");
+        assertEquals(0, waitsTaken(), "the tap's first payment: no wait");
         assertEquals(SW_OK, spend(2).getSW());
         assertEquals(waitsRule(0, 10, 0, true), waitsTaken(), "the second in the same tap: slowed, with no PIN as with it");
         assertEquals(20, noPinSpent());
@@ -12578,8 +12573,8 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("D188: every payment waits a floor: three 'not yet' answers before the signature of one within its limit (four signatures of the card's work with its own), with no limit as with one; the card's change outputs take two waits off for every three, never below none; the floor alone is not marked in the log as a wait")
-    void testEveryPaymentWaitsTheFloor() throws Exception {
+    @DisplayName("D205: a payment within its limit, the first of its time in the field, is signed at its first SPEND_ALL_SIGN, with no limit as with one (2.3's floor of three 'not yet' answers, D188, is gone); the card's change outputs take two waits off an over-the-limit wait for every three, never below none; a payment with no wait is not marked in the log as one that waited")
+    void testAPaymentWithinItsLimitIsSignedAtTheFirstSign() throws Exception {
         readyWithLimit(0);
         assertEquals(SW_OK, setLimits(0, 1000));
         assertEquals(SW_OK, load(buildProof(KEYSET, 100, 1)).getSW());
@@ -12587,27 +12582,46 @@ class CashuAppletTest {
         assertEquals(SW_OK, verify(TEST_PIN));
         byte[] named = slot(0);
         assertEquals(SW_OK, sw(beginCommand(0)));
-        for (int k = 1; k <= 3; k++) assertNotYet(transmit(SIGN_ALL), "wait " + k + " of the floor's three, within a limit of 1000");
         ResponseAPDU sig = transmit(SIGN_ALL);
-        assertEquals(SW_OK, sig.getSW());
-        assertEquals(64, sig.getData().length, "the fourth SIGN is the signature");
+        assertEquals(SW_OK, sig.getSW(), "the first SIGN is the signature: no 'not yet'");
+        assertEquals(64, sig.getData().length);
         assertTrue(signedFor(sig.getData(), named, REFUND));
-        assertEquals(0, logTap(0)[4] & 0x02, "the floor alone is not a payment that waited past it");
-        // the card's change outputs: one takes nothing off, two take one, three two, five three (to none), seven four (none)
-        int[][] cases = { { 1, 3 }, { 2, 2 }, { 3, 1 }, { 5, 0 }, { 7, 0 } };
+        assertEquals(0, logTap(0)[4] & 0x02, "a payment with no wait is not one that waited");
+        // no limit at all: the same
+        simulator = freshCard();
+        ready();
+        assertEquals(SW_OK, load(buildProof(KEYSET, 100, 1)).getSW());
+        newTap();
+        assertEquals(SW_OK, verify(TEST_PIN));
+        assertEquals(SW_OK, sw(beginCommand(0)));
+        assertEquals(SW_OK, transmit(SIGN_ALL).getSW(), "no limit on a payment: signed at the first SIGN too");
+        // the card's change outputs take two waits off for every three of them from a wait that is owed, never below none:
+        // 150 under a limit of 100 owes ten (W of D205), and n outputs of 1 take off n * 2 / 3
+        int[][] cases = { { 1, 10 }, { 2, 9 }, { 3, 8 }, { 5, 7 }, { 7, 6 } };
         for (int[] c : cases) {
             simulator = freshCard();
-            ready();
-            assertEquals(SW_OK, load(buildProof(KEYSET, 100, 1)).getSW());
+            readyWithLimit(0);
+            assertEquals(SW_OK, setLimits(0, 100));
+            assertEquals(SW_OK, load(buildProof(KEYSET, 150, 1)).getSW());
             newTap();
             assertEquals(SW_OK, verify(TEST_PIN));
             assertEquals(SW_OK, sw(beginCommand(0)));
-            for (int k = 0; k < c[0]; k++) assertEquals(SW_OK, change(10).getSW(), c[0] + " outputs: output " + k);
+            for (int k = 0; k < c[0]; k++) assertEquals(SW_OK, change(1).getSW(), c[0] + " outputs: output " + k);
             ResponseAPDU r = signAll();
             assertEquals(64, r.getData().length, c[0] + " outputs");
-            assertEquals(c[1], waitsTaken(), c[0] + " change outputs: the floor's three less two for every three outputs");
-            assertEquals(c[1], waitsRule(0, 100 - 10L * c[0], c[0]), "and the rule says so");
+            assertEquals(c[1], waitsTaken(), c[0] + " change outputs: the wait owed less two for every three outputs");
+            assertEquals(c[1], waitsRule(100, 150 - c[0], c[0]), "and the rule says so");
         }
+        // and a payment within its limit with change: still no wait
+        simulator = freshCard();
+        ready();
+        assertEquals(SW_OK, load(buildProof(KEYSET, 100, 1)).getSW());
+        newTap();
+        assertEquals(SW_OK, verify(TEST_PIN));
+        assertEquals(SW_OK, sw(beginCommand(0)));
+        for (int k = 0; k < 5; k++) assertEquals(SW_OK, change(10).getSW());
+        assertEquals(64, signAll().getData().length);
+        assertEquals(0, waitsTaken(), "within the limit, five change outputs: no wait, and the credit does not go below none");
     }
 
     @Test

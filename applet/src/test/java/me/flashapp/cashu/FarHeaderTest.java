@@ -304,7 +304,7 @@ class FarHeaderTest {
         ResponseAPDU r;
         while ((r = c.sim.transmitCommand(reset)).getSW() == SW_KEEP_HOLDING && n < 200) n++;
         assertEquals(SW_OK, r.getSW(), "reset after " + n + " askings");
-        assertEquals(CashuApplet.RESET_ASKINGS - 1, n);
+        assertEquals(CashuAppletTest.RESET_ASKINGS - 1, n);
         assertEquals(T0 + 900, clock(c), "the clock back at the anchor");
     }
 

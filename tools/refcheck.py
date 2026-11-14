@@ -58,6 +58,7 @@ SIZES = {
     35213: True,   # 2.3 source padded to this size, 2026-11-13, a J3R180: installed; SELECT 0203 and GET_INFO answered
     35466: True,   # 2.3 (sha256 48b8597c...), unpadded, 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s; SELECT 0203, selftest 20/20
     36953: True,   # 2.3 (CAP sha256 30c7bb8d..., load file f216644a...), unpadded, D200 to D204, 2026-11-14, J3R180 09312320: three steps, opener first, load 16 to 17 s, card applet 2 s; SELECT 0203, selftest 20/20, installed three times
+    36950: True,   # 2.3 (CAP sha256 01edad4c..., load file 075448e4...), unpadded, D200 to D205 without the loader's y, 2026-11-14, J3R180 09301220: three steps, opener first, load 16 to 17 s, card applet 2 s at the first create; SELECT 0203, selftest 20/20, installed twice
     35509: True,   # the 2.3 chip run's test-only build (2.3 with one command added that says the signer's temporary key's kind; never shipped, load file sha256 1bf178bc...), 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s
     21540: False,  # 2.2 first build (sha256 51ddeee4...), ENG-823, 2026-11-06: loaded (88 blocks), card applet 6F00 at create; cause not isolated: the size window or the constructor's +4,321 B persistent (D176, docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
 }
@@ -76,6 +77,8 @@ PROVEN = {
         'testnut.cashu.space: real signatures and real change verified on the chip',
     'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2.3 with D200 to D204, 36,953 bytes, 2026-11-14, J3R180 '
         '09312320 at testnut.cashu.space: real signatures and real change verified on the chip',
+    '075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a': '2.3 with D200 to D205 (no payment floor, shorter holds), 36,950 bytes, '
+        '2026-11-14, J3R180 09301220 at testnut.cashu.space: real signatures and real change verified on the chip',
 }
 # what every entry of PROVEN says of its chip run, word for word
 PROVEN_NEEDS = 'real signatures and real change verified on the chip'

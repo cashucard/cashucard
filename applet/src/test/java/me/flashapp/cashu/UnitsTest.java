@@ -472,7 +472,7 @@ class UnitsTest {
         Map<String, byte[]> before = c.snapshot();
         assertEquals(SW_WRONG_DATA, c.loadAs(2, c.piece(SAT_A, 5)).getSW(), "unit 02");
         assertEquals(SW_WRONG_DATA, c.loadAs(0xFF, c.piece(SAT_A, 5)).getSW(), "unit FF");
-        for (int p2 : new int[] { 4, 0x80, 0xFF }) {
+        for (int p2 : new int[] { 8, 0x80, 0xFF }) {
             assertEquals(SW_WRONG_P1P2, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, p2, concat(new byte[] { 0 }, c.piece(SAT_A, 5)), 256)), "P2 = " + p2);
         }
         for (int len : new int[] { 81, 83, 162, 164, 243, 245 }) {

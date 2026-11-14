@@ -675,12 +675,12 @@ test("allowLoad takes 6200 as the grant, refuses 9000 (a card whose grant opens 
   await assert.rejects(new CardSim("http://127.0.0.1:9", { fetch: answer("6A91") }).allowLoad(), e => e instanceof CardError && e.sw === 0x6a91)
 })
 
-test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (six askings), bounded; VERIFY_PIN holds the same way", async () => {
+test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (four askings), bounded; VERIFY_PIN holds the same way", async () => {
   const claim = encode.setOwner(ownerPublicKey()).toString("hex")
   const seen = []
-  const sim = new CardSim("http://127.0.0.1:9", { fetch: scripted([...Array(5).fill([claim, "6A98"]), [claim, "9000"]], seen) })
+  const sim = new CardSim("http://127.0.0.1:9", { fetch: scripted([...Array(3).fill([claim, "6A98"]), [claim, "9000"]], seen) })
   await sim.claimOwner()
-  assert.equal(seen.length, 6)
+  assert.equal(seen.length, 4)
   const refused = new CardSim("http://127.0.0.1:9", { fetch: scripted([[claim, "6A98"], [claim, "6A98"], [claim, "6985"]]) })
   await assert.rejects(refused.claimOwner(), e => e instanceof CardError && e.sw === 0x6985)
   const sent = []

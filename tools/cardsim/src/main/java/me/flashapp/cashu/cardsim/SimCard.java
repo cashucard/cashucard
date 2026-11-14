@@ -72,7 +72,7 @@ final class SimCard {
     static final int SW_OK = 0x9000;
     static final int SW_KEEP_HOLDING = 0x6A98;
     static final int SW_SLOT_EMPTY = 0x6A88;
-    /** The most askings the bridge sends an owner's claim: the card takes six, the first five answered 6A98. */
+    /** The most askings the bridge sends an owner's claim: the card takes four, the first three answered 6A98. */
     static final int CLAIM_MOST = 10;
 
     /** GET_INFO P1 = 4: 59 bytes on 2.3 (the keyset table, the no-PIN window, the profiles, the loads left). */

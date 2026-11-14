@@ -86,7 +86,7 @@ const INSTALL_ORDER = [
   0xe4,
   0xe4, // sweep: tag, card, opener, package
   0xe6, // INSTALL [for load]
-  ...new Array(150).fill(0xe8), // LOAD
+  ...new Array(153).fill(0xe8), // LOAD
   0xe6,
   0xe6,
   0xe6, // the opener, the card's applet, the tag
@@ -154,7 +154,7 @@ describe('provision: the Cashu card', () => {
       PHASES,
     );
     assert.equal(r.apdus.length, card.log.length);
-    assert.deepEqual(r.blocks, {at: 150, of: 150});
+    assert.deepEqual(r.blocks, {at: 153, of: 153});
     assert.ok(
       r.freeBefore &&
         r.freeAfter &&
@@ -325,7 +325,7 @@ describe('provision: the Cashu card', () => {
       const first = await provision(pull.tx, CASHU, options());
       assert.equal(first.kind, 'pulled');
       assert.equal(first.phase, 'load');
-      assert.deepEqual(first.blocks, {at: 37, of: 150});
+      assert.deepEqual(first.blocks, {at: 37, of: 153});
       card.reset();
       assert.equal(card.partial.size, partialLoad === 'keep' ? 1 : 0);
       const again = await provision(card.transceive, CASHU, options());
@@ -344,7 +344,7 @@ describe('provision: the Cashu card', () => {
       options({onEvent: event => events.push(event)}),
     );
     assert.equal(result.kind, 'pulled');
-    assert.deepEqual(result.blocks, {at: 37, of: 150});
+    assert.deepEqual(result.blocks, {at: 37, of: 153});
     const written = events.filter(
       (event): event is Extract<RunEvent, {type: 'block'}> =>
         event.type === 'block',
@@ -659,9 +659,9 @@ describe('provision: the Cashu card', () => {
     }[];
     assert.deepEqual(
       blocks.map(b => b.index),
-      Array.from({length: 150}, (_, i) => i + 1),
+      Array.from({length: 153}, (_, i) => i + 1),
     );
-    assert.ok(blocks.every(b => b.of === 150));
+    assert.ok(blocks.every(b => b.of === 153));
     assert.equal(
       events.filter(e => e.type === 'apdu').length,
       INSTALL_ORDER.length,
@@ -709,7 +709,7 @@ describe('provision: the Cashu card', () => {
       options(),
     );
     assert.equal(r.ok, true, r.reason);
-    assert.equal(card.insLog().filter(i => i === 0xe8).length, 185);
+    assert.equal(card.insLog().filter(i => i === 0xe8).length, 188);
     assertInstalled(card);
   });
 });
@@ -744,7 +744,7 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
         `INS ${toHex([a[1]])} ends in Le 00`,
       );
     }
-    assert.deepEqual(r.blocks, {at: 150, of: 150});
+    assert.deepEqual(r.blocks, {at: 153, of: 153});
   });
 
   it('comes back from a pull at any APDU, before or after the card acts, with a run that sweeps and installs', async () => {

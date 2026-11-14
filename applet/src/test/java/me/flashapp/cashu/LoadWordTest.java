@@ -42,9 +42,10 @@ class LoadWordTest {
             assertArrayEquals(e.getValue(), PerPaymentKeyTest.field(c, e.getKey()), "nothing written: " + e.getKey());
         }
         assertEquals(0, readUint32(c.balance(0), 0));
-        // a P2 past the two bits is what it was (6B00)
-        assertEquals(0x6B00, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 4, piece, 256)), "P2 04");
-        assertEquals(0x6B00, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 6, piece, 256)), "P2 06");
+        // a P2 past the two bits is 6B00, the loader's y (P2 bit 2) too: D205 took it out again, slower on the chip and the file too large to create
+        for (int p2 : new int[] { 4, 5, 6, 7, 8, 10 }) {
+            assertEquals(0x6B00, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, p2, piece, 256)), "P2 " + p2);
+        }
         // with the word
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, piece, 256)), "P2 02");
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 3, concat(new byte[] { 0 }, buildProof(UnitsTest.SAT_A, 500, 92, 0)), 256)), "P2 03, the unit first");

@@ -8,17 +8,39 @@ the merged pull requests besides.
 ## `firmware-v2.3.0`: Cashu Card protocol 2.3 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-2.3.0.cap`, sha256
-`30c7bb8d98274da0953e2e90c93027fa2313391b05a2211a9489a2111dbaed83`. Its load file,
-the bytes a card is LOADed with, is 36,953 bytes by `tools/refcheck.py`'s measure,
-sha256 `f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440`. `SELECT`
+`01edad4cf1b815dae47510780db10658a4dfb56373ffb5ec2d513a56d4dd8b39`. Its load file,
+the bytes a card is LOADed with, is 36,950 bytes by `tools/refcheck.py`'s measure,
+sha256 `075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a`. `SELECT`
 and `GET_INFO` answer `02 03`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D204](DECISIONS.md#d204), and the wire is in
+[D183](DECISIONS.md#d183) to [D205](DECISIONS.md#d205), and the wire is in
 [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
 This file ran on a chip on 2026-11-14
+([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
+[its report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)): it is the file before D205 with
+[D205](DECISIONS.md#d205) added (no payment floor, shorter holds). A second bench J3R180 (not the card of the run
+below) installed it twice, each in three steps (16 to 17 s to load, 2 s for the card's applet, created at the first
+try), and, at a FakeWallet test mint with fake sats:
+
+- passed `cardctl selftest` 20 of 20 (`AUTH` 631 ms);
+- answered its first `SET_CARD` with `9000` (1.21 s);
+- signed a plain payment at its first `SPEND_ALL_SIGN`, with no "not yet" (889 ms for the signature, 4.1 s from
+  `SPEND_ALL_BEGIN` with five change outputs, 5.2 s with eight), the mint taking each swap, and paid on with the change
+  loaded back with no PIN; a payment over the limit on one payment still waited (10 "not yet" for 150 with a limit of
+  100, 14 for 250), and so did a second payment in a time in the field;
+- held as D205 says: the owner's claim answered at the 4th asking (2.9 s), the history of a card with a PIN and no
+  owner at the 7th (3.6 s), and the reset by the PIN at the 17th after the history's 7 (24 askings, 14.8 s in all);
+- refused `LOAD_PROOF` with P2 `04`, `06` or `07` (`6B00`), and loaded a piece in 226 to 235 ms;
+- kept what the run of the file before D205 showed of the clock, the owner's c and the refusals.
+
+Not covered by that run: the day of loads (not rerun, the code unchanged), `LOCK_CARD`, a dated piece taken back after
+its date by the refund key, a header far ahead or a weak clock, tears, the certificate, a dollar card, a production mint
+and a phone.
+
+The file before D205 (36,953 bytes, load file sha256 `f216644a…`, D183 to D204) ran on a chip on 2026-11-14
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
 [its report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)): the bench J3R180
 installed it three times in three steps (16 to 17 s to load, 2 s for the card's applet)
@@ -74,9 +96,14 @@ a J3R180 whose configuration lacks either cannot run the card.
 
 ### What a holder notices
 
-- **Every payment takes about three to four seconds** on a J3R180 from its first
-  command to the signature: every payment waits a floor, and the card makes its own
-  change in that time ([D188](DECISIONS.md#d188)).
+- **A payment within its limit is signed at its first `SIGN`**: no floor, so no wait added
+  for the card's own change either ([D205](DECISIONS.md#d205), which took away
+  [D188](DECISIONS.md#d188)'s floor on the project owner's word). A payment over the limit on one
+  payment, and a second payment in a time in the field, wait as 2.2's did. A brush of a tap
+  within the limit is no longer slowed: the limits hold.
+- **Loading is faster with the piece's y**: a loader that sends each piece's C's y
+  (`LOAD_PROOF` P2 bit 2) saves about 108 ms a piece on a J3R180; the old form still works
+  ([D205](DECISIONS.md#d205)).
 - **A top-up always asks for the PIN.** A card with no PIN holds nothing and pays
   nothing (`6A97`), and the owner's phone loads under the PIN too
   ([D185](DECISIONS.md#d185)).
@@ -91,11 +118,13 @@ a J3R180 whose configuration lacks either cannot run the card.
   phone visits or the PIN is typed in a tap that pays nothing; the 24-hour window is
   the owner's switch ([D186](DECISIONS.md#d186)).
 - **Set-up holds a few seconds longer and finishes in one tap**: the owner is
-  claimed by six askings ([D187](DECISIONS.md#d187)).
+  claimed by four askings, about 3 seconds on a J3R180 ([D187](DECISIONS.md#d187),
+  [D205](DECISIONS.md#d205)).
 - **A card with no phone owner is a simple card**: its limits, mint and unit are set
   once, at its first set-up. Its PIN never blocks: each wrong try makes the next wait
   twice as long, and an empty card whose PIN was forgotten takes a new one. It is
-  reset by its PIN in a held tap of about 45 seconds ([D189](DECISIONS.md#d189),
+  reset by its PIN in a held tap: the history's seven askings (about 4 seconds), then the
+  reset's seventeen (24 askings, about 15 seconds in all) on a J3R180 ([D189](DECISIONS.md#d189),
   [D195](DECISIONS.md#d195), [D196](DECISIONS.md#d196)).
 - **A card loads at most 300 pieces a day**, change included, and refuses a piece
   above the day's limit ([D195](DECISIONS.md#d195), [D196](DECISIONS.md#d196)). A

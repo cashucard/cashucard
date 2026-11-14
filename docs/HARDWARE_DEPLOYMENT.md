@@ -88,18 +88,20 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 2.3 build is **36,953 bytes** by refcheck's measure (89 past a multiple of 256;
-the Method component 30,069), in 150 blocks of 247 bytes: the load file inside the
+The 2.3 build is **36,950 bytes** by refcheck's measure (86 past a multiple of 256;
+the Method component 30,066), in 150 blocks of 247 bytes: the load file inside the
 tracked CAP (`applet/target/cashu-javacard-2.3.0.cap`), whose own sha256 is not the
 CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
-exact file has run on a chip: the bench J3R180 of the run of 2026-11-14 below. It is the source of the run below with [D200](DECISIONS.md#d200) to
-[D204](DECISIONS.md#d204) added (a payment's change counted
+exact file has run on a chip: a bench J3R180 (09301220) in the run of 2026-11-14 (the second run of the day) below. It is the source of the
+run of 2026-11-14 (the first) below ([D200](DECISIONS.md#d200) to [D204](DECISIONS.md#d204): a payment's change counted
 when it is made, the owner's anchor bringing the clock back on an empty card, a header at
 the floor's work beginning and ending no day, with `REFRESH` bringing the clock back,
 the card's secret c made from its owner's words at the claim or the hand-over, and a fresh
 or newly set-up card held to the same bar, with the owner's back form bringing back the
-day of loads, and the first set-up's anchor bringing back any clock on an empty card); refcheck keeps its size as one
-that installs and its load file's sha256 on its list of hashes, from that run (the checklist below).
+day of loads, and the first set-up's anchor bringing back any clock on an empty card; that file was 36,953 bytes, load file
+sha256 `f216644a…`, whose size and hash refcheck keeps on its lists) with
+[D205](DECISIONS.md#d205) added (no payment floor, shorter holds; the loader's y was tried and taken out, so 3 bytes fewer);
+refcheck keeps its size as one that installs and its load file's sha256 on its list of hashes, from the second run (the checklist below).
 
 On 2026-11-13 a J3R180 was given earlier 2.3 source padded to three sizes: it
 installed the files of 33,647 and 35,213 bytes and refused the card's applet in
@@ -173,9 +175,43 @@ taking money back after D with the refund key at a mint (it needs a wait past D)
 tears, a phone and a production mint ([the hardware
 report](reports/HARDWARE_TEST_REPORT_2026-11-13_J3R180_2.3.md)).
 
-The chip run of the tracked file, on 2026-11-14, on the same bench J3R180 09312320
+The chip run of the tracked file (36,950 bytes, load file `075448e4…`, with [D205](DECISIONS.md#d205): no payment floor and
+shorter holds), on 2026-11-14, a second time that day, on a second bench J3R180, CPLC serial 09301220 (checked by the
+install script before anything was sent; the public default test key), through the same reader. The CAP `01edad4c…` was
+installed twice in three steps (load 16 to 17 s, the card's applet 2 s, created at the first try both times; a first build
+of D205 with the loader's y, 37,573 bytes, had been refused at that create with `6F00` and is not this file); `SELECT`
+`02 03`, the tag `getfoxy.io/card`. Real mainnet headers from mempool.space (blocks 975,750 to 975,841), the mint
+`testnut.cashu.space`, the TEST owner key, a second test key and two made-up seeds. The first `SET_CARD` answered `9000`
+in 1,208 ms (1,008 ms in a later set-up); `selftest` passed 20 of 20, `AUTH` 631 ms. The owner's claim with the owner's c
+answered `9000` at the 4th `SET_OWNER` (678, 681, 681 and 859 ms: 2.9 s in all), and c was read back. Real signatures and
+real change: 64, 32 and 16 fake sats minted and loaded under the PIN (`LOAD_PROOF` 226 to 235 ms a piece, the plain form;
+P2 `04`, `06` and `07` answered `6B00` and stored nothing), a payment of the three to a till's 50 with five change outputs
+signed at its first `SPEND_ALL_SIGN` with no "not yet" (889 ms for the signature, 4.1 s from `SPEND_ALL_BEGIN`; good under
+P + t·G and not under P), and testnut took the swap (`200`, the three inputs `SPENT`); the change came back by `LOAD_CHANGE`
+in a new tap with no PIN (1.02 s each, `UNSPENT`). The largest payment, eight change outputs (510 of change), signed with no
+"not yet" (853 ms, 5.2 s from `SPEND_ALL_BEGIN`, not `6A96`), and its eight pieces came back. Dated pieces (D 2026-12-15, 72 sats)
+were loaded, paid to a till's 40 with five change outputs (no "not yet", 699 ms) and taken by testnut, the change loaded
+back. With a limit on one payment of 100 and a day's limit of 5,000: a payment of 48 signed at once (1.35 s from
+`SPEND_ALL_BEGIN`); a payment of 150 answered 10 "not yet" (7.2 s), one of 250 answered 14 (9.7 s); a second payment in the
+same time in the field answered 10 (7.4 s) and the first of a new tap none (1.2 s); a payment of 447 answered 22 (14.6 s).
+The holds (a held asking measured 0.59 to 0.66 s): the claim at the 4th asking, 2.9 s; the history of a card with a PIN and
+no owner `6A98` six times and the log at the 7th, 3.6 s; the reset by the PIN with the tip as its anchor, the history's 7
+askings and then `6A98` sixteen times and the reset at the 17th, 24 askings and 14.8 s in all (10.8 s for the reset's 17).
+The PIN's wait after wrong tries was as before (one held asking after one wrong try, two after the second). The clock and the
+owner: the first set-up's anchor (an older header in the set-up's own selection answered the older time in 75 ms; after a
+`SELECT` it moved nothing, and the tip moved it on), a claim's anchor 7.1 h older than a clock the tip had set brought it
+back, a hand-over to a second seed's owner read back the second c (1,236 ms), the owner's reset with an anchor 7.1 h older
+(`RESET_CARD` 374 ms) and `REFRESH`'s back form worked, and with pieces on the card the hand-over and the owner's reset with an
+older anchor each answered `6A8D`; `REFRESH` P1 02, `SET_OWNER` P1 02 and P2 55 answered `6B00`, a claim with another seed's
+check `6A80`, one with no envelope before it `6985`; `INBOX` answered week 2967; the hardest's bits stayed `73160217`; a
+sealed `VERIFY_PIN` answered `9000` in 278 ms. The day of loads was not run again (its code is as in the file before D205).
+Not run: `LOCK_CARD`, taking money back after D with the refund key, a header far ahead or a weak clock, tears, a phone and a
+production mint ([the hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)). The card was then installed
+again from the same file and left fresh (no PIN, no owner).
+
+The chip run of the file before D205 (36,953 bytes, load file `f216644a…`), on 2026-11-14, on the same bench J3R180 09312320
 (CPLC serial checked first; the default test key), through the same reader. The CAP
-`30c7bb8d…` (load file 36,953 bytes, `f216644a…`) was installed three times, each in
+`30c7bb8d…` (load file 36,953 bytes, `f216644a…`, the file before D205) was installed three times, each in
 three steps (load 16 to 17 s, card's applet 2 s), `SELECT` `02 03` and the tag
 `getfoxy.io/card` each time; the headers were real mainnet headers from
 mempool.space (blocks 974,766 to 975,777), the mint `testnut.cashu.space`, the
@@ -274,10 +310,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 2.3**, sha256
-`30c7bb8d98274da0953e2e90c93027fa2313391b05a2211a9489a2111dbaed83`
+`01edad4cf1b815dae47510780db10658a4dfb56373ffb5ec2d513a56d4dd8b39`
 (`applet/target/cashu-javacard-2.3.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 36,953 bytes), has sha256
-`f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440`: the hash the
+is LOADed with (refcheck's measure, 36,950 bytes), has sha256
+`075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -368,7 +404,7 @@ python3 cardctl.py selftest --pin 1234
     `set-limit --owner-key <…>`;
   - a card with a PIN and no owner holds nothing, and nothing more can be written
     to it until it is reset by its PIN, `python3 cardctl.py reset --pin 1234`
-    (about 45 seconds on the reader), then set up again;
+    (about 15 seconds on the reader), then set up again;
   - a first `SET_CARD` that answers `6F00` is the chip's ECDH framing
     ([ECDH framing probe](#ecdh-framing-probe-at-set_card)).
 
@@ -611,7 +647,7 @@ The run of 2026-11-13 (above) did each item but the last five, for the file befo
 D200, with two differences: `INBOX` for last week was read after a reinstall anchored
 in that week, as no reader's header moves the clock back; and the sealed `VERIFY_PIN`
 ran once, after the run, while `selftest` ran before and after. The run of 2026-11-14
-(above) did them all for the tracked file, but the owner's reset of a locked card,
+(above) did them all for the file before D205, but the owner's reset of a locked card,
 which would lock the bench card for good; `INBOX` for last week was read after a reset
 by the PIN anchored in that week. Write the sha256 of every file sent to the chip in the
 run's log.
@@ -682,6 +718,17 @@ run's log.
   hours older>`: `info` says the older header's time (the claim's anchor brought the clock
   back; where the clock was more than two hours past the anchor, setup says so); in the next
   tap `cardctl set-header` with a header older still moves nothing, and the tip moves it on.
+The run of the tracked file with D205 (above) did every item below for it but the day of loads and the owner's reset of a
+locked card.
+
+- No payment floor ([D205](DECISIONS.md#d205)): a payment within its limit, the first of its
+  time in the field, is signed at its first `SPEND_ALL_SIGN` (time `SPEND_ALL_BEGIN` to the
+  signature); one over the limit on one payment still waits, and so does a second payment in
+  a time in the field.
+- The holds ([D205](DECISIONS.md#d205)), each at about 0.6 s an asking (0.59 to 0.66 s measured): the owner's claim
+  answers `9000` at the 4th asking (about 3 s), the history of a card with no owner at the
+  7th (about 4 s), the reset by the PIN at the 17th (24 askings and about 15 s in all with the history's 7).
+- `LOAD_PROOF` takes P2 `02` and `03` only: a P2 with bit 2 (the loader's y, tried and taken out, [D205](DECISIONS.md#d205)) is `6B00`.
 
 ### The signer's temporary key
 

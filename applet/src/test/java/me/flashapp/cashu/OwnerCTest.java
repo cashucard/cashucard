@@ -374,10 +374,10 @@ class OwnerCTest {
         assertEquals(SW_KEEP_HOLDING, card.sim.transmitCommand(good).getSW(), "the first asking");
         assertEquals(SW_WRONG_DATA, card.sim.transmitCommand(new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, concat(OWNER.pub, check(other)))).getSW(), "another s's check");
         for (int i = 2; i < CLAIM_ASKINGS; i++) assertEquals(SW_KEEP_HOLDING, card.sim.transmitCommand(good).getSW(), "asking " + i + ": the count kept");
-        // an envelope sent again (the same s) begins the askings again: six more
+        // an envelope sent again (the same s) begins the askings again: four more
         assertEquals(SW_OK, card.sim.transmitCommand(stage(envelope(s, q, E2))).getSW(), "the envelope again");
         for (int i = 1; i < CLAIM_ASKINGS; i++) assertEquals(SW_KEEP_HOLDING, card.sim.transmitCommand(good).getSW(), "asking " + i + " after the envelope: from the first");
-        assertEquals(SW_OK, card.sim.transmitCommand(good).getSW(), "the sixth good asking");
+        assertEquals(SW_OK, card.sim.transmitCommand(good).getSW(), "the fourth good asking");
         assertArrayEquals(c(s, 1), cOf(card));
         // a hand-over whose check is not under the proof
         card.tap();

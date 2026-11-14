@@ -187,14 +187,19 @@ test("35,466 bytes, the 2.3 build before D200, is known to install, and its hash
   assert.match(readFileSync(REFCHECK, "utf8"), /'48b8597cfd23ace73c6451a962541bfa09534a312f225ebcf382a8769fe01c96': '2\.3, 35,466 bytes/);
 });
 
-// The tracked CAP adds D200 to D204; it installed on a J3R180 on 2026-11-14, and its chip run had real signatures and
-// real change verified on the chip: refcheck says this exact file has run on a chip, at a size known to install.
-test("the tracked 2.3 CAP's load file has run on a chip, at a size known to install", () => {
+// The tracked CAP adds D205 (no payment floor, shorter holds) to the file that ran on a chip on 2026-11-14 (36,953 bytes, load
+// file sha256 f216644a...), and ran on a chip itself the same day (36,950 bytes, load file sha256 075448e4..., a J3R180 at a test
+// mint: real signatures and real change verified on the chip). Both stay on refcheck's lists.
+test("the tracked 2.3 CAP's load file has run on a chip: its size and its hash are on the lists, and the file before D205 stays proven", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-2.3.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 36953 bytes/);
-  assert.match(r.stdout, /load file sha256: f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440; this exact file has run on a chip\.\n/);
-  assert.match(r.stdout, /a size known to install/);
-  assert.match(readFileSync(REFCHECK, "utf8"), /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes/);
+  assert.match(r.stdout, /load file: 36950 bytes/);
+  assert.match(r.stdout, /load file sha256: 075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a; this exact file has run on a chip\.\n/);
+  assert.doesNotMatch(r.stdout, /not yet tried on a chip/);
+  const source = readFileSync(REFCHECK, "utf8");
+  assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes/);
+  assert.match(source, /'075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a': '2\.3 with D200 to D205[^']*36,950 bytes[^']*'\s*'2026-11-14, J3R180 09301220 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
+  assert.match(source, /36953: True/);
+  assert.match(source, /36950: True/);
 });
