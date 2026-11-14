@@ -8,7 +8,7 @@ The wire of the shared Cashu card protocol, version 3.0: the applet in this
 repository (`applet/src/main/java/me/flashapp/cashu/CashuApplet.java`), which is
 the Foxy wallet project's software 1.20 with a neutral identity and the fixes in
 [`docs/DECISIONS.md`](../docs/DECISIONS.md) D18 to D26, the settlement record of
-D175 and D176 (2.2), and the decisions of 3.0, D183 to D209. Version 2.x is not
+D175 and D176 (2.2), and the decisions of 3.0, D183 to D210. Version 2.x is not
 compatible with the 0.x applet that this file used to describe, nor with Foxy's
 1.x: it has an AID of its own, so that neither can be mistaken for it.
 
