@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
  * header begins a new day and a new daily limit. Real headers come once a day for free (the network makes them), so a
  * till kept the card's PIN and a phone's worth of headers takes a limit a day for as long as it holds the card, and a
  * no-PIN reader takes the no-PIN allowance a day. 2.0 bounds both: the window rolls at most `rollBudget` times between
- * the owner's REFRESHes (default 7), and a card whose owner was set with a header never runs at now = 0. 2.3 (D186) gives
+ * the owner's REFRESHes (default 7), and a card whose owner was set with a header never runs at now = 0. 3.0 (D186) gives
  * the allowance a window of its own, which begins again only once per arming (an owner's proof, or a PIN in a time in the
  * field that pays nothing).
  *

@@ -1,6 +1,6 @@
 // node --test tools/cardsim/e2e-swap.test.cjs
 //
-// The 2.3 card against a real mint (DECISIONS D18, D183, D190, D197): the card set up as a wallet sets it up (the PIN,
+// The 3.0 card against a real mint (DECISIONS D18, D183, D190, D197): the card set up as a wallet sets it up (the PIN,
 // the record, the owner's claim); the card's key for the date 0 read under the PIN (GROUP_KEYS); pieces minted at a
 // Nutshell mint as format-4 SIG_ALL secrets locked to that key, their DLEQ checked; loaded under the PIN with the
 // mint's proof; the mint's keyset taught to the card (KEYSET_KEYS), checked by the card against its ID; paid with one

@@ -74,7 +74,7 @@ class CashuAppletTest {
     /** GET_DLEQ (1.20): the mint's proof kept with an unspent piece, for the place P1 and, unless P2 is FF, the place P2. */
     static final byte INS_GET_DLEQ          = (byte) 0x1A;
     static final byte INS_SPEND_ALL_CHANGE  = (byte) 0x26;
-    static final byte INS_LOAD_CHANGE       = (byte) 0x27;   // 2.3 (D183): the card finishes its own change
+    static final byte INS_LOAD_CHANGE       = (byte) 0x27;   // 3.0 (D183): the card finishes its own change
     static final byte INS_SET_LIMIT        = (byte) 0x33;   // by PIN: an open card only
     static final byte INS_SET_LIMIT_OWNER  = (byte) 0x34;
     /** SET_TIME, a time under a key's signature: gone in 1.15. It answers 6D00 and stays unassigned. */
@@ -122,17 +122,17 @@ class CashuAppletTest {
     // any more: every test is checked for it at the end (noPaymentLimitRefusal), and the applet's source for the word.
     static final int SW_NO_LONGER_ANSWERED  = 0x6A95;
     static final int SW_TOO_MANY            = 0x6A96;
-    /** 2.3 (D185): a card with no PIN takes and pays nothing until it is given one. */
+    /** 3.0 (D185): a card with no PIN takes and pays nothing until it is given one. */
     static final int SW_NO_PIN              = 0x6A97;
-    /** 2.3 (D186): limit reached, enter the PIN: a payment with no PIN past what the no-PIN window has left, written in the log as a refusal over a limit. */
+    /** 3.0 (D186): limit reached, enter the PIN: a payment with no PIN past what the no-PIN window has left, written in the log as a refusal over a limit. */
     static final int SW_ENTER_PIN           = 0x6A9E;
-    /** 2.3 (D187, D189): keep holding, a held count not yet through (an owner's claim, a history of a card with no owner): ask again. */
+    /** 3.0 (D187, D189): keep holding, a held count not yet through (an owner's claim, a history of a card with no owner): ask again. */
     static final int SW_KEEP_HOLDING        = 0x6A98;
     /** The askings of a claim (D187) and of a history of a card with no owner (D189): the last goes through. */
     static final int CLAIM_ASKINGS = 6, HISTORY_ASKINGS = 10;
     /** The wait (6a) in answers of SPEND_ALL_SIGN: the applet's two sizes, for the first limit's worth over the limit and for every further one. */
     static final int WAIT_OVER_SIGNS = 10, WAIT_MORE_SIGNS = 4;
-    /** 2.3 (D188): every payment is at least four signatures of the card's work, its own among them: three "not yet" answers before it, less what its change outputs took. */
+    /** 3.0 (D188): every payment is at least four signatures of the card's work, its own among them: three "not yet" answers before it, less what its change outputs took. */
     static final int WAIT_FLOOR_SIGNS = 4, FLOOR = WAIT_FLOOR_SIGNS - 1;
     /** The most limits' worth a payment is counted for: the applet's WAIT_UNITS_MOST. */
     static final int WAIT_UNITS_MOST = 255;
@@ -758,7 +758,7 @@ class CashuAppletTest {
         for (int i = 0; i < slots.length; i++) list[i] = (byte) slots[i];
         return spendBegin(list);
     }
-    /** SPEND_ALL_BEGIN of these places as a reader of 2.3 sends it: P1 bit 1 (the keys per load), and no unit read. */
+    /** SPEND_ALL_BEGIN of these places as a reader of 3.0 sends it: P1 bit 1 (the keys per load), and no unit read. */
     static CommandAPDU spendBegin(byte[] places) { return spendBegin(0, places); }
     /** SPEND_ALL_BEGIN of these places with P1 bit 1 and `units`: BEGIN_UNITS where the reader reads units, else 0. */
     static CommandAPDU spendBegin(int units, byte[] places) { return new CommandAPDU(CLA, INS_SPEND_ALL_BEGIN, BEGIN_DATE_KEYS | units, 0, places, 0x45); }
@@ -958,7 +958,7 @@ class CashuAppletTest {
         // too (today its 1.x card's ten bytes, F0 FOXYCARD 01); on 2.0 the whole AID is these eleven
         ResponseAPDU whole = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_HEX), 256));
         assertEquals(SW_OK, whole.getSW());
-        assertArrayEquals(new byte[] { 0x02, 0x03 }, whole.getData(), "the same answer either way: version 2.3");
+        assertArrayEquals(new byte[] { 0x03, 0x00 }, whole.getData(), "the same answer either way: version 3.0");
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_GET_INFO, 0, 0, 256)), "and its instructions follow");
     }
 
@@ -967,17 +967,17 @@ class CashuAppletTest {
     void testSelect() {
         ResponseAPDU resp = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR)));
         assertEquals(SW_OK, resp.getSW());
-        assertArrayEquals(new byte[] { 0x02, 0x03 }, resp.getData(), "version 2.3: the card finishes its own change, two units, keyset keys, the paid list and the certificate (D183 to D193), on 2.2: the assisted-settlement record and GET_OUTBOX (D175), on 2.1: the shared protocol (D18), Foxy's 1.20 under the neutral AID with the fixes of D19 to D24, and D26's rollover rules (1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
+        assertArrayEquals(new byte[] { 0x03, 0x00 }, resp.getData(), "version 3.0: the card finishes its own change, two units, keyset keys, the paid list and the certificate (D183 to D193), on 2.2: the assisted-settlement record and GET_OUTBOX (D175), on 2.1: the shared protocol (D18), Foxy's 1.20 under the neutral AID with the fixes of D19 to D24, and D26's rollover rules (1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
         assertNotEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(UPSTREAM_AID))),
             "an upstream reader must not find this applet under upstream's AID: the wire is not the same");
     }
 
     @Test
-    @DisplayName("GET_INFO on a new card: 30 bytes: version 2.3, 128 empty slots, no PIN, three tries, format 4, capabilities FF, no record, no limit, no owner, no block header seen, no change due")
+    @DisplayName("GET_INFO on a new card: 30 bytes: version 3.0, 128 empty slots, no PIN, three tries, format 4, capabilities FF, no record, no limit, no owner, no block header seen, no change due")
     void testInfoFresh() {
         byte[] d = info();
         assertEquals(30, d.length);
-        assertEquals(2, d[0]); assertEquals(3, d[1]);
+        assertEquals(3, d[0]); assertEquals(0, d[1]);
         assertEquals(MAX_PROOFS, d[2] & 0xFF);
         assertEquals(0, d[3]); assertEquals(0, d[4]);
         assertEquals(MAX_PROOFS, d[5] & 0xFF);
@@ -1016,7 +1016,7 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("2.3's wire: CERT_READ 1C, LOAD_CHANGE 27, KEYSET_KEYS 38 and CERT_WRITE 54 are named, and each answers (D192: a card with no certificate says so to CERT_READ P1 = FF, and has none to give a page of); 2E and 2F are kept for a later profile and answer 6D00; the nine new status words 6A97 to 6A9F are named in order")
+    @DisplayName("3.0's wire: CERT_READ 1C, LOAD_CHANGE 27, KEYSET_KEYS 38 and CERT_WRITE 54 are named, and each answers (D192: a card with no certificate says so to CERT_READ P1 = FF, and has none to give a page of); 2E and 2F are kept for a later profile and answer 6D00; the nine new status words 6A97 to 6A9F are named in order")
     void testTheWireOfTwoThree() throws Exception {
         assertEquals((byte) 0x1C, CashuApplet.INS_CERT_READ);
         assertEquals((byte) 0x27, CashuApplet.INS_LOAD_CHANGE);
@@ -3005,7 +3005,7 @@ class CashuAppletTest {
                 // and the answer says what the marked places make it say
                 byte[] d = torn.getData();
                 if (name.equals("SELECT")) {
-                    assertArrayEquals(new byte[] { 0x02, 0x03 }, d, what);
+                    assertArrayEquals(new byte[] { 0x03, 0x00 }, d, what);
                 } else if (name.equals("GET_INFO")) {
                     assertEquals(others, d[3] & 0xFF, what + ": unspent");
                     assertEquals(n + others, d[4] & 0xFF, what + ": spent");
@@ -4057,8 +4057,8 @@ class CashuAppletTest {
         assertEquals(124, CashuApplet.CARD_HEADER_OFFSET);
         assertEquals(CashuApplet.CARD_BITS_OFFSET + 4 + 32 + 29, CashuApplet.CARD_NOW_OFFSET, "bits, hash and 29 zeros take the 65 bytes the time key had, and the clock is where it was");
         assertEquals(185, CashuApplet.CARD_NOW_OFFSET);
-        assertEquals(0x02, CashuApplet.VERSION_MAJOR);
-        assertEquals(0x03, CashuApplet.VERSION_MINOR);
+        assertEquals(0x03, CashuApplet.VERSION_MAJOR);
+        assertEquals(0x00, CashuApplet.VERSION_MINOR);
         assertEquals(212, CashuApplet.CARD_RECORD_LEN, "and the record is the length it was");
         assertEquals(212, field("cardRecord").length);
     }
@@ -5331,7 +5331,7 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("A2 (2.3, D189): a card with no owner is the card of a holder with no phone, loaded under its PIN given in this tap; with the PIN not given, nothing goes on; with an owner, as before")
+    @DisplayName("A2 (3.0, D189): a card with no owner is the card of a holder with no phone, loaded under its PIN given in this tap; with the PIN not given, nothing goes on; with an owner, as before")
     void testNoLoadWithoutAnOwner() {
         assertEquals(SW_OK, setPin(TEST_PIN));
         assertEquals(SW_OK, verify(TEST_PIN));
@@ -6913,7 +6913,7 @@ class CashuAppletTest {
     // ---------------------------------------------------------------------------------------------
 
     /**
-     * SPEND_ALL_CHANGE (2.3, D183): one change output of `amount`, bound to the mint's key for that amount, 33 bytes
+     * SPEND_ALL_CHANGE (3.0, D183): one change output of `amount`, bound to the mint's key for that amount, 33 bytes
      * compressed. The tests' mint signs every amount with one key (MINT_K), so the key is the same for every amount here.
      */
     private ResponseAPDU change(long amount) { return transmit(changeCommand(amount, mintKey())); }
@@ -7233,7 +7233,7 @@ class CashuAppletTest {
 
 
     // ---------------------------------------------------------------------------------------------
-    // 2.3 (D183): the card finishes its own change (LOAD_CHANGE)
+    // 3.0 (D183): the card finishes its own change (LOAD_CHANGE)
     // ---------------------------------------------------------------------------------------------
 
     @Test
@@ -8350,8 +8350,8 @@ class CashuAppletTest {
     void testTheCardRemembersNothingOfThePaymentLimit() throws Exception {
         readyWithLimit(0);
         byte[] more = infoTap();
-        assertEquals(2, more[0]);
-        assertEquals(3, more[1], "version 2.3");
+        assertEquals(3, more[0]);
+        assertEquals(0, more[1], "version 3.0");
         assertEquals((byte) 0xFF, more[6], "capabilities FF: the limit on one payment is waited for, not refused, the 1.6 forms are there, so are 128 places with the short listing, a payment burned outside its transaction, and the PIN taken sealed");
         assertEquals(SW_OK, setLimits(1000, 100));
         assertEquals(100, paymentLimit());
@@ -8734,14 +8734,14 @@ class CashuAppletTest {
         // 0x1B is GET_OUTBOX since 2.2 (D175), a read too: it is sent, and the byte after it is the one tried
         sw(new CommandAPDU(CLA, 0x1B, 0, 0, 256));
         sw(new CommandAPDU(CLA, 0x1B, 1, 0, new byte[] { 0, 0, (byte) 0xFF }, 256));
-        // 0x1C is CERT_READ since 2.3 (D192), a read as well; CERT_WRITE (0x54) writes no log, and is closed to a card that has had a PIN
+        // 0x1C is CERT_READ since 3.0 (D192), a read as well; CERT_WRITE (0x54) writes no log, and is closed to a card that has had a PIN
         assertEquals(SW_SLOT_EMPTY, sw(new CommandAPDU(CLA, 0x1C, 0, 0, 256)));
         assertEquals(SW_CONDITIONS_NOT_SATIS, sw(new CommandAPDU(CLA, 0x54, 0, 0, new byte[] { 0, 0, 1 })));
-        // 0x1D is GROUP_KEYS since 2.3 (D197), a read that writes nothing
+        // 0x1D is GROUP_KEYS since 3.0 (D197), a read that writes nothing
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x1D, 0, 0, u32(1900000000L), 256)));
-        // 0x1E is INBOX since 2.3 (D199), a read that writes nothing
+        // 0x1E is INBOX since 3.0 (D199), a read that writes nothing
         sw(new CommandAPDU(CLA, 0x1E, 0, 0, 256));
-        assertEquals(0x6D00, sw(new CommandAPDU(CLA, 0x1F, 0, 0, 256)), "there is no command beside it to write one with (0x1A, which was unassigned, is GET_DLEQ since 1.20, 0x1B GET_OUTBOX since 2.2, 0x1C CERT_READ, 0x1D GROUP_KEYS and 0x1E INBOX since 2.3, all reads: the byte after them is the one tried)");
+        assertEquals(0x6D00, sw(new CommandAPDU(CLA, 0x1F, 0, 0, 256)), "there is no command beside it to write one with (0x1A, which was unassigned, is GET_DLEQ since 1.20, 0x1B GET_OUTBOX since 2.2, 0x1C CERT_READ, 0x1D GROUP_KEYS and 0x1E INBOX since 3.0, all reads: the byte after them is the one tried)");
         transmit(new CommandAPDU(CLA, INS_GET_LOG, 1, 1, new byte[117], 256));
         assertArrayEquals(before, log(), "cleared slots, new limits, a new PIN, a new record, bytes sent with the command: the log is as it was");
     }
@@ -9304,7 +9304,7 @@ class CashuAppletTest {
         // in GET_LOG (the owner's phone may read the card's log with no PIN), in GET_LOG's receipts (which are the grant's alone), and in
         // SPEND_ALL_SIGN (the owner's phone, taking a whole card off in more than one signature, is not slowed for a second payment in the tap);
         // and KEYSET_KEYS (D190: the grant teaches a keyset's keys, and is the holder's say to bind an opening to another key);
-        // and nowhere else: since 2.3 (D185) it opens no load, no CLEAR_SPENT and no SET_PIN. 2.3 (D189): the holder's say (GET_INFO, a load's
+        // and nowhere else: since 3.0 (D185) it opens no load, no CLEAR_SPENT and no SET_PIN. 3.0 (D189): the holder's say (GET_INFO, a load's
         // keyset table, KEYSET_KEYS' other key) is read in holderSays and requireSay, the history's in requireHistory
         assertEquals(9, uses, "loadGrant is set by ALLOW_LOAD and read by SPEND_ALL_SIGN, KEYSET_KEYS' teaching, holderSays (GET_INFO, a load's keyset table), requireSay (KEYSET_KEYS' other key), requireHistory (GET_LOG and its receipts) and GET_CARD P1 = 3 (c, D197), and let go by RESET_CARD (1.17) and by an owner replaced (SET_OWNER, D197): " + uses);
         assertEquals(1, count(body(code, "private boolean holderSays(", "private void requireSay("), "loadGrant[0]"), "the holder's say is the grant on an owned card");
@@ -9333,7 +9333,7 @@ class CashuAppletTest {
         assertFalse(getReceipts.contains("beginTransaction") || getReceipts.contains("cardReceipts[") && getReceipts.contains("cardReceipts[3] ="), "and reading them writes nothing");
         /* the log is written in five places: the spend, the refusal of one, the putting on of pieces (LOAD_PROOF, and LOAD_CHANGE for
          * the card's own change, D183) and an opening given up (RESET_CARD's let-go form); a clock moved on twice in a tap was a sixth, before 1.15 */
-        // 2.3 (D184): the putting on of pieces is one helper, logLoaded, which LOAD_PROOF and LOAD_CHANGE call; every entry says its unit
+        // 3.0 (D184): the putting on of pieces is one helper, logLoaded, which LOAD_PROOF and LOAD_CHANGE call; every entry says its unit
         assertEquals(1, count(code, "private short logEntry("));
         assertEquals(5, count(code, "logEntry("), "its declaration, and the four that ask for it: the spend, the refusal, the putting on of pieces and the let-go, and nowhere else");
         assertEquals(3, count(code, "logLoaded("), "its declaration, LOAD_PROOF and LOAD_CHANGE");
@@ -9568,7 +9568,7 @@ class CashuAppletTest {
      * owner key and one proof for each label over a nonce and a value; the limit's
      * label twice, once over the four bytes of a day's limit and once over the
      * twelve bytes of all three limits (1.16); and, from 1.19, the tag's label over
-     * the one byte that switches it off; from 2.3, the limit's label over the
+     * the one byte that switches it off; from 3.0, the limit's label over the
      * seventeen bytes that carry the rate, and the reset's over the one byte of
      * the let-go form (an opening's number); the reset's over its anchor (D200, an
      * older header than the card's clock, which becomes it), and REFRESH's back
@@ -9592,7 +9592,7 @@ class CashuAppletTest {
         // SET_OWNER's over a key and the header that anchors the clock (145 bytes)
         byte[] tip = hexToBytes(TIP);
         byte[] thirteen = concat(u32(5000), u32(100), u32(50), new byte[] { 7 });
-        // 2.3 (D184): the seventeen-byte value, the rate (sats to the dollar) after the budget; and the let-go form of
+        // 3.0 (D184): the seventeen-byte value, the rate (sats to the dollar) after the budget; and the let-go form of
         // RESET_CARD (D183), the reset's label over the opening's number, which a card with no opening owed answers 6A88
         // only after the proof is good (a proof that is not the owner's is 6A91 before it)
         byte[] seventeen = concat(thirteen, u32(1500));
@@ -10597,7 +10597,7 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("jCardSim's own count: what installing the applet adds to the transient byte arrays the simulator holds as cleared on deselect is 941 bytes in 13 arrays (CashuApplet's 11 and SchnorrHW's 2; 2.3 adds a held tap's count, D187, D189), within the figure of the build that installs on the chip (941 in 14; 2.3 has no change grant, D185); the two it clears on reset are 7 bytes (the time the terminal told, 4, and the tap's three flags, D186). A larger build has to be measured on a card to exceed it")
+    @DisplayName("jCardSim's own count: what installing the applet adds to the transient byte arrays the simulator holds as cleared on deselect is 941 bytes in 13 arrays (CashuApplet's 11 and SchnorrHW's 2; 3.0 adds a held tap's count, D187, D189), within the figure of the build that installs on the chip (941 in 14; 3.0 has no change grant, D185); the two it clears on reset are 7 bytes (the time the terminal told, 4, and the tap's three flags, D186). A larger build has to be measured on a card to exceed it")
     void testInstallingAsksForNoMoreTransientMemoryThanTheBuildThatInstalls() throws Exception {
         ExposedRuntime fresh = new ExposedRuntime();
         long[][] before = transientHeld(fresh);
@@ -12105,7 +12105,7 @@ class CashuAppletTest {
         say(out, "the record: one roll", "exact", SW_OK, getCard);
         say(out, "the info: the new window, and 60 in it", "exact", SW_OK, info);
 
-        /* 2.3's reads, under the PIN of this tap: the long forms of GET_INFO, the keyset table, a date's keys (GROUP_KEYS:
+        /* 3.0's reads, under the PIN of this tap: the long forms of GET_INFO, the keyset table, a date's keys (GROUP_KEYS:
          * t and the keys come of the card's key and its c, another card's to differ in), the certificate's state on a card
          * that has none, and KEYSET_KEYS' refusals (teaching wants a keyset the mint's keys hash to: KeysetKeysTest). */
         say(out, "the info, P1 = 3: the keyset table kept, the rate, its entries, the last unit", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_INFO, 3, 0, 256));
@@ -12139,7 +12139,7 @@ class CashuAppletTest {
     }
 
     // =========================================================================
-    // The no-PIN allowance (1.16); since 2.3 a card is given its PIN before any money (D185)
+    // The no-PIN allowance (1.16); since 3.0 a card is given its PIN before any money (D185)
     // =========================================================================
     //
     // A card with no PIN takes and pays nothing (6A97). A card with a PIN has a third limit, the allowance: what it signs for in
@@ -12163,7 +12163,7 @@ class CashuAppletTest {
     private long noPinLimit() { return readUint32(infoTap(), 34); }
     /** What has been signed for with no PIN in the day's window: bytes 38..41 (as the record has it: not yet cleared by a day that has turned). */
     private long noPinSpent() { return readUint32(infoTap(), 38); }
-    /** When the no-PIN window that runs began (2.3, D186): GET_INFO P1 = 4, bytes 51..54, zeros where none runs. */
+    /** When the no-PIN window that runs began (3.0, D186): GET_INFO P1 = 4, bytes 51..54, zeros where none runs. */
     private long noPinStart() {
         byte[] i = transmit(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256)).getData();
         assertEquals(59, i.length, "GET_INFO P1 = 4 is 59 bytes");
@@ -13042,7 +13042,7 @@ class CashuAppletTest {
         byte[] d = info();
         assertEquals(30, d.length);
         byte[] fresh = new byte[30];
-        fresh[0] = 2; fresh[1] = 3; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
+        fresh[0] = 3; fresh[1] = 0; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
         System.arraycopy(u32(nowBefore), 0, fresh, 17, 4);
         assertArrayEquals(fresh, d, "GET_INFO: a new card, with the clock it had");
         assertEquals(nowBefore, now());

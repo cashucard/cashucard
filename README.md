@@ -10,7 +10,7 @@ payment offline and settle with the mint when online.
 > its testing so far is limited to the dated reports in this repository. Keep
 > only small amounts on a card.
 
-This is the **shared Cashu card protocol, version 2.3**: one wire for Flash and
+This is the **shared Cashu card protocol, version 3.0**: one wire for Flash and
 for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
 of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
 
@@ -30,18 +30,18 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > 2.0 has a neutral identity ([D19](docs/DECISIONS.md#d19)) and our fixes
 > ([D20](docs/DECISIONS.md#d20) to [D24](docs/DECISIONS.md#d24)).
 
-> ### Status: protocol 2.3 run on a J3R180 at a test mint; 2.1 tested with real phones
+> ### Status: protocol 3.0 not yet run on a chip; its source, numbered 2.3, run on a J3R180 at a test mint; 2.1 tested with real phones
 >
 > On 2026-11-13 a J3R180 installed the applet in this
-> tree as it was before [D200](docs/DECISIONS.md#d200) (a 35,466-byte load file, sha256
-> `48b8597c…`) and, at a FakeWallet test mint (fake sats), paid with real signatures, finished its own change
+> tree as it was before [D200](docs/DECISIONS.md#d200), numbered 2.3 then and answering
+> `02 03` (a 35,466-byte load file, sha256 `48b8597c…`) and, at a FakeWallet test mint (fake sats), paid with real signatures, finished its own change
 > with `LOAD_CHANGE` and paid that change again, each swap taken by the mint (the run
 > is in [the deployment guide](docs/HARDWARE_DEPLOYMENT.md) and
 > [its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-13_J3R180_2.3.md)). With a
 > refund key it loaded dated pieces, paid under their date's key, took its dated
 > change back, and gave c sealed to the refund key. It has not yet run with a phone,
 > at a production mint, or torn on purpose, and no dated piece has yet been taken
-> back after its date by the refund key. The file tracked now adds D200 (a payment's
+> back after its date by the refund key. The source of 2026-11-14 added D200 (a payment's
 > change counted when it is made, and the owner's anchor bringing back a clock moved
 > far ahead) and [D201](docs/DECISIONS.md#d201) (a header at the floor's work begins
 > and ends no day, and `REFRESH` brings the clock back), [D202](docs/DECISIONS.md#d202)
@@ -49,10 +49,14 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > [D203](docs/DECISIONS.md#d203) (a fresh or newly set-up card held to the same bar, and
 > the owner's back form bringing back the day of loads) and [D204](docs/DECISIONS.md#d204)
 > (the tip a card is set up with is its clock and its hardest); on 2026-11-14 the same
-> J3R180 installed it and, at the same test mint, had real signatures and real change
-> verified on the chip, with the clock brought back by the set-up, the resets, the
-> hand-over and the owner's back form, and the owner's c read back
-> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The
+> J3R180 installed its file, still numbered 2.3 (load file `f216644a…`), and, at the
+> same test mint, had real signatures and real change verified on the chip, with the
+> clock brought back by the set-up, the resets, the hand-over and the owner's back form,
+> and the owner's c read back
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
+> file is that file with the version moved to 3.0 ([D205](docs/DECISIONS.md#d205)), and
+> differs from it only in the version bytes. This exact file has run only in a simulator
+> so far, and no card has installed it; the run is to be repeated on it. The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The
@@ -108,7 +112,7 @@ beyond the card's own blinded change outputs. See [D3](docs/DECISIONS.md#d3).
 
 **AID:** package `F0 43 41 53 48 55 43 41 52 44` ("CASHUCARD"), applet `…44 01`.
 A reader selects the applet's whole AID, `F0 43 41 53 48 55 43 41 52 44 01`, and
-`SELECT` answers `02 03` (protocol 2.3); the package AID alone reaches the opener on a chip
+`SELECT` answers `03 00` (protocol 3.0); the package AID alone reaches the opener on a chip
 ([D25](docs/DECISIONS.md#d25)). A card on the 0.x AID (`D2 76 00 00 85 01 02`) or Foxy's
 1.x AID answers nothing to it: it needs an update.
 
@@ -137,7 +141,7 @@ The SDK is not downloaded for you:
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
-# → applet/target/cashu-javacard-2.3.0.cap   (three applets: the opener, the card's, then the NFC tag)
+# → applet/target/cashu-javacard-3.0.0.cap   (three applets: the opener, the card's, then the NFC tag)
 ```
 
 The build strips the Descriptor component and checks the load file's size against
@@ -175,14 +179,14 @@ on a simulator or emulator without a reader:
 ```bash
 tools/cardsim/cardsim.sh                               # from source, via Maven
 mvn -B -f tools/cardsim/pom.xml package && java -jar tools/cardsim/target/cardsim.jar
-curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"02039000","sw":"9000"}
+curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"03009000","sw":"9000"}
 ```
 
 Endpoints: `POST /apdu` (raw bytes in, data‖SW out, never retried), `POST /reset`
 (a brand-new card), `POST /fixture` (PIN, record, the deterministic test owner,
 anchor and headers, format-4 pieces with dates and DLEQ, spent slots, limits with
 the rollover budget, a blocked PIN), `GET /state`. `tools/cardsim/client.cjs` is a
-zero-dependency Node client with the 2.3 command set and the owner's proofs, and
+zero-dependency Node client with the 3.0 command set and the owner's proofs, and
 `tools/cardsim/cashu-crypto.cjs` the Cashu arithmetic a test needs. Two things a
 loader has to know: SELECT starts a session, as a tap does; and the simulator's
 card key is the same after every `/reset`, so mint pieces per run. The header of
@@ -197,7 +201,7 @@ port 47431) is kept beside it.
 ```
 applet/src/main/java/   applet source (JavaCard 3.0.5+): CashuApplet, SchnorrHW, Opener, Tag
 applet/src/test/java/   jCardSim test suite
-tools/cardctl/          PC/SC host driver (protocol 2.3) + its own tests
+tools/cardctl/          PC/SC host driver (protocol 3.0) + its own tests
 tools/cardsim/          jCardSim card over localhost HTTP for app e2e, its client and e2e
 tools/chip/             Foxy's bench scripts for a card on a reader
 tools/cardkit/          GlobalPlatform for the phone: SCP02 and SCP03, the install, a fake card (D27, D181)

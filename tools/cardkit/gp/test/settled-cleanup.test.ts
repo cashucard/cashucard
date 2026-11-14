@@ -20,11 +20,16 @@ const chipId = 'cplc-v1:4790d3213041093361205547';
 const secret = '01'.padStart(64, '0');
 const installationId = toHex(secp256k1.getPublicKey(secret)).toLowerCase();
 const mint = 'https://mint.example.test';
-/** `owed`: openings of change owed (GET_CHANGE's count on 2.1/2.2, byte 29 on 2.3); `format`: GET_INFO byte 8 and GET_CARD byte 0. */
+/** `owed`: openings of change owed (GET_CHANGE's count on 2.1/2.2, byte 29 on 3.0); `format`: GET_INFO byte 8 and GET_CARD byte 0. */
+type Version = readonly [number, number];
+const V21: Version = [2, 1],
+  V22: Version = [2, 2],
+  V30: Version = [3, 0];
+const is30 = (v: Version) => v[0] === 3 && v[1] === 0;
 function card(
   initialSpent = 1,
-  minor = 1,
-  infoMinor = minor,
+  version: Version = V21,
+  infoVersion: Version = version,
   {owed = 0, format = 4}: {owed?: number; format?: number} = {},
 ) {
   let spent = initialSpent;
@@ -51,11 +56,10 @@ function card(
         '9f7f2a4790d321470000000000304109336120554700000000000000000434a939333336310000000000000000',
       );
     } else if (a[1] === 0xa4) {
-      data = a.slice(5, -1).at(-1) === 1 && a[5] === 0xf0 ? [2, minor] : [];
+      data = a.slice(5, -1).at(-1) === 1 && a[5] === 0xf0 ? [...version] : [];
     } else if (a[1] === 1) {
       data = [
-        2,
-        infoMinor,
+        ...infoVersion,
         128,
         0,
         spent,
@@ -72,7 +76,7 @@ function card(
         0,
         1,
         ...new Array(12).fill(0),
-        infoMinor === 3 && owed ? 1 : 0,
+        is30(infoVersion) && owed ? 1 : 0,
       ];
     } else if (a[1] === 0x10) data = fromHex(installationId);
     else if (a[1] === 0x16) {
@@ -86,8 +90,8 @@ function card(
     } else if (a[1] === 0x14) data = [spent ? 2 : 0, ...new Array(127).fill(0)];
     else if (a[1] === 0x13) data = raw;
     else if (a[1] === 0x19) {
-      // GET_CHANGE: a 2.3 card's change owed is read from byte 29, never asked this way
-      assert.notEqual(minor, 3, 'GET_CHANGE sent to a 2.3 card');
+      // GET_CHANGE: a 3.0 card's change owed is read from byte 29, never asked this way
+      assert.ok(!is30(version), 'GET_CHANGE sent to a 3.0 card');
       data = [owed, ...new Array(80 * owed).fill(5)];
     } else if (a[1] === 0x44) {
       const key = fromHex(installationId);
@@ -132,27 +136,34 @@ function card(
   };
 }
 
-test('a 2.2 card (D175) and a 2.3 card are reviewed as a 2.1 card is, and a version this kit does not know stops', async () => {
-  for (const minor of [2, 3]) {
-    const review = await readResetReview(card(1, minor).tx);
+test('a 2.2 card (D175) and a 3.0 card are reviewed as a 2.1 card is, and a version this kit does not know stops', async () => {
+  for (const version of [V22, V30]) {
+    const review = await readResetReview(card(1, version).tx);
     assert.equal(review.chipId, chipId);
     assert.equal(review.spent, 1);
   }
-  for (const minor of [0, 4]) {
-    await assert.rejects(() => readResetReview(card(1, minor).tx));
+  for (const version of [
+    [2, 0],
+    [2, 3],
+    [2, 4],
+    [3, 1],
+    [4, 0],
+  ] as const) {
+    await assert.rejects(() => readResetReview(card(1, version).tx));
   }
 });
 
-test('the review says the change owed: GET_INFO byte 29 on a 2.3 card, GET_CHANGE on a 2.1 or 2.2 card', async () => {
-  for (const minor of [1, 2, 3]) {
+test('the review says the change owed: GET_INFO byte 29 on a 3.0 card, GET_CHANGE on a 2.1 or 2.2 card', async () => {
+  for (const version of [V21, V22, V30]) {
+    const name = version.join('.');
     for (const owed of [0, 1]) {
-      const c = card(0, minor, minor, {owed});
+      const c = card(0, version, version, {owed});
       const review = await readResetReview(c.tx);
-      assert.equal(review.changeOwed, owed === 1, `2.${minor}, ${owed} owed`);
-      assert.equal(review.version, `2.${minor}`);
+      assert.equal(review.changeOwed, owed === 1, `${name}, ${owed} owed`);
+      assert.equal(review.version, name);
       assert.equal(
         c.commands.some(a => a[1] === 0x19),
-        minor !== 3,
+        !is30(version),
         'GET_CHANGE is asked only of a 2.1 or 2.2 card',
       );
       assert.ok(c.commands.every(a => ![0x31, 0x40, 0x27].includes(a[1]!)));
@@ -160,15 +171,15 @@ test('the review says the change owed: GET_INFO byte 29 on a 2.3 card, GET_CHANG
   }
 });
 
-test("a 2.3 card of two units (format 05) is reviewed; format 05 on a 2.2 card, or a record whose format is not GET_INFO's, stops", async () => {
-  const two = await readResetReview(card(0, 3, 3, {format: 5}).tx);
-  assert.equal(two.version, '2.3');
+test("a 3.0 card of two units (format 05) is reviewed; format 05 on a 2.2 card, or a record whose format is not GET_INFO's, stops", async () => {
+  const two = await readResetReview(card(0, V30, V30, {format: 5}).tx);
+  assert.equal(two.version, '3.0');
   assert.equal(two.unspent, 0);
   await assert.rejects(
-    () => readResetReview(card(0, 2, 2, {format: 5}).tx),
+    () => readResetReview(card(0, V22, V22, {format: 5}).tx),
     (e: unknown) => (e as {code?: string}).code === 'unsupported-card',
   );
-  const c = card(0, 3, 3, {format: 5});
+  const c = card(0, V30, V30, {format: 5});
   await assert.rejects(
     () =>
       readResetReview(async a => {
@@ -193,8 +204,8 @@ test('a review saved by cardkit 0.2, with no changeOwed or version, still matche
   });
   assert.equal(result.spent, 0);
   // a saved review that has them is held to them: a card that now owes change has changed
-  const owing = card(1, 2, 2, {owed: 1});
-  const before = await readResetReview(card(1, 2, 2).tx);
+  const owing = card(1, V22, V22, {owed: 1});
+  const before = await readResetReview(card(1, V22, V22).tx);
   assert.equal(before.changeOwed, false);
   await assert.rejects(
     () =>
@@ -209,8 +220,8 @@ test('a review saved by cardkit 0.2, with no changeOwed or version, still matche
   assert.ok(owing.commands.every(a => ![0x31, 0x40].includes(a[1]!)));
 });
 
-test("a 2.3 card's spent entries are not cleaned: its secrets name its key for each piece's date, and nothing is sent to the mint or written", async () => {
-  const c = card(1, 3);
+test("a 3.0 card's spent entries are not cleaned: its secrets name its key for each piece's date, and nothing is sent to the mint or written", async () => {
+  const c = card(1, V30);
   const review = await readResetReview(c.tx);
   let asked = false,
     saved = false;
@@ -233,10 +244,12 @@ test("a 2.3 card's spent entries are not cleaned: its secrets name its key for e
   assert.ok(c.commands.every(a => ![0x31, 0x40].includes(a[1]!)));
 });
 
-test("GET_INFO's version must be SELECT's, as inspect requires: a 2.1 SELECT with a 2.2 GET_INFO, or the reverse, stops", async () => {
+test("GET_INFO's version must be SELECT's, as inspect requires: a 2.1 SELECT with a 2.2 GET_INFO, a 3.0 SELECT with a 2.x GET_INFO, or the reverse of either, stops", async () => {
   for (const [selected, reported] of [
-    [1, 2],
-    [2, 1],
+    [V21, V22],
+    [V22, V21],
+    [V30, [2, 3]],
+    [V22, V30],
   ] as const) {
     await assert.rejects(
       () => readResetReview(card(1, selected, reported).tx),

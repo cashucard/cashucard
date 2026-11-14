@@ -60,14 +60,14 @@ checks supported exports/private-path rejection, and scans app/ops imports.
 GP tests use fake cards and do not authorize a real reader or phone action.
 See [component releases](../../docs/COMPONENT-RELEASES.md).
 
-## 0.3.0: protocol 2.3, and change owed
+## 0.3.0: protocol 3.0, and change owed
 
-0.3.0 reads and installs the 2.3 card (`CARD_VERSION` is `[2, 3]`) and holds
+0.3.0 reads and installs the 3.0 card (`CARD_VERSION` is `[3, 0]`) and holds
 every reset and every "empty" test to the change a card is owed. It also carries
 the SCP03 changes below. Migration:
 
 - **Change owed.** A card that paid and has not had its change back yet is not
-  empty, and nothing removes it: the change is lost with the applet. A 2.3 card
+  empty, and nothing removes it: the change is lost with the applet. A 3.0 card
   says so in `GET_INFO` byte 29; a 2.1 or 2.2 card is asked `GET_CHANGE` (its
   byte 29 means something else). `InstallationInspection.publicState` gains
   `changeOwed`, and `empty` is false while it is set; `assessResetPreflight`
@@ -75,22 +75,22 @@ the SCP03 changes below. Migration:
   stops `guarded` before it saves anything, fresh or resumed; `provision`'s
   probe never sweeps one, Replace on or off. New: `readChangeOwed(ask, info)`,
   `changeOwedByte(info)` and `GET_CHANGE`. `notEmpty` names change owed on a
-  2.3 card. Inspection, the probe and the reset send one more plain command
-  (`GET_CHANGE`, `B0 19 00 00 00`) to a 2.1 or 2.2 card, and none to a 2.3 card.
+  3.0 card. Inspection, the probe and the reset send one more plain command
+  (`GET_CHANGE`, `B0 19 00 00 00`) to a 2.1 or 2.2 card, and none to a 3.0 card.
 - **Versions.** The probe removes only a card applet of a version this kit
-  knows (`CARD_VERSIONS`: 2.1, 2.2, 2.3), and only when its `GET_INFO` names
+  knows (`CARD_VERSIONS`: 2.1, 2.2, 3.0), and only when its `GET_INFO` names
   the version `SELECT` did; any other 2.x stops `guarded` after `SELECT`.
-  `holderCommands` throws `unsupported applet version` on a 2.3 card and the
+  `holderCommands` throws `unsupported applet version` on a 3.0 card and the
   settled-entry cleanup stops `unsupported-card` on one with spent entries
   (`ADMINISTERED_CARD_VERSIONS`: their owner commands and secrets are 2.2's); a
-  2.3 card's holder wallet frees its spent places.
+  3.0 card's holder wallet frees its spent places.
 - **`ResetReview`** (`@cashu-card/cardkit/cleanup`) gains `changeOwed` and
-  `version` (`'2.1'`, `'2.2'` or `'2.3'`). `readResetReview` reads a 2.3 card of
+  `version` (`'2.1'`, `'2.2'` or `'3.0'`). `readResetReview` reads a 3.0 card of
   two units (format `05` in `GET_INFO` byte 8 and `GET_CARD` byte 0) and refuses
   format `05` from any other version. A review saved by 0.2, without the two new
   fields, still matches its card in `cleanupSettledEntries`.
-- **`FakeCard`** answers `02 03`, `GET_CHANGE`, and takes `change` (openings owed)
-  and `minor` (1, 2 or 3) in `setCardState`.
+- **`FakeCard`** answers `03 00`, `GET_CHANGE`, and takes `change` (openings owed)
+  and `version` (`[2, 1]`, `[2, 2]` or `[3, 0]`, the default) in `setCardState`.
 - `tools/outbox-spike`'s runners require the reviewed 0.2.0 and refuse 0.3.0
   until they are reviewed against it ([D181](../../docs/DECISIONS.md#d181)).
 

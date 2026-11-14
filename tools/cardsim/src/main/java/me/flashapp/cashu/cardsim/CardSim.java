@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 /**
- * cardsim: the real CashuApplet, protocol 2.3, in jCardSim, served over loopback HTTP.
+ * cardsim: the real CashuApplet, protocol 3.0, in jCardSim, served over loopback HTTP.
  *
  * <pre>
  *   java -jar tools/cardsim/target/cardsim.jar [--port 9876]
@@ -41,7 +41,7 @@ import java.util.function.Supplier;
  *
  * <dl>
  *   <dt>{@code POST /apdu}  {"hex": "00A404000BF043415348554341524401"}</dt>
- *   <dd>{@code 200 {"hex": "02039000", "sw": "9000"}} — the applet's answer,
+ *   <dd>{@code 200 {"hex": "03009000", "sw": "9000"}} — the applet's answer,
  *       data‖SW. A non-9000 status word is still a 200: the transport worked,
  *       the card refused. 400 for bad JSON or bad hex. A SELECT by the package
  *       AID alone reaches the opener, as on a chip ({@code "9000"}, no version;
@@ -56,7 +56,7 @@ import java.util.function.Supplier;
  *       {@code /state}. <b>The card key P does not change</b>: jCardSim draws
  *       every keypair from an unseeded generator, so each install yields the
  *       same pubkey. The card's secret c, and so its key for each date
- *       (P + t*G, protocol 2.3's keys per load), is new at every reset: pieces
+ *       (P + t*G, protocol 3.0's keys per load), is new at every reset: pieces
  *       are locked to the key GROUP_KEYS answers under the PIN, never to P, and
  *       minted per run.</dd>
  *
@@ -68,7 +68,7 @@ import java.util.function.Supplier;
  *       validated against the card as it is before the first APDU — 400
  *       {@code {"error"}} with the card untouched, including for the 0.x keys
  *       {@code puk} and {@code appletVersion}, for pieces with no {@code pin}
- *       (a 2.3 card loads under the PIN given in the tap) and for a claim or a
+ *       (a 3.0 card loads under the PIN given in the tap) and for a claim or a
  *       record after the first set-up of a card with no owner. A step the
  *       applet refuses answers 409
  *       {@code {"error": "<step>", "sw": "6985", "state": {...}}} and
@@ -94,7 +94,7 @@ import java.util.function.Supplier;
  *       empty}, slots: [{slot, status, keysetId?, amount?, nonce?, C?, date?,
  *       dleq?: {e, s, r}}] (128 of them), fixtureError?: {step, sw}}}, read
  *       through commands that change nothing, in the tap as the app left it,
- *       without touching the session. A 2.3 card says its history (the day's
+ *       without touching the session. A 3.0 card says its history (the day's
  *       window and count, the rolls, the arming, the last header, a spent
  *       slot's piece) only to the PIN or the owner's grant given in the tap:
  *       with neither, those read as zeros and a spent slot as its number and
@@ -110,7 +110,7 @@ import java.util.function.Supplier;
  * SELECT starts a tap. The applet's PIN-verified flag, the owner's nonce
  * and the owner's grant are CLEAR_ON_DESELECT transients, so a re-SELECT
  * drops them the way a new NFC tap does; the fake transport sends SELECT on
- * every tap and there is no "tap" endpoint. What 2.3 keeps for a time in the
+ * every tap and there is no "tap" endpoint. What 3.0 keeps for a time in the
  * field (a payment signed, an owner claimed, a history read) outlasts a
  * SELECT; a fixture ends it, taking the card out of the field and back. {@code /state} sends no SELECT while
  * the card's applet is selected; with another instance selected (the opener, by
@@ -324,7 +324,7 @@ public final class CardSim {
             System.exit(1);
             return;
         } catch (IllegalStateException e) {
-            // a SELECT that did not answer a 2.x version after install
+            // a SELECT that did not answer a 3.x version after install
             System.err.println("cardsim: could not build the card: " + e.getMessage());
             System.exit(1);
             return;

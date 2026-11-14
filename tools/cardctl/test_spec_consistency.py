@@ -239,7 +239,7 @@ def test_the_applet_version_is_the_one_the_spec_the_guide_and_selftest_expect():
     """
     version = dict(re.findall(r"static final byte VERSION_(MAJOR|MINOR)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})", _applet_text()))
     major, minor = int(version["MAJOR"], 16), int(version["MINOR"], 16)
-    assert (major, minor) == (2, 3)
+    assert (major, minor) == (3, 0)
     assert f"`{major:02X} {minor:02X}`" in _heading_body("SELECT APPLICATION"), "the spec's SELECT response"
     guide = DEPLOYMENT_MD.read_text(encoding="utf-8")
     tracked = re.search(r"The CAP tracked in this repo is \*\*applet version (\d+)\.(\d+)\*\*", guide)
@@ -253,7 +253,7 @@ def test_the_applet_version_is_the_one_the_spec_the_guide_and_selftest_expect():
     ok, detail = cardctl._select_verdict(bytes([major, minor]))
     assert ok and detail == f"version {major}.{minor}", detail
     # 2.2 (D175) adds a read and changes nothing a 2.1 card does, so selftest's floor stays 2.1: a 2.1 card is not swept;
-    # 2.3 moves no floor either: a 2.1 or 2.2 card in the field keeps what it holds
+    # 3.0 moves no floor either: a 2.1 or 2.2 card in the field keeps what it holds
     assert cardctl.SELFTEST_MIN_VERSION == (2, 1) and cardctl.SELFTEST_MIN_VERSION <= (major, minor)
     assert cardctl._select_verdict(bytes([2, 1]))[0], "selftest passes a 2.1 card"
     assert not cardctl._select_verdict(bytes([1, 20]))[0], "selftest passes Foxy's 1.20"
@@ -399,7 +399,7 @@ def test_get_info_response_table_matches_the_decoder():
     assert sizes == [("30", "42", "43")], sizes
     longer = re.findall(r"43 with P1 = `02`, (\d+) with P1 = `03`, (\d+) with P1 = `04`", _section("GET_INFO"))
     assert longer == [("51", "59")], longer
-    # 2.3's bytes 43..58 (P1 = 3 and 4)
+    # 3.0's bytes 43..58 (P1 = 3 and 4)
     assert [(a, b, name) for a, b, name in rows if a >= 43] == [
         (43, 43, "keyset table"), (44, 47, "rate"), (48, 48, "entries"), (49, 49, "unmarked"), (50, 50, "last unit"),
         (51, 54, "no-PIN window"), (55, 56, "profiles"), (57, 58, "loads left")], [r for r in rows if r[0] >= 43]
@@ -643,12 +643,12 @@ def test_every_driven_command_matches_its_header_table():
 
 
 def test_get_info_asks_the_longest_form_the_card_speaks():
-    """P1 = 4 (59 bytes) from a card SELECT says is 2.3 or later, P1 = 2 (43 bytes) from an older one or before any
+    """P1 = 4 (59 bytes) from a card SELECT says is 3.0 or later, P1 = 2 (43 bytes) from an older one or before any
     SELECT: both forms are in the table."""
     p1_row = re.search(r"^\| P1 \| (.+?) \|$", _section("GET_INFO"), re.M).group(1)
     assert {2, 4} <= {int(c, 16) for c in re.findall(r"`([0-9A-F]{2})`", p1_row)}, p1_row
     assert _drive("get_info", (), [INFO_43])[2] == cardctl.INFO_P1_LONG == 2
-    for version, p1 in ((b"\x02\x03", 4), (b"\x02\x09", 4), (b"\x02\x02", 2), (b"\x02\x01", 2)):
+    for version, p1 in ((b"\x03\x00", 4), (b"\x03\x09", 4), (b"\x02\x02", 2), (b"\x02\x01", 2)):
         card = make_card([(version, 0x9000), (INFO_59, 0x9000)])
         card.select()
         card.get_info()
@@ -680,7 +680,7 @@ def test_lock_card_p2_is_the_confirmation_byte():
     assert "static final byte LOCK_CONFIRM_BYTE = (byte) 0xDE;" in _applet_text()
 
 
-# ── the card's own change, a keyset's keys and the certificate (2.3) ─────────
+# ── the card's own change, a keyset's keys and the certificate (3.0) ─────────
 def _applet_bytes() -> dict:
     return {n: int(v, 16) for n, v in re.findall(r"static final byte\s+(\w+)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})\s*;", _applet_text())}
 
@@ -705,8 +705,8 @@ def test_get_change_rows_are_the_tables_and_the_applets():
     assert (consts["CHANGE_REC"], consts["CHANGE_PAGE"], consts["CHANGE_MOST"]) == (83, 3, cardctl.CHANGE_MOST) == (83, 3, 8)
     assert (consts["OPEN_AMOUNT"], consts["OPEN_KEYSET"], consts["OPEN_DATE"], consts["OPEN_NONCE"]) == (0, 4, 12, 16)
     assert (consts["OPEN_KEYS_B"], consts["OPEN_KEYS_K"], consts["OPEN_KEYS_LEN"]) == (0, 33, 66)
-    # a reader reads 83-byte openings and sends LOAD_CHANGE only to a card that answers 02 03 or later
-    assert "A reader sends `LOAD_CHANGE` and reads 83-byte openings only from a card that answers `02 03` or later" \
+    # a reader reads 83-byte openings and sends LOAD_CHANGE only to a card that answers 03 00 or later
+    assert "A reader sends `LOAD_CHANGE` and reads 83-byte openings only from a card that answers `03 00` or later" \
         in " ".join(_heading_body("SELECT APPLICATION").split())
     for method, args in (("get_change", (0,)), ("load_change", _DRIVEN[[d[1] for d in _DRIVEN].index("load_change")][2])):
         card = make_card([(b"\x02\x02", 0x9000)])
@@ -880,7 +880,7 @@ def _cardctl_lines(text: str) -> list:
 def test_the_guides_set_a_card_up_with_setup_alone_and_every_cardctl_line_parses():
     """docs/HARDWARE_DEPLOYMENT.md and the site's guide (guide.html): every cardctl line parses with cardctl's own
     parser; a card is set up by one `setup` with the holder's --owner-key, never by the separate commands (each
-    selects the card again, which ends a 2.3 card's first set-up, D196); and a block that sets a card up holds no
+    selects the card again, which ends a 3.0 card's first set-up, D196); and a block that sets a card up holds no
     other writing command."""
     separate = {"set-pin", "verify-pin", "set-card", "set-owner", "set-owner-url", "set-limit"}
     for path in (DEPLOYMENT_MD, GUIDE_HTML):
@@ -987,7 +987,7 @@ def negated(said):
 
 
 def file_claims(text, said, names, html_text=False):
-    """Over a whole file: each sentence that names the file (`names`: "this exact file", "the 2.3 build", its size, its
+    """Over a whole file: each sentence that names the file (`names`: "this exact file", "the 3.0 build", its size, its
     hashes...) and claims an install or a chip run, and each that says anything in UNTRIED_NEVER, whatever it names."""
     flat = plain(text, html_text)
     out = []
@@ -1005,12 +1005,12 @@ def file_claims(text, said, names, html_text=False):
 def proven_overclaims(text, html_text=False, about=None):
     """Over a whole file: each sentence that says anything in PROVEN_NEVER, or names something a chip run did not cover
     (PROVEN_BEYOND) and claims a run of it (PROVEN_CLAIMS) without saying it is not covered (PROVEN_NOT), each read as a
-    reader sees it (plain()); with `about`, only the sentences that say it (README and the release notes speak of other
-    versions' runs too, with phones)."""
+    reader sees it (plain()); with `about` (a string, or a tuple of them), only the sentences that say it, or one of
+    them (README and the release notes speak of other versions' runs too, with phones)."""
     flat = plain(text, html_text)
     out = []
     for sentence in re.split(rf"\s*{_PARAGRAPH}\s*|(?<=[.!?;])\s+", flat):
-        if about is not None and about not in sentence:
+        if about is not None and not any(a in sentence for a in ((about,) if isinstance(about, str) else about)):
             continue
         never = [n for n in PROVEN_NEVER if re.search(n, sentence)]
         beyond = [b for b in PROVEN_BEYOND if re.search(r"(?<![\w-])" + re.escape(b) + r"(?![\w-])", sentence)]
@@ -1032,10 +1032,10 @@ def _refcheck():
 def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme=None, notes=None):
     """What the untried rule finds wrong in the three texts for the CAP `cap_bytes`, as a list of findings (empty when
     they say what refcheck knows): each place where a reader meets it first (the agents' guide before its rules, the
-    site's guide in step 2's note, the deployment guide's paragraph on the 2.3 build) gives refcheck's sentence for the
+    site's guide in step 2's note, the deployment guide's paragraph on the 3.0 build) gives refcheck's sentence for the
     file, worked out from PROVEN and SIZES (refcheck.said), word for word; while the file is untried those places say
     nothing else of an install, a chip run or a pass (UNTRIED_REFUSES), no sentence anywhere in the three that names the
-    file (its size, its hashes, "this exact file", "the 2.3 build") claims one, and none says UNTRIED_NEVER, each read as a
+    file (its size, its hashes, "this exact file", "the 3.0 build") claims one, and none says UNTRIED_NEVER, each read as a
     reader sees it (plain()); and the chip run's checklist gives refcheck's rule for PROVEN (PROVEN_NEEDS). At all times,
     proven or not, no sentence in the three, nor in README.md and RELEASE-NOTES.md (`readme`, `notes`: read from the tree
     where not given), claims what a chip run did not cover (proven_overclaims): a file proven earlier stays in the
@@ -1057,7 +1057,7 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
     label = "Not yet on a card" if untried else "On a card"
     guide_html_note = re.search(r'<p class="note"><b>' + re.escape(label) + r'\.</b>(.*?)</p>', guide_html, re.S)
     try:
-        deployment_size = deployment[deployment.index("The 2.3 build is"):deployment.index("On 2026-11-13 a J3R180")]
+        deployment_size = deployment[deployment.index("The 3.0 build is"):deployment.index("On 2026-11-13 a J3R180")]
     except ValueError:
         deployment_size = ""
     for name, text, is_html in (("guide.md", guide_md.split("## Rules")[0], False),
@@ -1076,17 +1076,19 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
     texts = (("guide.md", guide_md, False), ("guide.html", guide_html, True), ("HARDWARE_DEPLOYMENT.md", deployment, False),
              ("README.md", readme, False), ("RELEASE-NOTES.md", notes, False))
     if untried:
-        names = ("this exact file", "this exact", "2.3 file", "2.3 build", "2.3 cap", "2.3.0.cap", f"{size:,}", str(size),
+        names = ("this exact file", "this exact", "3.0 file", "3.0 build", "3.0 cap", "3.0.0.cap", f"{size:,}", str(size),
                  sha[:8], cap_sha[:8]) + UNTRIED_NAMES
         for name, text, is_html in texts:
             claims = file_claims(text, said, names, is_html)
             if claims:
                 found.append(f"{name}: claims of a file that has run only in a simulator: {claims}")
     for name, text, is_html in texts:
-        claims = proven_overclaims(text, is_html, "2.3" if name in ("README.md", "RELEASE-NOTES.md") else None)
+        # the two speak of other versions' runs too, with phones: held to the sentences of 3.0 and of its source's
+        # runs, made when it was numbered 2.3 (D205)
+        claims = proven_overclaims(text, is_html, ("3.0", "2.3") if name in ("README.md", "RELEASE-NOTES.md") else None)
         if claims:
             found.append(f"{name}: claims beyond what the chip run proved: {claims}")
-    head = "### The 2.3 chip run's checklist"
+    head = "### The 3.0 chip run's checklist"
     checklist = deployment[deployment.index(head):] if head in deployment else ""
     if "\n### " in checklist[len(head):]:
         checklist = checklist[:checklist.index("\n### ", len(head))]
@@ -1102,7 +1104,7 @@ def test_the_guides_say_what_refcheck_knows_of_the_tracked_file_and_where_the_fr
     tracked CAP; and the ECDH framing is checked at SET_CARD, not at install: the install's 6F00 points at the order and
     the size, the first SET_CARD's at the framing."""
     refcheck = _refcheck()
-    cap = ROOT / "applet" / "target" / "cashu-javacard-2.3.0.cap"
+    cap = ROOT / "applet" / "target" / "cashu-javacard-3.0.0.cap"
     guide_md = (ROOT / "website" / "dist" / "guide.md").read_text(encoding="utf-8")
     guide_html = GUIDE_HTML.read_text(encoding="utf-8")
     deployment = DEPLOYMENT_MD.read_text(encoding="utf-8")
@@ -1123,7 +1125,7 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
     them, in other words, as a flip, or hidden by entities, soft hyphens, zero-width characters, look-alike letters or
     full-width forms), finds it; and finds a checklist without refcheck's rule for PROVEN."""
     refcheck = _refcheck()
-    cap = (ROOT / "applet" / "target" / "cashu-javacard-2.3.0.cap").read_bytes()
+    cap = (ROOT / "applet" / "target" / "cashu-javacard-3.0.0.cap").read_bytes()
     md = (ROOT / "website" / "dist" / "guide.md").read_text(encoding="utf-8")
     html_ = GUIDE_HTML.read_text(encoding="utf-8")
     hd = DEPLOYMENT_MD.read_text(encoding="utf-8")
@@ -1135,10 +1137,10 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
         plants = [
             ("md", s, s + " It is ready for production mints, tested with phones, torn on purpose, and safe to install on "
                           "any J3R180."),
-            ("md", s, s + " Every 2.3 card in the field has been verified with real money at a production mint."),
+            ("md", s, s + " Every 3.0 card in the field has been verified with real money at a production mint."),
             ("hd", "## Install", "## Install\n\nThis exact file has been torn on purpose and has paid a production mint "
                                  "with a phone; it is ready for cards.\n"),
-            ("html", "</body>", "<p>The 2.3 build is cleared for production and has run on every J3R180 configuration."
+            ("html", "</body>", "<p>The 3.0 build is cleared for production and has run on every J3R180 configuration."
                                 "</p></body>"),
             ("md", s, s + " It has paid a production mint."),
             ("md", s, s + " It was tested with a phone."),
@@ -1146,7 +1148,7 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
             ("md", s, s + " It installs on any J3R180."),
             ("hd", "## Install", "## Install\n\nEvery configuration of the chip runs it.\n"),
             ("hd", "## Install", "## Install\n\nIt works on all configurations.\n"),
-            ("html", "</body>", "<p>The 2.3 build is cleared for production.</p></body>"),
+            ("html", "</body>", "<p>The 3.0 build is cleared for production.</p></body>"),
             ("html", "</body>", "<p>It has paid a pr&shy;oduction mint.</p></body>"),
             ("md", s, s + " It was tested with a ph\u200bone."),
             ("md", s, s + " It is \u0440roduction-ready."),
@@ -1165,12 +1167,14 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
     s = said + "."
     size = refcheck.load_file_size(_cap_parts(cap))
     flip = " (Updated: the line above is old. The card now runs this file and pays real mints from it.)"
+    # the deployment guide wraps refcheck's sentence, so its flip is planted after the sentence's last clause
+    tail = said.rsplit(", and ", 1)[-1] + "."
     plants = [
         ("md", s, s + " It was then installed on a J3R180 and passed its chip run."),
         ("md", s, s + " That was true until 2026-11-13: a J3R180 has since loaded it, and real payments from it were "
                       "verified on the chip. It is ready for cards."),
         ("md", s, s + " That note is out of date: the chip run is done and the file is cleared for cards."),
-        ("md", s, s + flip), ("html", s, s + flip), ("hd", "file of its size.", "file of its size." + flip),
+        ("md", s, s + flip), ("html", s, s + flip), ("hd", tail, tail + flip),
         ("html", s, s + " It has since been &#105;nstalled on a J3R180 and pa&#115;sed its c&#104;ip run."),
         ("html", s, s + " It has since been in&shy;stalled."),
         ("html", s, s + " It was <span>in</span>stalled."),
@@ -1181,20 +1185,20 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
         ("md", s, s + " It was \uff49nstalled."),
         ("hd", "adds its answer to\nrefcheck's table.", "adds its answer to\nrefcheck's table. On 2026-11-14 this exact "
                f"{size:,}-byte file installed on a J3R180 and passed its chip run."),
-        ("md", "## Rules", "## Rules\n\nThe 2.3 file installed and passed its chip run on a J3R180; it is safe to install.\n"),
-        ("html", "</body>", "<p>The 2.3 build has since been verified on the chip.</p></body>"),
+        ("md", "## Rules", "## Rules\n\nThe 3.0 file installed and passed its chip run on a J3R180; it is safe to install.\n"),
+        ("html", "</body>", "<p>The 3.0 build has since been verified on the chip.</p></body>"),
         ("hd", "## Install", "## Install\n\nThis exact file is ready for cards.\n"),
         # what the run of an earlier file did not cover, and the words a file tried somewhere is said in
         ("md", s, s + " The fix-15 file was tried on the bench J3R180 and every payment worked."),
         ("md", s, s + " D200's change rule and the anchored reset were checked on a chip."),
         ("hd", "## Install", "## Install\n\nThe current CAP went onto the bench card and paid testnut.\n"),
         ("html", "</body>", "<p>The tracked file has been tried on a chip; its run is done.</p></body>"),
-        ("hd", "## Install", "## Install\n\nThe 2.3 file of 35,466 bytes has paid a production mint with a phone and was torn "
+        ("hd", "## Install", "## Install\n\nThe 3.0 file of 35,466 bytes has paid a production mint with a phone and was torn "
                              "on purpose.\n"),
-        ("md", s, s + " Protocol 2.3 is ready for production on any J3R180 from any seller."),
-        ("hd", "## Install", "## Install\n\nThe earlier 2.3 file has paid a production mint.\n"),
+        ("md", s, s + " Protocol 3.0 is ready for production on any J3R180 from any seller."),
+        ("hd", "## Install", "## Install\n\nThe earlier 3.0 file has paid a production mint.\n"),
         ("readme", "## ", "## Status\n\nThe tracked file has run on a chip and is ready for production.\n\n## "),
-        ("notes", "## ", "## Run\n\nThe earlier 2.3 file paid a production mint with a phone.\n\n## "),
+        ("notes", "## ", "## Run\n\nThe earlier 3.0 file paid a production mint with a phone.\n\n## "),
     ]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     notes = (ROOT / "docs" / "RELEASE-NOTES.md").read_text(encoding="utf-8")
@@ -1204,7 +1208,7 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
         assert old in texts[where], (where, old)
         texts[where] = texts[where].replace(old, new, 1)
         assert guide_findings(refcheck, cap, texts["md"], texts["html"], texts["hd"], texts["readme"], texts["notes"]), (where, new)
-    head = "### The 2.3 chip run's checklist"
+    head = "### The 3.0 chip run's checklist"
     checklist = hd[hd.index(head):]
     checklist = checklist[:checklist.index("\n### ", len(head))]
     bullet = next(b for b in checklist.split("\n- ") if "PROVEN" in b)
@@ -1228,7 +1232,7 @@ def test_the_untried_rule_refuses_a_claim_of_an_install_or_a_chip_run():
              "its chip run, so it is safe to install")
     assert said not in plain(plant), "a hedge cut short is not the sentence"
     assert {"installed", "passed", "chip run", "safe to install"} <= set(untried_claims(plant, said)), untried_claims(plant, said)
-    assert untried_claims("The 2.3 build: " + said.replace(" so far", "\n so far") + ". If the install in step 4 fails, stop.", said) == []
+    assert untried_claims("The 3.0 build: " + said.replace(" so far", "\n so far") + ". If the install in step 4 fails, stop.", said) == []
     assert untried_claims("No card has installed this exact file or a file of its size. Stop.", said) == []
     for claim in ("It installs on a J3R180.", "Proven on silicon.", "It has run on a card.", "The chip run went well.",
                   "It passed.", "Now safe to install.", "Tested on a J3R452.", "It ran on a card.",
@@ -1245,13 +1249,13 @@ def test_the_untried_rule_refuses_a_claim_of_an_install_or_a_chip_run():
                   "Prοven.", "It was in**stall**ed.", "It was <b>in</b>stalled.", "It was &amp;#105;nstalled."):
         html_text = "<" in claim
         assert untried_claims(said + ". " + claim, said, html_text), claim
-    names = ("this exact file", "this exact", "2.3 file", "2.3 build", "35,466", "48b8597c")
+    names = ("this exact file", "this exact", "3.0 file", "3.0 build", "35,466", "48b8597c")
     for doc in ("On 2026-11-14 this exact 35,466-byte file installed on a J3R180 and passed its chip run.",
-                "## Rules\n\nThe 2.3 file installed and passed its chip run on a J3R180; it is safe to install.\n",
+                "## Rules\n\nThe 3.0 file installed and passed its chip run on a J3R180; it is safe to install.\n",
                 "The load file 48b8597c­ has since been loaded on a card.",
                 "Some words. It is safe to install."):
         assert file_claims(doc, said, names), doc
-    for doc in ("The 2.3 build is **35,466 bytes**: " + said + ". The chip run that releases it installs it first.",
+    for doc in ("The 3.0 build is **35,466 bytes**: " + said + ". The chip run that releases it installs it first.",
                 "- `gp --install` fails with `6F00`: no card has installed this exact file or a file of its size.",
                 "On 2026-11-13 a J3R180 installed the files of 33,647 and 35,213 bytes.",
                 "Add the load file's sha256 to PROVEN only once real signatures and real change verified on the chip."):

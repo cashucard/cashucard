@@ -338,7 +338,7 @@ class SchnorrHWMathTest {
      * The allocations that are not install-time and are let through all the same (1.20), each by its file, by the method it is
      * in and by the whole statement it is, so that nothing else in that method, or anywhere else, goes through with it:
      * { file, the method's declaration, the statement }. There are seven: the room for the mint's proofs, the two arrays of
-     * 2.2's assisted-settlement record (D176), which the chip refused in the constructor as well, and 2.3's openings' keys, keyset
+     * 2.2's assisted-settlement record (D176), which the chip refused in the constructor as well, and 3.0's openings' keys, keyset
      * table and paid list (D183, D184, D191) at SET_CARD and its certificate (D192) at the first CERT_WRITE. The chip will not install an
      * applet whose constructor asks for that much more (+300 bytes installs, +12,288 does not: docs/FOXY-CARD-HARDWARE.md), and gives the
      * same bytes asked for after the install, so SET_CARD reserves them. What this test exists to catch, an allocation that repeats on
@@ -354,16 +354,16 @@ class SchnorrHWMathTest {
           "if (outbox == null) { try { outbox = new byte[OUTBOX_LEN]; } catch (SystemException e) { outbox = null; } }" },
         { "CashuApplet.java", "private void processSetCard(",
           "if (outbox != null && outStage == null) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e) { outStage = null; } }" },
-        // 2.3's openings' B_ and K (D183) with their shown mark (D190), 536 bytes, for the same reason
+        // 3.0's openings' B_ and K (D183) with their shown mark (D190), 536 bytes, for the same reason
         { "CashuApplet.java", "private void processSetCard(",
           "if (openKeys == null) { try { openKeys = new byte[(short)(CHANGE_MOST * OPEN_KEYS_ROW)]; } catch (SystemException e) { openKeys = null; } }" },
-        // 2.3's keyset table (D184), 267 bytes, for the same reason
+        // 3.0's keyset table (D184), 267 bytes, for the same reason
         { "CashuApplet.java", "private void processSetCard(",
           "if (book == null) { try { book = new byte[BOOK_LEN]; } catch (SystemException e) { book = null; } }" },
-        // 2.3's paid list (D191) and the signatures kept beside the receipts (D194), 9,235 bytes, for the same reason
+        // 3.0's paid list (D191) and the signatures kept beside the receipts (D194), 9,235 bytes, for the same reason
         { "CashuApplet.java", "private void processSetCard(",
           "if (paid == null) { try { paid = new byte[PAID_LEN]; } catch (SystemException e) { paid = null; } }" },
-        // 2.3's certificate (D192), 1,027 bytes, at the first CERT_WRITE: only a card an issuer certifies asks for it
+        // 3.0's certificate (D192), 1,027 bytes, at the first CERT_WRITE: only a card an issuer certifies asks for it
         { "CashuApplet.java", "private void processCertWrite(",
           "if (cert == null) { try { cert = new byte[CERT_LEN]; } catch (SystemException e) { cert = null; } }" },
     };
@@ -601,7 +601,7 @@ class SchnorrHWMathTest {
      *
      * 2.2 (ENG-819, D175) added the assisted-settlement record's four arrays, 4,321 bytes (outbox 3,692, outStage 593, outInstall 32,
      * outGen 4), and a J3R180 refused that constructor at create (6F00, 2026-11-06, D176). The two large ones are reserved at the
-     * first SET_CARD now; the installation and the generation (36 bytes) stay: 29,842 in all. 2.3 (D185) has no note of a payment
+     * first SET_CARD now; the installation and the generation (36 bytes) stay: 29,842 in all. 3.0 (D185) has no note of a payment
      * for the tap after it (1 byte): 29,841; and the mark that the card has had a PIN (D192, 1 byte): 29,842; and the PIN's marks
      * (D195, 10 bytes: the wrong tries in a row on a card with no owner, the askings owed, the first set-up, the day's loads): 29,852;
      * and D196's 37: what left the card and the message's hash kept beside the last signature (36), and the openings whose change
@@ -610,7 +610,7 @@ class SchnorrHWMathTest {
      * the card has taken (4, after c and the refund key's y): 30,056, within the +300 measured to install.
      */
     @Test
-    @DisplayName("the constructors make 30,056 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36), less 2.3's one byte of no change grant (D185) and with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195), and D196's 37, and D197's 162 (c, the refund key's y, the payment's keys), and the PIN's mark of a forgotten history (D196, 1), and D202's 4 (the count of the owners' c): neither the 12,288 of the mint's proofs nor the record's 4,293 are among them, for the chip refuses a constructor that asks for that much more")
+    @DisplayName("the constructors make 30,056 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36), less 3.0's one byte of no change grant (D185) and with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195), and D196's 37, and D197's 162 (c, the refund key's y, the payment's keys), and the PIN's mark of a forgotten history (D196, 1), and D202's 4 (the count of the owners' c): neither the 12,288 of the mint's proofs nor the record's 4,293 are among them, for the chip refuses a constructor that asks for that much more")
     void theConstructorsAskForNoMorePersistentMemoryThanTheBuildThatInstalls() throws Exception {
         String applet = stripCommentsAndCharLiterals(new String(
             java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -630,7 +630,7 @@ class SchnorrHWMathTest {
         }
         org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36 - 1 + 1 + 10 + 37 + 64 + 98 + 1 + 4, total,
             "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install) "
-            + "and 2.2's installation and generation, 36 (the record's 4,293 are made at SET_CARD, D176), less 2.3's one byte of no change grant (D185), with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195) and D196's 37 (the receipt's figures kept with the last signature, the counted openings) and D197's 162 (c and the refund key's y, the payment's keys), and one byte more of the PIN's marks: a forgotten PIN's history owed (D196), and D202's count of the owners' c the card has taken (4). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
+            + "and 2.2's installation and generation, 36 (the record's 4,293 are made at SET_CARD, D176), less 3.0's one byte of no change grant (D185), with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195) and D196's 37 (the receipt's figures kept with the last signature, the counted openings) and D197's 162 (c and the refund key's y, the payment's keys), and one byte more of the PIN's marks: a forgotten PIN's history owed (D196), and D202's count of the owners' c the card has taken (4). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
         org.junit.jupiter.api.Assertions.assertEquals(25, arrays, "the parse found the 22 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
         org.junit.jupiter.api.Assertions.assertTrue(total + 12_288 > 29_806 + 300, "and the store is the kind of figure the chip refuses there");
     }
@@ -1011,7 +1011,7 @@ class SchnorrHWMathTest {
     }
 
     @Test
-    @DisplayName("RAM budget: the two constructors ask for no more than 941 bytes of CLEAR_ON_DESELECT, 8 of CLEAR_ON_RESET, in no more than 16 arrays: the figures of 1.12, which are 1.7's and a payment's change and net (1.15 asks for 6 on reset: the time the terminal told, 4, and the tap's two flags; 2.3 adds a third, 7)")
+    @DisplayName("RAM budget: the two constructors ask for no more than 941 bytes of CLEAR_ON_DESELECT, 8 of CLEAR_ON_RESET, in no more than 16 arrays: the figures of 1.12, which are 1.7's and a payment's change and net (1.15 asks for 6 on reset: the time the terminal told, 4, and the tap's two flags; 3.0 adds a third, 7)")
     void transientMemoryIsWithinTheBuildThatInstallsOnTheChip() throws Exception {
         int[] asked = transientMemoryAskedFor();
         String why = " These are the figures of 1.12 (941 bytes that are cleared on deselect, 8 on reset, in 16 arrays: 1.7's 931 in 14, and the change and the net of a payment). "
@@ -1020,9 +1020,9 @@ class SchnorrHWMathTest {
         org.junit.jupiter.api.Assertions.assertTrue(asked[1] <= RAM_ON_RESET_MOST, "CLEAR_ON_RESET is " + asked[1] + " bytes, over " + RAM_ON_RESET_MOST + "." + why);
         org.junit.jupiter.api.Assertions.assertTrue(asked[2] <= RAM_ARRAYS_MOST, "transient arrays are " + asked[2] + ", over " + RAM_ARRAYS_MOST + "." + why);
         // a parse that found nothing would prove nothing
-        org.junit.jupiter.api.Assertions.assertEquals(15, asked[2], "the parse found the 13 of CashuApplet and the 2 of SchnorrHW (2.3 has no change grant, D185)");
-        org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 (2.3: a held tap's count, one byte, D187, D189) and SchnorrHW 544");
-        org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 2.3 adds TAP_ARMED, D186); 1.14 kept six bytes for a clock told twice, and eight with the flags");
+        org.junit.jupiter.api.Assertions.assertEquals(15, asked[2], "the parse found the 13 of CashuApplet and the 2 of SchnorrHW (3.0 has no change grant, D185)");
+        org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 (3.0: a held tap's count, one byte, D187, D189) and SchnorrHW 544");
+        org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 3.0 adds TAP_ARMED, D186); 1.14 kept six bytes for a clock told twice, and eight with the flags");
     }
 
     @Test

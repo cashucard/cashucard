@@ -5,8 +5,8 @@
 > **Historical design record.** Foxy's software 1.20 was merged as protocol 2.0
 > (ENG-673, [D18](docs/DECISIONS.md#d18)). The body below preserves that fork
 > at the time, including its version numbers, paths and CI state. For the current
-> protocol 2.3 wire, use [`spec/APDU.md`](spec/APDU.md); readers select the whole
-> applet AID `F043415348554341524401`, which answers `02 03`. See
+> protocol 3.0 wire, use [`spec/APDU.md`](spec/APDU.md); readers select the whole
+> applet AID `F043415348554341524401`, which answers `03 00`. See
 > [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the current repository layout.
 
 `getfoxy/card` is a fork of `cashucard/javacard` (applet 0.4, `c1f4580`,

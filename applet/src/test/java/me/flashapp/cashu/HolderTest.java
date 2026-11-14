@@ -73,7 +73,7 @@ import java.math.BigInteger;
 import java.util.Arrays;
 
 /**
- * The owner claimed slowly (2.3, D187) and a holder with no phone (2.3, D189): SET_OWNER on a card with no owner is a claim of
+ * The owner claimed slowly (3.0, D187) and a holder with no phone (3.0, D189): SET_OWNER on a card with no owner is a claim of
  * six askings under the PIN, never in a time in the field that paid, after which that time in the field pays nothing; the
  * card of a holder with no phone is loaded and set under its PIN, its history held for over ten askings, and a held tap
  * stands where the owner's grant or proof stands; a factory record is no record; REFRESH P1 = 1. And the owner's key is a

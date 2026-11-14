@@ -182,7 +182,7 @@ export function cashuPlan(loadFile: LoadFileAsset): Plan {
     sweep: [TAG_AID, CARD_AID, OPENER_AID, CASHU_PACKAGE_AID],
     guard: CARD_AID,
     checks: [
-      // the whole AID, never the package AID (D25): the tracked CAP's version, 02 03
+      // the whole AID, never the package AID (D25): the tracked CAP's version, 03 00
       {apdu: selectAid(CARD_AID), data: [...CARD_VERSION]},
       {apdu: GET_INFO, length: 30},
       {apdu: GET_PUBKEY, length: 33},
@@ -460,14 +460,14 @@ class Run<P extends string> {
 
 /**
  * Why GET_INFO's 30 bytes are not an empty card, or null when they are. On a
- * 2.3 card byte 29 says change is owed; a 2.1 or 2.2 card is asked GET_CHANGE
+ * 3.0 card byte 29 says change is owed; a 2.1 or 2.2 card is asked GET_CHANGE
  * besides (readChangeOwed), which these bytes cannot say.
  */
 export function notEmpty(info: Bytes): string | null {
   if (info.length < 30) {
     return `GET_INFO answered ${info.length} bytes, not 30`;
   }
-  if (info[0] === 2 && info[1] === 3 && changeOwedByte(info)) {
+  if (info[0] === 3 && info[1] === 0 && changeOwedByte(info)) {
     return 'it is owed change that has not come back to it yet';
   }
   if (info[3] !== 0) {
@@ -589,7 +589,7 @@ export async function provision(
       expectOk(selected, 0xa4);
       if (!supportedCardVersion(selected.data)) {
         throw new Guard(
-          `${toHex(guard)} answers ${toHex(selected.data)} ${swHex(selected.sw)}, not a card applet version this kit knows (2.1, 2.2 or 2.3): the app will not remove it`,
+          `${toHex(guard)} answers ${toHex(selected.data)} ${swHex(selected.sw)}, not a card applet version this kit knows (2.1, 2.2 or 3.0): the app will not remove it`,
         );
       }
       const info = expectOk(await run.plain(GET_INFO), 0x01);

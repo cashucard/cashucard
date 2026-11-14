@@ -11,7 +11,7 @@ import me.flashapp.cashu.Tag;
 import java.util.Arrays;
 
 /**
- * One simulated protocol 2.3 card: the package's three applets installed into a jCardSim {@link CardSimulator} as a
+ * One simulated protocol 3.0 card: the package's three applets installed into a jCardSim {@link CardSimulator} as a
  * chip has them (the opener, the card's applet, and the NFC tag under the NFC Forum's own name), driven with raw APDU
  * bytes so that the bytes the app sends are the bytes the applet sees.
  *
@@ -19,7 +19,7 @@ import java.util.Arrays;
  * first instance it made whose AID begins with the name: a SELECT by the package AID {@code F0 CASHUCARD} reaches the
  * opener, made first, which answers 9000 with no version and 6D00 to everything after (ENG-681, DECISIONS D25).
  * jCardSim instead keeps its applets in a map sorted by AID and gives a partial name to the lowest that matches, which
- * here is the card's applet ({@code …44 01} sorts before {@code …44 4D}); left alone it would answer 02 03 where the
+ * here is the card's applet ({@code …44 01} sorts before {@code …44 4D}); left alone it would answer 03 00 where the
  * chip does not. So {@link #transmit} resolves a partial SELECT by name itself, against {@link #INSTANCES} in the
  * order {@link #install()} made them, and hands jCardSim the whole AID of the instance the chip would pick. Only a
  * SELECT by name for the first or only occurrence (P1 04, P2's low bits 00) is resolved; a whole AID, a name that
@@ -41,7 +41,7 @@ import java.util.Arrays;
  *
  * <p><b>SELECT starts a tap.</b> The applet's PIN-verified flag, the owner's nonce and the owner's grant are
  * {@code CLEAR_ON_DESELECT} transients, so a re-SELECT drops them, as a new NFC tap does. A fake transport sends SELECT
- * on every tap; there is no separate "tap" operation here. What protocol 2.3 keeps for a <i>time in the field</i> (a
+ * on every tap; there is no separate "tap" operation here. What protocol 3.0 keeps for a <i>time in the field</i> (a
  * payment signed, an owner claimed, a history read: {@code CLEAR_ON_RESET}) outlasts a SELECT and goes only when the
  * card leaves the field, which here is jCardSim's reset ({@link #outOfTheFieldAndBack}). A fixture does that after an
  * owner's claim, so that the card pays again, and at its end, so that the app's first command finds a fresh tap in a
@@ -49,7 +49,7 @@ import java.util.Arrays;
  *
  * <p><b>The card key is deterministic; its keys per date are not.</b> jCardSim's key generator draws from an unseeded
  * generator, so every install, every {@link #reset()}, yields the same card key P. The card's secret c, from which it
- * works out its key for each date (P + t*G, protocol 2.3's keys per load), is drawn by the applet's RandomData, which
+ * works out its key for each date (P + t*G, protocol 3.0's keys per load), is drawn by the applet's RandomData, which
  * is seeded from the host (below): a new c at every reset, and so new keys for every date. A loader reads GROUP_KEYS
  * under the PIN after each reset and mints per run; pieces are never locked to P itself.
  */
@@ -62,7 +62,7 @@ final class SimCard {
     static final String TAG_HEX = "D2760000850101";
     /** The instances, in the order {@link #install()} makes them and a chip is given them: the opener first (D25). */
     static final String[] INSTANCES = { OPENER_HEX, AID_HEX, TAG_HEX };
-    /** SELECT by the card's applet's whole AID, as a reader sends it (D25): answers 02 03. */
+    /** SELECT by the card's applet's whole AID, as a reader sends it (D25): answers 03 00. */
     static final byte[] SELECT = Hex.parse("00A404000B" + AID_HEX);
     /** SELECT by the package AID alone: a partial name, which reaches the opener (9000, no version). */
     static final byte[] SELECT_PACKAGE = Hex.parse("00A404000A" + PACKAGE_HEX);
@@ -75,7 +75,7 @@ final class SimCard {
     /** The most askings the bridge sends an owner's claim: the card takes six, the first five answered 6A98. */
     static final int CLAIM_MOST = 10;
 
-    /** GET_INFO P1 = 4: 59 bytes on 2.3 (the keyset table, the no-PIN window, the profiles, the loads left). */
+    /** GET_INFO P1 = 4: 59 bytes on 3.0 (the keyset table, the no-PIN window, the profiles, the loads left). */
     private static final byte[] GET_INFO = Hex.parse("B001040000");
     private static final byte[] GET_CARD = Hex.parse("B016000000");
     private static final byte[] GET_PUBKEY = Hex.parse("B010000021");
@@ -122,8 +122,8 @@ final class SimCard {
         sim.installApplet(AIDUtil.create(INSTANCES[1]), CashuApplet.class);
         sim.installApplet(AIDUtil.create(INSTANCES[2]), Tag.class, TAG_INSTALL, (short) 0, (byte) TAG_INSTALL.length);
         byte[] resp = sim.transmitCommand(SELECT);
-        if (sw(resp) != SW_OK || resp.length != 4 || resp[0] != 2) {
-            throw new IllegalStateException("SELECT after install answered " + Hex.format(resp) + ", not a 2.x applet");
+        if (sw(resp) != SW_OK || resp.length != 4 || resp[0] != 3) {
+            throw new IllegalStateException("SELECT after install answered " + Hex.format(resp) + ", not a 3.x applet");
         }
         selected = AID_HEX;
         tagFile = null;
@@ -264,7 +264,7 @@ final class SimCard {
     }
 
     /**
-     * Apply a fixture, additively, to the current card. The order is the one the applet's gates dictate (protocol 2.3):
+     * Apply a fixture, additively, to the current card. The order is the one the applet's gates dictate (protocol 3.0):
      * <ol>
      *   <li>SET_PIN on a card with no PIN, which begins the card's first set-up, then VERIFY_PIN (on a card that has one,
      *       the fixture's pin is the PIN to verify); the tap stays verified for the steps below;</li>
@@ -338,7 +338,7 @@ final class SimCard {
                 slotOf[i] = resp[0] & 0xFF;
             }
             for (int idx : f.spentSlots) {
-                // P1 = 02: this burns the place and builds no secret, so it names the keys per load (D197) as a reader of 2.3 does
+                // P1 = 02: this burns the place and builds no secret, so it names the keys per load (D197) as a reader of 3.0 does
                 expect("SPEND_ALL_BEGIN", apdu(0x22, 0x02, 0, new byte[] { (byte) slotOf[idx] }, 0x45), SW_OK);
                 byte[] signed;
                 int waits = 0;
@@ -375,7 +375,7 @@ final class SimCard {
         selected = AID_HEX;
     }
 
-    /** A held command (2.3): the same command sent again while the card answers 6A98, keep holding, at most {@code most} times. */
+    /** A held command (3.0): the same command sent again while the card answers 6A98, keep holding, at most {@code most} times. */
     private byte[] held(String step, byte[] command, int most) throws FixtureException {
         for (int asked = 1; ; asked++) {
             byte[] resp = raw(command);
@@ -400,7 +400,7 @@ final class SimCard {
     /**
      * The card as the applet reports it, through reads that need no PIN and change nothing (GET_INFO P1 = 4, GET_CARD,
      * GET_PUBKEY, GET_BALANCE, GET_SLOT_STATUS, and GET_PROOF and GET_DLEQ for each slot that is not empty). Reading never
-     * touches the session. With neither the PIN nor the owner's grant, a 2.3 card says its history as zeros (the day's
+     * touches the session. With neither the PIN nor the owner's grant, a 3.0 card says its history as zeros (the day's
      * window and count, the rolls, the arming, the last header) and a spent slot as an empty one (6A88): a spent slot
      * here is its number and status alone.
      */
@@ -461,7 +461,7 @@ final class SimCard {
             slot.addProperty("slot", i);
             slot.addProperty("status", statusName(status[i]));
             byte[] read = status[i] != 0 ? raw(apdu(0x13, i, 0, null, 0x52)) : null;
-            // a spent slot is history: 6A88 to a reader with neither the PIN nor the grant (2.3, D198); any other refusal is the bridge's error
+            // a spent slot is history: 6A88 to a reader with neither the PIN nor the grant (3.0, D198); any other refusal is the bridge's error
             if (read != null && !(status[i] == 2 && sw(read) == SW_SLOT_EMPTY)) {
                 byte[] p = data(read, "GET_PROOF");
                 slot.addProperty("keysetId", Hex.formatLower(p, 1, 8));

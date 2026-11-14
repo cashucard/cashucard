@@ -7,7 +7,7 @@
  *   - NUT-00 hash_to_curve, blinding and unblinding;
  *   - NUT-12 DLEQ verification, of a blind signature (e, s) and of a proof (e, s, r) as the card keeps it;
  *   - BIP-340 verification, for the card's AUTH and payment signatures;
- *   - the keys per load (protocol 2.3, spec/APDU.md "Keys per load"): a date's tweak t, the card's key for the date
+ *   - the keys per load (protocol 3.0, spec/APDU.md "Keys per load"): a date's tweak t, the card's key for the date
  *     P + t*G and the refund key for the date R + u*G, worked out from the card's secret c;
  *   - the format-4 secret the card signs (NUT-CCP's card proofs), which names the card's key for the piece's date, and
  *     the NUT-11 SIG_ALL message.
@@ -167,7 +167,7 @@ function schnorrVerify(pub, msg, sig) {
 }
 
 // ── the card ─────────────────────────────────────────────────────────────────
-// Keys per load (2.3): t = SHA-256("CashuCard/key" || c || date (4, big-endian)) mod n, and the card's key for the date
+// Keys per load (3.0): t = SHA-256("CashuCard/key" || c || date (4, big-endian)) mod n, and the card's key for the date
 // is P + t*G; u = SHA-256("CashuCard/refund-key" || c || date) mod n, and the refund key for the date is R + u*G.
 const LABEL_KEY = "CashuCard/key"
 const LABEL_REFUND_KEY = "CashuCard/refund-key"
@@ -208,8 +208,8 @@ function dateKeys(c, cardKey, refundKey, date) {
 }
 
 /**
- * The format-4 secret a card signs (NUT-CCP's card proofs), on 2.3 under the keys per load: `dateKey` is the card's key
- * for the piece's date, P + t*G (never the card's key P itself: no 2.3 card signs with P alone), and a dated piece names
+ * The format-4 secret a card signs (NUT-CCP's card proofs), on 3.0 under the keys per load: `dateKey` is the card's key
+ * for the piece's date, P + t*G (never the card's key P itself: no 3.0 card signs with P alone), and a dated piece names
  * the date's refund key, R + u*G, in its refund tag; SIG_ALL last. dateKeys() works both out.
  */
 function cardSecret(nonce, dateKey, date = 0, dateRefund = null) {

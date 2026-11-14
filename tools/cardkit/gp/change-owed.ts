@@ -15,14 +15,14 @@ const PAGE = 3;
 /** One opening of a 2.1 or 2.2 card: the amount, the keyset, the date, the nonce and r. */
 const OPENING = 80;
 
-/** What a 2.3 card says in GET_INFO byte 29 to anyone: 1 while change is owed. */
+/** What a 3.0 card says in GET_INFO byte 29 to anyone: 1 while change is owed. */
 export function changeOwedByte(info: ArrayLike<number>): boolean {
   return info.length >= 30 && info[29] !== 0;
 }
 
 /**
  * Whether the card applet SELECT and GET_INFO answered (`info`, its first two
- * bytes the version) owes change. A 2.3 card says it in GET_INFO byte 29. A
+ * bytes the version) owes change. A 3.0 card says it in GET_INFO byte 29. A
  * 2.1 or 2.2 card's byte 29 says something else, so it is asked GET_CHANGE
  * (`ask`, plain, with the card applet selected), whose count is the openings
  * owed. Any other version, or an answer that is not GET_CHANGE's, throws: a
@@ -34,17 +34,18 @@ export async function readChangeOwed(
   ask: (apdu: number[]) => Promise<Reply>,
   info: ArrayLike<number>,
 ): Promise<boolean> {
-  if (info.length < 30 || info[0] !== 2) {
-    throw new CardError(0x9000, 0x01, 'GET_INFO did not say a 2.x card');
+  if (info.length < 30) {
+    throw new CardError(0x9000, 0x01, 'GET_INFO was too short for a card');
   }
-  if (info[1] === 3) {
+  const [major, minor] = [info[0]!, info[1]!];
+  if (major === 3 && minor === 0) {
     return changeOwedByte(info);
   }
-  if (info[1] !== 1 && info[1] !== 2) {
+  if (major !== 2 || (minor !== 1 && minor !== 2)) {
     throw new CardError(
       0x9000,
       0x01,
-      `a 2.${info[1]} card: this kit cannot tell whether it owes change`,
+      `a ${major}.${minor} card: this kit cannot tell whether it owes change`,
     );
   }
   const reply = await ask(GET_CHANGE);

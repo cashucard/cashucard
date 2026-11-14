@@ -1,6 +1,6 @@
 "use strict"
 /*
- * client.cjs — zero-dependency Node client for the cardsim bridge, protocol 2.3.
+ * client.cjs — zero-dependency Node client for the cardsim bridge, protocol 3.0.
  *
  *   const { CardSim, CardError, encode, constants } = require("./client.cjs")
  *   const sim = new CardSim()                       // http://127.0.0.1:9876
@@ -19,7 +19,7 @@
  *
  * This file, the four routes and their bodies are the contract flash-pos and flash-mobile pin by CASHU_JAVACARD_REF.
  *
- * Protocol 2.3, in what a reader does (spec/APDU.md, "What 2.3 changes"):
+ * Protocol 3.0, in what a reader does (spec/APDU.md, "What 3.0 changes"):
  *   - Keys per load. Every piece is locked to the card's key for its date, P + t*G, never to the card's key P that
  *     GET_PUBKEY answers. A loader gets the key from GROUP_KEYS (the PIN in the tap) or works it out from c
  *     (cashu-crypto.dateKeys); LOAD_PROOF and LOAD_CHANGE carry the loader's word on it (P2 bit 1, 02). A till sends
@@ -143,10 +143,10 @@ const SW = Object.freeze({
 const PACKAGE_AID = Buffer.from("F0434153485543415244", "hex")
 const APPLET_AID = Buffer.from("F043415348554341524401", "hex")
 const SELECT_AIDS = Object.freeze([APPLET_AID, PACKAGE_AID])
-// Withdrawn: a card that answers these, or does not answer the 2.x AID, needs an update.
+// Withdrawn: a card that answers these, or does not answer the shared AID (D19, since 2.0), needs an update.
 const OLD_AIDS = Object.freeze({ upstream0x: Buffer.from("D2760000850102", "hex"), foxy1x: Buffer.from("F0464F585943415244", "hex") })
 
-const VERSION = Object.freeze({ major: 2, minor: 3 })
+const VERSION = Object.freeze({ major: 3, minor: 0 })
 /** GET_OUTBOX (2.2): the scope's length, and the most bytes one page answers. */
 const OUTBOX_SCOPE_LEN = 45
 const OUTBOX_PAGE = 255
@@ -161,27 +161,27 @@ const PIN_MIN_LEN = 4, PIN_MAX_LEN = 8
 const ROLL_BUDGET_DEFAULT = 7, ROLL_BUDGET_MOST = 30
 const STATUS_NAMES = Object.freeze({ 0: "empty", 1: "unspent", 2: "spent" })
 const PIN_STATE_NAMES = Object.freeze({ 0: "none", 1: "set", 2: "blocked" })
-/** SPEND_ALL_BEGIN's P1 (2.3): bit 1, the reader builds the secrets with the keys per load (always); bit 0, it reads units. */
+/** SPEND_ALL_BEGIN's P1 (3.0): bit 1, the reader builds the secrets with the keys per load (always); bit 0, it reads units. */
 const BEGIN_DATE_KEYS = 0x02, BEGIN_UNITS = 0x01
 /** SPEND_ALL_BEGIN's answer: the pieces' worth (4), t (32), the date's refund key R + u*G (33). */
 const BEGIN_ANSWER_LEN = 69
-/** LOAD_PROOF's and LOAD_CHANGE's P2 bit 1 (2.3): the loader's word that the pieces are locked to the card's keys for their date. LOAD_PROOF's bit 0: the unit first. */
+/** LOAD_PROOF's and LOAD_CHANGE's P2 bit 1 (3.0): the loader's word that the pieces are locked to the card's keys for their date. LOAD_PROOF's bit 0: the unit first. */
 const LOAD_DATE_KEYS = 0x02, LOAD_UNIT_FIRST = 0x01
 /** GROUP_KEYS' answer: t (32), P + t*G (33), R + u*G (33). */
 const GROUP_KEYS_LEN = 98
-/** The card's own change (2.3): GET_CHANGE rows, three to a page, eight openings; SPEND_ALL_CHANGE's data; LOAD_CHANGE's data and answer. */
+/** The card's own change (3.0): GET_CHANGE rows, three to a page, eight openings; SPEND_ALL_CHANGE's data; LOAD_CHANGE's data and answer. */
 const CHANGE_ROW_LEN = 83, CHANGE_PAGE = 3, CHANGE_MOST = 8
 const SPEND_ALL_CHANGE_LEN = 45
 const LOAD_CHANGE_LEN = 194, LOAD_CHANGE_ANSWER_LEN = 83
 const EC_POINT_LEN = 65
-/** KEYSET_KEYS (2.3): a key on the wire is amount (8) || K (33); six to a command, 64 to a keyset; a tail of 64 at most; a path of 6 at most. */
+/** KEYSET_KEYS (3.0): a key on the wire is amount (8) || K (33); six to a command, 64 to a keyset; a tail of 64 at most; a path of 6 at most. */
 const KEYSET_KEY_WIRE = 41, KEYSET_KEYS_PER_COMMAND = 6, KEYSET_KEYS_MOST = 64, KEYSET_TAIL_MOST = 64, KEYSET_PATH_MOST = 6
 const KEYSET_UNITS = Object.freeze(["sat", "usd"])
-/** CERT_READ (2.3): P1 FF the state (4 bytes), P1 00 to 03 pages of 256. */
+/** CERT_READ (3.0): P1 FF the state (4 bytes), P1 00 to 03 pages of 256. */
 const CERT_STATE = 0xff, CERT_PAGE = 256, CERT_PAGES = 4
-/** GET_NONCE P1 = 1 (2.3): the nonce (16), the PIN key (33), the card key's signature over it (64). */
+/** GET_NONCE P1 = 1 (3.0): the nonce (16), the PIN key (33), the card key's signature over it (64). */
 const PIN_KEY_ANSWER_LEN = 113
-/** Held commands (2.3): a claim is six askings; a VERIFY_PIN on a card with no owner waits at most 16,384 askings, in stretches of 16, then the try. */
+/** Held commands (3.0): a claim is six askings; a VERIFY_PIN on a card with no owner waits at most 16,384 askings, in stretches of 16, then the try. */
 const CLAIM_MOST = 10
 const PIN_WAIT_MOST = 16384 + 16384 / 16 + 2
 /** GET_INFO P1 = 4, bytes 55 and 56: the profiles a card keeps, one bit each (spec/APDU.md, GET_INFO). */
@@ -593,7 +593,7 @@ function openingNumber(k) {
 /** Pure encoders: the bytes each command puts on the wire. Argument checks throw before any transport. */
 const encode = Object.freeze({
   select: (aid = APPLET_AID) => Buffer.concat([Buffer.from([0x00, 0xa4, 0x04, 0x00, aid.length]), aid]),
-  /** GET_INFO: P1 = 4 (59 bytes on 2.3), the longest; 0 to 3 for the shorter forms. */
+  /** GET_INFO: P1 = 4 (59 bytes on 3.0), the longest; 0 to 3 for the shorter forms. */
   getInfo: (p1 = 4) => apdu(INS.GET_INFO, p1, 0, null, 0x00),
   getPubkey: () => apdu(INS.GET_PUBKEY, 0, 0, null, 0x21),
   getBalance: () => apdu(INS.GET_BALANCE, 0, 0, null, 0x04),
@@ -826,7 +826,7 @@ function parseCard(b) {
 }
 
 /**
- * GET_CHANGE (2.3): a count (0 to 3), then that many openings of 83 bytes: the opening's number (LOAD_CHANGE's P1),
+ * GET_CHANGE (3.0): a count (0 to 3), then that many openings of 83 bytes: the opening's number (LOAD_CHANGE's P1),
  * amount, keyset, date, the blinded message B_ and K, the mint's key it is bound to. No nonce and no blinding factor:
  * only the card finishes its change.
  */
@@ -908,7 +908,7 @@ function validateFixture(f) {
   const proofs = f.proofs === undefined ? [] : f.proofs
   if (!Array.isArray(proofs)) throw new TypeError("proofs must be an array")
   if (proofs.length > MAX_PROOFS) throw new RangeError(`proofs has ${proofs.length} entries; the card has ${MAX_PROOFS} slots`)
-  if (proofs.length && f.pin === undefined) throw new TypeError("proofs need pin: a load wants the PIN given in this tap (2.3), and a card with no PIN takes nothing (6A97)")
+  if (proofs.length && f.pin === undefined) throw new TypeError("proofs need pin: a load wants the PIN given in this tap (3.0), and a card with no PIN takes nothing (6A97)")
   const nonces = new Set()
   proofs.forEach((p, i) => {
     const where = `proofs[${i}]`
@@ -1051,7 +1051,7 @@ class CardSim {
     }
   }
 
-  /** GET_INFO: P1 = 4 by default (59 bytes on 2.3: the keyset table, the rate, the no-PIN window, the profiles, the loads left). */
+  /** GET_INFO: P1 = 4 by default (59 bytes on 3.0: the keyset table, the rate, the no-PIN window, the profiles, the loads left). */
   async getInfo(p1 = 4) { return parseInfo(await this.send(encode.getInfo(p1), "GET_INFO")) }
   /** GET_PUBKEY: the card's key P (33). For AUTH and a certificate; never lock ecash to it (keys per load). */
   async getPubkey() { return this.send(encode.getPubkey(), "GET_PUBKEY") }
@@ -1068,9 +1068,9 @@ class CardSim {
    * half) opens it.
    */
   async getCardSecret(E = null) { return this.send(encode.getCardSecret(E), "GET_CARD c") }
-  /** GROUP_KEYS (2.3): a date's keys, under the PIN given in this tap or the owner's grant: { t, key: P + t*G, refund: R + u*G }. */
+  /** GROUP_KEYS (3.0): a date's keys, under the PIN given in this tap or the owner's grant: { t, key: P + t*G, refund: R + u*G }. */
   async groupKeys(date) { return parseGroupKeys(await this.send(encode.groupKeys(date), "GROUP_KEYS")) }
-  /** CERT_READ (2.3): the state, then the pages to the container's length. { sealed, version, length, container }. Public. */
+  /** CERT_READ (3.0): the state, then the pages to the container's length. { sealed, version, length, container }. Public. */
   async certRead() {
     const state = await this.send(encode.certRead(CERT_STATE), "CERT_READ state")
     if (state.length !== 4) throw new Error(`CERT_READ P1 FF returned ${state.length} bytes, expected 4`)
@@ -1092,7 +1092,7 @@ class CardSim {
     const b = await this.send(encode.auth(reader), "AUTH")
     return { card: b.subarray(0, 16), signature: b.subarray(16) }
   }
-  /** GET_CHANGE (2.3): one page of openings owed, up to three, 83 bytes each (parseChange). No PIN. */
+  /** GET_CHANGE (3.0): one page of openings owed, up to three, 83 bytes each (parseChange). No PIN. */
   async getChange(page = 0) { return parseChange(await this.send(encode.getChange(page), `GET_CHANGE page ${page}`)) }
   /** Every opening owed: pages from 0 until one answers fewer than three. An opening seen twice (let go between pages) is listed once. */
   async owedChange() {
@@ -1106,7 +1106,7 @@ class CardSim {
   }
   async getDleq(first, second = null) { return this.send(encode.getDleq(first, second), "GET_DLEQ") }
   /**
-   * GET_OUTBOX's scope (2.2): 45 bytes. 2.3 says it in the time in the field that signed the payment, and otherwise to
+   * GET_OUTBOX's scope (2.2): 45 bytes. 3.0 says it in the time in the field that signed the payment, and otherwise to
    * the PIN or the owner's grant in this tap (6982). A card with no record throws CardError 6A88.
    */
   async getOutboxScope() {
@@ -1144,7 +1144,7 @@ class CardSim {
   }
 
   /**
-   * SPEND_ALL_BEGIN (2.3): the payment's places, P1 02 (03 with `units`: the reader reads units). Answers { total, t,
+   * SPEND_ALL_BEGIN (3.0): the payment's places, P1 02 (03 with `units`: the reader reads units). Answers { total, t,
    * refund }: what the pieces are worth, the tweak of the payment's date (the card's key for it is P + t*G,
    * cashu-crypto.tweakedKey) and the date's refund key R + u*G (zeros for an undated payment).
    */
@@ -1159,7 +1159,7 @@ class CardSim {
     if (b.length !== 33) throw new Error(`SPEND_ALL_CHANGE returned ${b.length} bytes, expected 33`)
     return b
   }
-  /** SPEND_ALL_SIGN, sent again for as long as the card answers "not yet" (00 01; 2.3: every payment waits a floor). Answers { signature, waits }. Not idempotent. */
+  /** SPEND_ALL_SIGN, sent again for as long as the card answers "not yet" (00 01; 3.0: every payment waits a floor). Answers { signature, waits }. Not idempotent. */
   async spendAllSign({ maxWaits = 1100 } = {}) {
     for (let waits = 0; waits <= maxWaits; waits++) {
       const b = await this.send(encode.spendAllSign(), "SPEND_ALL_SIGN")
@@ -1170,13 +1170,13 @@ class CardSim {
   }
   async spendAllAgain(messageHash = null) { return this.send(encode.spendAllAgain(messageHash), "SPEND_ALL_AGAIN") }
   /**
-   * LOAD_CHANGE (2.3): opening `k` made into its piece from the mint's answer for its B_ (C_, K, and the DLEQ e and s),
+   * LOAD_CHANGE (3.0): opening `k` made into its piece from the mint's answer for its B_ (C_, K, and the DLEQ e and s),
    * which the card checks and unblinds. Any reader, no PIN, once the opening's key is shown (showOpeningKey). Answers
    * { slot, proofKept, piece }. Not idempotent: a second LOAD_CHANGE of the same opening is 6A88.
    */
   async loadChange(k, C_, K, e, s) { return parseLoadChange(await this.send(encode.loadChange(k, C_, K, e, s), `LOAD_CHANGE opening ${k}`)) }
 
-  // KEYSET_KEYS (2.3)
+  // KEYSET_KEYS (3.0)
   async keysetKeysBegin(keyset, tail) { await this.send(encode.keysetKeysBegin(keyset, tail), "KEYSET_KEYS begin") }
   async keysetKeysKeys(keys) { await this.send(encode.keysetKeysKeys(keys), "KEYSET_KEYS keys") }
   async keysetKeysFinish() {
@@ -1213,7 +1213,7 @@ class CardSim {
     return index
   }
 
-  /** LOAD_PROOF (2.3: P2 02, the word that the piece is locked to the card's keys for its date). Wants the PIN given in this tap. Returns the slot. Not idempotent: a replay is 6A94. */
+  /** LOAD_PROOF (3.0: P2 02, the word that the piece is locked to the card's keys for its date). Wants the PIN given in this tap. Returns the slot. Not idempotent: a replay is 6A94. */
   async loadProof(keyset, amount, nonce, C, date = 0, dleq = null, opts = {}) {
     return (await this.send(encode.loadProof(keyset, amount, nonce, C, date, dleq, opts), "LOAD_PROOF"))[0]
   }
@@ -1238,7 +1238,7 @@ class CardSim {
     await this.send(encode.changePin(ownerProof(LABEL.CHANGE_PIN, await this.getNonce(), pin, ownerKeyHex), pin), "CHANGE_PIN")
   }
   /**
-   * ALLOW_LOAD, the owner's grant for this tap. A 2.3 card answers 6200 where the grant is given: it opens no load (a load
+   * ALLOW_LOAD, the owner's grant for this tap. A 3.0 card answers 6200 where the grant is given: it opens no load (a load
    * wants the PIN) and signs nothing; under it the history is read, GET_INFO says the limit on one payment and the rate,
    * and a second payment in the time in the field waits the floor alone. A 9000 is a card of 2.2 or earlier, whose grant
    * opens loads with no PIN: refused here.
@@ -1246,7 +1246,7 @@ class CardSim {
   async allowLoad(ownerKeyHex = TEST_OWNER_PRIVATE) {
     const { sw } = await this.apdu(encode.allowLoad(ownerProof(LABEL.LOAD, await this.getNonce(), Buffer.alloc(0), ownerKeyHex)))
     if (sw === SW.GRANT_GIVEN) return
-    if (sw === SW.OK) throw new Error("ALLOW_LOAD answered 9000: a card of 2.2 or earlier, whose grant opens a load with no PIN; a card of 2.3 answers 6200")
+    if (sw === SW.OK) throw new Error("ALLOW_LOAD answered 9000: a card of 2.2 or earlier, whose grant opens a load with no PIN; a card of 3.0 answers 6200")
     throw new CardError(sw, "ALLOW_LOAD")
   }
   async setLimit(limits, ownerKeyHex = TEST_OWNER_PRIVATE) {

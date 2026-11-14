@@ -86,7 +86,7 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Two units on one card (2.3, D184): the keyset table the first SET_CARD reserves, the labelled load and the table's rules at
+ * Two units on one card (3.0, D184): the keyset table the first SET_CARD reserves, the labelled load and the table's rules at
  * every load, one unit a payment, every limit in the card's unit with a payment in the other unit turned at the rate, the one
  * SET_LIMIT layout of seventeen bytes, and what GET_INFO P1 = 3, GET_CARD P1 = 2, GET_BALANCE P1 = 1 and GET_LOG P1 = 2 and 3
  * say. A card of one unit answers as it did, but for the version.

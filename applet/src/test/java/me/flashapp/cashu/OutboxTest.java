@@ -251,7 +251,7 @@ class OutboxTest {
     // ---- the tests -------------------------------------------------------
 
     @Test
-    @DisplayName("2.3 (D183): a till's output is under the first piece's keyset in the record even where its B_ is an owed opening's of an earlier payment: only the payment's own change is looked up among the openings")
+    @DisplayName("3.0 (D183): a till's output is under the first piece's keyset in the record even where its B_ is an owed opening's of an earlier payment: only the payment's own change is looked up among the openings")
     void aTillsOutputIsNeverTakenForChange() throws Exception {
         int[] first = load(8, 16);
         byte[] moved = hexToBytes("00aabbccddeeff01");
@@ -267,7 +267,7 @@ class OutboxTest {
     }
 
     @Test
-    @DisplayName("2.3 (D183): the card's own change carries its opening's keyset in the record: the one SPEND_ALL_CHANGE's 45-byte form named, or the first piece's; the till's outputs carry the first piece's")
+    @DisplayName("3.0 (D183): the card's own change carries its opening's keyset in the record: the one SPEND_ALL_CHANGE's 45-byte form named, or the first piece's; the till's outputs carry the first piece's")
     void theChangeCarriesItsOwnKeyset() throws Exception {
         int[] places = load(8, 16);
         byte[] moved = hexToBytes("00aabbccddeeff01");

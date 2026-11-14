@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * A {@code POST /fixture} body for a protocol 2.3 card, parsed and fully validated before a single APDU is sent.
+ * A {@code POST /fixture} body for a protocol 3.0 card, parsed and fully validated before a single APDU is sent.
  *
  * <pre>
  * {
@@ -38,7 +38,7 @@ import java.util.Set;
  * as it is for a form without it (D26); the fixture always sends them all, so a fixture's card never keeps a number
  * from before. tools/cardsim/README.md has the whole schema.
  *
- * Protocol 2.3's rules, each checked here so the card refuses a fixture only for what it holds, never for its shape:
+ * Protocol 3.0's rules, each checked here so the card refuses a fixture only for what it holds, never for its shape:
  * a card with no PIN takes nothing, so {@code proofs} need {@code pin} (the PIN given in the tap opens a load; the
  * owner's grant opens none); a card with no owner is set up once, in its first set-up, which the SET_PIN of a card with
  * no PIN begins and the fixture's own SELECT ends, so on such a card {@code owner} (a claim) needs {@code pin} in the
@@ -128,7 +128,7 @@ final class Fixture {
             this.noPinWindow = noPinWindow;
         }
 
-        /** SET_LIMIT's eighteen bytes (2.3's one layout): day ‖ payment ‖ allowance ‖ rollover budget ‖ rate ‖ the no-PIN window's switch. */
+        /** SET_LIMIT's eighteen bytes (3.0's one layout): day ‖ payment ‖ allowance ‖ rollover budget ‖ rate ‖ the no-PIN window's switch. */
         byte[] value() {
             byte[] v = new byte[18];
             putUint32(v, 0, day);
@@ -177,15 +177,15 @@ final class Fixture {
         if (root == null || !root.isJsonObject()) throw new IllegalArgumentException("fixture must be a JSON object");
         JsonObject o = root.getAsJsonObject();
         for (String k : o.keySet()) {
-            if ("puk".equals(k)) throw new IllegalArgumentException("puk: there is no PUK on a 2.x card (D18); the owner's change-pin unblocks a PIN");
-            if ("appletVersion".equals(k)) throw new IllegalArgumentException("appletVersion: the 0.x version masks are gone (D18); the bridge is the 2.3 applet");
+            if ("puk".equals(k)) throw new IllegalArgumentException("puk: there is no PUK on a card since 2.0 (D18); the owner's change-pin unblocks a PIN");
+            if ("appletVersion".equals(k)) throw new IllegalArgumentException("appletVersion: the 0.x version masks are gone (D18); the bridge is the 3.0 applet");
             if (!KEYS.contains(k)) throw new IllegalArgumentException("unknown fixture key: " + k);
         }
 
         byte[] pin = optionalSecret(o, "pin", PIN_MIN_LEN, PIN_MAX_LEN);
         boolean blockedPin = optionalBoolean(o, "blockedPin");
         if (blockedPin && pin == null) throw new IllegalArgumentException("blockedPin requires pin");
-        // the card's first set-up (2.3, D196): the SET_PIN of a card with no PIN begins it, the fixture's SELECT ends it
+        // the card's first set-up (3.0, D196): the SET_PIN of a card with no PIN begins it, the fixture's SELECT ends it
         boolean firstSetUp = pin != null && !card.pinSet;
 
         byte[] mint = null;
@@ -220,7 +220,7 @@ final class Fixture {
             throw new IllegalArgumentException("the card already has an owner whose key the bridge does not hold: /reset first");
         }
         if (owner != null && !card.owned) {
-            // a claim (2.3, D187): under the PIN, in the card's first set-up, onto a record of the holder's
+            // a claim (3.0, D187): under the PIN, in the card's first set-up, onto a record of the holder's
             if (!firstSetUp) {
                 throw new IllegalArgumentException("owner: a card with no owner is claimed in its first set-up, under the PIN: give pin in the same fixture as owner, on a card with no PIN (/reset first)");
             }
@@ -301,7 +301,7 @@ final class Fixture {
                 proofs.add(proof);
             }
             if (!proofs.isEmpty()) {
-                if (pin == null) throw new IllegalArgumentException("proofs need pin: a load wants the PIN given in this tap (2.3), and a card with no PIN takes nothing (6A97)");
+                if (pin == null) throw new IllegalArgumentException("proofs need pin: a load wants the PIN given in this tap (3.0), and a card with no PIN takes nothing (6A97)");
                 if (mint == null && !card.recordSet) throw new IllegalArgumentException("proofs need a record: give mint (LOAD_PROOF answers 6A8C without one)");
             }
         }

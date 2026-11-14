@@ -84,8 +84,8 @@ export function ResetCardScreen({
   };
   const card = pending ? visible.review : flow.resetReview?.card;
   const lookup = flow.resetReview?.source;
-  // a 2.3 card's spent entries are freed by its holder wallet, not by this app's settlement check
-  const cleanable = !!card && card.version !== '2.3';
+  // a 3.0 card's spent entries are freed by its holder wallet, not by this app's settlement check
+  const cleanable = !!card && card.version !== '3.0';
   const allowed =
     !!card &&
     card.unspent === 0 &&

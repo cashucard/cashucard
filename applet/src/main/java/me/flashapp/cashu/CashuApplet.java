@@ -22,46 +22,46 @@ import javacardx.crypto.*;
  * AID: F0 43 41 53 48 55 43 41 52 44   ("CASHUCARD" after a proprietary F0)
  *
  * Command set:
- *   0x01  GET_INFO         — version, format, slot stats, PIN state, tries, limit, owner, the day; with P1 = 1, the tap limit (owner only) and the no-PIN allowance as well; with P1 = 2, those and whether the NFC tag is on; with P1 = 3 (2.3), those and the keyset table: whether it is kept, the rate (the holder only), the entries in use and the last payment's unit
+ *   0x01  GET_INFO         — version, format, slot stats, PIN state, tries, limit, owner, the day; with P1 = 1, the tap limit (owner only) and the no-PIN allowance as well; with P1 = 2, those and whether the NFC tag is on; with P1 = 3 (3.0), those and the keyset table: whether it is kept, the rate (the holder only), the entries in use and the last payment's unit
  *   0x10  GET_PUBKEY       — 33-byte compressed secp256k1 card pubkey
- *   0x11  GET_BALANCE      — sum of the unspent pieces of the card's unit (uint32); with P1 = 1 (2.3), each unit's pieces and sum
+ *   0x11  GET_BALANCE      — sum of the unspent pieces of the card's unit (uint32); with P1 = 1 (3.0), each unit's pieces and sum
  *   0x12  GET_PROOF_COUNT  — count of non-empty slots
  *   0x13  GET_PROOF        — full proof data at slot index, with its date
  *   0x14  GET_SLOT_STATUS  — bulk 1-byte status for all slots
  *   0x15  AUTH             — prove this is the card: sign the reader's nonce and its own
- *   0x16  GET_CARD         — the card record: mint, unit, refund key, limit, the clock's block header (its bits and hash); with P1 = 2 (2.3), the keyset table
+ *   0x16  GET_CARD         — the card record: mint, unit, refund key, limit, the clock's block header (its bits and hash); with P1 = 2 (3.0), the keyset table
  *   0x17  GET_PIECES       — every slot's state and every unspent piece, a page at a time (P1 = the first slot)
- *   0x18  GET_LOG          — the card's own account of its taps: what it signed for, what it refused; with P1 = 1, the receipts; with P1 = 2 and 3 (2.3), the same with the other unit's count and each receipt's unit; on a card with no owner (2.3), under the PIN and held for (ten askings, 6A98 to each but the last), never in a time in the field that paid
+ *   0x18  GET_LOG          — the card's own account of its taps: what it signed for, what it refused; with P1 = 1, the receipts; with P1 = 2 and 3 (3.0), the same with the other unit's count and each receipt's unit; on a card with no owner (3.0), under the PIN and held for (ten askings, 6A98 to each but the last), never in a time in the field that paid
  *   0x19  GET_CHANGE       — the change the card made for itself and has not been handed: the openings, a page at a time
  *   0x1A  GET_DLEQ         — the mint's proof kept with an unspent piece, for one place or two (P1, P2; FF for none)
- *   0x1C  CERT_READ        — (2.3) the certificate, to anyone: whether one is sealed (P1 = FF), or a page of 256 bytes (P1 = 0 to 3)
- *   0x1D  GROUP_KEYS       — (2.3, D197) for a date: the tweak t, the card's key for it P + t*G and the refund key for it R + u*G, to anyone
- *   0x1E  INBOX            — (2.3, D199) SHA-256("CashuCard/inbox" || c || W) and W, the week of the card's own clock, to anyone with no PIN
- *   0x22  SPEND_ALL_BEGIN  — the places a payment is made of, in order (one signature for all: NUT-11 SIG_ALL); P1 bit 1 (2.3, D197), the reader builds the secrets with the keys per load (6A86 without it); bit 0, it reads units
+ *   0x1C  CERT_READ        — (3.0) the certificate, to anyone: whether one is sealed (P1 = FF), or a page of 256 bytes (P1 = 0 to 3)
+ *   0x1D  GROUP_KEYS       — (3.0, D197) for a date: the tweak t, the card's key for it P + t*G and the refund key for it R + u*G, to anyone
+ *   0x1E  INBOX            — (3.0, D199) SHA-256("CashuCard/inbox" || c || W) and W, the week of the card's own clock, to anyone with no PIN
+ *   0x22  SPEND_ALL_BEGIN  — the places a payment is made of, in order (one signature for all: NUT-11 SIG_ALL); P1 bit 1 (3.0, D197), the reader builds the secrets with the keys per load (6A86 without it); bit 0, it reads units
  *   0x23  SPEND_ALL_OUTPUTS — the swap's outputs, 37 bytes each, hashed into the message as they come; with P1 = 1, their keyset (8) first
  *   0x26  SPEND_ALL_CHANGE — one change output the card makes for itself, locked to its own key, in a keyset named and taught; answers the blinded message
  *   0x24  SPEND_ALL_SIGN   — the one signature; every piece named is burned as it is given; with a PIN set, the PIN or the no-PIN allowance (6A94)
  *   0x25  SPEND_ALL_AGAIN  — the last signature given, again, for an answer lost on the air; with P1 = 1, the one of the kept receipt whose message is given
- *   0x30  LOAD_PROOF       — store new proof (a record of the holder's and the PIN given in this tap, with an owner or none); with P1 = 1, one piece and the mint's proof for it; with P2 = 1 (2.3), the pieces' unit first
+ *   0x30  LOAD_PROOF       — store new proof (a record of the holder's and the PIN given in this tap, with an owner or none); with P1 = 1, one piece and the mint's proof for it; with P2 = 1 (3.0), the pieces' unit first
  *   0x31  CLEAR_SPENT      — free spent slots (the PIN given in this tap)
  *   0x32  SET_CARD         — write the card record (open card: PIN, and on a used one a held tap; owned card: the owner's proof; only with nothing unspent or owed); a mint of "-" alone is a factory record
- *   0x33  SET_LIMIT        — the limits, by PIN: an open card only (no owner, nothing unspent or owed); the owner's layout (2.3: 4, 8, 12, 13 or 17 bytes)
- *   0x34  SET_LIMIT        — the daily limit, by the owner's proof; with eight bytes, the limit on one payment as well; with twelve, the no-PIN allowance; thirteen, the rollover budget; seventeen (2.3), the rate, sats to the dollar
+ *   0x33  SET_LIMIT        — the limits, by PIN: an open card only (no owner, nothing unspent or owed); the owner's layout (3.0: 4, 8, 12, 13 or 17 bytes)
+ *   0x34  SET_LIMIT        — the daily limit, by the owner's proof; with eight bytes, the limit on one payment as well; with twelve, the no-PIN allowance; thirteen, the rollover budget; seventeen (3.0), the rate, sats to the dollar
  *   0x35  (was SET_TIME, a time under a key's signature: gone in 1.15, answers 6D00)
  *   0x36  SET_HEADER       — a Bitcoin block header: its proof of work moves the card's clock forward
  *   0x37  TELL_TIME        — the terminal's own clock, a note for receipts and the log, trusted for nothing
- *   0x38  KEYSET_KEYS      — (2.3) a keyset's keys taught and held to its ID by the top of a tree of them (P1 0 to 2, the PIN); an opening's key shown to be one of them by its path (P1 3), or moved to another key and keyset by the holder
+ *   0x38  KEYSET_KEYS      — (3.0) a keyset's keys taught and held to its ID by the top of a tree of them (P1 0 to 2, the PIN); an opening's key shown to be one of them by its path (P1 3), or moved to another key and keyset by the holder
  *   0x40  VERIFY_PIN       — verify the PIN
  *   0x41  SET_PIN          — set or replace the PIN on an open card (no owner, nothing unspent or owed); a card set up keeps its PIN: a new one wants it, and on a used card a held tap
  *   0x42  CHANGE_PIN       — the owner's proof and the new PIN: no old PIN, any state
  *   0x43  SET_OWNER        — give the card its owner key, a point of P-256: an open card claimed under its PIN, asked for six times in a row (6A98 to each but the last), never in a time in the field that paid, with no change owed; or the old owner's proof, with nothing unspent
  *   0x44  GET_NONCE        — a fresh nonce for the owner's proof
- *   0x45  ALLOW_LOAD       — the owner's grant for this tap: the history, the limit on one payment, the holder's say (2.3: it opens no load, and answers 6200)
+ *   0x45  ALLOW_LOAD       — the owner's grant for this tap: the history, the limit on one payment, the holder's say (3.0: it opens no load, and answers 6200)
  *   0x50  LOCK_CARD        — permanently disable write operations (PIN, and the owner's proof)
  *   0x51  RESET_CARD       — back to a card out of its packet, for another person to set up (the owner's proof; nothing unspent; the PIN too if locked)
  *   0x52  SET_TAG          — switch the card's NFC tag off or on (the owner's proof; no PIN; any funds)
- *   0x53  REFRESH          — the owner's proof over a block header: the header is taken, and the rollover budget is full again (2.0); with P1 = 1 (2.3), on a card with no owner, the header alone, under the PIN in a held tap
- *   0x54  CERT_WRITE       — (2.3) the certificate written in pieces (P1 = 0) and sealed (P1 = 1), on a card that has never had a PIN, with no owner and nothing on it; the seal checks that it names the card key
+ *   0x53  REFRESH          — the owner's proof over a block header: the header is taken, and the rollover budget is full again (2.0); with P1 = 1 (3.0), on a card with no owner, the header alone, under the PIN in a held tap
+ *   0x54  CERT_WRITE       — (3.0) the certificate written in pieces (P1 = 0) and sealed (P1 = 1), on a card that has never had a PIN, with no owner and nothing on it; the seal checks that it names the card key
  *
  * What the fork changes, and why (the spec's section 4, and docs/FOXY-CARD-DAILY-LIMIT.md):
  *   - SPEND_PROOF takes no message. Upstream signed 32 bytes the reader
@@ -72,7 +72,7 @@ import javacardx.crypto.*;
  *     what is left of "prove you are the card", over a tagged hash that no
  *     secret can hash to.
  *   - Nothing is loaded onto a card but under its PIN given in that tap. A
- *     card with no PIN takes and pays nothing (2.3, D185: 6A97).
+ *     card with no PIN takes and pays nothing (3.0, D185: 6A97).
  *   - A piece is loaded once. A nonce that is in any slot, spent or not, is
  *     refused (6A94): the card signs the secret, which the nonce makes, and
  *     takes the amount on the terminal's word, so a copy with a smaller
@@ -133,7 +133,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     // packet (`outbox`), and GET_OUTBOX (0x1B, public: no PIN, no grant) serves it in pages. It is written after the
     // payment's receipt, data first and its status byte last, and only for a payment that was signed; a refused or dropped
     // payment leaves the one before it as it was. Nothing else on the wire moves.
-    static final byte VERSION_MAJOR = (byte) 0x02;
+    // 2.0 to 2.2 are major 2. 3.0 is the wire of D183 and after (the comment above VERSION_MINOR has it): a 2.2 reader
+    // cannot read it, and readers take the major as the line they can read, so the major moves to 3 and the minor counts
+    // from 0 again. Cards in the field stay 2.1 and 2.2, and answer as they did.
+    static final byte VERSION_MAJOR = (byte) 0x03;
     // 1.9 takes its PIN sealed: enciphered to a key the card keeps for that and nothing else, under
     // sixteen bytes of its own that are good once (see `unseal`). Capability bit 7 says so.
     // 1.8 burns a payment's pieces outside the transaction that commits the payment (see `finishBurn`):
@@ -180,10 +183,11 @@ public class CashuApplet extends Applet implements TagSwitch {
     // constructor, which the chip refuses to install with so much more in it (docs/FOXY-CARD-HARDWARE.md); the same bytes asked for
     // after the install are given. Every use of `dleq` is safe while it is null (before the first SET_CARD, or after the card has
     // refused the room). GET_INFO is 1.19's to the byte but for the version; a phone tells a 1.20 card by that.
-    // 2.3 (D183 to D193): the card finishes its own change (LOAD_CHANGE, 0x27), a PIN before any money, the owner claimed
+    // 3.0 (D183 to D193): the card finishes its own change (LOAD_CHANGE, 0x27), a PIN before any money, the owner claimed
     // slowly, two units on one card, a holder with no phone, keyset keys (KEYSET_KEYS, 0x38), the paid list and the
-    // certificate (CERT_WRITE 0x54, CERT_READ 0x1C). spec/APDU.md, "Profiles of 2.3", lists them.
-    static final byte VERSION_MINOR = (byte) 0x03;
+    // certificate (CERT_WRITE 0x54, CERT_READ 0x1C). spec/APDU.md, "Profiles of 3.0", lists them. It breaks a 2.2
+    // reader, so it is a new major and not 2.3: the minor counts from 0 again.
+    static final byte VERSION_MINOR = (byte) 0x00;
     static final byte FORMAT        = (byte) 0x04;
     /** GET_INFO byte 8 and GET_CARD byte 0 on a card whose keyset table holds a keyset of the other unit than its own (D184): the secret is format 4's. */
     static final byte FORMAT_UNITS  = (byte) 0x05;
@@ -205,11 +209,11 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte INS_GET_DLEQ         = (byte) 0x1A;
     /** 2.2 (D175): the last SIG_ALL payment's assisted-settlement packet; P1 = 0 its scope, P1 = 1 a page of it. Public. */
     static final byte INS_GET_OUTBOX       = (byte) 0x1B;
-    /** 2.3 (D192): the card's certificate, in pages. Public. */
+    /** 3.0 (D192): the card's certificate, in pages. Public. */
     static final byte INS_CERT_READ        = (byte) 0x1C;
-    /** 2.3 (D197): the keys of one date's pieces: the tweak, the card's key and the refund key for that date. Public. */
+    /** 3.0 (D197): the keys of one date's pieces: the tweak, the card's key and the refund key for that date. Public. */
     static final byte INS_GROUP_KEYS       = (byte) 0x1D;
-    /** 2.3 (D199): where money waits for the card in the week of its clock, a hash of c and the week. Public, with no PIN. */
+    /** 3.0 (D199): where money waits for the card in the week of its clock, a hash of c and the week. Public, with no PIN. */
     static final byte INS_INBOX            = (byte) 0x1E;
     // 0x20 was SPEND_PROOF: one piece, one signature over its secret alone. A
     // piece of format 4 says SIG_ALL in its secret, and a mint takes no such
@@ -219,7 +223,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte INS_SPEND_ALL_SIGN    = (byte) 0x24;
     static final byte INS_SPEND_ALL_AGAIN   = (byte) 0x25;
     static final byte INS_SPEND_ALL_CHANGE  = (byte) 0x26;
-    /** 2.3 (D183, D193): the mint's answer for the card's own change, checked and unblinded on the card. */
+    /** 3.0 (D183, D193): the mint's answer for the card's own change, checked and unblinded on the card. */
     static final byte INS_LOAD_CHANGE       = (byte) 0x27;
     // 0x2E and 0x2F are kept for a later profile: they answer 6D00.
     // 0x21 was SIGN_ARBITRARY. It answers 6D00 and must stay unassigned.
@@ -235,7 +239,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 1.15 (the key could be copied out of any phone), it answers 6D00 and stays unassigned.
     static final byte INS_SET_HEADER       = (byte) 0x36;
     static final byte INS_TELL_TIME        = (byte) 0x37;
-    /** 2.3 (D190): a keyset's keys taught to the card, and an opening's key shown to be one of them. */
+    /** 3.0 (D190): a keyset's keys taught to the card, and an opening's key shown to be one of them. */
     static final byte INS_KEYSET_KEYS      = (byte) 0x38;
     static final byte INS_VERIFY_PIN       = (byte) 0x40;
     static final byte INS_SET_PIN          = (byte) 0x41;
@@ -248,7 +252,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte INS_SET_TAG          = (byte) 0x52;
     /** 2.0 (D20): the owner's proof over a block header; the header is taken as SET_HEADER takes it, and the rollover budget is full again. */
     static final byte INS_REFRESH          = (byte) 0x53;
-    /** 2.3 (D192): the certificate written in pages and sealed, on a card that has never had a PIN. */
+    /** 3.0 (D192): the certificate written in pages and sealed, on a card that has never had a PIN. */
     static final byte INS_CERT_WRITE       = (byte) 0x54;
 
     // -------------------------------------------------------------------------
@@ -324,23 +328,23 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 2.0 (D20), three of the 29 bytes after the hash, so that GET_CARD shows them (its bytes 76, 77, 78) and RESET_CARD
     // clears them with the rest: how many times the day's window has rolled since the owner's last REFRESH (or the anchored
     // SET_OWNER); the most it may roll before the next (0 is the default, ROLL_BUDGET_DEFAULT; 1 to ROLL_BUDGET_MOST); and
-    // whether the no-PIN allowance is armed (2.3, D186: 1 once an owner's proof, a SET_LIMIT_PIN that carries the allowance or a
+    // whether the no-PIN allowance is armed (3.0, D186: 1 once an owner's proof, a SET_LIMIT_PIN that carries the allowance or a
     // VERIFY_PIN in a time in the field that signs no payment has been given since a no-PIN window last began).
     static final short CARD_ROLLS_OFFSET   = (short) 156;
     static final short CARD_BUDGET_OFFSET  = (short) 157;
     static final short CARD_ARMED_OFFSET   = (short) 158;
-    /* 2.3 (D184): the rate, sats to the dollar, four bytes, big-endian, 0 for none: the four after the arming. A payment in the
+    /* 3.0 (D184): the rate, sats to the dollar, four bytes, big-endian, 0 for none: the four after the arming. A payment in the
      * other unit than the card's is counted at it against every limit (`inCardUnit`). SET_LIMIT's seventeen bytes write it,
      * RESET_CARD clears it with the record, SET_CARD never touches it; GET_CARD answers these bytes as zeros, and GET_INFO
      * P1 = 3 says it to whom the limit on one payment is said. */
     static final short CARD_RATE_OFFSET    = (short) 159;
-    /* 2.3 (D186): when the no-PIN window that runs began, by the card's clock (GET_CARD 83..86), 0 where it began before the
+    /* 3.0 (D186): when the no-PIN window that runs began, by the card's clock (GET_CARD 83..86), 0 where it began before the
      * card had taken a header, which the first header then anchors; and the byte after it (GET_CARD 87), SET_LIMIT's
      * eighteenth: 0 for the window of 24 hours, 1 for none, the allowance coming back only at an arming. RESET_CARD clears
      * both with the record and SET_CARD never touches them. The 17 bytes after them are zeros. */
     static final short CARD_NOPIN_START_OFFSET = (short) 163;
     static final short CARD_NOPIN_DAY_OFFSET   = (short) 167;
-    /* 2.3 (D201, D203): 1 where the clock was set by a weak header, one with less than half the work of the hardest the card had
+    /* 3.0 (D201, D203): 1 where the clock was set by a weak header, one with less than half the work of the hardest the card had
      * taken when it took it (its target over twice the hardest's), or, before any, less than twice the floor's work: a header at
      * the floor's work is one, the network's own never are; 0 otherwise. Written with the clock (`writeHeader`); RESET_CARD keeps it with the clock's time; GET_CARD answers it as
      * zero. At such a clock no day the card counts ends, and none begins at it (`dayEnded`, `beginAtNow`). */
@@ -382,7 +386,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short CARD_TAP_LIMIT_OFFSET  = (short) 197;
     // The NO-PIN ALLOWANCE (1.16): what the card signs for without the PIN in its no-PIN window, in the card's unit,
     // big-endian, on a card that has a PIN; 0 is none, and then every payment needs the PIN. And the count of the no-PIN
-    // window that runs (2.3, D186): the whole pieces of every payment signed with no PIN since it began; 0 where none runs.
+    // window that runs (3.0, D186): the whole pieces of every payment signed with no PIN since it began; 0 where none runs.
     // GET_INFO P1 >= 1 says them (34..37 and 38..41), to anyone.
     static final short CARD_NOPIN_LIMIT_OFFSET = (short) 201;
     static final short CARD_NOPIN_SPENT_OFFSET = (short) 205;
@@ -392,7 +396,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short CARD_RECORD_LEN     = (short) 212;
     /** Keys per load (D197): a date's keys, t (32), P + t*G (33), R + u*G (33), as `group` holds them and GROUP_KEYS answers them. */
     static final short GROUP_LEN           = (short) 98;
-    /** SPEND_ALL_BEGIN's answer (2.3, D197): the pieces' worth (4), t (32), R + u*G (33). */
+    /** SPEND_ALL_BEGIN's answer (3.0, D197): the pieces' worth (4), t (32), R + u*G (33). */
     static final short BEGIN_ANSWER_LEN    = (short) 69;
     /** SPEND_ALL_BEGIN's P1 bits: the reader reads units (bit 0, D184); it builds the secrets with the keys per load (bit 1, D197). */
     static final byte  BEGIN_UNITS         = (byte) 0x01;
@@ -467,7 +471,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // moment they are made until the piece is written back. An opening is the amount (4), the keyset
     // (8), the date (4), the nonce (32) and the blinding factor (32); its state is a byte of `openState`,
     // kept apart so that a payment's SIGN flips every opening it made in one write of its transaction.
-    // From 2.3 (D183) each opening also has its blinded message B_ and the mint's key K it is bound to,
+    // From 3.0 (D183) each opening also has its blinded message B_ and the mint's key K it is bound to,
     // 33 bytes each, compressed, in `openKeys` (OPEN_KEYS_ROW an opening), reserved at the first SET_CARD; and (D190) a byte
     // that says the key has been shown to be one of its keyset's keys (KEYSET_KEYS P1 = 3), which LOAD_CHANGE asks for.
     static final short CHANGE_MOST   = (short) 8;    // openings a card keeps; a payment makes at most this many change outputs
@@ -489,7 +493,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short OPEN_KEYS_SHOWN = (short) 66;
     static final short OPEN_KEYS_ROW = (short) 67;
 
-    /* KEYSET_KEYS (2.3, D190). allState[0] while a keyset's keys are being taught (1 is a payment begun), and then [1] the
+    /* KEYSET_KEYS (3.0, D190). allState[0] while a keyset's keys are being taught (1 is a payment begun), and then [1] the
      * keyset's entry, [2] the keys given so far, [3] the ID's version, [4] the tail's length. The keys' hash tree is folded as
      * the keys come, a node a height pending at most (heights 0 to 5; the top of 64 keys is height 6): heights 0 to 3 and 6 in
      * allSlots (32 bytes each, at (h & 3) * 32: a node of height 6 is the only node left, where height 2's was), 4 and 5 in
@@ -555,8 +559,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte  LOG_FLAG_WAITED      = (byte) 0x02; // a payment in this tap was over the limit on one payment, and was waited for
     static final byte  LOG_FLAG_CLOCK       = (byte) 0x04; // set by software before 1.15, when a signed clock was moved on twice in one tap; never set since (the clock is block headers)
     static final byte  LOG_FLAG_NOPIN       = (byte) 0x08; // 1.16: a payment in this tap was signed with no PIN, on a card that has one, under its no-PIN allowance
-    static final byte  LOG_FLAG_LET_GO      = (byte) 0x10; // 2.3 (D183): an opening of change was given up in this tap (RESET_CARD P1 = 1)
-    static final byte  LOG_FLAG_OTHER       = (byte) 0x20; // 2.3 (D184): what the entry counts is of the other unit than the card's; a tap whose payment or load is of the other unit than its entry begins a new entry
+    static final byte  LOG_FLAG_LET_GO      = (byte) 0x10; // 3.0 (D183): an opening of change was given up in this tap (RESET_CARD P1 = 1)
+    static final byte  LOG_FLAG_OTHER       = (byte) 0x20; // 3.0 (D184): what the entry counts is of the other unit than the card's; a tap whose payment or load is of the other unit than its entry begins a new entry
     /** `logEntry`'s word for a write that has no amount (the let-go of an opening): the tap's entry whatever its unit, and a new one of the card's unit where there is none. */
     static final byte  LOG_ANY              = (byte) 0xFF;
     static final short LOG_E_LOADS         = (short) 11;  // pieces put on in it (1, stops at 255)
@@ -590,7 +594,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // a run of this many refusals inside one tap's ten seconds is a terminal trying the limit, and is marked
     static final short TAMPER_RUN           = (short) 3;
 
-    /* ---- the keyset table (2.3, D184) ------------------------------------------
+    /* ---- the keyset table (3.0, D184) ------------------------------------------
      * Which unit each keyset the card holds is: BOOK_ENTRIES entries of ENTRY_LEN, each the keyset's eight bytes as a piece
      * holds them, a state byte (00 free; otherwise ENTRY_USED, ENTRY_MARK where it was entered with the holder's say in the
      * tap, ENTRY_KEYS once the top of its keys' tree is kept (D190), and the unit code in bit 0: 0 sat, 1 usd) and the top
@@ -611,7 +615,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte  ENTRY_USED     = (byte) 0x40;
     static final byte  ENTRY_MARK     = (byte) 0x80;
     static final byte  ENTRY_KEYS     = (byte) 0x02;
-    /* The paid list (2.3, D191): the first PAID_ROW bytes of the nonce of each of the last PAID_ROWS pieces the card has signed
+    /* The paid list (3.0, D191): the first PAID_ROW bytes of the nonce of each of the last PAID_ROWS pieces the card has signed
      * for, a ring filled from row 0, then the ring's next row (2), then 1 once it has gone round (1): the rows in use are the
      * rows before the next one until then, and all of them after. Reserved at the first SET_CARD. */
     static final short PAID_ROWS      = (short) 1024;
@@ -624,7 +628,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short PAID_SIGS      = (short)(PAID_NEXT + 3);
     static final short SIG_KEPT       = (short) 65;
     static final short PAID_LEN       = (short)(PAID_SIGS + RECEIPTS * SIG_KEPT);
-    /* The certificate (2.3, D192): the container (CERT_MOST bytes at the most), then 1 once it is sealed (1), then the length it
+    /* The certificate (3.0, D192): the container (CERT_MOST bytes at the most), then 1 once it is sealed (1), then the length it
      * was sealed at (2). Reserved at the first CERT_WRITE. A container: "CCP-CERT" (8), the version 01 (1), the form (1); form
      * 01 the card key (33); form 02 the leaf's index (2), the depth (1), the path (32 each) and the top (32); then three parts,
      * each its length (2) and its bytes: the statement, the signature and the chain, which the card does not read. */
@@ -676,7 +680,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short SW_PIN_NEEDED            = (short) 0x6A94; // SPEND_ALL_SIGN, a PIN set and not given, and the no-PIN allowance not enough: the PIN, for the whole payment (1.16; a different command from the load that answers the same word)
     // 6A95 was "over the limit on one tap", when that was refused; it is now waited for (6a) and the word is unused
     static final short SW_TOO_MANY              = (short) 0x6A96; // more pieces than one signature can burn at once
-    // 2.3 (spec/APDU.md, Error Code Summary)
+    // 3.0 (spec/APDU.md, Error Code Summary)
     static final short SW_NO_PIN                = (short) 0x6A97; // no PIN: the card takes and pays nothing until it is given one
     static final short SW_KEEP_HOLDING          = (short) 0x6A98; // a held count not yet through (an owner's claim, a history): ask again
     static final short SW_NO_RATE               = (short) 0x6A99; // a payment or a load of the other unit on a card with a limit set and no rate
@@ -994,7 +998,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // for the first limit's worth over the limit, and for every further limit's worth. Each change output
     // made (about 0.4 s) counts as one of them done. Within the limit there is no wait.
     static final short WAIT_OVER_SIGNS   = (short) 10;
-    /** 2.3 (D188): every payment is at least this many signatures of the card's work from SPEND_ALL_BEGIN to its own. */
+    /** 3.0 (D188): every payment is at least this many signatures of the card's work from SPEND_ALL_BEGIN to its own. */
     static final short WAIT_FLOOR_SIGNS  = (short) 4;
     static final short WAIT_MORE_SIGNS   = (short) 4;
     /** The most limits' worth a payment is counted as: past this it waits as 255 do (about twelve minutes). */
@@ -1155,7 +1159,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     private static final short X_LOADS = (short) 156;
     // a point of LOAD_CHANGE's arithmetic, 65 bytes, over X_DEC .. X_NOPIN, which nothing else uses while it runs
     private static final short X_PT    = (short) 98;
-    /* SPEND_ALL_SIGN's figures in the card's unit (2.3, D184, `inCardUnit`): the whole of the pieces at X_CONV, what leaves the
+    /* SPEND_ALL_SIGN's figures in the card's unit (3.0, D184, `inCardUnit`): the whole of the pieces at X_CONV, what leaves the
      * card at X_CONV + 4, and the turning's room after them (X_DIV, thirteen bytes): all inside X_HEX, which nothing uses at
      * SIGN between the turning and the figures' last reading. Worked out at the first SIGN and again at the last. */
     private static final short X_CONV  = (short) 0;
@@ -1180,7 +1184,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * whether it has an entry in the log yet; [1] whether a payment has been
      * signed in it, so that a second one is slowed (6a: one payment a tap at
      * full speed, unless the owner's grant is in this tap); [2] TAP_ARMED,
-     * a VERIFY_PIN in it armed the no-PIN allowance (2.3, D186), which
+     * a VERIFY_PIN in it armed the no-PIN allowance (3.0, D186), which
      * a payment's commit takes back; TAP_PAID, TAP_CLAIMED and TAP_READ
      * (D187, D189). RESET_CARD clears TAP_ARMED and TAP_READ, which were the
      * PIN's it takes away, and keeps TAP_PAID and TAP_CLAIMED.
@@ -1628,7 +1632,7 @@ public class CashuApplet extends Applet implements TagSwitch {
          * was, whatever the tag's state. Any other P1 is answered as it was, with
          * the thirty bytes.
          *
-         * P1 = 3 (2.3, D184) is the 43 bytes of P1 = 2 and eight more: whether the card keeps its keyset table (43: 01, or 00
+         * P1 = 3 (3.0, D184) is the 43 bytes of P1 = 2 and eight more: whether the card keeps its keyset table (43: 01, or 00
          * where it has none), the rate (44..47, to whom the limit on one payment is said, and zeros to anyone else), the
          * entries in use (48), those of them without the holder's mark (49) and the last payment's unit (50, relative to the
          * card's): 51 bytes. */
@@ -1681,7 +1685,7 @@ public class CashuApplet extends Applet implements TagSwitch {
                     }
                     if (told) buf[50] = book[BOOK_LAST];
                 }
-                /* P1 = 4 (2.3, D186): and when the no-PIN window that runs began (51..54, zeros where none runs: its count is
+                /* P1 = 4 (3.0, D186): and when the no-PIN window that runs began (51..54, zeros where none runs: its count is
                  * 0), the profiles the card keeps (55, 56), and the pieces the card will still load today (57, 58, D195): 300
                  * less the day's count, or 300 where a day has passed since the day of loads began; history, and zeros to a
                  * reader not told it. 59 bytes. */
@@ -2903,7 +2907,7 @@ public class CashuApplet extends Applet implements TagSwitch {
                              tapOpen[1] == (byte) 1 && loadGrant[0] != (byte) 1);
             // waited past the floor (the log's bit 1): over the limit on one payment, or a second payment in the time in the field
             allState[4] = (byte)(waits > 0 ? 1 : 0);
-            /* The floor (2.3, D188): WAIT_FLOOR_SIGNS signatures of work with its own, less what its change outputs took,
+            /* The floor (3.0, D188): WAIT_FLOOR_SIGNS signatures of work with its own, less what its change outputs took,
              * two waits for every three, and never below 0: waits = max(0, (WAIT_FLOOR_SIGNS - 1) + W - 2 * outputs / 3). */
             waits += (short)(WAIT_FLOOR_SIGNS - 1 - (short)((short)((allState[6] & 0xFF) * 2) / 3));
             if (waits < 0) waits = 0;
@@ -3083,7 +3087,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * the top after a tear is safe. A card that leaves before the transaction
      * commits has a list nobody reads, and has burned nothing.
      *
-     * 2.3 (D191): each place's nonce goes on the paid list here too, in the
+     * 3.0 (D191): each place's nonce goes on the paid list here too, in the
      * rows the commit moved the list's next row past, so a tear is finished in
      * the same way: the same rows, the same bytes.
      */
@@ -3483,7 +3487,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * GET_CARD: format, whether the record is set, unit, limit, refund key, the clock's block header (its bits and hash), mint.
      *
-     * 2.3 (D184): byte 0 is the card's format as GET_INFO byte 8 says it (4, or 5 for a card of both units), and the rate,
+     * 3.0 (D184): byte 0 is the card's format as GET_INFO byte 8 says it (4, or 5 for a card of both units), and the rate,
      * kept in the four bytes after the arming, is answered as zeros (79..82). With P1 = 2, the keyset table: how many entries
      * are in use (1), then each, its keyset and state byte as kept (9), in the table's order (55 bytes at the most); 00 alone
      * with no table. Any other P1 is P1 = 0.
@@ -3721,7 +3725,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     }
 
     /**
-     * KEYSET_KEYS (0x38, 2.3, D190): the card learns a keyset's keys, checks them against the keyset's ID as NUT-02 makes it,
+     * KEYSET_KEYS (0x38, 3.0, D190): the card learns a keyset's keys, checks them against the keyset's ID as NUT-02 makes it,
      * and keeps the top of a hash tree of them in the keyset's entry, so that it writes a change piece only under a key it has
      * seen to be one of them (LOAD_CHANGE, `6A9F`).
      *
@@ -4005,13 +4009,13 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the card has no room for proofs and the piece went on without it. Any other P1 is what it always was; the card
          * does not look at P1 beyond that.
          *
-         * 2.3 (D184): with P2 = 1 the first data byte is the pieces' unit, 00 sat or 01 usd, and everything after it is read
+         * 3.0 (D184): with P2 = 1 the first data byte is the pieces' unit, 00 sat or 01 usd, and everything after it is read
          * as P2 = 0 reads its data, one byte on (82, 163 or 244 bytes; 178 with P1 = 1). The pieces of P2 = 0 are of the
          * card's unit. Any other P2 is 6B00, before anything is read. The table's rules are each piece's (`loadOne`): a keyset
          * entered as the other unit 6A9B, a new keyset the tap may not enter 6A9D, no room 6A9C. Pieces of the other unit on
          * a card with a limit set and no rate are 6A99, before any is read (`limitWithNoRate`).
          *
-         * 2.3 (D197): P2 bit 1 (02) is the reader's word that each piece is locked to the keys of its date, P + t*G and
+         * 3.0 (D197): P2 bit 1 (02) is the reader's word that each piece is locked to the keys of its date, P + t*G and
          * R + u*G, which are the only keys the card signs with; without it `6A86`, before the data is read and with nothing
          * written: a reader that locked a piece to the card key alone has a piece the card could never pay. P2 is then 02,
          * or 03 with the unit first; any other bit is 6B00. */
@@ -4097,7 +4101,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * place's record is written, or made zero, before anything of the place and long before its status byte, so that an
      * UNSPENT place holds its own proof or zeros and never another piece's, whatever the place held before.
      *
-     * `unit` (2.3, D184) is the piece's unit code, which LOAD_PROOF says (its label, or the card's unit), or -1 for the card's
+     * `unit` (3.0, D184) is the piece's unit code, which LOAD_PROOF says (its label, or the card's unit), or -1 for the card's
      * own change, which enters nothing. A keyset in an entry of the other unit is refused (6A9B). A keyset in no entry is
      * entered, as the card's unit or the last payment's under the PIN alone, and as either with the holder's say in the tap,
      * which marks it (6A9D otherwise); where no entry is free, or the new one would be a third live one without the mark, the
@@ -4364,7 +4368,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             }
         }
         /* The room for the assisted-settlement record (2.2, D176), reserved the same way and for the same reason: the J3R180
-         * refused 2.2's constructor while it asked for these bytes (6F00 at create, 2026-11-06): 4,285 then, 4,293 since 2.3 keeps
+         * refused 2.2's constructor while it asked for these bytes (6F00 at create, 2026-11-06): 4,285 then, 4,293 since 3.0 keeps
          * the reader's keyset with the staged outputs. After the store of the
          * mint's proofs, whose room matters more, and before the transaction. If either stays null the card is set up all the
          * same and works as one that never keeps a record: GET_OUTBOX answers 6A88, and every use is safe while null. */
@@ -4476,7 +4480,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * with no PIN has no allowance to set: a 12-byte form with a number in the
      * allowance is refused (`6985`), and one with a zero in it is the 8-byte form.
      * 2.0 (D20) adds a thirteenth byte, the rollover budget (1 to 30); a form
-     * without it leaves the budget as it is (D26). 2.3 (D184) adds four more,
+     * without it leaves the budget as it is (D26). 3.0 (D184) adds four more,
      * the rate (sats to the dollar, 0 none): 17 bytes, one layout for both
      * forms, every figure in the card's unit.
      */
@@ -4524,9 +4528,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         // 2.0 (D20): the thirteenth byte is the rollover budget, 1 to 30 days between the owner's REFRESHes; in both forms (D184)
         boolean budgetGiven = len >= (short) 13;
         if (budgetGiven && (src[(short)(at + 12)] < (byte) 1 || src[(short)(at + 12)] > ROLL_BUDGET_MOST)) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
-        // 2.3 (D186): the eighteenth byte is the no-PIN window's switch, 0 the window of 24 hours or 1 none
+        // 3.0 (D186): the eighteenth byte is the no-PIN window's switch, 0 the window of 24 hours or 1 none
         if (len == (short) 18 && (src[(short)(at + 17)] & 0xFE) != 0) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
-        /* 2.3 (D184): bytes 13 to 16 are the rate, written where it changed. A rate alone changed begins no window and keeps
+        /* 3.0 (D184): bytes 13 to 16 are the rate, written where it changed. A rate alone changed begins no window and keeps
          * every count: the counts are in the card's unit already. */
         boolean rateChanged = len >= (short) 17 && !sameBytes(src, (short)(at + 13), cardRecord, CARD_RATE_OFFSET, (short) 4);
         /* A limit that would stand with no rate on a card holding pieces of the other unit is refused (6A99) before anything
@@ -4580,7 +4584,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * locked card too, since a locked card still pays and its day still turns. A wrong proof or a header without the
      * work changes nothing. Answers the card's `now`, as SET_HEADER does.
      *
-     * The way back from a header far ahead (2.3, D201), on a card that holds money too. An older header that is not weak
+     * The way back from a header far ahead (3.0, D201), on a card that holds money too. An older header that is not weak
      * (`checkHeader`) brings a weak clock back to its time; the days the card counts are where they were, and end by the
      * clock as before. The owner may ask more, with a byte 01 after the header (under its proof): the clock goes back to
      * any older header that is not weak, and the day's limit's window, where it began after it, begins again at it,
@@ -4589,7 +4593,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      *
      * P1 other than 00 and 01: `6B00`, before anything is read.
      *
-     * P1 = 1 (2.3, D189): a card with no owner has no proof to give. The header comes alone, and the PIN given in this
+     * P1 = 1 (3.0, D189): a card with no owner has no proof to give. The header comes alone, and the PIN given in this
      * tap and a held tap stand for the proof: `6A91` on an owned card, `6A97` with no PIN, `6982` with the PIN not
      * given, `6985` in a time in the field that paid, `6982` with no hold; then as P1 = 0 without the byte 01 (`6700` with
      * it): the holder brings back a weak clock, never another.
@@ -4644,7 +4648,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * difficulty where it is the hardest yet, and its hash, as Bitcoin shows
      * one, for the owner's screen. Answers the card's `now`.
      *
-     * 2.3 (D204): in the card's first set-up (`PM_FIRST`), while it holds nothing, the header is the set-up's anchor, as the
+     * 3.0 (D204): in the card's first set-up (`PM_FIRST`), while it holds nothing, the header is the set-up's anchor, as the
      * empty card's reset takes one: it becomes the clock even where it is older, and the day's window and the day of loads
      * begun after it begin again at it (`firstAnchor`).
      */
@@ -5789,11 +5793,11 @@ public class CashuApplet extends Applet implements TagSwitch {
      * replaces them). The lock goes first, then the PIN, then the owner, so that a
      * locked card torn in the middle is not left locked with its PIN gone.
      *
-     * 2.3 (D191): the paid list is emptied in that last transaction, after the
+     * 3.0 (D191): the paid list is emptied in that last transaction, after the
      * new key is made, by putting its next row back to 0: a card torn before it
      * has the old list with the new key, which refuses only pieces it need not.
      *
-     * 2.3 (D192): a card whose certificate is sealed keeps its card key, its certificate and its paid list; it is given a new
+     * 3.0 (D192): a card whose certificate is sealed keeps its card key, its certificate and its paid list; it is given a new
      * PIN key all the same, and everything else goes as on any other card.
      */
     private void processResetCard(APDU apdu) {
@@ -6023,7 +6027,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     }
 
     // -------------------------------------------------------------------------
-    // The certificate (2.3, D192)
+    // The certificate (3.0, D192)
     // -------------------------------------------------------------------------
 
     /** Whether a certificate is sealed: then the card keeps its key through RESET_CARD, and CERT_READ serves it. */
@@ -6403,7 +6407,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * inside a transaction; the caller marks the tap open once it has
      * committed (`tapOpen`, which is RAM and would not be undone with it).
      *
-     * An entry is of one unit (2.3, D184): `unit` is LOG_FLAG_OTHER for what
+     * An entry is of one unit (3.0, D184): `unit` is LOG_FLAG_OTHER for what
      * is of the other unit than the card's and 0 for the card's, and a tap
      * whose entry is of the other begins a new one, its bit written here, in
      * the transaction that begins it; so the count of taps counts entries.
@@ -6489,7 +6493,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * card was used and for how much, which is more than a stranger's reader
      * should be told. A card with no PIN has nothing in it, and answers anyone.
      *
-     * P1 = 2 (2.3, D184) is the same with the other unit's count of what was
+     * P1 = 2 (3.0, D184) is the same with the other unit's count of what was
      * signed for, ever (4), after the four counts; P1 = 3 is the receipts'
      * form with each receipt's unit. `6A86` for a P1 over 3.
      */
@@ -6531,7 +6535,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * the PIN and the held tap, as the log (D189). (A card with no PIN has
      * signed nothing.)
      *
-     * P1 = 3 (2.3, D184): the same, each receipt followed by its payment's unit,
+     * P1 = 3 (3.0, D184): the same, each receipt followed by its payment's unit,
      * relative to the card's (UNIT_CARD, UNIT_OTHER; 00 for a receipt made
      * before the table, or on a card with none): 78 bytes a receipt.
      */
@@ -6659,7 +6663,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         return loads <= LOADS_A_DAY;
     }
 
-    // ---- the keyset table (2.3, D184) ---------------------------------------------
+    // ---- the keyset table (3.0, D184) ---------------------------------------------
 
     /** The entry whose keyset is the eight bytes at `off` in `a`, or -1 for none (or no table). */
     private short entryOf(byte[] a, short off) {
@@ -6936,12 +6940,13 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 2.3: no lines here, and the load file is 36,953 bytes (89 past a multiple of 256), the least this source comes to;
-         * no chip has been given a file of that size (the source before D200 came to 35,466 bytes, and a test-only build of
-         * it to 35,509: a J3R180 installed both on 2026-11-13). On 2026-11-13 a J3R180 refused the card's applet in earlier 2.3 source
-         * padded to 32,777 bytes (6F00, twice) and installed it padded to 33,647 and 35,213 (111 and 141 past a multiple of
-         * 256); the file is kept out of 32,700 to 32,850, the sizes not to be shipped untried. The 1.20 build of 19,634 bytes
-         * (178 past a multiple of 256) installs, as a 1.19 build of 19,269 (69 past) did; 1.16 installs at 203 past a
+        /* 3.0: no lines here, and the load file is 36,953 bytes (89 past a multiple of 256), the least this source comes to.
+         * No chip has been given this file; on 2026-11-14 a J3R180 installed the same source numbered 2.3, a file of the same
+         * size that differs only in its version bytes (D205). The source before D200 came to 35,466 bytes, and a test-only
+         * build of it to 35,509: a J3R180 installed both on 2026-11-13. On 2026-11-13 a J3R180 refused the card's applet in
+         * earlier source, numbered 2.3 then, padded to 32,777 bytes (6F00, twice) and installed it padded to 33,647 and
+         * 35,213 (111 and 141 past a multiple of 256); the file is kept out of 32,700 to 32,850, the sizes not to be shipped
+         * untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
     }
 }

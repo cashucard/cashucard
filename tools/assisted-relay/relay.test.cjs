@@ -642,7 +642,7 @@ test("a 510-byte packet is captured after pages 0 and 255 and never read at its 
   assert.equal(r.packet, Buffer.from(packet).toString("hex"));
 });
 
-// 2.3: the packet's unit is 00 sat or 01 usd, and the relay settles a usd payment
+// 3.0: the packet's unit is 00 sat or 01 usd, and the relay settles a usd payment
 // against the mint's usd keysets alone. (The body changed, so the descriptor is
 // not checked here: `trusting` verifies every signature.)
 const trusting = { ...crypto, verify: () => true };
@@ -693,7 +693,7 @@ test("a usd payment is settled against usd keysets, and refused against sat ones
   );
 });
 
-// 2.3: the packet names the card's key for the date 0, P + t*G, never the card
+// 3.0: the packet names the card's key for the date 0, P + t*G, never the card
 // key P that GET_PUBKEY answers. The policy names it as `date0Key`; an older
 // policy's `cardKey` is read as the same key where no `date0Key` is given.
 test("the policy's date0Key is the key the packet must name", () => {

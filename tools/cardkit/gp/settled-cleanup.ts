@@ -36,11 +36,11 @@ export interface ResetReview {
   recordDigest: string;
   /**
    * The card made a payment whose change is not back on it yet (GET_INFO byte
-   * 29 on 2.3, GET_CHANGE on 2.1 and 2.2). Nothing may reset such a card: the
+   * 29 on 3.0, GET_CHANGE on 2.1 and 2.2). Nothing may reset such a card: the
    * holder's wallet brings the change home first.
    */
   changeOwed: boolean;
-  /** The card applet's version as SELECT answered it: '2.1', '2.2' or '2.3'. */
+  /** The card applet's version as SELECT answered it: '2.1', '2.2' or '3.0'. */
   version: string;
 }
 export class CleanupError extends Error {
@@ -74,20 +74,20 @@ const send = async (tx: Transceiver, a: number[]) => {
 };
 /**
  * GET_INFO's answer, its version held to the one SELECT answered (`selected`), as inspect does. The format (byte 8) is
- * 04, or on a 2.3 card 05 when it holds keysets of both units; a 2.3 card's byte 29, the change owed, is 00 or 01.
+ * 04, or on a 3.0 card 05 when it holds keysets of both units; a 3.0 card's byte 29, the change owed, is 00 or 01.
  */
 function info(data: number[], selected: readonly number[]) {
-  const v23 = selected[0] === 2 && selected[1] === 3;
+  const v30 = selected[0] === 3 && selected[1] === 0;
   if (
     data.length !== 30 ||
     !equal(data.slice(0, 2), selected) ||
     data[2] !== 128 ||
-    !(data[8] === 4 || (v23 && data[8] === 5)) ||
+    !(data[8] === 4 || (v30 && data[8] === 5)) ||
     data[3]! + data[4]! + data[5]! !== 128 ||
     ![0, 1, 2].includes(data[7]!) ||
     data[9]! > 3 ||
     [data[10], data[11], data[16]].some(v => v !== 0 && v !== 1) ||
-    (v23 && data[29] !== 0 && data[29] !== 1)
+    (v30 && data[29] !== 0 && data[29] !== 1)
   )
     stop('unsupported-card');
   return {
@@ -260,7 +260,7 @@ export async function cleanupSettledEntries(
   if (review.unspent || review.locked || review.pinBlocked || !review.tag)
     stop('card-not-empty');
   if (!review.spent) return review;
-  // the secrets below are a 2.1 or 2.2 card's: a 2.3 card's name its key for each piece's date
+  // the secrets below are a 2.1 or 2.2 card's: a 3.0 card's name its key for each piece's date
   if (!administeredCardVersion(version)) stop('unsupported-card');
   if (
     !review.pin ||

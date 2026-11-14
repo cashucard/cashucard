@@ -491,7 +491,7 @@ final class SchnorrHW {
      * point g (65 bytes, uncompressed) first. The generic mapping multiplies
      * whatever generator its key has, which is what makes it the addition of
      * any two points. Every use of the mapping sets the generator it means,
-     * so none is left over from another. For LOAD_CHANGE (2.3, D183): a
+     * so none is left over from another. For LOAD_CHANGE (3.0, D183): a
      * blinding factor taken off, and a mint's proof checked.
      */
     void addTo(byte[] s, short sOff, byte[] g, short gOff, byte[] h, short hOff, byte[] out, short outOff) {
@@ -510,7 +510,7 @@ final class SchnorrHW {
     /**
      * out = [k]p by the chip's key agreement, 65 bytes (04 || x || y): `k` 32
      * bytes under n, `p` a point on the curve, 65 bytes uncompressed. For
-     * LOAD_CHANGE (2.3, D183). The agreement multiplies the point it is
+     * LOAD_CHANGE (3.0, D183). The agreement multiplies the point it is
      * given, and not the key's generator, so what addTo leaves there does not
      * matter here or to sign().
      */

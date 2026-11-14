@@ -180,7 +180,7 @@ jobs:
           RELEASE_COMPONENT: provisioner
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          cp applet/target/cashu-javacard-2.3.0.cap release/
+          cp applet/target/cashu-javacard-3.0.0.cap release/
           python3 tools/release/manifest.py write release
       # Sigstore-signed build provenance for the AAB, the IPA, the CAP and the
       # manifest (docs/PROVENANCE.md).

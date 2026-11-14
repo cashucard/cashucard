@@ -231,7 +231,7 @@ test('a card with value offers holder recovery instructions and no reset prepara
 test('a card owed change says how to bring it home and offers no reset preparation', async () => {
   for (const [i, over] of [
     {spent: 0, owner: true, changeOwed: true},
-    {spent: 0, owner: true, changeOwed: true, version: '2.3'},
+    {spent: 0, owner: true, changeOwed: true, version: '3.0'},
   ].entries()) {
     if (i > 0) {
       await act(async () => {
@@ -248,8 +248,8 @@ test('a card owed change says how to bring it home and offers no reset preparati
     expect(f.service.keys).not.toHaveBeenCalled();
   }
 });
-test("a 2.3 card's spent entries are left to its holder wallet: no settlement check, no reset preparation", async () => {
-  const f = await mount({spent: 13, version: '2.3'});
+test("a 3.0 card's spent entries are left to its holder wallet: no settlement check, no reset preparation", async () => {
+  const f = await mount({spent: 13, version: '3.0'});
   await press('reset-inspect');
   expect(JSON.stringify(tree.toJSON())).toContain(
     'The holder wallet frees this card’s spent entries',

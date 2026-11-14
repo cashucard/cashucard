@@ -20,7 +20,7 @@ export type InstallationInspection =
         owner: boolean;
         /**
          * The card made a payment whose change is not back on it yet: GET_INFO
-         * byte 29 on 2.3, GET_CHANGE's count on 2.1 and 2.2. Deleting the
+         * byte 29 on 3.0, GET_CHANGE's count on 2.1 and 2.2. Deleting the
          * applet loses that change for good.
          */
         changeOwed: boolean;

@@ -6,7 +6,7 @@ const test = require("node:test");
 // The runners that drive a card (run-compact.cjs, run-probe.cjs) were reviewed
 // against cardkit 0.2.0 and require it (D181): a cardkit of another version
 // stops them before they touch a card, until they are reviewed against it.
-// cardkit is 0.3.0 since protocol 2.3, so the runners refuse it for now.
+// cardkit is 0.3.0 since protocol 3.0, so the runners refuse it for now.
 test("the outbox-spike runners require the reviewed cardkit 0.2.0 and refuse any other", () => {
   const compact = readFileSync(join(__dirname, "run-compact.cjs"), "utf8");
   const probe = readFileSync(join(__dirname, "run-probe.cjs"), "utf8");

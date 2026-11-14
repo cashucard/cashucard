@@ -5,23 +5,30 @@ One entry per component release, newest first, as
 in the reviewed pull request, and the tag follows the merge. A GitHub release lists
 the merged pull requests besides.
 
-## `firmware-v2.3.0`: Cashu Card protocol 2.3 (not yet tagged)
+## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
-The tracked CAP is `applet/target/cashu-javacard-2.3.0.cap`, sha256
-`30c7bb8d98274da0953e2e90c93027fa2313391b05a2211a9489a2111dbaed83`. Its load file,
+The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
+`c94dff1b122d8d823d72d7d8f69e36cbaacb78c017483b6498e527ad1184fb9e`. Its load file,
 the bytes a card is LOADed with, is 36,953 bytes by `tools/refcheck.py`'s measure,
-sha256 `f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440`. `SELECT`
-and `GET_INFO` answer `02 03`. The core is revision `03` of
+sha256 `a7778e7b8f23e12086a3dceeac7dd9db6d407daa119b6e1caedeed28d139ce78`. `SELECT`
+and `GET_INFO` answer `03 00`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D204](DECISIONS.md#d204), and the wire is in
-[`spec/APDU.md`](../spec/APDU.md).
+[D183](DECISIONS.md#d183) to [D204](DECISIONS.md#d204), numbered 3.0 by
+[D205](DECISIONS.md#d205), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This file ran on a chip on 2026-11-14
-([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
-[its report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)): the bench J3R180
-installed it three times in three steps (16 to 17 s to load, 2 s for the card's applet)
+This exact file has run only in a simulator so far, and no card has installed it. It is
+the file of 2026-11-14 below with the version moved from 2.3 to 3.0
+([D205](DECISIONS.md#d205)): its load file differs from that file's only in the two
+version bytes in the Method component and the package's version in the Header
+component. The run is to be repeated on it
+([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)).
+
+On 2026-11-14 the bench J3R180 ran the source then numbered 2.3, answering `02 03`
+(CAP `30c7bb8d…`, load file `f216644a…`, which refcheck keeps as proven;
+[its report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)): it installed that
+file three times in three steps (16 to 17 s to load, 2 s for the card's applet)
 and, at a FakeWallet test mint with fake sats:
 
 - passed `cardctl selftest` 20 of 20 (`AUTH` 632 ms), and 21 of 21 with the PIN after;
@@ -47,8 +54,8 @@ list, the PIN's waits, a dollar card, a production mint and a phone.
 
 On 2026-11-13 a
 J3R180 (the bench card the [deployment guide](HARDWARE_DEPLOYMENT.md) names) installed
-the file before D200 (35,466 bytes, load file sha256 `48b8597c…`, which refcheck keeps
-as proven) in three steps (16 s to load, 2 s for the card's applet) and, at a
+the file before D200, numbered 2.3 then and answering `02 03` (35,466 bytes, load file
+sha256 `48b8597c…`, which refcheck keeps as proven), in three steps (16 s to load, 2 s for the card's applet) and, at a
 FakeWallet test mint with fake sats:
 
 - passed `cardctl selftest` 20 of 20 (`AUTH` 626 ms through a contact reader);
@@ -176,13 +183,15 @@ a J3R180 whose configuration lacks either cannot run the card.
   the keyset table, `6A9D` the holder's say needed, `6A9E` limit reached (enter the
   PIN), `6A9F` keys not shown; `6200` from `ALLOW_LOAD` (the grant given, no load
   opened); `63CX` on a card with no owner counts wrong tries in a row.
-- **A 2.2 reader** can read a 2.3 card and cannot pay from it, load it, finish its
-  change or set it up, and stops before burning anything. A 2.2 loader swaps a
-  top-up before the card refuses it, so a wallet checks the version first:
+- **A 2.2 reader** that holds to the major, as flash-pos, flash-mobile and cardctl
+  do, refuses a 3.0 card at `SELECT` and sends nothing after it
+  ([D205](DECISIONS.md#d205)). One that goes on can read a 3.0 card and cannot pay
+  from it, load it, finish its change or set it up, and stops before burning
+  anything, but a 2.2 loader swaps a top-up before the card refuses it:
   [What a 2.2 reader sees](../spec/APDU.md#what-a-22-reader-sees). flash-pos and
-  flash-mobile move to 2.3 before a 2.3 card is handed out; the cardsim contract
-  they pin by `CASHU_JAVACARD_REF` is 2.3's
-  ([`tools/cardsim/README.md`](../tools/cardsim/README.md#what-changed-for-23)).
+  flash-mobile move to 3.0 before a 3.0 card is handed out; the cardsim contract
+  they pin by `CASHU_JAVACARD_REF` is 3.0's
+  ([`tools/cardsim/README.md`](../tools/cardsim/README.md#what-changed-for-30)).
 - **Rules a reader keeps:** leave a dated piece whose date is less than a day after
   your own time out of every payment, online or not, and, online, ask the mint the state of every input before
   `SPEND_ALL_SIGN`; never give a card a block header more than two hours ahead of
@@ -210,28 +219,28 @@ otherwise is never set up ([ECDH framing probe](HARDWARE_DEPLOYMENT.md#ecdh-fram
 ### Moving from 2.2
 
 There is no upgrade in place. Spend or move every piece, bring home any change owed
-(`GET_CHANGE` on a 2.2 card), delete the package and install 2.3: the card gets a
+(`GET_CHANGE` on a 2.2 card), delete the package and install 3.0: the card gets a
 new key ([Reinstall](HARDWARE_DEPLOYMENT.md#reinstall-delete--install)). Readers and
-wallets move to the 2.3 wire before a 2.3 card is handed out.
+wallets move to the 3.0 wire before a 3.0 card is handed out.
 
 ### Host components in the same change
 
-- **cardkit 0.3.0** reads and installs the 2.3 card and refuses to reset one that is
+- **cardkit 0.3.0** reads and installs the 3.0 card and refuses to reset one that is
   owed change ([`tools/cardkit/README.md`](../tools/cardkit/README.md)).
-- **cardctl** speaks 2.3 (`setup`, `reset`, `change`, `load-change`, `keyset-keys`,
+- **cardctl** speaks 3.0 (`setup`, `reset`, `change`, `load-change`, `keyset-keys`,
   `group-keys`, `card-secret`, `cert`) and `selftest` takes 2.1 and later.
-- **The provisioner** carries the 2.3 load file and keeps installation switched off
+- **The provisioner** carries the 3.0 load file and keeps installation switched off
   for it until the operator approves it (`src/releaseGates.ts`).
 - **ops** `local-reset` refuses a card owed change.
 
-## `cardkit-v0.3.0`: protocol 2.3, change owed, and SCP03 (not yet tagged)
+## `cardkit-v0.3.0`: protocol 3.0, change owed, and SCP03 (not yet tagged)
 
 `tools/cardkit/package.json` moves to 0.3.0, a minor release for changes that are not
 compatible ([`tools/cardkit/README.md`](../tools/cardkit/README.md) has the migration):
 
-- **Protocol 2.3.** `CARD_VERSION` is `[2, 3]`; the kit reads and installs the 2.3
-  card and knows 2.1, 2.2 and 2.3 (`CARD_VERSIONS`). It refuses 2.2's owner commands
-  on a 2.3 card.
+- **Protocol 3.0.** `CARD_VERSION` is `[3, 0]`; the kit reads and installs the 3.0
+  card and knows 2.1, 2.2 and 3.0 (`CARD_VERSIONS`). It refuses 2.2's owner commands
+  on a 3.0 card.
 - **Change owed.** A card owed its own change is not empty: every reset and every
   "empty" test holds to it (`changeOwed`, `readChangeOwed`, `GET_CHANGE`), and the
   probe never sweeps such a card.

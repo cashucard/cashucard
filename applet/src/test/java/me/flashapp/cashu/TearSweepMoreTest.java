@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * More of the tear sweep (TearSweepTest.sweep: the act torn after every persistent write, a chip's transactions, NonAtomic
- * halves; the power cut; the card read and checked) over 2.3's later commands and states: SPEND_ALL_AGAIN by the message's
+ * halves; the power cut; the card read and checked) over 3.0's later commands and states: SPEND_ALL_AGAIN by the message's
  * hash after a torn payment and another (D194, D196), the ring of kept signatures going round, the forgotten PIN, the first
  * set-up, the PIN's wait at its cap, the sealed PIN on a card with no owner, LOAD_CHANGE giving the day back (D196), a batch at
  * the day's loads, the mend's move, and a reset by the PIN (D196).

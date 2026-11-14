@@ -376,7 +376,7 @@ export function SignInScreen({onServices}: {onServices?: () => void} = {}) {
 }
 
 /** The load set this build makes, the same pin the batch screen states. */
-const SIGNIN_BUILD = `Builds the 2.3 card · Load file ${CASHU_LOAD_FILE.sha256.slice(
+const SIGNIN_BUILD = `Builds the 3.0 card · Load file ${CASHU_LOAD_FILE.sha256.slice(
   0,
   8,
 )}…`;

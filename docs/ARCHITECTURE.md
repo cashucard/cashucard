@@ -50,7 +50,7 @@ terminal's local acceptance is not a mint settlement receipt. It retains its
 payment and change obligations until reconciliation; the ops-service does not
 settle payments or hold the holder wallet's recovery phrase.
 
-The card generates its secp256k1 installation key P on chip. Since protocol 2.3
+The card generates its secp256k1 installation key P on chip. Since protocol 3.0
 proofs are locked not to P but to the card's key for their date, P + t·G, with t
 from a secret c the card keeps; the holder's wallet reads c sealed, or works it out
 from its words and P where the owner gave the card its c at the claim or the hand-over

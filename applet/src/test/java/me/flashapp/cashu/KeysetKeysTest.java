@@ -50,7 +50,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Keyset keys (2.3, D190): KEYSET_KEYS (38) teaches the card a keyset's keys, held to the keyset's ID as NUT-02 makes it
+ * Keyset keys (3.0, D190): KEYSET_KEYS (38) teaches the card a keyset's keys, held to the keyset's ID as NUT-02 makes it
  * (version 00 and 01), and keeps the top of a hash tree of them; P1 = 3 shows that an opening's key is one of them by its
  * path; LOAD_CHANGE writes nothing under a key not shown (6A9F); and a holder binds an opening a reader bound to a key that
  * is not the mint's to the mint's key. The tree is worked out here on its own, with the JDK's SHA-256, and not by any code

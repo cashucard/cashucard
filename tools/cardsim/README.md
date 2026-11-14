@@ -1,14 +1,14 @@
 <a id="cardsim-the-20-card-over-loopback-http"></a>
 <a id="cardsim-the-23-card-over-loopback-http"></a>
 
-# cardsim: the 2.3 card over loopback HTTP
+# cardsim: the 3.0 card over loopback HTTP
 
-The real `CashuApplet` (protocol 2.3, AID `F0 43 41 53 48 55 43 41 52 44 01`,
-`SELECT` answers `02 03`) in jCardSim, behind a small HTTP API. flash-pos and
+The real `CashuApplet` (protocol 3.0, AID `F0 43 41 53 48 55 43 41 52 44 01`,
+`SELECT` answers `03 00`) in jCardSim, behind a small HTTP API. flash-pos and
 flash-mobile run it in their e2e jobs, pinned by `CASHU_JAVACARD_REF`. **This file
 is that contract**: the four routes, the `/fixture` schema, the `/state` fields and
 the Node client. A change to any of them is a change for both apps, so it is made
-here and in both apps' pins together. [What changed for 2.3](#what-changed-for-23)
+here and in both apps' pins together. [What changed for 3.0](#what-changed-for-30)
 says what both apps must change before they move their pin.
 
 ```bash
@@ -49,18 +49,18 @@ not expect is **500** `{"error"}`. The card is kept as it was.
   is deterministic.** jCardSim draws every key pair from an unseeded generator, so
   every reset (and every bridge) has the same `pubkey`
   (`02fa05ed0a3649886270bacec5ddc1a3643009a759bee996f9a6ac060c9992a82e` today).
-  **Its keys per date are not.** On 2.3 every piece is locked to the card's key for
+  **Its keys per date are not.** On 3.0 every piece is locked to the card's key for
   its date, P + t·G, where t comes from the card's secret c
   ([spec/APDU.md, Keys per load](../../spec/APDU.md#keys-per-load)); c is drawn
   with the card's other randomness (change openings, nonces), which is seeded from
   the host, so it is new at every reset. Read the key with `GROUP_KEYS` under the
   PIN after each reset (`client.groupKeys(date)`), and mint for each run. **Never
-  mint to `pubkey` itself**: a 2.3 card never signs with P alone, so such a piece
+  mint to `pubkey` itself**: a 3.0 card never signs with P alone, so such a piece
   can never be paid.
 - **Taps and times in the field.** `SELECT` starts a tap. The PIN-verified flag,
   the owner's nonce and the owner's grant are cleared on deselect, so a re-`SELECT`
   drops them as a new NFC tap does. There is no "tap" route: a transport sends
-  `SELECT` on each tap. What 2.3 keeps for a *time in the field* (a payment signed,
+  `SELECT` on each tap. What 3.0 keeps for a *time in the field* (a payment signed,
   an owner claimed, a history read) outlasts a `SELECT`: a second payment in one
   time in the field waits longer, and after an owner's claim no payment is taken in
   it (`6985`). Only a fixture takes the card out of the field and back (jCardSim's
@@ -74,7 +74,7 @@ not expect is **500** `{"error"}`. The card is kept as it was.
 
 ## `/fixture`
 
-A fixture is applied on top of the card as it is. The usual order on 2.3 is:
+A fixture is applied on top of the card as it is. The usual order on 3.0 is:
 
 1. `/reset`;
 2. `/fixture {pin, mint, owner}`: the card's first set-up (its PIN, its record and
@@ -122,7 +122,7 @@ is now. Anything the applet would refuse because of the fixture's own shape is a
 - `anchor` needs an owner in the same fixture. Each header is exactly 80 bytes.
 - `proofs`: at most 128, no repeated `nonce`, `C` starting `02` or `03`, `1 ≤ amount < 2^32`.
   A dated piece (`date` ≠ 0) needs a refund key. Proofs need `pin` in the same
-  fixture (a 2.3 card loads under the PIN given in the tap, nothing else opens a
+  fixture (a 3.0 card loads under the PIN given in the tap, nothing else opens a
   load, and a card with no PIN takes nothing) and a record (`mint` here or
   earlier); no owner is needed. The card itself checks that `C` is a point of the
   curve (`6A80`, a 409).
@@ -156,7 +156,7 @@ A step the applet refuses stops the fixture there. The answer is **409**
 and `/state.fixtureError` keeps `{step, sw}` until the next fixture or reset.
 
 **`limits` always sends 18 bytes.** The bridge sends the owner's eighteen-byte
-`SET_LIMIT` (2.3's one layout): `day`, `payment` and `allowance` (each 0 when left
+`SET_LIMIT` (3.0's one layout): `day`, `payment` and `allowance` (each 0 when left
 out: no limit, no allowance), `rollBudget`, which is **7 when left out**, the card's
 default ([D20](../../docs/DECISIONS.md#d20)), `rate` (sats to the dollar, 0 when left
 out: none) and `noPinWindow` (0 when left out: the no-PIN window of 24 hours; 1:
@@ -180,7 +180,7 @@ built in, so a header mined for a test is refused (`6A93`).
 
 Read through commands that change nothing (`GET_INFO P1 = 4`, `GET_CARD`,
 `GET_PUBKEY`, `GET_BALANCE`, `GET_SLOT_STATUS`, then `GET_PROOF` and `GET_DLEQ` for
-each slot that is not empty), in the tap as the app left it. **A 2.3 card says its
+each slot that is not empty), in the tap as the app left it. **A 3.0 card says its
 history only to the PIN or the owner's grant given in that tap**
 ([D198](../../docs/DECISIONS.md#d198)): with neither, `windowStart`, `spentToday`,
 `rolls`, `allowanceArmed` and `lastHeader` read as zeros, and a spent slot as its
@@ -191,7 +191,7 @@ neither; an app that has given the PIN in its tap sees them.
 |---|---|
 | `generation` | goes up on every reset and fixture, so a test can tell its card from one another run left |
 | `deterministicKey` | always `true`: the card key P, never the keys per date |
-| `version` | `"2.3"` |
+| `version` | `"3.0"` |
 | `pubkey` | the card key P, 33 bytes compressed: for `AUTH` and a certificate, never to lock ecash to |
 | `balance` | the card's unit in unspent pieces |
 | `pinState`, `tries`, `locked` | `0` no PIN, `1` set, `2` blocked; tries left (on a card with no owner the chip's counter); the owner's lock |
@@ -200,7 +200,7 @@ neither; an app that has given the PIN in its tap sees them.
 | `format`, `unit` | `GET_INFO` byte 8 (`4`, or `5` with keysets of both units); the record's unit, `0` sat, `1` usd |
 | `changeOwed` | `GET_INFO` byte 29: an opening of the card's own change is owed (`GET_CHANGE`) |
 | `noPinWindow` | `GET_CARD` byte 87: `0` the no-PIN window of 24 hours, `1` none |
-| `profiles` | `GET_INFO` bytes 55 and 56, hex: `ff03`, every profile of 2.3 |
+| `profiles` | `GET_INFO` bytes 55 and 56, hex: `ff03`, every profile of 3.0 |
 | `now`, `windowStart`, `spentToday` | the card's clock (the newest header's time, 0 before any); the day's window start; what has left the card in it (history) |
 | `dailyLimit`, `allowance`, `nopinSpent` | the day's limit and the no-PIN allowance (0 is none); what the no-PIN window that runs has counted |
 | `rolls`, `rollBudget`, `allowanceArmed` | D20: rolls since the owner's last `REFRESH` (history); the budget (7 when the card holds 0); whether the next payment with no PIN may begin a new no-PIN window (history) |
@@ -212,7 +212,7 @@ neither; an app that has given the PIN in its tap sees them.
 ## The Node client
 
 `tools/cardsim/client.cjs` has no dependencies. It exports `CardSim` (the routes plus
-a method for each 2.3 command a reader sends), `encode` (the pure encoders, for a
+a method for each 3.0 command a reader sends), `encode` (the pure encoders, for a
 fake NFC transport), `constants` (INS, status words, labels, lengths), the parsers,
 `validateFixture` (the fixture's shape checked on the client, so most bad fixtures
 fail before the HTTP call; the bridge's checks against the card are the final
@@ -221,9 +221,9 @@ word), `ownerProof`, `ownerData`, `limitValue`, the points `uncompressedPoint` a
 `keysetLeaf`, `keysetLevels`, `keysetPath`, `foldPath`, `keysetFromMint`), which put
 the same bytes on the wire as `tools/cardctl/cardctl.py`.
 
-| Method | Command | 2.3 |
+| Method | Command | 3.0 |
 |---|---|---|
-| `select()` | `SELECT` | answers `{major: 2, minor: 3}` |
+| `select()` | `SELECT` | answers `{major: 3, minor: 0}` |
 | `getInfo(p1 = 4)` | `GET_INFO` | P1 4 by default: 59 bytes, parsed with `keysetTable`, `rate`, `entries`, `unmarked`, `lastUnit`, `noPinWindowStart`, `profiles`, `keysPerLoad`, `loadsLeft`; byte 29 is `changeOwed` |
 | `getCard()` | `GET_CARD` | 109 bytes and the mint, with `noPinWindowStart` and `noPinWindow` |
 | `getCardSecret(E?)` | `GET_CARD` P1 3 | c, sealed (the raw answer), after `getNonce(1)` |
@@ -264,7 +264,7 @@ curl -s -X POST localhost:9876/reset | jq -r .pubkey      # P: for AUTH, never t
 curl -s -X POST localhost:9876/fixture -d '{"pin": "1234", "mint": "http://127.0.0.1:3338", "owner": true,
   "anchor": "<the tip header, 80 bytes>"}' | jq '{hasOwner, pinState}'
 # the card's key for the date 0: SELECT, VERIFY_PIN, GROUP_KEYS (t, P + t*G, R + u*G)
-curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"02039000",…}
+curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"03009000",…}
 curl -s -X POST localhost:9876/apdu -d '{"hex":"B04000000431323334"}'
 curl -s -X POST localhost:9876/apdu -d '{"hex":"B01D0000040000000062"}'               # bytes 32 to 64: P + t*G
 # mint pieces to that key at your mint (format-4 SIG_ALL secrets, NUT-CCP's card proofs), then:
@@ -306,13 +306,14 @@ loaded with `LOAD_CHANGE`. CI runs it against a Nutshell 0.20.3 with forge's key
 shape (an 8-byte id, no fee) and against a fresh v2 keyset (a 33-byte id, a fee of
 100).
 
-## What changed for 2.3
+## What changed for 3.0
 
 For flash-pos and flash-mobile, before either moves its `CASHU_JAVACARD_REF` pin
 past this change (both pins move together, with the app changes below):
 
-- **`SELECT` answers `02 03`**, `/state.version` is `"2.3"`. An app that checks the
-  minor version takes 3.
+- **`SELECT` answers `03 00`**, `/state.version` is `"3.0"`. The major moves
+  ([D205](../../docs/DECISIONS.md#d205)): an app that takes only major 2 answers this
+  card with "needs an update" until it takes major 3.
 - **Lock pieces to the card's key for their date, never to `/state.pubkey`.** Read
   `GROUP_KEYS` under the PIN (`client.groupKeys(date)`), or work the keys out from c
   (`GET_CARD` P1 3, `cashu-crypto.dateKeys`). A piece minted to P can never be paid.

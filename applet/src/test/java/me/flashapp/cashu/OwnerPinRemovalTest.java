@@ -33,7 +33,7 @@ import java.util.List;
  *    change nothing.)
  * 2. pinState 0 over a partly spent counter, set on the card directly, is
  *    harmless: no command reads the counter behind a card with no PIN, such a
- *    card takes and pays nothing (2.3, D185: 6A97), SET_PIN on an owned card
+ *    card takes and pays nothing (3.0, D185: 6A97), SET_PIN on an owned card
  *    is refused (no card has an owner and no PIN), and the owner's CHANGE_PIN
  *    starts a PIN with three fresh tries. And a successful OwnerPIN.check
  *    refills the counter by itself, which the applet leans on.

@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * SimCard against the real 2.3 applet. Every assertion is about bytes the app would see over the bridge, so the
+ * SimCard against the real 3.0 applet. Every assertion is about bytes the app would see over the bridge, so the
  * raw-byte path (Simulator.transmitCommand on a byte[]) is checked against what the applet suite reports.
  */
 class SimCardTest {
@@ -26,7 +26,7 @@ class SimCardTest {
     static final String NONCE_A = "ab".repeat(32);
     static final String NONCE_B = "cd".repeat(32);
     static final String NONCE_C = "ef".repeat(32);
-    // points of the curve, G, 2G and 3G: a 2.3 card checks a piece's C is one (6A80)
+    // points of the curve, G, 2G and 3G: a 3.0 card checks a piece's C is one (6A80)
     static final String C_A = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
     static final String C_B = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
     static final String C_C = "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
@@ -89,12 +89,12 @@ class SimCardTest {
     // ── fresh card ──────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("a fresh card answers SELECT by the card's applet's whole AID, F0 CASHUCARD 01, with 02 03 9000")
+    @DisplayName("a fresh card answers SELECT by the card's applet's whole AID, F0 CASHUCARD 01, with 03 00 9000")
     void selectAnswersVersion() {
-        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("03009000", Hex.format(card.transmit(SimCard.SELECT)));
         assertEquals("00A404000BF043415348554341524401", Hex.format(SimCard.SELECT));
-        assertEquals("2.3", card.state().get("version").getAsString());
-        assertEquals("ff03", card.state().get("profiles").getAsString(), "every profile of 2.3, keys per load among them");
+        assertEquals("3.0", card.state().get("version").getAsString());
+        assertEquals("ff03", card.state().get("profiles").getAsString(), "every profile of 3.0, keys per load among them");
     }
 
     @Test
@@ -106,7 +106,7 @@ class SimCardTest {
         assertEquals("9000", Hex.format(card.transmit(Hex.parse("00A404000AF043415348554341524400"))), "with an Le as well");
         assertEquals("6D00", Hex.format(card.transmit(GET_PUBKEY_LE21)));
         // the whole AID then reaches the card's applet, and the card answers again
-        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("03009000", Hex.format(card.transmit(SimCard.SELECT)));
         assertEquals(43, data(card.transmit(GET_INFO_LONG)).length);
         // the opener by its own whole AID is the same applet
         assertEquals("9000", Hex.format(card.transmit(Hex.parse("00A404000B" + SimCard.OPENER_HEX))));
@@ -119,13 +119,13 @@ class SimCardTest {
         assertEquals(SimCard.AID_HEX, card.selected());
         assertEquals("9000", Hex.format(card.transmit(SimCard.SELECT_PACKAGE)));
         assertEquals(SimCard.OPENER_HEX, card.selected(), "the package AID selected the opener");
-        assertEquals("2.3", card.state().get("version").getAsString());
+        assertEquals("3.0", card.state().get("version").getAsString());
         assertEquals(SimCard.OPENER_HEX, card.selected());
         assertEquals("6D00", Hex.format(card.transmit(GET_INFO_LONG)), "the opener is still what the app reaches");
 
         assertEquals(0x9000, SimCard.sw(card.transmit(Hex.parse("00A4040007" + SimCard.TAG_HEX + "00"))));
         assertEquals(SimCard.TAG_HEX, card.selected());
-        assertEquals("2.3", card.state().get("version").getAsString());
+        assertEquals("3.0", card.state().get("version").getAsString());
         assertEquals(SimCard.TAG_HEX, card.selected());
         // a SELECT that finds nothing leaves the selection where it was
         card.transmit(Hex.parse("00A4040007D2760000850102"));
@@ -145,7 +145,7 @@ class SimCardTest {
         assertEquals(0x9000, SimCard.sw(before));
         assertEquals(24, before.length, "the NDEF file's 22 bytes and the status word");
 
-        assertEquals("2.3", card.state().get("version").getAsString());
+        assertEquals("3.0", card.state().get("version").getAsString());
         assertEquals(SimCard.TAG_HEX, card.selected());
         assertArrayEquals(before, card.transmit(READ_NDEF), "the file the app chose is still chosen after /state");
 
@@ -170,7 +170,7 @@ class SimCardTest {
 
         // nor across a stay on another instance
         assertEquals("9000", Hex.format(card.transmit(SELECT_NDEF_FILE)));
-        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("03009000", Hex.format(card.transmit(SimCard.SELECT)));
         assertEquals(0x9000, SimCard.sw(card.transmit(SELECT_TAG)));
         card.state();
         assertEquals("6986", Hex.format(card.transmit(READ_NDEF)));
@@ -219,7 +219,7 @@ class SimCardTest {
         com.licel.jcardsim.smartcardio.CardSimulator raw = new com.licel.jcardsim.smartcardio.CardSimulator();
         raw.installApplet(com.licel.jcardsim.utils.AIDUtil.create(SimCard.OPENER_HEX), me.flashapp.cashu.Opener.class);
         raw.installApplet(com.licel.jcardsim.utils.AIDUtil.create(SimCard.AID_HEX), me.flashapp.cashu.CashuApplet.class);
-        assertEquals("02039000", Hex.format(raw.transmitCommand(SimCard.SELECT_PACKAGE)),
+        assertEquals("03009000", Hex.format(raw.transmitCommand(SimCard.SELECT_PACKAGE)),
             "if jCardSim ever gives the first instance the partial name itself, SimCard.resolveSelect can go");
         // the bridge, with the opener made first, answers as the chip does (a new SimCard: jCardSim's runtime is per
         // simulator, and the one made last is the current one)
@@ -281,7 +281,7 @@ class SimCardTest {
     @DisplayName("the NFC tag is installed beside the card: its name answers 9000 while the owner leaves it on")
     void theTagIsInstalled() {
         assertEquals(0x9000, SimCard.sw(card.transmit(Hex.parse("00A4040007D276000085010100"))));
-        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("03009000", Hex.format(card.transmit(SimCard.SELECT)));
     }
 
     // ── pieces ──────────────────────────────────────────────────────────────
@@ -311,7 +311,7 @@ class SimCardTest {
         assertFalse(slots.get(3).getAsJsonObject().has("nonce"), "empty slots carry no proof fields");
         assertFalse(s.get("changeOwed").getAsBoolean(), "a payment with no outputs owes no change");
 
-        // 2.3: no tap is the tap after a payment; CLEAR_SPENT wants the PIN given in this tap
+        // 3.0: no tap is the tap after a payment; CLEAR_SPENT wants the PIN given in this tap
         assertEquals(0x6982, SimCard.sw(card.transmit(CLEAR_SPENT)));
         assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)));
         slot1 = card.state().getAsJsonArray("slots").get(1).getAsJsonObject();
@@ -363,7 +363,7 @@ class SimCardTest {
         assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)));
         byte[] begun = card.transmit(SimCard.apdu(0x22, 0x02, 0, new byte[] { 0 }, 0x45));
         assertEquals(0x9000, SimCard.sw(begun), "SPEND_ALL_BEGIN, not 6985");
-        assertEquals(69, data(begun).length, "2.3: the worth, t and the date's refund key");
+        assertEquals(69, data(begun).length, "3.0: the worth, t and the date's refund key");
         assertEquals(8, SimCard.readUint32(begun, 0));
         assertEquals(0x6A86, SimCard.sw(card.transmit(SimCard.apdu(0x22, 0x00, 0, new byte[] { 0 }, 0x04))), "P1 00: no word on keys per load");
     }
@@ -648,7 +648,7 @@ class SimCardTest {
         for (int i = 0; i < 128; i++) {
             assertEquals("empty", s.getAsJsonArray("slots").get(i).getAsJsonObject().get("status").getAsString());
         }
-        assertEquals("02039000", Hex.format(card.transmit(SimCard.SELECT)));
+        assertEquals("03009000", Hex.format(card.transmit(SimCard.SELECT)));
     }
 
     @Test

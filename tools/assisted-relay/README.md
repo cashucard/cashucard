@@ -101,7 +101,7 @@ both signatures, packet identity and the expected mint/card/installation.
 the date 0, P + t·G, which the packet names and both signatures are by: the
 holder's wallet works it out from the card's c, or asks the card for the keys of
 the date `00000000`. It is never the card key P that `GET_PUBKEY` answers, which
-verifies neither signature of a 2.3 packet. An older policy's `cardKey` is read as
+verifies neither signature of a 3.0 packet. An older policy's `cardKey` is read as
 `date0Key` where that is not given. The private profile bounds packets to 32 KiB
 and 128 inputs/outputs; these are prototype limits. Format-4, date-zero,
 no-refund, exact payments in sat (unit `00`) or usd (unit `01`) are supported:

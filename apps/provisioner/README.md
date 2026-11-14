@@ -41,15 +41,15 @@ workflow. The decision behind the GlobalPlatform implementation is
 - **Install Cashu card.** The three-step install of
   [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 36,953-byte
   load file in 150 blocks, the opener, the card's applet, then the tag under
-  `D2760000850101`. Then it checks the card's applet answers `02 03`, `GET_INFO`
+  `D2760000850101`. Then it checks the card's applet answers `03 00`, `GET_INFO`
   (30 bytes), `GET_PUBKEY` (33 bytes) and the tag's SELECT.
 - **Rotate keys and back.** The card manager from its factory keys (`40` to `4F`)
   to the spike's public test set (ENC `10` to `1F`, MAC `20` to `2F`, DEK `30` to
   `3F`) and back, each proved by a fresh login.
 - **Replace existing install (spare card only).** Off by default. With it on, an
   installed card applet is removed first, and only if it is a version the app
-  knows (2.1, 2.2 or 2.3), its `GET_INFO` is empty and it is owed no change
-  (`GET_INFO` byte 29 on 2.3, `GET_CHANGE` on 2.1 and 2.2).
+  knows (2.1, 2.2 or 3.0), its `GET_INFO` is empty and it is owed no change
+  (`GET_INFO` byte 29 on 3.0, `GET_CHANGE` on 2.1 and 2.2).
 
 Every run starts from the card as it is: it checks for an installed applet, logs
 in, removes whatever a torn run left (newest instance first, then the package) and
@@ -187,12 +187,15 @@ cancellation during key prefetch prevents NFC from opening later.
 
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
-chip has installed and the operator approved. The 2.3 load file (36,953 bytes,
-sha256 `f216644a…`) is not on it yet, so a build from this tree installs no card
-and resets none. No chip has installed it yet (the file before D200, 35,466 bytes,
-`48b8597c…`, ran on a J3R180 on 2026-11-13, and `tools/refcheck.py` keeps its size
-and its hash); it goes on `VALIDATED_LOAD_FILE_SHA256S` once the operator
-approves it, with the run's hardware report, in a change that also updates
+chip has installed and the operator approved. The 3.0 load file (36,953 bytes,
+sha256 `a7778e7b…`) is not on it yet, so a build from this tree installs no card
+and resets none. No chip has installed it yet. Its source ran on a J3R180 while it
+was numbered 2.3, answering `02 03`: the file before D200 (35,466 bytes, `48b8597c…`)
+on 2026-11-13, and the file with D200 to D204 (`f216644a…`, which differs from the
+3.0 file only in its version bytes, D205) on 2026-11-14; `tools/refcheck.py` keeps
+their sizes and hashes. The 3.0 file goes on `VALIDATED_LOAD_FILE_SHA256S` after its
+own chip run, once the operator approves it, with the run's hardware report, in a
+change that also updates
 `__tests__/releaseGates.test.ts`. Both batch creation
 and programming enforce the gate; software-only record recovery and explicit
 disposition remain usable. Reauthentication, foregrounding and a 30-second timer
@@ -223,7 +226,7 @@ perform mint/owner/PIN personalization or report holder readiness.
 The read-only cardkit inspector returns the full installation key, empty-state
 and tag evidence. A card owed change from a payment is never empty: the status
 and reset screens send the operator to the holder wallet to bring the change home,
-and the reset stops before anything is saved or deleted. A 2.3 card's spent entries
+and the reset stops before anything is saved or deleted. A 3.0 card's spent entries
 are freed by its holder wallet; this app's settlement check is a 2.1 and 2.2 card's. An interrupted complete new installation can be adopted;
 absent, partial or untouched old states quarantine without a recovery sweep.
 The saved intent names the verified pre-install inspection state separately

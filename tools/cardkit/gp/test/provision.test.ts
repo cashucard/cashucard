@@ -93,7 +93,7 @@ const INSTALL_ORDER = [
   0xa4,
   0x01,
   0x10,
-  0xa4, // verify: 02 03, GET_INFO, GET_PUBKEY, the tag
+  0xa4, // verify: 03 00, GET_INFO, GET_PUBKEY, the tag
   0xa4,
   0xca, // FF21 again
 ];
@@ -449,7 +449,7 @@ describe('provision: the Cashu card', () => {
       {owner: 1},
       {pin: 1},
       {record: 1},
-      // change owed, said by a 2.3 card in GET_INFO byte 29
+      // change owed, said by a 3.0 card in GET_INFO byte 29
       {change: 1},
     ];
     for (const state of states) {
@@ -477,14 +477,17 @@ describe('provision: the Cashu card', () => {
   });
 
   it('asks a 2.1 or 2.2 card GET_CHANGE, and never sweeps one owed change: no DELETE, no login', async () => {
-    for (const minor of [1, 2]) {
+    for (const version of [
+      [2, 1],
+      [2, 2],
+    ] as const) {
       for (const replace of [false, true]) {
         const card = new FakeCard();
         assert.equal(
           (await provision(card.transceive, CASHU, options())).ok,
           true,
         );
-        card.setCardState({minor, change: 1});
+        card.setCardState({version, change: 1});
         card.reset();
         const before = card.log.length;
         const r = await provision(card.transceive, CASHU, options({replace}));
@@ -502,13 +505,16 @@ describe('provision: the Cashu card', () => {
   });
 
   it('sweeps an empty 2.1 or 2.2 card applet with replace on, once GET_CHANGE says nothing is owed', async () => {
-    for (const minor of [1, 2]) {
+    for (const version of [
+      [2, 1],
+      [2, 2],
+    ] as const) {
       const card = new FakeCard();
       assert.equal(
         (await provision(card.transceive, CASHU, options())).ok,
         true,
       );
-      card.setCardState({minor});
+      card.setCardState({version});
       card.reset();
       const r = await provision(
         card.transceive,
@@ -520,11 +526,11 @@ describe('provision: the Cashu card', () => {
     }
   });
 
-  it("names change owed from a 2.3 card's GET_INFO byte 29, and leaves a 2.1 or 2.2 card's byte 29 to GET_CHANGE", () => {
-    // a 2.3 card with no piece, no owner, no PIN and no record, owed change (byte 29 = 1)
+  it("names change owed from a 3.0 card's GET_INFO byte 29, and leaves a 2.1 or 2.2 card's byte 29 to GET_CHANGE", () => {
+    // a 3.0 card with no piece, no owner, no PIN and no record, owed change (byte 29 = 1)
     const owed = [
-      2,
       3,
+      0,
       0x80,
       0,
       0,
@@ -540,7 +546,7 @@ describe('provision: the Cashu card', () => {
     assert.match(notEmpty(owed) ?? '', /owed change/);
     assert.equal(notEmpty(owed.map((b, i) => (i === 29 ? 0 : b))), null);
     // on 2.2 byte 29 says something else, which readChangeOwed asks GET_CHANGE about
-    assert.equal(notEmpty(owed.map((b, i) => (i === 1 ? 2 : b))), null);
+    assert.equal(notEmpty(owed.map((b, i) => (i < 2 ? 2 : b))), null);
   });
 
   it('removes an empty card applet only with replace on', async () => {
@@ -562,14 +568,20 @@ describe('provision: the Cashu card', () => {
     assertInstalled(card);
   });
 
-  it('leaves alone a card applet of a version this kit does not know (2.0, 2.4), even empty and with replace on', async () => {
-    for (const minor of [0, 4]) {
+  it('leaves alone a card applet of a version this kit does not know (2.0, 2.3, 2.4, 3.1, 4.0), even empty and with replace on', async () => {
+    for (const version of [
+      [2, 0],
+      [2, 3],
+      [2, 4],
+      [3, 1],
+      [4, 0],
+    ] as const) {
       const card = new FakeCard();
       assert.equal(
         (await provision(card.transceive, CASHU, options())).ok,
         true,
       );
-      card.setCardState({minor});
+      card.setCardState({version});
       card.reset();
       const before = card.log.length;
       const r = await provision(

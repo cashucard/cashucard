@@ -55,7 +55,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The certificate (2.3, D192): CERT_WRITE writes a container in pieces on a card that has never had a PIN and seals it once it
+ * The certificate (3.0, D192): CERT_WRITE writes a container in pieces on a card that has never had a PIN and seals it once it
  * names the card's own key, CERT_READ gives it to anyone, and RESET_CARD keeps a certified card's key, certificate and paid
  * list. The card reads neither the statement nor the signature; these tests make both as a reader would read them, so that the
  * containers are whole, and record the vectors for NUT-CCP's certificate profile.
@@ -207,7 +207,7 @@ class CertificateTest {
 
     /** A form 01 container for the card key `key`, with a statement signed by the test issuer. */
     static byte[] signedForm01(byte[] key) {
-        String line = "cashu-card-cert/1 issuer=test-issuer form=card key=" + toHex(key) + " applet=0203 build=" + BUILD + " date=" + DATE + " scheme=bip340";
+        String line = "cashu-card-cert/1 issuer=test-issuer form=card key=" + toHex(key) + " applet=0300 build=" + BUILD + " date=" + DATE + " scheme=bip340";
         return form01(key, line.getBytes(StandardCharsets.US_ASCII), statementSig(ISSUER, line), NOTHING);
     }
 
@@ -222,7 +222,7 @@ class CertificateTest {
         return new byte[][][] { leaves, sorted };
     }
     static String batchLine(byte[] top, int count) {
-        return "cashu-card-cert/1 issuer=test-issuer form=batch top=" + toHex(top) + " count=" + count + " applet=0203 build=" + BUILD + " date=" + DATE + " scheme=bip340";
+        return "cashu-card-cert/1 issuer=test-issuer form=batch top=" + toHex(top) + " count=" + count + " applet=0300 build=" + BUILD + " date=" + DATE + " scheme=bip340";
     }
 
     /** A card with the key of `scalar` that has never had a PIN. */
@@ -424,7 +424,7 @@ class CertificateTest {
         Arrays.fill(leaves, EMPTY);
         leaves[0xFFFF] = leaf(key);
         List<byte[][]> lv = tree(leaves);
-        String line = "cashu-card-cert/1 issuer=" + "abcdefghijklmnopqrstuvwxyz012345" + " form=batch top=" + toHex(top(lv)) + " count=65535 applet=0203 build=" + BUILD + " date=" + DATE + " scheme=bip137";
+        String line = "cashu-card-cert/1 issuer=" + "abcdefghijklmnopqrstuvwxyz012345" + " form=batch top=" + toHex(top(lv)) + " count=65535 applet=0300 build=" + BUILD + " date=" + DATE + " scheme=bip137";
         byte[] bare = form02(0xFFFF, path(lv, 0xFFFF), top(lv), line.getBytes(StandardCharsets.US_ASCII), new byte[65], NOTHING);
         assertEquals(890, bare.length, "the longest statement, a signature of 65 bytes and no chain");
         byte[] full = form02(0xFFFF, path(lv, 0xFFFF), top(lv), line.getBytes(StandardCharsets.US_ASCII), new byte[65], new byte[1024 - bare.length]);
