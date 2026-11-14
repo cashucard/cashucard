@@ -330,6 +330,18 @@ test("preview and pins refuse changed artifacts before opening a reader", async 
   assert.throws(() => compactArtifact(o));
   assert.equal(f.calls.opens, 0);
 });
+test("without an injected cardkit the runner refuses any cardkit but the reviewed 0.2.0 before it touches a journal or card", async (t) => {
+  const o = fixture(t),
+    f = fake();
+  const { sdk, ...withoutSdk } = f.deps;
+  const version = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "cardkit", "package.json"), "utf8"),
+  ).version;
+  if (version === "0.2.0") return;
+  await assert.rejects(runCompact(o, withoutSdk), /reviewed cardkit required/);
+  assert.equal(f.calls.opens, 0);
+  assert.ok(!fs.existsSync(o.journal));
+});
 test("07297620 uses only its exact captured baseline and remains bound through cleanup", async (t) => {
   const o = fixture(t),
     chip = "cplc-v1:4790d3213180072976207515",

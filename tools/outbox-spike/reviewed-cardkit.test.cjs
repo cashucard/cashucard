@@ -10,7 +10,7 @@ const test = require("node:test");
 test("the outbox-spike runners require the reviewed cardkit 0.2.0 and refuse any other", () => {
   const compact = readFileSync(join(__dirname, "run-compact.cjs"), "utf8");
   const probe = readFileSync(join(__dirname, "run-probe.cjs"), "utf8");
-  assert.match(compact, /require\("\.\.\/cardkit\/package\.json"\)\.version !== "0\.2\.0"\)\n\s+throw Error\("reviewed cardkit required"\)/);
+  assert.match(compact, /!dependencies\.sdk &&\n\s+require\("\.\.\/cardkit\/package\.json"\)\.version !== "0\.2\.0"\n\s+\)\n\s+throw Error\("reviewed cardkit required"\)/);
   assert.match(probe, /require\("\.\.\/cardkit\/package\.json"\)\.version !== "0\.2\.0"\n\s+\) \{\n\s+throw new Error\("resource probe requires reviewed cardkit 0\.2\.0"\)/);
   for (const source of [compact, probe]) assert.doesNotMatch(source, /cardkit[^\n]*0\.3\.0/);
   assert.match(readFileSync(join(__dirname, "README.md"), "utf8"), /Build cardkit 0\.2\.0's public package before execution/);

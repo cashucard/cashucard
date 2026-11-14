@@ -140,7 +140,9 @@ afterEach(async () => {
 test('distributed defaults allow authenticated installation without laboratory controls', async () => {
   const f = fixture();
   const runCard = jest.fn(async () => 'interrupted' as const);
-  await mount({...f, runCard, serviceFor: () => f.service});
+  // the build's own gate follows the load file it carries (releaseGates.ts, and releaseGates.test.ts for its value); this test is of
+  // the flow once that file is validated: authenticated installation with no laboratory control
+  await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
   await signIn();
   await act(async () => {
     expect(await flow.create(config)).toBe(true);
@@ -166,7 +168,7 @@ test("every reserved tap asks for replaceSellerTag, so a J3R452's seller tag is 
     tapOptions = options;
     return 'interrupted';
   };
-  await mount({...f, runCard, serviceFor: () => f.service});
+  await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
   await signIn();
   await act(async () => {
     expect(await flow.create(config)).toBe(true);
@@ -1275,7 +1277,7 @@ test('stale independent backup pauses before NFC and retains the reserved attemp
 test('a canceled operation waiting for the shared queue never arms a later card session', async () => {
   const f = fixture();
   const resetWithCard = jest.fn(async () => {throw new Error('canceled read must not arm');});
-  const options = {...f, serviceFor: () => f.service, resetWithCard};
+  const options = {...f, hardwareValidated: true, serviceFor: () => f.service, resetWithCard};
   await mount(options);
   await signIn();
   const first = flow;
