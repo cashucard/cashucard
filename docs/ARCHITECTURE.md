@@ -11,7 +11,7 @@ version and deployment contracts.
 
 | Component | Source | Responsibility |
 | --- | --- | --- |
-| Protocol | [cashucard/nut](https://github.com/cashucard/nut), `spec/` | NUT-CCP in cashucard/nut defines the shared core. This repository maintains the applet command reference and implementation profiles; cashucard/javacard mirrors `spec/` after merge. |
+| Protocol | [cashucard/nut](https://github.com/cashucard/nut), `spec/` | NUT-CCP in cashucard/nut defines the shared core. This repository maintains the applet command reference and implementation profiles; cashucard/javacard is archived and mirrors nothing ([D177](DECISIONS.md#d177)). |
 | Firmware | `applet/` | JavaCard 3.0.5 applet, on-card keys/proofs, spend protection and NFC tag. The tracked CAP and its hashes are release evidence. |
 | cardkit | `tools/cardkit/` | Environment-neutral TypeScript API for installation, manager-key rotation over SCP02 or SCP03 (whichever the card opens), interrupted-install recovery and owned-card reset. It receives an APDU transceiver; it does not open NFC, call HTTP or decide operator authorization. |
 | Provisioner | `apps/provisioner/` | React Native operator app (`com.islandbitcoin.provisioner`): sign-in, batch setup, card installation, saved recovery, status and reset. Platform NFC and HTTP adapters surround cardkit. |
@@ -50,8 +50,19 @@ terminal's local acceptance is not a mint settlement receipt. It retains its
 payment and change obligations until reconciliation; the ops-service does not
 settle payments or hold the holder wallet's recovery phrase.
 
-The card generates its secp256k1 installation key on chip. Proofs are locked to
-that key. The holder controls a separate P-256 owner key through a holder
+The card generates its secp256k1 installation key P on chip. Since protocol 3.0
+proofs are locked not to P but to the card's key for their date, P + t·G, with t
+from a secret c the card keeps; the holder's wallet reads c sealed, or works it out
+from its words and P where the owner gave the card its c at the claim or the hand-over
+([D202](DECISIONS.md#d202); a lost card's take-back also needs P and the pieces, which
+the words do not give), and a loader that does not hold it asks the card under
+the PIN ([D197](DECISIONS.md#d197)). Nothing may be locked to P itself. The card makes and
+finishes its own change: it blinds the change outputs of a payment, and later takes
+the mint's answer, checks its DLEQ proof against keys it was taught for the keyset,
+and unblinds it ([D183](DECISIONS.md#d183), [D190](DECISIONS.md#d190)). A card may
+carry a certificate for P from a certifier, which the card stores and any reader
+fetches ([D192](DECISIONS.md#d192), [CERTIFIER](CERTIFIER.md)). The holder controls
+a separate P-256 owner key through a holder
 wallet; Flash's tested setup derives it from the wallet's recovery phrase.
 Neither the provisioner nor an ops-service operator becomes the card owner by
 installing the applet. Ownership, PINs, limits and mint personalization are

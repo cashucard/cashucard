@@ -224,14 +224,9 @@ class SlotWriteOrderTest {
 
     // ── the states a tear can now leave ──────────────────────────────────────
 
-    /** A runtime that hands the test its applet, so a slot can be set to what a tear leaves. */
-    private static final class ExposedRuntime extends SimulatorRuntime {
-        Applet appletAt(AID aid) {
-            return getApplet(aid);
-        }
-    }
-
     private static final byte CLA = CashuAppletTest.CLA;
+    /** The runtime CashuAppletTest uses: it hands the test its applet, and marks the table's keysets taught for a change. */
+    private CashuAppletTest.ExposedRuntime runtime;
     private CardSimulator sim;
     private byte[] storage;
     /** The text kept beside each place for a payment to hash (CashuApplet.slotHex), live. */
@@ -244,7 +239,7 @@ class SlotWriteOrderTest {
     private byte[] burnPending, burnList;
 
     private void freshCard() throws Exception {
-        ExposedRuntime runtime = new ExposedRuntime();
+        runtime = new CashuAppletTest.ExposedRuntime();
         sim = new CardSimulator(runtime);
         AID aid = AIDUtil.create(CashuAppletTest.AID_HEX);
         sim.installApplet(aid, CashuApplet.class);
@@ -299,11 +294,11 @@ class SlotWriteOrderTest {
     }
 
     private ResponseAPDU send(CommandAPDU apdu) {
-        return sim.transmitCommand(apdu);
+        return CashuAppletTest.held(sim::transmitCommand, apdu);
     }
 
     private ResponseAPDU load(byte[] proof) {
-        return send(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, proof, 0, proof.length, 1));
+        return send(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, proof, 0, proof.length, 1));
     }
 
     /** LOAD_PROOF with P1 = 1 (1.20): the piece and the mint's proof for it. */
@@ -320,17 +315,14 @@ class SlotWriteOrderTest {
 
     /** A payment of that one piece: named, and signed for. The answer of whichever of the two refused, or the signature. */
     private ResponseAPDU spend(int slot) {
-        ResponseAPDU begun = send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { (byte) slot }, 4));
+        ResponseAPDU begun = send(CashuAppletTest.spendBegin(new byte[] { (byte) slot }));
         if (begun.getSW() != CashuAppletTest.SW_OK) return begun;
-        return send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64));
+        return CashuAppletTest.signThrough(this::send);
     }
 
     /** Whether `sig` is the card's for a payment of that one piece, which is what was sent to LOAD_PROOF, into no outputs. */
     private boolean signedFor(byte[] sig, byte[] sentProof) throws Exception {
-        byte[] key = send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_PUBKEY, 0, 0, 256)).getData();
-        byte[] message = CashuAppletTest.sha256(CashuAppletTest.allMessage(key, CashuAppletTest.REFUND,
-            new byte[][] { CashuAppletTest.asSlot(sentProof) }, new byte[0][]).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        return CashuAppletTest.schnorrVerify(CashuAppletTest.extractPubkeyX(key), message, sig);
+        return DateKeys.of(applet).signed(sig, new byte[][] { CashuAppletTest.asSlot(sentProof) }, new byte[0][]);
     }
 
     private ResponseAPDU clearSpent() {
@@ -442,7 +434,7 @@ class SlotWriteOrderTest {
     void aLoadWhoseLogWriteIsLostLeavesThePiecesGood() throws Exception {
         freshCard();
         byte[] logBefore = cardLog.clone();
-        ResponseAPDU batch = send(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0,
+        ResponseAPDU batch = send(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2,
             CashuAppletTest.concat(CashuAppletTest.PROOF_1, CashuAppletTest.PROOF_2), 3));
         assertEquals(CashuAppletTest.SW_OK, batch.getSW());
         assertArrayEquals(new byte[] { 0, 1 }, batch.getData());
@@ -487,14 +479,14 @@ class SlotWriteOrderTest {
         assertEquals(CashuAppletTest.SW_OK, again.getSW());
         assertArrayEquals(paid.getData(), again.getData(), "its signature can still be asked for");
         // the owner reads the receipts: none
-        assertEquals(CashuAppletTest.SW_OK, allowLoad());
+        assertEquals(CashuAppletTest.SW_GRANT, allowLoad());
         ResponseAPDU none = send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_LOG, 1, 0, 256));
         assertEquals(CashuAppletTest.SW_OK, none.getSW());
         assertArrayEquals(new byte[4], none.getData(), "the payment has no receipt");
         // the next payment has one, and it is the first
         ResponseAPDU second = spend(1);
         assertEquals(CashuAppletTest.SW_OK, second.getSW());
-        assertEquals(CashuAppletTest.SW_OK, allowLoad());
+        assertEquals(CashuAppletTest.SW_GRANT, allowLoad());
         ResponseAPDU one = send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_LOG, 1, 0, 256));
         assertEquals(4 + CashuAppletTest.RECEIPT_LEN, one.getData().length, "a receipt is 77 bytes since 1.15");
         assertEquals(1, CashuAppletTest.readUint32(one.getData(), 0));
@@ -610,7 +602,7 @@ class SlotWriteOrderTest {
         int stores = 0;
         Matcher all = STORE_WRITE.matcher(code);
         while (all.find()) stores++;
-        assertEquals(3, stores, "the load's copy and fill of a record, and the reset's fill of the store: three writes in all");
+        assertEquals(4, stores, "the load's copy and fill of a record, and the fill of the store by the reset and by an owner's replacement (`forgetOwed`, D197): four writes in all");
     }
 
     @Test
@@ -707,7 +699,8 @@ class SlotWriteOrderTest {
      * written, one call at a time, and a tear between two such calls is a state the card must tolerate.
      */
     static final String[] PERSISTENT = { "proofStorage", "slotHex", "dleq", "cardLocked", "pinState", "cardRecord", "ownerSet", "tagOff",
-        "changeDue", "cardLog", "cardReceipts", "changeOpen", "openState", "lastSig", "burnList", "burnPending", "pinKeySig" };
+        "cardLog", "cardReceipts", "changeOpen", "openState", "openKeys", "book", "lastSig", "burnList", "burnPending", "pinKeySig", "paid",
+        "hadPin", "pinMarks", "cert", "outbox", "outStage", "outGen", "outInstall", "chain", "group" };
 
     /**
      * Every method with a persistent write outside a transaction, the number of such writes in it, and why a tear between them
@@ -715,25 +708,41 @@ class SlotWriteOrderTest {
      * until it is reviewed here and in docs/DECISIONS.md D23.
      */
     static final String[][] REVIEWED = {
+        { "CashuApplet", "3", "install time (the constructor): the record's generation set to 1 (2.2, D175), the installation's and c's random bytes (D175, D197)" },
         { "initCardKeypair", "1", "install time: no card exists until install() returns" },
+        { "process", "1", "one byte (pinState 2) where a PIN's tries are all gone and its state byte says set: a last wrong try torn before failPinCheck wrote it is finished before any command reads the byte" },
         { "initPinKey", "1", "install time" },
-        { "processSpendAllBegin", "1", "one byte per opening (a draft let go), each atomic; a tear leaves drafts the next BEGIN lets go" },
-        { "processSpendAllChange", "4", "an EMPTY opening's fields, then openState DRAFT: the state byte is the opening's commit" },
-        { "blindChange", "1", "r of the opening SPEND_ALL_CHANGE is filling, before its state byte" },
-        { "processGetChange", "1", "one byte: a pending opening whose piece is back on the card, let go" },
-        { "clearOpening", "1", "one byte: the opening of change just loaded, let go" },
-        { "processSpendAllSign", "2", "burnList, read only while burnPending is set, and burnPending is set in the payment's transaction after it" },
-        { "finishBurn", "1", "status bytes of a committed payment, idempotent, before burnPending is cleared in a transaction of its own" },
-        { "loadOne", "7", "D14/D17: record, hex, data, then the status byte last; changeDue after it (a tear leaves the change grant for one more tap, which opens loading only)" },
+        { "processSpendAllBegin", "4", "one byte per opening (a draft let go), each atomic; a tear leaves drafts the next BEGIN lets go; the payment's keys (D197), read only by this payment's commands, which a tear drops, and written again by every BEGIN before anything reads them; and the staging's count and the till's keyset to nothing (2.2), read only by this payment's SIGN, which a tear drops" },
+        { "processSpendAllOutputs", "1", "the till's keyset into the staging (P1 = 1), read only by this payment's record, which a tear drops before its SIGN" },
+        { "processSpendAllChange", "7", "an EMPTY opening's shown mark off (D190), K, amount, keyset and date, then B_ after the blinding, then openState DRAFT: the state byte is the opening's commit (D183)" },
+        { "stageOutput", "4", "an output staged for the record (2.2): its amount and B_, then the count, the staging's commit; read only by this payment's SIGN, which a tear drops" },
+        { "writeOutbox", "26", "the record's body (2.2, D175), after its status byte was cleared in a transaction of its own; marked whole, with its length, only in the transaction that ends it: torn anywhere, the card has no record, never a mix of two" },
+        { "ensureDescriptor", "1", "the descriptor's 64 bytes after the body, then its flag in a transaction of one byte: torn, the flag is off and the next read signs it again" },
+        { "processLoadChange", "1", "the day's count with the change given back (one atomic copy): inside the transaction `loadOne` began for the card's own change (D196), with the status byte and the opening let go, and committed here; the parser cannot see a transaction begun in another method, so it is counted" },
+        { "blindChange", "2", "the nonce and r of the opening SPEND_ALL_CHANGE is filling, before its state byte" },
+        { "letGo", "1", "one byte, an opening EMPTY: for a piece back on the card (GET_CHANGE, LOAD_CHANGE, the owed gates, a load's clearOpening) or one given up (in the let-go's transaction, D183)" },
+        { "processSpendAllSign", "5", "burnList, and what left the card and the message's hash beside the last signature (D196), all read only while burnPending is set, and burnPending is set in the payment's transaction after them; and the record's status byte cleared (one byte) where writing the record failed" },
+        { "finishBurn", "2", "a committed payment's rows of the paid list (D191) and its status bytes, a row then its place's status, both idempotent, before burnPending is cleared in the receipt's transaction (D196)" },
+        { "loadOne", "6", "D14/D17: the day's loads and its start in one atomic copy first (D195: torn after it, a load counted and not made), then record, hex, data, then the status byte last (for the card's own change in a transaction with its opening let go and the day given back, which LOAD_CHANGE commits, D196); nothing of the load is written after it (D185)" },
         { "freeSpent", "2", "D14: data zeroed, then the status byte EMPTY last" },
-        { "writeHeader", "4", "a helper: every caller holds a transaction around it (CashuAppletTest pins the callers)" },
+        { "writeHeader", "7", "a helper: every caller holds a transaction around it (CashuAppletTest pins the callers); the fifth anchors a no-PIN window begun with no clock (D186); the sixth is whether the clock is weak, one byte (D201); the seventh the day of loads the owner's back form brings back (D203)" },
+        { "beginAtNow", "1", "a helper: every caller holds a transaction around it (the payment's commit, SET_LIMIT's): a day begun at the clock, or with no clock at a weak one (D201)" },
         { "failPinCheck", "1", "one byte; the counter's decrement before it is the JCRE's, and a tear between leaves a counter at 0, which VERIFY_PIN and the allowance read as blocked (D22)" },
-        { "processSetPin", "2", "the allowance zeroed on a card with no PIN, before the PIN's transaction: each copy atomic, and a card with no PIN has no allowance" },
+        { "forgetOwed", "14", "a forgotten PIN's history taken down (D196), and after an owner's replacement (D197) the spent places freed (`freeSpent`), the mint's proofs, the staged outputs' count and the openings filled first (nothing unspent or owed is on the card), then the record's refund key and its y, the day's window and count, the no-PIN window's start (its count the old owner's proof ended), the day of loads, the clock's last header hash with the rolls (one fill) and the arming filled with zeros, the paid list's round byte and next row put back, the dead keyset entries let go (`reclaim`): then `forget`, then its mark (one byte, keeping the new PIN owed), set in the transaction of the SET_PIN or SET_OWNER: torn before the mark is cleared, the next command (`process`) does it all again, and nothing reads any of it before" },
+        { "forget", "7", "the history forgotten (RESET_CARD, and SET_PIN replacing a forgotten PIN, D189, D196): first the settlement record's generation by one atomic copy (so that the receipt count, which begins again, never gives a later packet an earlier one's id and generation; sent again after a tear it steps again, only a larger number), the keyset table's tail (the last unit, the other unit's count, the receipts' units), the log, the receipts, the last signature and the signatures kept, then the last packet's status byte (one byte, so a read finds none); torn, part is gone and the command, sent again, takes the rest: nothing is given that was not before" },
         { "processLockCard", "1", "one byte" },
-        { "processResetCard", "14", "the bulk wipes, then who the card is in one transaction, last: torn before it, the card is still its owner's, who resets it again" },
+        { "processResetCard", "16", "the bulk wipes (the record in four runs, stepping over the hardest bits, D203, the clock's time and its weakness; the openings' keys, the keyset table, the record's descriptor flag and staging count; the generation and the history by `forget`, the generation first, D175, D183, D184, D196), then who the card is, with its new c (D197), in one transaction, last: torn before it, the card is still its owner's, with the c its owner's phone holds, and the owner resets it again" },
+        { "processSetCard", "1", "one byte per opening, a draft let go before the record's transaction, as SPEND_ALL_BEGIN lets it go (D183)" },
         { "processSetTag", "1", "one byte" },
-        { "logEntry", "4", "a helper: every caller holds a transaction around it" },
-        { "armAllowance", "1", "one byte (D20)" },
+        { "logEntry", "2", "a helper: every caller holds a transaction around it: the count of taps, and a new entry made whole in scratch and written with one copy (its clock, told time and unit bit, D184)" },
+        { "enter", "2", "a new keyset's entry (D184): its eight bytes, then its state byte, the entry's commit; torn between, the entry is still free (loadOne and SPEND_ALL_CHANGE write it before anything that names it)" },
+        { "reclaim", "1", "one state byte per entry nothing names (D184), each atomic; torn halfway, some dead entries are freed and the next reclaim frees the rest; a live entry is never freed" },
+        { "armAllowance", "1", "one byte (D20, D186)" },
+        { "endNoPinWindow", "2", "the no-PIN window's count to nothing, then its start (D186): the count alone says whether a window runs, so torn between, none runs and the stale start is written over by the next window's beginning; then armAllowance's one byte" },
+        { "select", "1", "one byte, the first set-up's mark to nothing at a selection (D195): torn, the mark is still set and the next selection clears it; no command runs in a selection whose select did not return" },
+        { "countTry", "1", "the chip's counter refilled after the wrong try and the next try's wait are written in a transaction BEFORE the PIN is checked (D195): torn before the transaction's commit, no try was made; after it, the try is counted, and a counter not refilled is refilled before the next check" },
+        { "processVerifyPin", "1", "the right PIN's marks to nothing (D195), one atomic copy after the check: torn before it, the right PIN is counted as one more wrong try, which only makes the next try wait" },
+        { "processCertWrite", "1", "a page of the certificate (D192), which counts for nothing until the seal: torn, the issuer writes it again; the seal, the length and its byte, is one transaction" },
     };
 
     @Test
@@ -748,16 +757,20 @@ class SlotWriteOrderTest {
     }
 
     @Test
-    @DisplayName("D23: the inventory counts a write outside a transaction, not one inside, and not one inside a transaction whose catch aborts it")
+    @DisplayName("D23: the inventory counts a write outside a transaction, and a NonAtomic one inside a transaction (an abort does not undo it); not an atomic one inside, and not one inside a transaction whose catch aborts it")
     void theInventoryCanSayNo() {
         String src = "class A {\n"
             + "    private void inside() { JCSystem.beginTransaction(); cardRecord[0] = 1; Util.arrayCopy(a, (short) 0, cardLog, (short) 0, (short) 4); JCSystem.commitTransaction(); }\n"
             + "    private void outside() { pinState[0] = (byte) 1; Util.arrayFillNonAtomic(cardLog, (short) 0, (short) 4, (byte) 0); }\n"
             + "    private void aborted() { JCSystem.beginTransaction(); try { k.setW(b, o, l); } catch (CryptoException e) { JCSystem.abortTransaction(); ISOException.throwIt(x); } ownerSet[0] = (byte) 1; JCSystem.commitTransaction(); }\n"
             + "    private void reads() { if (pinState[0] == (byte) 1) { x = cardRecord[0]; } Util.arrayCopyNonAtomic(cardRecord, (short) 0, buf, (short) 0, (short) 4); }\n"
+            + "    private void nonAtomicInside() { JCSystem.beginTransaction(); Util.arrayFillNonAtomic(cardLog, (short) 0, (short) 4, (byte) 0); Util.arrayCopyNonAtomic(a, (short) 0, outbox, (short) 0, (short) 4); cardRecord[0] = 1; JCSystem.commitTransaction(); }\n"
             + "}\n";
         java.util.Map<String, Integer> found = writesOutsideTransactions(src);
-        assertEquals(java.util.Collections.singletonMap("outside", 2), found);
+        java.util.Map<String, Integer> expected = new java.util.TreeMap<>();
+        expected.put("outside", 2);
+        expected.put("nonAtomicInside", 2);
+        assertEquals(expected, new java.util.TreeMap<>(found), "a NonAtomic write inside a transaction counts as outside one, and the record's arrays are persistent");
     }
 
     /** Method name -> the persistent writes in it that are not between a beginTransaction and its commitTransaction. */
@@ -771,7 +784,8 @@ class SlotWriteOrderTest {
             + "|Util\\.arrayCopy(?:NonAtomic)?\\s*\\([^;]*?,[^;]*?,\\s*" + names + "\\s*,"
             + "|Util\\.arrayFill(?:NonAtomic)?\\s*\\(\\s*" + names + "\\s*,"
             + "|\\baddUint32Stop\\s*\\(\\s*(?:cardLog|cardReceipts)\\s*,"
-            + "|\\b(?:ownerKey\\.setW|cardKeyPair\\.genKeyPair|pinKeyPair\\.genKeyPair|pin\\.update)\\s*\\(");
+            + "|\\brng\\.generateData\\s*\\(\\s*" + names + "\\s*,"
+            + "|\\b(?:ownerKey\\.setW|cardKeyPair\\.genKeyPair|pinKeyPair\\.genKeyPair|pin\\.update|pin\\.resetAndUnblock)\\s*\\(");
         Pattern method = Pattern.compile("\\n    (?:private|public|protected|static)[^\\n;=]*?(\\w+)\\s*\\([^)]*\\)\\s*\\{");
         java.util.Map<String, Integer> out = new java.util.LinkedHashMap<>();
         Matcher m = method.matcher(src);
@@ -788,7 +802,8 @@ class SlotWriteOrderTest {
             while (w.find()) {
                 String before = body.substring(0, w.start());
                 int begun = count(before, "JCSystem.beginTransaction()"), committed = count(before, "JCSystem.commitTransaction()");
-                if (begun <= committed) outside++;
+                // a NonAtomic copy or fill is not undone by an abort on a chip: inside a transaction it is a write outside one
+                if (begun <= committed || w.group().contains("NonAtomic")) outside++;
             }
             if (outside > 0) out.merge(m.group(1), outside, Integer::sum);
         }
@@ -815,25 +830,68 @@ class SlotWriteOrderTest {
         assertEquals(1, change.getData().length);
         // a payment that makes change takes the first EMPTY opening and writes all of it, the state byte last
         assertEquals(CashuAppletTest.SW_OK, load(CashuAppletTest.PROOF_1).getSW());
-        assertEquals(CashuAppletTest.SW_OK, send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4)).getSW());
-        assertEquals(CashuAppletTest.SW_OK, send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_CHANGE, 0, 0, CashuAppletTest.u32(500), 256)).getSW());
+        assertEquals(CashuAppletTest.SW_OK, send(CashuAppletTest.spendBegin(new byte[] { 0 })).getSW());
+        assertEquals(CashuAppletTest.SW_OK, send(CashuAppletTest.changeCommand(500, CashuAppletTest.mintKey())).getSW());
         assertEquals(CashuApplet.OPEN_DRAFT, openState[0], "the opening, now a draft");
         assertEquals(500, CashuAppletTest.readUint32(changeOpen, CashuApplet.OPEN_AMOUNT), "its amount is this change's, not the torn one's");
         assertTrue(changeOpen[CashuApplet.OPEN_R] != 0x5A || changeOpen[CashuApplet.OPEN_R + 1] != 0x5A, "and its r is new");
     }
 
     @Test
-    @DisplayName("D23: a change load torn after its status byte and before changeDue is cleared leaves the change grant for one more tap: it opens loading, and no payment")
-    void aTornChangeLoadLeavesTheGrantForLoadingOnly() throws Exception {
+    @DisplayName("D23 (D183): a SPEND_ALL_CHANGE torn before its opening's state byte leaves B_ and K of a change never committed in the openings' keys: GET_CHANGE serves nothing, and the next change writes both before its state byte")
+    void aTornChangeLeavesKeysThatAreNeverServed() throws Exception {
         freshCard();
+        byte[] keys = live("openKeys"), openState = live("openState");
+        assertEquals(CashuApplet.CHANGE_MOST * CashuApplet.OPEN_KEYS_ROW, keys.length, "reserved by the set-up");
+        java.util.Arrays.fill(keys, 0, CashuApplet.OPEN_KEYS_LEN, (byte) 0x5A);
+        keys[CashuApplet.OPEN_KEYS_SHOWN] = 1;   // and the shown mark (D190) of a key that is not this change's
+        powerCycle();
+        ResponseAPDU change = send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_CHANGE, 0, 0, 256));
+        assertArrayEquals(new byte[] { 0 }, change.getData(), "no opening is served");
         assertEquals(CashuAppletTest.SW_OK, load(CashuAppletTest.PROOF_1).getSW());
-        live("changeDue")[0] = 1;   // the note a payment leaves, still standing as a tear after the change's status byte would leave it
-        sim.reset();
-        assertEquals(CashuAppletTest.SW_OK, send(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, CashuAppletTest.hexToBytes(CashuAppletTest.AID_STR))).getSW());
-        assertEquals(CashuAppletTest.SW_PIN_NEEDED, send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4)).getSW() == CashuAppletTest.SW_OK
-            ? send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64)).getSW() : -1, "no payment without the PIN: the grant is not the PIN");
-        assertEquals(1, storage[CashuAppletTest.SLOT * 0] , "the piece is unspent");
-        assertEquals(CashuAppletTest.SW_OK, load(CashuAppletTest.PROOF_2).getSW(), "a load, which the grant is for");
-        assertEquals(0, live("changeDue")[0], "and the load that used it takes the note down");
+        assertEquals(CashuAppletTest.SW_OK, send(CashuAppletTest.spendBegin(new byte[] { 0 })).getSW());
+        ResponseAPDU made = send(CashuAppletTest.changeCommand(500, CashuAppletTest.mintKey()));
+        assertEquals(CashuAppletTest.SW_OK, made.getSW());
+        assertArrayEquals(made.getData(), java.util.Arrays.copyOfRange(keys, CashuApplet.OPEN_KEYS_B, CashuApplet.OPEN_KEYS_B + 33), "B_ is this change's");
+        assertArrayEquals(CashuAppletTest.mintKey(), java.util.Arrays.copyOfRange(keys, CashuApplet.OPEN_KEYS_K, CashuApplet.OPEN_KEYS_K + 33), "and K");
+        assertEquals(0, keys[CashuApplet.OPEN_KEYS_SHOWN], "and its K not shown (D190): the mark the bytes before it had is taken off");
+        assertEquals(CashuApplet.OPEN_DRAFT, openState[0]);
+    }
+
+    @Test
+    @DisplayName("D23 (D183): a LOAD_CHANGE torn before the piece's status byte leaves the place EMPTY with the piece's bytes in it and the opening owed: the same answer again goes on, into the same place, and the opening is let go; one torn after the status byte and before the letting go owes nothing, and is let go by the next asking (6A94)")
+    void aTornLoadChangeIsFinishedByTheSameAnswer() throws Exception {
+        freshCard();
+        byte[] openState = live("openState");
+        assertEquals(CashuAppletTest.SW_OK, load(CashuAppletTest.PROOF_1).getSW());
+        assertEquals(CashuAppletTest.SW_OK, send(CashuAppletTest.spendBegin(new byte[] { 0 })).getSW());
+        assertEquals(CashuAppletTest.SW_OK, send(CashuAppletTest.changeCommand(500, CashuAppletTest.mintKey())).getSW());
+        ResponseAPDU r = null;
+        for (int i = 0; i <= CashuAppletTest.WAITS_MOST; i++) {
+            r = send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64));
+            if (!(r.getSW() == CashuAppletTest.SW_OK && r.getData().length == 2)) break;
+        }
+        assertEquals(64, r.getData().length);
+        byte[] rows = send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_CHANGE, 0, 0, 256)).getData();
+        byte[] answer = CashuAppletTest.mintAnswer(java.util.Arrays.copyOfRange(rows, 18, 51));
+        powerCycle();
+        CashuAppletTest.shownByHand(live("openKeys"), 0);   // KEYSET_KEYS P1 = 3's mark, by hand (CashuAppletTest.loadChange)
+        ResponseAPDU first = send(CashuAppletTest.loadChangeCommand(0, answer));
+        assertEquals(CashuAppletTest.SW_OK, first.getSW());
+        int place = first.getData()[0];
+        // torn before the status byte: the piece's bytes are in the place, its status EMPTY, the opening owed
+        storage[place * 82] = 0;
+        openState[0] = CashuApplet.OPEN_PENDING;
+        powerCycle();
+        assertEquals(1, send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_CHANGE, 0, 0, 256)).getData()[0], "still owed");
+        ResponseAPDU again = send(CashuAppletTest.loadChangeCommand(0, answer));
+        assertEquals(CashuAppletTest.SW_OK, again.getSW(), "the same answer goes on");
+        assertArrayEquals(first.getData(), again.getData(), "into the same place, the same piece");
+        assertEquals(CashuApplet.OPEN_EMPTY, openState[0], "and the opening is let go");
+        // torn after the status byte and before the letting go
+        openState[0] = CashuApplet.OPEN_PENDING;
+        powerCycle();
+        assertEquals(CashuAppletTest.SW_PIECE_ON_CARD, send(CashuAppletTest.loadChangeCommand(0, answer)).getSW(), "its piece is on the card");
+        assertEquals(CashuApplet.OPEN_EMPTY, openState[0], "and the opening is let go, owing nothing");
     }
 }

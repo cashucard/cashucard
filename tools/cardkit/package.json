@@ -1,6 +1,6 @@
 {
   "name": "@cashu-card/cardkit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Versioned Cashu Card installation and recovery API over an injected APDU transport.",
   "license": "MIT",

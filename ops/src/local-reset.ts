@@ -77,6 +77,14 @@ export class LocalResetFailure extends Error {
     super('local reset stopped; retain its journal and source backup');
   }
 }
+/** The card is owed change from a payment: its holder wallet brings the change home before any reset. */
+class ChangeOwed extends Error {
+  constructor() {
+    super(
+      "the card is owed change: bring it home with the holder's wallet first",
+    );
+  }
+}
 function protectedFile(path: string): void {
   const stat = lstatSync(path);
   if (
@@ -358,6 +366,9 @@ export async function executeLocalReset(
         await readChipIdentity(reader.tx, journal.chip_id);
         phase = 'fresh-installation';
         const inspected = await inspectInstallation(reader.tx);
+        // a reset deletes the applet, and with it the change a payment left at the mint
+        if (inspected.state === 'present' && inspected.publicState.changeOwed)
+          throw new ChangeOwed();
         phase = 'preflight';
         const preflight = assessResetPreflight({
           chipId: journal.chip_id,
@@ -490,16 +501,18 @@ export async function executeLocalReset(
           ? 'chip-mismatch'
           : error instanceof InspectionError
             ? 'invalid-applet-evidence'
-            : error instanceof CardError
-              ? 'card-refused'
-              : error instanceof TransportError
-                ? 'transport-failed'
-                : error &&
-                    typeof error === 'object' &&
-                    'code' in error &&
-                    error.code === 'SQLITE_BUSY'
-                  ? 'source-busy'
-                  : 'stopped');
+            : error instanceof ChangeOwed
+              ? 'change-owed'
+              : error instanceof CardError
+                ? 'card-refused'
+                : error instanceof TransportError
+                  ? 'transport-failed'
+                  : error &&
+                      typeof error === 'object' &&
+                      'code' in error &&
+                      error.code === 'SQLITE_BUSY'
+                    ? 'source-busy'
+                    : 'stopped');
     throw new LocalResetFailure(
       phase,
       code,

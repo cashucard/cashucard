@@ -21,8 +21,11 @@ SDK edits. See the [architecture](../../docs/ARCHITECTURE.md) and
 
 The original ENG-738 spare-card bench is retained for approved laboratory Debug
 builds only. `BENCH_RUNS_ENABLED` defaults to false: Settings hides it, navigation
-rejects entry and its handlers cannot open NFC. Native Release builds require
-that flag and recovery drills to remain disabled. Do not enable bench writes to
+rejects entry and its handlers cannot open NFC. Even with the bench on, its
+Cashu card install also needs `CARD_INSTALLATION_VALIDATED` (the build's load
+file one a chip has installed), so the bench never installs a load file no chip
+has taken; the chip run that validates a new one is made with gp and cardctl.
+Native Release builds require that flag and recovery drills to remain disabled. Do not enable bench writes to
 bypass the production coordinator or its stopped-card evidence.
 
 The historical bench operations below are described for that controlled Debug
@@ -36,15 +39,17 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 21,631-byte
-  load file in 88 blocks, the opener, the card's applet, then the tag under
-  `D2760000850101`. Then it checks the card's applet answers `02 02`, `GET_INFO`
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 37,413-byte
+  load file in 152 blocks, the opener, the card's applet, then the tag under
+  `D2760000850101`. Then it checks the card's applet answers `03 00`, `GET_INFO`
   (30 bytes), `GET_PUBKEY` (33 bytes) and the tag's SELECT.
 - **Rotate keys and back.** The card manager from its factory keys (`40` to `4F`)
   to the spike's public test set (ENC `10` to `1F`, MAC `20` to `2F`, DEK `30` to
   `3F`) and back, each proved by a fresh login.
 - **Replace existing install (spare card only).** Off by default. With it on, an
-  installed card applet is removed first, and only if its `GET_INFO` is empty.
+  installed card applet is removed first, and only if it is a version the app
+  knows (2.1, 2.2 or 3.0), its `GET_INFO` is empty and it is owed no change
+  (`GET_INFO` byte 29 on 3.0, `GET_CHANGE` on 2.1 and 2.2).
 
 Every run starts from the card as it is: it checks for an installed applet, logs
 in, removes whatever a torn run left (newest instance first, then the package) and
@@ -180,7 +185,20 @@ service cannot view attempt details or replay it. One operation queue survives
 React remounts. Actor changes cancel an armed session and block further commands;
 cancellation during key prefetch prevents NFC from opening later.
 
-`src/releaseGates.ts` enables installation for internal testing. Both batch creation
+`src/releaseGates.ts` enables installation for internal testing only when the
+build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
+chip has installed and the operator approved. The 3.0 load file (37,413 bytes,
+sha256 `d4a897d8…`) is not on it yet, so a build from this tree installs no card.
+The gate holds back only what loads the file: an owned-card reset removes an
+installation and restores the manager keys, loads nothing, and is not held to it.
+No chip has installed the 3.0 file, or a file of its size, yet. Earlier sources ran on
+a J3R180 while they were numbered 2.3, answering `02 03`: the file before D200
+(35,466 bytes, `48b8597c…`) on 2026-11-13, and the file with D200 to D204
+(36,953 bytes, `f216644a…`) on 2026-11-14; `tools/refcheck.py` keeps their sizes and
+hashes. The 3.0 file is that source renumbered (D205) with D206 to D210 added. The 3.0 file goes on `VALIDATED_LOAD_FILE_SHA256S` after its
+own chip run, once the operator approves it, with the run's hardware report, in a
+change that also updates
+`__tests__/releaseGates.test.ts`. Both batch creation
 and programming enforce the gate; software-only record recovery and explicit
 disposition remain usable. Reauthentication, foregrounding and a 30-second timer
 retry only frozen records, without keys or NFC. Summaries report acknowledged
@@ -208,7 +226,10 @@ NFC or key lookup. It reports exact installation/rotation stages; it does not
 perform mint/owner/PIN personalization or report holder readiness.
 
 The read-only cardkit inspector returns the full installation key, empty-state
-and tag evidence. An interrupted complete new installation can be adopted;
+and tag evidence. A card owed change from a payment is never empty: the status
+and reset screens send the operator to the holder wallet to bring the change home,
+and the reset stops before anything is saved or deleted. A 3.0 card's spent entries
+are freed by its holder wallet; this app's settlement check is a 2.1 and 2.2 card's. An interrupted complete new installation can be adopted;
 absent, partial or untouched old states quarantine without a recovery sweep.
 The saved intent names the verified pre-install inspection state separately
 from the new key. Older draft intents lacking that evidence stop for

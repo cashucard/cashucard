@@ -1,8 +1,14 @@
 /** Empty-card spent-entry cleanup. Private proof/PIN material stays in this call. */
 import {secp256k1, schnorr} from '@noble/curves/secp256k1';
 import {sha256} from '@noble/hashes/sha256';
-import {CARD_AID, TAG_AID, supportedCardVersion} from './aids';
+import {
+  CARD_AID,
+  TAG_AID,
+  administeredCardVersion,
+  supportedCardVersion,
+} from './aids';
 import {equal, toHex} from './bytes';
+import {readChangeOwed} from './change-owed';
 import {readChipIdentity} from './identity';
 import {
   CardError,
@@ -28,6 +34,14 @@ export interface ResetReview {
   mint: string;
   /** Public record commitment, including refund key, limits and header. */
   recordDigest: string;
+  /**
+   * The card made a payment whose change is not back on it yet (GET_INFO byte
+   * 29 on 3.0, GET_CHANGE on 2.1 and 2.2). Nothing may reset such a card: the
+   * holder's wallet brings the change home first.
+   */
+  changeOwed: boolean;
+  /** The card applet's version as SELECT answered it: '2.1', '2.2' or '3.0'. */
+  version: string;
 }
 export class CleanupError extends Error {
   constructor(readonly code: string) {
@@ -58,17 +72,22 @@ const send = async (tx: Transceiver, a: number[]) => {
   if (r.sw !== 0x9000) throw new CardError(r.sw, a[1]!);
   return r.data;
 };
-/** GET_INFO's answer, its version held to the one SELECT answered (`selected`), as inspect does. */
+/**
+ * GET_INFO's answer, its version held to the one SELECT answered (`selected`), as inspect does. The format (byte 8) is
+ * 04, or on a 3.0 card 05 when it holds keysets of both units; a 3.0 card's byte 29, the change owed, is 00 or 01.
+ */
 function info(data: number[], selected: readonly number[]) {
+  const v30 = selected[0] === 3 && selected[1] === 0;
   if (
     data.length !== 30 ||
     !equal(data.slice(0, 2), selected) ||
     data[2] !== 128 ||
-    data[8] !== 4 ||
+    !(data[8] === 4 || (v30 && data[8] === 5)) ||
     data[3]! + data[4]! + data[5]! !== 128 ||
     ![0, 1, 2].includes(data[7]!) ||
     data[9]! > 3 ||
-    [data[10], data[11], data[16]].some(v => v !== 0 && v !== 1)
+    [data[10], data[11], data[16]].some(v => v !== 0 && v !== 1) ||
+    (v30 && data[29] !== 0 && data[29] !== 1)
   )
     stop('unsupported-card');
   return {
@@ -81,6 +100,7 @@ function info(data: number[], selected: readonly number[]) {
     record: data[11] === 1,
     owner: data[16] === 1,
     sealed: !!(data[6]! & 0x80),
+    format: data[8]!,
   };
 }
 async function snapshot(
@@ -90,7 +110,9 @@ async function snapshot(
   const chip = await readChipIdentity(tx, expected?.chipId);
   const version = await send(tx, selectAid(CARD_AID));
   if (!supportedCardVersion(version)) stop('unsupported-card');
-  const state = info(await send(tx, [0xb0, 1, 0, 0, 0]), version);
+  const infoData = await send(tx, [0xb0, 1, 0, 0, 0]);
+  const {format, ...state} = info(infoData, version);
+  const changeOwed = await readChangeOwed(c => transmit(tx, c), infoData);
   const installationId = hex(await send(tx, [0xb0, 0x10, 0, 0, 0x21]));
   if (
     !point(installationId) ||
@@ -101,7 +123,7 @@ async function snapshot(
   if (
     record.length < 109 ||
     record.length !== 109 + record[105]! ||
-    record[0] !== 4 ||
+    record[0] !== format ||
     record[1] !== Number(state.record)
   )
     stop('record-invalid');
@@ -125,11 +147,13 @@ async function snapshot(
     mint,
     tag: selected.sw === 0x9000,
     recordDigest: digest(record),
+    changeOwed,
+    version: `${version[0]}.${version[1]}`,
   };
   // Return to the card; SELECT deliberately removes any prior grants.
   if (!supportedCardVersion(await send(tx, selectAid(CARD_AID))))
     stop('unsupported-card');
-  return {review, record};
+  return {review, record, version};
 }
 /** No authentication, network or mutation. The UI sees public metadata only. */
 export async function readResetReview(tx: Transceiver): Promise<ResetReview> {
@@ -143,9 +167,12 @@ function match(
 ) {
   const a = actual.spent,
     b = expected.spent;
+  // a review saved by cardkit 0.2 has no changeOwed or version: those two are compared where it has them
+  const added = (k: string) =>
+    (k === 'changeOwed' || k === 'version') && !(k in expected);
   if (
     Object.keys(actual)
-      .filter(k => k !== 'spent' && k !== 'tries')
+      .filter(k => k !== 'spent' && k !== 'tries' && !added(k))
       .some(
         k =>
           actual[k as keyof ResetReview] !== expected[k as keyof ResetReview],
@@ -228,11 +255,21 @@ export async function cleanupSettledEntries(
   options: CleanupOptions,
 ): Promise<ResetReview> {
   expected = {...expected}; // Freeze card-specific approval before the first await.
-  const {review, record} = await snapshot(tx, expected);
+  const {review, record, version} = await snapshot(tx, expected);
   match(review, expected, true, options.resumePartial === true);
-  if (review.unspent || review.locked || review.pinBlocked || !review.tag)
+  // change owed is read fresh from the card, never taken from the saved review
+  // (one saved by cardkit 0.2 has none): no reset follows, so nothing is cleared
+  if (
+    review.unspent ||
+    review.changeOwed ||
+    review.locked ||
+    review.pinBlocked ||
+    !review.tag
+  )
     stop('card-not-empty');
   if (!review.spent) return review;
+  // the secrets below are a 2.1 or 2.2 card's: a 3.0 card's name its key for each piece's date
+  if (!administeredCardVersion(version)) stop('unsupported-card');
   if (
     !review.pin ||
     !review.sealed ||

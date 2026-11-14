@@ -43,6 +43,7 @@ class OwnerUnblockTest {
 
     private static final byte CLA = CashuAppletTest.CLA;
     private static final int SW_OK = CashuAppletTest.SW_OK;
+    static final int SW_GRANT = CashuAppletTest.SW_GRANT;
     private static final int SW_PIN_BLOCKED = CashuAppletTest.SW_PIN_BLOCKED;
     private static final int SW_OWNER_PROOF = CashuAppletTest.SW_OWNER_PROOF;
     private static final int SW_SECURITY_NOT_SATIS = CashuAppletTest.SW_SECURITY_NOT_SATIS;
@@ -161,7 +162,7 @@ class OwnerUnblockTest {
         sim.installApplet(aid, CashuApplet.class);
         assertEquals(SW_OK, reselect());
         CashuAppletTest.readyOn(sim, 0);
-        assertEquals(SW_OK, sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0,
+        assertEquals(SW_OK, sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2,
             CashuAppletTest.PROOF_1, 1)).getSW(), "a piece, loaded under the verified PIN");
         Applet applet = runtime.appletAt(aid);
         pinState = (byte[]) field(applet, "pinState");
@@ -212,13 +213,13 @@ class OwnerUnblockTest {
 
     /** A payment of the piece in place 0 and no outputs: BEGIN, then SIGN. The status of whichever step ended it. */
     private int pay() {
-        ResponseAPDU begun = sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4));
+        ResponseAPDU begun = sim.transmitCommand(CashuAppletTest.spendBegin(new byte[] { 0 }));
         if (begun.getSW() != SW_OK) return begun.getSW();
-        return sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64)).getSW();
+        return CashuAppletTest.signThrough(sim::transmitCommand).getSW();
     }
 
     private int loadProof2() {
-        return sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.PROOF_2, 1)).getSW();
+        return sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.PROOF_2, 1)).getSW();
     }
 
     private byte[] info() {
@@ -275,7 +276,8 @@ class OwnerUnblockTest {
         assertEquals(SW_OK, r.getSW(), "GET_NONCE");
         assertEquals(16, r.getData().length, "a nonce, nothing else");
         // UNBLOCK_PIN's bytes at 0x45: ALLOW_LOAD takes them as a proof, which they are not
-        assertEquals(SW_OWNER_PROOF, send(0x45, 0, OLD_UNBLOCK_DATA), "ALLOW_LOAD refuses a PUK and a PIN as a proof");
+        // (6700: their first byte read as a proof's length leaves bytes after it, and ALLOW_LOAD asks its length before any proof)
+        assertEquals(CashuAppletTest.SW_WRONG_LENGTH, send(0x45, 0, OLD_UNBLOCK_DATA), "ALLOW_LOAD refuses a PUK and a PIN as a proof");
         assertTheBlockedPinGates("after a 0.6 unblock attempt");
         assertEquals(SW_PIN_BLOCKED, verify(NEW_PIN), "the PIN the old UNBLOCK_PIN named was never set");
     }
@@ -319,7 +321,7 @@ class OwnerUnblockTest {
             "a proof under another command's label");
         assertEquals(SW_OWNER_PROOF, send(CashuAppletTest.INS_CHANGE_PIN, 0, CashuAppletTest.ownerData(good, NEW_PIN)),
             "the right proof over a nonce already tried: one try a nonce");
-        assertEquals(SW_OK, allowLoad(), "the owner's load grant");
+        assertEquals(SW_GRANT, allowLoad(), "the owner's load grant");
         assertEquals(SW_SECURITY_NOT_SATIS, loadProof2(), "opens no load on a blocked card");
         assertTheBlockedPinGates("after every wrong way");
     }
@@ -351,32 +353,37 @@ class OwnerUnblockTest {
     }
 
     @Test
-    @DisplayName("a card with no owner has nobody to unblock it: CHANGE_PIN is 6A90, and the open card's SET_PIN is the way")
+    @DisplayName("a card with no owner has nobody to unblock it and is never blocked (D195): a wrong PIN is 63C1 and the next try waits; CHANGE_PIN is 6A90, and the open card's SET_PIN is the way to a new PIN")
     void anOpenCardIsNotUnblockedByAProof() throws Exception {
         CashuAppletTest.ExposedRuntime runtime = new CashuAppletTest.ExposedRuntime();
         sim = new CardSimulator(runtime);
         sim.installApplet(AIDUtil.create(CashuAppletTest.AID_HEX), CashuApplet.class);
         assertEquals(SW_OK, reselect());
         assertEquals(SW_OK, send(CashuAppletTest.INS_SET_PIN, 0, TEST_PIN));
-        blockThePin();
+        assertEquals(0x63C1, verify(WRONG_PIN));
+        assertEquals(CashuAppletTest.SW_KEEP_HOLDING, verify(WRONG_PIN), "the next try waits");
         assertEquals(CashuAppletTest.SW_NO_OWNER, send(CashuAppletTest.INS_CHANGE_PIN, 0,
             CashuAppletTest.ownerData(new byte[8], NEW_PIN)), "no owner, no proof to give");
-        assertEquals(2, infoPinState());
-        assertEquals(SW_OK, send(CashuAppletTest.INS_SET_PIN, 0, NEW_PIN), "an open card holds nothing: SET_PIN sets a PIN and unblocks");
-        assertEquals(SW_OK, verify(NEW_PIN));
+        assertEquals(1, infoPinState(), "not blocked");
+        assertEquals(CashuAppletTest.SW_SECURITY_NOT_SATIS, send(CashuAppletTest.INS_SET_PIN, 0, NEW_PIN), "a card with no owner keeps its PIN: a new one wants it given, or three wrong tries in a row (D195, D196)");
     }
 
     @Test
-    @DisplayName("after LOCK_CARD, CHANGE_PIN is 6986: a locked card keeps the PIN it has, blocked or not")
+    @DisplayName("after LOCK_CARD, CHANGE_PIN is 6986 while the PIN works: a locked card keeps the PIN it has; a locked card whose PIN is blocked takes the owner's new PIN, the one way back to what is on it, and is still locked")
     void aLockedCardKeepsItsPin() throws Exception {
         readyCardWithAPiece();
         byte[] proof = CashuAppletTest.ownerProof(CashuAppletTest.L_LOCK, CashuAppletTest.OWNER, nonce(), new byte[0]);
         assertEquals(SW_OK, send(CashuAppletTest.INS_LOCK_CARD, 0xDE, CashuAppletTest.ownerData(proof, new byte[0])));
         newTap();
+        assertEquals(CashuAppletTest.SW_NOT_ALLOWED, changePin(CashuAppletTest.OWNER, NEW_PIN), "a PIN that works is kept");
+        assertEquals(3, pin.getTriesRemaining());
         blockThePin();
-        assertEquals(CashuAppletTest.SW_NOT_ALLOWED, changePin(CashuAppletTest.OWNER, NEW_PIN));
         assertEquals(2, infoPinState());
         assertArrayEquals(new byte[] { 2 }, pinState.clone(), "the state byte itself");
         assertEquals(0, pin.getTriesRemaining());
+        assertEquals(SW_OK, changePin(CashuAppletTest.OWNER, NEW_PIN), "blocked: the owner's new PIN is taken");
+        assertEquals(1, infoPinState(), "set again");
+        assertEquals(SW_OK, verify(NEW_PIN));
+        assertEquals(CashuAppletTest.SW_NOT_ALLOWED, changePin(CashuAppletTest.OWNER, TEST_PIN), "and, its PIN working again, kept as it is");
     }
 }

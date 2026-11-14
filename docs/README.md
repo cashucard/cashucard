@@ -12,6 +12,7 @@ runs. Historical proposals retain the assumptions and gates of their date.
 - [Design decisions](DECISIONS.md): decisions, alternatives and supersessions.
 - [Glossary](GLOSSARY.md): terms used across the code and documentation.
 - [Security model](SECURITY-MODEL.md): card threats and verification coverage.
+- [Becoming a certifier](CERTIFIER.md): what a certifier of Cashu Cards vouches for, protects and takes on.
 - [Hardware deployment](HARDWARE_DEPLOYMENT.md): build, install and package details.
 - [Hardware loop](HARDWARE-LOOP.md): turning one silicon observation into a fixture fix, a regression and a green suite without a second human round.
 
@@ -30,7 +31,7 @@ runs. Historical proposals retain the assumptions and gates of their date.
 - [Partner governance proposal](OPS-GOVERNANCE.md).
 - [Recovery custody and independent copies](OPS-RECOVERY-PLAN.md).
 - [Console custom domain](OPS_CUSTOM_DOMAIN.md), with its rollback.
-- [Component releases](COMPONENT-RELEASES.md) and [provenance](PROVENANCE.md).
+- [Component releases](COMPONENT-RELEASES.md), [release notes](RELEASE-NOTES.md) and [provenance](PROVENANCE.md).
 - [Local service and recovery commands](../ops/README.md).
 
 ## Evidence and design history

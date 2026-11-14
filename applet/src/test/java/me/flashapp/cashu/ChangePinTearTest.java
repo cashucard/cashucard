@@ -34,6 +34,7 @@ class ChangePinTearTest {
 
     private static final byte CLA = CashuAppletTest.CLA;
     private static final int SW_OK = CashuAppletTest.SW_OK;
+    static final int SW_GRANT = CashuAppletTest.SW_GRANT;
 
     private CardSimulator sim;
     private CashuAppletTest.ExposedRuntime runtime;
@@ -48,7 +49,7 @@ class ChangePinTearTest {
         sim.installApplet(aid, CashuApplet.class);
         assertEquals(SW_OK, reselect());
         CashuAppletTest.readyOn(sim, 0);
-        assertEquals(SW_OK, sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.PROOF_1, 1)).getSW());
+        assertEquals(SW_OK, sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.PROOF_1, 1)).getSW());
         Applet applet = runtime.appletAt(aid);
         java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("pinState");
         f.setAccessible(true);
@@ -71,9 +72,9 @@ class ChangePinTearTest {
     private int verify(byte[] p) { return send(CashuAppletTest.INS_VERIFY_PIN, p); }
 
     private int pay() {
-        ResponseAPDU begun = sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4));
+        ResponseAPDU begun = sim.transmitCommand(CashuAppletTest.spendBegin(new byte[] { 0 }));
         if (begun.getSW() != SW_OK) return begun.getSW();
-        return sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64)).getSW();
+        return CashuAppletTest.signThrough(sim::transmitCommand).getSW();
     }
 
     private int pieceStatus() {
@@ -131,10 +132,10 @@ class ChangePinTearTest {
         assertEquals(CashuAppletTest.SW_PIN_NEEDED, pay(), "a payment on the torn card");
         assertEquals(1, pieceStatus(), "the piece is unspent");
         assertEquals(CashuAppletTest.SW_SECURITY_NOT_SATIS,
-            sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.PROOF_2, 1)).getSW(), "a load");
-        assertEquals(SW_OK, allowLoad());
+            sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.PROOF_2, 1)).getSW(), "a load");
+        assertEquals(SW_GRANT, allowLoad());
         assertEquals(CashuAppletTest.SW_SECURITY_NOT_SATIS,
-            sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.PROOF_2, 1)).getSW(),
+            sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.PROOF_2, 1)).getSW(),
             "a load with the owner's grant: a blocked PIN waives nothing");
         assertEquals(2, sim.transmitCommand(new CommandAPDU(CLA, CashuAppletTest.INS_GET_INFO, 0, 0, 256)).getData()[7], "GET_INFO says blocked, and is right");
     }

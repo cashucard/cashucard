@@ -53,13 +53,13 @@ class CardSimHttpTest {
     }
 
     @Test
-    @DisplayName("POST /apdu round-trips a SELECT by the card's applet's whole AID, F0 CASHUCARD 01: 02 02")
+    @DisplayName("POST /apdu round-trips a SELECT by the card's applet's whole AID, F0 CASHUCARD 01: 03 00")
     void apduRoundTrip() throws Exception {
         HttpResponse<String> r = post("/apdu", "{\"hex\":\"00A404000BF043415348554341524401\"}");
         assertEquals(200, r.statusCode());
         assertEquals("application/json", r.headers().firstValue("Content-Type").orElse(""));
         JsonObject o = json(r);
-        assertEquals("02029000", o.get("hex").getAsString());
+        assertEquals("03009000", o.get("hex").getAsString());
         assertEquals("9000", o.get("sw").getAsString());
     }
 
@@ -73,9 +73,9 @@ class CardSimHttpTest {
         // GET /state still reads the card, and leaves the opener selected for the app
         HttpResponse<String> state = get("/state");
         assertEquals(200, state.statusCode(), state.body());
-        assertEquals("2.2", json(state).get("version").getAsString());
+        assertEquals("3.0", json(state).get("version").getAsString());
         assertEquals("6D00", json(post("/apdu", "{\"hex\":\"B001020000\"}")).get("sw").getAsString());
-        assertEquals("02029000", json(post("/apdu", "{\"hex\":\"00A404000BF043415348554341524401\"}")).get("hex").getAsString());
+        assertEquals("03009000", json(post("/apdu", "{\"hex\":\"00A404000BF043415348554341524401\"}")).get("hex").getAsString());
         assertEquals("9000", json(post("/apdu", "{\"hex\":\"B001020000\"}")).get("sw").getAsString());
     }
 
@@ -134,7 +134,7 @@ class CardSimHttpTest {
     void stateAndReset() throws Exception {
         JsonObject s = json(get("/state"));
         assertEquals(0, s.get("generation").getAsLong());
-        assertEquals("2.2", s.get("version").getAsString());
+        assertEquals("3.0", s.get("version").getAsString());
         assertEquals(66, s.get("pubkey").getAsString().length());
         assertEquals(128, s.getAsJsonArray("slots").size());
         assertEquals(7, s.get("rollBudget").getAsInt());
@@ -183,20 +183,22 @@ class CardSimHttpTest {
     }
 
     @Test
-    @DisplayName("every new fixture field applies over HTTP: owner, mint, headers, limits with the budget, a piece with its mint's proof")
+    @DisplayName("every fixture field applies over HTTP: owner, mint, headers, limits with the budget, the rate and the no-PIN window's switch, a piece with its mint's proof")
     void newFixtureFields() throws Exception {
         String header = SimCardTest.HEADERS.get(5);
         String proof = "{\"keysetId\":\"0059534ce0bfa19a\",\"amount\":8,\"nonce\":\"" + "ab".repeat(32)
-            + "\",\"C\":\"02" + "11".repeat(32) + "\",\"dleq\":{\"e\":\"" + "01".repeat(32) + "\",\"s\":\"" + "02".repeat(32)
+            + "\",\"C\":\"" + SimCardTest.C_A + "\",\"dleq\":{\"e\":\"" + "01".repeat(32) + "\",\"s\":\"" + "02".repeat(32)
             + "\",\"r\":\"" + "03".repeat(32) + "\"}}";
         HttpResponse<String> r = post("/fixture", "{\"pin\":\"1234\",\"mint\":\"http://127.0.0.1:3338\",\"owner\":true,\"anchor\":\""
-            + header + "\",\"proofs\":[" + proof + "],\"limits\":{\"day\":1000,\"allowance\":100,\"rollBudget\":5}}");
+            + header + "\",\"proofs\":[" + proof + "],\"limits\":{\"day\":1000,\"allowance\":100,\"rollBudget\":5,\"rate\":95000,\"noPinWindow\":1}}");
         assertEquals(200, r.statusCode(), r.body());
         JsonObject s = json(r);
         assertEquals(SimCardTest.TIMES.get(5).longValue(), s.get("now").getAsLong());
         assertEquals(1000, s.get("dailyLimit").getAsLong());
         assertEquals(100, s.get("allowance").getAsLong());
         assertEquals(5, s.get("rollBudget").getAsInt());
+        assertEquals(1, s.get("noPinWindow").getAsInt(), "SET_LIMIT's eighteenth byte, GET_CARD byte 87");
+        assertEquals("ff03", s.get("profiles").getAsString());
         assertTrue(s.get("testOwner").getAsBoolean());
         assertEquals("http://127.0.0.1:3338", s.get("mint").getAsString());
         assertEquals("01".repeat(32), s.getAsJsonArray("slots").get(0).getAsJsonObject().getAsJsonObject("dleq").get("e").getAsString());
@@ -249,15 +251,15 @@ class CardSimHttpTest {
     @Test
     @DisplayName("a card that cannot be built fails start() (main exits 1) and releases the port")
     void cardBuildFailureFailsStart() throws Exception {
-        // The failure SimCard raises when the applet does not answer a 2.x
+        // The failure SimCard raises when the applet does not answer a 3.x
         // version after install. It used to surface as a 500 on the first
         // request, after main had already printed "listening".
         sim.stop();
         int port = sim.port();
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> CardSim.start(port, () -> {
-            throw new IllegalStateException("SELECT after install answered 01149000, not a 2.x applet");
+            throw new IllegalStateException("SELECT after install answered 01149000, not a 3.x applet");
         }));
-        assertTrue(e.getMessage().contains("not a 2.x applet"), e.getMessage());
+        assertTrue(e.getMessage().contains("not a 3.x applet"), e.getMessage());
 
         // The failed start stopped its server: the same port binds again and serves.
         sim = CardSim.start(port);
@@ -273,8 +275,9 @@ class CardSimHttpTest {
         assertEquals(128, fresh.get("empty").getAsInt());
 
         String proof = "{\"keysetId\":\"0059534ce0bfa19a\",\"amount\":8,\"nonce\":\"" + "ab".repeat(32)
-            + "\",\"C\":\"02" + "11".repeat(32) + "\"}";
-        JsonObject loaded = json(post("/fixture", "{\"mint\":\"http://m\",\"owner\":true,\"proofs\":[" + proof + "]}")).getAsJsonObject("counts");
+            + "\",\"C\":\"" + SimCardTest.C_A + "\"}";
+        assertEquals(400, post("/fixture", "{\"mint\":\"http://m\",\"owner\":true,\"proofs\":[" + proof + "]}").statusCode(), "3.0: a load wants the PIN");
+        JsonObject loaded = json(post("/fixture", "{\"pin\":\"1234\",\"mint\":\"http://m\",\"owner\":true,\"proofs\":[" + proof + "]}")).getAsJsonObject("counts");
         assertEquals(1, loaded.get("unspent").getAsInt());
         assertEquals(0, loaded.get("spent").getAsInt());
         assertEquals(127, loaded.get("empty").getAsInt());

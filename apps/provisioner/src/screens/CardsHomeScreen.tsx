@@ -119,14 +119,12 @@ export function CardsHomeScreen({
     !!flow.resetState && flow.resetState.journal.stage !== 'complete';
   const toolsDisabled =
     flow.busy || flow.status !== 'ready' || !flow.scopeMatches;
-  const resetDisabled =
-    toolsDisabled || !!batch || pendingReset || !flow.hardwareValidated;
+  // Reset loads nothing, so the installation gate does not hold it back.
+  const resetDisabled = toolsDisabled || !!batch || pendingReset;
   const resetDetail = batch
     ? 'Finish or end the current batch first.'
     : pendingReset
     ? 'Continue the saved reset above.'
-    : !flow.hardwareValidated
-    ? 'Reset is unavailable in this build.'
     : undefined;
   const connectionOrigin = /^https?:\/\/[^\s/?#@]+\/?$/.test(app.serviceUrl)
     ? app.serviceUrl

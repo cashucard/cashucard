@@ -6,8 +6,12 @@
  *   - secp256k1 points (affine, BigInt), compressed and uncompressed encodings;
  *   - NUT-00 hash_to_curve, blinding and unblinding;
  *   - NUT-12 DLEQ verification, of a blind signature (e, s) and of a proof (e, s, r) as the card keeps it;
- *   - BIP-340 verification, for the card's AUTH and payment signatures;
- *   - the format-4 secret the card signs (NUT-CCP's card proofs) and the NUT-11 SIG_ALL message.
+ *   - BIP-340 verification, for the card's AUTH and payment signatures, and signing, for a refund key's spend;
+ *   - the keys per load (protocol 3.0, spec/APDU.md "Keys per load"): a date's tweak t, the card's key for the date
+ *     P + t*G and the refund key for the date R + u*G, worked out from the card's secret c;
+ *   - the format-4 secret the card signs (NUT-CCP's card proofs), which names the card's key for the piece's date, and
+ *     the NUT-11 SIG_ALL message;
+ *   - the card's secret c opened from GET_CARD P1 = 3 with the refund key's private key.
  *
  * Speed is irrelevant: a test makes a few dozen points. Checked in cashu-crypto.test.cjs against NUT-00's vectors, the
  * card's own spec/vectors/secret.json, and (with CARDSIM_URL and MINT_URL set) a real Nutshell mint.
@@ -164,12 +168,58 @@ function schnorrVerify(pub, msg, sig) {
 }
 
 // ── the card ─────────────────────────────────────────────────────────────────
-/** The format-4 secret a 2.0 card signs (NUT-CCP's card proofs): its key, the nonce, and with a date the locktime and refund key; SIG_ALL last. */
-function cardSecret(nonceHex, cardKeyHex, date = 0, refundHex = null) {
-  const head = `["P2PK",{"nonce":"${nonceHex.toLowerCase()}","data":"${cardKeyHex.toLowerCase()}","tags":[`
+// Keys per load (3.0): t = SHA-256("CashuCard/key" || c || date (4, big-endian)) mod n, and the card's key for the date
+// is P + t*G; u = SHA-256("CashuCard/refund-key" || c || date) mod n, and the refund key for the date is R + u*G.
+const LABEL_KEY = "CashuCard/key"
+const LABEL_REFUND_KEY = "CashuCard/refund-key"
+
+function dateBytes(date) {
+  if (!Number.isInteger(date) || date < 0 || date >= 2 ** 32) throw new RangeError(`a date is 0 to 2^32 - 1, got ${date}`)
+  const d = Buffer.alloc(4)
+  d.writeUInt32BE(date)
+  return d
+}
+
+/** SHA-256(label || c (32) || date (4)) mod n: t with "CashuCard/key", u with "CashuCard/refund-key". */
+function dateTweak(label, c, date) {
+  const cc = buf(c)
+  if (cc.length !== 32) throw new RangeError(`the card's secret c is 32 bytes, got ${cc.length}`)
+  return mod(int(sha256(Buffer.from(label, "ascii"), cc, dateBytes(date))), N)
+}
+
+/** P + t*G: the card's key for the date whose tweak is t (32 bytes, as SPEND_ALL_BEGIN and GROUP_KEYS answer it). */
+function tweakedKey(key, t) {
+  const p = point(key)
+  if (!p) throw new Error("not a point of the curve")
+  const sum = add(p, mul(typeof t === "bigint" ? t : int(t)))
+  if (!sum) throw new Error("the tweak cancels the key")
+  return compressed(sum)
+}
+
+/**
+ * A date's keys from the card's secret c, as GROUP_KEYS answers them: { t (32), key: P + t*G (33), refund: R + u*G (33) }.
+ * The refund is 33 zeros for the date 0 (an undated piece names no refund key) and on a card with no refund key R.
+ */
+function dateKeys(c, cardKey, refundKey, date) {
+  const t = dateTweak(LABEL_KEY, c, date)
+  const key = tweakedKey(cardKey, t)
+  let refund = Buffer.alloc(33)
+  if (refundKey && buf(refundKey).some(b => b !== 0) && date !== 0) refund = tweakedKey(refundKey, dateTweak(LABEL_REFUND_KEY, c, date))
+  return { t: bytes32(t), key, refund }
+}
+
+/**
+ * The format-4 secret a card signs (NUT-CCP's card proofs), on 3.0 under the keys per load: `dateKey` is the card's key
+ * for the piece's date, P + t*G (never the card's key P itself: no 3.0 card signs with P alone), and a dated piece names
+ * the date's refund key, R + u*G, in its refund tag; SIG_ALL last. dateKeys() works both out.
+ */
+function cardSecret(nonce, dateKey, date = 0, dateRefund = null) {
+  // hex text as given, in lower case; bytes as their hex
+  const text = v => (typeof v === "string" ? v.toLowerCase() : hexOf(v))
+  const head = `["P2PK",{"nonce":"${text(nonce)}","data":"${text(dateKey)}","tags":[`
   if (!date) return head + '["sigflag","SIG_ALL"]]}]'
-  if (!refundHex) throw new Error("a dated piece names the card's refund key")
-  return head + `["locktime","${date}"],["refund","${refundHex.toLowerCase()}"],["sigflag","SIG_ALL"]]}]`
+  if (!dateRefund || !buf(dateRefund).some(b => b !== 0)) throw new Error("a dated piece names the refund key for its date")
+  return head + `["locktime","${date}"],["refund","${text(dateRefund)}"],["sigflag","SIG_ALL"]]}]`
 }
 
 /** The NUT-11 SIG_ALL message: every input's secret and C (hex), then every output's amount (decimal) and B_ (hex). */
@@ -180,13 +230,58 @@ function sigAllMessage(inputs, outputs) {
   return sha256(Buffer.from(m, "utf8"))
 }
 
-/** AUTH's message: SHA-256(T || T || reader (16) || card (16) || card key (33)), T = SHA-256("CashuCard/auth"). */
+/**
+ * A payment's signature checked as a mint checks it: BIP-340 under the key its secrets name, the card's key for the
+ * payment's date (P + t*G), over the SIG_ALL message.
+ */
+function verifyPayment(dateKey, inputs, outputs, signature) {
+  return schnorrVerify(dateKey, sigAllMessage(inputs, outputs), signature)
+}
+
+/**
+ * BIP-340 sign, as the reference does it: `priv` a scalar (BigInt, or 32 bytes / hex), `msg` 32 bytes, `aux` 32 bytes
+ * (fresh when not given). A test signs with it what a wallet signs and the card does not: the refund key's spend, by
+ * r + u after the piece's date. Checked against BIP-340's own vectors in cashu-crypto.test.cjs.
+ */
+function schnorrSign(priv, msg, aux = null) {
+  const d0 = mod(typeof priv === "bigint" ? priv : int(priv), N)
+  if (d0 === 0n) throw new RangeError("a private key is 1 to n - 1")
+  const Pk = mul(d0)
+  const d = (Pk[1] & 1n) === 0n ? d0 : N - d0
+  const px = bytes32(Pk[0])
+  const a = aux === null ? crypto.randomBytes(32) : buf(aux)
+  const t = bytes32(d ^ int(taggedHash("BIP0340/aux", a)))
+  const k0 = mod(int(taggedHash("BIP0340/nonce", Buffer.concat([t, px, buf(msg)]))), N)
+  if (k0 === 0n) throw new Error("a nonce of 0")
+  const R = mul(k0)
+  const k = (R[1] & 1n) === 0n ? k0 : N - k0
+  const rx = bytes32(R[0])
+  const e = mod(int(taggedHash("BIP0340/challenge", Buffer.concat([rx, px, buf(msg)]))), N)
+  return Buffer.concat([rx, bytes32(mod(k + e * d, N))])
+}
+
+/**
+ * The card's secret c from GET_CARD P1 = 3 on a card with a refund key R (spec/APDU.md, GET_CARD): the card answers
+ * K = k*G (65) and c XOR SHA-256("CashuCard/seal" || 01 || x(k*R) || K || the sixteen bytes of GET_NONCE P1 = 1 || 16),
+ * and the refund key's private key r opens it, since r*K = k*R. A wallet keeps c with r: a refund needs both (r + u).
+ */
+function openCardSecret(answer, nonce16, r) {
+  const a = buf(answer)
+  if (a.length !== 97 || a[0] !== 4) throw new RangeError(`GET_CARD P1 = 3 on a card with a refund key answers 97 bytes, K first; got ${a.length}`)
+  const K = a.subarray(0, 65)
+  const shared = mul(typeof r === "bigint" ? r : int(r), point(K))
+  const block = sha256(Buffer.from("CashuCard/seal", "ascii"), Buffer.from([1]), bytes32(shared[0]), K, buf(nonce16), Buffer.from([0x16]))
+  return Buffer.from(a.subarray(65).map((b, i) => b ^ block[i]))
+}
+
+/** AUTH's message: SHA-256(T || T || reader (16) || card (16) || card key (33)), T = SHA-256("CashuCard/auth"). AUTH is under P. */
 function authMessage(reader, card, key) {
   return taggedHash("CashuCard/auth", Buffer.concat([buf(reader), buf(card), buf(key)]))
 }
 
 module.exports = {
   P, N, G, add, neg, mul, point, compressed, uncompressed, sha256, buf, hexOf, int, bytes32,
-  hashToCurve, blind, unblind, hashE, verifyBlindDleq, verifyProofDleq, taggedHash, schnorrVerify,
-  cardSecret, sigAllMessage, authMessage,
+  hashToCurve, blind, unblind, hashE, verifyBlindDleq, verifyProofDleq, taggedHash, schnorrVerify, schnorrSign,
+  LABEL_KEY, LABEL_REFUND_KEY, dateTweak, tweakedKey, dateKeys, cardSecret, openCardSecret, sigAllMessage, verifyPayment,
+  authMessage,
 }

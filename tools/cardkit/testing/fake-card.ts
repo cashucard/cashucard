@@ -73,6 +73,25 @@ export interface CardAppletState {
   pin: number;
   record: number;
   owner: number;
+  /**
+   * Openings of change owed (0 by default): GET_CHANGE's count, and on a 3.0
+   * card GET_INFO byte 29 = 1 while any is owed.
+   */
+  change?: number;
+  /**
+   * The version SELECT and GET_INFO answer, major and minor: [3, 0] (the
+   * tracked CAP's) by default, [2, 1] or [2, 2] for an older card.
+   */
+  version?: readonly [number, number];
+}
+
+/** The tracked CAP's version, 3.0: what a card applet answers unless its state names another. */
+const TRACKED_VERSION: readonly [number, number] = [3, 0];
+function versionOf(s: CardAppletState): readonly [number, number] {
+  return s.version ?? TRACKED_VERSION;
+}
+function isThreeZero(v: readonly [number, number]): boolean {
+  return v[0] === 3 && v[1] === 0;
 }
 
 export interface FakeCardOptions {
@@ -375,8 +394,8 @@ export class FakeCard {
     }
     const inst = this.instances.get(target)!;
     if (inst.module === CARD_MODULE) {
-      // the tracked CAP's version (CARD_VERSION): 2.2
-      return sw(0x9000, [0x02, 0x02]);
+      // the tracked CAP's version (CARD_VERSION), 3.0, unless the state names another
+      return sw(0x9000, [...versionOf(inst.state)]);
     }
     return sw(0x9000);
   }
@@ -385,9 +404,9 @@ export class FakeCard {
     const [cla, ins] = apdu;
     if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x01) {
       const s = inst.state;
+      const version = versionOf(s);
       const info = [
-        0x02,
-        0x02,
+        ...version,
         0x80,
         s.unspent,
         s.spent,
@@ -399,8 +418,16 @@ export class FakeCard {
         0x00,
         s.record,
       ];
-      info.push(0, 0, 0, 0, s.owner, ...new Array(13).fill(0));
+      info.push(0, 0, 0, 0, s.owner, ...new Array(12).fill(0));
+      // byte 29: on 3.0, change owed; 2.1 and 2.2 say something else there, 0 outside a tap that loads change
+      info.push(isThreeZero(version) && (s.change ?? 0) > 0 ? 1 : 0);
       return sw(0x9000, info);
+    }
+    if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x19) {
+      // GET_CHANGE page 0: a count, then 83-byte openings on 3.0, 80-byte ones on 2.1 and 2.2
+      const owed = Math.min(inst.state.change ?? 0, 3);
+      const size = isThreeZero(versionOf(inst.state)) ? 83 : 80;
+      return sw(0x9000, [owed, ...new Array(owed * size).fill(0x0c)]);
     }
     if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x10) {
       return sw(0x9000, [0x03, ...new Array(32).fill(0x5a)]);

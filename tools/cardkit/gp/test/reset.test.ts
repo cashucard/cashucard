@@ -374,3 +374,72 @@ test('storage loss at every acknowledgement boundary retains a recoverable inten
     assert.equal(card.failedAuths, 0);
   }
 });
+
+// GET_INFO P1 0 of a 3.0 card in jCardSim: a 100 piece paid with 40 change, the till gone before LOAD_CHANGE, then
+// CLEAR_SPENT under the PIN. No unspent and no spent place; byte 29 = 1, change owed.
+const OWED_30 = fromHex(
+  '030080000080ff0104030001000003e8016b49d2006b49d2000000006401',
+);
+test('a 3.0 card owed change, with no unspent and no spent place, is not reset: nothing is saved, deleted or rotated', async () => {
+  const card = await installed();
+  const tx = async (a: number[]) =>
+    a.length === 5 && a[0] === 0xb0 && a[1] === 0x01 && a[2] === 0 && a[3] === 0
+      ? [...OWED_30, 0x90, 0]
+      : card.transceive(a);
+  const saved: ResetStage[] = [];
+  const r = await resetOwnedCard(
+    tx,
+    options({persist: async s => void saved.push(s)}),
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, 'guarded');
+  assert.deepEqual(saved, []);
+  assert.equal(
+    card.instances.size,
+    3,
+    'the opener, the card applet and the tag stay',
+  );
+  assert.equal(
+    card.insLog().some(i => [0xe4, 0xd8].includes(i)),
+    false,
+  );
+});
+test('change owed stops a reset on a 3.0 card (GET_INFO byte 29) and a 2.1 or 2.2 card (GET_CHANGE), fresh or resumed', async () => {
+  for (const state of [
+    {change: 1},
+    {version: [2, 1] as const, change: 1},
+    {version: [2, 2] as const, change: 3},
+  ])
+    for (const stage of ['reviewed', 'delete_intent'] as const) {
+      const card = await installed();
+      card.setCardState({owner: 1, pin: 1, record: 1, ...state});
+      const saved: ResetStage[] = [];
+      const r = await resetOwnedCard(
+        card.transceive,
+        options({stage, persist: async s => void saved.push(s)}),
+      );
+      const what = JSON.stringify({state, stage});
+      assert.equal(r.ok, false, what);
+      assert.equal(r.kind, 'guarded', what);
+      assert.deepEqual(saved, [], what);
+      assert.equal(card.instances.size, 3, what);
+      assert.equal(
+        card.insLog().some(i => [0xe4, 0xd8].includes(i)),
+        false,
+        what,
+      );
+      assert.equal(
+        card.insLog().includes(0x19),
+        state.version !== undefined,
+        'GET_CHANGE only for a 2.1 or 2.2 card',
+      );
+    }
+});
+test('a 2.2 card that GET_CHANGE says owes nothing is reset as before', async () => {
+  const card = await installed();
+  card.setCardState({owner: 1, pin: 1, record: 1, version: [2, 2]});
+  const r = await resetOwnedCard(card.transceive, options());
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(card.instances.size, 0);
+  assert.ok(card.insLog().includes(0x19));
+});

@@ -84,7 +84,9 @@ function readPacket(raw, crypto) {
     /[?#@\\]/.test(mint)
   )
     fail("mint");
-  if (number(1) !== 0) fail("unit");
+  // the payment's unit: 00 sat, 01 usd
+  const unitByte = number(1);
+  if (unitByte > 1) fail("unit");
   const inputCount = positive(1);
   if (inputCount > 128) fail("inputs");
   const inputs = [];
@@ -155,7 +157,7 @@ function readPacket(raw, crypto) {
     index,
     generation,
     mint,
-    unit: "sat",
+    unit: unitByte === 1 ? "usd" : "sat",
     inputs,
     outputs,
     witness: hex(payment),
@@ -170,7 +172,11 @@ function decodePacket(raw, policy, crypto) {
   if (
     !policy ||
     p.mint !== policy.mint ||
-    p.cardKey !== policy.cardKey ||
+    // the card's key for the date 0, P + t*G (from c, or the card's keys of the
+    // date 0), never the card key P GET_PUBKEY answers; `cardKey` is an older
+    // policy's name for the same key
+    !(policy.date0Key ?? policy.cardKey) ||
+    p.cardKey !== (policy.date0Key ?? policy.cardKey) ||
     p.installation !== policy.installation
   )
     fail("context");
@@ -358,7 +364,7 @@ async function reconcilePayment({ journal, policy, crypto, request, save }) {
           typeof full !== "string" ||
           !/^[0-9a-f]{66}$/.test(full) ||
           !full.startsWith(short) ||
-          sets.get(full)?.unit !== "sat",
+          sets.get(full)?.unit !== p.unit,
       )
     )
       fail("journal");
@@ -378,7 +384,7 @@ async function reconcilePayment({ journal, policy, crypto, request, save }) {
     const k = sets.get(full(input.id));
     if (
       !k ||
-      k.unit !== "sat" ||
+      k.unit !== p.unit ||
       !Number.isSafeInteger(k.input_fee_ppk ?? 0) ||
       (k.input_fee_ppk ?? 0) < 0
     )
@@ -392,7 +398,7 @@ async function reconcilePayment({ journal, policy, crypto, request, save }) {
     fail("fee-policy");
   const keys = {};
   for (const id of new Set(submitted.map((o) => o.id))) {
-    if (sets.get(id)?.unit !== "sat") fail("output-keyset");
+    if (sets.get(id)?.unit !== p.unit) fail("output-keyset");
     const r = await request("/v1/keys/" + id);
     if (
       !Array.isArray(r?.keysets) ||

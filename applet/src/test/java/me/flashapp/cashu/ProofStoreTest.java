@@ -3,6 +3,7 @@ package me.flashapp.cashu;
 import static me.flashapp.cashu.CashuAppletTest.AID_HEX;
 import static me.flashapp.cashu.CashuAppletTest.AID_STR;
 import static me.flashapp.cashu.CashuAppletTest.CLA;
+import static me.flashapp.cashu.CashuAppletTest.SW_NO_PIN;
 import static me.flashapp.cashu.CashuAppletTest.INS_ALLOW_LOAD;
 import static me.flashapp.cashu.CashuAppletTest.INS_CLEAR_SPENT;
 import static me.flashapp.cashu.CashuAppletTest.INS_GET_BALANCE;
@@ -20,7 +21,6 @@ import static me.flashapp.cashu.CashuAppletTest.INS_RESET_CARD;
 import static me.flashapp.cashu.CashuAppletTest.INS_SET_CARD;
 import static me.flashapp.cashu.CashuAppletTest.INS_SET_OWNER;
 import static me.flashapp.cashu.CashuAppletTest.INS_SET_PIN;
-import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_BEGIN;
 import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_CHANGE;
 import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_OUTPUTS;
 import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_SIGN;
@@ -43,6 +43,7 @@ import static me.flashapp.cashu.CashuAppletTest.SW_NO_OWNER;
 import static me.flashapp.cashu.CashuAppletTest.SW_NO_REFUND_KEY;
 import static me.flashapp.cashu.CashuAppletTest.SW_NO_SPACE;
 import static me.flashapp.cashu.CashuAppletTest.SW_OK;
+import static me.flashapp.cashu.CashuAppletTest.SW_GRANT;
 import static me.flashapp.cashu.CashuAppletTest.SW_PIECE_ON_CARD;
 import static me.flashapp.cashu.CashuAppletTest.SW_SECURITY_NOT_SATIS;
 import static me.flashapp.cashu.CashuAppletTest.SW_SLOT_OUT_OF_RANGE;
@@ -110,7 +111,7 @@ class ProofStoreTest {
     private static final byte[] NONE = { 0 };
 
     /** Every persistent array a command could change, by the applet's name for it (the store, `dleq`, is null until the first SET_CARD). */
-    private static final String[] PERSISTENT = { "proofStorage", "slotHex", "dleq", "cardLocked", "pinState", "cardRecord", "ownerSet", "changeDue",
+    private static final String[] PERSISTENT = { "proofStorage", "slotHex", "dleq", "cardLocked", "pinState", "cardRecord", "ownerSet",
         "cardLog", "cardReceipts", "lastSig", "burnList", "burnPending", "changeOpen", "openState" };
 
     /** A card in a simulator of its own, and what a test does to it. */
@@ -125,7 +126,7 @@ class ProofStoreTest {
             select();
         }
 
-        ResponseAPDU send(CommandAPDU c) { return sim.transmitCommand(c); }
+        ResponseAPDU send(CommandAPDU c) { return CashuAppletTest.held(sim::transmitCommand, c); }
         int sw(CommandAPDU c) { return send(c).getSW(); }
         void select() { assertEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR)))); }
         /** Taken out of the field and put back: a new tap, with no PIN given and none of the owner's grants. */
@@ -138,7 +139,7 @@ class ProofStoreTest {
         int setCard(byte[] refund) { return sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, record(MINT, refund))); }
         int setOwner() { return sw(new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, OWNER.pub)); }
 
-        ResponseAPDU loadPlain(byte[]... pieces) { return send(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, concat(pieces), 256)); }
+        ResponseAPDU loadPlain(byte[]... pieces) { return send(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, concat(pieces), 256)); }
         ResponseAPDU loadProof(byte[] piece, byte[] proof) { return send(loadWithProofCommand(piece, proof)); }
         ResponseAPDU dleq(int first, int second) { return send(getDleqCommand(first, second)); }
         /** What GET_DLEQ answers for one place. */
@@ -158,7 +159,7 @@ class ProofStoreTest {
         ResponseAPDU begin(int... places) {
             byte[] list = new byte[places.length];
             for (int i = 0; i < places.length; i++) list[i] = (byte) places[i];
-            return send(new CommandAPDU(CLA, INS_SPEND_ALL_BEGIN, 0, 0, list, 4));
+            return send(CashuAppletTest.spendBegin(list));
         }
         /** SPEND_ALL_SIGN, again for as long as the card says "not yet" (9000 and two bytes), so: the signature, or what refused. */
         ResponseAPDU sign() {
@@ -308,14 +309,14 @@ class ProofStoreTest {
         assertArrayEquals(new byte[] { 4 }, stopped.getData());
         // a P1 that is not 1 is the plain form whatever it is: 1.19 did not look at it
         for (int p1 : new int[] { 0, 2, 3, 0x7F, 0x80, 0xFE, 0xFF }) {
-            ResponseAPDU r = c.send(new CommandAPDU(CLA, INS_LOAD_PROOF, p1, 0, piece(1, 20 + p1), 256));
+            ResponseAPDU r = c.send(new CommandAPDU(CLA, INS_LOAD_PROOF, p1, 2, piece(1, 20 + p1), 256));
             assertEquals(SW_OK, r.getSW(), "P1 = " + p1);
             assertEquals(1, r.getData().length, "P1 = " + p1 + ": one place, as it was");
             assertArrayEquals(NONE, c.dleqOf(r.getData()[0] & 0xFF), "P1 = " + p1 + ": no proof");
         }
         // and 177 bytes under any of them are not whole pieces
-        assertEquals(SW_WRONG_LENGTH, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, concat(piece(1, 40), dleqProof(4)), 256)), "P1 = 0 with a piece and a proof");
-        assertEquals(SW_WRONG_LENGTH, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 2, 0, concat(piece(1, 40), dleqProof(4)), 256)), "P1 = 2 with a piece and a proof");
+        assertEquals(SW_WRONG_LENGTH, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, concat(piece(1, 40), dleqProof(4)), 256)), "P1 = 0 with a piece and a proof");
+        assertEquals(SW_WRONG_LENGTH, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 2, 2, concat(piece(1, 40), dleqProof(4)), 256)), "P1 = 2 with a piece and a proof");
     }
 
     @Test
@@ -455,7 +456,7 @@ class ProofStoreTest {
         Arrays.fill(fill, (byte) 0x5A);
         Map<String, byte[]> before = c.snapshot();
         for (int len : new int[] { 0, 1, 80, 81, 82, 96, 162, 176, 178, 243, 254 }) {
-            ResponseAPDU r = c.send(new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 0, Arrays.copyOf(fill, len), 256));
+            ResponseAPDU r = c.send(new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 2, Arrays.copyOf(fill, len), 256));
             assertEquals(SW_WRONG_LENGTH, r.getSW(), len + " bytes");
             assertEquals(0, r.getData().length);
             c.assertSameAs(before, len + " bytes");
@@ -489,28 +490,28 @@ class ProofStoreTest {
     }
 
     @Test
-    @DisplayName("P1 = 1 is refused as a plain load is, with the same words in the same order: no card record 6A8C, no owner 6A90, no PIN given 6982, a locked card 6986, a piece already on the card 6A94 (spent or not), a full card 6A84, a date with no refund key 6A8E; and nothing is written")
+    @DisplayName("P1 = 1 is refused as a plain load is, with the same words in the same order: no card record 6A8C, a factory record 6A8C (no owner asked for, D189), no PIN given 6982, a locked card 6986, a piece already on the card 6A94 (spent or not), a full card 6A84, a date with no refund key 6A8E; and nothing is written")
     void theProofFormIsRefusedAsAPlainLoadIs() throws Exception {
         byte[] p = piece(10, 1), proof = dleqProof(1);
         // no card record: a PIN and an owner, and no SET_CARD
         Card noRecord = new Card();
         noRecord.setPin();
         noRecord.pin();
-        assertEquals(SW_OK, noRecord.setOwner());
+        assertEquals(SW_NO_CARD_RECORD, noRecord.setOwner(), "no claim on a card with no record of the holder's");
         Map<String, byte[]> snap = noRecord.snapshot();
         assertEquals(SW_NO_CARD_RECORD, noRecord.loadPlain(p).getSW());
         assertEquals(SW_NO_CARD_RECORD, noRecord.loadProof(p, proof).getSW(), "no card record");
         noRecord.assertSameAs(snap, "no card record");
         assertNull(noRecord.store(), "and the refusal reserved nothing");
-        // no owner: a PIN and a record
+        // no owner and a factory record (D189): a PIN, and a record whose mint is "-" alone
         Card noOwner = new Card();
+        assertEquals(SW_OK, noOwner.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, record("-", REFUND))), "the issuer's, before any PIN (D196)");
         noOwner.setPin();
         noOwner.pin();
-        assertEquals(SW_OK, noOwner.setCard(REFUND));
         snap = noOwner.snapshot();
-        assertEquals(SW_NO_OWNER, noOwner.loadPlain(p).getSW());
-        assertEquals(SW_NO_OWNER, noOwner.loadProof(p, proof).getSW(), "no owner");
-        noOwner.assertSameAs(snap, "no owner");
+        assertEquals(SW_NO_CARD_RECORD, noOwner.loadPlain(p).getSW());
+        assertEquals(SW_NO_CARD_RECORD, noOwner.loadProof(p, proof).getSW(), "a factory record");
+        noOwner.assertSameAs(snap, "a factory record");
         assertArrayEquals(NONE, noOwner.dleqOf(0));
         // a PIN set and not given, no grant: as a plain load refuses
         Card c = new Card().ready();
@@ -546,7 +547,12 @@ class ProofStoreTest {
         assertEquals(SW_PIECE_ON_CARD, d.loadProof(p, other).getSW(), "spent, it is still on the card");
         d.assertSameAs(snap, "a spent piece");
         assertEquals(SW_OK, d.clearSpent());
-        assertEquals(SW_OK, d.loadProof(p, other).getSW(), "freed, it may be loaded again, with whatever proof");
+        snap = d.snapshot();
+        assertEquals(SW_PIECE_ON_CARD, d.loadProof(p, other).getSW(), "freed, it is not loaded again, with whatever proof: the card signed for it (D191)");
+        d.assertSameAs(snap, "a piece on the paid list");
+        byte[] fresh = p.clone();
+        fresh[12] ^= 0x01;
+        assertEquals(SW_OK, d.loadProof(fresh, other).getSW(), "another piece goes into the freed place, with its proof");
         assertArrayEquals(dleqHeld(other), d.dleqOf(0));
         // a full card says so whatever it is sent, as a plain load's word, before the length or the piece is looked at
         Card full = new Card().ready();
@@ -556,7 +562,7 @@ class ProofStoreTest {
         snap = full.snapshot();
         assertEquals(SW_NO_SPACE, full.loadPlain(p).getSW());
         assertEquals(SW_NO_SPACE, full.loadProof(p, proof).getSW(), "a full card");
-        assertEquals(SW_NO_SPACE, full.send(new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 0, new byte[10], 256)).getSW(), "whatever the length: full is said first");
+        assertEquals(SW_NO_SPACE, full.send(new CommandAPDU(CLA, INS_LOAD_PROOF, 1, 2, new byte[10], 256)).getSW(), "whatever the length: full is said first");
         full.assertSameAs(snap, "a full card");
         assertEquals(128, full.count());
         // a locked card takes no writes, this one among them; and it still reads
@@ -571,31 +577,33 @@ class ProofStoreTest {
     }
 
     @Test
-    @DisplayName("P1 = 1 is let through by the same authority as a plain load: the PIN verified, the owner's grant for the tap, a card with no PIN at all; not a blocked PIN; and GET_DLEQ asks for none of them")
+    @DisplayName("P1 = 1 is let through by the same authority as a plain load: the PIN given in this tap, and nothing else (D185): not the owner's grant, not a blocked PIN, not a card with no PIN (6A97); and GET_DLEQ asks for none of them")
     void theProofFormNeedsTheAuthorityAPlainLoadNeeds() throws Exception {
         byte[] proof = dleqProof(40);
-        // the owner's grant, with no PIN
+        // the owner's grant, with no PIN, opens no load
         Card c = new Card().ready();
         c.power();
         assertEquals(SW_SECURITY_NOT_SATIS, c.loadProof(piece(1, 1), proof).getSW(), "no PIN, no grant");
-        assertEquals(SW_OK, c.allowLoad());
-        assertArrayEquals(new byte[] { 0, 1 }, c.loadProof(piece(1, 1), proof).getData(), "the grant");
+        assertEquals(SW_GRANT, c.allowLoad());
+        assertEquals(SW_SECURITY_NOT_SATIS, c.loadProof(piece(1, 1), proof).getSW(), "the grant opens no load");
+        assertEquals(0, c.count(), "and nothing was written");
+        c.pin();
+        assertArrayEquals(new byte[] { 0, 1 }, c.loadProof(piece(1, 1), proof).getData(), "the PIN");
         assertArrayEquals(dleqHeld(proof), c.dleqOf(0));
         c.power();
         assertArrayEquals(dleqHeld(proof), c.dleqOf(0), "a reader with no PIN and no grant reads it");
-        assertEquals(SW_SECURITY_NOT_SATIS, c.loadProof(piece(1, 2), proof).getSW(), "the grant went with the tap");
+        assertEquals(SW_SECURITY_NOT_SATIS, c.loadProof(piece(1, 2), proof).getSW(), "the PIN went with the tap");
         // a blocked PIN waives nothing, and still lets the proof be read
         for (int i = 0; i < 3; i++) c.sw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, WRONG_PIN));
         assertEquals(2, c.info(0)[7], "the PIN is blocked");
         assertEquals(SW_SECURITY_NOT_SATIS, c.loadProof(piece(1, 3), proof).getSW());
         assertArrayEquals(dleqHeld(proof), c.dleqOf(0));
-        // a card set up with no PIN is loaded by whoever holds it
+        // a card with no PIN takes nothing
         Card noPin = new Card();
         assertEquals(SW_OK, noPin.setCard(REFUND));
-        assertEquals(SW_OK, noPin.setOwner());
         assertEquals(0, noPin.info(0)[7], "no PIN");
-        assertArrayEquals(new byte[] { 0, 1 }, noPin.loadProof(piece(1, 1), proof).getData(), "whoever holds it");
-        assertArrayEquals(dleqHeld(proof), noPin.dleqOf(0));
+        assertEquals(SW_NO_PIN, noPin.loadProof(piece(1, 1), proof).getSW(), "a card is given its PIN before anything goes on it");
+        assertEquals(0, noPin.count());
     }
 
     // =========================================================================
@@ -603,51 +611,36 @@ class ProofStoreTest {
     // =========================================================================
 
     @Test
-    @DisplayName("A P1 = 1 load under the change grant alone behaves as a plain load does: the note is spent, the opening is let go, the same log entry is written, and the tap's later change still goes on")
-    void aProofLoadUnderTheChangeGrantAloneBehavesAsAPlainOneDoes() throws Exception {
-        Card[] twins = { new Card().ready(), new Card().ready() };
-        for (int variant = 0; variant < 2; variant++) {
-            Card c = twins[variant];
-            boolean withProof = variant == 1;
-            assertEquals(SW_OK, c.loadPlain(piece(100, 1)).getSW());
-            // a payment of the piece, 40 of it kept as the card's own change
-            c.power();
-            c.pin();
-            assertEquals(SW_OK, c.begin(0).getSW());
-            ResponseAPDU change = c.send(new CommandAPDU(CLA, INS_SPEND_ALL_CHANGE, 0, 0, u32(40), 33));
-            assertEquals(SW_OK, change.getSW());
-            assertEquals(SW_OK, c.sign().getSW());
-            assertEquals(1, c.field("changeDue")[0], "a note that the card has paid");
-            ResponseAPDU opened = c.send(new CommandAPDU(CLA, INS_GET_CHANGE, 0, 0, 256));
-            assertEquals(1, opened.getData()[0], "one opening, pending");
-            byte[] opening = Arrays.copyOfRange(opened.getData(), 1, 81);
-            // the next tap, with no PIN: the change goes on under the change grant
-            c.power();
-            byte[] back = piece(40, 2);
-            System.arraycopy(opening, 16, back, 12, 32);
-            ResponseAPDU loaded = withProof ? c.loadProof(back, dleqProof(50)) : c.loadPlain(back);
-            assertEquals(SW_OK, loaded.getSW(), "the change, with no PIN, under the change grant");
-            assertArrayEquals(withProof ? new byte[] { 1, 1 } : new byte[] { 1 }, loaded.getData());
-            assertEquals(0, c.field("changeDue")[0], "the note is spent");
-            assertEquals(0, c.send(new CommandAPDU(CLA, INS_GET_CHANGE, 0, 0, 256)).getData()[0], "and the opening is let go");
-            assertTrue(allZero(c.field("openState")), "every opening is empty");
-            // the rest of the change of the same tap goes on, as the grant is the tap's
-            ResponseAPDU more = withProof ? c.loadProof(piece(1, 3), dleqProof(51)) : c.loadPlain(piece(1, 3));
-            assertEquals(SW_OK, more.getSW(), "the grant stands for the rest of the tap");
-            // and the next tap has none
-            c.power();
-            assertEquals(SW_SECURITY_NOT_SATIS, (withProof ? c.loadProof(piece(1, 4), dleqProof(52)) : c.loadPlain(piece(1, 4))).getSW(), "nor a new tap");
-            c.pin();
-            assertArrayEquals(withProof ? dleqHeld(dleqProof(50)) : NONE, c.dleqOf(1));
-        }
-        // the twins differ in the store alone: the same places, the same texts, the same log, the same note, the same openings
-        for (String name : new String[] { "proofStorage", "slotHex", "cardLog", "cardRecord", "changeDue", "changeOpen", "openState", "cardReceipts", "lastSig", "burnList", "burnPending", "pinState" }) {
-            assertArrayEquals(twins[0].field(name), twins[1].field(name), name + " is the same whether the piece came with a proof or not");
-        }
-        assertFalse(Arrays.equals(twins[0].store(), twins[1].store()), "and the store is what differs");
-        ResponseAPDU logA = twins[0].send(new CommandAPDU(CLA, INS_GET_LOG, 0, 0, 256)), logB = twins[1].send(new CommandAPDU(CLA, INS_GET_LOG, 0, 0, 256));
-        assertEquals(SW_OK, logA.getSW());
-        assertArrayEquals(logA.getData(), logB.getData(), "and the card's own account of the loads is the same");
+    @DisplayName("The card's own change comes back by LOAD_CHANGE (D183), with no PIN, and its proof is kept in the store as a P1 = 1 load keeps one: e and s as the mint gave them and the card's r after them; the tap after the payment opens no LOAD_PROOF in either form")
+    void theCardsOwnChangeKeepsTheMintsProof() throws Exception {
+        Card c = new Card().ready();
+        assertEquals(SW_OK, c.loadPlain(piece(100, 1)).getSW());
+        // a payment of the piece, 40 of it kept as the card's own change
+        c.power();
+        c.pin();
+        assertEquals(SW_OK, c.begin(0).getSW());
+        assertEquals(SW_OK, c.send(CashuAppletTest.changeCommand(40, CashuAppletTest.mintKey())).getSW());
+        assertEquals(SW_OK, c.sign().getSW());
+        ResponseAPDU opened = c.send(new CommandAPDU(CLA, INS_GET_CHANGE, 0, 0, 256));
+        assertEquals(1, opened.getData()[0], "one opening, owed");
+        byte[] row = Arrays.copyOfRange(opened.getData(), 1, 84);
+        // the next tap, with no PIN: no piece goes on by LOAD_PROOF
+        c.power();
+        byte[] before = c.field("proofStorage").clone();
+        assertEquals(SW_SECURITY_NOT_SATIS, c.loadPlain(piece(40, 2)).getSW(), "the tap after a payment opens no load (D185)");
+        assertEquals(SW_SECURITY_NOT_SATIS, c.loadProof(piece(40, 2), dleqProof(50)).getSW(), "in either form");
+        assertArrayEquals(before, c.field("proofStorage"), "and writes nothing");
+        // the change, by LOAD_CHANGE, with no PIN
+        byte[] answer = CashuAppletTest.mintAnswer(Arrays.copyOfRange(row, 17, 50));
+        CashuAppletTest.shownByHand(c.field("openKeys"), row[0]);   // KEYSET_KEYS P1 = 3's mark, by hand (CashuAppletTest.loadChange)
+        ResponseAPDU loaded = c.send(CashuAppletTest.loadChangeCommand(row[0], answer));
+        assertEquals(SW_OK, loaded.getSW(), "the change, with no PIN");
+        assertEquals(1, loaded.getData()[0], "in place 1");
+        assertEquals(1, loaded.getData()[1], "its proof kept");
+        byte[] r = Arrays.copyOfRange(c.field("changeOpen"), CashuApplet.OPEN_R, CashuApplet.OPEN_R + 32);
+        assertArrayEquals(dleqHeld(concat(Arrays.copyOfRange(answer, 130, 194), r)), c.dleqOf(1), "e and s, then r");
+        assertEquals(0, c.send(new CommandAPDU(CLA, INS_GET_CHANGE, 0, 0, 256)).getData()[0], "and the opening is let go");
+        assertTrue(allZero(c.field("openState")), "every opening is empty");
     }
 
     @Test
@@ -668,15 +661,17 @@ class ProofStoreTest {
         assertEquals(SW_OK, b.getSW());
         assertEquals(64, b.getData().length);
         assertArrayEquals(a.getData(), b.getData(), "the same signature bytes for the same pieces and outputs");
-        byte[] message = sha256(allMessage(proofed.key(), REFUND, new byte[][] { asSlot(x), asSlot(y), asSlot(z) }, outputs).getBytes(StandardCharsets.UTF_8));
-        assertTrue(schnorrVerify(extractPubkeyX(proofed.key()), message, b.getData()), "over the text of the pieces and the outputs, which has no proof in it");
+        assertTrue(DateKeys.of(proofed.runtime.appletAt(proofed.aid)).signed(b.getData(), new byte[][] { asSlot(x), asSlot(y), asSlot(z) }, outputs), "over the text of the pieces and the outputs, which has no proof in it");
         assertArrayEquals(storeBefore, proofed.store(), "a payment writes nothing to the store");
         // the signature is given again, and the store is the same
         proofed.power();
         proofed.pin();
         ResponseAPDU again = proofed.send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_AGAIN, 0, 0, 64));
         assertArrayEquals(b.getData(), again.getData());
-        // everything else that lasts is the same on the two cards, the store apart
+        // everything else that lasts is the same on the two cards, the store apart (the plain card's PIN typed in a tap
+        // that pays nothing as well, which arms the allowance, D186)
+        plain.power();
+        plain.pin();
         for (String name : PERSISTENT) {
             if (name.equals("dleq")) continue;
             assertArrayEquals(plain.field(name), proofed.field(name), name);
@@ -700,7 +695,8 @@ class ProofStoreTest {
         assertSame(store, c.store(), "the same array: it is not made again");
         assertEquals(12288, c.store().length);
         assertTrue(allZero(c.store()), "RESET_CARD fills the store with zeros");
-        // set up again, as another person does
+        // set up again, as another person does, in a time in the field of its own (D187)
+        CashuAppletTest.newTimeInTheField(c.sim);
         readyOn(c.sim, 0);
         assertSame(store, c.store(), "set up again, the room is not reserved a second time");
         assertArrayEquals(new byte[] { 0 }, c.loadPlain(piece(10, 1)).getData());
@@ -737,7 +733,7 @@ class ProofStoreTest {
             if (f.get(c.runtime.appletAt(c.aid)) == null) missing.add(f.getName());
         }
         // and 2.2's assisted-settlement record and its staging (D176), refused in the constructor too
-        assertEquals(new TreeSet<>(Arrays.asList("dleq", "outStage", "outbox")), missing, "every other array of the applet is made at install, the store and the record after it");
+        assertEquals(new TreeSet<>(Arrays.asList("book", "cert", "dleq", "openKeys", "outStage", "outbox", "paid")), missing, "every other array of the applet is made at install, the store, the record (D176), the openings' keys (D183), the keyset table (D184) and the paid list (D191) after it, and the certificate (D192) at the first CERT_WRITE");
         c.setPin();
         c.pin();
         assertNull(c.store(), "a PIN does not reserve it");
@@ -757,14 +753,18 @@ class ProofStoreTest {
     }
 
     @Test
-    @DisplayName("GET_INFO is as it was but for the version: 01 14, 30 bytes for P1 = 0 (and any P1 but 1 and 2), 42 for P1 = 1, 43 for P1 = 2, byte for byte the same whether pieces came with proofs or not")
+    @DisplayName("GET_INFO is as it was but for the version: 03 00, 30 bytes for P1 = 0 (and any P1 but 1 to 4), 42 for P1 = 1, 43 for P1 = 2, 51 for P1 = 3 (D184), 59 for P1 = 4 (D186, D195), byte for byte the same whether pieces came with proofs or not")
     void getInfoIsAsItWasButForTheVersion() throws Exception {
         Card c = new Card();
-        for (int p1 : new int[] { 0, 3, 4, 0x7F, 0xFF }) {
+        assertEquals(51, c.info(3).length, "P1 = 3: the keyset table's eight bytes after the 43");
+        assertArrayEquals(c.info(2), Arrays.copyOf(c.info(3), 43));
+        assertEquals(59, c.info(4).length, "P1 = 4: the no-PIN window's start, the profiles and the loads left today after the 51");
+        assertArrayEquals(c.info(3), Arrays.copyOf(c.info(4), 51));
+        for (int p1 : new int[] { 0, 5, 0x7F, 0xFF }) {
             byte[] d = c.info(p1);
             assertEquals(30, d.length, "P1 = " + p1);
-            assertEquals(2, d[0]);
-            assertEquals(0x02, d[1], "version 2.2");
+            assertEquals(3, d[0]);
+            assertEquals(0x00, d[1], "version 3.0");
             assertEquals((byte) 0xFF, d[6], "capabilities as they were");
             assertEquals(4, d[8], "format 4");
         }
@@ -772,7 +772,7 @@ class ProofStoreTest {
         assertEquals(43, c.info(2).length);
         assertArrayEquals(c.info(1), Arrays.copyOf(c.info(2), 42));
         assertEquals(0, c.info(2)[42], "the tag is on");
-        assertArrayEquals(new byte[] { 0x02, 0x02 }, c.send(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR))).getData(), "SELECT says 2.2");
+        assertArrayEquals(new byte[] { 0x03, 0x00 }, c.send(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR))).getData(), "SELECT says 3.0");
         // with pieces on, the same on a card whose pieces came with proofs and one whose did not
         Card plain = new Card().ready(), proofed = new Card().ready();
         for (int i = 0; i < 4; i++) {
@@ -806,6 +806,9 @@ class ProofStoreTest {
         int seed = 1;
         int loadedWithProof = 0, loadedPlain = 0, paid = 0, cleared = 0;
         for (int step = 0; step < 500; step++) {
+            // the day's count of loads set to nothing by hand (D195): this history loads more pieces than a day takes
+            c.field("pinMarks")[CashuApplet.PM_LOADS] = 0;
+            c.field("pinMarks")[CashuApplet.PM_LOADS + 1] = 0;
             byte[] st = c.statuses();
             int unspent = 0, empty = 0;
             for (int i = 0; i < 128; i++) { if (st[i] == 1) unspent++; if (st[i] == 0) empty++; }
@@ -904,7 +907,7 @@ class ProofStoreTest {
     }
 
     /** The names of the methods whose bodies name `word`. */
-    private static TreeSet<String> methodsNaming(String src, String word) {
+    static TreeSet<String> methodsNaming(String src, String word) {
         int[] depth = SchnorrHWMathTest.braceDepths(src);
         TreeSet<String> names = new TreeSet<>();
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b" + word + "\\b").matcher(src);
@@ -922,11 +925,11 @@ class ProofStoreTest {
     }
 
     @Test
-    @DisplayName("Only LOAD_PROOF (and the one step of it), GET_DLEQ, SET_CARD's reservation and RESET_CARD name the store: no payment command, CLEAR_SPENT or burn does, and so no write is added to one")
+    @DisplayName("Only LOAD_PROOF (and the one step of it), LOAD_CHANGE (which says whether the proof was kept), GET_DLEQ, SET_CARD's reservation, RESET_CARD and an owner replaced (forgetOwed) name the store: no payment command, CLEAR_SPENT or burn does, and so no write is added to one")
     void noPaymentCommandNamesTheStore() throws Exception {
         String code = appletCode();
         TreeSet<String> names = methodsNaming(code, "dleq");
-        assertEquals(new TreeSet<>(Arrays.asList("(class body)", "processGetDleq", "processLoadProof", "loadOne", "processSetCard", "processResetCard")), names,
+        assertEquals(new TreeSet<>(Arrays.asList("(class body)", "forgetOwed", "processGetDleq", "processLoadChange", "processLoadProof", "loadOne", "processSetCard", "processResetCard")), names,
             "the methods that name the store");
         // the writes: the one step of a load and the reset's fill (the reservation is an assignment, which the scan of the allocations holds to SET_CARD)
         TreeSet<String> writers = new TreeSet<>();
@@ -945,7 +948,7 @@ class ProofStoreTest {
                 writers.add(name.group(1));
             }
         }
-        assertEquals(new TreeSet<>(Arrays.asList("loadOne", "processResetCard")), writers, "the store is written by a load, and zeroed by a reset");
+        assertEquals(new TreeSet<>(Arrays.asList("forgetOwed", "loadOne", "processResetCard")), writers, "the store is written by a load, and zeroed by a reset and by an owner replaced (D197)");
         for (String untouched : new String[] { "processClearSpent", "freeSpent", "finishBurn", "processSpendAllBegin", "processSpendAllOutputs", "processSpendAllChange", "processSpendAllSign",
             "processSpendAllAgain", "requireNothingUnspent", "processGetPieces", "processGetChange", "processGetInfo", "processGetProof", "processAuth", "processSetLimit", "processAllowLoad" }) {
             assertFalse(names.contains(untouched), untouched + " does not name the store");

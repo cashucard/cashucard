@@ -15,21 +15,46 @@ export const OPENER_AID = fromHex('F04341534855434152444D');
 /** The card's applet, selected by its whole AID (D25). */
 export const CARD_AID = fromHex('F043415348554341524401');
 /**
- * The card applet's versions this kit reads and administers, as SELECT and GET_INFO's first two bytes answer them:
- * 2.1 (D26), and 2.2 (D175), which adds the public GET_OUTBOX and changes nothing a 2.1 card does.
+ * The card applet's versions this kit reads, as SELECT and GET_INFO's first two bytes answer them: 2.1 (D26), 2.2
+ * (D175), which adds the public GET_OUTBOX and changes nothing a 2.1 card does, and 3.0 (D183 to D198), which the
+ * tracked CAP installs.
  */
 export const CARD_VERSIONS: readonly (readonly [number, number])[] = [
   [2, 1],
   [2, 2],
+  [3, 0],
 ];
-/** The version the tracked CAP installs (applet/target/cashu-javacard-2.1.0.cap), which provisioning verifies. */
-export const CARD_VERSION: readonly [number, number] = [2, 2];
-/** Whether `v` is exactly two bytes and a version in CARD_VERSIONS. */
-export function supportedCardVersion(v: readonly number[]): boolean {
+/**
+ * The versions whose holder commands (holderCommands) and settled-entry cleanup this kit sends: 2.1 and 2.2. A 3.0
+ * card takes money only under its PIN, answers the owner's grant with 6200 and locks every piece to its key for the
+ * piece's date (spec/APDU.md, "PIN before money" and "Keys per load"), so 2.2's owner commands and the secrets the
+ * cleanup builds are not a 3.0 card's: this kit installs and reads a 3.0 card, and sends it neither.
+ */
+export const ADMINISTERED_CARD_VERSIONS: readonly (readonly [
+  number,
+  number,
+])[] = [
+  [2, 1],
+  [2, 2],
+];
+/** The version the tracked CAP installs (applet/target/cashu-javacard-3.0.0.cap), which provisioning verifies. */
+export const CARD_VERSION: readonly [number, number] = [3, 0];
+function listed(
+  versions: readonly (readonly [number, number])[],
+  v: readonly number[],
+): boolean {
   return (
     v.length === 2 &&
-    CARD_VERSIONS.some(([major, minor]) => v[0] === major && v[1] === minor)
+    versions.some(([major, minor]) => v[0] === major && v[1] === minor)
   );
+}
+/** Whether `v` is exactly two bytes and a version in CARD_VERSIONS. */
+export function supportedCardVersion(v: readonly number[]): boolean {
+  return listed(CARD_VERSIONS, v);
+}
+/** Whether `v` is exactly two bytes and a version in ADMINISTERED_CARD_VERSIONS. */
+export function administeredCardVersion(v: readonly number[]): boolean {
+  return listed(ADMINISTERED_CARD_VERSIONS, v);
 }
 /** The NFC tag's class, listed last in the package. */
 export const TAG_CLASS_AID = fromHex('F043415348554341524454');

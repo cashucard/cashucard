@@ -4,8 +4,8 @@
 
 > Historical Foxy design, recorded at software 1.20 and incorporated into
 > shared protocol 2.0 ([D18](DECISIONS.md#d18)). The current applet wire is
-> [protocol 2.1](../spec/APDU.md): readers SELECT the full applet AID
-> `F043415348554341524401`, which answers `02 01`. Owner labels use
+> [protocol 3.0](../spec/APDU.md): readers SELECT the full applet AID
+> `F043415348554341524401`, which answers `03 00`. Owner labels use
 > `CashuCard/…`; [D20](DECISIONS.md#d20) through [D26](DECISIONS.md#d26)
 > record the shared protocol changes. Use the current APDU reference when
 > implementing a reader.

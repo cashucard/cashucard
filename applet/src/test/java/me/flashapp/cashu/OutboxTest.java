@@ -58,6 +58,8 @@ class OutboxTest {
     private void reselect() { assertEquals(SW_OK, tx(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR))).getSW()); }
     private void verifyPin() { assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, TEST_PIN)).getSW()); }
     private byte[] cardKey() { return tx(new CommandAPDU(CLA, INS_GET_PUBKEY, 0, 0, 256)).getData(); }
+    /** The card's keys now (D197): a packet's payment is of the date 0, and names the card's key for it. */
+    private DateKeys keys() { return DateKeys.of(runtime.appletAt(com.licel.jcardsim.utils.AIDUtil.create(AID_HEX))); }
 
     private byte[] field(String name) throws Exception {
         java.lang.reflect.Field f = CashuApplet.class.getDeclaredField(name);
@@ -71,7 +73,7 @@ class OutboxTest {
         for (int i = 0; i < amounts.length; i++) {
             byte[] p = buildProof(KEYSET, amounts[i], seed, date);
             seed += 3;
-            ResponseAPDU r = tx(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, p, 1));
+            ResponseAPDU r = tx(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, p, 1));
             assertEquals(SW_OK, r.getSW(), "load " + i);
             places[i] = r.getData()[0] & 0xFF;
             pieces.put(places[i], p);
@@ -79,33 +81,48 @@ class OutboxTest {
         return places;
     }
     private int[] load(long... amounts) { return loadDated(0, amounts); }
+    /** A piece of `keyset` on the card, so that the table holds it (a change is made only in a keyset the card holds and was taught). */
+    private void holdAPieceOf(byte[] keyset) {
+        assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(toHex(keyset), 1, 77), 1)).getSW(), "a piece of " + toHex(keyset));
+    }
 
     /** A payment as a till makes one: the places, its outputs, the card's change of these amounts, and the signature. */
     static final class Payment {
         int[] places;
         byte[][] outputs;     // the till's, then the change, as the message has them
+        byte[][] keysets;     // each output's keyset where it is not the first piece's (the change's in SPEND_ALL_CHANGE's 45-byte form), or null
         byte[] signature;
         int sw;
     }
 
     private Payment pay(int[] places, byte[][] outputs, long... change) {
+        return pay(places, outputs, change, new byte[change.length][]);
+    }
+
+    /** The same, each change output signed in the keyset `keysets` names for it (the 45-byte form), or the first piece's where null. */
+    private Payment pay(int[] places, byte[][] outputs, long[] change, byte[][] keysets) {
         Payment p = new Payment();
         p.places = places;
         byte[] list = new byte[places.length];
         for (int i = 0; i < places.length; i++) list[i] = (byte) places[i];
-        ResponseAPDU begun = tx(new CommandAPDU(CLA, INS_SPEND_ALL_BEGIN, 0, 0, list, 4));
+        ResponseAPDU begun = tx(CashuAppletTest.spendBegin(list));
         assertEquals(SW_OK, begun.getSW(), "begin");
         List<byte[]> all = new ArrayList<>(Arrays.asList(outputs));
         for (int at = 0; at < outputs.length; at += 6) {
             ResponseAPDU r = tx(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, concat(Arrays.copyOfRange(outputs, at, Math.min(outputs.length, at + 6)))));
             assertEquals(SW_OK, r.getSW(), "outputs");
         }
-        for (long c : change) {
-            ResponseAPDU r = tx(new CommandAPDU(CLA, INS_SPEND_ALL_CHANGE, 0, 0, u32(c), 33));
+        List<byte[]> named = new ArrayList<>(Arrays.asList(new byte[outputs.length][]));
+        for (int i = 0; i < change.length; i++) {
+            long c = change[i];
+            CommandAPDU ask = keysets[i] == null ? changeCommand(c, mintKey()) : changeCommand(c, mintKey(), keysets[i]);
+            ResponseAPDU r = tx(ask);
             assertEquals(SW_OK, r.getSW(), "change");
             all.add(output(c, r.getData()));
+            named.add(keysets[i]);
         }
         p.outputs = all.toArray(new byte[0][]);
+        p.keysets = named.toArray(new byte[0][]);
         for (int waits = 0; waits < 2000; waits++) {
             ResponseAPDU r = tx(new CommandAPDU(CLA, INS_SPEND_ALL_SIGN, 0, 0, 64));
             p.sw = r.getSW();
@@ -117,6 +134,15 @@ class OutboxTest {
         }
         fail("the card is still waiting");
         return p;
+    }
+
+    /** Every opening of change owed given up by the owner (RESET_CARD's let-go form): a reset wants nothing owed (D183). */
+    private void letGoAll() {
+        for (byte[] d = tx(new CommandAPDU(CLA, INS_GET_CHANGE, 0, 0, 256)).getData(); d[0] != 0; d = tx(new CommandAPDU(CLA, INS_GET_CHANGE, 0, 0, 256)).getData()) {
+            byte[] k = { d[1] };
+            byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
+            assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_RESET_CARD, 1, k[0], ownerData(ownerProof(L_RESET, OWNER, n, k), k))).getSW(), "opening " + k[0] + " given up");
+        }
     }
 
     private static byte[][] tillOutputs(long... amounts) {
@@ -152,7 +178,7 @@ class OutboxTest {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         b.write("CCP-AS".getBytes(StandardCharsets.US_ASCII));
         b.write(1);
-        b.write(cardKey());
+        b.write(keys().key(0));
         b.write(field("outInstall"));
         b.write(new byte[4]);
         b.write(u32(paymentId));
@@ -177,10 +203,11 @@ class OutboxTest {
             b.write(d, 44, 33);
         }
         b.write(p.outputs.length);
-        for (byte[] o : p.outputs) {
+        for (int i = 0; i < p.outputs.length; i++) {
+            byte[] o = p.outputs[i];
             b.write(o, 0, 4);
             b.write(8);
-            b.write(firstKeyset);
+            b.write(p.keysets[i] == null ? firstKeyset : p.keysets[i]);
             b.write(o, 4, 33);
         }
         b.write(p.signature);
@@ -197,7 +224,8 @@ class OutboxTest {
         assertEquals(body.length + 64, packet.length, "body and descriptor");
         assertArrayEquals(body, Arrays.copyOfRange(packet, 0, body.length), "the body, byte for byte");
         byte[] descriptor = Arrays.copyOfRange(packet, body.length, packet.length);
-        assertTrue(schnorrVerify(extractPubkeyX(cardKey()), tagged(body), descriptor), "the descriptor is the card key's over SHA-256(tag || tag || body)");
+        assertTrue(schnorrVerify(extractPubkeyX(keys().key(0)), tagged(body), descriptor), "the descriptor is the signature of the card's key for the date 0 (the key the packet names) over SHA-256(tag || tag || body)");
+        assertFalse(schnorrVerify(extractPubkeyX(cardKey()), tagged(body), descriptor), "and not the card key's: the packet does not name it");
         ResponseAPDU s = scope();
         assertEquals(SW_OK, s.getSW());
         assertArrayEquals(concat(new byte[] { body[80] }, Arrays.copyOfRange(body, 72, 80), Arrays.copyOfRange(body, 81, 85), sha256(body)), s.getData(),
@@ -223,12 +251,46 @@ class OutboxTest {
     // ---- the tests -------------------------------------------------------
 
     @Test
-    @DisplayName("a record only after a payment that was signed: none on a new card (6A88); a paid one leaves it; a later payment refused for the PIN (6A94), or dropped after its outputs by the read itself, leaves it byte for byte")
+    @DisplayName("3.0 (D183): a till's output is under the first piece's keyset in the record even where its B_ is an owed opening's of an earlier payment: only the payment's own change is looked up among the openings")
+    void aTillsOutputIsNeverTakenForChange() throws Exception {
+        int[] first = load(8, 16);
+        byte[] moved = hexToBytes("00aabbccddeeff01");
+        holdAPieceOf(moved);
+        Payment earlier = pay(first, tillOutputs(9), new long[] { 15 }, new byte[][] { moved });
+        assertEquals(SW_OK, earlier.sw);
+        byte[] owedB = Arrays.copyOfRange(earlier.outputs[1], 4, 37);
+        // the next payment's till names an output whose B_ is that opening's, which is still owed
+        Payment p = pay(load(5), new byte[][] { output(5, owedB) });
+        assertEquals(SW_OK, p.sw);
+        byte[] packet = packet();
+        assertRecord(expectedBody(p, MINT, 2, 1), packet);
+    }
+
+    @Test
+    @DisplayName("3.0 (D183): the card's own change carries its opening's keyset in the record: the one SPEND_ALL_CHANGE's 45-byte form named, or the first piece's; the till's outputs carry the first piece's")
+    void theChangeCarriesItsOwnKeyset() throws Exception {
+        int[] places = load(8, 16);
+        byte[] moved = hexToBytes("00aabbccddeeff01");
+        holdAPieceOf(moved);
+        Payment p = pay(places, tillOutputs(9, 1), new long[] { 4, 6, 4 }, new byte[][] { moved, null, moved });
+        assertEquals(SW_OK, p.sw);
+        assertTrue(keys().signed(p.signature, slotData(p), p.outputs),
+            "the keyset is in no message: the witness is the one the 37-byte form gives");
+        byte[] packet = packet();
+        assertRecord(expectedBody(p, MINT, 1, 1), packet);
+        // and the expected body is not the one with every output under the first piece's keyset
+        Payment allFirst = new Payment();
+        allFirst.places = p.places; allFirst.outputs = p.outputs; allFirst.signature = p.signature; allFirst.keysets = new byte[p.outputs.length][];
+        assertFalse(Arrays.equals(expectedBody(allFirst, MINT, 1, 1), Arrays.copyOf(packet, packet.length - 64)));
+    }
+
+    @Test
+    @DisplayName("a record only after a payment that was signed: none on a new card (6A88 to the PIN's scope; the PIN alone on a card with an owner is not told the packet, 6982); a paid one leaves it; a later payment refused for the PIN (6A94), or dropped after its outputs by the read itself, leaves it byte for byte")
     void recordOnlyAfterSuccessfulSign() throws Exception {
         assertEquals(SW_SLOT_EMPTY, scope().getSW(), "a new card has no record");
-        assertEquals(SW_SLOT_EMPTY, page(0, 255).getSW());
+        assertEquals(SW_SECURITY_NOT_SATIS, page(0, 255).getSW(), "the packet is the holder's say: the owner's grant");
         Payment p = twoByTwo();
-        assertTrue(schnorrVerify(extractPubkeyX(cardKey()), sha256(allMessage(cardKey(), REFUND, slotData(p), p.outputs).getBytes(StandardCharsets.UTF_8)), p.signature),
+        assertTrue(keys().signed(p.signature, slotData(p), p.outputs),
             "(the witness this test holds is the payment's)");
         byte[] first = packet();
         assertRecord(expectedBody(p, MINT, 1, 1), first);
@@ -245,7 +307,7 @@ class OutboxTest {
         // dropped: begun, its outputs given, and then the read, which is not a step of a payment
         verifyPin();
         byte[] list = { (byte) more[0], (byte) more[1] };
-        assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_SPEND_ALL_BEGIN, 0, 0, list, 4)).getSW());
+        assertEquals(SW_OK, tx(CashuAppletTest.spendBegin(list)).getSW());
         assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, concat(tillOutputs(11)))).getSW());
         assertArrayEquals(first, packet(), "staged outputs are not the record");
         assertEquals(SW_CONDITIONS_NOT_SATIS, tx(new CommandAPDU(CLA, INS_SPEND_ALL_SIGN, 0, 0, 64)).getSW(), "and the read dropped the payment");
@@ -282,14 +344,43 @@ class OutboxTest {
         assertArrayEquals(scopeBefore, scope().getData());
     }
 
+    /** The owner's grant in this tap (ALLOW_LOAD with the owner's proof): the holder's say on a card with an owner. */
+    private void grant() {
+        byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
+        assertEquals(SW_GRANT, tx(new CommandAPDU(CLA, INS_ALLOW_LOAD, 0, 0, ownerData(ownerProof(L_LOAD, OWNER, n, new byte[0]), new byte[0]))).getSW());
+    }
+
     @Test
-    @DisplayName("GET_OUTBOX is public: a card with a PIN, the PIN not given, answers the scope and every page")
-    void readableWithoutPin() throws Exception {
+    @DisplayName("who reads the record: the tap that paid reads both forms, a re-SELECT in it included; in a new tap a stranger gets 6982 to both, the PIN reads the scope and not the packet (6982) on a card with an owner, and the owner's grant reads both")
+    void thePayingTapAndTheHolderRead() throws Exception {
         Payment p = twoByTwo();
         reselect();
         assertEquals(1, tx(new CommandAPDU(CLA, INS_GET_INFO, 0, 0, 256)).getData()[7], "a PIN is set");
-        assertEquals(SW_OK, scope().getSW());
+        assertEquals(SW_OK, scope().getSW(), "a re-SELECT keeps the tap that paid");
         assertRecord(expectedBody(p, MINT, 1, 1), packet());
+        sim.reset();
+        reselect();
+        assertEquals(SW_SECURITY_NOT_SATIS, scope().getSW(), "a stranger: no scope");
+        assertEquals(SW_SECURITY_NOT_SATIS, page(0, 255).getSW(), "a stranger: no page");
+        verifyPin();
+        assertEquals(SW_OK, scope().getSW(), "the PIN: the scope");
+        assertEquals(SW_SECURITY_NOT_SATIS, page(0, 255).getSW(), "the PIN on a card with an owner: no page");
+        sim.reset();
+        reselect();
+        grant();
+        assertEquals(SW_OK, scope().getSW(), "the owner's grant: the scope");
+        assertRecord(expectedBody(p, MINT, 1, 1), packet());
+    }
+
+    @Test
+    @DisplayName("a stranger cannot tell whether a record is kept: with none, GET_OUTBOX answers it 6982 to both forms, as with one; a reader with the PIN gets 6A88")
+    void aStrangerCannotTellARecordIsKept() throws Exception {
+        sim.reset();
+        reselect();
+        assertEquals(SW_SECURITY_NOT_SATIS, scope().getSW(), "no record, a stranger: 6982");
+        assertEquals(SW_SECURITY_NOT_SATIS, page(0, 255).getSW(), "no record, a stranger's page: 6982");
+        verifyPin();
+        assertEquals(SW_SLOT_EMPTY, scope().getSW(), "no record, the PIN: 6A88");
     }
 
     @Test
@@ -355,6 +446,25 @@ class OutboxTest {
         ResponseAPDU again = tx(new CommandAPDU(CLA, INS_SPEND_ALL_AGAIN, 0, 0, 64));
         assertEquals(SW_OK, again.getSW());
         assertArrayEquals(again.getData(), Arrays.copyOfRange(body, body.length - 64, body.length), "the witness is the signature the card gave");
+    }
+
+    @Test
+    @DisplayName("a descriptor whose signature the card's check refuses (SchnorrHW.sign's step 8: here the public key object names another key) is not given: both forms of GET_OUTBOX answer 6F00 with nothing, the record stays unsigned (its flag 0) and nothing of it is kept; once the key agrees, the next read signs it and it verifies")
+    void aRefusedDescriptorIsNotKept() throws Exception {
+        Payment p = twoByTwo();
+        byte[] before = field("outbox").clone();
+        Object applet = runtime.appletAt(AIDUtil.create(AID_HEX));
+        java.lang.reflect.Field k = CashuApplet.class.getDeclaredField("cardPubKey");
+        k.setAccessible(true);
+        Object key = k.get(applet);
+        k.set(applet, new SignatureCheckTest.ChipPublicKey(SchnorrHWSignTest.xy(hexToBytes((String) SchnorrHWSignTest.KEYS[0][1]), 0), false));
+        assertEquals(CashuApplet.SW_CRYPTO_ERROR & 0xFFFF, scope().getSW(), "the scope");
+        assertEquals(0, scope().getData().length);
+        assertEquals(CashuApplet.SW_CRYPTO_ERROR & 0xFFFF, page(0, 255).getSW(), "a page");
+        assertArrayEquals(before, field("outbox"), "nothing written: the flag 0, no descriptor");
+        k.set(applet, key);
+        assertRecord(expectedBody(p, MINT, 1, 1), packet());
+        assertEquals(1, field("outbox")[1], "signed once the key agrees");
     }
 
     @Test
@@ -429,11 +539,13 @@ class OutboxTest {
         byte[] install = field("outInstall").clone();
         byte[] keyBefore = cardKey();
         assertEquals(SW_OK, scope().getSW());
+        letGoAll();
         byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
         assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_RESET_CARD, 0, RESET_CONFIRM, ownerData(ownerProof(L_RESET, OWNER, n, new byte[0]), new byte[0]))).getSW());
         assertEquals(SW_SLOT_EMPTY, scope().getSW(), "no record after a reset");
         assertArrayEquals(new byte[] { 0, 0, 0, 2 }, field("outGen"));
         assertArrayEquals(install, field("outInstall"), "the installation is the card's");
+        CashuAppletTest.newTimeInTheField(sim);
         readyOn(sim, 0, true, MINT);
         pieces.clear();
         Payment p = twoByTwo();
@@ -450,8 +562,12 @@ class OutboxTest {
         int from = code.indexOf("private void processResetCard(");
         assertTrue(from >= 0, "RESET_CARD's handler");
         String reset = code.substring(from, code.indexOf("\n    }\n", from));
-        int stepped = reset.indexOf("Util.arrayCopy(scratch, X_NUM, outGen, (short) 0, (short) 4);");
-        int zeroed = reset.indexOf("Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);");
+        assertTrue(reset.indexOf("forget();") > 0, "RESET_CARD takes the history down by `forget`, as a forgotten PIN's is");
+        // `forget` steps the generation first, and only then zeroes the receipts
+        int from2 = code.indexOf("private void forget(");
+        String forget = code.substring(from2, code.indexOf("\n    }\n", from2));
+        int stepped = forget.indexOf("Util.arrayCopy(scratch, X_NUM, outGen, (short) 0, (short) 4);");
+        int zeroed = forget.indexOf("Util.arrayFillNonAtomic(cardReceipts, (short) 0, RECEIPTS_LEN, (byte) 0);");
         assertTrue(stepped > 0 && zeroed > 0 && stepped < zeroed, "the generation is written before the receipts are zeroed");
     }
 
@@ -490,10 +606,12 @@ class OutboxTest {
             "status 0 in a transaction, then the body, then the length and status 1 in a transaction");
         assertEquals(1, w.split("outbox\\[0\\] = \\(byte\\) 1;", -1).length - 1, "status 1 is written once");
         assertFalse(w.substring(clearCommit, markBegin).contains("beginTransaction"), "the body is written outside any transaction");
-        String sign = code.substring(code.indexOf("private void processSpendAllSign("), code.indexOf("private void finishBurn("));
-        int receipt = sign.indexOf("addUint32Stop(cardReceipts, (short) 0, ONE, (short) 0);");
+        String sign = code.substring(code.indexOf("private void processSpendAllSign("), code.indexOf("private boolean finishBurn("));
+        // the receipt is finishBurn's (D196), which SIGN calls before the record
+        int receipt = sign.indexOf("if (!finishBurn()) n = 0;");
         int record = sign.indexOf("writeOutbox(buf, n);");
         int answer = sign.lastIndexOf("apdu.setOutgoingAndSend((short) 0, sigLen);");
+        assertTrue(code.substring(code.indexOf("private boolean finishBurn("), code.indexOf("private void processSpendAllAgain(")).contains("addUint32Stop(cardReceipts, (short) 0, ONE, (short) 0);"), "finishBurn writes the receipt");
         assertTrue(receipt > 0 && receipt < record && record < answer, "the record after the receipt, before the answer");
         assertTrue(sign.substring(record, answer).contains("Util.arrayCopyNonAtomic(lastSig, (short) 1, buf, (short) 0, (short) 64);"), "and the signature put back for the answer");
         String dispatch = code.substring(code.indexOf("public void process("), code.indexOf("private void processGetInfo("));
@@ -511,7 +629,7 @@ class OutboxTest {
     /** The count of payments ever, as GET_LOG P1 = 1 answers it to the owner's grant (given here, in this tap). */
     private long receiptCount() {
         byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
-        assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_ALLOW_LOAD, 0, 0, ownerData(ownerProof(L_LOAD, OWNER, n, new byte[0]), new byte[0]))).getSW(), "the owner's grant");
+        assertEquals(SW_GRANT, tx(new CommandAPDU(CLA, INS_ALLOW_LOAD, 0, 0, ownerData(ownerProof(L_LOAD, OWNER, n, new byte[0]), new byte[0]))).getSW(), "the owner's grant");
         ResponseAPDU r = tx(new CommandAPDU(CLA, INS_GET_LOG, 1, 0, 256));
         assertEquals(SW_OK, r.getSW(), "the receipts");
         return readUint32(r.getData(), 0);
@@ -521,7 +639,7 @@ class OutboxTest {
     private void paidDespiteAFault(String what, long receiptsBefore) throws Exception {
         Payment p = twoByTwo();
         assertEquals(64, p.signature.length, what + ": SIGN answers the signature");
-        assertTrue(schnorrVerify(extractPubkeyX(cardKey()), sha256(allMessage(cardKey(), REFUND, slotData(p), p.outputs).getBytes(StandardCharsets.UTF_8)), p.signature),
+        assertTrue(keys().signed(p.signature, slotData(p), p.outputs),
             what + ": the signature is over the payment's message");
         ResponseAPDU again = tx(new CommandAPDU(CLA, INS_SPEND_ALL_AGAIN, 0, 0, 64));
         assertEquals(SW_OK, again.getSW(), what + ": SPEND_ALL_AGAIN");
@@ -551,13 +669,13 @@ class OutboxTest {
     }
 
     @Test
-    @DisplayName("the record's room is reserved by the first SET_CARD that goes through (D176): none after install, where GET_OUTBOX answers 6A88 to both forms; 3,692 and 593 bytes after it; the same arrays after every SET_CARD that follows")
+    @DisplayName("the record's room is reserved by the first SET_CARD that goes through (D176): none after install, where GET_OUTBOX answers 6982 to both forms (no reader is told before a PIN); 3,692 and 601 bytes after it (593 staged outputs and the till's keyset, 8); the same arrays after every SET_CARD that follows")
     void theRecordIsReservedAtTheFirstSetCard() throws Exception {
         fresh(null);
         assertNull(field("outbox"), "not made at install");
         assertNull(field("outStage"), "not made at install");
-        assertEquals(SW_SLOT_EMPTY, scope().getSW(), "a card not set up has no record: 6A88, as an empty one");
-        assertEquals(SW_SLOT_EMPTY, page(0, 255).getSW(), "and the same to a page");
+        assertEquals(SW_SECURITY_NOT_SATIS, scope().getSW(), "a card not set up tells no reader: 6982");
+        assertEquals(SW_SECURITY_NOT_SATIS, page(0, 255).getSW(), "and the same to a page");
         assertEquals(SW_INCORRECT_P1P2, tx(new CommandAPDU(CLA, INS_GET_OUTBOX, 2, 0, 256)).getSW(), "a P1 that is not 00 or 01 is still refused first");
         assertArrayEquals(new byte[] { 0, 0, 0, 1 }, field("outGen"), "the generation is made at install");
         readyOn(sim, 0, true, MINT);
@@ -565,7 +683,7 @@ class OutboxTest {
         byte[] outStage = field("outStage");
         assertNotNull(outbox, "the first SET_CARD reserves the record");
         assertEquals(3692, outbox.length);
-        assertEquals(593, outStage.length);
+        assertEquals(601, outStage.length);
         assertEquals(SW_SLOT_EMPTY, scope().getSW(), "and it holds none yet");
         byte[] rec = record(MINT, REFUND);
         byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
@@ -589,11 +707,13 @@ class OutboxTest {
         assertNull(field("outStage"));
 
         // RESET_CARD lets nothing go but steps the generation as ever
+        letGoAll();
         byte[] n = tx(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
         assertEquals(SW_OK, tx(new CommandAPDU(CLA, INS_RESET_CARD, 0, RESET_CONFIRM, ownerData(ownerProof(L_RESET, OWNER, n, new byte[0]), new byte[0]))).getSW(), "RESET_CARD");
         assertArrayEquals(new byte[] { 0, 0, 0, 2 }, field("outGen"), "the generation stepped");
         assertEquals(SW_SLOT_EMPTY, scope().getSW());
         // and the next SET_CARD asks again (here the simulator gives the room, so the card records again)
+        CashuAppletTest.newTimeInTheField(sim);
         readyOn(sim, 0, true, MINT);
         pieces.clear();
         assertNotNull(field("outbox"), "SET_CARD asks for the room again");
@@ -617,7 +737,7 @@ class OutboxTest {
     }
 
     @Test
-    @DisplayName("the layout: OUTBOX_MAX is 3,688 and the four arrays are 4,321 bytes, all persistent: the installation and the generation (36) made at install, the record and its staging (3,692 + 593) at the first SET_CARD (D176)")
+    @DisplayName("the layout: OUTBOX_MAX is 3,688 and the four arrays are 4,329 bytes, all persistent: the installation and the generation (36) made at install, the record and its staging (3,692 + 601: the outputs and the till's keyset) at the first SET_CARD (D176)")
     void layoutConstants() throws Exception {
         // a card just installed: the installation and the generation, and no record or staging yet
         fresh(null);
@@ -632,10 +752,11 @@ class OutboxTest {
         assertEquals(32, CashuApplet.OUT_IN_MOST);
         assertEquals(16, CashuApplet.OUT_OUT_MOST);
         assertEquals(3692, field("outbox").length);
-        assertEquals(593, field("outStage").length);
+        assertEquals(601, field("outStage").length);
+        assertEquals(593, CashuApplet.OUT_STAGE_KEYSET, "the till's keyset after the sixteen outputs");
         assertEquals(32, field("outInstall").length);
         assertEquals(4, field("outGen").length);
-        assertEquals(4321, field("outbox").length + field("outStage").length + field("outInstall").length + field("outGen").length);
+        assertEquals(4329, field("outbox").length + field("outStage").length + field("outInstall").length + field("outGen").length);
         assertArrayEquals(new byte[] { 0, 0, 0, 1 }, field("outGen"), "generation 1 at install");
         assertFalse(Arrays.equals(new byte[32], field("outInstall")), "the installation drawn at install");
         assertEquals(0x1B, CashuApplet.INS_GET_OUTBOX);

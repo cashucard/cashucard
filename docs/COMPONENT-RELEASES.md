@@ -11,8 +11,8 @@ authorities. Do not generate replacement signing keys to make CI pass.
 
 | Component   | Current manifest identity                                        | New release tag              |
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
-| Firmware    | `applet/pom.xml`: 2.1.0; tracked CAP and APDU version remain 2.1 | `firmware-v2.1.0`            |
-| cardkit     | `tools/cardkit/package.json`: 0.2.0                              | `cardkit-v0.2.0`             |
+| Firmware    | `applet/pom.xml`: 3.0.0; tracked CAP `cashu-javacard-3.0.0.cap`, APDU version 3.0 | `firmware-v3.0.0`            |
+| cardkit     | `tools/cardkit/package.json`: 0.3.0                              | `cardkit-v0.3.0`             |
 | Ops-service | `ops/package.json`: 0.2.0                                        | `ops-v0.2.0`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 15                  | `provisioner-v1.0.0-build.15` |
 
@@ -31,7 +31,7 @@ and fences; redeploying old code is not a database rollback.
 
 ## Verification and tags
 
-Update the component's manifest and changelog/release notes in a reviewed PR.
+Update the component's manifest and its entry in [the release notes](RELEASE-NOTES.md) in a reviewed PR.
 After merge, tag that exact main commit with its component tag. The release
 identity guard is loaded from main, verifies tag ancestry before checking out
 the requested commit, and validates its manifest/native versions and tag target; branches, mismatched versions and legacy tag shapes are rejected.

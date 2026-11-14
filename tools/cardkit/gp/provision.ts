@@ -13,8 +13,9 @@
  * Guards, in the order they act:
  * - the load file's sha256 is checked before the first APDU;
  * - a card applet already installed is removed only with `replace` on and
- *   GET_INFO empty (no unspent or spent piece, no owner, no PIN, no record):
- *   a card that holds anything is never swept;
+ *   GET_INFO empty (no unspent or spent piece, no owner, no PIN, no record,
+ *   no change owed) and a version it knows: a card that holds anything is
+ *   never swept;
  * - the card's proof of the keys is checked before EXTERNAL AUTHENTICATE
  *   (scp02.ts, and scp03.ts for an SCP03 card);
  * - on an SCP03 card, the J3R452, a sweep of the Cashu AIDs deletes nothing
@@ -37,7 +38,9 @@ import {
   OPENER_AID,
   TAG_AID,
   TAG_CLASS_AID,
+  supportedCardVersion,
 } from './aids';
+import {changeOwedByte, readChangeOwed} from './change-owed';
 import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
 import {
   RegistryEvidenceError,
@@ -179,7 +182,7 @@ export function cashuPlan(loadFile: LoadFileAsset): Plan {
     sweep: [TAG_AID, CARD_AID, OPENER_AID, CASHU_PACKAGE_AID],
     guard: CARD_AID,
     checks: [
-      // the whole AID, never the package AID (D25): the tracked CAP's version, 02 02
+      // the whole AID, never the package AID (D25): the tracked CAP's version, 03 00
       {apdu: selectAid(CARD_AID), data: [...CARD_VERSION]},
       {apdu: GET_INFO, length: 30},
       {apdu: GET_PUBKEY, length: 33},
@@ -455,10 +458,17 @@ class Run<P extends string> {
   }
 }
 
-/** Why GET_INFO's 30 bytes are not an empty card, or null when they are. */
+/**
+ * Why GET_INFO's 30 bytes are not an empty card, or null when they are. On a
+ * 3.0 card byte 29 says change is owed; a 2.1 or 2.2 card is asked GET_CHANGE
+ * besides (readChangeOwed), which these bytes cannot say.
+ */
 export function notEmpty(info: Bytes): string | null {
   if (info.length < 30) {
     return `GET_INFO answered ${info.length} bytes, not 30`;
+  }
+  if (info[0] === 3 && info[1] === 0 && changeOwedByte(info)) {
+    return 'it is owed change that has not come back to it yet';
   }
   if (info[3] !== 0) {
     return `it holds ${info[3]} unspent pieces`;
@@ -577,13 +587,22 @@ export async function provision(
         return; // no card applet: nothing to guard
       }
       expectOk(selected, 0xa4);
-      if (selected.data.length < 2 || selected.data[0] !== 0x02) {
+      if (!supportedCardVersion(selected.data)) {
         throw new Guard(
-          `${toHex(guard)} answers ${toHex(selected.data)} ${swHex(selected.sw)}, not a 2.x card applet: the app will not remove it`,
+          `${toHex(guard)} answers ${toHex(selected.data)} ${swHex(selected.sw)}, not a card applet version this kit knows (2.1, 2.2 or 3.0): the app will not remove it`,
         );
       }
       const info = expectOk(await run.plain(GET_INFO), 0x01);
-      const why = notEmpty(info.data);
+      if (!equal(info.data.slice(0, 2), selected.data)) {
+        throw new Guard(
+          `the card applet's GET_INFO says ${toHex(info.data.slice(0, 2))}, not the version SELECT answered: the app will not remove it`,
+        );
+      }
+      const why =
+        notEmpty(info.data) ??
+        ((await readChangeOwed(c => run.plain(c), info.data))
+          ? 'it is owed change that has not come back to it yet'
+          : null);
       if (why) {
         throw new Guard(
           `the card applet is installed and ${why}: the app never removes a card that holds anything`,

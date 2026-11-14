@@ -159,15 +159,19 @@ USD backend.
 holds it. The entire product thesis ([`VISION.md`](VISION.md)).
 
 **Profile B / B+**: the 0.x draft's offline bearer profile and its PIN-gated
-variant. Protocol 2.0 replaces both: a PIN is optional, payments are bounded by
-the owner's limits, and the owner administers the card ([D18](DECISIONS.md#d18)).
+variant. Protocol 2.0 replaces both: payments are bounded by the owner's
+limits, and the owner administers the card ([D18](DECISIONS.md#d18)). A PIN was
+optional in 2.0 to 2.2; since 3.0 a card with no PIN takes and pays nothing
+([D185](DECISIONS.md#d185)).
 
 **Owner key**: a holder-controlled P-256 key managed by the wallet. Flash's
 tested setup derives it from the wallet recovery phrase; wallet implementations
 must define their custody and recovery procedure. Its ECDSA proofs, under
 `CashuCard/…` labels, change the PIN (unblocking a blocked card), the limits,
-the record and the owner, add funds with no PIN, and refresh the card. Payment
-signing uses the separate on-card secp256k1 key.
+the record and the owner, read the card's secret c, and refresh the card. Up to
+2.2 its grant also added funds with no PIN; since 3.0 every top-up wants the PIN
+([D185](DECISIONS.md#d185)). Payment signing uses the separate on-card secp256k1
+key.
 
 **Rollover budget**: how many times the day's window may roll between the
 owner's `REFRESH`es (default 7, 1 to 30): the bound on a terminal that walks the
