@@ -4899,7 +4899,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             if (pinMarks[PM_WRONG] != (byte) 0) Util.arrayCopy(ZERO, (short) 0, pinMarks, PM_WRONG, (short) 3);
             // Nothing about spending is touched here: the PIN can be presented as
             // often as its holder, or a terminal holding it, likes. It arms
-            // nothing (D186): a reader handed the PIN to take a payment has it
+            // nothing (D208): a reader handed the PIN to take a payment has it
             // too, and must not open the no-PIN allowance again for whoever taps
             // the card next. The owner's proof arms it, and on a card with no
             // owner a held tap (`requireHistory`), which no payment can share.
