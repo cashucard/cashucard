@@ -97,7 +97,10 @@ async function signIn(operator = 1) {
     await app.signIn('operator', 'test-password', {client});
   });
 }
-async function mount(overrides: Partial<ResetReview> = {}) {
+async function mount(
+  overrides: Partial<ResetReview> = {},
+  hardwareValidated = true,
+) {
   let id = 0;
   leave = jest.fn();
   const storage = disk(),
@@ -128,8 +131,8 @@ async function mount(overrides: Partial<ResetReview> = {}) {
           options={{
             storage,
             resetStorage,
-            // the build's own gate follows the tracked load file (releaseGates.ts); these tests are of the reset screen
-            hardwareValidated: true,
+            // the build's own gate follows the tracked load file (releaseGates.ts); it gates installing, never a reset
+            hardwareValidated,
             uuid: () => uuid(++id),
             resetServiceFor: () => service,
             resetWithCard: async callback => {
@@ -542,4 +545,95 @@ test('a new completion shows its result once; cancelling the next check never re
   expect(f.run).toHaveBeenCalledTimes(2);
   expect(f.service.authorize).not.toHaveBeenCalled();
   expect(f.service.keys).not.toHaveBeenCalled();
+});
+
+// The bundled load file is not on the chip-proven list (releaseGates.ts), so a
+// build may refuse to install; a reset loads nothing and stays available.
+test('with the load file not validated, a reset is offered, prepared and continued, while installing stays refused', async () => {
+  const f = await mount({spent: 0}, false);
+  expect(flow.hardwareValidated).toBe(false);
+  await press('reset-inspect');
+  await press('reset-consent-erase');
+  await press('reset-consent-value');
+  expect(tree.root.findByProps({testID: 'reset-prepare'}).props.disabled).toBe(
+    false,
+  );
+  await press('reset-prepare');
+  expect(flow.resetState?.journal.stage).toBe('reviewed');
+  expect(tree.root.findByProps({testID: 'reset-continue'}).props.disabled).toBe(
+    false,
+  );
+  await press('reset-continue');
+  // the reset went on to the service's authorization (whose empty reply stops it here)
+  expect(f.service.authorize).toHaveBeenCalledTimes(1);
+  expect(flow.notice).not.toBe('Reset unavailable');
+  await act(async () => {
+    expect(await flow.program()).toBe(false);
+  });
+  for (const start of [flow.create, flow.startAndRead]) {
+    await act(async () => {
+      expect(
+        await start({
+          count: 1,
+          mint: 'https://mint.test',
+          pinPolicy: 'perCard',
+          pinBatch: '',
+          dailyUsd: 25,
+          noPinUsd: 5,
+        }),
+      ).toBe(false);
+    });
+  }
+  expect(flow.snapshot?.batch).toBeFalsy();
+});
+
+test('with the load file not validated, a reset saved by an earlier build is finished and its completion saved', async () => {
+  const f = await mount({spent: 0}, false);
+  const completed = completedReset();
+  const saved: OwnedResetState = JSON.parse(JSON.stringify(completed));
+  // an earlier build saved a cardkit 0.2 review, with no changeOwed or version
+  delete (saved.review as Partial<ResetReview>).changeOwed;
+  delete (saved.review as Partial<ResetReview>).version;
+  saved.journal.stage = 'factory_verified';
+  delete saved.journal.reconciliation_receipt;
+  jest
+    .mocked(f.service.complete)
+    .mockResolvedValue(JSON.parse(completed.journal.reconciliation_receipt!));
+  await act(async () => {
+    await f.resetStorage.replace(JSON.stringify(saved));
+    await flow.reload();
+  });
+  const button = tree.root.findByProps({testID: 'reset-continue'});
+  expect(button.props.title).toBe('SAVE RESET COMPLETION');
+  expect(button.props.disabled).toBe(false);
+  await press('reset-continue');
+  expect(f.service.complete).toHaveBeenCalledTimes(1);
+  expect(flow.resetState?.journal.stage).toBe('complete');
+  expect(JSON.parse((await f.resetStorage.read())!).journal.stage).toBe(
+    'complete',
+  );
+});
+
+test('with the load file not validated, a saved reset with spent entries goes on to the card to clear them', async () => {
+  const f = await mount({spent: 13}, false);
+  const saved: OwnedResetState = JSON.parse(JSON.stringify(completedReset()));
+  saved.review = {...card, spent: 13};
+  saved.journal.stage = 'reviewed';
+  delete saved.journal.service_intent_receipt;
+  delete saved.journal.factory_evidence;
+  delete saved.journal.reconciliation_receipt;
+  await act(async () => {
+    await f.resetStorage.replace(JSON.stringify(saved));
+    await flow.reload();
+  });
+  await act(async () => {
+    tree.root.findByProps({testID: 'reset-pin'}).props.onChangeText('1234');
+  });
+  expect(tree.root.findByProps({testID: 'reset-continue'}).props.disabled).toBe(
+    false,
+  );
+  await press('reset-continue');
+  expect(f.service.lookup).toHaveBeenCalledTimes(1);
+  expect(f.run).toHaveBeenCalledTimes(1);
+  expect(f.service.authorize).not.toHaveBeenCalled();
 });

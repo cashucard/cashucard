@@ -443,7 +443,7 @@ class SimCardTest {
         assertEquals(MINT, s.get("mint").getAsString());
         // the PIN in the app's tap: the card says its history, the arming among it
         assertEquals(0x9000, SimCard.sw(card.transmit(VERIFY_1234)));
-        assertTrue(card.state().get("allowanceArmed").getAsBoolean(), "armed by the PIN and the owner's proofs");
+        assertTrue(card.state().get("allowanceArmed").getAsBoolean(), "armed by the owner's proofs (the PIN alone arms nothing, D208)");
         byte[] info = data(card.transmit(Hex.parse("B001040000")));
         assertEquals(59, info.length);
         assertEquals(0, SimCard.readUint32(info, 44), "the rate is the holder's: the PIN alone on an owned card is told zeros");

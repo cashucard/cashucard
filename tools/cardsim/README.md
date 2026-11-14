@@ -69,7 +69,7 @@ not expect is **500** `{"error"}`. The card is kept as it was.
   "SELECT the applet's whole AID" below).
 - **Old cards.** An old AID (0.x `D2 76 00 00 85 01 02`, or Foxy's 1.x
   `F0 46 4F 58 59 …`) through jCardSim answers `6E00` or `6999`, where a real card's
-  runtime answers `6A82`. Treat any `SELECT` answer that is not `02xx 9000` as
+  runtime answers `6A82`. Treat any `SELECT` answer that is not `03xx 9000` as
   "This card needs an update".
 
 ## `/fixture`
@@ -253,8 +253,9 @@ so the card leaves its budget as it is (D26).
 `tools/cardsim/cashu-crypto.cjs` is the Cashu arithmetic the tests use (NUT-00
 blinding, NUT-12 DLEQ, BIP-340, the keys per load `dateKeys(c, P, R, date)` and
 `tweakedKey(P, t)`, the format-4 card secret `cardSecret(nonce, dateKey, date,
-dateRefund)` naming the date's key, `verifyPayment` and the SIG_ALL message), also
-with no dependencies.
+dateRefund)` naming the date's key, `verifyPayment` and the SIG_ALL message, BIP-340
+signing `schnorrSign` for a refund key's spend, and `openCardSecret`, c opened from
+`GET_CARD` P1 3 with the refund key's r), also with no dependencies.
 
 ## A worked example
 
@@ -300,9 +301,17 @@ curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}
 The same in Node, minting at a real mint with a SIG_ALL swap, is
 `tools/cardsim/e2e-swap.test.cjs`: the first set-up, `GROUP_KEYS`, pieces minted to
 the card's key for the date 0, loaded under the PIN, the mint's keyset taught
-(`KEYSET_KEYS`), a payment with the card's own change bound to the mint's keys, the
-swap, then in a new tap with no PIN each opening's key shown and the mint's answer
-loaded with `LOAD_CHANGE`. CI runs it against a Nutshell 0.20.3 with forge's keyset
+(`KEYSET_KEYS`), a payment with the card's own change bound to the mint's keys (asked
+for only after the mint's `/v1/info` says NUT-12 and NUT-09), the swap, then in a new
+tap with no PIN each opening's key shown and the mint's answer loaded with
+`LOAD_CHANGE`. The same round runs with dated pieces: a card with a refund key, pieces
+locked to its key for a date 30 days ahead with that date as their locktime and the
+date's refund key, paid and their dated change loaded back. A third test takes back a
+lost card's pieces by the refund key: c read sealed to the refund key under the PIN
+(`getNonce(1)`, `getCardSecret()`, `cashu-crypto.openCardSecret` with r), pieces of a
+date already past loaded and never paid, and the swap signed by r + u alone
+(`cashu-crypto.schnorrSign`); the mint is also shown to refuse that key before the
+date, and r without u. CI runs them against a Nutshell 0.20.3 with forge's keyset
 shape (an 8-byte id, no fee) and against a fresh v2 keyset (a 33-byte id, a fee of
 100).
 
@@ -335,6 +344,19 @@ past this change (both pins move together, with the app changes below):
   PIN; `6A9F` otherwise). The change comes back with `owedChange`,
   `showOpeningKey` and `loadChange`, in any tap and with no PIN; `getChange` no
   longer gives a nonce or a blinding factor, and `loadProof` of change is gone.
+- **Ask for change only at a mint that gives it back.** `loadChange` needs the
+  mint's NUT-12 proof (e, s) of each change signature, and nobody but the card can
+  unblind the change. At a mint that gives no DLEQ, the payment's inputs are spent
+  and its change can never be loaded: lost for good. So before `spendAllChange`, an
+  app reads the mint's `GET /v1/info` and asks the card for change only where
+  `nuts["12"].supported` and `nuts["9"].supported` are both `true` (NUT-09 restore,
+  by the opening's B_, is the only way back to a swap answer lost on its way); at
+  any other mint it pays the exact amount, with no change output. After the swap, a
+  change signature with no `dleq` is not handed to `loadChange`: the opening stays
+  owed, and the app asks the mint for it again by NUT-09 restore. `client.cjs`
+  encodes the card's commands and talks to no mint, so this check is the app's;
+  `e2e-swap.test.cjs` makes it before every `spendAllChange`, and
+  `tools/cardctl/cardctl.py` has it as `check_change_mint` and `change_signature`.
 - **Loads and the owner.** `LOAD_PROOF` (P2 `02`) and `CLEAR_SPENT` want the PIN in
   the tap; `allowLoad` answers `6200` and opens no load; the tap after a payment
   opens nothing (`GET_INFO` byte 29 is now "change owed"). A card with no PIN

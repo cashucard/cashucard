@@ -88,24 +88,28 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 3.0 build is **36,953 bytes** by refcheck's measure (89 past a multiple of 256;
-the Method component 30,069), in 150 blocks of 247 bytes: the load file inside the
-tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is not the
-CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
-exact file has run only in a simulator so far, and no card has installed it. Its source
-is the one of 2026-11-14 below, with the version moved from 2.3 to 3.0
-([D205](DECISIONS.md#d205)): the load file differs from that day's (`f216644a…`) only in
-the two version bytes in the Method component and the package's version in the Header
-component, and the size is the same. That source is the one of 2026-11-13 below with
+The 3.0 build is **37,413 bytes** by refcheck's measure (37 past a multiple of 256;
+the Method component 30,457), in 152 blocks of 247 bytes, the last 116: the load file
+inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
+not the CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
+exact file has run only in a simulator so far, and no card has installed it or a file of its size.
+Its source is the one of 2026-11-14 below, with the version moved from 2.3 to 3.0
+([D205](DECISIONS.md#d205)) and [D206](DECISIONS.md#d206) to [D210](DECISIONS.md#d210)
+added: the card checks each signature before it gives it out, the no-PIN allowance
+is armed by the owner's proof or a held tap and not by the PIN alone, `GET_INFO` says
+whether the paid list has its room, and `ALLOW_LOAD`'s length is checked before its
+proof. Those add 460 bytes to the 36,953 of that day's file
+(`f216644a…`), and refcheck names the size untried: the nearest size known to install
+is that file's. The source of 2026-11-14 is the one of 2026-11-13 below with
 [D200](DECISIONS.md#d200) to [D204](DECISIONS.md#d204) added (a payment's change counted
 when it is made, the owner's anchor bringing the clock back on an empty card, a header at
 the floor's work beginning and ending no day, with `REFRESH` bringing the clock back,
 the card's secret c made from its owner's words at the claim or the hand-over, and a fresh
 or newly set-up card held to the same bar, with the owner's back form bringing back the
 day of loads, and the first set-up's anchor bringing back any clock on an empty card).
-refcheck says its size is a size known to install on the chip, from the file of
-2026-11-14; its list of hashes holds that file's hash, not this one's, and this file's
-own run, as the checklist below, is still to come.
+refcheck's list of hashes holds that day's file's hash, not this one's, and this file's
+own run, as the checklist below, is still to come; if the chip refuses its size, it is
+moved with `sizeTheFile` (below).
 
 On 2026-11-13 a J3R180 was given earlier source, numbered 2.3 then, padded to three
 sizes: it installed the files of 33,647 and 35,213 bytes and refused the card's applet in
@@ -231,9 +235,9 @@ passed 21 of 21 with the PIN. Not run: `LOCK_CARD` (the owner's reset of a locke
 card), taking money back after D with the refund key, a header far ahead or a weak
 clock (no real header makes either), tears, a phone and a production mint ([the
 hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
-file is that day's file with the version moved to 3.0 ([D205](DECISIONS.md#d205)). This
-exact file has run only in a simulator so far, and no card has installed it; the run is
-to be repeated on it.
+file is that day's source with the version moved to 3.0 ([D205](DECISIONS.md#d205)) and
+D206 to D210 added. This exact file has run only in a simulator so far, and no card has
+installed it or a file of its size; the run is to be repeated on it.
 
 > **Three applets, installed in order.** The chip refuses the card's applet as the
 > first instantiated from its package (no answer, or `6F00`); it takes it once a
@@ -283,10 +287,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.0**, sha256
-`7cfd7e5d3c650e3ac8a25dbc875bdbb8b83d0f3bc4d7513bc708bdaca34bf245`
+`ff5d17ecc6e07922746d2528a7acfb19abcbd802a43e561f5514b14aec583c2d`
 (`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 36,953 bytes), has sha256
-`a7778e7b8f23e12086a3dceeac7dd9db6d407daa119b6e1caedeed28d139ce78`: the hash the
+is LOADed with (refcheck's measure, 37,413 bytes), has sha256
+`d4a897d856ac23073350e2e12f5a284401f5e168043b9c22ab17e97b0815a22f`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -625,9 +629,9 @@ in that week, as no reader's header moves the clock back; and the sealed `VERIFY
 ran once, after the run, while `selftest` ran before and after. The run of 2026-11-14
 (above) did them all for that day's file, numbered 2.3 (`f216644a…`), but the owner's
 reset of a locked card, which would lock the bench card for good; `INBOX` for last week
-was read after a reset by the PIN anchored in that week. The run on the 3.0 file, which
-differs from that day's only in its version bytes, is to do them all again. Write the
-sha256 of every file sent to the chip in the run's log.
+was read after a reset by the PIN anchored in that week. The run on the 3.0 file, whose
+source is that day's renumbered with D206 to D210 added, is to do them all again, and
+the size first. Write the sha256 of every file sent to the chip in the run's log.
 
 - Install the three applets in order, and add the load file's size to refcheck's
   SIZES only once the card's applet is selected and answers.

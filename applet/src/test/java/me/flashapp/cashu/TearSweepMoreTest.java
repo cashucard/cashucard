@@ -374,4 +374,28 @@ class TearSweepMoreTest {
                 if (c.f("pinState")[0] != 0) c.wrong("reset again, and still a PIN");
             });
     }
+
+    // ---- the arming a held tap gives (D186, amended): one byte, before TAP_READ ----
+
+    static void noOwnerWithThePin(Card c) {
+        readyNoOwner(c);
+        assertEquals(SW_OK, c.sim.transmitCommand(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, TEST_PIN)).getSW());
+        assertEquals(0, c.f("cardRecord")[CashuApplet.CARD_ARMED_OFFSET], "nothing armed: the PIN arms nothing");
+        TearHook.refresh();
+    }
+
+    @Test
+    void aHeldTapArms() throws Exception {
+        sweep("a held tap on a card with no owner, which arms the no-PIN allowance", TearSweepMoreTest::noOwnerWithThePin,
+            c -> assertEquals(SW_OK, c.send(new CommandAPDU(CLA, INS_GET_LOG, 0, 0, 256)).getSW()),
+            c -> {
+                byte armed = c.f("cardRecord")[CashuApplet.CARD_ARMED_OFFSET];
+                if (armed != 0 && armed != 1) c.wrong("the arming is " + armed);
+                if ((c.f("tapOpen")[2] & CashuApplet.TAP_READ) != 0) c.wrong("a held tap through the card leaving the field");
+                // armed or not, the holder holds again in a new tap, and it is armed
+                tap(c);
+                int h = c.send(new CommandAPDU(CLA, INS_GET_LOG, 0, 0, 256)).getSW();
+                if (h != SW_OK || c.f("cardRecord")[CashuApplet.CARD_ARMED_OFFSET] != 1) c.wrong(String.format("held again: %04X, armed %d", h, c.f("cardRecord")[CashuApplet.CARD_ARMED_OFFSET]));
+            });
+    }
 }

@@ -22,8 +22,22 @@ import javacard.security.*;
  *   4. R = k·G  (via KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY)
  *   5. If R.y is odd, k = n − k
  *   6. e = SHA256_tagged("BIP0340/challenge", R.x ‖ P.x ‖ msg) mod n
- *   7. s = (k + e·d_eff) mod n   (using mulModN + addModN)
- *   8. sig = R.x ‖ s (64 bytes)
+ *   7. s = (k + e·d_eff) mod n   (using mulModN + addModN), into scratch
+ *   8. Verify: R' = s·G − e·Q, Q the even-Y point whose x went into e;
+ *      R'.x must be R.x and R'.y even, or the card answers 6F00 and gives
+ *      nothing (`verify`)
+ *   9. sig = R.x ‖ s (64 bytes), written to the caller's buffer only now
+ *
+ *   Step 8 is BIP-340's own last step of default signing ("if Verify fails,
+ *   abort"). d is in RAM and e·d a multiplication in software, and AUTH
+ *   signs for any reader with no PIN, as often as it likes: one fault in that
+ *   multiplication, or one bit of d flipped in the scratch, makes a signature
+ *   whose error s'·G − R − e·P = e·δ·G leaves few values for δ, a bit or a
+ *   byte of d; enough of them give d, and every piece on the card with it.
+ *   A signature that does not verify never leaves the card. The waits
+ *   (`signatureWork`) do steps 1 to 7 and 9 and not 8: their signature is
+ *   thrown away by the caller, and their length is a signature's work as it
+ *   was before the check (CashuApplet.work).
  *
  *   Steps 2–3 are BIP-340's *default signing* nonce derivation, auxiliary
  *   randomness and all — not a deterministic RFC6979-style nonce. This matters
@@ -79,7 +93,10 @@ import javacard.security.*;
  *   A secret scalar is in a key object only for the call that uses it: the
  *   nonce in sign(), the scalar addTo() and mul() are handed, and the key
  *   agree() is handed. Each of them ends, however it ends, by `rest()`;
- *   sign() first zeroes `sc` and `work`, which held d, k and e·d.
+ *   sign() first zeroes `sc` and `work`, which held d, k and e·d. The check
+ *   of step 8 begins by zeroing d, k and e·d and taking the nonce out of the
+ *   key (`rest()`): it needs none of them, and its own calls put only public
+ *   scalars in the key (e, s, a date's t).
  *
  * ENG-182 — cashucard/javacard
  */
@@ -150,6 +167,30 @@ final class SchnorrHW {
     private static final short W_HI   = (short)128;
     private static final short W_SUB  = (short)160;   // mulSmallByDelta's region
     private final byte[] work;
+
+    // ── The check of step 8 (`verify`), and the signature before it leaves ──
+    // Once mulModN is done with `work`, s and what the check reads are kept
+    // there, and the points it makes go in `sc`, which it zeroes first (d, k
+    // and e·d are no part of the check). No engine call is given the same
+    // bytes as a point it reads and the point it writes: a chip is not known
+    // to take its answer over its input. In `work`:
+    //   [  0.. 31]  s   : k + e·d mod n: the half that gives d away where it is wrong
+    //   [ 32.. 63]  e   : the challenge
+    //   [ 64.. 95]  Rx  : R's x, the other half
+    //   [ 96..127]  Px  : the x that went into e
+    //   [128..192]  R'  : [s]G + (−T), 65 bytes, which must be R
+    // In `sc`:
+    //   [  0.. 64]  W   : the card's own point, 04 || X || Y: getW's, or [d]G where getW gives 33 bytes
+    //   [ 65..129]  Q   : W + [t]G, the date's key (D197); with no date, Q is W in place
+    //   [130..194]  T   : [e]Q, then −T
+    private static final short V_S    = (short)  0;
+    private static final short V_E    = (short) 32;
+    private static final short V_RX   = (short) 64;
+    private static final short V_PX   = (short) 96;
+    private static final short V_R    = (short)128;
+    private static final short V_W    = (short)  0;
+    private static final short V_Q    = (short) 65;
+    private static final short V_T    = (short)130;
 
     // ── Crypto objects (allocated once) ───────────────────────────────────
     private final MessageDigest sha256;
@@ -278,15 +319,38 @@ final class SchnorrHW {
      * BIP-340 under the card's key for a date (keys per load, D197): with `g` not null, the private key is d + t mod n, t the
      * 32 bytes at g[gOff], and its public key the compressed point after them (33), P + t*G, which the caller worked out; with
      * `g` null, the key itself. `g` is read before anything is written to `out`.
+     *
+     * The signature is verified before it is written (step 8, `verify`): `6F00` (SW_CRYPTO_ERROR) for one that does not
+     * verify under the key whose x went into its challenge, for a public key object that names another key than the private
+     * one, and for a point at g + 32 that is not P + t*G with its parity, with nothing written to `out` and nothing of s left
+     * in this class's scratch. Every signature that leaves the card is made here.
      */
     short sign(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,
                byte[] msg, short msgOff,
                byte[] out, short outOff) {
+        return signed(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, true);
+    }
+
+    /**
+     * A signature's work whose result never leaves the card: the waits of a payment, of the PIN and of a held tap
+     * (CashuApplet.work), which are specified in units of it. Steps 1 to 7 and 9 of sign(), with the card's own key and no
+     * date, and not the check of step 8, so that a wait is as long as it was before signatures were checked. The 64 bytes
+     * it writes to `out` are not checked and must never be sent: its caller clears them.
+     */
+    short signatureWork(ECPrivateKey privKey, ECPublicKey pubKey,
+                        byte[] msg, short msgOff,
+                        byte[] out, short outOff) {
+        return signed(privKey, pubKey, null, (short)0, msg, msgOff, out, outOff, false);
+    }
+
+    private short signed(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,
+                         byte[] msg, short msgOff,
+                         byte[] out, short outOff, boolean checked) {
         // d, k and e·d are in sc and work, and k in the temporary key, for this
         // call and no longer: however it ends, the two are zeroed first and
         // then the key is wiped, so a wipe the chip refuses leaves neither
         try {
-            return signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff);
+            return signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, checked);
         } finally {
             Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
             Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
@@ -296,7 +360,7 @@ final class SchnorrHW {
 
     private short signOnce(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,
                            byte[] msg, short msgOff,
-                           byte[] out, short outOff) {
+                           byte[] out, short outOff, boolean checked) {
 
         // ── Step 1: Extract d, check P.y parity ──────────────────────
         // getS is specified to return the scalar's byte length, with the value
@@ -422,15 +486,80 @@ final class SchnorrHW {
         reduceModN(sc, SC_E);         // e = e mod n
 
         // ── Step 7: s = (k + e·d) mod n ──────────────────────────────
+        // Into work (V_S), which mulModN is done with, and not into `out`:
+        // nothing of the signature is where the host can read it until step 8
+        // has passed. Rx beside it: step 6 shifted it to sc[SC_TMP..SC_TMP+31]
+        // before hashing (the challenge hash wrote to SC_E, not SC_TMP), and
+        // the check zeroes sc.
         mulModN(sc, SC_E, sc, SC_D, sc, SC_ED, work, (short)0);  // ed = e * d mod n
-        addModN(sc, SC_ED, sc, SC_K, out, (short)(outOff + 32)); // s = ed + k mod n
+        addModN(sc, SC_ED, sc, SC_K, work, V_S);                 // s = ed + k mod n
+        Util.arrayCopyNonAtomic(sc, SC_TMP, work, V_RX, (short)32);
 
-        // ── Step 8: output = Rx ‖ s ──────────────────────────────────
-        // Rx sits at sc[SC_TMP..SC_TMP+31] — step 6 shifted it there before
-        // hashing; the challenge hash wrote to SC_E, not SC_TMP.
-        Util.arrayCopy(sc, SC_TMP, out, outOff, (short)32);  // Rx
+        // ── Step 8: the signature verified, or 6F00 and nothing out ──
+        if (checked) verify(privKey, pubKey, g, gOff);
+
+        // ── Step 9: output = Rx ‖ s ──────────────────────────────────
+        Util.arrayCopyNonAtomic(work, V_RX, out, outOff, (short)32);
+        Util.arrayCopyNonAtomic(work, V_S, out, (short)(outOff + 32), (short)32);
 
         return (short)64;
+    }
+
+    /**
+     * Step 8, BIP-340's "if Verify(P, m, sig) fails, abort": s*G - e*Q is R, with R's x (work[V_RX]) and an even Y, where Q
+     * is the key the signature is under, whole and with an even Y (BIP-340's lift_x), and its x the Px that went into e
+     * (work[V_PX]). `6F00` (SW_CRYPTO_ERROR) otherwise, before anything is written to the caller's buffer; sign()'s
+     * `finally` then zeroes sc and work, s among them.
+     *
+     * Q comes of the card's own point W and nothing the signing worked out: W is getW's 65 bytes, or, where the chip's getW
+     * gives the 33-byte form, [d]G by the key agreement with the card's private key (never a square root, which would take
+     * the parity on trust). With `g` (a date's key, D197) Q = [t]G + W by the point addition (t is public) and must be the
+     * caller's 33-byte point at g + 32, its x and its parity: a wrong point there is refused, whatever the signature. Every
+     * scalar this puts in the temporary key (t, e, s) is public once the signature is out; [d]G gives the agreement the card's
+     * own key object, as agree() does for the PIN key; d, k and e·d are zeroed and the nonce taken out of the key and both
+     * agreements first. Its own calls each end by rest().
+     *
+     * What jCardSim cannot show of it (D10): the chip's answers for a scalar of 0 or a sum at infinity, which no key, date
+     * or message reaches but by chance (e = 0, s = 0, t = d or t = -d, each about 2^-256); and its time on a chip.
+     */
+    private void verify(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff) {
+        // what the check reads, beside s and Rx; then d, k and e·d (all of sc) zeroed, and the nonce out of the key
+        Util.arrayCopyNonAtomic(sc, SC_E, work, V_E, (short)32);
+        Util.arrayCopyNonAtomic(sc, SC_PX, work, V_PX, (short)32);
+        Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
+        rest();
+
+        // W, the card's own point, whole
+        short wLen = pubKey.getW(sc, V_W);
+        if (wLen == (short)33) {
+            agree(privKey, CashuApplet.SECP256K1_G, (short)0, (short)65, sc, V_W);
+        } else if (wLen != (short)65 || sc[V_W] != (byte)0x04) {
+            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        }
+        // Q: W, or W + [t]G, which must be the point the caller named, x and parity
+        short q = V_W;
+        if (g != null) {
+            addToG(g, gOff, sc, V_W, sc, V_Q);
+            q = V_Q;
+            if (g[(short)(gOff + 32)] != (byte)(0x02 | (sc[(short)(V_Q + 64)] & 1))
+                || Util.arrayCompare(sc, (short)(V_Q + 1), g, (short)(gOff + 33), (short)32) != (byte)0) {
+                ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+            }
+        }
+        // its x the one in e; and its Y made even (p - Y), as lift_x has it
+        if (Util.arrayCompare(sc, (short)(q + 1), work, V_PX, (short)32) != (byte)0) {
+            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        }
+        if ((sc[(short)(q + 64)] & 1) != 0) sub32(CashuApplet.SECP256K1_P, (short)0, sc, (short)(q + 33), sc, (short)(q + 33));
+
+        // T = [e]Q by the key agreement, made -T; R' = [s]G + (-T) by the point addition
+        mul(work, V_E, sc, q, sc, V_T);
+        sub32(CashuApplet.SECP256K1_P, (short)0, sc, (short)(V_T + 33), sc, (short)(V_T + 33));
+        addToG(work, V_S, sc, V_T, work, V_R);
+        if ((work[(short)(V_R + 64)] & 1) != 0
+            || Util.arrayCompare(work, (short)(V_R + 1), work, V_RX, (short)32) != (byte)0) {
+            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        }
     }
 
     // ── Tagged hash ───────────────────────────────────────────────────────

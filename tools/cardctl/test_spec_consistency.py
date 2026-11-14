@@ -440,7 +440,9 @@ def test_get_info_response_table_matches_the_decoder():
     assert "p1 == (byte) 2 ? (short) 43 : (short) 42" in src and "apdu.setOutgoingAndSend((short) 0, (short) 30);" in src
     assert "apdu.setOutgoingAndSend((short) 0, (short) 51);" in src, "P1 = 3's 51 bytes (D184)"
     assert "apdu.setOutgoingAndSend((short) 0, (short) 59);" in src, "P1 = 4's 59 bytes (D186, D195)"
-    assert "buf[55] = (byte) 0xFF;" in src and "buf[56] = (byte) 0x03;" in src and "answers `FF 03`" in _section("GET_INFO"), "the profile bits"
+    assert ("buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x7F : (byte) 0xFF;" in src
+            and "buf[56] = (byte) 0x03;" in src and "answers `FF 03`" in _section("GET_INFO")
+            and "`7F 03`" in _section("GET_INFO")), "the profile bits, and the paid list's (D210)"
 
 
 def test_get_card_table_matches_the_decoder_and_the_applets_rollover_bytes():
@@ -538,6 +540,10 @@ def test_the_floor_the_spec_states_is_the_applets():
     assert f"`0x{bits}`" in _section("SET_HEADER"), bits
 
 
+# A mint's GET /v1/info that says NUT-09 and NUT-12: SPEND_ALL_CHANGE is asked only at such a mint.
+_CHANGE_MINT = {"nuts": {"9": {"supported": True}, "12": {"supported": True}}}
+
+
 # ── the bytes cardctl sends, against the tables ──────────────────────────────
 # Every command cardctl drives, as (spec section, Card method, arguments, the
 # answer to give it). The completeness ratchet below fails the day a Card
@@ -573,7 +579,7 @@ _DRIVEN = [
     ("GET_CHANGE", "get_change", (0,), [b"\x00"]),
     ("LOAD_CHANGE", "load_change", (0, cardctl.point_uncompressed(bip340.G), cardctl.point_uncompressed(bip340.G),
                                     bytes(32), bytes(32)), [bytes(83)]),
-    ("SPEND_ALL_CHANGE", "spend_all_change", (1, cardctl.point_compressed(bip340.G), bytes(8)), [bytes(33)]),
+    ("SPEND_ALL_CHANGE", "spend_all_change", (1, cardctl.point_compressed(bip340.G), bytes(8), _CHANGE_MINT), [bytes(33)]),
     ("KEYSET_KEYS", "keyset_keys_begin", (bytes(8),), [b""]),
     ("KEYSET_KEYS", "keyset_keys_keys", ([(1, cardctl.point_compressed(bip340.G))],), [b""]),
     ("KEYSET_KEYS", "keyset_keys_finish", (), [bytes(8)]),
@@ -705,8 +711,8 @@ def test_get_change_rows_are_the_tables_and_the_applets():
     assert (consts["CHANGE_REC"], consts["CHANGE_PAGE"], consts["CHANGE_MOST"]) == (83, 3, cardctl.CHANGE_MOST) == (83, 3, 8)
     assert (consts["OPEN_AMOUNT"], consts["OPEN_KEYSET"], consts["OPEN_DATE"], consts["OPEN_NONCE"]) == (0, 4, 12, 16)
     assert (consts["OPEN_KEYS_B"], consts["OPEN_KEYS_K"], consts["OPEN_KEYS_LEN"]) == (0, 33, 66)
-    # a reader reads 83-byte openings and sends LOAD_CHANGE only to a card that answers 03 00 or later
-    assert "A reader sends `LOAD_CHANGE` and reads 83-byte openings only from a card that answers `03 00` or later" \
+    # a reader reads 83-byte openings and sends LOAD_CHANGE only to a card that answers 03 xx (the major, D205)
+    assert "A reader sends `LOAD_CHANGE` and reads 83-byte openings only from a card that answers `03 xx`" \
         in " ".join(_heading_body("SELECT APPLICATION").split())
     for method, args in (("get_change", (0,)), ("load_change", _DRIVEN[[d[1] for d in _DRIVEN].index("load_change")][2])):
         card = make_card([(b"\x02\x02", 0x9000)])
@@ -765,7 +771,7 @@ def test_spend_all_change_sends_its_45_bytes_in_the_tables_order():
     assert [int(n) for n in re.findall(r"\((\d+)", data)] == [4, 33, 8]
     assert cardctl.SPEND_ALL_CHANGE_LEN == 45 == int(_row(section, "Lc").split()[0], 16) == _applet_shorts()["CHANGE_ASK_KEYSET_LEN"]
     k = cardctl.point_compressed(bip340.G)
-    sent = _drive("spend_all_change", (0x01020304, k, bytes(range(8))), [bytes(33)])
+    sent = _drive("spend_all_change", (0x01020304, k, bytes(range(8)), _CHANGE_MINT), [bytes(33)])
     assert sent[5:50] == bytes([1, 2, 3, 4]) + k + bytes(range(8)) and sent[-1] == 33 == int(_row(section, "Le"), 16)
 
 

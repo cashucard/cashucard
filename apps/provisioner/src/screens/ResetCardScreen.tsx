@@ -332,7 +332,6 @@ export function ResetCardScreen({
                   danger={visible.journal.stage !== 'factory_verified'}
                   disabled={
                     flow.busy ||
-                    !flow.hardwareValidated ||
                     (visible.review.spent > 0 && !/^[0-9]{4,8}$/.test(pin))
                   }
                   onPress={() => {
@@ -362,12 +361,7 @@ export function ResetCardScreen({
                       title="PREPARE THIS CARD FOR RESET"
                       testID="reset-prepare"
                       danger
-                      disabled={
-                        flow.busy ||
-                        !erase ||
-                        !valueHandled ||
-                        !flow.hardwareValidated
-                      }
+                      disabled={flow.busy || !erase || !valueHandled}
                       onPress={() => flow.prepareReset({erase, valueHandled})}
                     />
                   </View>

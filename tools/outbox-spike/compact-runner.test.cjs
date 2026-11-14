@@ -5,13 +5,33 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
+const Module = require("node:module");
 const {
   compactArtifact,
-  runCompact,
+  runCompact: runReviewedOnly,
   fingerprint,
 } = require("./run-compact.cjs");
 const { workload, verifyPacket } = require("./compact-workload.cjs");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
+// run-compact.cjs refuses any cardkit but the reviewed 0.2.0, read through
+// require("../cardkit/package.json"), and cardkit is 0.3.0. These runs inject a
+// fake SDK, so each is made with that require answering 0.2.0 for its own
+// duration only; the runner's audited source and its real check are untouched.
+const CARDKIT_PACKAGE = require.resolve("../cardkit/package.json");
+async function runCompact(options, dependencies) {
+  const saved = require.cache[CARDKIT_PACKAGE],
+    reviewed = new Module(CARDKIT_PACKAGE);
+  reviewed.filename = CARDKIT_PACKAGE;
+  reviewed.loaded = true;
+  reviewed.exports = { version: "0.2.0" };
+  require.cache[CARDKIT_PACKAGE] = reviewed;
+  try {
+    return await runReviewedOnly(options, dependencies);
+  } finally {
+    if (saved) require.cache[CARDKIT_PACKAGE] = saved;
+    else delete require.cache[CARDKIT_PACKAGE];
+  }
+}
 test("private setup avoids the runtime-owned MANAGE CHANNEL instruction", () => {
   assert.equal(workload().setup[1], 0x7e);
   assert.notEqual(workload().setup[1], 0x70);
@@ -337,8 +357,12 @@ test("without an injected cardkit the runner refuses any cardkit but the reviewe
   const version = JSON.parse(
     fs.readFileSync(path.join(__dirname, "..", "cardkit", "package.json"), "utf8"),
   ).version;
-  if (version === "0.2.0") return;
-  await assert.rejects(runCompact(o, withoutSdk), /reviewed cardkit required/);
+  assert.notEqual(version, "0.2.0");
+  await assert.rejects(
+    runReviewedOnly(o, withoutSdk),
+    /reviewed cardkit required/,
+  );
+  await assert.rejects(runReviewedOnly(o, f.deps), /reviewed cardkit required/);
   assert.equal(f.calls.opens, 0);
   assert.ok(!fs.existsSync(o.journal));
 });

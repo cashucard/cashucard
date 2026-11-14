@@ -1148,7 +1148,7 @@ class UnitsTest {
     // =========================================================================
 
     @Test
-    @DisplayName("a payment with the PIN takes back only an arming given in its own time in the field (D186): the holder's arming from an earlier tap stays for the next tap with no PIN")
+    @DisplayName("a payment with the PIN neither arms nor takes back an arming (D186, amended): the owner's arming from an earlier tap stays for the next tap with no PIN, and the PIN typed in a tap, whether it then pays or not, arms nothing")
     void aPinPaymentKeepsAnEarlierTapsArming() {
         Card c = owned(SAT);
         // no day, no payment limit, an allowance of 100, budget 7, no rate, no 24-hour window
@@ -1159,17 +1159,19 @@ class UnitsTest {
         assertEquals(64, c.pay(p[0]).getData().length, "no PIN: 60 of the allowance, the arming spent");
         assertEquals(0, c.getCard(0)[78], "not armed");
         c.tap();
-        assertEquals(1, c.getCard(0)[78], "armed by the holder's own tap, which pays nothing");
+        assertEquals(0, c.getCard(0)[78], "the holder's PIN in a tap that pays nothing arms nothing");
+        c.grant();
+        assertEquals(1, c.getCard(0)[78], "the owner's proof does");
         c.tap();
         assertEquals(64, c.pay(p[1]).getData().length, "a payment with the PIN, in a later tap");
         assertEquals(1, c.getCard(0)[78], "the earlier tap's arming kept");
         c.power();
         assertEquals(64, c.pay(p[2]).getData().length, "the next tap with no PIN pays from the renewed allowance");
-        // the PIN typed in a tap that then pays: that tap's own arming is taken back
+        // the PIN typed in a tap that then pays: nothing armed before the payment or after it
         c.tap();
-        assertEquals(1, c.getCard(0)[78], "armed in this tap");
+        assertEquals(0, c.getCard(0)[78], "the PIN arms nothing in this tap");
         assertEquals(64, c.pay(p[3]).getData().length);
-        assertEquals(0, c.getCard(0)[78], "taken back by the payment of the same tap");
+        assertEquals(0, c.getCard(0)[78], "and nothing after the payment");
     }
 
     @Test

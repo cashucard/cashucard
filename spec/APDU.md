@@ -8,7 +8,7 @@ The wire of the shared Cashu card protocol, version 3.0: the applet in this
 repository (`applet/src/main/java/me/flashapp/cashu/CashuApplet.java`), which is
 the Foxy wallet project's software 1.20 with a neutral identity and the fixes in
 [`docs/DECISIONS.md`](../docs/DECISIONS.md) D18 to D26, the settlement record of
-D175 and D176 (2.2), and the decisions of 3.0, D183 to D198. Version 2.x is not
+D175 and D176 (2.2), and the decisions of 3.0, D183 to D209. Version 2.x is not
 compatible with the 0.x applet that this file used to describe, nor with Foxy's
 1.x: it has an AID of its own, so that neither can be mistaken for it.
 
@@ -83,7 +83,7 @@ v2.0.0 release, whose rollover rules D26 replaced, `02 01` is 2.1, which has no
 finishes itself from the blinding factor `GET_CHANGE` gives (80-byte openings) and
 which has no `LOAD_CHANGE` (`6D00`). A
 reader sends `LOAD_CHANGE` and reads 83-byte openings only from a card that
-answers `03 00` or later.
+answers `03 xx`.
 
 A reader selects the applet's whole AID ([D25](../docs/DECISIONS.md#d25)). The
 package AID `F0 43 41 53 48 55 43 41 52 44` begins two instance AIDs, the
@@ -195,7 +195,8 @@ A missing, wrong or used proof is `6A91`; it costs no PIN try, changes nothing
 and does not end the PIN session. A card with no owner answers `6A90`. A good
 proof also arms the no-PIN allowance and ends the no-PIN window, whatever the
 command and even where the command is then refused for something else
-([The clock and the limits](#the-clock-and-the-limits)).
+([The clock and the limits](#the-clock-and-the-limits)); an `ALLOW_LOAD` with bytes
+after its proof is refused before the proof is read, and writes nothing.
 
 The card hashes these tags too: `CashuCard/auth` ([AUTH](#auth-0x15)),
 `CashuCard/seal` and `CashuCard/pinkey` (the sealed PIN, [VERIFY_PIN](#verify_pin-0x40)),
@@ -322,7 +323,10 @@ payment ([The clock and the limits](#the-clock-and-the-limits)), bit 4
 [a holder with no phone](#a-holder-with-no-phone), bit 6
 [keyset keys](#keyset-keys), bit 7 [the paid list](#the-paid-list). Byte 56: bit 0
 [the certificate](#the-certificate), bit 1 [keys per load](#keys-per-load); bits 2
-to 7 are `0`. A 3.0 card from this repository answers `FF 03`. A card that answers less than 57 bytes to P1 = 4 keeps
+to 7 are `0`. A 3.0 card from this repository answers `FF 03`; byte 55
+bit 7 is `0` (`7F 03`) on a card whose record is set (byte 11 = `01`) and whose first
+`SET_CARD` could not reserve the paid list: such a card refuses every `LOAD_PROOF`
+(`6A84`), and a loader reads the bit before it swaps ([Keys per load](#keys-per-load)). A card that answers less than 57 bytes to P1 = 4 keeps
 none of them.
 
 ### GET_PUBKEY (0x10)
@@ -428,7 +432,9 @@ zeroed: its bytes are not a proof.
 
 It proves the reader holds the card that has that key. No PIN, and nothing is
 burned: the message is 129 bytes behind a tag, and no piece's secret (text
-beginning `["P2PK"`) hashes to it. `6700` for any length but 16.
+beginning `["P2PK"`) hashes to it. `6700` for any length but 16; `6F00`, with no
+data, for a signature that does not pass the card's own check
+([D207](../docs/DECISIONS.md#d207)).
 
 ### GET_CARD (0x16)
 
@@ -621,7 +627,9 @@ not yet back on the card (owed):
 Never the nonce or the blinding factor: only the card finishes its change
 ([LOAD_CHANGE](#load_change-0x27)). An opening whose piece is on the card already
 is let go first. No PIN; it refuses nothing. A phone that missed the mint's answer
-asks the mint for it by B_ (NUT-09 restore). 2.2 and earlier answered 80-byte
+asks the mint for it by B_ (NUT-09 restore); the answer must carry the mint's NUT-12
+proof, without which the change cannot be loaded
+([SPEND_ALL_CHANGE](#spend_all_change-0x26) says when a reader may ask for change). 2.2 and earlier answered 80-byte
 openings (the amount, the keyset, the date, the nonce and r).
 
 ### GET_DLEQ (0x1A)
@@ -752,7 +760,9 @@ answered in all of these as it would be without the record.
 the body's length, in one transaction after it: a card pulled away in between has
 no record, and never a mix of two. The descriptor is made at the first read of
 either form, kept, and marked in a transaction of one byte; a read after a tear
-signs it again. A tear between the receipt and the record leaves the payment made
+signs it again. A descriptor that does not pass the card's own check
+([D207](../docs/DECISIONS.md#d207)) is not kept: both forms answer `6F00`, and the
+next read signs again. A tear between the receipt and the record leaves the payment made
 with no record.
 
 **Capacity and timing.** 3,688 bytes at the most (a 77-byte mint, 32 inputs and
@@ -1150,6 +1160,19 @@ about two thirds of a signature's work on the chip, which the floor counts
 ([The clock and the limits](#the-clock-and-the-limits)). A reader may make fewer, four
 say, and take the rest of the change in a later payment.
 
+**Only at a mint that proves its signatures**
+([D206](../docs/DECISIONS.md#d206)). [LOAD_CHANGE](#load_change-0x27) wants the
+mint's NUT-12 proof, and the card gives out neither the nonce nor r, so a change
+signature that comes back with no proof can be finished by no one: that change is
+lost. A reader **MUST NOT** send `SPEND_ALL_CHANGE` for a mint it does not know to
+list NUT-12 and NUT-09 as supported in its info (NUT-06), read when the reader was
+last online with that mint: NUT-12 for the proof on every signature of a swap, and
+NUT-09 so that an answer the reader missed can be asked for again by B_. At any
+other mint the reader names outputs for the whole of the pieces and makes no change
+output of the card's, or does not pay. A reader given a change signature with no
+`dleq` keeps the swap's answer and asks the mint again (NUT-09) before it tells
+the holder that the change is lost.
+
 The day's limit counts the pieces whole, this change with them, until the change
 is back on the card ([LOAD_CHANGE](#load_change-0x27)); the no-PIN allowance counts
 the whole of the pieces; the wait is held to what leaves the card, the pieces less
@@ -1202,8 +1225,11 @@ would pass the allowance (the payment given up, and the refusal written in the
 log); `6A8F` where the day's count and the whole of this payment's pieces, its
 change with them, would pass the day's limit (given up, written in the log). At
 the last, `6A8F` where the day of loads has no room for the payment's change, which
-`SPEND_ALL_CHANGE` refuses first (given up, nothing written); `6A96` if the commit
-cannot hold it, with nothing changed. The change the payment makes is counted in the
+`SPEND_ALL_CHANGE` refuses first (given up, nothing written); `6F00` for a
+signature that does not pass the card's own check, made and checked before the
+commit, so that nothing is burned, counted or kept and the payment is given up
+([D207](../docs/DECISIONS.md#d207)); `6A96` if the commit cannot hold it, with
+nothing changed. The change the payment makes is counted in the
 day of loads in the commit, with the openings it makes owed
 ([D200](../docs/DECISIONS.md#d200)): a day over begins again at `now`, as at a load;
 a payment with no change leaves the day of loads as it is. A payment in the other
@@ -1763,11 +1789,10 @@ the top.
 | P2 | `00` |
 | Data | the PIN, 4–8 bytes; with P1 = 1, the PIN sealed (`FOXY-CARD-DAILY-LIMIT.md` 6e, under `CashuCard/seal` and `CashuCard/pinkey`) |
 
-Success opens the PIN's commands for this tap. It arms the no-PIN allowance only
-where no payment is then signed in this time in the field: a payment's commit
-takes back an arming this `VERIFY_PIN` gave earlier in the same time in the field,
-and never one the allowance already had from an earlier time in the field
-([The clock and the limits](#the-clock-and-the-limits)). It ends no no-PIN window.
+Success opens the PIN's commands for this tap. It does not arm the no-PIN allowance
+and ends no no-PIN window ([D208](../docs/DECISIONS.md#d208)): a PIN typed at a
+reader, for a payment or for anything else, opens no allowance for whoever taps the
+card next ([The clock and the limits](#the-clock-and-the-limits)).
 Wrong, on a card with an owner: `63CX` with X tries left; the try that exhausts
 the counter blocks the card (`6983`), and so does every `VERIFY_PIN` after it.
 `6984` with no PIN set. `6982`, before the PIN is looked at and costing no try,
@@ -1960,7 +1985,7 @@ signatures), which it keeps where its restore reaches them:
     start and count, and the day of loads and its count;
   - the last header's hash, the rolls and the arming (`GET_CARD` bytes 44 to 76, 76
     and 78 read zeros): the rolls begin again as at a `REFRESH`, and the no-PIN
-    allowance waits for the new owner's arming (its PIN or its proof).
+    allowance waits for the new owner's arming (its proof).
 - **It loses the record's refund key.** Until the new owner names its own with
   [SET_CARD](#set_card-0x32) (its proof, on an empty card):
   - `GET_CARD` P1 = 3 seals c to the PIN key, as on a card with no refund key, to the
@@ -2041,7 +2066,8 @@ last, `6A96`.
 **Response:** 16 fresh random bytes for one owner's proof (`6A90` with no owner).
 With P1 = 1, on any card: the 16 bytes, the PIN key (33, compressed) and the card
 key's BIP-340 signature over `SHA-256("CashuCard/pinkey" ‖ PIN key)` (64), 113 in
-all, for sealing a PIN.
+all, for sealing a PIN; `6F00`, with no nonce given, for a signature that does not
+pass the card's own check ([D207](../docs/DECISIONS.md#d207)).
 
 ### ALLOW_LOAD (0x45)
 
@@ -2061,14 +2087,16 @@ keyset of either unit is entered with the holder's mark, `GET_OUTBOX`'s packet a
 spent slots are read, and with the PIN an opening is bound to another key or
 keyset. It teaches no keyset. Like every good proof it ends the no-PIN window.
 
-**Response:** no data, and **`6200`** where the grant is given (ISO 7816-4: a
-warning, the state of lasting memory unchanged; the grant lasts for the tap and no
-longer). Not `9000`: 2.2's grant opened `LOAD_PROOF` and `CLEAR_SPENT` with no PIN,
+**Response:** no data, and **`6200`** where the grant is given (ISO 7816-4's
+warning; the grant lasts for the tap and no longer, and nothing of it is written.
+What a good `ALLOW_LOAD` writes is what every good proof writes: the no-PIN window
+ended and the allowance armed). Not `9000`: 2.2's grant opened `LOAD_PROOF` and `CLEAR_SPENT` with no PIN,
 and a 2.2 wallet that reads `9000` here swaps an owner's top-up to the card key
 before it loads; on 3.0 the load is then refused (`6982`) and the swapped proofs,
 locked to the card, could not be put on it. A wallet of 3.0 reads `6200` as the
-grant given. In order: `6986` locked; `6A90` with no owner; `6A91` with no good
-proof; `6700` for bytes after the proof.
+grant given. In order: `6986` locked; `6A90` with no owner; `6700` for bytes
+after the proof, said before the proof is read, with the nonce spent and nothing
+written; `6A91` with no good proof.
 
 ---
 
@@ -2370,13 +2398,16 @@ header begins at the first header it takes); `GET_INFO` P1 = 4 bytes 51 to 54 an
 The clock alone never brings the allowance back. The payment with no PIN that
 begins a window, whether one ran before it or not, spends the arming: one allowance
 for each arming. The allowance is armed by an owner's good proof, by a
-`SET_LIMIT_PIN` that carries it, or by a `VERIFY_PIN` in a time in the field in
-which no payment has been or is then signed: a payment's commit takes back an
-arming a `VERIFY_PIN` gave earlier in the same time in the field, and leaves one
-from an earlier time in the field as it is. So a PIN typed for a payment at a reader opens no allowance for whoever taps
-the card next, and a holder's own phone that takes the PIN in a tap that pays
-nothing (a top-up, a look at the history) arms it. `GET_CARD` byte 78 says whether
-it is armed. A payment with no PIN that the window's count and its whole pieces
+`SET_LIMIT_PIN` that carries it, or, on a card with no owner, by a held tap gone
+through ([A holder with no phone](#a-holder-with-no-phone)): the PIN, held for the
+history's ten askings, in a time in the field that signs no payment. The PIN alone
+arms nothing ([D208](../docs/DECISIONS.md#d208)). So a PIN typed at a reader, for a
+payment or for a top-up, opens no allowance for whoever taps the card next. An
+owner's phone that wants the allowance back sends a proof in its tap (`ALLOW_LOAD`,
+or the limits again). A proof also ends the window that runs, so on a card with an
+owner the allowance comes back at the proof, whatever the window's switch says; the
+window of 24 hours holds back only a card with no owner, whose held tap arms and
+ends no window. `GET_CARD` byte 78 says whether it is armed. A payment with no PIN that the window's count and its whole pieces
 would take past the allowance is `6A9E`, "limit reached, enter the PIN": given up,
 and written in the log as a refusal over a limit; with the PIN the same payment
 goes through. An allowance of 0, or a blocked PIN, is `6A94`, with nothing written.
@@ -2739,6 +2770,11 @@ that ties two dates, or a date to the card.
   what the card takes waits in the phone, locked to the card's keys, and is lost if
   the card is reset or lost first.
 - **Check that the card will take this mint's pieces**, before swapping:
+  - the card itself: `GET_INFO` byte 10 is `00` (a locked card still answers
+    `GROUP_KEYS`, and refuses every load, `6986`); byte 11 is `01` and the record
+    is a holder's, not a factory record (`GET_CARD`'s mint is not `-`; `6A8C`); and
+    P1 = `04` byte 55 bit 7 is set (a card refused the room for its paid list at its
+    first `SET_CARD` clears it and takes no piece, `6A84`);
   - the keyset table: `GET_INFO` P1 = `03` byte 43 (the table kept), byte 48 (entries
     in use, of 6) and byte 49 (entries without the holder's mark, of 2), and the
     entries themselves (`GET_CARD` P1 = 2). A keyset already in an entry of the
@@ -2758,7 +2794,13 @@ that ties two dates, or a date to the card.
   date it is about to load with the keys it works out itself. A card reset since (by
   its owner, or by the PIN on a card with no owner), or whose owner was replaced, has
   a new c and answers other keys; the generation (`GET_OUTBOX`) cannot show this to a
-  reader without the PIN, and says nothing on a card with no record.
+  reader without the PIN, and says nothing on a card with no record. It compares
+  them **again in the tap that loads**, before its first `LOAD_PROOF`: the card
+  cannot check what a piece is locked to, so a card reset between the swap and the
+  load would take pieces it can never sign for, and a payment that names one is
+  refused by the mint after the card has spent the good pieces of the payment with
+  it. A wallet that finds other keys there does not load: dated pieces come back to
+  the refund key after their date, and undated ones are lost.
 - **What a reader holding the card learns** (with no PIN and no grant), and so, with
   the mint's records, what it ties to the card: the keys of every date with a piece on
   the card (`SPEND_ALL_BEGIN` answers t and R + u·G before any PIN, because a till
@@ -2807,6 +2849,17 @@ The card stores the container and checks only that it names the card's own key.
 Who vouches for a card, and how a reader decides whether to believe them, is the
 certificate profile's and the reader's: the card has no part in it.
 
+**Who may write one** ([D209](../docs/DECISIONS.md#d209)). Whoever holds the card
+before its first PIN, with no proof of anything: the card does not know a certifier
+from anyone else. A certifier writes and seals before the card leaves its hands. A
+card that leaves its maker with no certificate can be given one, of any content that
+names its key, by anyone who holds it before its first `SET_PIN`, and from then it
+keeps one key and its paid list through every reset, as a certified card does. So a
+wallet that sets a card up **MUST** read `CERT_READ` P1 = `FF` before the first
+`SET_PIN`, and where a certificate is sealed that it does not believe, it tells the
+holder before going on that this card keeps one key for its life: every reader can
+tell it is the same card under every holder, and no reset changes that.
+
 ---
 
 ## Error Code Summary
@@ -2814,7 +2867,7 @@ certificate profile's and the reader's: the card has no part in it.
 | SW | Meaning |
 |---|---|
 | 9000 | Success |
-| 6200 | `ALLOW_LOAD`: the owner's grant given for this tap, no load opened by it (a warning: lasting memory unchanged) |
+| 6200 | `ALLOW_LOAD`: the owner's grant given for this tap, no load opened by it (a warning; the proof has ended the no-PIN window and armed the allowance, as every good proof does) |
 | 6700 | Wrong length |
 | 6982 | Security status not satisfied: the PIN (or a grant, or a held tap) needed and not given in this tap; the last payment's record or its scope (`GET_OUTBOX`), c (`GET_CARD` P1 = `03`) or a date's keys (`GROUP_KEYS`) asked by a reader not given them |
 | 6983 | PIN blocked (a card with an owner): the counter spent, or the PIN state 2 |
@@ -2848,7 +2901,7 @@ certificate profile's and the reader's: the card has no part in it.
 | 6B00 | Wrong P1/P2: a missing confirmation byte (`LOCK_CARD`, `RESET_CARD`), a number that is not P2 (`RESET_CARD` P1 = 1), a load's P2 with a bit past bit 1 (`LOAD_PROOF`), a tag switch other than `00` or `01` or a byte that is not P1 (`SET_TAG`), a P1 or P2 other than `00` (`INBOX`), a P1 other than `00` or `01` or a P2 other than `00` (`SET_OWNER`), a P1 other than `00` or `01` (`REFRESH`) |
 | 6D00 | Instruction not supported |
 | 6E00 | Class not supported |
-| 6F00 | Signing failed |
+| 6F00 | The chip's arithmetic failed, or a signature did not pass the card's own check before leaving it: nothing is given |
 | 63CX | Wrong PIN: X tries left on a card with an owner; X wrong tries in a row on a card with none (`F` for fifteen or more), the next try waiting |
 
 ---
@@ -2882,8 +2935,8 @@ change, a teaching of keyset keys begun, and the count of a held tap (a claim's
 askings, a history's, a reset's by the PIN, or the askings of a stretch of the PIN's
 wait). Gone with the power, kept through a `SELECT` (this time
 in the field): the time the reader told, whether a payment was signed in it,
-whether an owner was claimed in it, whether a history was read in it (a held tap),
-and whether a `VERIFY_PIN` in it armed the allowance. Kept in lasting memory, though
+whether an owner was claimed in it, and whether a history was read in it (a held
+tap). Kept in lasting memory, though
 they read like a tap's: the PIN's wrong tries in a row and the askings owed
 ([VERIFY_PIN](#verify_pin-0x40)), and the first set-up's mark, which every selection
 ends ([SET_PIN](#set_pin-0x41)).
@@ -2955,7 +3008,8 @@ A reader: `SET_HEADER` with the tip when it has one; `GET_INFO` (P1 = 4: the
 no-PIN allowance, its window and the profiles), `GET_PIECES` (P2 = 3), `AUTH`;
 `SPEND_ALL_BEGIN` (P1 = `02`, or `03` where the reader reads units; its answer's t
 gives the payment's key, P + t·G, and the refund key for the date), `SPEND_ALL_OUTPUTS`, `SPEND_ALL_CHANGE` (amount and the mint's
-key), `SPEND_ALL_SIGN` until it answers the signature (`VERIFY_PIN` goes before
+key; only at a mint the reader knows to list NUT-12 and NUT-09,
+[SPEND_ALL_CHANGE](#spend_all_change-0x26)), `SPEND_ALL_SIGN` until it answers the signature (`VERIFY_PIN` goes before
 `SPEND_ALL_BEGIN`, unless the allowance covers the payment: any command between the
 payment's steps gives it up); the outputs and the change come to the pieces less
 the mint's input fee, if its keyset has one; swap at the mint; then, in the same tap
@@ -3010,7 +3064,7 @@ check the major, or goes on in spite of it, meets ([D193](../docs/DECISIONS.md#d
 | `RESET_CARD` on a card with no owner | `6A90` | the reset by the PIN: `6A97`, `6982`, `6985`, `6A98` | never sent by a 2.2 reader to a card with no owner |
 | `VERIFY_PIN` wrong on a card with no owner | `63C2`, `63C1`, `6983` | `63C1`, `63C2` ... and `6A98` before each next try | a 2.2 reader that stops at `6A98` takes it as a refusal; nothing is blocked |
 | `ALLOW_LOAD` | opens loads, `9000` | opens none, `6200` | a 2.2 wallet that waits for `9000` before it swaps a top-up stops before swapping |
-| `VERIFY_PIN` | arms the allowance | arms it only in a time in the field that signs no payment | a reader's PIN for a payment opens no allowance after it |
+| `VERIFY_PIN` | arms the allowance | arms nothing: an owner's proof does, or a held tap on a card with no owner | a PIN given to a reader opens no allowance after it |
 | `RESET_CARD` | a new card key | a new key, or the same one on a certified card | unchanged for a reader that reads the key after |
 | new words | | `6A97`–`6A9F`, and `6200` | taken as refusals (NUT-CCP) |
 | new commands | | `1C`, `1D`, `1E`, `27`, `38`, `54` | never sent by a 2.2 reader |

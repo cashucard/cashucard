@@ -328,8 +328,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 2.0 (D20), three of the 29 bytes after the hash, so that GET_CARD shows them (its bytes 76, 77, 78) and RESET_CARD
     // clears them with the rest: how many times the day's window has rolled since the owner's last REFRESH (or the anchored
     // SET_OWNER); the most it may roll before the next (0 is the default, ROLL_BUDGET_DEFAULT; 1 to ROLL_BUDGET_MOST); and
-    // whether the no-PIN allowance is armed (3.0, D186: 1 once an owner's proof, a SET_LIMIT_PIN that carries the allowance or a
-    // VERIFY_PIN in a time in the field that signs no payment has been given since a no-PIN window last began).
+    // whether the no-PIN allowance is armed (3.0, D186: 1 once an owner's proof, a SET_LIMIT that carries the allowance or, on a
+    // card with no owner, a held tap, D189, has been given since a no-PIN window last began; the PIN alone arms nothing).
     static final short CARD_ROLLS_OFFSET   = (short) 156;
     static final short CARD_BUDGET_OFFSET  = (short) 157;
     static final short CARD_ARMED_OFFSET   = (short) 158;
@@ -1183,14 +1183,16 @@ public class CashuApplet extends Applet implements TagSwitch {
      * This time in the field (gone with the power, not with a SELECT): [0]
      * whether it has an entry in the log yet; [1] whether a payment has been
      * signed in it, so that a second one is slowed (6a: one payment a tap at
-     * full speed, unless the owner's grant is in this tap); [2] TAP_ARMED,
-     * a VERIFY_PIN in it armed the no-PIN allowance (3.0, D186), which
-     * a payment's commit takes back; TAP_PAID, TAP_CLAIMED and TAP_READ
-     * (D187, D189). RESET_CARD clears TAP_ARMED and TAP_READ, which were the
-     * PIN's it takes away, and keeps TAP_PAID and TAP_CLAIMED.
+     * full speed, unless the owner's grant is in this tap); [2] TAP_PAID,
+     * TAP_CLAIMED and TAP_READ (D187, D189). RESET_CARD clears TAP_READ,
+     * which was the PIN's it takes away, and keeps TAP_PAID and TAP_CLAIMED.
+     * (Bit 0 was TAP_ARMED: a VERIFY_PIN armed the no-PIN allowance, and a
+     * payment's commit took back an arming given in the same time in the
+     * field. The flag was RAM and the arming lasting, so a field cycle between
+     * two VERIFY_PINs kept the arming through a payment made with the PIN. The
+     * PIN alone arms nothing now, D208; bit 0 is unused.)
      */
     private byte[] tapOpen;
-    static final byte TAP_ARMED   = (byte) 0x01;
     /** A payment was signed: no owner is claimed, and no history of a card with no owner read, in this time in the field. */
     static final byte TAP_PAID    = (byte) 0x02;
     /** An owner was claimed: no payment in this time in the field. */
@@ -1692,7 +1694,10 @@ public class CashuApplet extends Applet implements TagSwitch {
                 if (p1 == (byte) 4) {
                     Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_START_OFFSET, buf, (short) 51, (short) 4);
                     if (!told || isZero(cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4)) Util.arrayFillNonAtomic(buf, (short) 51, (short) 4, (byte) 0);
-                    buf[55] = (byte) 0xFF;
+                    /* every profile of byte 55, but bit 7, the paid list (D191), on a card set up whose chip refused its room
+                     * (SET_CARD reserves it, and writes the record all the same): such a card takes no piece (LOAD_PROOF 6A84), and
+                     * a loader reads this before it swaps at the mint. A card not yet set up has had no room asked for: FF. */
+                    buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x7F : (byte) 0xFF;
                     // the certificate (bit 0) and keys per load (bit 1, D197)
                     buf[56] = (byte) 0x03;
                     short left = dayEnded(pinMarks, PM_LOAD_DAY) ? LOADS_A_DAY : (short)(LOADS_A_DAY - Util.getShort(pinMarks, PM_LOADS));
@@ -2957,7 +2962,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         if (!roomToLoad(made)) ISOException.throwIt(SW_OVER_LIMIT);
 
         shaAll.doFinal(buf, (short) 0, (short) 0, scratch, X_MSG);
-        // under the card's key for the payment's date (D197): d + t, whose key is P + t*G
+        /* under the card's key for the payment's date (D197): d + t, whose key is P + t*G. A signature that does not verify
+         * (SchnorrHW.sign's step 8) is 6F00 here, before the list below, the transaction and the signature kept: nothing is
+         * burned or counted, SPEND_ALL_AGAIN gives what it gave before, and the payment is given up (allState[0], above) */
         short sigLen = schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, scratch, X_MSG, buf, (short) 1);
 
         /* The places, written down where `finishBurn` will find them. Not
@@ -3003,12 +3010,13 @@ public class CashuApplet extends Applet implements TagSwitch {
             if (made != 0) Util.arrayCopy(scratch, X_LOADS, pinMarks, PM_LOAD_DAY, (short) 7);
             else if (limited) pinMarks[PM_COUNTED] = scratch[(short)(X_LOADS + 6)];
             /* The no-PIN window (D186): its count, moved by a payment with no PIN alone; begun by one, at `now`, spending
-             * the arming. And an arming a VERIFY_PIN gave in this time in the field is taken back by any payment. */
+             * the arming. A payment with the PIN leaves the arming as it found it: the PIN arms nothing, so no arming can have
+             * come of the PIN a reader was handed to take it. */
             if (noPin) {
                 if (begins) beginAtNow(CARD_NOPIN_START_OFFSET);
                 Util.arrayCopy(scratch, X_NOPIN, cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4);
             }
-            if (begins || (tapOpen[2] & TAP_ARMED) != 0) cardRecord[CARD_ARMED_OFFSET] = (byte) 0;
+            if (begins) cardRecord[CARD_ARMED_OFFSET] = (byte) 0;
             /* The payment itself: one byte, whatever the number of places.
              * From the moment this commits every place in the list is spent,
              * whether or not its status byte says so yet. */
@@ -4890,13 +4898,12 @@ public class CashuApplet extends Applet implements TagSwitch {
             // the right PIN: no wrong try in a row, and nothing owed (D195; an owned card's marks are nothing already)
             if (pinMarks[PM_WRONG] != (byte) 0) Util.arrayCopy(ZERO, (short) 0, pinMarks, PM_WRONG, (short) 3);
             // Nothing about spending is touched here: the PIN can be presented as
-            // often as its holder, or a terminal holding it, likes. It arms the
-            // no-PIN allowance only in a time in the field that signs no payment
-            // (D186): none signed in it before, and a payment's commit takes back
-            // an arming given in it (TAP_ARMED), and only that one: an arming from an earlier time in the field is kept. It
-            // ends no window.
+            // often as its holder, or a terminal holding it, likes. It arms
+            // nothing (D186): a reader handed the PIN to take a payment has it
+            // too, and must not open the no-PIN allowance again for whoever taps
+            // the card next. The owner's proof arms it, and on a card with no
+            // owner a held tap (`requireHistory`), which no payment can share.
             pinVerifiedFlag[0] = (byte) 1;
-            if (tapOpen[1] != (byte) 1 && armAllowance()) tapOpen[2] |= TAP_ARMED;
         } finally {
             forgetPin(buf, got, sealed);
         }
@@ -5398,10 +5405,15 @@ public class CashuApplet extends Applet implements TagSwitch {
         ISOException.throwIt(SW_KEEP_HOLDING);
     }
 
-    /** A signature's work over bytes of the card's own, thrown away (a payment's wait, a held tap's asking): the signature is in `buf` and cleared after it, so nothing of it leaves. */
+    /**
+     * A signature's work over bytes of the card's own, thrown away (a payment's wait, a held tap's asking, the PIN's wait): the
+     * signature is in `buf` and cleared after it, so nothing of it leaves. `signatureWork`, and not `sign`: every wait is
+     * specified in units of this work, and a signature that leaves the card is now checked before it does (`sign`'s step 8),
+     * which would make each wait longer by the check; this one never leaves, so nothing is lost by not checking it.
+     */
     private void work(byte[] buf) {
         rng.generateData(scratch, X_MSG, (short) 32);
-        schnorrHW.sign(cardPrivKey, cardPubKey, scratch, X_MSG, buf, (short) 0);
+        schnorrHW.signatureWork(cardPrivKey, cardPubKey, scratch, X_MSG, buf, (short) 0);
         Util.arrayFillNonAtomic(buf, (short) 0, (short) 64, (byte) 0);
     }
 
@@ -5669,17 +5681,31 @@ public class CashuApplet extends Applet implements TagSwitch {
      * memory): the log and the receipts are read, and GET_INFO says the limit
      * on one payment. It opens no load (D185: LOAD_PROOF and CLEAR_SPENT want
      * the PIN given in this tap) and signs nothing.
+     *
+     * What a good one writes in lasting memory is what every good owner's
+     * proof writes (`requireOwnerProof`, D186): the no-PIN window ended (its
+     * count, then its start, to zeros, where one runs) and the allowance armed
+     * (one byte), and nothing else; the grant is RAM. A command whose data is
+     * longer than the length byte and the proof it names is `6700` before the
+     * proof is looked at, with the nonce spent and nothing written: the proof
+     * is over no value. One shorter, or with no data, is `6A91`, as before,
+     * and writes nothing either.
      */
     private void processAllowLoad(APDU apdu) {
         requireNotLocked();
         if (ownerSet[0] != (byte) 1) ISOException.throwIt(SW_NO_OWNER);
         short dataLen = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
-        short at = requireOwnerProof(LABEL_LOAD, buf, dataLen);
-        if ((short)(ISO7816.OFFSET_CDATA + dataLen) != at) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        /* the length first: a good proof is the owner's having seen the card, and writes (`endNoPinWindow`) whatever the
+         * command then does, so bytes after it are refused before it is taken; the nonce goes as a proof tried would take it */
+        if (dataLen > (short)(1 + (short)(buf[ISO7816.OFFSET_CDATA] & 0xFF))) {
+            nonceLive[0] = (byte) 0;
+            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        }
+        requireOwnerProof(LABEL_LOAD, buf, dataLen);
         loadGrant[0] = (byte) 1;
-        /* Given, and answered 6200 (a warning: nothing in the card's lasting memory changed), not 9000: software that takes
-         * 9000 here for "a load is open" goes no further, and none is open (D185). */
+        /* Given, and answered 6200, a warning, not 9000: software that takes 9000 here for "a load is open" goes no further,
+         * and none is open (D185). What lasts of it is the proof's own writes, above. */
         ISOException.throwIt(SW_GRANT_GIVEN);
     }
 
@@ -5906,7 +5932,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         loadGrant[0] = (byte) 0;
         tapOpen[0] = (byte) 0;
         tapOpen[1] = (byte) 0;
-        // and the hold and the arming with the PIN that gave them: a new PIN in this selection has no hold it did not ask for
+        // and the hold with the PIN that gave it (the arming it gave went with the record): a new PIN in this selection has no hold it did not ask for
         tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED);
     }
 
@@ -6351,6 +6377,12 @@ public class CashuApplet extends Applet implements TagSwitch {
      * HISTORY_ASKINGS askings in a row, each but the last answered `6A98` after a signature's work (`holdOn`). Once through,
      * the history is open to the PIN for the rest of this time in the field (TAP_READ, a held tap), through a SELECT, and no
      * payment is taken in it (`process`). The balance and the pieces are never held for.
+     *
+     * A held tap completed arms the no-PIN allowance (D208, D189): on a card with no owner it stands where the owner's proof
+     * stands, and the PIN alone, which a reader is handed to take a payment, arms nothing. It arms only: it ends no window,
+     * and the window that runs comes back by the arming and the switch as at any arming. No payment can be taken in the time
+     * in the field that armed it (TAP_READ, `process`), nor can a held tap be completed in one that paid (TAP_PAID above).
+     * One byte, written before TAP_READ: torn, the arming is made or not, and TAP_READ, RAM, is gone with the power either way.
      */
     private void requireHistory(byte[] buf, boolean receipts) {
         if (pinState[0] == (byte) 0) return;
@@ -6364,6 +6396,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         if ((tapOpen[2] & TAP_PAID) != 0) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         if ((tapOpen[2] & TAP_READ) != 0) return;
         holdOn(buf, (short)((short)(nonceLive[1] & 0x7F) + 1), HISTORY_ASKINGS, HELD_HISTORY);
+        armAllowance();
         tapOpen[2] |= TAP_READ;
     }
 
@@ -6940,9 +6973,9 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.0: no lines here, and the load file is 36,953 bytes (89 past a multiple of 256), the least this source comes to.
-         * No chip has been given this file; on 2026-11-14 a J3R180 installed the same source numbered 2.3, a file of the same
-         * size that differs only in its version bytes (D205). The source before D200 came to 35,466 bytes, and a test-only
+        /* 3.0: no lines here, and the load file is unpadded, the least this source comes to; refcheck prints its size at every build.
+         * No chip has been given this file; on 2026-11-14 a J3R180 installed the source before D205 to D210, numbered 2.3 then,
+         * a file of 36,953 bytes (refcheck's PROVEN and SIZES). The source before D200 came to 35,466 bytes, and a test-only
          * build of it to 35,509: a J3R180 installed both on 2026-11-13. On 2026-11-13 a J3R180 refused the card's applet in
          * earlier source, numbered 2.3 then, padded to 32,777 bytes (6F00, twice) and installed it padded to 33,647 and
          * 35,213 (111 and 141 past a multiple of 256); the file is kept out of 32,700 to 32,850, the sizes not to be shipped

@@ -220,6 +220,44 @@ test('a review saved by cardkit 0.2, with no changeOwed or version, still matche
   assert.ok(owing.commands.every(a => ![0x31, 0x40].includes(a[1]!)));
 });
 
+test('a 2.1 or 2.2 card that owes change is never cleaned: the fresh read stops it before the PIN, the mint or a save, whatever the saved review says', async () => {
+  for (const version of [V21, V22]) {
+    const name = version.join('.');
+    const read = await readResetReview(card(1, version, version, {owed: 1}).tx);
+    assert.equal(read.changeOwed, true);
+    // a review saved by cardkit 0.2 has no changeOwed: the card's answer decides
+    const saved02: Partial<ResetReview> = {...read};
+    delete saved02.changeOwed;
+    delete saved02.version;
+    for (const saved of [read, saved02 as ResetReview]) {
+      const c = card(1, version, version, {owed: 1});
+      let asked = false,
+        persisted = false;
+      await assert.rejects(
+        () =>
+          cleanupSettledEntries(c.tx, saved, {
+            pin: '1234',
+            random: n => new Array(n).fill(1),
+            mintJson: async () => {
+              asked = true;
+              return {};
+            },
+            persist: async () => {
+              persisted = true;
+            },
+          }),
+        (e: unknown) => (e as {code?: string}).code === 'card-not-empty',
+        name,
+      );
+      assert.ok(!asked && !persisted, name);
+      assert.ok(
+        c.commands.every(a => ![0x44, 0x40, 0x31, 0x13].includes(a[1]!)),
+        name,
+      );
+    }
+  }
+});
+
 test("a 3.0 card's spent entries are not cleaned: its secrets name its key for each piece's date, and nothing is sent to the mint or written", async () => {
   const c = card(1, V30);
   const review = await readResetReview(c.tx);

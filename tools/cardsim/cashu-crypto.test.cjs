@@ -3,7 +3,8 @@
 // The Cashu arithmetic the cardsim e2e trusts, held to published vectors and to the card's own: NUT-00's
 // hash_to_curve, the applet's spec/vectors/secret.json (each date's keys from c, format-4 secrets naming them,
 // messages, BIP-340 signatures under the date's key, AUTH under the card's key), and a
-// blind signature and its NUT-12 proof made here with a known mint key, checked both ways and refused when altered.
+// blind signature and its NUT-12 proof made here with a known mint key, checked both ways and refused when altered;
+// BIP-340 signing held to BIP-340's own vectors, and c sealed to a refund key opened with its r.
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const nodeCrypto = require("node:crypto")
@@ -98,4 +99,48 @@ test("a blind signature and its DLEQ, made here with a known mint key, verify bl
   assert.ok(!cc.verifyProofDleq(secret.replace("cd", "ce"), C, eh, sh, cc.bytes32(r), K), "another secret")
   assert.ok(!cc.verifyBlindDleq(B_, C_, eh, cc.hexOf(cc.bytes32(s + 1n)), K), "another s")
   assert.ok(!cc.verifyBlindDleq(B_, C_, eh, sh, cc.compressed(cc.mul(a + 1n))), "another mint key")
+})
+
+// BIP-340's test-vectors.csv, its signing cases: the secret key, the aux bytes and the message give the signature, byte
+// for byte (the same four tools/cardctl/test_bip340.py verifies).
+const BIP340_SIGNING = [
+  ["0000000000000000000000000000000000000000000000000000000000000003", "F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9",
+    "0000000000000000000000000000000000000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000000000",
+    "E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0"],
+  ["B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF", "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
+    "0000000000000000000000000000000000000000000000000000000000000001", "243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89",
+    "6896BD60EEAE296DB48A229FF71DFE071BDE413E6D43F917DC8DCF8C78DE33418906D11AC976ABCCB20B091292BFF4EA897EFCB639EA871CFA95F6DE339E4B0A"],
+  ["C90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B14E5C9", "DD308AFEC5777E13121FA72B9CC1B7CC0139715309B086C960E18FD969774EB8",
+    "C87AA53824B4D7AE2EB035A2B5BBBCCC080E76CDC6D1692C4B0B62D798E6D906", "7E2D58D8B3BCDF1ABADEC7829054F90DDA9805AAB56C77333024B9D0A508B75C",
+    "5831AAEED7B44BB74E5EAB94BA9D4294C49BCF2A60728D8B4C200F50DD313C1BAB745879A5AD954A72C45A91C3A51D3C7ADEA98D82F8481E0E1E03674A6F3FB7"],
+  ["0B432B2677937381AEF05BB02A66ECD012773062CF3FA2549E44F58ED2401710", "25D1DFF95105F5253C4022F628A996AD3A0D95FBF21D468A1B33F8C160D8F517",
+    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+    "7EB0509757E246F19449885651611CB965ECC1A187DD51B64FDA1EDC9637D5EC97582B9CB13DB3933705B32BA982AF5AF25FD78881EBB32771FC5922EFC66EA3"],
+]
+
+test("BIP-340 signing reproduces BIP-340's own vectors, and a fresh signature verifies under its key and no other", () => {
+  for (const [sk, pk, aux, msg, sig] of BIP340_SIGNING) {
+    assert.equal(cc.hexOf(cc.bytes32(cc.mul(cc.int(sk))[0])), pk.toLowerCase(), "the vector's public key")
+    assert.equal(cc.hexOf(cc.schnorrSign(sk, msg, aux)), sig.toLowerCase())
+    assert.ok(cc.schnorrVerify(pk, msg, sig))
+  }
+  const d = cc.int(cc.sha256(Buffer.from("a refund key")))
+  const msg = cc.sha256(Buffer.from("a SIG_ALL message"))
+  const sig = cc.schnorrSign(d, msg)
+  assert.ok(cc.schnorrVerify(cc.compressed(cc.mul(d)), msg, sig))
+  assert.ok(!cc.schnorrVerify(cc.compressed(cc.mul(d + 1n)), msg, sig), "not under another key")
+  assert.throws(() => cc.schnorrSign(0n, msg), /private key/)
+})
+
+test("c sealed to the refund key opens with r: r*K = k*R, the seal's block over x(k*R), K, the sixteen bytes and 16", () => {
+  const r = 0x5eed5eedn, k = 0x0badf00dn
+  const R = cc.mul(r)
+  const nonce = Buffer.alloc(16, 0xa5)
+  const c = Buffer.from(vectors.c, "hex")
+  const K = cc.uncompressed(cc.mul(k))
+  const block = cc.sha256(Buffer.from("CashuCard/seal"), Buffer.from([1]), cc.bytes32(cc.mul(k, R)[0]), K, nonce, Buffer.from([0x16]))
+  const answer = Buffer.concat([K, Buffer.from(c.map((b, i) => b ^ block[i]))])
+  assert.equal(cc.hexOf(cc.openCardSecret(answer, nonce, r)), vectors.c)
+  assert.notEqual(cc.hexOf(cc.openCardSecret(answer, nonce, r + 1n)), vectors.c, "another key opens nothing")
+  assert.throws(() => cc.openCardSecret(answer.subarray(1), nonce, r), /97 bytes/)
 })

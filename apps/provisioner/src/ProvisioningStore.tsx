@@ -939,8 +939,9 @@ function ProvisioningSession({
       }, true),
     continueReset: pin =>
       operate(async (w, _service, reset) => {
+        // A reset removes the applet and restores keys; it loads nothing, so it
+        // is not held to the installation gate (hardwareValidated).
         if (
-          !hardwareValidated ||
           w.snapshot().batch ||
           reset.snapshot()?.journal.device_id !== w.snapshot().device_id
         ) {

@@ -30,7 +30,7 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > 2.0 has a neutral identity ([D19](docs/DECISIONS.md#d19)) and our fixes
 > ([D20](docs/DECISIONS.md#d20) to [D24](docs/DECISIONS.md#d24)).
 
-> ### Status: protocol 3.0 not yet run on a chip; its source, numbered 2.3, run on a J3R180 at a test mint; 2.1 tested with real phones
+> ### Status: protocol 3.0 not yet run on a chip; an earlier source, numbered 2.3, run on a J3R180 at a test mint; 2.1 tested with real phones
 >
 > On 2026-11-13 a J3R180 installed the applet in this
 > tree as it was before [D200](docs/DECISIONS.md#d200), numbered 2.3 then and answering
@@ -54,9 +54,11 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > clock brought back by the set-up, the resets, the hand-over and the owner's back form,
 > and the owner's c read back
 > ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
-> file is that file with the version moved to 3.0 ([D205](docs/DECISIONS.md#d205)), and
-> differs from it only in the version bytes. This exact file has run only in a simulator
-> so far, and no card has installed it; the run is to be repeated on it. The
+> file is built from that source with the version moved to 3.0
+> ([D205](docs/DECISIONS.md#d205)) and [D206](docs/DECISIONS.md#d206) to
+> [D210](docs/DECISIONS.md#d210) added, which make it 460 bytes larger. This exact file
+> has run only in a simulator so far, and no card has installed it or a file of its size;
+> the run is to be repeated on it. The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The

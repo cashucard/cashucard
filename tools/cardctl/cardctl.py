@@ -145,6 +145,17 @@ SELFTEST_MIN_VERSION = (2, 1)
 SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0))
 # The majors cardctl speaks outside the card file tools: those of SELFTEST_VERSIONS.
 PROTOCOL_MAJORS = tuple(sorted({v[0] for v in SELFTEST_VERSIONS}))
+# The versions cardctl drives a card as (`driven_as`, `connect`): those selftest knows, and 2.0, the release D26
+# replaced, whose wire cardctl's 2.x paths were written for (selftest refuses it for the card's sake, not the wire's).
+DRIVEN_VERSIONS = ((2, 0),) + SELFTEST_VERSIONS
+# The majors D205's rule holds for: a reader takes every minor of such a major it was built for. Major 2 came before
+# the rule, and a 2.x above 2.2 is no release (a 02 03 card is 3.0's wire before its renumbering).
+RULED_MAJORS = (3,)
+# The commands that move no money and set nothing up: `connect` lets them read a card of a version it would otherwise
+# refuse, with a note; `apdu` too, whose bytes are the operator's own. Every other command (and one it cannot name) is
+# refused there. `selftest` selects for itself and gives its own verdict (`_select_verdict`).
+READ_ONLY_COMMANDS = frozenset({"info", "pubkey", "balance", "auth", "slots", "proof", "change", "cert", "outbox",
+                                "group-keys", "card-secret", "verify-pin", "apdu"})
 
 # GET_OUTBOX (2.2, spec/APDU.md, D175): the scope's length, one page's most, the
 # descriptor's tag, and the packet's magic and format.
@@ -972,6 +983,9 @@ class Card:
         # caller says so; a 3.0 card answers 6A86 to a load without it and writes nothing. A 0.x card takes P2 00.
         if date_keys and self.legacy:
             raise SystemExit("a 0.x card has no keys per date")
+        if date_keys and self.version and not self.at_least(3, 0):
+            raise SystemExit(f"a card of version {_version_text(self.version)} has no keys per date (3.0's): it "
+                             "could never pay a piece locked to one")
         return self.send(INS_LOAD_PROOF, p2=LOAD_DATE_KEYS if date_keys else 0, data=payload, le=0x01,
                          context="LOAD_PROOF")[0]
 
@@ -1002,9 +1016,14 @@ class Card:
             raise SystemExit(f"LOAD_CHANGE returned {len(b)} bytes, expected {LOAD_CHANGE_ANSWER_LEN}")
         return {"slot": b[0], "proof_kept": b[1] == 1, "piece": decode_piece(b[2:])}
 
-    def spend_all_change(self, amount: int, k33: bytes, keyset8: bytes) -> bytes:
+    def spend_all_change(self, amount: int, k33: bytes, keyset8: bytes, mint_info: dict) -> bytes:
         """SPEND_ALL_CHANGE (26), in a payment begun: a change output of `amount` for the card itself, bound to the
-        mint's key K for that amount (33, compressed) and made in `keyset8`. Answers the output's B_ (33)."""
+        mint's key K for that amount (33, compressed) and made in `keyset8`. Answers the output's B_ (33).
+
+        `mint_info` is the GET /v1/info answer of the mint the payment will be swapped at (`fetch_mint_info`), and it
+        is required: the change is asked for only where it says NUT-12 and NUT-09 are supported (`check_change_mint`),
+        since at any other mint the change could never be loaded. Without it the till pays the exact amount."""
+        check_change_mint(mint_info)
         if not 0 < amount < 2 ** 32:
             raise SystemExit(f"the change is 1 to 2^32 - 1, got {amount}")
         if len(k33) != 33 or k33[0] not in (0x02, 0x03):
@@ -1243,11 +1262,34 @@ def parse_hex(value: str, expected_len: Optional[int] = None, what: str = "value
     return b
 
 
+def driven_as(version: bytes) -> Optional[Tuple[int, int]]:
+    """
+    The version cardctl drives a card as, from the two bytes SELECT answered, or None for one it would drive by the
+    wrong wire. A version it knows (DRIVEN_VERSIONS) is itself. A later minor of a major from D205 on (3.1, 3.2, ...)
+    is too: D205's rule is that a reader takes every minor of a major it was built for, since a minor never changes what
+    a reader of an earlier minor sends or is answered, and `at_least(3, 0)` holds for it. Major 2 is older than that
+    rule and closed: a `02 03` card is a build of 3.0's wire from before its renumbering (D205), which a 2.2 reader
+    would drive wrongly (GET_INFO P1 2, GET_PUBKEY as the outbox key, the old clock check), and no other 2.x is known.
+    """
+    if len(version) < 2:
+        return None
+    ver = (version[0], version[1])
+    if ver in DRIVEN_VERSIONS:
+        return ver
+    if ver[0] in RULED_MAJORS and ver > max(v for v in DRIVEN_VERSIONS if v[0] == ver[0]):
+        return ver
+    return None
+
+
 def connect(args) -> Card:
     """
     A card with the applet selected. The card file tools ask for the 0.x applet
     (`legacy`) and refuse a card that answers any other major version; every
     other command speaks majors 2 and 3 (PROTOCOL_MAJORS) and refuses any other.
+    Within those, a command that moves money or sets a card up (any not in
+    READ_ONLY_COMMANDS) is refused on a version cardctl would drive by the wrong
+    wire (`driven_as`), before anything after SELECT is sent; a read-only one
+    goes on, with a note.
     """
     legacy = bool(getattr(args, "legacy", False))
     card = Card(reader_index=args.reader, verbose=args.verbose)
@@ -1257,7 +1299,31 @@ def connect(args) -> Card:
         raise SystemExit(f"this card answers version {_version_text(version)}; card files are 0.x-only (spec/CARD-FILE.md)")
     if not legacy and major not in PROTOCOL_MAJORS:
         raise SystemExit(f"this card answers version {_version_text(version)}; cardctl speaks protocols 2.x and 3.x")
+    if not legacy and driven_as(version) is None:
+        command = getattr(args, "command", None)
+        why = unknown_version_text(version)
+        if command not in READ_ONLY_COMMANDS:
+            raise SystemExit(f"{why}. {command or 'this command'} moves money or sets the card up, so cardctl sends "
+                             "it to none but a version it knows; nothing was sent after SELECT. The reads (info, "
+                             "balance, slots, proof, auth) still answer")
+        print(f"note: {why}; read anyway, as the {version[0]}.x it knows is read, so what it says may be wrong",
+              file=sys.stderr)
     return card
+
+
+def unknown_version_text(version: bytes) -> str:
+    """What a card whose version `driven_as` refuses answered, and what cardctl knows."""
+    known = ", ".join(f"{a}.{b}" for a, b in DRIVEN_VERSIONS)
+    text = (f"this card answers version {_version_text(version)}; cardctl knows {known}, and every later minor of "
+            f"major {', '.join(str(m) for m in RULED_MAJORS)} (D205)")
+    if len(version) >= 2 and version[0] == 2:
+        text += f". No 2.x above 2.2 was released: {PRE_RENUMBERING}"
+    return text
+
+
+PRE_RENUMBERING = ("a card answering 02 03 is a build of 3.0's wire from before its renumbering (D205), which a 2.2 "
+                   "reader drives wrongly; once it holds nothing, reinstall it with the tracked CAP "
+                   "(docs/HARDWARE_DEPLOYMENT.md)")
 
 
 def _version_text(version: bytes) -> str:
@@ -1687,6 +1753,75 @@ def dleq_holds(b_: bytes, c_: bytes, k: bytes, e: bytes, s: bytes) -> bool:
     return hashlib.sha256(text.encode("ascii")).digest() == e
 
 
+# ── a mint the card's change may be asked at (3.0) ──────────────────────────
+# The card finishes its own change: LOAD_CHANGE takes the mint's blind signature only with the mint's NUT-12 proof
+# (e, s), and GET_CHANGE never gives the opening's nonce or blinding factor out, so nobody but the card can make the
+# change a piece. A mint that gives no DLEQ takes the payment's inputs and answers change that can never be loaded: it
+# is lost for good. And a swap answer lost on the way back is asked for again by NUT-09 restore, by the opening's B_,
+# the only way back to it. So a reader asks the card for change (SPEND_ALL_CHANGE) only at a mint whose GET /v1/info
+# says it supports both; at any other it pays the exact amount, with no change output, or not at all.
+CHANGE_NUTS = (("12", "NUT-12, the DLEQ proof LOAD_CHANGE needs"),
+               ("9", "NUT-09, restore, the way back to a swap answer lost on its way"))
+
+
+def change_mint_problem(info) -> Optional[str]:
+    """Why the card's change must not be asked for at the mint whose GET /v1/info answered `info`, or None: its `nuts`
+    must say `"supported": true` for both NUT-12 and NUT-09. A mint that does not say so is taken not to."""
+    nuts = info.get("nuts") if isinstance(info, dict) else None
+    if not isinstance(nuts, dict):
+        return "its /v1/info names no nuts"
+    missing = [what for nut, what in CHANGE_NUTS
+               if not (isinstance(nuts.get(nut), dict) and nuts[nut].get("supported") is True)]
+    if missing:
+        return "its /v1/info does not say it supports " + " or ".join(missing)
+    return None
+
+
+def check_change_mint(info, mint: str = "the mint") -> None:
+    """Refuse, before anything is sent, to ask the card for change at a mint that will not give it back (above)."""
+    problem = change_mint_problem(info)
+    if problem:
+        raise SystemExit(
+            f"no change asked of the card at {mint}: {problem}. The card loads its change only with the mint's DLEQ "
+            "proof, and nobody else can unblind it, so change swapped at this mint would be lost for good. Pay the "
+            "exact amount, with no change output, or pay at a mint that supports both; nothing was sent.")
+
+
+def fetch_mint_info(url: str) -> dict:
+    """GET {url}/v1/info (NUT-06), the mint's own word on the NUTs it supports. Test-injectable."""
+    import urllib.request
+
+    req = urllib.request.Request(url.rstrip("/") + "/v1/info")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001, the transport's own words are the message
+        raise SystemExit(f"the mint at {url} did not answer /v1/info: {exc}")
+    if not isinstance(body, dict):
+        raise SystemExit(f"the mint at {url} answered /v1/info with no object")
+    return body
+
+
+def change_signature(sig, what: str = "the change") -> Tuple[bytes, bytes, bytes]:
+    """
+    C_, e and s from the mint's blind signature for one change output: an entry of a swap's `signatures`, or of a
+    NUT-09 restore's, `{"amount", "id", "C_", "dleq": {"e", "s"}}`. A signature with no DLEQ is said plainly: the card
+    cannot load it, and the way on is restore, not a retry of LOAD_CHANGE.
+    """
+    if not isinstance(sig, dict) or not isinstance(sig.get("C_"), str):
+        raise SystemExit(f"{what}: the mint's signature is not an object with a C_")
+    dleq = sig.get("dleq")
+    if not isinstance(dleq, dict) or not isinstance(dleq.get("e"), str) or not isinstance(dleq.get("s"), str):
+        raise SystemExit(
+            f"{what}: the mint's signature carries no DLEQ proof (NUT-12, its \"dleq\": e and s). The card loads its "
+            "change only with that proof (LOAD_CHANGE checks it, and nobody but the card can unblind the change), so "
+            "nothing was sent and the opening stays owed on the card. Ask the mint for the signature again by NUT-09 "
+            "restore (POST /v1/restore with the opening's B_, which `change` lists): a mint that supports NUT-12 "
+            "answers it with the proof. A mint that never gives one cannot give this change back.")
+    return parse_point_65(sig["C_"], "C_"), parse_hex(dleq["e"], 32, "the DLEQ's e"), parse_hex(dleq["s"], 32,
+                                                                                                "the DLEQ's s")
+
+
 def placeholder_c(nonce: bytes) -> bytes:
     """A placeholder C for `load` without --c: a point of the curve (a 3.0 card refuses one that is not, 6A80), found
     from the nonce by SHA-256("cardctl/placeholder-C" || nonce || counter) until its x is on the curve. Nobody knows
@@ -1968,6 +2103,12 @@ def cmd_load(args) -> int:
         raise SystemExit(f"--date must fit four bytes, got {args.date}")
     owner = owner_key(args) if args.owner else None
     card = connect(args)
+    if args.date_keys and not card.at_least(3, 0):
+        # before VERIFY_PIN: a card of 2.2 or earlier signs with its key P alone, so a piece locked to a date's key
+        # P + t*G is one it can never pay, and its P2 bit 1 is no word it reads
+        raise SystemExit(f"--date-keys is protocol 3.0's word (LOAD_PROOF P2 02): this card answers version "
+                         f"{_version_text(card.version)} and signs with its key P alone, so a piece locked to a date's "
+                         "key could never be paid from it; nothing was sent")
     if owner is not None and not args.pin and card.at_least(3, 0):
         raise SystemExit("the owner's grant opens no load on this card: a load wants the PIN given in this tap (--pin)")
     if args.pin:
@@ -2723,6 +2864,17 @@ def _setup_stopped(card, step: str, exc: BaseException, design: bytes = b"") -> 
     return "\n".join(lines)
 
 
+# A reset draws the card a new c (spec/APDU.md, Keys per load), and with it new keys for every date. The card being empty
+# says nothing of eCash a wallet has already swapped to this card's keys and not yet loaded: no card will ever sign for it
+# again. Undated (the date 0), it has no refund and is lost for good; dated, only the refund key takes it back, after its
+# date, with r + u, and u comes from the c the card holds now. So the warning is given before every reset, --yes or not.
+RESET_LOSES_SWAPPED = (
+    "a reset gives the card a new c, so new keys for every date. eCash already swapped to this card's keys and not yet "
+    "loaded can never be loaded or paid after it: undated (the date 0), it is lost for good; dated, only the refund key "
+    "takes it back, after its date, with r + u, where u comes from the c the card holds now. Load such eCash first, or "
+    "read c and keep it with the refund key's r (card-secret) before the reset")
+
+
 def cmd_reset(args) -> int:
     """
     RESET_CARD on a card with no owner (3.0, D196): the reset by the PIN. The PIN given, a held tap (GET_LOG held for),
@@ -2764,6 +2916,7 @@ def cmd_reset(args) -> int:
         problem = header_work_problem(anchor, card.get_card()["hardest_bits"])
         if problem:
             raise SystemExit(f"--anchor: {problem}. Nothing was written to the card.")
+    print(f"warning: {RESET_LOSES_SWAPPED}", file=sys.stderr)
     if not args.yes:
         print("RESET_CARD makes the card as new: no PIN, no record, a new card key. It holds nothing now.")
         if input("Type 'reset' to confirm: ").strip() != "reset":
@@ -2793,6 +2946,7 @@ def _reset_by_owner(args, card, info: dict, pin: Optional[bytes], anchor: Option
         problem = header_work_problem(anchor, card.get_card()["hardest_bits"])
         if problem:
             raise SystemExit(f"--anchor: {problem}. Nothing was written to the card.")
+    print(f"warning: {RESET_LOSES_SWAPPED}", file=sys.stderr)
     if not args.yes:
         print("RESET_CARD makes the card as new: no PIN, no record, no owner, a new card key. It holds nothing now.")
         if input("Type 'reset' to confirm: ").strip() != "reset":
@@ -3152,10 +3306,32 @@ def cmd_load_change(args) -> int:
     """
     if not 0 <= args.opening < CHANGE_MOST:
         raise SystemExit(f"an opening is 0 to {CHANGE_MOST - 1}, got {args.opening}")
-    c_ = parse_point_65(args.c, "C_")
+    if args.signature is not None:
+        # the mint's own answer for the opening's B_, as its swap or its NUT-09 restore gives it: one with no DLEQ is
+        # said plainly here, before the card is asked
+        if args.c or args.e or args.s:
+            raise SystemExit("--signature gives C_, e and s: not with --c, --e or --s")
+        text = args.signature
+        if not text.lstrip().startswith("{"):
+            try:
+                with open(text, encoding="utf-8") as f:
+                    text = f.read()
+            except OSError as exc:
+                raise SystemExit(f"--signature: {exc}")
+        try:
+            sig = json.loads(text)
+        except ValueError as exc:
+            raise SystemExit(f"--signature is not JSON: {exc}")
+        c_, e, s = change_signature(sig, f"opening {args.opening}")
+    else:
+        if not (args.c and args.e and args.s):
+            raise SystemExit("give the mint's answer for the opening: --signature (its JSON, with the DLEQ), or --c, "
+                             "--e and --s (e and s are its NUT-12 proof: a mint that gave none cannot have its change "
+                             "loaded; ask it again by NUT-09 restore)")
+        c_ = parse_point_65(args.c, "C_")
+        e = parse_hex(args.e, 32, "e")
+        s = parse_hex(args.s, 32, "s")
     k = parse_point_65(args.k, "K")
-    e = parse_hex(args.e, 32, "e")
-    s = parse_hex(args.s, 32, "s")
     card = connect(args)
     _needs_23(card, "load-change")
     row = next((r for r in card.owed_change() if r["number"] == args.opening), None)
@@ -3378,12 +3554,19 @@ def _select_verdict(version: bytes) -> Tuple[bool, str]:
     protocol 2.1, 2.2 or 3.0 (SELFTEST_VERSIONS). The shared AID (D19) answers
     nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26 replaced:
     it is reinstalled. A later minor of a major this tool knows (2.3, 3.1), or a
-    later major (4.0), is one it does not know, and is refused.
+    later major (4.0), is one it does not know, and is refused. That is a
+    statement about the test, not the wire: a 3.1 is still driven as 3.0 by the
+    other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
+    before the renumbering, is not, and is said so here.
     """
     if len(version) < 2:
         return False, "SELECT returned no applet version"
     ver = tuple(version[:2])
     newest_of_major = max((v for v in SELFTEST_VERSIONS if v[0] == ver[0]), default=None)
+    if driven_as(version) is None and newest_of_major is not None and ver > newest_of_major:
+        # 02 03: no release, but 3.0's wire before its renumbering (D205); the other commands refuse to drive it
+        return False, (f"applet {ver[0]}.{ver[1]} is no released version, and the commands that move money or set a "
+                       f"card up refuse it: {PRE_RENUMBERING}")
     if ver > SELFTEST_VERSIONS[-1] or (newest_of_major is not None and ver > newest_of_major):
         return False, (f"applet {ver[0]}.{ver[1]} is a version this cardctl does not know (it knows 2.1, 2.2 and "
                        f"3.0): use a cardctl of that version")
@@ -3639,10 +3822,13 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("load-change", help="LOAD_CHANGE (3.0): an opening of the card's change made into its piece "
                                            "from the mint's answer for its B_; any reader, no PIN")
     s.add_argument("opening", type=int, help="the opening's number, 0 to 7, as change lists it")
-    s.add_argument("--c", required=True, help="C_, the mint's blind signature: 33 bytes (02/03) or 65 (04) of hex")
+    s.add_argument("--signature", help="the mint's answer for the opening's B_, one entry of its swap's or NUT-09 "
+                                       "restore's signatures, {\"C_\", \"dleq\": {\"e\", \"s\"}, ...}: JSON, or a file "
+                                       "holding it; in place of --c, --e and --s")
+    s.add_argument("--c", help="C_, the mint's blind signature: 33 bytes (02/03) or 65 (04) of hex")
     s.add_argument("--k", required=True, help="K, the mint's key for the opening's amount: 33 or 65 bytes of hex")
-    s.add_argument("--e", required=True, help="e of the mint's proof (NUT-12), 32 bytes hex")
-    s.add_argument("--s", required=True, help="s of the mint's proof (NUT-12), 32 bytes hex")
+    s.add_argument("--e", help="e of the mint's proof (NUT-12), 32 bytes hex")
+    s.add_argument("--s", help="s of the mint's proof (NUT-12), 32 bytes hex")
     s.set_defaults(func=cmd_load_change)
 
     s = sub.add_parser("keyset-keys", help="KEYSET_KEYS (3.0): teach the card a keyset's keys from the mint's (NUT-01 "

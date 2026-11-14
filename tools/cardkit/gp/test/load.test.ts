@@ -12,17 +12,17 @@ function reassemble(apdus: number[][]): number[] {
 }
 
 describe('splitLoad', () => {
-  it('cuts the card load file into 150 blocks of 247 bytes, the last 150, which reassemble to it', () => {
+  it('cuts the card load file into 152 blocks of 247 bytes, the last 116, which reassemble to it', () => {
     const file = fromHex(CASHU_LOAD_FILE.hex);
-    assert.equal(file.length, 36953);
+    assert.equal(file.length, 37413);
     assert.equal(
       createHash('sha256').update(Buffer.from(file)).digest('hex'),
       CASHU_LOAD_FILE.sha256,
     );
     const apdus = splitLoad(file);
-    assert.equal(apdus.length, 150);
-    assert.equal(apdus[149][4], 150);
-    assert.ok(apdus.slice(0, 138).every(a => a[4] === 247));
+    assert.equal(apdus.length, 152);
+    assert.equal(apdus[151][4], 116);
+    assert.ok(apdus.slice(0, 151).every(a => a[4] === 247));
     assert.deepEqual(reassemble(apdus), file);
   });
 
@@ -48,12 +48,12 @@ describe('splitLoad', () => {
     assert.deepEqual(reassemble(apdus), file);
   });
 
-  it('takes a smaller block size (200: 185 blocks for the card), and not one that needs more than 256 (128: 289)', () => {
+  it('takes a smaller block size (200: 188 blocks for the card), and not one that needs more than 256 (128: 293)', () => {
     const file = fromHex(CASHU_LOAD_FILE.hex);
     const apdus = splitLoad(file, 200);
-    assert.equal(apdus.length, 185);
+    assert.equal(apdus.length, 188);
     assert.deepEqual(reassemble(apdus), file);
-    assert.throws(() => splitLoad(file, 128), /289 blocks/);
+    assert.throws(() => splitLoad(file, 128), /293 blocks/);
   });
 
   it('refuses a block with no room for the C-MAC, and a file of more than 256 blocks', () => {

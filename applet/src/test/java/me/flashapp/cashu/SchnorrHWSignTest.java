@@ -48,7 +48,7 @@ class SchnorrHWSignTest {
         + "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
 
     /** { private key d, uncompressed public key 04||X||Y, "is P.y odd" }. */
-    private static final Object[][] KEYS = {
+    static final Object[][] KEYS = {
         { "0000000000000000000000000000000000000000000000000000000000000003",
           "04F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9"
           + "388F7B0F632DE8140FE337E62A37F3566500A99934C2231B6CB9FD7584B8E672",
@@ -398,7 +398,7 @@ class SchnorrHWSignTest {
     private static final BigInteger FP = new BigInteger(1, SECP_P);
     private static final BigInteger FN = new BigInteger(1, SECP_N);
 
-    private static Object hidden(SchnorrHW s, String name) throws Exception {
+    static Object hidden(SchnorrHW s, String name) throws Exception {
         java.lang.reflect.Field f = SchnorrHW.class.getDeclaredField(name);
         f.setAccessible(true);
         return f.get(s);
@@ -410,7 +410,7 @@ class SchnorrHWSignTest {
         f.set(s, value);
     }
 
-    private static ECPrivateKey keyOf(String hexD) {
+    static ECPrivateKey keyOf(String hexD) {
         ECPrivateKey priv = (ECPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PRIVATE, KeyBuilder.LENGTH_EC_FP_256, false);
         ECPublicKey pub = (ECPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PUBLIC, KeyBuilder.LENGTH_EC_FP_256, false);
         setCurve(priv, pub);
@@ -418,7 +418,7 @@ class SchnorrHWSignTest {
         return priv;
     }
 
-    private static ECPublicKey pubOf(String hexW) {
+    static ECPublicKey pubOf(String hexW) {
         ECPrivateKey priv = (ECPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PRIVATE, KeyBuilder.LENGTH_EC_FP_256, false);
         ECPublicKey pub = (ECPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PUBLIC, KeyBuilder.LENGTH_EC_FP_256, false);
         setCurve(priv, pub);
@@ -426,7 +426,7 @@ class SchnorrHWSignTest {
         return pub;
     }
 
-    private static boolean allZero(byte[] b) {
+    static boolean allZero(byte[] b) {
         for (byte x : b) if (x != 0) return false;
         return true;
     }

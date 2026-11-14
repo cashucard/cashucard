@@ -338,6 +338,8 @@ class FarHeaderTest {
         c.power();
         assertEquals(SW_OK, header(c, F));
         c.tap();
+        // armed already, by an owner's proof: a good proof refused after it writes its own arming (D186), and that is all
+        c.grant();
         java.util.Map<String, byte[]> before = c.snapshot();
         assertEquals(SW_LITTLE_WORK, c.sw(ownersReset(c, unmined(T0 + 60, TEST_BITS))), "no work");
         assertEquals(SW_WRONG_LENGTH, c.sw(ownersReset(c, Arrays.copyOf(blockAt(T0 + 60), 79))), "79 bytes");

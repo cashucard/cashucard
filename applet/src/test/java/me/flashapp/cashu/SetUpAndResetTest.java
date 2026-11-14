@@ -31,7 +31,7 @@ class SetUpAndResetTest {
     static final CommandAPDU VERIFY = new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, TEST_PIN);
 
     @Test
-    @DisplayName("the reset by the PIN clears the held tap (TAP_READ, TAP_ARMED) with the PIN: a new PIN in the same selection has no hold it did not ask for")
+    @DisplayName("the reset by the PIN clears the held tap (TAP_READ) with the PIN, and the arming the held tap gave with the record: a new PIN in the same selection has no hold it did not ask for")
     void theResetEndsTheHeldTap() throws Exception {
         UnitsTest.Card c = SimpleCardTest.setUpWith(SimpleCardTest.eighteen(1000, 500, 0, 7, 0, 0));
         int p = c.put(-1, KeysetKeysTest.A.id8(), 60);
@@ -41,7 +41,8 @@ class SetUpAndResetTest {
         c.pin();
         assertEquals(SW_OK, c.log(0).getSW(), "the history held for");
         assertEquals(SW_OK, SimpleCardTest.resetByPin(c)[1], "the reset by the PIN");
-        assertEquals(0, c.field("tapOpen")[2] & (CashuApplet.TAP_READ | CashuApplet.TAP_ARMED), "nothing of the held tap or the arming is left");
+        assertEquals(0, c.field("tapOpen")[2] & CashuApplet.TAP_READ, "nothing of the held tap is left");
+        assertEquals(0, c.record()[CashuApplet.CARD_ARMED_OFFSET], "nor the arming it gave (D186): it went with the record");
         assertEquals(SW_OK, SimpleCardTest.raw(c, new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
         c.pin();
         // a command that wants a held tap: the let-go of an opening (none is owed) asks for the hold first

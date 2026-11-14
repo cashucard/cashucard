@@ -73,7 +73,9 @@ class OldCardTest {
         byte[] nonce = card.transmit(SET_PUK);
         assertEquals(0x9000, SimCard.sw(nonce), "GET_NONCE reads no data");
         assertEquals(16, data(nonce).length);
-        assertEquals(0x6A91, SimCard.sw(card.transmit(UNBLOCK_PIN)), "ALLOW_LOAD takes a PUK and a PIN as no proof");
+        // the PUK's length byte (08) names a proof shorter than the fourteen bytes sent: ALLOW_LOAD refuses data longer
+        // than its length byte and the proof it names with 6700, before the proof is looked at (processAllowLoad)
+        assertEquals(0x6700, SimCard.sw(card.transmit(UNBLOCK_PIN)), "ALLOW_LOAD takes a PUK and a PIN as no proof");
         assertEquals(before, card.state().toString(), "nothing a 0.x reader sent was written");
     }
 

@@ -1022,7 +1022,7 @@ class SchnorrHWMathTest {
         // a parse that found nothing would prove nothing
         org.junit.jupiter.api.Assertions.assertEquals(15, asked[2], "the parse found the 13 of CashuApplet and the 2 of SchnorrHW (3.0 has no change grant, D185)");
         org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 (3.0: a held tap's count, one byte, D187, D189) and SchnorrHW 544");
-        org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 3.0 adds TAP_ARMED, D186); 1.14 kept six bytes for a clock told twice, and eight with the flags");
+        org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 3.0 adds a byte of marks, TAP_PAID, TAP_CLAIMED and TAP_READ, D187, D189); 1.14 kept six bytes for a clock told twice, and eight with the flags");
     }
 
     @Test

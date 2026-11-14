@@ -276,7 +276,8 @@ class OwnerUnblockTest {
         assertEquals(SW_OK, r.getSW(), "GET_NONCE");
         assertEquals(16, r.getData().length, "a nonce, nothing else");
         // UNBLOCK_PIN's bytes at 0x45: ALLOW_LOAD takes them as a proof, which they are not
-        assertEquals(SW_OWNER_PROOF, send(0x45, 0, OLD_UNBLOCK_DATA), "ALLOW_LOAD refuses a PUK and a PIN as a proof");
+        // (6700: their first byte read as a proof's length leaves bytes after it, and ALLOW_LOAD asks its length before any proof)
+        assertEquals(CashuAppletTest.SW_WRONG_LENGTH, send(0x45, 0, OLD_UNBLOCK_DATA), "ALLOW_LOAD refuses a PUK and a PIN as a proof");
         assertTheBlockedPinGates("after a 0.6 unblock attempt");
         assertEquals(SW_PIN_BLOCKED, verify(NEW_PIN), "the PIN the old UNBLOCK_PIN named was never set");
     }

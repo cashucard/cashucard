@@ -157,7 +157,7 @@ reader is the more reliable way to install, leaving NFC for tap testing.
 | `clear-spent [--pin P]` | free spent slots |
 | `verify-pin PIN` | verify the PIN for this tap; sent again for as long as the card answers `6A98` (a card with no owner serving the wait its wrong tries left: keep holding it). Every command that takes `--pin` does the same |
 | `setup --pin P --mint URL (--owner-key K \| --test-owner-key) [--unit sat\|usd] [--refund HEX] [--design XYZ] --anchor HDR [--owner-seed SEED] [--day N [--payment N --allowance N --budget N --rate N --no-pin-window 0\|1]]` | 3.0: a fresh card's first set-up in one selection (D196: every `SELECT` ends it, so separate commands cannot make it): `SET_PIN`, `VERIFY_PIN`, `SET_CARD`, the owner claimed (held for, with the anchor), then the owner's limits. `--anchor`, the tip (`tip` prints one), is required: the claim's anchor, the first set-up's on an empty card, becomes the card's clock even where the clock was later, and its hardest where it is harder ([D204](../../docs/DECISIONS.md#d204)), so a far header a stranger gave the card before is let go; setup without it refuses before anything is sent. With `--owner-seed` (the owner's 64-byte BIP-39 seed, hex) the claim gives the card a c made from it ([D202](../../docs/DECISIONS.md#d202)), s worked out from the card's own key read in this tap, so that a phone restored from the words has c (to take back a lost card's dated pieces it needs the card's key P and the pieces too); setup then reads c back from the card (`GROUP_KEYS` for the date 0) and finds its n before it says c is the owner's, and stops, naming the owner's reset, where no n gives it. **`--owner-key` is required for any card that will hold money**; `--test-owner-key` sets a bench card up under the TEST key, which anyone with this repository holds: they can change its PIN and spend it. Before anything is written it checks the PIN, the key, the mint (1 to 77 printable ASCII characters), the refund key (a point of the curve), the anchor's work (its own, the floor, and a quarter of the hardest header the card has taken), the card's clock (on a card older than 3.0, whose claim moves the clock only forward, a clock more than two hours past the anchor's time was set by a header far ahead: setup refuses the card and names the reset with the tip as its anchor, [D203](../../docs/DECISIONS.md#d203); a 3.0 card's claim brings it back, and setup says so) and the limits, and refuses a card with a PIN, an owner or a holder's record (a factory record is taken, and its design kept unless `--design`, three capital letters or digits, names another). A failure after `SET_PIN` prints the card's state and the way on (below): on 3.0 the reset by the PIN, then `setup` again (with `--design` and the factory record's design, which the reset clears); on a card older than 3.0, which has no reset by the PIN, the claim at a later tap (`set-owner --pin`) |
-| `reset --pin P [--anchor HEX] [--yes]` | 3.0: the reset by the PIN of an empty card with no owner (`RESET_CARD`): the PIN, a held tap (`GET_LOG` held for, ten askings), then sixty askings, about 45 seconds on the reader, all in one selection. The card is then as from its install, with a new card key and a new c. `--anchor`: a block header that becomes the clock even where it is older (D200), the way back from a clock a header far ahead set; on a fresh card with no PIN (`--anchor` only), `--pin` is set first, for the reset alone, in the same selection ([D203](../../docs/DECISIONS.md#d203)) |
+| `reset --pin P [--anchor HEX] [--yes]` | 3.0 (both forms warn first, `--yes` or not: a reset gives the card a new c, so eCash already swapped to its keys and not yet loaded can never be loaded after it, lost for good undated and the refund key's after its date where dated; load it first, or keep c with r, `card-secret`): the reset by the PIN of an empty card with no owner (`RESET_CARD`): the PIN, a held tap (`GET_LOG` held for, ten askings), then sixty askings, about 45 seconds on the reader, all in one selection. The card is then as from its install, with a new card key and a new c. `--anchor`: a block header that becomes the clock even where it is older (D200), the way back from a clock a header far ahead set; on a fresh card with no PIN (`--anchor` only), `--pin` is set first, for the reset alone, in the same selection ([D203](../../docs/DECISIONS.md#d203)) |
 | `reset --owner-key K [--pin P] [--anchor HEX] [--yes]` | 3.0: the owner's reset of an empty card with an owner: the owner's proof over the anchor, or over nothing (D200); a locked card wants `--pin` too |
 | `set-pin PIN [--owner]` | set the PIN on a card with no owner; `--owner` (ADD PIN under the grant) is for 2.2 and earlier: a 3.0 card with an owner refuses `SET_PIN`, use `change-pin`. A 3.0 card with no PIN is refused, with nothing sent: alone, its `SET_PIN` would begin a first set-up that the next command ends; use `setup` |
 | `change-pin NEW` | the owner sets a new PIN: no old PIN, any state; unblocks a blocked card |
@@ -174,7 +174,7 @@ reader is the more reliable way to install, leaving NFC for tap testing.
 | `group-keys --date N [--pin P \| --owner]` | `GROUP_KEYS` (3.0): the keys of the pieces of date N (0 for undated): t, P + t·G and R + u·G, after the PIN or the owner's grant; P + t·G is checked against `GET_PUBKEY` |
 | `card-secret [--refund-key HEX \| --refund-key-file PATH] [--pin P] [--owner-key K] [--show] [--owner-seed SEED [--date D]]` | `GET_CARD` P1 `03` (3.0): the card's secret c, sealed, opened here (below); with `--owner-seed`, c checked against the owner's c worked out from the seed alone, and with `--date` the take-back key of that date |
 | `change` | `GET_CHANGE` (3.0): every opening of the card's own change owed (its number, amount, keyset, date, B_ and the mint's key K it is bound to), page by page until a short answer. No PIN |
-| `load-change N --c HEX --k HEX --e HEX --s HEX` | `LOAD_CHANGE` (3.0): opening N made into its piece from the mint's answer for its B_: C_ and K as 33 bytes (`02`/`03`) or 65 (`04`), sent in the `04` form, e and s of the mint's proof. The opening is read first: K must be the key it is bound to and the proof must hold for its B_, or nothing is sent. Any reader, no PIN (below) |
+| `load-change N --k HEX (--signature JSON\|FILE \| --c HEX --e HEX --s HEX)` | `LOAD_CHANGE` (3.0): opening N made into its piece from the mint's answer for its B_: C_ and K as 33 bytes (`02`/`03`) or 65 (`04`), sent in the `04` form, e and s of the mint's proof; or `--signature`, the mint's own answer for it (one entry of its swap's or NUT-09 restore's `signatures`, JSON or a file), and one with no `dleq` is said plainly, naming NUT-09 restore, with nothing sent. The opening is read first: K must be the key it is bound to and the proof must hold for its B_, or nothing is sent. Any reader, no PIN (below) |
 | `keyset-keys FILE [--pin P] [--show N [--rebind --owner]] [--input-fee-ppk F]` | `KEYSET_KEYS` (3.0): with `--pin`, teach the card a keyset's keys from the mint's (NUT-01 JSON), the ID the card answers checked against the file's; with `--show N`, show opening N's key to be one of them by its path (no PIN); `--rebind` binds the opening to the file's key for its amount, or moves it to the file's keyset, under the PIN and the owner's grant (below) |
 | `cert` | `CERT_READ` (3.0): the certificate's state and, where one is sealed, its container in hex and its SHA-256 |
 | `dump --mint URL [--unit U] [--out PATH] [--force] [--unspent-only]` | **0.x cards only**: write the card's slots out as a card file. `--out` refuses to overwrite without `--force` |
@@ -187,6 +187,21 @@ Gone with the 0.x wire ([D18](../../docs/DECISIONS.md#d18)): `sign`
 till drives), `clear-pin`, `set-puk` and `unblock-pin`. Their opcodes `43`, `44`,
 `45` are `SET_OWNER`, `GET_NONCE` and `ALLOW_LOAD` on 2.0, so they must not come
 back; `test_apdu.py` checks the parser refuses them.
+
+**The versions cardctl drives.** A command selects the card and reads its version
+first. It drives 2.0, 2.1, 2.2 and 3.0 as each is, and every later minor of 3 (3.1,
+3.2, ...) as 3.0: D205's rule is that a reader takes every minor of a major it was
+built for, since a minor never changes what a reader of an earlier one sends or is
+answered. Any other major is refused. A 2.x above 2.2 was never released: a card
+answering `02 03` is a build of 3.0's wire from before its renumbering (D205), which
+cardctl's 2.x paths would drive wrongly (`GET_INFO` P1 `02`, `GET_PUBKEY` as the
+outbox key, the old set-up clock check). Every command that moves money or sets the
+card up refuses such a card after its `SELECT`, saying what it answered and what
+cardctl knows; the reads (`info`, `balance`, `slots`, `proof`, `auth`, `change`,
+`cert`, `outbox`, `group-keys`, `card-secret`, `verify-pin`) and `apdu` go on, with a
+note. `selftest` passes only the versions it knows (2.1, 2.2, 3.0): a 3.1 fails its
+`SELECT` check as a version that cardctl does not know, which says the test is not
+proven on it, not that the wire differs.
 
 Global flags: `-r/--reader N` to pick a reader, `-v/--verbose` to log every APDU
 to stderr. Use `-v` when a command misbehaves, since the raw exchange usually
@@ -230,10 +245,20 @@ locked to the card's main key P alone can never be spent by the card, and an
 undated piece has no refund either. `load` writes whatever it is given, so a real
 top-up is a wallet's NUT-11 swap to those keys first: `group-keys --date N` gives
 them, or c does (`card-secret`). `--date-keys` is the loader's word that this was
-done, P2 `02`; without it a 3.0 card answers `6A86` and writes nothing.
+done, P2 `02`; without it a 3.0 card answers `6A86` and writes nothing. A card of
+2.2 or earlier signs with P alone, so `--date-keys` is refused there before the PIN
+is sent.
 
 cardctl has no payment flow: `Card.spend_all_change` (the 45-byte
-`SPEND_ALL_CHANGE`) is there for a till built on cardctl's library.
+`SPEND_ALL_CHANGE`) is there for a till built on cardctl's library, and it takes the
+mint's `GET /v1/info` (`fetch_mint_info`) as its fourth argument. It asks the card
+for change only where that answer says NUT-12 and NUT-09 are supported
+(`check_change_mint`): the card loads its change only with the mint's DLEQ proof,
+and nobody else can unblind it, so change swapped at a mint that gives none is lost
+for good, and NUT-09 restore is the only way back to a swap answer lost on its way.
+At any other mint it refuses, with nothing sent, and the till pays the exact amount
+with no change output. `change_signature` reads one of the mint's change signatures
+and says plainly, naming restore, when it carries no `dleq`.
 
 ## A set-up that stops
 

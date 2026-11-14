@@ -411,7 +411,7 @@ class PerPaymentKeyTest {
     }
 
     @Test
-    @DisplayName("What keys per load cost, counted: SPEND_ALL_BEGIN two SHA-256 and two point additions with a refund key (one and one without), SIGN nothing more, GROUP_KEYS the same as BEGIN, SET_CARD with a refund key three powers of the chip's RSA")
+    @DisplayName("What keys per load cost, counted: SPEND_ALL_BEGIN two SHA-256 and two point additions with a refund key (one and one without), SIGN nothing more of keys per load (the signature's check, step 8, is two point additions and one or two key agreements more), GROUP_KEYS the same as BEGIN, SET_CARD with a refund key three powers of the chip's RSA")
     void whatItCosts() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         Object applet = c.applet();
@@ -434,8 +434,13 @@ class PerPaymentKeyTest {
         int waits = c.waits;
         int[] signed = { sha.done - s0[0], shaAll.done - s0[1], rsa.powers - s0[2], gm.made - s0[3], ecdh.made - s0[4], signSha.done - s0[5] };
         assertEquals(0, signed[0], "SIGN: no SHA-256 of keys per load");
-        assertEquals(0, signed[3], "and no point addition");
-        assertEquals(waits + 1, signed[4], "one k*G a signature (the waits' and the payment's), as before");
+        // the signature's check (SchnorrHW.sign's step 8): Q = W + [t]G and [s]G - T, two point additions; [e]Q one key
+        // agreement more, and [d]G another where the chip's getW gives 33 bytes. The waits' work has no check.
+        java.lang.reflect.Field pk = CashuApplet.class.getDeclaredField("cardPubKey");
+        pk.setAccessible(true);
+        boolean w33 = ((javacard.security.ECPublicKey) pk.get(applet)).getW(new byte[65], (short) 0) == 33;
+        assertEquals(2, signed[3], "and the two point additions of the signature's check");
+        assertEquals(waits + 2 + (w33 ? 1 : 0), signed[4], "one k*G a signature (the waits' and the payment's), as before, and the check's [e]Q" + (w33 ? " and [d]G" : ""));
         int g0 = gm.made, h0 = sha.done;
         assertEquals(SW_OK, groupKeys(c, D2).getSW());
         assertEquals(2, gm.made - g0, "GROUP_KEYS: two point additions");

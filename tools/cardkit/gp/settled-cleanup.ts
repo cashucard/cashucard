@@ -257,7 +257,15 @@ export async function cleanupSettledEntries(
   expected = {...expected}; // Freeze card-specific approval before the first await.
   const {review, record, version} = await snapshot(tx, expected);
   match(review, expected, true, options.resumePartial === true);
-  if (review.unspent || review.locked || review.pinBlocked || !review.tag)
+  // change owed is read fresh from the card, never taken from the saved review
+  // (one saved by cardkit 0.2 has none): no reset follows, so nothing is cleared
+  if (
+    review.unspent ||
+    review.changeOwed ||
+    review.locked ||
+    review.pinBlocked ||
+    !review.tag
+  )
     stop('card-not-empty');
   if (!review.spent) return review;
   // the secrets below are a 2.1 or 2.2 card's: a 3.0 card's name its key for each piece's date

@@ -614,9 +614,8 @@ class HolderTest {
     }
 
     @Test
-    @DisplayName("The time in the field's marks (TAP_PAID, TAP_CLAIMED, TAP_READ) are three bits of the CLEAR_ON_RESET byte beside the allowance's arming, gone with the power and kept through a SELECT; the held count is one CLEAR_ON_DESELECT byte")
+    @DisplayName("The time in the field's marks (TAP_PAID, TAP_CLAIMED, TAP_READ) are three bits of a CLEAR_ON_RESET byte (bit 0, which was the PIN's arming of the allowance until D186's amendment, is unused), gone with the power and kept through a SELECT; the held count is one CLEAR_ON_DESELECT byte")
     void theMarksAreRam() throws Exception {
-        assertEquals(0x01, CashuApplet.TAP_ARMED);
         assertEquals(0x02, CashuApplet.TAP_PAID);
         assertEquals(0x04, CashuApplet.TAP_CLAIMED);
         assertEquals(0x08, CashuApplet.TAP_READ);
@@ -629,4 +628,79 @@ class HolderTest {
         assertEquals(0, c.field("tapOpen")[2], "gone with the power");
         assertEquals(2, c.field("nonceLive").length, "the nonce's mark and the held count");
     }
+
+    @Test
+    @DisplayName("D186 (amended), a card with no owner: the PIN alone arms nothing, a held tap given up before its tenth asking arms nothing, and a held tap completed arms the allowance (and ends no window); no payment is taken in the time in the field that armed it (6985), and the next reader with no PIN has the allowance again (the switch 01: the arming alone brings it back)")
+    void aHeldTapArmsTheAllowance() throws Exception {
+        UnitsTest.Card c = SimpleCardTest.setUpWith(SimpleCardTest.eighteen(1000, 1000, 30, 7, 0, 1));
+        int a = c.put(-1, A.id8(), 20), b = c.put(-1, A.id8(), 20);
+        assertEquals(1, armed(c), "the first set-up's SET_LIMIT_PIN, which carries the allowance, armed it");
+        c.power();
+        assertEquals(64, c.pay(a).getData().length, "20 of 30 with no PIN: the window begins");
+        assertEquals(0, armed(c), "and spends the arming");
+        c.power();
+        assertEquals(CashuAppletTest.SW_ENTER_PIN, c.pay(b).getSW(), "40 is past 30, and nothing is armed");
+        // the PIN alone, in a tap that pays nothing
+        c.tap();
+        assertEquals(0, armed(c), "VERIFY_PIN arms nothing");
+        // a held tap given up: five askings, then out of the field
+        c.tap();
+        CommandAPDU log = new CommandAPDU(CLA, INS_GET_LOG, 0, 0, 256);
+        for (int k = 0; k < 5; k++) assertEquals(SW_KEEP_HOLDING, SimpleCardTest.raw(c, log), "asking " + (k + 1));
+        assertEquals(0, armed(c), "five askings arm nothing");
+        c.power();
+        assertEquals(0, armed(c), "nor does a held tap given up");
+        // a held tap completed
+        c.pin();
+        long counted = readUint32(c.record(), CashuApplet.CARD_NOPIN_SPENT_OFFSET);
+        hold(c);
+        assertEquals(1, armed(c), "the tenth asking arms the allowance");
+        assertEquals(counted, readUint32(c.record(), CashuApplet.CARD_NOPIN_SPENT_OFFSET), "and ends no window: the count stays");
+        assertEquals(SW_CONDITIONS_NOT_SATIS, c.begin(b).getSW(), "no payment in the time in the field that armed it, with the PIN or without");
+        assertEquals(1, armed(c));
+        c.power();
+        assertEquals(64, c.pay(b).getData().length, "the next reader with no PIN: armed, a new window");
+        assertEquals(0, armed(c), "the arming spent");
+    }
+
+    @Test
+    @DisplayName("D186 (amended), the other paths: SET_PIN in the first set-up, SET_PIN replacing a used card's PIN in a held tap (the hold arms, the SET_PIN nothing of its own), and a hand-over's CHANGE_PIN arm nothing of their own; a hand-over (SET_OWNER) takes the arming down with the day's counts; RESET_CARD takes it with the record")
+    void theOtherPathsArmNothingOfTheirOwn() throws Exception {
+        // the first set-up: a PIN and a record, no limits: nothing armed
+        UnitsTest.Card c = SimpleCardTest.inFirstSetUp(SAT);
+        assertEquals(0, armed(c), "SET_PIN, VERIFY_PIN and SET_CARD in the first set-up arm nothing");
+        // a used card's SET_PIN, in a held tap: the hold armed it; disarmed by hand, the SET_PIN arms nothing
+        UnitsTest.Card u = noOwner();
+        int piece = u.put(-1, A.id8(), 20);
+        assertEquals(64, u.pay(piece).getData().length, "a payment, so that the log has a tap and nothing is unspent");
+        assertEquals(SW_OK, u.clearSpent());
+        u.tap();
+        hold(u);
+        assertEquals(1, armed(u), "the hold armed it");
+        u.record()[CashuApplet.CARD_ARMED_OFFSET] = 0;
+        assertEquals(SW_OK, u.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, NEW_PIN)), "the holder's new PIN, in the held tap");
+        assertEquals(0, armed(u), "SET_PIN arms nothing of its own");
+        // an owned card handed over: the arming goes with the day's counts; the new owner's CHANGE_PIN arms nothing of its
+        // own (its proof does, as every owner's proof does: D186)
+        UnitsTest.Card o = UnitsTest.owned(SAT);
+        o.grant();
+        assertEquals(1, armed(o), "the owner's proof arms it");
+        o.tap();
+        byte[] n = o.send(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
+        assertEquals(SW_OK, o.sw(new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, ownerData(ownerProof(L_OWNER, OWNER, n, OTHER_OWNER.pub), OTHER_OWNER.pub))), "the hand-over");
+        assertEquals(0, armed(o), "the hand-over takes the arming down (forgetOwed)");
+        assertEquals(SW_SECURITY_NOT_SATIS, o.sw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, CashuAppletTest.TEST_PIN)), "the last owner's PIN opens nothing");
+        assertEquals(0, armed(o));
+        // RESET_CARD: the record, the arming in it, to zeros
+        UnitsTest.Card r = UnitsTest.owned(SAT);
+        r.grant();
+        assertEquals(1, armed(r));
+        r.tap();
+        byte[] rn = r.send(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
+        assertEquals(SW_OK, r.sw(new CommandAPDU(CLA, INS_RESET_CARD, 0, RESET_CONFIRM, ownerData(ownerProof(L_RESET, OWNER, rn, new byte[0]), new byte[0]))), "the reset");
+        assertEquals(0, armed(r), "the reset takes the arming with the record");
+    }
+
+    /** Whether the no-PIN allowance is armed, as the card keeps it (GET_CARD byte 78). */
+    static int armed(UnitsTest.Card c) throws Exception { return c.record()[CashuApplet.CARD_ARMED_OFFSET]; }
 }

@@ -56,6 +56,9 @@ def make_card(responses=None):
 
 import p256
 
+# A mint's GET /v1/info that says NUT-09 and NUT-12: SPEND_ALL_CHANGE is asked only at such a mint.
+CHANGE_MINT = {"nuts": {"9": {"supported": True}, "12": {"supported": True}}}
+
 # A GET_INFO answer of 2.0 (P1 = 2, 43 bytes): version 2.0, 128 slots, 3 unspent,
 # 1 spent, 124 empty, caps FF, PIN set, format 4, 3 tries, not locked, record set,
 # a daily limit of 5000, an owner, now 1791814824, window 1791800000, 100 spent
@@ -1073,9 +1076,13 @@ def test_select_verdict_passes_only_2_1_2_2_and_3_0():
         ok, detail = cardctl._select_verdict(version)
         assert ok is False and "not protocol 2.1, 2.2 or 3.0" in detail and "reinstall the tracked CAP" in detail, detail
     # a later minor of a major this tool knows, or a later major, is a version it does not know: refused, not passed
-    for version in (bytes([2, 3]), bytes([2, 4]), bytes([2, 0xFF]), bytes([3, 1]), bytes([4, 0])):
+    for version in (bytes([3, 1]), bytes([4, 0])):
         ok, detail = cardctl._select_verdict(version)
         assert ok is False and "a version this cardctl does not know" in detail, detail
+    # a 2.x above 2.2 is no release: 02 03 is 3.0's wire before its renumbering (D205), said as such
+    for version in (bytes([2, 3]), bytes([2, 4]), bytes([2, 0xFF])):
+        ok, detail = cardctl._select_verdict(version)
+        assert ok is False and "no released version" in detail and "02 03" in detail and "D205" in detail, detail
     ok, detail = cardctl._select_verdict(b"")
     assert ok is False and "no applet version" in detail, detail
 
@@ -2413,6 +2420,7 @@ def test_load_sends_p2_02_only_with_date_keys():
     assert card.connection.last[:4] == bytes.fromhex("B0300000"), card.connection.last[:4].hex()
     for flags, p2 in (([], 0x00), (["--date-keys"], 0x02)):
         card = make_card([(b"\x03", 0x9000)])
+        card.version = b"\x03\x00"
         assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", *flags])[0] == 0
         assert card.connection.last[3] == p2, (flags, card.connection.last.hex())
 
@@ -2426,6 +2434,7 @@ def test_load_without_date_keys_explains_the_6a86():
     else:
         raise AssertionError("a 6A86 to a load without --date-keys was not explained")
     card = make_card([(b"", 0x6A86)])
+    card.version = b"\x03\x00"
     try:
         _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys"])
     except cardctl.CardError as exc:
@@ -2783,21 +2792,21 @@ def test_load_change_refusals_say_what_they_mean():
 def test_spend_all_change_encoding_and_argument_checks():
     k = _sec33(_smul(9))
     card = make_card([(_sec33(_smul(10)), 0x9000)])
-    assert card.spend_all_change(64, k, _KS8) == _sec33(_smul(10))
+    assert card.spend_all_change(64, k, _KS8, CHANGE_MINT) == _sec33(_smul(10))
     assert card.connection.last == bytes.fromhex("B02600002D") + (64).to_bytes(4, "big") + k + _KS8 + b"\x21", \
         card.connection.last.hex()
     for args in ((0, k, _KS8), (2 ** 32, k, _KS8), (64, _g65(9), _KS8), (64, b"\x02" + bytes(32), _KS8),
                  (64, k, _KS8[:7])):
         card = make_card([(bytes(33), 0x9000)])
         try:
-            card.spend_all_change(*args)
+            card.spend_all_change(*args, CHANGE_MINT)
         except SystemExit:
             pass
         else:
             raise AssertionError(f"SPEND_ALL_CHANGE sent with {args}")
         assert card.connection.sent == []
     try:
-        make_card([(bytes(32), 0x9000)]).spend_all_change(64, k, _KS8)
+        make_card([(bytes(32), 0x9000)]).spend_all_change(64, k, _KS8, CHANGE_MINT)
     except SystemExit:
         pass
     else:
@@ -2827,7 +2836,7 @@ def test_the_applets_recorded_load_change_is_the_wire_cardctl_speaks():
     assert v["K"] == _sec33(_smul(8)), "the mint's key for 8 is 8*G"
     keyset = v["spend_all_change"][-9:-1]
     card = make_card([(v["spend_all_change_response"], 0x9000)])
-    assert card.spend_all_change(8, v["K"], keyset) == v["spend_all_change_response"]
+    assert card.spend_all_change(8, v["K"], keyset, CHANGE_MINT) == v["spend_all_change_response"]
     assert card.connection.last == v["spend_all_change"], card.connection.last.hex()
     row = make_card([(v["get_change_response"], 0x9000)]).get_change()[0]
     assert (row["number"], row["amount"], row["keyset"], row["date"]) == (0, 8, keyset, 0)
@@ -3348,6 +3357,275 @@ def test_load_change_checks_the_bound_key_and_the_mints_proof_before_the_card():
         else:
             raise AssertionError(f"{argv} was taken")
         assert fresh.connection.sent == []
+
+
+# ── the card's change only at a mint that gives it back (NUT-12 and NUT-09) ───
+# Nutshell 0.20.3's own GET /v1/info `nuts`, as a local FakeWallet mint answered it (2026-11-14).
+NUTSHELL_INFO = {"name": "Cashu mint", "version": "Nutshell/0.20.3", "nuts": {
+    "4": {"methods": [{"method": "bolt11", "unit": "sat"}], "disabled": False},
+    "5": {"methods": [{"method": "bolt11", "unit": "sat"}], "disabled": False},
+    "7": {"supported": True}, "8": {"supported": True}, "9": {"supported": True}, "10": {"supported": True},
+    "11": {"supported": True}, "12": {"supported": True}, "14": {"supported": True}, "20": {"supported": True}}}
+
+
+def _without(info, nut, value=None):
+    """A copy of a mint's info whose `nuts` lack `nut`, or hold `value` for it."""
+    import copy
+    out = copy.deepcopy(info)
+    if value is None:
+        del out["nuts"][nut]
+    else:
+        out["nuts"][nut] = value
+    return out
+
+
+def test_the_cards_change_is_asked_only_at_a_mint_that_says_nut_12_and_nut_09():
+    """A mint that gives no DLEQ burns the inputs and answers change nobody can load; one with no restore leaves a lost
+    swap answer lost. SPEND_ALL_CHANGE is refused, with nothing sent, unless the mint's /v1/info says both."""
+    k = _sec33(_smul(9))
+    assert cardctl.change_mint_problem(NUTSHELL_INFO) is None
+    card = make_card([(_sec33(_smul(10)), 0x9000)])
+    assert card.spend_all_change(64, k, _KS8, NUTSHELL_INFO) == _sec33(_smul(10))
+    for info, words in ((_without(NUTSHELL_INFO, "12"), "NUT-12"),
+                        (_without(NUTSHELL_INFO, "12", {"supported": False}), "NUT-12"),
+                        (_without(NUTSHELL_INFO, "12", {"supported": "yes"}), "NUT-12"),
+                        (_without(NUTSHELL_INFO, "9"), "NUT-09"),
+                        ({"name": "a mint", "nuts": {}}, "NUT-12, the DLEQ proof LOAD_CHANGE needs or NUT-09"),
+                        ({"name": "a mint"}, "names no nuts"),
+                        (None, "names no nuts")):
+        assert words in (cardctl.change_mint_problem(info) or ""), (info, cardctl.change_mint_problem(info))
+        card = make_card([(_sec33(_smul(10)), 0x9000)])
+        try:
+            card.spend_all_change(64, k, _KS8, info)
+        except SystemExit as exc:
+            assert words in str(exc) and "exact amount" in str(exc) and "lost for good" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"SPEND_ALL_CHANGE asked at a mint whose info is {info}")
+        assert card.connection.sent == [], "nothing sent"
+
+
+def test_fetch_mint_info_reads_the_mints_own_word_on_its_nuts():
+    """A till reads GET /v1/info before it asks for change: a fake mint that omits NUT-12 is refused by what it says."""
+    import json as _json
+    import urllib.request
+
+    asked = []
+
+    def fake(info):
+        class Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self):
+                return _json.dumps(info).encode()
+
+        def urlopen(req, timeout=None):
+            asked.append(req.full_url)
+            return Resp()
+        return urlopen
+
+    real = urllib.request.urlopen
+    try:
+        urllib.request.urlopen = fake(_without(NUTSHELL_INFO, "12"))
+        info = cardctl.fetch_mint_info("http://127.0.0.1:3338/")
+        assert asked == ["http://127.0.0.1:3338/v1/info"], asked
+        assert "NUT-12" in cardctl.change_mint_problem(info)
+        urllib.request.urlopen = fake(NUTSHELL_INFO)
+        assert cardctl.change_mint_problem(cardctl.fetch_mint_info("http://127.0.0.1:3338")) is None
+        urllib.request.urlopen = fake(["not", "an", "object"])
+        try:
+            cardctl.fetch_mint_info("http://127.0.0.1:3338")
+        except SystemExit as exc:
+            assert "no object" in str(exc), str(exc)
+        else:
+            raise AssertionError("a /v1/info that is no object was taken")
+
+        def down(req, timeout=None):
+            raise OSError("connection refused")
+        urllib.request.urlopen = down
+        try:
+            cardctl.fetch_mint_info("http://127.0.0.1:3338")
+        except SystemExit as exc:
+            assert "did not answer /v1/info" in str(exc) and "connection refused" in str(exc), str(exc)
+        else:
+            raise AssertionError("a mint that did not answer was taken")
+    finally:
+        urllib.request.urlopen = real
+
+
+def test_load_change_takes_the_mints_answer_and_one_with_no_dleq_points_at_restore():
+    """load-change --signature: one entry of the swap's (or a NUT-09 restore's) signatures. With its DLEQ the card loads
+    it; without, cardctl says so plainly and names NUT-09 restore, with nothing sent to the card."""
+    import json as _json
+    import tempfile
+    keys, ks_id, priv = _mint_v01()
+    ks8 = bytes.fromhex(ks_id[:16])
+    c_, e, s = _mint_answer(priv[8], _smul(0xB2))
+    with_dleq = {"amount": 8, "id": ks_id, "C_": _sec33(c_).hex(), "dleq": {"e": e.hex(), "s": s.hex()}}
+    no_dleq = {"amount": 8, "id": ks_id, "C_": _sec33(c_).hex()}
+    for sig in (no_dleq, dict(no_dleq, dleq=None), dict(no_dleq, dleq={"e": e.hex()})):
+        card = _change_card()
+        card.connection.owe(2, 8, ks8, keys[3][1], r=0x5151, b=0xB2)
+        before = len(card.connection.sent)
+        try:
+            _run(card, ["load-change", "2", "--k", keys[3][1].hex(), "--signature", _json.dumps(sig)])
+        except SystemExit as exc:
+            text = str(exc)
+            assert "no DLEQ proof (NUT-12" in text and "NUT-09" in text and "/v1/restore" in text, text
+            assert "opening 2" in text and "stays owed" in text, text
+        else:
+            raise AssertionError(f"a signature with no DLEQ was taken: {sig}")
+        assert card.connection.sent[before:] == [], "nothing sent, not even SELECT"
+        assert 2 in card.connection.openings
+    # with its DLEQ, from a file as the mint's answer is kept: the card loads it
+    card = _change_card()
+    card.connection.owe(2, 8, ks8, keys[3][1], r=0x5151, b=0xB2)
+    card.connection.openings[2]["shown"] = True
+    with tempfile.TemporaryDirectory() as tmp:
+        path = f"{tmp}/sig.json"
+        with open(path, "w") as f:
+            _json.dump(with_dleq, f)
+        code, out, _ = _run(card, ["load-change", "2", "--k", keys[3][1].hex(), "--signature", path])
+    assert code == 0 and "loaded into slot 12" in out and 2 not in card.connection.openings, out
+    assert card.connection.sent[-1][5:70] == _sec65(c_)
+    # the mint's answer is given once: --signature with --c, or neither, is refused before the reader
+    for argv in (["load-change", "2", "--k", keys[3][1].hex(), "--signature", _json.dumps(with_dleq), "--c",
+                  _sec33(c_).hex()],
+                 ["load-change", "2", "--k", keys[3][1].hex(), "--c", _sec33(c_).hex()]):
+        fresh = make_card()
+        try:
+            _run(fresh, argv)
+        except SystemExit as exc:
+            assert "--signature" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"{argv} was taken")
+        assert fresh.connection.sent == []
+
+
+# ── the versions cardctl drives (D205) ───────────────────────────────────────
+def _connect_with(answer, command):
+    """The real connect, its SELECT answered `answer`, for `command`: (card or the SystemExit, stderr, APDUs sent)."""
+    card = make_card([(answer, 0x9000)])
+    real = cardctl.Card
+    cardctl.Card = lambda *a, **kw: card
+    err = io.StringIO()
+    args = types.SimpleNamespace(reader=0, verbose=False, legacy=False, command=command)
+    try:
+        with contextlib.redirect_stderr(err):
+            try:
+                got = cardctl.connect(args)
+            except SystemExit as exc:
+                got = exc
+    finally:
+        cardctl.Card = real
+    return got, err.getvalue(), card.connection.sent
+
+
+def test_connect_drives_no_02_03_card_as_2_2_for_a_command_that_moves_money_or_sets_up():
+    """A card answering 02 03 speaks 3.0's wire from before its renumbering (D205). Driven as 2.2 it would be read with
+    GET_INFO P1 2, its outbox checked against GET_PUBKEY, and set up with the old clock check: every command that moves
+    money or sets a card up is refused at SELECT, saying what it answered and what cardctl knows. The reads go on."""
+    commands = set(cardctl.build_parser()._subparsers._group_actions[0].choices)
+    writes = commands - cardctl.READ_ONLY_COMMANDS - {"readers", "tip", "selftest", "dump", "load-file"}
+    assert {"load", "load-change", "keyset-keys", "clear-spent", "setup", "set-pin", "set-card", "set-owner",
+            "set-owner-url", "set-limit", "change-pin", "reset", "refresh", "lock", "set-header"} == writes, writes
+    for answer in (b"\x02\x03", b"\x02\x04", b"\x02\xFF"):
+        for command in sorted(writes) + [None]:
+            got, _, sent = _connect_with(answer, command)
+            assert isinstance(got, SystemExit), (answer, command)
+            text = str(got)
+            assert f"answers version 2.{answer[1]}" in text and "knows 2.0, 2.1, 2.2, 3.0" in text, text
+            assert "02 03" in text and "D205" in text and "nothing was sent after SELECT" in text, text
+            assert len(sent) == 1 and sent[0][1] == 0xA4, [a.hex() for a in sent]
+        for command in sorted(cardctl.READ_ONLY_COMMANDS):
+            got, err, _ = _connect_with(answer, command)
+            assert isinstance(got, cardctl.Card) and not got.at_least(3, 0), (answer, command)
+            assert "note:" in err and "may be wrong" in err and "02 03" in err, err
+
+
+def test_connect_takes_every_minor_of_3_as_3_0_and_the_known_versions_as_before():
+    """D205: a reader takes every minor of a major it was built for. A 3.1 card is driven as 3.0 by every command
+    (at_least(3, 0) holds), while selftest still refuses to pass a version it does not know: a statement about the test,
+    not the wire. 2.0, 2.1, 2.2 and 3.0 connect for every command as before, with no note; 4.0 and 1.x for none."""
+    for answer in (b"\x02\x00", b"\x02\x01", b"\x02\x02", b"\x03\x00", b"\x03\x01", b"\x03\x07"):
+        for command in ("load", "setup", "reset", "info", None):
+            got, err, _ = _connect_with(answer, command)
+            assert isinstance(got, cardctl.Card), (answer, command, got)
+            assert err == "", err
+            assert got.at_least(3, 0) == (answer[0] == 3)
+    assert cardctl.driven_as(b"\x03\x01") == (3, 1) and cardctl.driven_as(b"\x02\x03") is None
+    assert cardctl._select_verdict(b"\x03\x01")[0] is False
+    for answer in (b"\x04\x00", b"\x01\x14"):
+        for command in ("load", "info"):
+            got, _, _ = _connect_with(answer, command)
+            assert isinstance(got, SystemExit) and "speaks protocols 2.x and 3.x" in str(got), (answer, command)
+
+
+def test_load_with_date_keys_is_refused_on_a_card_older_than_3_0_before_the_pin():
+    """--date-keys is 3.0's word (LOAD_PROOF P2 02). A 2.2 card signs with P alone, so a piece locked to a date's key is
+    one it can never pay: refused before VERIFY_PIN, so no try is spent and nothing is written."""
+    for version in (b"\x02\x01", b"\x02\x02"):
+        card = make_card([(b"", 0x9000), (b"\x03", 0x9000)])
+        card.version = version
+        try:
+            _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--pin", "1234", "--date-keys"])
+        except SystemExit as exc:
+            assert "--date-keys is protocol 3.0's" in str(exc) and f"version 2.{version[1]}" in str(exc), str(exc)
+        else:
+            raise AssertionError("a 2.x card was sent P2 02")
+        assert card.connection.sent == [], [a.hex() for a in card.connection.sent]
+        card = make_card([(b"\x03", 0x9000)])
+        card.version = version
+        try:
+            card.load_proof(bytes.fromhex("0059534ce0bfa19a"), 8, bytes(32), cardctl.placeholder_c(bytes(32)), 0,
+                            date_keys=True)
+        except SystemExit as exc:
+            assert "no keys per date" in str(exc), str(exc)
+        else:
+            raise AssertionError("load_proof sent P2 02 to a 2.x card")
+        assert card.connection.sent == []
+        # without --date-keys, a 2.2 card loads as it did (P2 00)
+        card = make_card([(b"", 0x9000), (b"\x03", 0x9000)])
+        card.version = version
+        assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--pin", "1234"])[0] == 0
+        assert card.connection.last[:4] == bytes.fromhex("B0300000"), card.connection.last.hex()
+
+
+def test_reset_warns_that_ecash_swapped_to_the_cards_keys_and_not_loaded_is_lost():
+    """A reset draws a new c: eCash a wallet swapped to this card's keys and has not loaded can never be loaded after it,
+    lost for good undated, the refund key's after its date where dated. Said before every reset, --yes or not, by the
+    PIN and by the owner's proof."""
+    def said(err):
+        assert "warning:" in err and "new c" in err and "not yet loaded" in err, err
+        assert "undated (the date 0), it is lost for good" in err and "refund key" in err and "card-secret" in err, err
+
+    conn, card = _setup_card(refuse={cardctl.INS_SET_CARD: 0x6F00})
+    try:
+        _run(card, _setup_args())
+    except SystemExit:
+        pass
+    card.select()
+    code, _, err = _run(card, ["reset", "--pin", "1234", "--yes"])
+    assert code == 0 and conn.pin_state == 0
+    said(err)
+    conn, card = _owned_reset_card()
+    code, _, err = _run(card, ["reset", "--owner-key", f"{OWNER:064x}", "--yes"])
+    assert code == 0 and conn.got
+    said(err)
+    # asked, and declined: the warning is given before the question, and nothing is reset
+    import builtins
+    conn, card = _owned_reset_card()
+    real = builtins.input
+    builtins.input = lambda prompt="": "no"
+    try:
+        code, out, err = _run(card, ["reset", "--owner-key", f"{OWNER:064x}"])
+    finally:
+        builtins.input = real
+    assert code == 1 and "aborted" in out and not conn.got, (out, conn.got)
+    said(err)
 
 
 def test_a_holder_rebinds_an_opening_to_the_mints_key_and_moves_it_to_another_keyset():

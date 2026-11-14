@@ -73,7 +73,9 @@ the SCP03 changes below. Migration:
   `changeOwed`, and `empty` is false while it is set; `assessResetPreflight`
   refuses such a card ("the holder's wallet brings it home"); `resetOwnedCard`
   stops `guarded` before it saves anything, fresh or resumed; `provision`'s
-  probe never sweeps one, Replace on or off. New: `readChangeOwed(ask, info)`,
+  probe never sweeps one, Replace on or off; `cleanupSettledEntries` stops
+  `card-not-empty` on one, by the change owed it reads from the card, never by a
+  saved review's. New: `readChangeOwed(ask, info)`,
   `changeOwedByte(info)` and `GET_CHANGE`. `notEmpty` names change owed on a
   3.0 card. Inspection, the probe and the reset send one more plain command
   (`GET_CHANGE`, `B0 19 00 00 00`) to a 2.1 or 2.2 card, and none to a 3.0 card.

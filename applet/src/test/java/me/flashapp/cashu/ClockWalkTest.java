@@ -33,8 +33,8 @@ import java.util.regex.Pattern;
  * till kept the card's PIN and a phone's worth of headers takes a limit a day for as long as it holds the card, and a
  * no-PIN reader takes the no-PIN allowance a day. 2.0 bounds both: the window rolls at most `rollBudget` times between
  * the owner's REFRESHes (default 7), and a card whose owner was set with a header never runs at now = 0. 3.0 (D186) gives
- * the allowance a window of its own, which begins again only once per arming (an owner's proof, or a PIN in a time in the
- * field that pays nothing).
+ * the allowance a window of its own, which begins again only once per arming (an owner's proof, or on a card with no
+ * owner a held tap; the PIN alone arms nothing).
  *
  * Every header here is a real mainnet header (spec/vectors/headers.json), held to the floor built into the applet:
  * nothing a test mines is accepted, which is the point.
@@ -425,10 +425,10 @@ class ClockWalkTest {
     // ---- the armed allowance --------------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("D186: a no-PIN reader gets one allowance per arming: the payment that begins a no-PIN window spends the arming, a day on by the clock renews nothing, and the window begins again 24 hours on only after a PIN in a tap that pays nothing or an owner's proof")
+    @DisplayName("D186: a no-PIN reader gets one allowance per arming: the payment that begins a no-PIN window spends the arming, a day on by the clock renews nothing, and the PIN arms nothing, typed alone or to pay: the window begins again only after an owner's proof")
     void aNoPinReaderGetsOneAllowancePerArming() {
         setUp(0, 0, 100, 30, 12, 100);
-        assertEquals(1, armed(), "armed by the PIN typed at set-up and the owner's proof");
+        assertEquals(1, armed(), "armed by the owner's proof at set-up");
         int slot = 0;
         newTap();
         assertEquals(SW_OK, pay(slot++), "no PIN, within the allowance: the first window begins");
@@ -441,31 +441,27 @@ class ClockWalkTest {
             assertEquals(SW_OK, setHeader(H.get(d)));
             assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day " + d + ": not armed, no new allowance");
         }
-        // the holder types the PIN once (nothing paid): armed
+        // the holder types the PIN once (nothing paid): nothing armed (D186: the PIN alone arms nothing, a reader has it too)
         newTap();
         assertEquals(SW_OK, verify());
-        assertEquals(1, armed(), "a PIN arms it");
+        assertEquals(0, armed(), "a PIN arms nothing");
         newTap();
         assertEquals(SW_OK, setHeader(H.get(4)));
-        assertEquals(SW_OK, pay(slot++), "day 4: armed by the PIN, a new allowance");
-        assertEquals(0, armed());
-        newTap();
-        assertEquals(SW_OK, setHeader(H.get(5)));
-        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day 5: spent again");
-        // a PIN typed to pay, in the same time in the field, arms nothing: the payment's commit takes it back
+        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day 4: no new allowance");
+        // a PIN typed to pay, in the same time in the field, arms nothing either
         newTap();
         assertEquals(SW_OK, verify());
         assertEquals(SW_OK, pay(slot++), "with the PIN");
         assertEquals(0, armed(), "the PIN typed for a payment opens no allowance for the next reader");
         newTap();
-        assertEquals(SW_OK, setHeader(H.get(6)));
-        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day 6: still spent");
+        assertEquals(SW_OK, setHeader(H.get(5)));
+        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day 5: still spent");
         // the owner's phone (any owner's proof) ends the window: a new allowance at once
         newTap();
         assertEquals(SW_GRANT, allowLoad());
         assertEquals(1, armed(), "an owner's proof arms it");
         newTap();
-        assertEquals(SW_OK, pay(slot++), "day 6: the owner's proof ended the window");
+        assertEquals(SW_OK, pay(slot++), "day 5: the owner's proof ended the window");
     }
 
     @Test

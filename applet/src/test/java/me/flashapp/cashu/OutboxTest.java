@@ -449,6 +449,25 @@ class OutboxTest {
     }
 
     @Test
+    @DisplayName("a descriptor whose signature the card's check refuses (SchnorrHW.sign's step 8: here the public key object names another key) is not given: both forms of GET_OUTBOX answer 6F00 with nothing, the record stays unsigned (its flag 0) and nothing of it is kept; once the key agrees, the next read signs it and it verifies")
+    void aRefusedDescriptorIsNotKept() throws Exception {
+        Payment p = twoByTwo();
+        byte[] before = field("outbox").clone();
+        Object applet = runtime.appletAt(AIDUtil.create(AID_HEX));
+        java.lang.reflect.Field k = CashuApplet.class.getDeclaredField("cardPubKey");
+        k.setAccessible(true);
+        Object key = k.get(applet);
+        k.set(applet, new SignatureCheckTest.ChipPublicKey(SchnorrHWSignTest.xy(hexToBytes((String) SchnorrHWSignTest.KEYS[0][1]), 0), false));
+        assertEquals(CashuApplet.SW_CRYPTO_ERROR & 0xFFFF, scope().getSW(), "the scope");
+        assertEquals(0, scope().getData().length);
+        assertEquals(CashuApplet.SW_CRYPTO_ERROR & 0xFFFF, page(0, 255).getSW(), "a page");
+        assertArrayEquals(before, field("outbox"), "nothing written: the flag 0, no descriptor");
+        k.set(applet, key);
+        assertRecord(expectedBody(p, MINT, 1, 1), packet());
+        assertEquals(1, field("outbox")[1], "signed once the key agrees");
+    }
+
+    @Test
     @DisplayName("over capacity the payment is paid and leaves no record, and none of the one before: 33 inputs, or 17 outputs")
     void overCapacityPaysNoRecord() throws Exception {
         twoByTwo();
