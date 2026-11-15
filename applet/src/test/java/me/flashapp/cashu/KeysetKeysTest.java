@@ -296,7 +296,7 @@ class KeysetKeysTest {
         int e = c.entryOf(id8);
         return Arrays.copyOfRange(c.book(), e * UnitsTest.ENTRY + 9, e * UnitsTest.ENTRY + 41);
     }
-    static boolean keysKnown(UnitsTest.Card c, String id8) throws Exception { return (c.stateOf(id8) & 0x02) != 0; }
+    static boolean keysKnown(UnitsTest.Card c, String id8) throws Exception { int s = c.stateOf(id8); return s >= 0 && (s & 0x02) != 0; }
     static void lock(UnitsTest.Card c) {
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_LOCK_CARD, 0, 0xDE, ownerData(c.proofFor(L_LOCK, new byte[0]), new byte[0]))));
     }

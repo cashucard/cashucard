@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The anchors torn at every persistent write (TearSweepTest.sweep): round 13a's hand-over with an anchor (R13aTearTest, made
+ * The anchors torn at every persistent write (TearSweepTest.sweep): the review's hand-over with an anchor (R13aTearTest, made
  * permanent, at the tests' floor so that the hand-over goes through: its untorn run is held to be the new owner's), and the
  * first set-up's anchor (D204) in `SET_HEADER` and in a claim, on a card a stranger's far header set, its day's window begun
  * at that far clock. Every tear leaves the old card or the new one: never a clock brought back with its window left far.

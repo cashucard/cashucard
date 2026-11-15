@@ -263,7 +263,7 @@ MINT_MOST = 77
 FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
-# the seventeenth asking after the history's seven (24 askings, about 15 s in all), D205: the project owner's counts, 0.59 to 0.66 s an asking on the J3R180.
+# the seventeenth asking after the history's seven (24 askings, about 11 s in all), D205: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D205 measured it).
 LOG_HOLD_MOST = 7
 RESET_MOST = 17
 RESET_CONFIRM_BYTE = 0xAD
@@ -925,21 +925,21 @@ class Card:
 
     def hold_history(self) -> bytes:
         """GET_LOG P1 = 0, held for: on a card with no owner the log answers the PIN at the seventh asking in a row (the
-        first six 6A98, keep holding; about 4 seconds on a J3R180), and the rest of this time in the field is a held tap (spec/APDU.md, A holder
+        first six 6A98, keep holding; about 3 seconds on a J3R180), and the rest of this time in the field is a held tap (spec/APDU.md, A holder
         with no phone). Wants the PIN given in this tap."""
         return self.held(INS_GET_LOG, le=0x00, context="GET_LOG", most=LOG_HOLD_MOST,
                          note="the card counts the hold: keep holding it on the reader")
 
     def reset_by_pin(self, anchor: Optional[bytes] = None) -> None:
         """RESET_CARD P1 = 0, P2 = AD, on a card with no owner (D196): the PIN given and a held tap in this selection,
-        nothing unspent or owed; the card resets at the seventeenth asking in a row after the history's seven (24 askings, about 15 seconds in all on a J3R180, 0.6 s an asking). The card
+        nothing unspent or owed; the card resets at the seventeenth asking in a row after the history's seven (24 askings, about 11 seconds in all on a J3R180, 0.5 s an asking). The card
         is then as from its install: no PIN, no record, no owner, a new card key and c. No data, or `anchor` (D200): a
         block header (80 bytes), the data of every asking, which becomes the card's clock even where it is older than
         the card's (the card is empty), the way back from a clock moved far ahead by one header."""
         if anchor is not None and len(anchor) != HEADER_LEN:
             raise SystemExit(f"the anchor is a block header, {HEADER_LEN} bytes; got {len(anchor)}")
         self.held(INS_RESET_CARD, p2=RESET_CONFIRM_BYTE, data=anchor or b"", context="RESET_CARD", most=RESET_MOST,
-                  note="the card counts the reset: keep holding it on the reader (about 15 seconds)")
+                  note="the card counts the reset: keep holding it on the reader (about 11 seconds)")
 
     # ── the clock ─────────────────────────────────────────────────────────────
     def set_header(self, header: bytes) -> int:
@@ -1305,7 +1305,7 @@ def clock_ahead_problem(now: int, tip: bytes) -> Optional[str]:
         return None
     return (f"the card's clock ({now}) is more than two hours past the tip's time ({header_time(tip)}): a header far "
             "ahead set it, and the card's days would be held there. Bring it back first, while the card is empty, by "
-            "the reset with the tip as its anchor (it takes about 15 seconds on the reader): python3 cardctl.py reset "
+            "the reset with the tip as its anchor (it takes about 11 seconds on the reader): python3 cardctl.py reset "
             "--pin <a PIN> --anchor <the tip header> (a card with no PIN is given that PIN for the reset alone; one "
             "with an owner: --owner-key <its owner key> in place of --pin). Then run setup")
 
@@ -2729,7 +2729,7 @@ def _setup_stopped(card, step: str, exc: BaseException, design: bytes = b"") -> 
         lines.append("  - owner yes: it is claimed, and set up; send any limits with python3 cardctl.py set-limit "
                      "--owner-key <the owner key> --day N ...")
         lines.append("  - a PIN and no owner: it holds nothing, and nothing more can be written to it until it is "
-                     "reset by its PIN (about 15 seconds on the reader): python3 cardctl.py reset --pin <the PIN>, "
+                     "reset by its PIN (about 11 seconds on the reader): python3 cardctl.py reset --pin <the PIN>, "
                      f"then run {again}")
         lines.append("  - no PIN: nothing was kept; run setup again")
         return "\n".join(lines)
@@ -2753,7 +2753,7 @@ def _setup_stopped(card, step: str, exc: BaseException, design: bytes = b"") -> 
 def cmd_reset(args) -> int:
     """
     RESET_CARD on a card with no owner (2.3, D196): the reset by the PIN. The PIN given, a held tap (GET_LOG held for),
-    then RESET_CARD seventeen times in a row (24 askings with the history's, about 15 seconds in all on a J3R180), all in one selection. Only an empty card that is
+    then RESET_CARD seventeen times in a row (24 askings with the history's, about 11 seconds in all on a J3R180), all in one selection. Only an empty card that is
     owed nothing: the card is then as from its install, with a new card key and a new c, for setup. With --owner-key, a
     card with an owner is reset by its owner's proof instead (the PIN too where the card is locked). With --anchor
     (D200), a block header that becomes the card's clock even where it is older: the way back from a clock moved far
@@ -3583,7 +3583,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_setup)
 
     s = sub.add_parser("reset", help="2.3: the reset of an empty card: by the PIN on a card with no owner (a held tap, "
-                                     "then fifteen askings, about 15 seconds in all), by the owner's proof (--owner-key) on one "
+                                     "then seventeen askings, about 11 seconds in all), by the owner's proof (--owner-key) on one "
                                      "with an owner: no PIN, no record, a new card key, for setup")
     s.add_argument("--pin", help="the card's PIN: a card with no owner (on a fresh card reset with --anchor, set here "
                                  "for the reset alone), or a locked card with an owner")

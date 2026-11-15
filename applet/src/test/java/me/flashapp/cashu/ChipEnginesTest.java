@@ -529,7 +529,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D210: BIP-340 signatures by the chip's multiplication verify: 30 signatures under keys of both P.y parities (and the date form, d + t), 0, 1 and n - 1 among the keys, over random messages; each verified with the BIP-340 reference (schnorrVerify), two squarings a signature, nothing of d or k left in the signer's work or scratch afterwards")
+    @DisplayName("D210, D211: BIP-340 signatures by the chip's multiplication verify: 30 signatures under keys of both P.y parities (and the date form, d + t), 0, 1 and n - 1 among the keys, over random messages; each verified with the BIP-340 reference (schnorrVerify), four squarings a signature (the split of D211), nothing of d or k left in the signer's work or scratch afterwards")
     void signaturesByTheChipVerify() throws Exception {
         Engine eng = new Engine(null);
         SchnorrHW s = signerWith(eng);
@@ -553,7 +553,7 @@ class ChipEnginesTest {
             assertTrue(isZero(get(s, SchnorrHW.class, "work"), 0), "work is cleared after the signature");
         }
         assertTrue(odd > 3 && even > 3, "both parities: " + odd + " odd, " + even + " even");
-        assertEquals(2 * ds.size(), eng.powers, "two squarings a signature");
+        assertEquals(4 * ds.size(), eng.powers, "four squarings a signature (D211: two products, e*d1 and e*d2, of two each; D210 made it two)");
         assertEquals(0, eng.garbage, "of inputs under n alone");
         // keys per load: d + t, the public key P + t*G given after t
         BigInteger d = BigInteger.valueOf(0x123456789ABCDEFL), t = N.subtract(BigInteger.valueOf(5));

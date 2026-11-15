@@ -12,9 +12,9 @@ function reassemble(apdus: number[][]): number[] {
 }
 
 describe('splitLoad', () => {
-  it('cuts the card load file into 160 blocks of 247 bytes, the last 70, which reassemble to it', () => {
+  it('cuts the card load file into 164 blocks of 247 bytes, the last 104, which reassemble to it', () => {
     const file = fromHex(CASHU_LOAD_FILE.hex);
-    assert.equal(file.length, 39343);
+    assert.equal(file.length, 40365);
     assert.equal(
       createHash('sha256').update(Buffer.from(file)).digest('hex'),
       CASHU_LOAD_FILE.sha256,

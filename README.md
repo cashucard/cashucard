@@ -61,12 +61,17 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > [D206](docs/DECISIONS.md#d206) (`LOAD_PROOF`'s 04 form, C held to the curve by the chip's key agreement; 37,269 bytes, load
 > file sha256 `fe156f4f…`); the same day the second J3R180 installed it five times at the first try and, at the same test
 > mint, had real signatures and real change verified on the chip, and took a first load of 45 pieces in 8.2 s where the
-> 33-byte form took 11.8 ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)). The file tracked now adds
+> 33-byte form took 11.8 ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)). The file after it adds
 > [D207](docs/DECISIONS.md#d207) to [D210](docs/DECISIONS.md#d210) (a keyset taught at set-up; the field's arithmetic, the change's
 > point checks and the signature's e·d on the chip's own engines; 39,343 bytes, load file sha256 `c79b30a7…`); the same day the
 > J3R180 installed it at the first try and, at the same test mint, had real signatures and real change verified on the chip, and
 > took a first load of 45 pieces in 7.8 s and a payment with change in 2.2 s where it took 4.0
-> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14d_J3R180_2.3.md)). The
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14d_J3R180_2.3.md)). The file tracked now adds
+> [D211](docs/DECISIONS.md#d211) to [D214](docs/DECISIONS.md#d214) (the signature's product in two shares, every signature checked on the
+> card before it leaves, wider known answers at set-up, a taught keyset kept until its first piece; 40,365 bytes, load file sha256
+> `8aefa0db…`); the same day the J3R180 installed it at the first try and, at the same test mint, had real signatures and real change
+> verified on the chip, and took a first load of 45 pieces in 8.0 s, every signature 0.27 s longer than before
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14e_J3R180_2.3.md)). The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The

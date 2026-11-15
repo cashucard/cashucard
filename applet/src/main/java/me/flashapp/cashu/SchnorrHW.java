@@ -422,12 +422,33 @@ final class SchnorrHW {
         taggedHash(tagHashChallenge, sc, SC_TMP, (short)96, sc, SC_E);
         reduceModN(sc, SC_E);         // e = e mod n
 
-        // ── Step 7: s = (k + e·d) mod n ──────────────────────────────
-        // ed = e * d mod n: by the chip's RSA where the set-up's test of it held (D210: e and d are reduced in place first, and
-        // the product is two squarings and two halvings, all by mask), by the bytecode where not
-        if (chipMul) mulModNChip(sc, SC_E, sc, SC_D, sc, SC_ED, work, (short)0);
-        else mulModN(sc, SC_E, sc, SC_D, sc, SC_ED, work, (short)0);
-        addModN(sc, SC_ED, sc, SC_K, out, (short)(outOff + 32)); // s = ed + k mod n
+        // ── Step 7: s = (k + e·d) mod n, and the signature held to the key before it leaves ──────
+        // e·d by the chip's RSA where the set-up's test of it held (D210, D211: d is never given to the engine alone, but as
+        // two shares of a fresh random split), by the bytecode where not; every signature, either way, is checked on the card
+        // against the public key (D212) and is withheld if it fails: a failing chip path is given up (chipMul false) and the
+        // product made again by the bytecode, and a signature that fails then is not released at all.
+        boolean good = false;
+        if (chipMul) {
+            try {
+                splitProduct();
+                addModN(sc, SC_ED, sc, SC_K, out, (short)(outOff + 32)); // s = ed + k mod n
+                good = holds(out, outOff);
+            } catch (RuntimeException x) {
+                good = false;
+            }
+            // the shares and the chip's room are cleared on every way out of the chip's part
+            Util.arrayFillNonAtomic(sc, (short)(SC_TMP + 32), (short)64, (byte)0);
+            Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
+            if (!good) chipMul = false;
+        }
+        if (!good) {
+            mulModN(sc, SC_E, sc, SC_D, sc, SC_ED, work, (short)0);
+            addModN(sc, SC_ED, sc, SC_K, out, (short)(outOff + 32)); // s = ed + k mod n
+            if (!holds(out, outOff)) {
+                Util.arrayFillNonAtomic(out, outOff, (short)64, (byte)0);
+                ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+            }
+        }
 
         // ── Step 8: output = Rx ‖ s ──────────────────────────────────
         // Rx sits at sc[SC_TMP..SC_TMP+31] — step 6 shifted it there before
@@ -435,6 +456,47 @@ final class SchnorrHW {
         Util.arrayCopy(sc, SC_TMP, out, outOff, (short)32);  // Rx
 
         return (short)64;
+    }
+
+    // ── The signature's product by the chip, in two shares, and the check of the signature (D211, D212) ─────
+
+    /**
+     * SC_ED = e·d mod n by the chip, d never alone: a fresh random d1 (under n) and d2 = d - d1 mod n, then e·d = e·d1 + e·d2,
+     * each product by two squarings (`mulModNChip`), four squarings in all. Every operand the engine sees, e + d1 and |e - d1|,
+     * e + d2 and |e - d2|, is uniform and independent of d taken alone, whatever e is (e is public in every signature: a mask
+     * by it only, as D210 had it, hid nothing). The shares sit in sc[SC_TMP + 32, SC_TMP + 96) (Rx is below them) and the
+     * second product in work[256, 288); the caller clears the shares and `work` after, on every way out (and sign()'s finally
+     * does again). d at sc[SC_D] is read and left as it is.
+     */
+    private void splitProduct() {
+        short d1 = (short)(SC_TMP + 32), d2 = (short)(SC_TMP + 64), second = (short)256;
+        rng.generateData(sc, d1, (short)32);
+        reduceModN(sc, d1);
+        short borrow = sub32(sc, SC_D, sc, d1, sc, d2);       // d - d1, and whether it went below zero
+        addIf(sc, d2, CashuApplet.SECP256K1_N, borrow);       // + n then: d2 = d - d1 mod n
+        mulModNChip(sc, SC_E, sc, d1, sc, SC_ED, work, (short)0);
+        Util.arrayFillNonAtomic(work, (short)0, (short)256, (byte)0);
+        mulModNChip(sc, SC_E, sc, d2, work, second, work, (short)0);
+        Util.arrayFillNonAtomic(work, (short)0, (short)256, (byte)0);
+        Util.arrayFillNonAtomic(sc, d1, (short)64, (byte)0);
+        addModN(sc, SC_ED, work, second, sc, SC_ED);
+    }
+
+    /**
+     * Whether the signature at out[outOff] (Rx, 32, then s, 32) is the card's own under its key: s·G - e·P is a point whose x
+     * is Rx and whose y is even, which is BIP-340's own check, by the chip's two point engines. P is the key's x, Px, with its
+     * y made even by d (d_eff·G, one key agreement, which also shows d to be the key's); e, k and Rx are in sc as the signing
+     * left them. Three engine runs and about 0.24 s on a J3R180; public values only but d, which is in the key for the one
+     * run and put back by `mul`. Any exception is the caller's to take as no.
+     */
+    private boolean holds(byte[] out, short outOff) {
+        byte[] g = CashuApplet.SECP256K1_G;
+        mul(sc, SC_D, g, (short)0, work, (short)0);                         // P = d·G at work[0, 65)
+        if (Util.arrayCompare(work, (short)1, sc, SC_PX, (short)32) != 0 || (work[(short)64] & 1) != 0) return false;
+        subtractFromN(sc, SC_E, sc, (short)(SC_TMP + 32));                  // n - e
+        mul(sc, (short)(SC_TMP + 32), work, (short)0, work, (short)65);     // -e·P at work[65, 130)
+        addTo(out, (short)(outOff + 32), g, (short)0, work, (short)65, work, (short)130);   // s·G - e·P at work[130, 195)
+        return Util.arrayCompare(work, (short)131, sc, SC_TMP, (short)32) == 0 && (work[(short)194] & 1) == 0;
     }
 
     // ── Tagged hash ───────────────────────────────────────────────────────
@@ -502,15 +564,46 @@ final class SchnorrHW {
     }
 
     /**
-     * The install's test of the agreement (D206): G is taken and G with y one more, a point of no curve, is not. Where
-     * either fails the card never leans on the agreement for a piece's point and refuses the 04 form (6B00): a chip whose
-     * agreement skips the curve, or refuses good points, is not leaned on. `work` is the room.
+     * A point of the twist, for the install's test of the agreement: x = 5, whose x^3 + 7 is no square (the point is on no curve
+     * of ours), and the y with y^2 = -(x^3 + 7) mod p, which the twist's equation (p is 3 mod 4: -1 is no square) has for it.
+     */
+    private static final byte[] TWIST_Y = {
+        (byte)0x35,(byte)0x0A,(byte)0xE3,(byte)0xB4,(byte)0x80,(byte)0x47,(byte)0xAD,(byte)0xAC,
+        (byte)0xDE,(byte)0xEA,(byte)0x49,(byte)0xFB,(byte)0x8A,(byte)0x0B,(byte)0x28,(byte)0x9A,
+        (byte)0x94,(byte)0xF7,(byte)0x26,(byte)0x80,(byte)0x10,(byte)0x78,(byte)0x40,(byte)0x8A,
+        (byte)0xBA,(byte)0x79,(byte)0x63,(byte)0x1F,(byte)0xA7,(byte)0xA1,(byte)0xB6,(byte)0xBA
+    };
+
+    /**
+     * The install's test of the agreement (D206, D213): G is taken, and each of six points that are not on the curve is not:
+     * G with y one more; an x with no root (5) with G's y; the twist's point (5 and the y of the twist's equation); G's x with
+     * G's y and its top bit flipped (a valid x with a wrong y); G's x with y = p - 1 (a y near p); and 04 with zeros. Where any
+     * one fails the card never leans on the agreement for a piece's point and refuses the 04 form (6B00): a chip whose agreement
+     * skips the curve, checks it in part, or refuses good points, is not leaned on. `work` is the room.
      */
     boolean checksCurve() {
-        Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short) 0, work, (short) 0, (short) 65);
+        byte[] g = CashuApplet.SECP256K1_G;
+        Util.arrayCopyNonAtomic(g, (short) 0, work, (short) 0, (short) 65);
         if (!agrees(work, (short) 0)) return false;
-        work[64]++;
-        return !agrees(work, (short) 0);
+        for (short k = 0; k < 6; k++) {
+            Util.arrayCopyNonAtomic(g, (short) 0, work, (short) 0, (short) 65);
+            if (k == 0) {
+                work[64]++;
+            } else if (k == 1 || k == 2) {
+                Util.arrayFillNonAtomic(work, (short) 1, (short) 32, (byte) 0);
+                work[32] = (byte) 5;
+                if (k == 2) Util.arrayCopyNonAtomic(TWIST_Y, (short) 0, work, (short) 33, (short) 32);
+            } else if (k == 3) {
+                work[33] ^= (byte) 0x80;
+            } else if (k == 4) {
+                Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_P, (short) 0, work, (short) 33, (short) 32);
+                work[64]--;
+            } else {
+                Util.arrayFillNonAtomic(work, (short) 1, (short) 64, (byte) 0);
+            }
+            if (agrees(work, (short) 0)) return false;
+        }
+        return true;
     }
 
     /**
@@ -1120,8 +1213,9 @@ final class SchnorrHW {
     /**
      * The squaring key and its known answers, at every SET_CARD: modulus n padded to 64 bytes (32 zeros before it: the chip's
      * RSA is of its modulus' length and takes an input under it, and answers garbage, with no error, for one at or over it),
-     * exponent 2; then 3^2 = 9, (n - 1)^2 = 1, and G's x times G's y, both ways round, equal to their product mod n (worked out
-     * beforehand), by `mulModNChip` whole. True where all hold; false on any wrong answer or any exception (a chip that refuses
+     * exponent 2; then 3^2 = 9, (n - 1)^2 = 1, and three products by `mulModNChip` whole (D213): G's x times G's y, G's y times n less
+     * G's x (n less the first), and n - 1 times n - 2 (2), whose squarings are eight distinct numbers of the full width, each worked
+     * out beforehand. True where all hold; false on any wrong answer or any exception (a chip that refuses
      * the key, the room for it or the use), and `chipMul` is then false: the signature is made as before. `work` and `sc` are
      * the room, and are cleared after.
      */
@@ -1143,18 +1237,34 @@ final class SchnorrHW {
             work[63]--;
             square(work, (short)0, (short)64);
             if (work[127] != (byte)1 || !allZero(work, (short)64, (short)63)) return false;
-            // G's x and y, in the order given and the other
-            for (short r = 0; r < 2; r++) {
-                Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short)(r == 0 ? 1 : 33), sc, (short)0, (short)32);
-                Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short)(r == 0 ? 33 : 1), sc, (short)32, (short)32);
+            // three products, each with squarings of its own, of full-width operands (D213): a·b for a = G's x, b = G's y; for
+            // a = G's y, b = n - G's x (the product is n less the first); and for a = n - 1, b = n - 2 (the product is 2).
+            // Their squared values, a + b and |a - b|, are six different numbers, all but one at or above 2^255.
+            for (short r = 0; r < 3; r++) {
+                if (r == 0) {
+                    Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short)1, sc, (short)0, (short)32);
+                    Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short)33, sc, (short)32, (short)32);
+                    Util.arrayCopyNonAtomic(KAT_GXGY, (short)0, sc, (short)96, (short)32);
+                } else if (r == 1) {
+                    Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short)33, sc, (short)0, (short)32);
+                    subtractFromN(CashuApplet.SECP256K1_G, (short)1, sc, (short)32);
+                    subtractFromN(KAT_GXGY, (short)0, sc, (short)96);
+                } else {
+                    Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, sc, (short)0, (short)32);
+                    Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, sc, (short)32, (short)32);
+                    sc[31]--;
+                    sc[63] -= (byte)2;
+                    Util.arrayFillNonAtomic(sc, (short)96, (short)32, (byte)0);
+                    sc[127] = (byte)2;
+                }
                 mulModNChip(sc, (short)0, sc, (short)32, sc, (short)64, work, (short)0);
-                if (Util.arrayCompare(sc, (short)64, KAT_GXGY, (short)0, (short)32) != (byte)0) return false;
+                if (Util.arrayCompare(sc, (short)64, sc, (short)96, (short)32) != (byte)0) return false;
             }
             return true;
         } catch (RuntimeException e) {
             return false;
         } finally {
-            Util.arrayFillNonAtomic(sc, (short)0, (short)96, (byte)0);
+            Util.arrayFillNonAtomic(sc, (short)0, (short)128, (byte)0);
             Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
         }
     }

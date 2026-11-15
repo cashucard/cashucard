@@ -1,6 +1,6 @@
 /**
  * The provisioner's generated load files (tools/cardkit/make-assets.py), so
- * the tests run the real bytes: the card's 39,343-byte file from the tracked
+ * the tests run the real bytes: the card's 40,365-byte file from the tracked
  * CAP, and the hello applet's.
  */
 export {CASHU_LOAD_FILE} from '../../../../apps/provisioner/src/assets/cashu';

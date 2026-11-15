@@ -228,6 +228,11 @@ class UnitsTest {
         byte[] record() throws Exception { return field("cardRecord"); }
         /** The state byte of the entry whose keyset is `keyset`, or -1 where none in use has it. */
         int stateOf(String keyset) throws Exception {
+            int e = rawStateOf(keyset);
+            return e < 0 ? -1 : e & ~0x04;   // the loaded bit (D214) is the card's own and not part of what a reader is told
+        }
+        /** The state byte as the card keeps it, the loaded bit (0x04, D214) with it. */
+        int rawStateOf(String keyset) throws Exception {
             int e = entryOf(keyset);
             return e < 0 ? -1 : book()[e * ENTRY + 8] & 0xFF;
         }

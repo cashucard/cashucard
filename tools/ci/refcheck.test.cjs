@@ -190,13 +190,15 @@ test("35,466 bytes, the 2.3 build before D200, is known to install, and its hash
 // The tracked CAP adds D207 to D210 (a keyset taught at set-up, the field on p padded, LOAD_CHANGE's points by the key agreement,
 // e*d on the chip's RSA) to the file that ran on a chip on 2026-11-14 (37,269 bytes, load file sha256 fe156f4f..., D206), and ran on
 // a chip itself the same day (39,343 bytes, load file sha256 c79b30a7..., a J3R180 at a test mint: real signatures and real change
-// verified on the chip). The files before it stay on refcheck's lists.
+// verified on the chip). The files before it stay on refcheck's lists. The tracked CAP now adds D211 to D214 (the signature's product in two
+// shares, every signature checked, wider known answers, a taught keyset kept) and ran on a chip the same day (40,365 bytes, load file sha256
+// 8aefa0db..., real signatures and real change verified on the chip).
 test("the tracked 2.3 CAP's load file has run on a chip: its size and its hash are on the lists, and the files before D207 stay proven", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-2.3.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 39343 bytes/);
-  assert.match(r.stdout, /load file sha256: c79b30a7cf54ce6a97ca5a9f4fba72744618fbe6b42fd03d00b48aa5d508da00; this exact file has run on a chip\.\n/);
+  assert.match(r.stdout, /load file: 40365 bytes/);
+  assert.match(r.stdout, /load file sha256: 8aefa0db7ba81c0c9a3832e33e301110d6fa5d52b7a52a1434eda6ac9ee206aa; this exact file has run on a chip\.\n/);
   assert.doesNotMatch(r.stdout, /not yet tried on a chip/);
   const source = readFileSync(REFCHECK, "utf8");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes/);
@@ -207,4 +209,6 @@ test("the tracked 2.3 CAP's load file has run on a chip: its size and its hash a
   assert.match(source, /36950: True/);
   assert.match(source, /37269: True/);
   assert.match(source, /39343: True/);
+  assert.match(source, /'8aefa0db7ba81c0c9a3832e33e301110d6fa5d52b7a52a1434eda6ac9ee206aa': '2\.3 with D200 to D214[^;]*40,365 bytes[^;]*real signatures and real change verified on the chip'/);
+  assert.match(source, /40365: True/);
 });

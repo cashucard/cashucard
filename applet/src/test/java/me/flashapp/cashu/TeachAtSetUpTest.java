@@ -72,7 +72,7 @@ class TeachAtSetUpTest {
     }
 
     @Test
-    @DisplayName("D207: a teaching refused at its begin enters nothing (a tail of no unit 6A80, an ID version the card cannot hash 6A80, no PIN in the tap 6982: the table as it was); one that began is entered at its begin (after every other check), and refused at the end (keys that are not the ID's, out of order) or cut by another command (6985) leaves an entry that names no piece and has no keys known, which the reclaim lets go")
+    @DisplayName("D207, D214: a teaching refused at its begin enters nothing (a tail of no unit 6A80, an ID version the card cannot hash 6A80, no PIN in the tap 6982: the table as it was); one that began is entered only at its end, once its keys hold (D214; D207 entered it at the begin), so one refused at the end (keys that are not the ID's, out of order) or cut by another command (6985) leaves no entry at all")
     void aTeachingRefusedEntersNothing() throws Exception {
         UnitsTest.Card c = card();
         Map<String, byte[]> before = c.snapshot();
@@ -82,7 +82,7 @@ class TeachAtSetUpTest {
         assertEquals(SW_SECURITY_NOT_SATIS, begin(c, V1.id8(), V1.tail).getSW(), "no PIN in this tap");
         c.assertUnchanged(before, "nothing entered, not a byte of the table");
         assertEquals(0, c.inUse());
-        // begun, then refused at the end or cut: an entry that names no piece, no keys known, and the reclaim lets it go
+        // begun, then refused at the end or cut: no entry is made (D214, which made the entry at the end; D207 left one that the reclaim let go)
         byte[][] off = wires(V1);
         off[3] = off[4];
         c.pin();
@@ -95,13 +95,12 @@ class TeachAtSetUpTest {
         c.balance(0);
         assertEquals(SW_CONDITIONS_NOT_SATIS, finish(c).getSW(), "given up by a read between");
         assertTrue(!keysKnown(c, V1.id8()), "no keys kept of a teaching given up");
-        assertEquals(SW_OK, c.clearSpent(), "CLEAR_SPENT reclaims");
-        assertEquals(-1, c.entryOf(V1.id8()), "the entry that names nothing is let go");
+        assertEquals(-1, c.entryOf(V1.id8()), "no entry was ever made");
         assertEquals(0, c.inUse());
     }
 
     @Test
-    @DisplayName("D207: within the table's six entries: a card whose six entries each name a piece answers 6A9C to a seventh keyset taught, nothing written; entries a teaching made that name nothing are let go by the reclaim like any other, and one of them is taught again after")
+    @DisplayName("D207, D214: within the table's six entries: a card whose six entries each name a piece answers 6A9C to a seventh keyset taught, nothing written; an entry a teaching made that names no piece and has had none is kept by the reclaim (D214: it waits for its first piece; D207 let it go), keys known, and a teaching again of it is taken")
     void withinTheSixEntries() throws Exception {
         UnitsTest.Card c = card();
         for (int i = 1; i <= 6; i++) c.put(-1, "00aa00000000000" + i, 1);
@@ -111,7 +110,7 @@ class TeachAtSetUpTest {
         UnitsTest.Card d = card();
         taught(d, V1);
         assertEquals(SW_OK, d.clearSpent(), "CLEAR_SPENT reclaims");
-        assertEquals(-1, d.entryOf(V1.id8()), "an entry that names no piece is let go");
+        assertTrue(d.entryOf(V1.id8()) >= 0 && keysKnown(d, V1.id8()), "a keyset taught and not yet loaded is kept (D214)");
         taught(d, V1);
         assertTrue(keysKnown(d, V1.id8()));
     }

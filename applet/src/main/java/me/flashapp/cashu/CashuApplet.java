@@ -619,6 +619,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte  ENTRY_USED     = (byte) 0x40;
     static final byte  ENTRY_MARK     = (byte) 0x80;
     static final byte  ENTRY_KEYS     = (byte) 0x02;
+    /** A piece has been loaded under the entry's keyset (D214): set at the first, with the entry or after it; the reclaim spares an entry taught and never loaded. */
+    static final byte  ENTRY_LOADED   = (byte) 0x04;
     /* The paid list (2.3, D191): the first PAID_ROW bytes of the nonce of each of the last PAID_ROWS pieces the card has signed
      * for, a ring filled from row 0, then the ring's next row (2), then 1 once it has gone round (1): the rows in use are the
      * rows before the next one until then, and all of them after. Reserved at the first SET_CARD. */
@@ -706,15 +708,16 @@ public class CashuApplet extends Applet implements TagSwitch {
      * the last is answered 6A98, keep holding, after a signature's work of the card's own, thrown away (`holdOn`), as a
      * payment's wait does it: about half a second an asking on a slower chip, so the hold is seconds the holder sees.
      *
-     *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fourth asking, about three seconds.
+     *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fourth asking, about 2.6 seconds.
      *   HISTORY_ASKINGS  GET_LOG, the log or the receipts, under the PIN on a card with no owner: answered at the seventh,
-     *                    about four seconds; then open for the rest of the time in the field (TAP_READ).
-     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the seventeenth asking, about eleven seconds
-     *                    (about fifteen in all with the history's seven before it: 24 askings).
+     *                    about three seconds (2.95 s measured); then open for the rest of the time in the field (TAP_READ).
+     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the seventeenth asking, about eight seconds
+     *                    (8.3 s measured; about eleven in all with the history's seven before it: 24 askings).
      *
      * The counts are the project owner's choice of 2026-11-14 (D205), each from the 0.59 to 0.66 s an asking
-     * measured on the J3R180 on 2026-11-14 (0.75 s was the first guess, and came out short): 4 askings about 2.9 s (the claim), 7 about 4.2 s
-     * (the history), 24 about 15 s (the reset by the PIN: the history's 7 and its own 17).
+     * measured on the J3R180 on 2026-11-14 (0.75 s was the first guess, and came out short). An asking is 0.49 to 0.58 s now (D210 made it
+     * 0.23 to 0.31 s, and D211 and D212, the split of the product and the check of every signature, added 0.27 s): 4 askings about 2.6 s (the
+     * claim), 7 about 3.0 s (the history), 24 about 11 s (the reset by the PIN: the history's 7 and its own 17). The counts are not changed.
      *
      *   the PIN's wait  VERIFY_PIN on a card with no owner after a wrong try (D195): the askings owed (pinMarks), served
      *                    PIN_STRETCH at a time, each stretch written down as it ends.
@@ -1003,10 +1006,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     /** The keys' tree (D190): a leaf is SHA-256(00 || amount || K), a node SHA-256(01 || left || right), a missing leaf SHA-256(02). */
     private static final byte[] TREE = { (byte) 0x00, (byte) 0x01, (byte) 0x02 };
 
-    /** What one limit's worth past the first costs a payment: this many signatures of work, about three seconds on the chip. */
-    // The wait (6a), in signatures of the card's own work (about 0.6 s each on the chip, 0.7 over NFC):
+    /** What one limit's worth past the first costs a payment: this many signatures of work, about two seconds on the chip. */
+    // The wait (6a), in signatures of the card's own work (about 0.5 s each on a J3R180 on the reader, 0.6 over NFC: D212 checks every signature):
     // for the first limit's worth over the limit, and for every further limit's worth. Each change output
-    // made (about 0.4 s) counts as one of them done. Within the limit there is no wait.
+    // made (about 0.23 s) counts as one of them done. Within the limit there is no wait.
     static final short WAIT_OVER_SIGNS   = (short) 10;
     static final short WAIT_MORE_SIGNS   = (short) 4;
     /** The most limits' worth a payment is counted as: past this it waits as 255 do (about twelve minutes). */
@@ -2593,9 +2596,26 @@ public class CashuApplet extends Applet implements TagSwitch {
             // the input half is as it was: s again, for the root
             powRaw(rsaRootP, b, (short) 0);
             if (!isZero(b, (short) 64, (short) 32)) return false;
-            if (sameBytes(b, (short) 96, SECP256K1_G, (short) 33, (short) 32)) return true;
-            SchnorrHW.sub32(SECP256K1_P, (short) 0, b, (short) 96, b, (short) 0);
-            return sameBytes(b, (short) 0, SECP256K1_G, (short) 33, (short) 32);
+            if (!sameBytes(b, (short) 96, SECP256K1_G, (short) 33, (short) 32)) {
+                SchnorrHW.sub32(SECP256K1_P, (short) 0, b, (short) 96, b, (short) 0);
+                if (!sameBytes(b, (short) 0, SECP256K1_G, (short) 33, (short) 32)) return false;
+            }
+            /* and at the top of the range (D213: G's numbers all have the top bit clear, and an engine wrong from 2^255 up would
+             * have passed): x = p - 1 (-1), whose cube, Euler's test and root are all p - 1 (p is 3 mod 4 and (p + 1)/4 is even:
+             * the root key's exponent is odd, and -1 to it is -1), and x = p - 2 (-2, a non-square as 2 is one), whose cube is
+             * p - 8 and whose Euler's test is p - 1 */
+            for (short r = 0; r < 5; r++) {
+                Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+                Util.arrayCopyNonAtomic(SECP256K1_P, (short) 0, b, (short) 32, (short) 32);
+                b[63] -= (byte)(r < 3 ? 1 : 2);
+                powRaw(r == 0 || r == 3 ? rsaCubeP : r == 1 || r == 4 ? rsaEulerP : rsaRootP, b, (short) 0);
+                if (!isZero(b, (short) 64, (short) 32)) return false;
+                // the answer: p - 1 for all of the first three and the Euler of p - 2, p - 8 for the cube of p - 2
+                Util.arrayCopyNonAtomic(SECP256K1_P, (short) 0, b, (short) 0, (short) 32);
+                b[31] -= (byte)(r == 3 ? 8 : 1);
+                if (!sameBytes(b, (short) 0, b, (short) 96, (short) 32)) return false;
+            }
+            return true;
         } catch (RuntimeException e) {
             return false;
         }
@@ -3351,8 +3371,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * pieces less the card's own change): within L (or within a thirty-second
      * over it, see below), nothing, change or no change — that change is
      * coming is the phone's to say, not the card's; over L, WAIT_OVER_SIGNS
-     * for the first limit's worth over (about seven seconds) and
-     * WAIT_MORE_SIGNS for every further one, whole or in part (three seconds
+     * for the first limit's worth over (about five seconds) and
+     * WAIT_MORE_SIGNS for every further one, whole or in part (two seconds
      * each).
      *
      * One payment a tap at full speed: a second payment signed in the same
@@ -3656,6 +3676,8 @@ public class CashuApplet extends Applet implements TagSwitch {
                 short from = (short)(e * ENTRY_LEN);
                 if ((book[(short)(from + ENTRY_STATE)] & ENTRY_USED) == 0) continue;
                 at = Util.arrayCopyNonAtomic(book, from, buf, at, (short)(ENTRY_STATE + 1));
+                // the loaded bit is the card's own (D214): the reader sees the state byte as it was
+                buf[(short)(at - 1)] &= (byte)~ENTRY_LOADED;
             }
             buf[0] = (byte)((short)(at - 1) / (short)(ENTRY_STATE + 1));
             apdu.setOutgoingAndSend((short) 0, at);
@@ -3907,13 +3929,18 @@ public class CashuApplet extends Applet implements TagSwitch {
                 ISOException.throwIt(ISO7816.SW_WRONG_DATA);
             }
             /* D207: and entered as its first piece would enter it (`newEntry`: 6A9D without the holder's say for the other
-             * unit than the card's or the last payment's, 6A9C with no room after a reclaim), after every other check of
-             * this command. A teaching refused later leaves an entry that names nothing, with no keys known, which the next
-             * reclaim lets go, as one whose pieces have all been paid. */
+             * unit than the card's or the last payment's, 6A9C with no room, after a reclaim that spares a keyset taught and
+             * not yet loaded: D214), after every other check of this command. The entry itself is made at the end. */
+            byte made = 0;
             if (e < 0) {
                 e = newEntry(unit);
                 if (e >= BOOK_ENTRIES) ISOException.throwIt(e);
-                enter(e, buf, in, newState(unit));
+                /* D214: only the room is held: the free entry gets the keyset's eight bytes and its state byte stays 00 (free:
+                 * nothing reads the bytes of a free entry). The entry is made at the end (P1 = 2), with the keys, in the one
+                 * transaction that writes them, so that a teaching cut or refused leaves nothing and no entry of the wrong unit
+                 * is planted */
+                enter(e, buf, in, (byte) 0);
+                made = newState(unit);
             }
             Util.arrayCopyNonAtomic(buf, (short)(in + 8), scratch, T_TAIL, (short)(len - 8));
             Util.arrayFillNonAtomic(allOut, (short) 0, (short) 8, (byte) 0);
@@ -3922,6 +3949,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             allState[2] = (byte) 0;
             allState[3] = version;
             allState[4] = (byte)(len - 8);
+            allState[5] = made;
             allState[0] = TEACHING;
             return;
         }
@@ -3983,7 +4011,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         while ((short)(n >> h) != (short) 1) h++;
         JCSystem.beginTransaction();
         Util.arrayCopy(nodeArr(h), nodeOff(h), book, (short)(at + ENTRY_TOP), (short) 32);
-        book[(short)(at + ENTRY_STATE)] |= ENTRY_KEYS;
+        book[(short)(at + ENTRY_STATE)] = (byte)(book[(short)(at + ENTRY_STATE)] | allState[5] | ENTRY_KEYS);
         JCSystem.commitTransaction();
         apdu.setOutgoingAndSend((short) 0, buf[0] == (byte) 0 ? (short) 8 : (short) 33);
     }
@@ -4296,7 +4324,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             } else {
                 entry = newEntry(unit);
                 if (entry >= BOOK_ENTRIES) return entry;
-                state = newState(unit);
+                state = (byte)(newState(unit) | ENTRY_LOADED);
             }
         }
         /* Not a piece that is here already. What the card signs is the piece's
@@ -4341,6 +4369,11 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         // a new keyset's entry, before anything of the place: its eight bytes, then its state byte, the entry's commit
         if (entry >= 0) enter(entry, buf, in, state);
+        else if (unit >= 0 && book != null) {
+            // D214: the first piece loaded under a keyset taught before it: one byte, before the piece's own writes
+            short at = (short)(entryOf(buf, in) * ENTRY_LEN + ENTRY_STATE);
+            if ((book[at] & ENTRY_LOADED) == 0) book[at] |= ENTRY_LOADED;
+        }
         short base = (short)(slot * PROOF_SIZE);
         short hex = (short)(slot * HEX_LEN);
         // its nonce and its C as the text a payment hashes (`slotHex`): before the data, and long before the status byte
@@ -6935,6 +6968,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         for (e = 0; e < BOOK_ENTRIES; e++) {
             short at = (short)(e * ENTRY_LEN + ENTRY_STATE);
+            // D214: a keyset taught and not yet loaded (its keys known, no piece ever under it) is waiting for its first piece
+            // and is not let go, so that a card taught three keysets does not forget the first
+            if ((byte)(book[at] & (byte)(ENTRY_KEYS | ENTRY_LOADED)) == ENTRY_KEYS) continue;
             if ((short)(marks & (short)(1 << e)) == 0 && book[at] != (byte) 0) book[at] = (byte) 0;
         }
     }

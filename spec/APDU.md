@@ -1160,7 +1160,8 @@ card has not been taught; `6A9B` for one of the other unit than the payment's;
 this payment (300 pieces a day, [The paid list](#the-paid-list)): change is counted
 when the payment is signed and its `LOAD_CHANGE` is never refused for the count
 ([D200](../docs/DECISIONS.md#d200)), so the card makes none it could not take back;
-`6F00` if the chip's arithmetic fails. Every refusal but the first three gives the
+`6F00` if the chip's arithmetic fails, or if the signature does not check against the card's key ([D212](../docs/DECISIONS.md#d212): every signature the card makes is checked before it
+leaves, a failing chip path is redone by the bytecode, and one that still fails is not released). Every refusal but the first three gives the
 payment up. A reader that meets `6A8F` here begins the payment again with pieces that
 need no change, or no more change outputs than the card made before the refusal; or
 the holder pays after the day of loads has turned. The `6A8F` comes before any PIN is
@@ -1361,7 +1362,7 @@ scalar that is a public number, G's x, and no key of the card's), in place of it
 with nothing written. The piece is then stored exactly as the same piece in the 33-byte form:
 C compressed, `02` or `03` by y's low bit, then x. The card leans on its chip's agreement only
 where it holds a point to the curve: at each `SET_CARD`, once the record is written, the card asks
-it of G (taken) and of G with y one more (refused); where either answer is another, P2 bit 3 is
+it of G (taken) and of six points off the curve (refused: G with y one more, an x with no root, a point of the twist, a valid x with a wrong y, y near p and 04 with zeros, [D213](../docs/DECISIONS.md#d213)); where any answer is another, P2 bit 3 is
 `6B00` before the data is read, and the reader sends the 33-byte form. So is it on a card before
 its first `SET_CARD`, and on a card before D206. A reader that has a piece's C compressed works y
 out as the root of x³ + 7 of C's parity.
@@ -1719,9 +1720,9 @@ last payment's under the PIN alone and as either with the holder's say in this t
 (the owner's grant; on a card with no owner a held tap), of the unit its version `01`
 tail names or the card's (version `00`): `6A9D` for the other unit without the
 holder's say, `6A9C` with no entry free after a reclaim, and `6A88` on a card
-with no keyset table. The entry is made at the begin and holds no keys until the
-finish: a teaching refused at its end or given up leaves an entry that names no
-piece, which the next reclaim lets go. The tail is the bytes NUT-02 hashes after the
+with no keyset table. Only the room is held at the begin ([D214](../docs/DECISIONS.md#d214)): the entry is made at the finish, with the keys, in the one transaction
+that writes them, so a teaching refused or given up makes none and the table is as it was. An entry taught and never loaded is not let go by the reclaim
+(it waits for its first piece), so a card with no entry free answers `6A9C` at the begin and forgets nothing. The tail is the bytes NUT-02 hashes after the
 keys for the ID's version (none for version `00`), at most 64. A version `01`
 tail names the unit first, `|unit:sat` or `|unit:usd` followed by the end or `|`,
 and it must be the entry's (`6A80` otherwise; for a keyset in no entry, it names the
@@ -1811,7 +1812,7 @@ a row (`F` for fifteen or more), and makes the next `VERIFY_PIN` wait: after the
 w-th wrong try in a row the next try owes 2^(w−1) askings (1, 2, 4, 8, 16, 32 ...;
 at most 16,384, about three hours, from the fifteenth on). Each asking owed is
 answered `6A98`, keep holding, with no data, after a signature's work of the card's
-own (about 0.7 s on a chip). The wait is served in stretches of 16 askings: the
+own (about 0.5 s on a J3R180 on the reader, now that every signature is checked on the card: D212). The wait is served in stretches of 16 askings: the
 asking after a stretch writes what is still owed, less the stretch, and answers
 `6A98` again while anything is owed, so that a long wait is served over as many
 taps as it takes, and a card taken out of the field loses at most the stretch it
@@ -2162,14 +2163,14 @@ card's numbers are set once: the PIN given in this tap, a held tap ([A holder wi
 phone](#a-holder-with-no-phone)), no data, and nothing unspent or owed; then the same
 command seventeen times in a row, each of the first sixteen answered `6A98`, keep
 holding, with no data, after a signature's work of the card's own (about 11
-seconds on a J3R180, at 0.59 to 0.66 s an asking; with the history's held tap before it, seven askings, about 4 seconds, 24 askings and about 15 seconds in all); any other command between, a `SELECT` among them, begins the
+seconds on a J3R180, at 0.50 s an asking, 8.3 s measured; with the history's held tap before it, seven askings, about 3 seconds, 24 askings and about 11 seconds in all); any other command between, a `SELECT` among them, begins the
 count again. The seventeenth resets the card as the owner's reset does, and the holder
 sets it up again in a new first set-up ([SET_PIN](#set_pin-0x41)), with a phone that
 claims it or by the PIN alone. The reset takes the hold and the arming with the PIN:
 a new PIN given in the same selection has no held tap until it holds for one.
 
 **The risk accepted.** Anyone who has the PIN and holds an empty card with no owner
-for about 15 seconds (the history's seven askings and the reset's seventeen, 24 askings at 0.59 to 0.66 s each on a J3R180) can reset it
+for about 11 seconds (the history's seven askings and the reset's seventeen, 24 askings at 0.49 to 0.50 s each on a J3R180, 11.3 s measured) can reset it
 and set it up again in the same selection: with the holder's PIN and mint, and its
 own numbers, its own refund key or itself as owner. The holder's next top-up is then
 under those. No till takes that long. The holder's phone, or a guest wallet that knows
@@ -2482,7 +2483,7 @@ the PIN set and given in this tap, in the card's first set-up alone (`6A91` afte
 [D196](../docs/DECISIONS.md#d196)), never in a time in the field in which a payment
 was signed, only on an empty card (nothing unspent and no change owed, `6A8D`, as
 on 2.2), the same data asked four times in a row, the first three answered `6A98`
-after a signature's work each (about three seconds in all on a J3R180, 0.59 to 0.66 s an asking: 2.94 s measured; the six of 2.3's first build took 4.1 s). After a claim, no payment command
+after a signature's work each (about 2.6 seconds in all on a J3R180, 0.57 s an asking: 2.58 s measured, D211 and D212; the six of 2.3's first build took 4.1 s). After a claim, no payment command
 is taken for the rest of that time in the field (`6985`). A phone sends
 `SET_OWNER` again for as long as the card answers `6A98`, and tells the holder to
 keep holding the card; a phone that asks once never takes `6A98` for done. A claim
@@ -2494,7 +2495,7 @@ A claim moves no money: a card is claimed empty, in the set-up that its first PI
 or a reset begins. A holder with no phone who later wants a phone as the card's
 owner does it in four steps: the money moved to the phone (paid to it under the PIN,
 within the limits), the empty card reset by the PIN ([RESET_CARD](#reset_card-0x51),
-about 15 seconds of holding), set up again with the phone, which claims it in that
+about 11 seconds of holding), set up again with the phone, which claims it in that
 first set-up, and the money loaded again under the PIN.
 
 ### Two units on one card
@@ -2512,7 +2513,8 @@ mint, told apart by keyset.
 - **The state byte.** `00` free; `40` in use; `80` added for the holder's mark (the
   entry made with the holder's say in the tap); bit 0 the unit (`0` sat, `1` usd);
   bit 1 the keys known (a top kept). The keyset's 8 bytes are written, then the
-  state byte, the entry's commit.
+  state byte, the entry's commit. The card also keeps bit 2, loaded, set at the first piece
+  loaded under the keyset ([D214](../docs/DECISIONS.md#d214)); `GET_CARD` does not show it.
 - **Every piece is of one unit.** `LOAD_PROOF` P2 = 1 names the pieces' unit; P2 = 0
   means the card's. A keyset in an entry of the other unit is `6A9B`. A keyset in no
   entry is entered: under the PIN alone as the card's unit or the last payment's,
@@ -2522,7 +2524,8 @@ mint, told apart by keyset.
   the mark, runs the reclaim and looks again (`6A9C` if it still finds none).
   `LOAD_CHANGE` enters nothing: change is in its opening's keyset.
 - **The reclaim** lets go every entry that no unspent place and no opening, drafted
-  or owed, names, one byte written for each, outside any transaction. It runs at
+  or owed, names, one byte written for each, outside any transaction, but not one whose
+  keys are known and which has never been loaded ([D214](../docs/DECISIONS.md#d214): a keyset taught before its first piece). It runs at
   `CLEAR_SPENT`, at a load that finds the table full, and at `SET_CARD`. A live
   entry is never freed or changed in place, so no command moves a piece from one
   unit to the other.
@@ -2565,7 +2568,7 @@ history on another phone as a guest.
 3. **The held tap.** `GET_LOG` wants the PIN given in this tap, and is refused
    (`6985`) in a time in the field in which a payment was signed. Each of the first
    six askings in a row is answered `6A98`, keep holding, after a signature's work
-   of the card's own, thrown away; the seventh answers (about four seconds on a J3R180, 0.59 to 0.66 s an asking).
+   of the card's own, thrown away; the seventh answers (about three seconds on a J3R180, 0.49 s an asking: 2.95 s measured).
    The log and the receipts count as one hold. Any other command, a `SELECT` among
    them, begins the count again. Once answered, the history is open to the PIN for
    the rest of that time in the field, which is then a **held tap**: no payment
@@ -2593,10 +2596,10 @@ history on another phone as a guest.
    (three wrong tries, `SET_PIN`, then the reset of item 8) unless it was claimed.
 8. **Other numbers, or an owner, later.** The holder empties the card, resets it by
    the PIN in a held tap ([RESET_CARD](#reset_card-0x51): seventeen askings after the history's seven,
-   24 askings and about 15 seconds in all), and sets it up again: with a phone, which claims it in that first set-up
+   24 askings and about 11 seconds in all), and sets it up again: with a phone, which claims it in that first set-up
    ([The owner claimed slowly](#the-owner-claimed-slowly)), or by the PIN alone. The
    reset is slow so that no till can do it while it takes a payment; anyone with the
-   PIN who holds the empty card for about 15 seconds can, and can set it up again with
+   PIN who holds the empty card for about 11 seconds can, and can set it up again with
    numbers, a refund key or an owner of its own (the risk accepted in
    [RESET_CARD](#reset_card-0x51)). A guest wallet that does not know the card cannot
    tell; the holder's own phone checks `GROUP_KEYS` before a top-up

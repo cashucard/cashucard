@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
  * the claim's anchor or the simple card's `SET_HEADER`, while the card holds nothing, is an anchor as the empty card's reset's
  * is: it becomes the clock even where it is older, and the hardest where it is harder. So a card set up by the text has the
  * network's own block as its hardest before it holds anything, and a far header costs half of that block's work, the case
- * the keeper accepted (option A). Round 13a's probe (R13aProbeTest) is the first test here; round 13b's claim probe (t2) the
+ * the keeper accepted (option A). the review's probe is the first test here; the review's claim probe (t2) the
  * second.
  *
  * The network here: WeakClockTest's (NET_BITS, four times the tests' floor's work, as the network's blocks were to the floor
