@@ -12,17 +12,17 @@ function reassemble(apdus: number[][]): number[] {
 }
 
 describe('splitLoad', () => {
-  it('cuts the card load file into 151 blocks of 247 bytes, the last 219, which reassemble to it', () => {
+  it('cuts the card load file into 160 blocks of 247 bytes, the last 70, which reassemble to it', () => {
     const file = fromHex(CASHU_LOAD_FILE.hex);
-    assert.equal(file.length, 37269);
+    assert.equal(file.length, 39343);
     assert.equal(
       createHash('sha256').update(Buffer.from(file)).digest('hex'),
       CASHU_LOAD_FILE.sha256,
     );
     const apdus = splitLoad(file);
-    assert.equal(apdus.length, 151);
-    assert.equal(apdus[150][4], 219);
-    assert.ok(apdus.slice(0, 150).every(a => a[4] === 247));
+    assert.equal(apdus.length, 160);
+    assert.equal(apdus[159][4], 70);
+    assert.ok(apdus.slice(0, 159).every(a => a[4] === 247));
     assert.deepEqual(reassemble(apdus), file);
   });
 

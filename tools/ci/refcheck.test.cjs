@@ -187,22 +187,24 @@ test("35,466 bytes, the 2.3 build before D200, is known to install, and its hash
   assert.match(readFileSync(REFCHECK, "utf8"), /'48b8597cfd23ace73c6451a962541bfa09534a312f225ebcf382a8769fe01c96': '2\.3, 35,466 bytes/);
 });
 
-// The tracked CAP adds D206 (LOAD_PROOF's 04 form, C held to the curve by the chip's key agreement) to the file that ran on a
-// chip on 2026-11-14 (36,950 bytes, load file sha256 075448e4..., D205), and ran on a chip itself the same day (37,269 bytes,
-// load file sha256 fe156f4f..., a J3R180 at a test mint: real signatures and real change verified on the chip). The files
-// before it stay on refcheck's lists.
-test("the tracked 2.3 CAP's load file has run on a chip: its size and its hash are on the lists, and the files before D206 stay proven", () => {
+// The tracked CAP adds D207 to D210 (a keyset taught at set-up, the field on p padded, LOAD_CHANGE's points by the key agreement,
+// e*d on the chip's RSA) to the file that ran on a chip on 2026-11-14 (37,269 bytes, load file sha256 fe156f4f..., D206), and ran on
+// a chip itself the same day (39,343 bytes, load file sha256 c79b30a7..., a J3R180 at a test mint: real signatures and real change
+// verified on the chip). The files before it stay on refcheck's lists.
+test("the tracked 2.3 CAP's load file has run on a chip: its size and its hash are on the lists, and the files before D207 stay proven", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-2.3.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 37269 bytes/);
-  assert.match(r.stdout, /load file sha256: fe156f4f505ccaecefe16aaeee4e270a76909d6373bf78cfd2ff9fd6c28a97e6; this exact file has run on a chip\.\n/);
+  assert.match(r.stdout, /load file: 39343 bytes/);
+  assert.match(r.stdout, /load file sha256: c79b30a7cf54ce6a97ca5a9f4fba72744618fbe6b42fd03d00b48aa5d508da00; this exact file has run on a chip\.\n/);
   assert.doesNotMatch(r.stdout, /not yet tried on a chip/);
   const source = readFileSync(REFCHECK, "utf8");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes/);
   assert.match(source, /'075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a': '2\.3 with D200 to D205[^']*36,950 bytes[^']*'\s*'2026-11-14, J3R180 09301220 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
   assert.match(source, /'fe156f4f505ccaecefe16aaeee4e270a76909d6373bf78cfd2ff9fd6c28a97e6': '2\.3 with D200 to D206[^']*'\s*'[^']*37,269 bytes, 2026-11-14, J3R180 09301220 at testnut\.cashu\.space: real signatures and real change '\s*'verified on the chip'/);
+  assert.match(source, /'c79b30a7cf54ce6a97ca5a9f4fba72744618fbe6b42fd03d00b48aa5d508da00': '2\.3 with D200 to D210[^']*(?:'\s*')?[^']*39,343 bytes[^;]*real signatures and real change verified on the chip'/);
   assert.match(source, /36953: True/);
   assert.match(source, /36950: True/);
   assert.match(source, /37269: True/);
+  assert.match(source, /39343: True/);
 });

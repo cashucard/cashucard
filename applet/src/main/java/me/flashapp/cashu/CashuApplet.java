@@ -401,6 +401,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte  LOAD_DATE_KEYS      = (byte) 0x02;
     /** LOAD_PROOF's P2 bit 3 (D206): each piece's C comes whole, 04 || x || y (65 bytes), and is held to the curve by the chip's key agreement. */
     static final byte  LOAD_FULL_C         = (byte) 0x08;
+    /** What `loadOne` does about a piece's C (D209): holds the compressed C to the curve by Euler's test, holds the whole C (at allSlots) to it by the key agreement, or takes it as held already (LOAD_CHANGE's, by the agreement as it came out of the unblinding). */
+    static final byte  LOAD_C_COMPRESSED   = (byte) 0;
+    static final byte  LOAD_C_WHOLE        = (byte) 1;
+    static final byte  LOAD_C_CHECKED      = (byte) 2;
     /** A piece in that form: keyset (8), amount (4), nonce (32), C (65), date (4). */
     static final short PIECE_FULL_LEN      = (short) 113;
     // SET_CARD's data: unit (1), refund key (33), 65 bytes that held a time key until 1.15 and are not read, mint length (1), then the mint
@@ -1272,6 +1276,14 @@ public class CashuApplet extends Applet implements TagSwitch {
     private Cipher rsa;
     private RSAPrivateKey rsaCube, rsaRoot, rsaEuler;
     /**
+     * The same three powers over a modulus that is p itself padded to 64 bytes (D208): the chip's RSA then answers under p
+     * at once, and the bytecode reduction of the p*p keys' answers (`reduceModP`, 39 ms each) is not needed. Made at the first
+     * SET_CARD, held to known answers at every one (`fieldPInit`); null where the chip refused them.
+     */
+    private RSAPrivateKey rsaCubeP, rsaRootP, rsaEulerP;
+    /** Whether the padded keys held to their known answers at the last SET_CARD (`fieldPInit`), worked out there and nowhere else: false until the first. Where false, every power is the p*p keys'. */
+    private boolean fieldP;
+    /**
      * The last signature given (64), and whether there has been one (1).
      * Permanent, and written in the transaction that burns the pieces it is
      * for: a card taken away as its answer was on the air has burned them, and
@@ -1358,9 +1370,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         changeOpen      = new byte[(short)(CHANGE_MOST * OPEN_LEN)];
         openState       = new byte[CHANGE_MOST];
         rsa             = Cipher.getInstance(Cipher.ALG_RSA_NOPAD, false);
-        rsaCube         = fieldKey(RSA_D_CUBE);
-        rsaRoot         = fieldKey(RSA_D_ROOT);
-        rsaEuler        = fieldKey(RSA_D_EULER);
+        rsaCube         = fieldKey(rsaKey(), RSA_D_CUBE, RSA_PP);
+        rsaRoot         = fieldKey(rsaKey(), RSA_D_ROOT, RSA_PP);
+        rsaEuler        = fieldKey(rsaKey(), RSA_D_EULER, RSA_PP);
         lastSig         = new byte[LAST_LEN];
         // the record's two large arrays, `outbox` and `outStage`, are reserved at the first SET_CARD (D176): the J3R180 refused
         // this constructor with them (6F00 at create); the installation and the generation are facts of the install, and stay
@@ -2412,12 +2424,21 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * The value at a[off + 32 .. off + 64) (a[off .. off + 32) zeros) to the
      * key's power, mod p, into a[off + 96 .. off + 128): the chip's RSA mod
-     * N (`powRaw`), then the reduction; 128 bytes of `a` from `off` are its room. An
+     * N (`powRaw`), then the reduction (or, with `fieldP`, over p padded, whose answer needs none: D208); 128 bytes of `a`
+     * from `off` are its room. An
      * answer may come back shorter than the modulus, without its leading
      * zeros (the simulator's does; a chip's is the modulus' length): it is
      * taken by the length answered and set right-aligned in the 64 bytes.
      */
     private void powModP(RSAPrivateKey key, byte[] a, short off) {
+        if (fieldP) {
+            /* D208: the same power over a modulus that is p padded: the answer is under p already, the last 32 of the 64, so no
+             * reduction. The chip answers garbage, with no error, for an x at or over its modulus, so none is given (every
+             * caller holds its x under p: 6F00 if one slips). */
+            if (SchnorrHW.cmp32(a, (short)(off + 32), SECP256K1_P, (short) 0) >= 0) ISOException.throwIt(SW_CRYPTO_ERROR);
+            powRaw(key == rsaCube ? rsaCubeP : key == rsaRoot ? rsaRootP : rsaEulerP, a, off);
+            return;
+        }
         powRaw(key, a, off);
         reduceModP(a, (short)(off + 64), scratch, X_OUT);
     }
@@ -2481,6 +2502,21 @@ public class CashuApplet extends Applet implements TagSwitch {
     }
 
     /**
+     * `requireFullPoint` for LOAD_CHANGE's K and C_ (D209): where the set-up's test of the chip's key agreement held
+     * (`curveByAgreement`), the point is held to the curve by one key agreement (`SchnorrHW.agrees`, about 28 ms, in place of
+     * 176) after the form check; where not, by `requireFullPoint`. The sealed commands' reader keys stay on `requireFullPoint`.
+     */
+    private void requireLoadedPoint(byte[] a, short at) {
+        if (!curveByAgreement) {
+            requireFullPoint(a, at);
+            return;
+        }
+        requireFullForm(a, at);
+        Util.arrayCopyNonAtomic(a, at, allSlots, (short) 0, EC_POINT_LEN);
+        if (!schnorrHW.agrees(allSlots, (short) 0)) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+    }
+
+    /**
      * `6A80` unless the 65 bytes at a[at] are of the 04 form: 04, then an x under p and a y under p (`requireFullPoint`, and
      * D206's piece, whose curve the chip's key agreement checks: it reduces x and y, and two encodings of one point would be
      * two pieces' bytes).
@@ -2499,12 +2535,70 @@ public class CashuApplet extends Applet implements TagSwitch {
         ISOException.throwIt(sw);
     }
 
-    /** The chip's RSA key for one power mod N (RSA_PP). */
-    private static RSAPrivateKey fieldKey(byte[] d) {
-        RSAPrivateKey k = (RSAPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PRIVATE, KeyBuilder.LENGTH_RSA_512, false);
-        k.setModulus(RSA_PP, (short) 0, (short) 64);
+    /** A new key of the chip's RSA, 512 bits (the one place the card makes one). */
+    private static RSAPrivateKey rsaKey() {
+        return (RSAPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PRIVATE, KeyBuilder.LENGTH_RSA_512, false);
+    }
+
+    /** `k` made the key of one power: the 64 bytes at m the modulus (RSA_PP's, or p padded), d the exponent. */
+    private static RSAPrivateKey fieldKey(RSAPrivateKey k, byte[] d, byte[] m) {
+        k.setModulus(m, (short) 0, (short) 64);
         k.setExponent(d, (short) 0, (short) d.length);
         return k;
+    }
+
+    /**
+     * The padded keys (D208), made once and checked at every SET_CARD: p, 64 bytes with 32 zeros before it, the modulus of each,
+     * and then the chip's powers held to known answers: 2^3 = 8, Euler's test of 4 is 1 and the root of 4 is 2, and, at full
+     * width, G's x cubed with 7 added is the square of G's y (its Euler's test is 1 and its root is y or p - y). True where all
+     * hold; false on a wrong answer or on any exception, a chip that refuses the key, the room or the use (the simulator
+     * refuses the modulus: "not composite"), and `fieldP` is then false and every power is the p*p keys'. A key made stays
+     * made (a refusal at its modulus leaves the object, which the next SET_CARD sets again). allSlots is the room: no payment
+     * is in hand.
+     */
+    private boolean fieldPInit() {
+        try {
+            byte[] b = allSlots;
+            Util.arrayFillNonAtomic(b, (short) 0, (short) 32, (byte) 0);
+            Util.arrayCopyNonAtomic(SECP256K1_P, (short) 0, b, (short) 32, (short) 32);
+            if (rsaCubeP == null) rsaCubeP = rsaKey();
+            if (rsaRootP == null) rsaRootP = rsaKey();
+            if (rsaEulerP == null) rsaEulerP = rsaKey();
+            fieldKey(rsaCubeP, RSA_D_CUBE, b);
+            fieldKey(rsaRootP, RSA_D_ROOT, b);
+            fieldKey(rsaEulerP, RSA_D_EULER, b);
+            // 2^3 = 8, 4 is a square, and its root is 2 (p is 7 mod 8: 2 is a square)
+            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+            b[63] = (byte) 2;
+            powRaw(rsaCubeP, b, (short) 0);
+            if (b[127] != (byte) 8 || !isZero(b, (short) 64, (short) 63)) return false;
+            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+            b[63] = (byte) 4;
+            powRaw(rsaEulerP, b, (short) 0);
+            if (b[127] != (byte) 1 || !isZero(b, (short) 64, (short) 63)) return false;
+            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+            b[63] = (byte) 4;
+            powRaw(rsaRootP, b, (short) 0);
+            if (b[127] != (byte) 2 || !isZero(b, (short) 64, (short) 63)) return false;
+            // at full width: x = G's x, s = x^3 + 7 is G's y squared; Euler's test of s is 1 and its root is y or p - y
+            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+            Util.arrayCopyNonAtomic(SECP256K1_G, (short) 1, b, (short) 32, (short) 32);
+            powRaw(rsaCubeP, b, (short) 0);
+            if (!isZero(b, (short) 64, (short) 32)) return false;
+            add7ModP(b, (short) 96);
+            Util.arrayCopyNonAtomic(b, (short) 96, b, (short) 32, (short) 32);
+            Util.arrayFillNonAtomic(b, (short) 0, (short) 32, (byte) 0);
+            powRaw(rsaEulerP, b, (short) 0);
+            if (b[127] != (byte) 1 || !isZero(b, (short) 64, (short) 63)) return false;
+            // the input half is as it was: s again, for the root
+            powRaw(rsaRootP, b, (short) 0);
+            if (!isZero(b, (short) 64, (short) 32)) return false;
+            if (sameBytes(b, (short) 96, SECP256K1_G, (short) 33, (short) 32)) return true;
+            SchnorrHW.sub32(SECP256K1_P, (short) 0, b, (short) 96, b, (short) 0);
+            return sameBytes(b, (short) 0, SECP256K1_G, (short) 33, (short) 32);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**
@@ -3654,10 +3748,11 @@ public class CashuApplet extends Applet implements TagSwitch {
             || !sameBytes(openKeys, (short)(key + 1), buf, (short)(in + LC_K + 1), (short) 32)) {
             ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         }
-        requireFullPoint(buf, (short)(in + LC_K));
-        requireFullPoint(buf, (short)(in + LC_C));
+        requireLoadedPoint(buf, (short)(in + LC_K));
+        requireLoadedPoint(buf, (short)(in + LC_C));
+        boolean checkedC = false;
         try {
-            unblind(buf, in, k);
+            checkedC = unblind(buf, in, k);
         } catch (RuntimeException e) {
             // a point the chip will not take, or a proof that does not hold: whatever the platform throws, it is the data's
             ISOException.throwIt(ISO7816.SW_WRONG_DATA);
@@ -3673,7 +3768,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* written as any piece is (its text, its proof, its data, the status byte last), and its opening let go; it enters
          * nothing in the keyset table (D184): it is in its opening's keyset, whose entry the opening has kept live, and its
          * log entry is of that keyset's unit */
-        short sw = loadOne(buf, in, X_NUM, (short)(in + LC_E), (byte) -1, false);
+        short sw = loadOne(buf, in, X_NUM, (short)(in + LC_E), (byte) -1, checkedC ? LOAD_C_CHECKED : LOAD_C_COMPRESSED);
         if (sw != (short) 0) ISOException.throwIt(sw);
         byte unit = logUnit(placeUnit((short)((short)(scratch[X_NUM] & 0xFF) * PROOF_SIZE)));
         /* The day's count gives the change back now that it is on the card (it was counted with the payment's pieces at SIGN), to
@@ -3700,9 +3795,11 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /**
      * LOAD_CHANGE's arithmetic: the mint's proof checked, and C = C_ - r*K into allOut, compressed. The data is at `in` in
-     * `buf` (LC_*), opening k's B_ in `openKeys`, its r in `changeOpen`. `6A80` where the proof does not hold.
+     * `buf` (LC_*), opening k's B_ in `openKeys`, its r in `changeOpen`. `6A80` where the proof does not hold. Answers whether
+     * C was held to the curve by the chip's key agreement as it came out (D209: `curveByAgreement`, and the agreement took
+     * it), where `loadOne` need not hold it to the curve again.
      */
-    private void unblind(byte[] buf, short in, short k) {
+    private boolean unblind(byte[] buf, short in, short k) {
         short open = (short)(k * OPEN_LEN), b = (short)(k * OPEN_KEYS_ROW + OPEN_KEYS_B);
         /* B_ whole: its x as the opening keeps it, and the root of x^3 + 7 of the parity it keeps, by the chip's RSA (as a change
          * output's point is found) with allSlots for room; then 04 || x || y at allSlots[0]. */
@@ -3720,6 +3817,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         schnorrHW.addTo(scratch, X_MSG, buf, (short)(in + LC_K), buf, (short)(in + LC_C), scratch, X_PT);
         allOut[0] = (byte)(((scratch[(short)(X_PT + 64)] & 1) == 0) ? 0x02 : 0x03);
         Util.arrayCopyNonAtomic(scratch, (short)(X_PT + 1), allOut, (short) 1, (short) 32);
+        // C is held to the curve now, while it is whole: K and C_ were, so it is, unless the sum was the point at infinity
+        boolean checkedC = curveByAgreement && schnorrHW.agrees(scratch, X_PT);
 
         // -e, the scalar of both halves of the proof
         Util.arrayCopyNonAtomic(buf, (short)(in + LC_E), scratch, X_MSG, (short) 32);
@@ -3738,6 +3837,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         pointText(buf, (short)(in + LC_C));
         sha.doFinal(scratch, X_HEX, (short) 0, scratch, X_MSG);
         if (!sameBytes(scratch, X_MSG, buf, (short)(in + LC_E), (short) 32)) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+        return checkedC;
     }
 
     /**
@@ -3763,7 +3863,9 @@ public class CashuApplet extends Applet implements TagSwitch {
      *
      * In order: `6A97` with no PIN; `6A86` for another P1; teaching, `6982` without the PIN given in this tap, `6985` for
      * P1 = 1 or 2 with no teaching begun, `6700` for a length that is not the step's (P1 = 0: 8 to 72 bytes, and 8 for an ID of
-     * version 00), `6A88` (P1 = 0) for a keyset in no entry, `6A80` for an ID version not 00 or 01, a version 01 tail whose
+     * version 00), `6A88` (P1 = 0) on a card with no keyset table, `6A9D` or `6A9C` (P1 = 0) for a keyset in no entry that a first piece
+     * of it would be refused for (D207: it is entered as that piece would enter it, of the unit its version 01 tail names or the
+     * card's, with no keys known until the end), `6A80` for an ID version not 00 or 01, a version 01 tail whose
      * unit is not the entry's, keys out of order, a version 00 key whose amount is not 2^n, more than 64, and (P1 = 2) no keys
      * or an ID whose first 8 bytes are not the keyset's. A refusal at P1 = 1 or 2 gives the
      * teaching up. A locked card is taught: it takes its own change.
@@ -3787,16 +3889,31 @@ public class CashuApplet extends Applet implements TagSwitch {
             allState[0] = (byte) 0;
             if (len < (short) 8 || len > (short)(8 + TAIL_MOST)) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
             short e = entryOf(buf, in);
-            if (e < 0) ISOException.throwIt(SW_SLOT_EMPTY);
+            // a card refused the room for its table has no entries: 6A88, as before D207 for a keyset in none
+            if (book == null) ISOException.throwIt(SW_SLOT_EMPTY);
             byte version = buf[in];
             if (version != (byte) 0 && version != (byte) 1) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
             if (version == (byte) 0 && len != (short) 8) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+            /* the entry's unit; D207: a keyset in no entry yet (a card set up and taught before its first piece) is of the
+             * unit its tail names (version 01), or the card's (version 00) */
+            short unit = cardRecord[CARD_UNIT_OFFSET];
+            if (e >= 0) unit = (short)(book[(short)(e * ENTRY_LEN + ENTRY_STATE)] & 1);
+            else if (version == (byte) 1 && Util.arrayCompare(buf, (short)(in + 8), UNIT_TAILS, (short)((1 - unit) * 9), (short) 9) == 0) unit = (short)(1 - unit);
             /* a version 01 ID names its unit first in the tail: "|unit:sat" or "|unit:usd", then the end or "|", and it is the
              * entry's unit (6A80 otherwise) */
             if (version == (byte) 1 && (len < (short) 17
-                || Util.arrayCompare(buf, (short)(in + 8), UNIT_TAILS, (short)((book[(short)(e * ENTRY_LEN + ENTRY_STATE)] & 1) * 9), (short) 9) != 0
+                || Util.arrayCompare(buf, (short)(in + 8), UNIT_TAILS, (short)(unit * 9), (short) 9) != 0
                 || (len > (short) 17 && buf[(short)(in + 17)] != (byte) '|'))) {
                 ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+            }
+            /* D207: and entered as its first piece would enter it (`newEntry`: 6A9D without the holder's say for the other
+             * unit than the card's or the last payment's, 6A9C with no room after a reclaim), after every other check of
+             * this command. A teaching refused later leaves an entry that names nothing, with no keys known, which the next
+             * reclaim lets go, as one whose pieces have all been paid. */
+            if (e < 0) {
+                e = newEntry(unit);
+                if (e >= BOOK_ENTRIES) ISOException.throwIt(e);
+                enter(e, buf, in, newState(unit));
             }
             Util.arrayCopyNonAtomic(buf, (short)(in + 8), scratch, T_TAIL, (short)(len - 8));
             Util.arrayFillNonAtomic(allOut, (short) 0, (short) 8, (byte) 0);
@@ -4079,7 +4196,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         short done = 0;
         for (short k = 0; k < n; k++) {
             short sw = loadOne(buf, (short)(in + (short)(k * PROOF_DATA_LEN)), (short)(X_DEC + k),
-                               withProof ? (short)(in + PROOF_DATA_LEN) : (short) -1, unit, full);
+                               withProof ? (short)(in + PROOF_DATA_LEN) : (short) -1, unit, full ? LOAD_C_WHOLE : LOAD_C_COMPRESSED);
             if (sw != (short) 0) {
                 if (k == (short) 0) ISOException.throwIt(sw);
                 break;
@@ -4142,7 +4259,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The new entry is written before anything of the place, its state byte last: torn there, it is an entry nothing names,
      * which the next reclaim frees.
      */
-    private short loadOne(byte[] buf, short in, short out, short proofAt, byte unit, boolean full) {
+    private short loadOne(byte[] buf, short in, short out, short proofAt, byte unit, byte form) {
         short slot = emptySlot();
         if (slot < 0 || paid == null) return SW_NO_SPACE;
         /* A piece with a date names the card's refund key in its secret, so a
@@ -4156,9 +4273,9 @@ public class CashuApplet extends Applet implements TagSwitch {
          * piece. A C that came whole (D206, `compact`) is held to the curve whole, by the chip's key agreement, in place of
          * Euler's test of its x: the same points go on, stored the same. */
         try {
-            if (!full) {
+            if (form == LOAD_C_COMPRESSED) {
                 requireCompressedPoint(buf, (short)(in + PROOF_C_OFFSET - 1), allSlots, (short) 0);
-            } else {
+            } else if (form == LOAD_C_WHOLE) {
                 requireFullForm(allSlots, (short) 0);
                 if (!schnorrHW.agrees(allSlots, (short) 0)) return ISO7816.SW_WRONG_DATA;
             }
@@ -4177,20 +4294,9 @@ public class CashuApplet extends Applet implements TagSwitch {
             if (e >= 0) {
                 if ((byte)(book[(short)(e * ENTRY_LEN + ENTRY_STATE)] & 1) != unit) return SW_OTHER_UNIT;
             } else {
-                // the holder's say in the tap: the owner's grant, or on a card with no owner a held tap (D189)
-                boolean say = holderSays();
-                byte last = book[BOOK_LAST];
-                byte mine = cardRecord[CARD_UNIT_OFFSET];
-                // the last payment's unit, as a code: the card's, the other, or none
-                short lastUnit = last == UNIT_CARD ? mine : last == UNIT_OTHER ? (short)(1 - mine) : (short) -1;
-                if (!say && unit != mine && unit != lastUnit) return SW_NOT_THIS_TAP;
-                entry = freeEntry(say);
-                if (entry < 0) {
-                    reclaim();
-                    entry = freeEntry(say);
-                    if (entry < 0) return SW_NO_TABLE_ROOM;
-                }
-                state = (byte)(ENTRY_USED | unit | (say ? ENTRY_MARK : 0));
+                entry = newEntry(unit);
+                if (entry >= BOOK_ENTRIES) return entry;
+                state = newState(unit);
             }
         }
         /* Not a piece that is here already. What the card signs is the piece's
@@ -4484,6 +4590,10 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* and, the record written, whether the chip's key agreement holds a point to the curve (D206): LOAD_PROOF's 04 form is
          * taken only where it does. Last, so that a SET_CARD refused writes nothing of it. */
         curveByAgreement = schnorrHW.checksCurve();
+        /* and whether the chip's RSA holds to the padded moduli (D208: the field's powers over p, D210: the signature's squaring over
+         * n): each is leaned on only where its known answers held, here, and not otherwise. Also after the record. */
+        fieldP = fieldPInit();
+        schnorrHW.chipMul = schnorrHW.chipMulInit();
     }
 
     /**
@@ -6762,6 +6872,34 @@ public class CashuApplet extends Applet implements TagSwitch {
     }
 
     /**
+     * A free entry for a new keyset of `unit` (D184), or the word it is refused with, which is above every entry's number:
+     * under the holder's say in the tap (the owner's grant, or on a card with no owner a held tap, D189) either unit, without
+     * it the card's or the last payment's (6A9D otherwise); where none is free, or the new one would be a third live one
+     * without the mark, the table is reclaimed and the counts taken again (6A9C if still so). Writes nothing but the reclaim.
+     * For a load (`loadOne`) and for a teaching of a keyset that has no entry yet (KEYSET_KEYS, D207).
+     */
+    private short newEntry(short unit) {
+        boolean say = holderSays();
+        byte last = book[BOOK_LAST];
+        byte mine = cardRecord[CARD_UNIT_OFFSET];
+        // the last payment's unit, as a code: the card's, the other, or none
+        short lastUnit = last == UNIT_CARD ? mine : last == UNIT_OTHER ? (short)(1 - mine) : (short) -1;
+        if (!say && unit != mine && unit != lastUnit) return SW_NOT_THIS_TAP;
+        short entry = freeEntry(say);
+        if (entry < 0) {
+            reclaim();
+            entry = freeEntry(say);
+            if (entry < 0) return SW_NO_TABLE_ROOM;
+        }
+        return entry;
+    }
+
+    /** A new entry's state byte: in use, of `unit`, and marked where the holder has the say in this tap. */
+    private byte newState(short unit) {
+        return (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0));
+    }
+
+    /**
      * A new keyset's entry `e`, free: its eight bytes at `off` in `a`, then its state byte, the entry's commit. Outside any
      * transaction: torn between the two, the entry is free still, its bytes a keyset nothing reads.
      */
@@ -6983,8 +7121,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 2.3: no lines here, and the load file is 37,269 bytes (149 past a multiple of 256), the least this source comes to;
-         * a J3R180 installed it five times on 2026-11-14 (D206), as it had the source before at 36,950 and 36,953 (D205 at
+        /* 2.3: no lines here, and the load file is 39,343 bytes (175 past a multiple of 256), the least this source comes to;
+         * a J3R180 installed it at the first try on 2026-11-14 (D207 to D210); the same source in an earlier build was refused (6F00)
+         * at 38,791 and 38,809 bytes (135 and 153 past) and installed at 38,893 (237 past). The file before it, 37,269 bytes, was installed
+         * five times the same day (D206), as it had the source before at 36,950 and 36,953 (D205 at
          * 37,573, with the loader's y, was refused at its first create), the source before D200 at 35,466 bytes and a
          * test-only build of it at 35,509 (2026-11-13). On 2026-11-13 a J3R180 refused the card's applet in earlier 2.3 source
          * padded to 32,777 bytes (6F00, twice) and installed it padded to 33,647 and 35,213 (111 and 141 past a multiple of

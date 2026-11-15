@@ -9314,7 +9314,9 @@ class CashuAppletTest {
         // a load's one step reads it once, for the holder's say over a new keyset's entry (D184): it marks the entry and lets nothing on
         String one = body(code, "private short loadOne(", "private void processClearSpent(");
         assertEquals(0, count(one, "loadGrant"), "loadOne reads no grant itself");
-        assertTrue(one.contains("boolean say = holderSays();"), "but the holder's say, and for nothing else");
+        // D207: the entry of a new keyset is made by `newEntry`, which a load and a teaching share, and it reads the say there
+        assertTrue(one.contains("newEntry(unit)"), "a new keyset's entry is made by newEntry");
+        assertTrue(body(code, "private short newEntry(", "private byte newState(").contains("boolean say = holderSays();"), "which asks for the holder's say, and for nothing else");
         String getInfo = body(code, "private void processGetInfo(", "private void processGetPubkey(");
         assertEquals(1, count(getInfo, "holderSays()"), "GET_INFO asks for the holder's say once: for the limit on one payment and the rate");
         assertFalse(getInfo.contains("pinVerifiedFlag") || getInfo.contains("loadGrant"), "and not the PIN alone: a till has that");
@@ -9334,7 +9336,7 @@ class CashuAppletTest {
         assertEquals(1, count(code, "private short logEntry("));
         assertEquals(5, count(code, "logEntry("), "its declaration, and the four that ask for it: the spend, the refusal, the putting on of pieces and the let-go, and nowhere else");
         assertEquals(3, count(code, "logLoaded("), "its declaration, LOAD_PROOF and LOAD_CHANGE");
-        assertTrue(body(code, "private void processLoadChange(", "private void unblind(").contains("logLoaded("));
+        assertTrue(body(code, "private void processLoadChange(", "private boolean unblind(").contains("logLoaded("));
         assertTrue(body(code, "private void processLetGo(", "private void processSetTag(").contains("logEntry(LOG_ANY)"), "the let-go, which has no amount, takes the tap's entry whatever its unit");
         assertTrue(body(code, "private void processSpendAllSign(", "private void processSpendAllAgain(").contains("logEntry(unit)"));
         assertTrue(body(code, "private void refuseOverLimit(", "private void processGetLog(").contains("logEntry(unit)"));
@@ -12116,7 +12118,7 @@ class CashuAppletTest {
         say(out, "CERT_READ P1 = 04", "exact", SW_INCORRECT_P1P2, new CommandAPDU(CLA, CashuApplet.INS_CERT_READ, 4, 0, 256));
         say(out, "KEYSET_KEYS P1 = 04", "exact", SW_INCORRECT_P1P2, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 4, 0, new byte[8]));
         say(out, "KEYSET_KEYS keys with no teaching begun", "exact", SW_CONDITIONS_NOT_SATIS, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 1, 0, new byte[41]));
-        say(out, "KEYSET_KEYS begun for a keyset in no entry of the table", "exact", SW_SLOT_EMPTY, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 0, 0, hexToBytes("00ffffffffffffff")));
+        say(out, "KEYSET_KEYS begun for a keyset in no entry of the table (D207: entered, as its first piece would be)", "exact", SW_OK, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 0, 0, hexToBytes("00ffffffffffffff")));
         sayReset(out, "taken away and put back, by a reader with no PIN");
         say(out, "select", "exact", SW_OK, select);
         say(out, "GROUP_KEYS with no PIN: refused", "exact", SW_SECURITY_NOT_SATIS, new CommandAPDU(CLA, CashuApplet.INS_GROUP_KEYS, 0, 0, u32(0), 0x62));

@@ -348,7 +348,7 @@ SW_COMMAND_MEANINGS = {
                 "a version 00 amount not 2^n, more than 64, or keys that do not hash to the keyset's ID; showing: "
                 "a path that does not reach the keyset's top",
         0x6A83: "no opening past 7",
-        0x6A88: "a keyset in no entry of the card's keyset table (teaching), or an opening not owed (showing)",
+        0x6A88: "a card with no keyset table (teaching; a keyset in no entry is entered, D207), or an opening not owed (showing)",
         0x6A9B: "the keyset named is of the other unit than the opening's",
         0x6A9F: "the keyset's keys have not been taught to the card",
     },

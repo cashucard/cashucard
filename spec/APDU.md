@@ -1280,10 +1280,12 @@ proof was kept with it or `00` where the card has no room for proofs (1), and th
 piece as `GET_PROOF` gives it after its status byte (81).
 
 The card checks K against the key the opening is bound to (its x and its y's
-parity) before any arithmetic; checks that C_ and K are points on the curve;
+parity) before any arithmetic; checks that C_ and K are points on the curve
+(by one key agreement of the chip each, [D209](../docs/DECISIONS.md#d209), where the card's set-up test of the agreement
+held, as for `LOAD_PROOF`'s 04 form, and by the card's own arithmetic where not);
 checks the mint's NUT-12 proof against K and its own B_ (`R1 = s·G − e·K`,
 `R2 = s·B_ − e·C_`, and e the SHA-256 of R1, R2, K and C_, each uncompressed, as
-lowercase hex text); takes off its own blinding factor (`C = C_ − r·K`); and writes
+lowercase hex text); takes off its own blinding factor (`C = C_ − r·K`), holding C to the curve the same way as it comes out of the unblinding; and writes
 the piece as `LOAD_PROOF` writes one (the opening's keyset, amount, nonce and date,
 and that C), with e, s and r kept as its proof. Its status byte, the opening let go
 and the day's count given back are one transaction ([D196](../docs/DECISIONS.md#d196));
@@ -1709,11 +1711,21 @@ to be one of them ([Keyset keys](#keyset-keys), [D190](../docs/DECISIONS.md#d190
 
 **P1 = `00` to `02`: teach.** Under the PIN given in this tap, and nothing else:
 the owner's grant alone does not teach, because a keyset taught is a key the card
-will write change under. P1 = 0 begins: the keyset must be in an entry of the
-keyset table (`6A88` otherwise); the tail is the bytes NUT-02 hashes after the
+will write change under. P1 = 0 begins: a keyset in an entry of the keyset table
+is taught in that entry; a keyset in no entry is entered as its first piece would
+enter it ([D207](../docs/DECISIONS.md#d207): a keyset is taught before its first
+piece, at set-up), after every other check of the begin, as the card's unit or the
+last payment's under the PIN alone and as either with the holder's say in this tap
+(the owner's grant; on a card with no owner a held tap), of the unit its version `01`
+tail names or the card's (version `00`): `6A9D` for the other unit without the
+holder's say, `6A9C` with no entry free after a reclaim, and `6A88` on a card
+with no keyset table. The entry is made at the begin and holds no keys until the
+finish: a teaching refused at its end or given up leaves an entry that names no
+piece, which the next reclaim lets go. The tail is the bytes NUT-02 hashes after the
 keys for the ID's version (none for version `00`), at most 64. A version `01`
 tail names the unit first, `|unit:sat` or `|unit:usd` followed by the end or `|`,
-and it must be the entry's (`6A80` otherwise). A version `00` ID hashes the keys
+and it must be the entry's (`6A80` otherwise; for a keyset in no entry, it names the
+entry's unit). A version `00` ID hashes the keys
 alone and binds no amount, so the card holds the n-th key's amount, from 0, to
 2^n (`6A80` otherwise). P1 = 1, sent as often as needed, gives
 the keyset's keys in increasing order of amount, every key the mint lists for the
@@ -1743,9 +1755,10 @@ another key, the key, the keyset and the mark are written in one transaction.
 
 In order: `6A97` with no PIN set; `6A86` for another P1; teaching, `6982` without the PIN given in this tap, `6985` for P1 = 1 or 2 with no teaching
 begun; at P1 = 0, `6700` for fewer than 8 bytes or more than a keyset and its
-longest tail, `6A88` for a keyset in no entry, `6A80` for an ID version other than
+longest tail, `6A88` for a card with no keyset table, `6A80` for an ID version other than
 `00` and `01`, `6700` for a tail after a keyset of version `00`, `6A80` for a
-version `01` tail whose unit is not the entry's; at P1 = 1, `6700` for a bad length,
+version `01` tail whose unit is not the entry's (or, for a keyset in no entry, no unit of
+the card's), then for a keyset in no entry `6A9D` and `6A9C` as above ([D207](../docs/DECISIONS.md#d207)); at P1 = 1, `6700` for a bad length,
 `6A80` for keys out of order (an
 amount of 0 among them), a version `00` key whose amount is not 2^n, more than 64,
 or (P1 = 2) no keys or an ID whose first 8 bytes are not the keyset's; a refusal at
@@ -2837,7 +2850,7 @@ certificate profile's and the reader's: the card has no part in it.
 | 6A83 | Slot or opening out of range, or an offset at or past the end (`GET_OUTBOX`, `CERT_READ`, `CERT_WRITE`) |
 | 6A84 | No space: no slot, no change opening, no keyset table to make change in, or no room the card could reserve |
 | 6A86 | Incorrect P1 or P2; a payment begun without P1 bit 1, or a load (`LOAD_PROOF`, `LOAD_CHANGE`) without P2 bit 1: no word on keys per load |
-| 6A88 | Slot empty (a spent slot, to a reader with neither the PIN nor the grant), no signature to give again (none kept for that message), no payment record (`GET_OUTBOX`), an opening not owed, a keyset in no entry (`KEYSET_KEYS`), no certificate (`CERT_READ`) |
+| 6A88 | Slot empty (a spent slot, to a reader with neither the PIN nor the grant), no signature to give again (none kept for that message), no payment record (`GET_OUTBOX`), an opening not owed, a card with no keyset table (`KEYSET_KEYS`; a keyset in no entry is entered at its teaching, D207), no certificate (`CERT_READ`) |
 | 6A8C | No card record, or a factory record (a load, a claim, and `INBOX`) |
 | 6A8D | Card in use: something unspent, or change owed, where only an empty card may be changed |
 | 6A8E | A dated piece on a card with no refund key |

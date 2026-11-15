@@ -1026,7 +1026,7 @@
   {"name": "CERT_READ P1 = 04", "kind": "exact", "apdu": "b01c040000", "sw": "6a86", "data": ""},
   {"name": "KEYSET_KEYS P1 = 04", "kind": "exact", "apdu": "b0380400080000000000000000", "sw": "6a86", "data": ""},
   {"name": "KEYSET_KEYS keys with no teaching begun", "kind": "exact", "apdu": "b0380100290000000000000000000000000000000000000000000000000000000000000000000000000000000000", "sw": "6985", "data": ""},
-  {"name": "KEYSET_KEYS begun for a keyset in no entry of the table", "kind": "exact", "apdu": "b03800000800ffffffffffffff", "sw": "6a88", "data": ""},
+  {"name": "KEYSET_KEYS begun for a keyset in no entry of the table (D207: entered, as its first piece would be)", "kind": "exact", "apdu": "b03800000800ffffffffffffff", "sw": "9000", "data": ""},
   {"name": "taken away and put back, by a reader with no PIN", "kind": "reset", "apdu": "", "sw": "", "data": ""},
   {"name": "select", "kind": "exact", "apdu": "00a404000bf043415348554341524401", "sw": "9000", "data": "0203"},
   {"name": "GROUP_KEYS with no PIN: refused", "kind": "exact", "apdu": "b01d0000040000000062", "sw": "6982", "data": ""},

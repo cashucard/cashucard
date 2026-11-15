@@ -34,6 +34,7 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 | 2026-11-14 | [2.3 with D200 to D204 on J3R180](HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md) | The clock, the owner's c and the day of loads at a test mint |
 | 2026-11-14 | [2.3 with D205 on a second J3R180](HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md) | No payment floor and the shorter holds, timed on the chip |
 | 2026-11-14 | [2.3 with D206 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md) | `LOAD_PROOF`'s 04 form checked by the chip's key agreement; a first load of 45 pieces timed in both forms |
+| 2026-11-14 | [2.3 with D207 to D210 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14d_J3R180_2.3.md) | A keyset taught at set-up; the field, the change's point checks and the signature on the chip's own engines; a first load in 7.8 s, a payment with change in 2.2 s, the holds timed |
 
 ## Hardware plans
 

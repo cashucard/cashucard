@@ -7940,3 +7940,99 @@ on `6B00`, the 33-byte form. Tests: `FullPointLoadTest` (good points stored the 
 and paid with the same signature; every bad case of the chip's study `6A80` with nothing written; the lengths; the
 set-up's test with an agreement that takes every point and one that refuses every point; a card whose test failed takes
 only the 33-byte form).
+
+## <a id="d207"></a>D207: A keyset is taught before its first piece
+
+**Decided (protocol 2.3, 2026-11-14, the project owner),** so that a first load's tap has no teaching in it. D206's file left
+it out for its 129 bytes; a reader taught the keys after the first piece, in the same tap (1.3 s).
+
+**The rule.** `KEYSET_KEYS` P1 `00` for a keyset in no entry of the keyset table is no longer `6A88`. The keyset is entered as
+its first piece would enter it (`newEntry`, now shared with `loadOne`: the card's unit or the last payment's under the PIN given
+in the tap, either with the holder's say, `6A9D` otherwise, `6A9C` where no entry is free after a reclaim), of the unit its
+version `01` tail names or the card's (version `00`). Every other check of the begin comes first; the entry is made after
+them; the rest is as it was: the keys come in, the ID is worked out and held to the keyset's eight bytes, and only then are
+the tree's top and the keys-known bit written, in one transaction. `6A88` stays for a card with no keyset table.
+
+**What it costs.** About 130 bytes. A teaching that begins and is refused at its end (keys that are not the ID's, out of
+order) or cut by another command leaves an entry that names no piece and has no keys known; nothing is kept of the keys and
+the next reclaim lets the entry go, as it lets go one whose pieces are all paid. The PIN is needed in the tap for any teaching,
+as before. The keys are held to the ID by the same hash; what they are trusted for is unchanged.
+
+**Built.** `newEntry`, `newState`, `processKeysetKeys` P1 `00`. Tests: `TeachAtSetUpTest`, and `KeysetKeysTest`'s case of a
+keyset in no entry, which was `6A88` and is now begun.
+
+## <a id="d208"></a>D208: The field's arithmetic on the chip's RSA with p itself for the modulus
+
+**Decided (2026-11-14, the project owner: "do all 3, we will security test it once it's working"),** after a study on a
+J3R180 of where the chip's engines could replace slow bytecode. The cost was not the chip's RSA (a power is about 12 ms) but the
+bytecode reduction of its answer after each (`reduceModP`, 39 ms).
+
+**The rule.** The three powers of the field (the cube for x³ + 7, Euler's test, the root) were the chip's RSA over N = p·q
+(`RSA_PP`), the answer taken mod p by bytecode. They are now, where the chip allows, the same powers over a modulus that is
+**p itself padded to 64 bytes**: the answer is under p at once. The padded keys are made at the first `SET_CARD` (not in the
+constructor, which the chip's first create is sensitive to) and held to known answers at every one (`fieldPInit`): 2³ = 8,
+Euler 4 = 1, root 4 = 2, and at full width G's x cubed plus 7 (G's y squared) has Euler 1 and a root of y or p - y. Where all
+hold `fieldP` (persistent, written there and nowhere else, false before the first `SET_CARD`) is true and `powModP` uses them;
+otherwise, or where the chip refuses the key, the room or the use (the simulator does: "not composite"), the p·q keys and the
+reduction are used as before. `powRaw`, which `requireOwnerPoint` uses for P-256's p (it needs the p·q modulus), is unchanged.
+The chip answers garbage, with no error, for an input at or over its modulus; every caller holds x under p and `powModP`
+refuses (`6F00`) one that is not.
+
+**What it gives** (J3R180 09301220, testnut; the study's figures, this file's in the chip run): a curve test of a compressed
+point 116 ms to 27, a change output's `hash_to_curve` 291 ms on average to 80, `SPEND_ALL_CHANGE` about 450 to 226 ms an output.
+
+**What it trusts.** The chip's RSA with a 64-byte modulus whose top half is zero, right for every input under p. It holds no
+secret (exponents and modulus are constants of the file and public), so it adds no exposure of a key; the risk is a chip that
+refuses it or answers wrongly, which the known answers at `SET_CARD` catch and the old keys stay for. They run once a set-up,
+not on every power.
+
+## <a id="d209"></a>D209: `LOAD_CHANGE`'s points held to the curve by the chip's key agreement
+
+**Decided (same day).** `LOAD_CHANGE` held K and C_ to the curve by three powers and two reductions each (176 ms), and the
+unblinded C by the 33-byte test of `loadOne` (116 ms).
+
+**The rule.** Where the set-up's test of the chip's key agreement held (`curveByAgreement`, D206), K and C_ are held to the curve
+by one agreement each after the form check (`requireLoadedPoint`, `SchnorrHW.agrees`, about 28 ms) and the unblinded C by one as
+it comes out of the unblinding (`unblind` answers that it was checked; `loadOne`'s third form, `LOAD_C_CHECKED`, skips its own
+test; where the agreement refuses C, `loadOne` runs the old test, which refuses it too). Where the test did not hold the old tests
+run. The sealed commands' reader keys stay on `requireFullPoint`.
+
+**What it trusts.** That the chip's agreement refuses a point off the curve, as D206 trusts it for a piece's point, on the two
+points the set-up asks (G taken, G with y + 1 refused); a twist point, which that test does not ask, is one of the refusals tried
+on the chip in this file's run. K is held to the opening's bound key besides, and the mint's DLEQ proof over K, C_ and B_ is
+checked, so a point taken wrongly gives a proof that does not hold. No key of the card takes part: the agreement is the signer's
+temporary key at the public scalar G's x.
+
+## <a id="d210"></a>D210: The signature's e·d mod n on the chip's RSA
+
+**Decided (same day).** The BIP-340 signature (`SchnorrHW.sign`: payments, `AUTH`, every asking of a held tap or a payment's
+wait) spent 473 of its 584 ms in `mulModN`, the bytecode product e·d mod n.
+
+**The rule.** The product is made, where the chip allows, by **two squarings on the chip's RSA with n padded to 64 bytes and
+exponent 2**: 4ab = (a + b)² − (a − b)², then two halvings mod n. a and b are reduced below n where they stand first (the chip
+answers garbage at or over its modulus), u = a + b mod n and v = |a − b| are under n; the rest is masks and fixed loops, as
+`mulModN` is. The key is made at the first `SET_CARD` and held to known answers at every one (`chipMulInit`): 3² = 9,
+(n − 1)² = 1, and G's x times G's y both ways round against the product worked out beforehand. Where all hold `chipMul`
+(persistent, written there only) is true and `sign` uses `mulModNChip`; otherwise the bytecode stays (the simulator refuses the
+modulus). `sign`'s `finally` still zeroes the work memory and scratch.
+
+**What it gives** (study figures): signature work 584 to 194 ms, `AUTH` 626 to 244, sealed PIN 278 to 129; a payment with five
+change outputs, change made and put back, 7.75 s to 4.16 s. **Holds and waits are shorter in seconds:** they are counts of the
+card's signing work (D205), so at the same counts the claim, history and reset by the PIN, and a payment over its limit, take
+about 2.5 times less time. The counts are left as they are for the project owner to say.
+
+**What it trusts: the item for the security test.** The signing step now passes a **masked form of the signing key through the
+chip's RSA engine**: the operands are u = e + d mod n and v = |e − d|, d the key (or d + t, or n − d), e the challenge, which
+the signature itself gives to anyone who sees it. So the mask is a mask in name only: one operand and the signature give d. What
+the engine leaks about the operand of a squaring (time, power, emission) is not known; its maker's countermeasures are aimed at
+secret exponents and CRT keys, and here the exponent and modulus are public. The bytecode product was constant-time by
+construction but ran in the VM, whose leakage was never measured either. The chip's answers are not checked per signature: an
+engine that failed after its set-up would give a signature that does not verify.
+
+**Built.** `SchnorrHW.chipMulInit`, `mulModNChip`, `square`, `halve`, `addIf`, `chipMul`; `CashuApplet.fieldPInit`, `rsaKey`,
+`fieldKey(key, d, modulus)`, `requireLoadedPoint`, `unblind` answering whether C was checked, `loadOne`'s `form`, `fieldP`.
+Tests: `ChipEnginesTest` (a test engine for the padded keys, which the simulator refuses, computing as the chip does and giving
+garbage at or over the modulus: 75 padded powers against Python's; 40 change points against NUT-00; the self-tests passing and
+failing with engines that lie, refuse, or are wrong only at full width, the fallbacks right each time; 340 products; inputs over
+n reduced first; 30 BIP-340 signatures verified; the same signature through chip and bytecode; work memory clear; `LOAD_CHANGE`'s
+agreements counted; off-curve points refused either way; a lying agreement not leaned on).

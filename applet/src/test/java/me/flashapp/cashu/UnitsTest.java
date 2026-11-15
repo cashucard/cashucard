@@ -1112,14 +1112,14 @@ class UnitsTest {
     }
 
     @Test
-    @DisplayName("Only these methods name the table: SET_CARD, RESET_CARD, the load and its one step, SPEND_ALL_CHANGE, SPEND_ALL_SIGN, the readers of GET_INFO, GET_CARD and GET_LOG, KEYSET_KEYS (its top kept in a transaction, and read to show a key, D190) and the table's own helpers, and the forget of the history (its tail: the last unit, the other unit's count, the receipts' units); and it is written outside a transaction only by `enter`, the reclaim, the forget and RESET_CARD's wipe")
+    @DisplayName("Only these methods name the table: SET_CARD, RESET_CARD, the load and its one step, SPEND_ALL_CHANGE, SPEND_ALL_SIGN, the readers of GET_INFO, GET_CARD and GET_LOG, KEYSET_KEYS (its top kept in a transaction, and read to show a key, D190; for a keyset in no entry the entry made by `newEntry`, D207) and the table's own helpers, and the forget of the history (its tail: the last unit, the other unit's count, the receipts' units); and it is written outside a transaction only by `enter`, the reclaim, the forget and RESET_CARD's wipe")
     void onlyTheseMethodsNameTheTable() throws Exception {
         String code = SchnorrHWMathTest.stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(
             SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
         java.util.TreeSet<String> names = ProofStoreTest.methodsNaming(code, "book");
         assertEquals(new java.util.TreeSet<>(Arrays.asList("(class body)", "processGetInfo", "processGetCard", "processSpendAllChange", "processSpendAllSign",
             "processLoadProof", "loadOne", "processSetCard", "processResetCard", "processGetLog", "processGetReceipts",
-            "processKeysetKeys", "showKey", "entryOf", "placeUnit", "cardFormat", "freeEntry", "enter", "reclaim", "finishBurn", "forget")), names);
+            "processKeysetKeys", "showKey", "entryOf", "placeUnit", "cardFormat", "freeEntry", "newEntry", "enter", "reclaim", "finishBurn", "forget")), names);
         assertNull(outside(code).get("processKeysetKeys"), "KEYSET_KEYS writes the table in its transaction alone");
         java.util.Map<String, Integer> outside = SlotWriteOrderTest.writesOutsideTransactions(code);
         assertEquals(2, (int) outside.get("enter"));

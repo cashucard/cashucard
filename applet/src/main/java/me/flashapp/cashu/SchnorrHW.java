@@ -2,6 +2,7 @@ package me.flashapp.cashu;
 
 import javacard.framework.*;
 import javacard.security.*;
+import javacardx.crypto.Cipher;
 
 /**
  * SchnorrHW — Hardware BIP-340 Schnorr signing for JavaCard 3.0.5+
@@ -422,7 +423,10 @@ final class SchnorrHW {
         reduceModN(sc, SC_E);         // e = e mod n
 
         // ── Step 7: s = (k + e·d) mod n ──────────────────────────────
-        mulModN(sc, SC_E, sc, SC_D, sc, SC_ED, work, (short)0);  // ed = e * d mod n
+        // ed = e * d mod n: by the chip's RSA where the set-up's test of it held (D210: e and d are reduced in place first, and
+        // the product is two squarings and two halvings, all by mask), by the bytecode where not
+        if (chipMul) mulModNChip(sc, SC_E, sc, SC_D, sc, SC_ED, work, (short)0);
+        else mulModN(sc, SC_E, sc, SC_D, sc, SC_ED, work, (short)0);
         addModN(sc, SC_ED, sc, SC_K, out, (short)(outOff + 32)); // s = ed + k mod n
 
         // ── Step 8: output = Rx ‖ s ──────────────────────────────────
@@ -1092,6 +1096,135 @@ final class SchnorrHW {
             carry = (short)((s >> 8) & 0xFF);
         }
         return carry;
+    }
+
+    // ── e·d mod n on the chip's RSA engine (D210) ─────────────────────────
+
+    /**
+     * Whether the chip's RSA held to the squaring's known answers at the last SET_CARD (`chipMulInit`): worked out there and
+     * nowhere else, false until the first. Where it is true the signature's e·d is made by `mulModNChip`, else by `mulModN`.
+     */
+    boolean chipMul;
+    /** The chip's RSA and its key for squaring mod n: made at the first SET_CARD (not in the constructor: the chip's first create is kept light), and never again. */
+    private Cipher rsaC;
+    private RSAPrivateKey sqKey;
+    private static final byte[] TWO = { (byte) 2 };
+    /** G's x times G's y mod n, for the squaring's test: a full-width product, whose two squarings borrow and carry. */
+    private static final byte[] KAT_GXGY = {
+        (byte)0x80,(byte)0x57,(byte)0x14,(byte)0xA2,(byte)0x52,(byte)0xD0,(byte)0xC0,(byte)0xB5,
+        (byte)0x89,(byte)0x10,(byte)0x90,(byte)0x7E,(byte)0x85,(byte)0xB5,(byte)0xB8,(byte)0x01,
+        (byte)0xFF,(byte)0xF6,(byte)0x10,(byte)0xA3,(byte)0x6B,(byte)0xDF,(byte)0x46,(byte)0x84,
+        (byte)0x7A,(byte)0x4B,(byte)0xF5,(byte)0xD9,(byte)0xAE,(byte)0x2D,(byte)0x10,(byte)0xED
+    };
+
+    /**
+     * The squaring key and its known answers, at every SET_CARD: modulus n padded to 64 bytes (32 zeros before it: the chip's
+     * RSA is of its modulus' length and takes an input under it, and answers garbage, with no error, for one at or over it),
+     * exponent 2; then 3^2 = 9, (n - 1)^2 = 1, and G's x times G's y, both ways round, equal to their product mod n (worked out
+     * beforehand), by `mulModNChip` whole. True where all hold; false on any wrong answer or any exception (a chip that refuses
+     * the key, the room for it or the use), and `chipMul` is then false: the signature is made as before. `work` and `sc` are
+     * the room, and are cleared after.
+     */
+    boolean chipMulInit() {
+        try {
+            if (rsaC == null) rsaC = Cipher.getInstance(Cipher.ALG_RSA_NOPAD, false);
+            if (sqKey == null) sqKey = (RSAPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PRIVATE, KeyBuilder.LENGTH_RSA_512, false);
+            Util.arrayFillNonAtomic(work, (short)0, (short)32, (byte)0);
+            Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, work, (short)32, (short)32);
+            sqKey.setModulus(work, (short)0, (short)64);
+            sqKey.setExponent(TWO, (short)0, (short)1);
+            Util.arrayFillNonAtomic(work, (short)0, (short)128, (byte)0);
+            work[63] = (byte)3;
+            square(work, (short)0, (short)64);
+            if (work[127] != (byte)9 || !allZero(work, (short)64, (short)63)) return false;
+            Util.arrayFillNonAtomic(work, (short)0, (short)128, (byte)0);
+            // n - 1: n's last byte, 41, less one
+            Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, work, (short)32, (short)32);
+            work[63]--;
+            square(work, (short)0, (short)64);
+            if (work[127] != (byte)1 || !allZero(work, (short)64, (short)63)) return false;
+            // G's x and y, in the order given and the other
+            for (short r = 0; r < 2; r++) {
+                Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short)(r == 0 ? 1 : 33), sc, (short)0, (short)32);
+                Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short)(r == 0 ? 33 : 1), sc, (short)32, (short)32);
+                mulModNChip(sc, (short)0, sc, (short)32, sc, (short)64, work, (short)0);
+                if (Util.arrayCompare(sc, (short)64, KAT_GXGY, (short)0, (short)32) != (byte)0) return false;
+            }
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        } finally {
+            Util.arrayFillNonAtomic(sc, (short)0, (short)96, (byte)0);
+            Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
+        }
+    }
+
+    private static boolean allZero(byte[] a, short off, short len) {
+        byte o = 0;
+        for (short i = 0; i < len; i++) o |= a[(short)(off + i)];
+        return o == 0;
+    }
+
+    /**
+     * The chip's squaring mod n: the 64 bytes at work[in] (32 zeros, then a value under n) squared into the 64 at work[out],
+     * the value in the last 32. The answer is the modulus' length; any other is refused (6F00).
+     */
+    private void square(byte[] w, short in, short out) {
+        rsaC.init(sqKey, Cipher.MODE_DECRYPT);
+        if (rsaC.doFinal(w, in, (short)64, w, out) != (short)64) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+    }
+
+    /**
+     * out = a * b mod n by two squarings on the chip: 4ab = (a + b)^2 - (a - b)^2, and the quarter by two halvings mod n.
+     * a and b (32 bytes each) are reduced below n where they stand first, and u = a + b mod n and v = |a - b| are under n, as
+     * the chip's RSA wants (at or over its modulus it answers garbage, and no error). Every step is a mask or a fixed loop:
+     * the same work for every a and b, as `mulModN`'s. `w` is 256 bytes of room, left holding a + b and |a - b| and their
+     * squares: the caller clears it (sign() does).
+     */
+    void mulModNChip(byte[] a, short aOff, byte[] b, short bOff, byte[] out, short outOff, byte[] w, short wOff) {
+        short u = wOff, uo = (short)(wOff + 64), v = (short)(wOff + 128), vo = (short)(wOff + 192);
+        reduceModN(a, aOff);
+        reduceModN(b, bOff);
+        Util.arrayFillNonAtomic(w, wOff, (short)256, (byte)0);
+        // u = a + b mod n, and v = |a - b|: both differences, and the one that did not borrow, by a mask
+        addModN(a, aOff, b, bOff, w, (short)(u + 32));
+        short bw = sub32(a, aOff, b, bOff, w, (short)(v + 32));
+        sub32(b, bOff, a, aOff, w, (short)(vo + 32));
+        choose(w, (short)(v + 32), w, (short)(vo + 32), bw);
+        Util.arrayFillNonAtomic(w, vo, (short)64, (byte)0);
+        square(w, u, uo);
+        square(w, v, vo);
+        // z = u^2 - v^2 mod n = 4ab, then a quarter of it
+        short borrow = sub32(w, (short)(uo + 32), w, (short)(vo + 32), w, (short)(uo + 32));
+        addIf(w, (short)(uo + 32), CashuApplet.SECP256K1_N, borrow);
+        halve(w, (short)(uo + 32), w, v);
+        halve(w, v, out, outOff);
+    }
+
+    /** v += m where take is 1 (mod 2^256: the carry out is dropped), by a mask. */
+    private static void addIf(byte[] v, short off, byte[] m, short take) {
+        short mask = (short)(-take & 0xFF), carry = 0;
+        for (short i = 31; i >= 0; i--) {
+            short s = (short)((v[(short)(off + i)] & 0xFF) + (m[i] & mask) + carry);
+            v[(short)(off + i)] = (byte)s;
+            carry = (short)((s >> 8) & 1);
+        }
+    }
+
+    /** out = x / 2 mod n (x under n): x, or x + n where x is odd, shifted right once, the 33rd bit in at the top; `out` is not x's place. */
+    private static void halve(byte[] x, short xOff, byte[] out, short outOff) {
+        short mask = (short)(-(x[(short)(xOff + 31)] & 1) & 0xFF), carry = 0;
+        for (short i = 31; i >= 0; i--) {
+            short s = (short)((x[(short)(xOff + i)] & 0xFF) + (CashuApplet.SECP256K1_N[i] & mask) + carry);
+            out[(short)(outOff + i)] = (byte)s;
+            carry = (short)((s >> 8) & 1);
+        }
+        short prev = carry;
+        for (short i = 0; i < 32; i++) {
+            short cur = (short)(out[(short)(outOff + i)] & 0xFF);
+            out[(short)(outOff + i)] = (byte)((prev << 7) | (cur >> 1));
+            prev = (short)(cur & 1);
+        }
     }
 
     // ── Utility ───────────────────────────────────────────────────────────

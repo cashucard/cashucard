@@ -1044,7 +1044,7 @@ class SchnorrHWMathTest {
      * a site that runs twice says so.
      */
     @Test
-    @DisplayName("Crypto objects: CashuApplet makes 1 OwnerPIN, 1 Signature, 2 MessageDigests, 1 RandomData, 2 KeyPairs and 2 key sites (newP256Key, run once since 1.15 for the owner's key alone, and the RSA keys of the change); SchnorrHW makes 1 MessageDigest, 2 KeyAgreements, 1 RandomData and 1 key; no KeyAgreement, Cipher or Checksum is made anywhere else")
+    @DisplayName("Crypto objects: CashuApplet makes 1 OwnerPIN, 1 Signature, 2 MessageDigests, 1 RandomData, 2 KeyPairs and 2 key sites (newP256Key, run once since 1.15 for the owner's key alone, and the RSA keys of the change); SchnorrHW makes 1 MessageDigest, 2 KeyAgreements, 1 RandomData, 1 key and, at the first SET_CARD (D210), a Cipher and the squaring's RSA key; no KeyAgreement, Cipher or Checksum is made anywhere else")
     void cryptoObjectsAreThoseOfTheBuildThatInstalls() throws Exception {
         String applet = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
         String signer = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -1053,7 +1053,8 @@ class SchnorrHWMathTest {
         // 1.12: the RSA keys of the change (one buildKey site, run three times) and their Cipher; SchnorrHW's second KeyAgreement is the chip's point addition
         int[] inApplet = { 1, 1, 2, 1, 2, 2, 0, 1, 0, 0 };
         // SchnorrHW names KeyAgreement in its fields' types and in the getInstance calls, and in its agree-less comments only
-        int[] inSigner = { 0, 0, 1, 1, 0, 1, 2, 0, 0, -1 };
+        // D210: the signature's squaring on the chip's RSA: one buildKey site and one Cipher, made at the first SET_CARD (`chipMulInit`), not in the constructor
+        int[] inSigner = { 0, 0, 1, 1, 0, 2, 2, 1, 0, -1 };
         for (int i = 0; i < kinds.length; i++) {
             long a = java.util.regex.Pattern.compile(kinds[i]).matcher(applet).results().count();
             org.junit.jupiter.api.Assertions.assertEquals(inApplet[i], a, "CashuApplet.java: " + kinds[i] + " is called " + a + " times where the build that installs called it " + inApplet[i] + ". A chip counts these; measure a larger figure on a card first.");
