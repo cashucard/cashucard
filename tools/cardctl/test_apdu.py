@@ -2432,6 +2432,43 @@ def test_the_loaders_y_is_gone():
             raise AssertionError("--with-y is still taken")
 
 
+def test_load_uncompressed_sends_c_whole():
+    """D206: `load --uncompressed` sends each piece's C whole (04 || x || y, 113 bytes a piece) with P2 bit 3 (08), the card
+    holding it to the curve by its key agreement; the 33 bytes it stores are the compressed form of the same point."""
+    nonce = bytes(range(32))
+    c33 = cardctl.placeholder_c(nonce)
+    card = make_card([(b"\x05", 0x9000)])
+    assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--nonce", nonce.hex(), "--date-keys", "--uncompressed"])[0] == 0
+    apdu = card.connection.last
+    assert apdu[:4] == bytes.fromhex("B030000A"), apdu[:4].hex()
+    assert apdu[4] == 113, apdu[4]
+    data = apdu[5:5 + 113]
+    c65 = data[44:109]
+    assert c65[0] == 4 and c65[1:33] == c33[1:], c65.hex()
+    y = int.from_bytes(c65[33:], "big")
+    x = int.from_bytes(c65[1:33], "big")
+    assert (pow(x, 3, bip340.P) + 7 - y * y) % bip340.P == 0, "a point of the curve"
+    assert (y & 1) == (c33[0] & 1), "the y of C's parity"
+    assert data[109:113] == bytes(4), "the date after C"
+    assert cardctl.whole_c(c33) == c65
+    assert cardctl.LOAD_FULL_C == 0x08
+
+
+def test_load_uncompressed_falls_back_on_6b00():
+    """D206: a card whose key agreement failed its install test (or one before D206) answers the 04 form 6B00 with nothing
+    written; `load --uncompressed` then sends the same piece in the 33-byte form, and says so."""
+    card = make_card([(b"", 0x6B00), (b"\x02", 0x9000)])
+    code, out, err = _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys", "--uncompressed"])
+    assert code == 0
+    first, second = card.connection.sent[-2], card.connection.sent[-1]
+    assert first[3] == 0x0A and first[4] == 113
+    assert second[3] == 0x02 and second[4] == 81
+    assert second[5 + 44:5 + 77] == bytes([2 | (first[5 + 108] & 1)]) + first[5 + 45:5 + 77], "the same C, compressed"
+    assert second[5:5 + 44] == first[5:5 + 44] and second[5 + 77:5 + 81] == first[5 + 109:5 + 113], "the same piece"
+    assert "6B00" in out + err and "33-byte" in out + err, out + err
+    assert "loaded into slot 2" in out
+
+
 def test_load_without_date_keys_explains_the_6a86():
     card = make_card([(b"", 0x6A86)])
     try:

@@ -399,6 +399,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte  BEGIN_DATE_KEYS     = (byte) 0x02;
     /** LOAD_PROOF's and LOAD_CHANGE's P2 bit 1 (D197): the reader's word that the piece is locked to the keys of its date. */
     static final byte  LOAD_DATE_KEYS      = (byte) 0x02;
+    /** LOAD_PROOF's P2 bit 3 (D206): each piece's C comes whole, 04 || x || y (65 bytes), and is held to the curve by the chip's key agreement. */
+    static final byte  LOAD_FULL_C         = (byte) 0x08;
+    /** A piece in that form: keyset (8), amount (4), nonce (32), C (65), date (4). */
+    static final short PIECE_FULL_LEN      = (short) 113;
     // SET_CARD's data: unit (1), refund key (33), 65 bytes that held a time key until 1.15 and are not read, mint length (1), then the mint
     static final short SET_CARD_FIXED      = (short) 100;
     static final short SET_CARD_MINTLEN_AT = (short) 99;
@@ -1105,6 +1109,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     // java.math, java.security, java.util or long), so it has been removed.
     // -------------------------------------------------------------------------
     private SchnorrHW schnorrHW;
+    /** Whether the chip's key agreement held to the curve at the last SET_CARD (D206, `SchnorrHW.checksCurve`), worked out there and nowhere else: false until the first. */
+    private boolean curveByAgreement;
 
     // -------------------------------------------------------------------------
     // Transient state (RAM, cleared on deselect)
@@ -2463,11 +2469,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private void requireFullPoint(byte[] a, short at) {
         short x = (short)(at + 1), y = (short)(at + 33);
-        if (a[at] != (byte) 0x04
-            || SchnorrHW.cmp32(a, x, SECP256K1_P, (short) 0) >= 0
-            || SchnorrHW.cmp32(a, y, SECP256K1_P, (short) 0) >= 0) {
-            ISOException.throwIt(ISO7816.SW_WRONG_DATA);
-        }
+        requireFullForm(a, at);
         curveSide(a, x, allSlots, (short) 0);
         Util.arrayCopyNonAtomic(allSlots, (short) 96, scratch, X_MSG, (short) 32);
         Util.arrayCopyNonAtomic(allSlots, (short) 96, allSlots, (short) 32, (short) 32);
@@ -2476,6 +2478,19 @@ public class CashuApplet extends Applet implements TagSwitch {
         powModP(rsaRoot, allSlots, (short) 0);
         if ((short)(allSlots[127] & 1) != (short)(a[(short)(y + 31)] & 1)) negateModP(allSlots, (short) 96);
         if (!sameBytes(allSlots, (short) 96, a, y, (short) 32)) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+    }
+
+    /**
+     * `6A80` unless the 65 bytes at a[at] are of the 04 form: 04, then an x under p and a y under p (`requireFullPoint`, and
+     * D206's piece, whose curve the chip's key agreement checks: it reduces x and y, and two encodings of one point would be
+     * two pieces' bytes).
+     */
+    private static void requireFullForm(byte[] a, short at) {
+        if (a[at] != (byte) 0x04
+            || SchnorrHW.cmp32(a, (short)(at + 1), SECP256K1_P, (short) 0) >= 0
+            || SchnorrHW.cmp32(a, (short)(at + 33), SECP256K1_P, (short) 0) >= 0) {
+            ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+        }
     }
 
     /** The payment in hand is given up, and the command refused with `sw`. */
@@ -3658,7 +3673,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* written as any piece is (its text, its proof, its data, the status byte last), and its opening let go; it enters
          * nothing in the keyset table (D184): it is in its opening's keyset, whose entry the opening has kept live, and its
          * log entry is of that keyset's unit */
-        short sw = loadOne(buf, in, X_NUM, (short)(in + LC_E), (byte) -1);
+        short sw = loadOne(buf, in, X_NUM, (short)(in + LC_E), (byte) -1, false);
         if (sw != (short) 0) ISOException.throwIt(sw);
         byte unit = logUnit(placeUnit((short)((short)(scratch[X_NUM] & 0xFF) * PROOF_SIZE)));
         /* The day's count gives the change back now that it is on the card (it was counted with the payment's pieces at SIGN), to
@@ -4024,16 +4039,32 @@ public class CashuApplet extends Applet implements TagSwitch {
         byte[] buf = apdu.getBuffer();
         boolean withProof = buf[ISO7816.OFFSET_P1] == (byte) 1;
         byte p2 = buf[ISO7816.OFFSET_P2];
-        if ((byte)(p2 & (byte) 0xFC) != (byte) 0) ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        if ((byte)(p2 & (byte) 0xF4) != (byte) 0) ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
         if ((p2 & LOAD_DATE_KEYS) == 0) ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+        /* D206: P2 bit 3 (08), each piece's C whole (04 || x || y), 32 bytes more a piece; on a chip whose key agreement did
+         * not hold to the curve at install, 6B00, and the reader sends the 33-byte form */
+        boolean full = (p2 & LOAD_FULL_C) != 0;
+        if (full && !curveByAgreement) ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
         short shift = (short)(p2 & 1);
         short dataLen = (short)(apdu.setIncomingAndReceive() - shift);
+        short in = (short)(ISO7816.OFFSET_CDATA + shift);
+        if (full) {
+            /* one piece a command in this form, 113 bytes (209 with its proof): C whole into allSlots[0..65) for `loadOne` to
+             * hold to the curve (no payment is in hand), and the piece made the 33-byte form's, in place: C 02 or 03 by y's
+             * low bit, then x, as a compressed C is written, and the date and the proof after it moved up by y's 32 bytes.
+             * Nothing is checked here: `loadOne` checks the point before anything is written. */
+            if (dataLen != (withProof ? (short)(PIECE_FULL_LEN + DLEQ_LEN) : PIECE_FULL_LEN)) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+            short c = (short)(in + PROOF_C_OFFSET - 1);
+            Util.arrayCopyNonAtomic(buf, c, allSlots, (short) 0, EC_POINT_LEN);
+            buf[c] = (byte)(0x02 | (buf[(short)(c + 64)] & 1));
+            dataLen -= (short) 32;
+            Util.arrayCopyNonAtomic(buf, (short)(c + EC_POINT_LEN), buf, (short)(c + 33), (short)(dataLen - 77));
+        }
         if (withProof ? dataLen != LOAD_DLEQ_LEN
             : (dataLen < PROOF_DATA_LEN || dataLen > (short)(BATCH_MOST * PROOF_DATA_LEN)
                || (short)(dataLen % PROOF_DATA_LEN) != (short) 0)) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
-        short in = (short)(ISO7816.OFFSET_CDATA + shift);
         byte unit = cardRecord[CARD_UNIT_OFFSET];
         if (shift != (short) 0) {
             unit = buf[ISO7816.OFFSET_CDATA];
@@ -4048,7 +4079,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         short done = 0;
         for (short k = 0; k < n; k++) {
             short sw = loadOne(buf, (short)(in + (short)(k * PROOF_DATA_LEN)), (short)(X_DEC + k),
-                               withProof ? (short)(in + PROOF_DATA_LEN) : (short) -1, unit);
+                               withProof ? (short)(in + PROOF_DATA_LEN) : (short) -1, unit, full);
             if (sw != (short) 0) {
                 if (k == (short) 0) ISOException.throwIt(sw);
                 break;
@@ -4111,7 +4142,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The new entry is written before anything of the place, its state byte last: torn there, it is an entry nothing names,
      * which the next reclaim frees.
      */
-    private short loadOne(byte[] buf, short in, short out, short proofAt, byte unit) {
+    private short loadOne(byte[] buf, short in, short out, short proofAt, byte unit, boolean full) {
         short slot = emptySlot();
         if (slot < 0 || paid == null) return SW_NO_SPACE;
         /* A piece with a date names the card's refund key in its secret, so a
@@ -4121,9 +4152,16 @@ public class CashuApplet extends Applet implements TagSwitch {
             && cardRecord[CARD_REFUND_OFFSET] == (byte) 0) {
             return SW_NO_REFUND_KEY;
         }
-        // not a point of the curve (allSlots for room: no payment is in hand), or worth nothing, or a proof of nothing: not a piece
+        /* not a point of the curve (allSlots for room: no payment is in hand), or worth nothing, or a proof of nothing: not a
+         * piece. A C that came whole (D206, `compact`) is held to the curve whole, by the chip's key agreement, in place of
+         * Euler's test of its x: the same points go on, stored the same. */
         try {
-            requireCompressedPoint(buf, (short)(in + PROOF_C_OFFSET - 1), allSlots, (short) 0);
+            if (!full) {
+                requireCompressedPoint(buf, (short)(in + PROOF_C_OFFSET - 1), allSlots, (short) 0);
+            } else {
+                requireFullForm(allSlots, (short) 0);
+                if (!schnorrHW.agrees(allSlots, (short) 0)) return ISO7816.SW_WRONG_DATA;
+            }
         } catch (ISOException x) {
             return ISO7816.SW_WRONG_DATA;
         }
@@ -4443,6 +4481,9 @@ public class CashuApplet extends Applet implements TagSwitch {
             if (JCSystem.getTransactionDepth() != (byte) 0) JCSystem.abortTransaction();
             ISOException.throwIt(SW_TOO_MANY);
         }
+        /* and, the record written, whether the chip's key agreement holds a point to the curve (D206): LOAD_PROOF's 04 form is
+         * taken only where it does. Last, so that a SET_CARD refused writes nothing of it. */
+        curveByAgreement = schnorrHW.checksCurve();
     }
 
     /**
@@ -6942,9 +6983,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 2.3: no lines here, and the load file is 36,950 bytes (86 past a multiple of 256), the least this source comes to;
-         * no chip has been given a file of that size (the source before D200 came to 35,466 bytes, and a test-only build of
-         * it to 35,509: a J3R180 installed both on 2026-11-13). On 2026-11-13 a J3R180 refused the card's applet in earlier 2.3 source
+        /* 2.3: no lines here, and the load file is 37,269 bytes (149 past a multiple of 256), the least this source comes to;
+         * a J3R180 installed it five times on 2026-11-14 (D206), as it had the source before at 36,950 and 36,953 (D205 at
+         * 37,573, with the loader's y, was refused at its first create), the source before D200 at 35,466 bytes and a
+         * test-only build of it at 35,509 (2026-11-13). On 2026-11-13 a J3R180 refused the card's applet in earlier 2.3 source
          * padded to 32,777 bytes (6F00, twice) and installed it padded to 33,647 and 35,213 (111 and 141 past a multiple of
          * 256); the file is kept out of 32,700 to 32,850, the sizes not to be shipped untried. The 1.20 build of 19,634 bytes
          * (178 past a multiple of 256) installs, as a 1.19 build of 19,269 (69 past) did; 1.16 installs at 203 past a

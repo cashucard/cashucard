@@ -6382,7 +6382,7 @@ which check the major alone, must move to the 2.3 wire for change, set-up and to
 **The cards.** A 2.2 card moves to 2.3 as a 2.1 card moved to 2.2: swept, then a new
 install, which makes a new key.
 
-**The size.** A load file of 36,950 bytes by refcheck's measure (86 past a multiple of 256),
+**The size.** A load file of 37,269 bytes by refcheck's measure (149 past a multiple of 256),
 against 21,631 for 2.2. On 2026-11-13 a J3R180 installed earlier 2.3 source padded to 33,647
 and 35,213 bytes and refused the card's applet padded to 32,777 (`6F00`, twice), so refcheck
 refuses a build from 32,700 to 32,850. This file is not padded. On the same day the same
@@ -6391,8 +6391,10 @@ sha256 `48b8597c…`), and that file's chip run had real signatures and real cha
 a test mint ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md)): refcheck keeps its size and
 its hash. The file before [D205](#d205) (36,953 bytes, load file sha256 `f216644a…`, D200 to D204)
 ran on the same J3R180 on 2026-11-14 with real signatures and real change verified, and refcheck keeps
-its size and its hash too. This file adds D205 (no payment floor, shorter holds; 3 bytes fewer, the loader's y
-having been tried and taken out) and is not yet tried on a chip: its own chip run comes before it ships.
+its size and its hash too. The file with D205 (no payment floor, shorter holds; 36,950 bytes, load file sha256 `075448e4…`, 3 bytes fewer, the loader's y
+having been tried and taken out) ran on a second J3R180 the same day with real signatures and real change verified, and refcheck
+keeps its size and its hash. This file adds [D206](#d206) (`LOAD_PROOF`'s 04 form, 319 bytes more) and ran on that J3R180 the
+same day with real signatures and real change verified: refcheck keeps its size and its hash.
 The constructor asks for 30,056 bytes of persistent memory, 214 more than 2.2's 29,842
 (the PIN's marks and the day's loads, the receipt's figures kept with the last signature, c,
 the refund key's y and the count of the owners' c); the openings' keys, the keyset table and the paid list are
@@ -7881,3 +7883,60 @@ and reset hold are a shorter time for a reader handed the PIN to hold an empty c
 count's low six bits hold 63 at the most). `SPEND_ALL_SIGN` no longer adds the floor: at the first
 `SIGN` it takes the change outputs' credit off W, never below 0. Every test and vector that pinned
 the old counts or the floor moved to the new ones.
+
+## <a id="d206"></a>D206: `LOAD_PROOF`'s 04 form: C sent whole and held to the curve by the chip's key agreement
+
+**Decided (protocol 2.3, 2026-11-14, the project owner).** After a study on a J3R180 of what its EC engine checks
+("holy moly!!!"): "Test it out, load 45 pieces in first load, tell me how long it takes."
+
+**What the chip showed** (a measurement-only build, 2026-11-14, J3R180 09301220). `ECPublicKey.setW` checks nothing: it
+takes every 65-byte point off the curve (an x on no point, a wrong y, the twist, P-256's G, x or y of p, zeros), refuses
+every 33-byte form, and takes a 33-byte input with prefix `04` and a 66-byte one as 65 bytes. `KeyAgreement`
+`ALG_EC_SVDP_DH_PLAIN_XY` refuses every point off the curve at `generateSecret` (`CryptoException`, 4.7 ms) and takes a
+good one in 19.1 ms, against 116 ms for the card's test of a 33-byte C (Euler's criterion on x³ + 7 by the chip's RSA);
+it reduces x and y of p or more silently. The Java Card specification does not require that check of the agreement.
+
+**The rule.** `LOAD_PROOF` P2 bit 3 (`08`): one piece a command, its C whole, `04` ‖ x ‖ y, in place of the 33 bytes
+(113 bytes, 209 with the mint's proof, one more with the unit). The card checks the exact length, the `04`, x under p
+and y under p itself (two encodings of one point would be two pieces' bytes, which matters to the scans for a nonce or a
+piece already on the card), and the curve by one key agreement of its chip with the signer's temporary key at its resting
+scalar, G's x: a public number, so that the answer, [G.x]C, which goes into the signer's scratch and nowhere else, tells
+nothing of any key, and a point of another curve learns nothing either. No key of the card's, the owner's or the PIN's
+takes part. A point the agreement refuses is `6A80`, before anything is written, in the place of the 33-byte form's test
+and in its order. The piece is then stored exactly as the same piece in the 33-byte form: C compressed, `02` or `03` by
+y's low bit, then x; nothing after the load knows which form it came in.
+
+**The set-up's test.** The card leans on the agreement only where it holds a point to the curve: at the end of each
+`SET_CARD` (once the record is written, so that a `SET_CARD` refused writes nothing of it) the card asks it of G (taken)
+and of G with y one more, a point of no curve (refused), and keeps the answer in the applet's `curveByAgreement`
+(persistent, written there and nowhere else, false before the first `SET_CARD`). Where either answer is another, P2 bit 3
+is `6B00` before the data is read, and the reader sends the 33-byte form, checked as before. A chip whose agreement
+refuses good points would otherwise answer `6A80` to every piece of the 04 form, which a reader does not take as "send
+the other form". The test is not in the constructor: the J3R180's first create of the card's applet is the step that
+went `6F00` for D205's first build, and the constructor is kept as it was. Its cost at `SET_CARD` is two agreements.
+
+**What it gives.** On a J3R180 a piece with its proof kept loads in 146 to 160 ms in the 04 form against 226 to 240 ms
+in the 33-byte form; a first load of 45 pieces in one selection, as the app makes one (the read, `AUTH`, the sealed PIN,
+the date's keys, 45 loads, the final read), took 8.22 s in all against 11.82 s, and 9.50 s against 13.14 s with the
+keyset's keys taught in the same selection after the first piece (1.31 s for 32 keys).
+
+**What it costs.** The load file is 37,269 bytes, 319 more than the file before (a first build of D205 at 37,573 had
+been refused at its first create; this one was created at the first try in five installs). A reader works y out from a
+compressed C (the root of x³ + 7 of C's parity) and sends 32 bytes more a piece. The card trusts one more engine of the
+chip for a piece's point: where that engine's check is not what the set-up's two asks find, the card would take a point
+off the curve as C. Such a piece is worth nothing at a mint (no mint signed it, and the phone checks the mint's proof,
+which implies a real point), and the card's own keys never meet it. `LOAD_CHANGE` is unchanged.
+
+**Left out (not in this file).** Teaching a keyset's keys before its first piece (`KEYSET_KEYS` for a keyset in no entry
+of the table, entered as its first piece would enter it) was built with its tests and measured at 129 bytes more (37,398);
+it was left out to keep the file near the size known to install. `KEYSET_KEYS` still answers `6A88` for a keyset in no
+entry: a reader teaches the keys after the first piece, in the same selection.
+
+**Built (applet).** `LOAD_FULL_C = 08`, `PIECE_FULL_LEN = 113`; `SchnorrHW.agrees` (one agreement with G's x, any
+exception a refusal) and `SchnorrHW.checksCurve` (G taken, G with y + 1 refused); `requireFullForm` (the `04`, x and y
+under p), shared with `requireFullPoint`; `curveByAgreement`, set at the end of `SET_CARD`; `loadOne` holds a piece of the
+04 form to the curve by the agreement in the place of the 33-byte test. `cardctl load --uncompressed` sends the form and,
+on `6B00`, the 33-byte form. Tests: `FullPointLoadTest` (good points stored the same as the 33-byte form on a twin card
+and paid with the same signature; every bad case of the chip's study `6A80` with nothing written; the lengths; the
+set-up's test with an agreement that takes every point and one that refuses every point; a card whose test failed takes
+only the 33-byte form).

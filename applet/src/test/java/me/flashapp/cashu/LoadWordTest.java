@@ -42,10 +42,13 @@ class LoadWordTest {
             assertArrayEquals(e.getValue(), PerPaymentKeyTest.field(c, e.getKey()), "nothing written: " + e.getKey());
         }
         assertEquals(0, readUint32(c.balance(0), 0));
-        // a P2 past the two bits is 6B00, the loader's y (P2 bit 2) too: D205 took it out again, slower on the chip and the file too large to create
-        for (int p2 : new int[] { 4, 5, 6, 7, 8, 10 }) {
+        // a P2 past the three bits is 6B00, the loader's y (P2 bit 2) too: D205 took it out again, slower on the chip and the file too large to create
+        for (int p2 : new int[] { 4, 5, 6, 7, 12, 14, 16, 18 }) {
             assertEquals(0x6B00, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, p2, piece, 256)), "P2 " + p2);
         }
+        // P2 bit 3 (08) is D206's form, C whole: without bit 1 the same 6A86, and with it an 81-byte piece is no piece of that form
+        assertEquals(SW_INCORRECT_P1P2, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 8, piece, 256)), "P2 08");
+        assertEquals(0x6700, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 10, piece, 256)), "P2 0A, 81 bytes");
         // with the word
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, piece, 256)), "P2 02");
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 3, concat(new byte[] { 0 }, buildProof(UnitsTest.SAT_A, 500, 92, 0)), 256)), "P2 03, the unit first");

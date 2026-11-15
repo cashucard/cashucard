@@ -1335,9 +1335,9 @@ and still learns the keys its own change comes back under.
 | CLA | `B0` |
 | INS | `30` |
 | P1 | `00`; `01` with the mint's proof |
-| P2 | `02`; `03` with the pieces' unit first: bit 1, the reader's word on keys per load; bit 0, the unit first |
-| Lc | `51` (81), or 162 or 243 for two or three pieces; `B1` (177) with P1 = 1; one more with P2 bit 0 |
-| Data | with P2 bit 0, the unit (1), then: for each piece: keyset_id (8) ‖ amount (4) ‖ nonce (32) ‖ C (33) ‖ date (4); with P1 = 1, one piece then e ‖ s ‖ r (96) |
+| P2 | `02`; `03` with the pieces' unit first; `0A` or `0B` with C whole: bit 1, the reader's word on keys per load; bit 0, the unit first; bit 3, C whole ([D206](../docs/DECISIONS.md#d206)) |
+| Lc | `51` (81), or 162 or 243 for two or three pieces; `B1` (177) with P1 = 1; with P2 bit 3 one piece only, `71` (113), `D1` (209) with P1 = 1; one more with P2 bit 0 |
+| Data | with P2 bit 0, the unit (1), then: for each piece: keyset_id (8) ‖ amount (4) ‖ nonce (32) ‖ C (33, or 65 with P2 bit 3) ‖ date (4); with P1 = 1, one piece then e ‖ s ‖ r (96) |
 | Le | `01` per piece; `02` with P1 = 1 |
 
 | Field | Size | |
@@ -1345,11 +1345,24 @@ and still learns the keys its own change comes back under.
 | keyset_id | 8 | the NUT-02 id's first 8 bytes, raw |
 | amount | 4 | uint32 |
 | nonce | 32 | the P2PK secret's nonce |
-| C | 33 | compressed point |
+| C | 33 | compressed point; with P2 bit 3, 65: `04` ‖ x ‖ y |
 | date | 4 | locktime, seconds, or 0 |
 
 **Response:** the slot of each piece stored; with P1 = 1, the slot and `01` where
 the proof was kept (`00` with no room for proofs).
+
+**P2 bit 3 (`08`), C whole** ([D206](../docs/DECISIONS.md#d206)): one piece a command, its C as
+`04` ‖ x ‖ y (65 bytes) in place of the 33. The card checks the length exactly, the `04`, x under p and
+y under p itself, and the curve by one key agreement of its chip (`ALG_EC_SVDP_DH_PLAIN_XY`, with a
+scalar that is a public number, G's x, and no key of the card's), in place of its own test of a
+33-byte C (Euler's criterion on x³ + 7 by the chip's RSA); a point the agreement refuses is `6A80`,
+with nothing written. The piece is then stored exactly as the same piece in the 33-byte form:
+C compressed, `02` or `03` by y's low bit, then x. The card leans on its chip's agreement only
+where it holds a point to the curve: at each `SET_CARD`, once the record is written, the card asks
+it of G (taken) and of G with y one more (refused); where either answer is another, P2 bit 3 is
+`6B00` before the data is read, and the reader sends the 33-byte form. So is it on a card before
+its first `SET_CARD`, and on a card before D206. A reader that has a piece's C compressed works y
+out as the root of x³ + 7 of C's parity.
 
 **P2 bit 1 (`02`), the reader's word on keys per load** ([D197](../docs/DECISIONS.md#d197)):
 the loader says each piece is locked to the card's keys for its date, P + t·G and
@@ -1364,13 +1377,14 @@ before money](#pin-before-money)); nothing else opens it: not the owner's grant
 and not the tap after a payment (the card's own change comes back by
 `LOAD_CHANGE`). In order: `6986` locked; `6A97` with no PIN; `6982` with the PIN
 not given in this tap; `6A8C` with no record, or a factory record; `6A84` with no
-slot free; `6B00` for a P2 with a bit other than its two (04, the loader's y, was tried in D205's first build and taken out again: slower on a J3R180, and the file too large for the card's applet to be created); `6A86` without P2 bit 1;
-`6700` for a bad length; `6A80` for
+slot free; `6B00` for a P2 with a bit other than its three (04, the loader's y, was tried in D205's first build and taken out again: slower on a J3R180, and the file too large for the card's applet to be created); `6A86` without P2 bit 1;
+`6B00` for P2 bit 3 on a card whose chip's key agreement did not hold to the curve at its last `SET_CARD` (or one never set up);
+`6700` for a bad length (with P2 bit 3, anything but 113 bytes, 209 with P1 = 1, after the unit); `6A80` for
 a unit over `01`, and `6A9C` for a label of the other unit on a card with no
 keyset table; `6A99` once, for pieces of the other unit than the card's on a card
 with a limit set and no rate; then for each piece: `6A84` no slot left or no paid
 list ([The paid list](#the-paid-list)), `6A8E` a dated piece on a card with no
-refund key, `6A80` a C that is not a point of the curve (`02` or `03` and an x under p for which x^3 + 7 is a square, checked by the card itself), an amount of 0 or a proof of 96 zeros,
+refund key, `6A80` a C that is not a point of the curve (`02` or `03` and an x under p for which x^3 + 7 is a square, checked by the card itself; with P2 bit 3, `04`, x and y under p, and the chip's key agreement taking the point), an amount of 0 or a proof of 96 zeros,
 `6A9B` a keyset in the table as the other unit, `6A9D` a new keyset of the other
 unit that is not the last payment's, without the holder's say in this tap, `6A9C`
 no entry free for a new keyset, `6A94` a nonce already in any slot, spent or

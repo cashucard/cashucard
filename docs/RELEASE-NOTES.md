@@ -8,19 +8,41 @@ the merged pull requests besides.
 ## `firmware-v2.3.0`: Cashu Card protocol 2.3 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-2.3.0.cap`, sha256
-`01edad4cf1b815dae47510780db10658a4dfb56373ffb5ec2d513a56d4dd8b39`. Its load file,
-the bytes a card is LOADed with, is 36,950 bytes by `tools/refcheck.py`'s measure,
-sha256 `075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a`. `SELECT`
+`55614a2f29e4f5dabc1df1a8926fbfef39ceb715ec782aa5c8f8961546b82b58`. Its load file,
+the bytes a card is LOADed with, is 37,269 bytes by `tools/refcheck.py`'s measure,
+sha256 `fe156f4f505ccaecefe16aaeee4e270a76909d6373bf78cfd2ff9fd6c28a97e6`. `SELECT`
 and `GET_INFO` answer `02 03`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D205](DECISIONS.md#d205), and the wire is in
+[D183](DECISIONS.md#d183) to [D206](DECISIONS.md#d206), and the wire is in
 [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
 This file ran on a chip on 2026-11-14
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
-[its report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)): it is the file before D205 with
+[its report](reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)): it is the file before D206 with
+[D206](DECISIONS.md#d206) added (`LOAD_PROOF`'s 04 form: each piece's C sent whole, `04` ‖ x ‖ y, and held to the curve by
+the chip's key agreement in place of the card's own square-root test). The bench J3R180 09301220 installed it five times,
+each in three steps (16 to 17 s to load, 2 to 3 s for the card's applet, created at the first try every time), and, at a
+FakeWallet test mint with fake sats:
+
+- loaded a piece with its proof kept in 146 to 160 ms in the 04 form (P2 `0A`), against 226 to 240 ms in the 33-byte form
+  (P2 `02`) on the same file;
+- took a first load of 45 real pieces in one selection, as the app makes one (the read, `AUTH`, the sealed PIN, the date's
+  keys, 45 `LOAD_PROOF`s with their proofs, the final read): 8.22 s in all in the 04 form and 11.82 s in the 33-byte form,
+  9.50 s and 13.14 s with the keyset's keys taught in the same selection after the first piece (1.31 s);
+- paid pieces loaded in either form at their first `SPEND_ALL_SIGN`, the mint taking every swap, wrote the change back with
+  `LOAD_CHANGE` with no PIN and spent it again;
+- refused ten points that are not the curve's in the 04 form with `6A80` (71 to 84 ms) and wrong lengths with `6700`,
+  storing nothing;
+- passed `cardctl selftest` 21 of 21.
+
+Not covered by that run: the day of loads, dated pieces in the 04 form, a chip whose key agreement fails the set-up's test
+(the simulator's tests cover both outcomes), `LOCK_CARD`, tears, the certificate, a dollar card, a production mint and a
+phone.
+
+The file before D206 (36,950 bytes, load file sha256 `075448e4…`, D183 to D205) ran on a chip on 2026-11-14
+([its report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)): it is the file before D205 with
 [D205](DECISIONS.md#d205) added (no payment floor, shorter holds). A second bench J3R180 (not the card of the run
 below) installed it twice, each in three steps (16 to 17 s to load, 2 s for the card's applet, created at the first
 try), and, at a FakeWallet test mint with fake sats:
@@ -96,6 +118,10 @@ a J3R180 whose configuration lacks either cannot run the card.
 
 ### What a holder notices
 
+- **A first load is about a third quicker** ([D206](DECISIONS.md#d206)): a reader that sends each piece's C whole (`LOAD_PROOF`
+  P2 bit 3) has it checked by the chip's key agreement, about 80 ms a piece less on a J3R180 (152 against 233 ms with the
+  proof kept); 45 pieces in one selection take 8.2 s where they took 11.8. A card whose chip's agreement does not hold to the
+  curve at its set-up answers that form `6B00`, and the reader sends the 33-byte form, which is checked as before.
 - **A payment within its limit is signed at its first `SIGN`**: no floor, so no wait added
   for the card's own change either ([D205](DECISIONS.md#d205), which took away
   [D188](DECISIONS.md#d188)'s floor on the project owner's word). A payment over the limit on one

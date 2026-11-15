@@ -477,6 +477,39 @@ final class SchnorrHW {
     }
 
     /**
+     * Whether the chip's key agreement takes the 65 bytes at p[off] (04 || x || y, its caller has held them to that form,
+     * x and y under p: the agreement reduces both) as a point of the curve (D206): one key agreement with the temporary key
+     * at its resting scalar, G's x, a public number, so that the answer, [G.x]p, which goes into sc and nowhere else,
+     * tells nothing of any key, and a point of another curve or of the twist learns nothing either. The J3R180 refuses
+     * every point off the curve at generateSecret (CryptoException); a simulator throws its own exception: any is a
+     * refusal. The key is left at that public scalar (no rest()): every other use of it sets the curve and its scalar
+     * first. Leaned on only where `checksCurve` held.
+     */
+    boolean agrees(byte[] p, short off) {
+        ready();
+        tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32);
+        ecdh.init(tmpPriv);
+        try {
+            ecdh.generateSecret(p, off, (short) 65, sc, SC_TMP);
+        } catch (RuntimeException x) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * The install's test of the agreement (D206): G is taken and G with y one more, a point of no curve, is not. Where
+     * either fails the card never leans on the agreement for a piece's point and refuses the 04 form (6B00): a chip whose
+     * agreement skips the curve, or refuses good points, is not leaned on. `work` is the room.
+     */
+    boolean checksCurve() {
+        Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_G, (short) 0, work, (short) 0, (short) 65);
+        if (!agrees(work, (short) 0)) return false;
+        work[64]++;
+        return !agrees(work, (short) 0);
+    }
+
+    /**
      * out = [s]G + H by the chip (TR-03111's generic mapping, which is a
      * scalar multiplication and a point addition in one): 65 bytes,
      * 04 || x || y. `s` is 32 bytes under n; `h` a point on the curve, 65

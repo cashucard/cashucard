@@ -101,6 +101,9 @@ INS_LOAD_PROOF = 0x30
 # LOAD_PROOF and LOAD_CHANGE P2 bit 1 (protocol 2.3): the loader's word that each piece is locked to the card's key
 # for its date, P + t*G (Keys per load). Sent only when the user says so (`load --date-keys`).
 LOAD_DATE_KEYS = 0x02
+# LOAD_PROOF P2 bit 3 (D206): each piece's C whole, 04 || x || y (65 bytes), which the card holds to the curve with its
+# chip's key agreement in place of Euler's test of x (about 100 ms a piece less on a J3R180). `load --uncompressed`.
+LOAD_FULL_C = 0x08
 INS_CLEAR_SPENT = 0x31
 INS_SET_CARD = 0x32
 INS_SET_LIMIT_PIN = 0x33
@@ -946,7 +949,7 @@ class Card:
 
     # ── write commands ────────────────────────────────────────────────────────
     def load_proof(self, keyset_id: bytes, amount: int, nonce: bytes, c: bytes, date: int = 0,
-                   date_keys: bool = False) -> int:
+                   date_keys: bool = False, uncompressed: bool = False) -> int:
         if len(keyset_id) != 8:
             raise SystemExit(f"keyset_id must be 8 raw bytes, got {len(keyset_id)}")
         # Every caller goes through here, so this is the one place that cannot be
@@ -970,8 +973,15 @@ class Card:
         # caller says so; a 2.3 card answers 6A86 to a load without it and writes nothing. A 0.x card takes P2 00.
         if date_keys and self.legacy:
             raise SystemExit("a 0.x card has no keys per date")
-        return self.send(INS_LOAD_PROOF, p2=LOAD_DATE_KEYS if date_keys else 0, data=payload, le=0x01,
-                         context="LOAD_PROOF")[0]
+        p2 = LOAD_DATE_KEYS if date_keys else 0
+        if uncompressed:
+            # D206: C whole, the date after it; a card that answers 6B00 (its chip's key agreement failed the card's install
+            # test, or a card before D206) wrote nothing, and the caller sends the 33-byte form
+            if self.legacy:
+                raise SystemExit("a 0.x card takes C in 33 bytes only")
+            payload = payload[:44] + whole_c(c) + payload[77:]
+            p2 |= LOAD_FULL_C
+        return self.send(INS_LOAD_PROOF, p2=p2, data=payload, le=0x01, context="LOAD_PROOF")[0]
 
     def clear_spent(self) -> int:
         return self.send(INS_CLEAR_SPENT, le=0x01, context="CLEAR_SPENT")[0]
@@ -1685,6 +1695,17 @@ def dleq_holds(b_: bytes, c_: bytes, k: bytes, e: bytes, s: bytes) -> bool:
     return hashlib.sha256(text.encode("ascii")).digest() == e
 
 
+def whole_c(c: bytes) -> bytes:
+    """A compressed point (02/03 || x) whole, 04 || x || y, y of its parity (D206's form of C at LOAD_PROOF)."""
+    point = bip340.lift_x(int.from_bytes(c[1:], "big")) if len(c) == 33 and c[0] in (2, 3) else None
+    if point is None:
+        raise SystemExit(f"C is not a compressed point of the curve: {_hex(c)}")
+    x, y = point
+    if (y & 1) != (c[0] & 1):
+        y = bip340.P - y
+    return b"\x04" + x.to_bytes(32, "big") + y.to_bytes(32, "big")
+
+
 def placeholder_c(nonce: bytes) -> bytes:
     """A placeholder C for `load` without --c: a point of the curve (a 2.3 card refuses one that is not, 6A80), found
     from the nonce by SHA-256("cardctl/placeholder-C" || nonce || counter) until its x is on the curve. Nobody knows
@@ -1975,7 +1996,15 @@ def cmd_load(args) -> int:
         # none, and the PIN given above opens it
         card.allow_load(owner)
     try:
-        slot = card.load_proof(keyset, args.amount, nonce, c, args.date, date_keys=args.date_keys)
+        try:
+            slot = card.load_proof(keyset, args.amount, nonce, c, args.date, date_keys=args.date_keys,
+                                   uncompressed=args.uncompressed)
+        except CardError as exc:
+            if not (args.uncompressed and exc.sw == 0x6B00):
+                raise
+            print("LOAD_PROOF answered 6B00 to C whole (this card does not check C by its chip's key agreement), "
+                  "and wrote nothing: sending the 33-byte form")
+            slot = card.load_proof(keyset, args.amount, nonce, c, args.date, date_keys=args.date_keys)
     except CardError as exc:
         if exc.sw == 0x6A86 and not args.date_keys:
             raise SystemExit(
@@ -3464,6 +3493,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--date-keys", action="store_true",
                    help="the piece was minted locked to the card's key for its date, P + t*G (from group-keys or "
                         "from c), never to the card's main key P: sends P2 02, which a 2.3 card wants (6A86 without)")
+    s.add_argument("--uncompressed", action="store_true",
+                   help="send C whole, 04 || x || y (P2 bit 3, D206): the card checks it with its chip's key agreement, "
+                        "faster than its check of a 33-byte C; on 6B00 (a card that does not) the 33-byte form is sent")
     _owner_arg(s)
     s.set_defaults(func=cmd_load)
 

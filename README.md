@@ -54,10 +54,14 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > verified on the chip, with the clock brought back by the set-up, the resets, the
 > hand-over and the owner's back form, and the owner's c read back
 > ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The file
-> tracked now adds [D205](docs/DECISIONS.md#d205) (no payment floor, shorter holds; 36,950 bytes, load file
+> after it adds [D205](docs/DECISIONS.md#d205) (no payment floor, shorter holds; 36,950 bytes, load file
 > sha256 `075448e4…`); on 2026-11-14 a second bench J3R180 installed it at the first try and, at the same test mint, had real
 > signatures and real change verified on the chip, with the shorter holds timed
-> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)). The
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)). The file tracked now adds
+> [D206](docs/DECISIONS.md#d206) (`LOAD_PROOF`'s 04 form, C held to the curve by the chip's key agreement; 37,269 bytes, load
+> file sha256 `fe156f4f…`); the same day the second J3R180 installed it five times at the first try and, at the same test
+> mint, had real signatures and real change verified on the chip, and took a first load of 45 pieces in 8.2 s where the
+> 33-byte form took 11.8 ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)). The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The

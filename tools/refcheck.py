@@ -59,6 +59,7 @@ SIZES = {
     35466: True,   # 2.3 (sha256 48b8597c...), unpadded, 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s; SELECT 0203, selftest 20/20
     36953: True,   # 2.3 (CAP sha256 30c7bb8d..., load file f216644a...), unpadded, D200 to D204, 2026-11-14, J3R180 09312320: three steps, opener first, load 16 to 17 s, card applet 2 s; SELECT 0203, selftest 20/20, installed three times
     36950: True,   # 2.3 (CAP sha256 01edad4c..., load file 075448e4...), unpadded, D200 to D205 without the loader's y, 2026-11-14, J3R180 09301220: three steps, opener first, load 16 to 17 s, card applet 2 s at the first create; SELECT 0203, selftest 20/20, installed twice
+    37269: True,   # 2.3 (CAP sha256 55614a2f..., load file fe156f4f...), unpadded, D200 to D206 (LOAD_PROOF's 04 form, C held to the curve by the chip's key agreement), 2026-11-14, J3R180 09301220: three steps, opener first, load 16 to 17 s, card applet 2 to 3 s at the first create, five installs; SELECT 0203, selftest 21/21
     35509: True,   # the 2.3 chip run's test-only build (2.3 with one command added that says the signer's temporary key's kind; never shipped, load file sha256 1bf178bc...), 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s
     21540: False,  # 2.2 first build (sha256 51ddeee4...), ENG-823, 2026-11-06: loaded (88 blocks), card applet 6F00 at create; cause not isolated: the size window or the constructor's +4,321 B persistent (D176, docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
 }
@@ -79,6 +80,9 @@ PROVEN = {
         '09312320 at testnut.cashu.space: real signatures and real change verified on the chip',
     '075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a': '2.3 with D200 to D205 (no payment floor, shorter holds), 36,950 bytes, '
         '2026-11-14, J3R180 09301220 at testnut.cashu.space: real signatures and real change verified on the chip',
+    'fe156f4f505ccaecefe16aaeee4e270a76909d6373bf78cfd2ff9fd6c28a97e6': '2.3 with D200 to D206 (the 04 form of LOAD_PROOF, C held to the curve by '
+        'the key agreement of the chip), 37,269 bytes, 2026-11-14, J3R180 09301220 at testnut.cashu.space: real signatures and real change '
+        'verified on the chip',
 }
 # what every entry of PROVEN says of its chip run, word for word
 PROVEN_NEEDS = 'real signatures and real change verified on the chip'

@@ -746,7 +746,9 @@ class SchnorrHWSignTest {
         assertEquals(3, src.split("finally \\{ rest\\(\\);", -1).length - 1, "addTo, mul and agree wipe the key and the agreements on every way out (the framing check is made of mul and addToG)");
         assertTrue(src.contains("finally { Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0); Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0); rest(); }"),
             "sign zeroes its scratch and work, then wipes the key, on every way out");
-        assertEquals(3, src.split("tmpPriv\\.setS\\(", -1).length - 2, "and sign, addTo and mul are the only uses that put a scalar in it (besides rest's public one)");
+        assertEquals(4, src.split("tmpPriv\\.setS\\(", -1).length - 2, "and sign, addTo and mul are the only uses that put a scalar in it (besides rest's public one and agrees', D206)");
+        assertTrue(src.contains("boolean agrees(byte[] p, short off) { ready(); tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32); ecdh.init(tmpPriv);"),
+            "agrees (D206) puts in it only G's x, the public scalar rest() leaves there, so it needs no rest() of its own");
         byte[] msg = new byte[32], sig = new byte[64];
         schnorr.sign(keyOf((String) KEYS[3][0]), pubOf((String) KEYS[3][1]), msg, (short) 0, sig, (short) 0);
         assertTrue(CashuAppletTest.schnorrVerify(java.util.Arrays.copyOfRange(CashuAppletTest.hexToBytes((String) KEYS[3][1]), 1, 33), msg, sig));
