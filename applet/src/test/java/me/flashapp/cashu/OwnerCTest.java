@@ -367,7 +367,7 @@ class OwnerCTest {
     @Test
     @DisplayName("A check that is not the kept s's is refused 6A80, as other data of a claim's own is: it neither counts nor ends the askings, and the s kept stays; an envelope sent again begins the askings again; on a hand-over the check is under the last owner's proof: one appended after a proof over the key alone is 6A91")
     void theCheckBindsTheEnvelope() throws Exception {
-        UnitsTest.Card card = SimpleCardTest.inFirstSetUp(UnitsTest.SAT);
+        UnitsTest.Card card = HolderTest.claimableHeld();   // its claim held for its askings (no record under the PIN in this tap, D215)
         byte[] s = s(WORDS, cardKey(card)), other = s(OTHER_WORDS, cardKey(card)), q = pinKey(card);
         assertEquals(SW_OK, card.sw(stage(envelope(s, q, E1))));
         CommandAPDU good = new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, concat(OWNER.pub, check(s)));

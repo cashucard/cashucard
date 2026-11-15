@@ -62,6 +62,7 @@ SIZES = {
     37269: True,   # 2.3 (CAP sha256 55614a2f..., load file fe156f4f...), unpadded, D200 to D206 (LOAD_PROOF's 04 form, C held to the curve by the chip's key agreement), 2026-11-14, J3R180 09301220: three steps, opener first, load 16 to 17 s, card applet 2 to 3 s at the first create, five installs; SELECT 0203, selftest 21/21
     39343: True,   # 2.3 (CAP sha256 b304d938..., load file c79b30a7...), unpadded, D200 to D210 (D207 keyset taught at set-up, D208 the field on p padded, D209 LOAD_CHANGE's points by the key agreement, D210 e*d on the chip's RSA), 2026-11-14, J3R180 09301220: three steps, opener first, load 17 s, card applet 2 s at the first create, installed three times; SELECT 0203, selftest 20/20
     40365: True,   # 2.3 (CAP sha256 20b6d726..., load file 8aefa0db...), unpadded, D200 to D214 (D211 the product in two shares, D212 every signature checked on the card, D213 wider known answers, D214 a taught keyset kept), 2026-11-14, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 1 to 3 s at the first create, four installs (173 past a multiple of 256; 135 and 153 past failed and 175 and 237 past installed); SELECT 0203, selftest 13/13, real signatures and real change verified on the chip
+    40412: True,   # 2.3 (CAP sha256 11104ceb..., load file 05c9b847...), unpadded, D200 to D215 (the claim after the set-up's record is one asking), 2026-11-15, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 2 s; selftest 13/13, set-up claim at the first asking, 9-piece payment with change, installed three times
     38791: False,  # 2.3 study build of D207 to D210 (ecdh study, never shipped), 2026-11-14, J3R180 09301220: loaded, opener made, card applet 6F00 at create (135 past a multiple of 256)
     38809: False,  # the same study source at this size, 2026-11-14, J3R180 09301220: card applet 6F00 at create (153 past a multiple of 256)
     38893: True,   # the same study source at this size (load file 92b67948..., never shipped), 2026-11-14, J3R180 09301220: installed at the first try (237 past a multiple of 256); passed the study's chip tests
@@ -93,6 +94,8 @@ PROVEN = {
         'testnut.cashu.space: real signatures and real change verified on the chip',
     '8aefa0db7ba81c0c9a3832e33e301110d6fa5d52b7a52a1434eda6ac9ee206aa': '2.3 with D200 to D214 (D211 the signature\'s product in two shares, D212 every signature checked on the card, D213 the '
         'set-up\'s known answers made wider, D214 a taught keyset kept until its first piece), 40,365 bytes, 2026-11-14, J3R180 09301220 at '
+        'testnut.cashu.space: real signatures and real change verified on the chip',
+    '05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3': '2.3 with D200 to D215 (D215 the claim after the set-up\'s record is one asking), 40,412 bytes, 2026-11-15, J3R180 09301220 at '
         'testnut.cashu.space: real signatures and real change verified on the chip',
 }
 # what every entry of PROVEN says of its chip run, word for word

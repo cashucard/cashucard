@@ -11110,10 +11110,13 @@ class CashuAppletTest {
         return r;
     }
 
-    /** A claim (D187), written down as a phone makes it: five askings answered 6A98, keep holding, and the sixth, which sets the owner. */
+    /**
+     * A claim (D187), written down as a phone makes it. Both claims here come right after the set-up's record, written under
+     * its PIN in the same time in the field, so each is one asking (D215); a claim with no such record is held for
+     * CLAIM_ASKINGS askings, each but the last answered 6A98, keep holding (HolderTest, ClaimAfterSetUpTest).
+     */
     private void sayClaim(StringBuilder out, String name, CommandAPDU claim) {
-        for (int k = 1; k < CLAIM_ASKINGS; k++) say(out, name + ": a claim, asking " + k + ": keep holding", "exact", SW_KEEP_HOLDING, claim);
-        say(out, name + ": the sixth asking sets the owner", "exact", SW_OK, claim);
+        say(out, name + ": right after the set-up's record, one asking sets the owner (D215)", "exact", SW_OK, claim);
     }
 
     /** The card taken out of the field and put back, written down as that: a model is to do the same, and send nothing. */

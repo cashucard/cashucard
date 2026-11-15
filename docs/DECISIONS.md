@@ -5953,7 +5953,8 @@ sealed in a `SET_OWNER` P1 = `01` just before it, and its check at the end of th
 set-up ([D196](#d196): a card set up with no owner is never claimed, `6A91`), no payment
 signed in this time in the field, an empty card (nothing unspent and no change owed,
 `6A8D`, as 2.2 had it; see [D195](#d195)), and the same data asked four times in a row
-(six until [D205](#d205)). Each of the first three askings is answered `6A98`, keep holding, after a signature's
+(six until [D205](#d205); *amended by [D215](#d215): once, where the set-up's PIN was set and then its record written in
+the same time in the field*). Each of the first three askings is answered `6A98`, keep holding, after a signature's
 work of the card's own, thrown away (about 2.6 seconds in all on a J3R180, 0.57 s an asking, 2.58 s measured with D211 and D212; 2.94 s at D205's 0.59 to 0.66 s); the fourth
 sets the owner. Other data, or any other command between, begins the count again.
 After a claim, no payment command is taken for the rest of that time in the field
@@ -8157,3 +8158,67 @@ used, which is a wallet's to avoid by teaching only the keysets it will load.
 (the third teaching refused with nothing forgotten; six taught and a seventh refused; a paid keyset still reclaimed; a cut or
 refused teaching leaves no entry; the planted entry plants nothing; the entry's state at the end), `TeachAtSetUpTest` (updated:
 the entry D207 left behind is no longer left), `UnitsTest` (the state byte the tests read does not show the loaded bit).
+
+## <a id="d215"></a>D215: A claim right after the set-up's record is one asking
+
+**Decided (protocol 2.3, 2026-11-15, the project owner; amends [D187](#d187)).** A claim (`SET_OWNER` on a card with no
+owner) sets the owner at its first asking where, in this time in the field, the card's first set-up set its PIN (`SET_PIN`
+on a card with no PIN) and then wrote its record (`SET_CARD` succeeded under that PIN). Otherwise it is held for four askings
+(`CLAIM_ASKINGS`), as before. Nothing else about the claim changes: the PIN set and given in this tap, a record of the
+holder's, the card's first set-up, no payment in this time in the field, an empty card, the anchor's checks, the owner's c
+and its check, the owner's key held to P-256, and no payment after the claim in that time in the field.
+
+**Why.** The hold is there so that a reader the holder only touches briefly cannot make itself the owner (D187). Writing the
+record already takes seconds of steady contact. Every `SET_CARD` runs the engines' self-tests (the framing check's seventeen
+calls, the key agreement's seven points, the field's and the squaring's known answers) and the record's transaction: a first
+`SET_CARD` took 2,033 ms on a J3R180 (2026-11-14e). A reader that set the card up and claims it in the same tap has held it
+that long already, so the claim's three thrown-away signatures (about 0.82 s each on the phone, about 2.5 s) were waiting the
+holder had done. The set-up tap is about 2.5 s shorter.
+
+**What it rests on.** The protection now rests on `SET_CARD`'s own time on the chip. If `SET_CARD` is ever made much faster
+(its self-tests moved to install, kept from one set-up to the next, or made cheaper), the claim's hold must come back in some
+form: the askings, or work of the same length in `SET_CARD`.
+
+**Cases checked.**
+
+- A `SET_CARD` that does little work: every `SET_CARD` that succeeds runs all the self-tests, whatever its data. The data
+  changes only the refund key's root (a point costs a power more; zeros cost nothing). The mark is set after the self-tests,
+  last of all.
+- A `SET_CARD` that is refused (a refund key that is no point, a wrong length, a factory record, a unit that is none, `6A96`,
+  a chip that fails the framing check): it throws before the mark. So does any exception after the record.
+- A `SET_CARD` before the PIN (a card with no PIN takes a record from anyone): no mark. The claim after `SET_PIN` is held.
+- A PIN from an earlier time in the field, or an earlier selection: `SET_CARD` is refused (`6A91`), and so is the claim. A
+  claim needs the first set-up, which only the selection of the card's first PIN is.
+- A `SELECT` between the record and the claim: the mark outlives it, but the first set-up does not, and the claim is `6A91`.
+- The card taken out of the field: the mark is RAM (`CLEAR_ON_RESET`) and goes with the power.
+- A reset in the same field (by the PIN, or by the owner after a claim): the reset clears the mark, and so does the `SET_PIN`
+  that begins the next set-up. The reset also clears the record, so the next claim needs a record of its own: written under
+  the new PIN, it earns its own mark; written before it, the claim is held.
+- A payment, money on the card, the PIN not given, a key off the curve: refused as before (`6985`, `6A8D`, `6982`, `6A80`).
+  The mark changes only how many askings.
+- The PIN replaced after the record, in the same set-up: the mark stays (the record was written under the set-up's PIN), and
+  the claim wants the new PIN given.
+- Another reader: a new reader is a new field, and a new selection. Neither the mark nor the first set-up reaches it.
+
+**Rejected.** A mark at `SET_PIN` alone: `SET_PIN` takes tens of milliseconds, so a brief touch would claim. Counting
+`SET_CARD` as askings of the claim: any other command begins the count again, and the count is gone with a `SELECT`; a mark
+of its own is simpler to reason about. No hold for any claim: a claim with no record written under the PIN in the tap has
+had no seconds of contact, and keeps its four askings.
+
+**Cost accepted.** A reader that sets a card up itself, from its first PIN (a new card, or one just reset), can claim it in
+that tap at the cost of `SET_CARD` and one asking, about 3 s with `SET_PIN` and `VERIFY_PIN`, where it was about 5.5 s. A
+wallet that sends `SET_OWNER` until it is answered `9000` needs no change; one that expected four askings gets `9000` at
+the first and must take it.
+
+**Built (applet).** `TAP_SETUP` (`0x10`), a fifth bit of the CLEAR_ON_RESET `tapOpen[2]`, beside `TAP_ARMED`, `TAP_PAID`,
+`TAP_CLAIMED` and `TAP_READ`. It is set at the end of a `SET_CARD` that succeeds on a card with no owner whose PIN is set
+(the check at the top of `SET_CARD` lets that through only in the first set-up), after the record's transaction and the
+self-tests. `RESET_CARD` clears it with `TAP_ARMED` and `TAP_READ`; a `SET_PIN` on a card with no PIN clears it after its
+commit. The claim calls `holdOn` with 1 for the askings where it is set, `CLAIM_ASKINGS` otherwise. RAM only: no write is new,
+in a transaction or out of one. Tests: `ClaimAfterSetUpTest` (one asking after the record; four with the record before the
+PIN or in an earlier tap; nothing after a field or a `SELECT` breaks the set-up; a reset clears it; a refused `SET_CARD` sets
+nothing; the mark opens no other door). `HolderTest`'s and `OwnerCTest`'s counts of askings use a card whose record was
+written before its PIN (`claimableHeld`). The transcript's two claims, each right after the set-up's record, are one asking
+(`spec/vectors/transcript.json`). The load file is 40,412 bytes (47 more than D214's 40,365), sha256 `05c9b847…`; it has not
+run on a chip, and no chip has installed a file of its size (220 past a multiple of 256). The tracked CAP stays the file before
+it until a chip run installs this one.

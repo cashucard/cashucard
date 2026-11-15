@@ -188,9 +188,11 @@ a J3R180 whose configuration lacks either cannot run the card.
 - **The no-PIN allowance counts whole pieces** and renews only when the owner's
   phone visits or the PIN is typed in a tap that pays nothing; the 24-hour window is
   the owner's switch ([D186](DECISIONS.md#d186)).
-- **Set-up holds a few seconds longer and finishes in one tap**: the owner is
-  claimed by four askings, about 2.6 seconds on a J3R180 ([D187](DECISIONS.md#d187),
-  [D205](DECISIONS.md#d205)).
+- **Set-up finishes in one tap, and its claim waits no longer than its record**: right
+  after `SET_CARD` under the PIN in the same tap, the owner is claimed at the first
+  asking, `SET_CARD`'s own seconds on the chip being the hold; otherwise by four
+  askings, about 2.6 seconds on a J3R180 ([D187](DECISIONS.md#d187),
+  [D205](DECISIONS.md#d205), [D215](DECISIONS.md#d215)).
 - **A card with no phone owner is a simple card**: its limits, mint and unit are set
   once, at its first set-up. Its PIN never blocks: each wrong try makes the next wait
   twice as long, and an empty card whose PIN was forgotten takes a new one. It is

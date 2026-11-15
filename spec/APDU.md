@@ -216,7 +216,8 @@ and c, with BIP-39's test words.
 
 A card is set up in one tap, owner last ([Personalisation](#personalisation)):
 `SET_PIN`, `VERIFY_PIN`, `SET_CARD` (the mint), then the owner's claim
-(`SET_OWNER` P1 = `01` with the owner's c, then `SET_OWNER`, four askings, carrying
+(`SET_OWNER` P1 = `01` with the owner's c, then `SET_OWNER`, one asking right after
+`SET_CARD` in the same tap ([D215](../docs/DECISIONS.md#d215)), carrying
 the tip block header as its anchor and the c's check). A card
 with no PIN takes nothing, and an owner is claimed only under the PIN.
 
@@ -2016,7 +2017,11 @@ this tap, a record of the holder's (not a factory record), the card's first set-
 an empty card, as on 2.2: nothing unspent and no change owed. The same data is asked for four times in a row;
 each of the first three is answered `6A98`, keep holding, with no data, after a
 signature's work of the card's own, thrown away; the fourth sets the owner and
-answers `9000`. Other data, or any other command between (a `SELECT` among them),
+answers `9000`. Where the card's first set-up set its PIN and then wrote its record
+(`SET_CARD` answered `9000` under that PIN) in this time in the field, the first asking
+sets the owner ([D215](../docs/DECISIONS.md#d215)): `SET_CARD`'s own seconds on the chip
+are the hold. A record written before the PIN, or in an earlier tap, leaves the four
+askings; a `RESET_CARD` takes the mark away, and the next set-up earns its own. Other data, or any other command between (a `SELECT` among them),
 begins the count again; a `SET_OWNER` refused for its own data neither counts nor
 ends it. After a claim, no payment is signed in that time in the field.
 
@@ -2483,7 +2488,10 @@ the PIN set and given in this tap, in the card's first set-up alone (`6A91` afte
 [D196](../docs/DECISIONS.md#d196)), never in a time in the field in which a payment
 was signed, only on an empty card (nothing unspent and no change owed, `6A8D`, as
 on 2.2), the same data asked four times in a row, the first three answered `6A98`
-after a signature's work each (about 2.6 seconds in all on a J3R180, 0.57 s an asking: 2.58 s measured, D211 and D212; the six of 2.3's first build took 4.1 s). After a claim, no payment command
+after a signature's work each (about 2.6 seconds in all on a J3R180, 0.57 s an asking: 2.58 s measured, D211 and D212; the six of 2.3's first build took 4.1 s).
+Right after the set-up's record, written under its PIN in the same time in the field,
+the claim is one asking ([D215](../docs/DECISIONS.md#d215)): `SET_CARD` holds the card
+for about two seconds of the chip's own work, and that is the hold. After a claim, no payment command
 is taken for the rest of that time in the field (`6985`). A phone sends
 `SET_OWNER` again for as long as the card answers `6A98`, and tells the holder to
 keep holding the card; a phone that asks once never takes `6A98` for done. A claim
@@ -2932,7 +2940,9 @@ its hardest where it is harder ([A header far ahead](#set_header-0x36), At set-u
 2. `SET_CARD`: unit, refund key, mint.
 3. `GET_NONCE` P1 = `01` (the PIN key, its signature checked), `SET_OWNER` P1 = `01`
    with the owner's c sealed to it, then `SET_OWNER` with the tip header as its anchor
-   and the c's check, sent until the card stops answering `6A98` (four askings).
+   and the c's check, sent until the card stops answering `6A98` (one asking right after
+   step 2 in the same tap, [D215](../docs/DECISIONS.md#d215); four where the record was
+   written before the PIN or in an earlier tap).
 4. `GET_NONCE`, `SET_LIMIT` (18 bytes, with the rollover budget, the rate and the
    no-PIN window's switch), if the holder wants limits. A wallet that wants the
    no-PIN allowance to come back only when the holder's phone or PIN is seen, never
@@ -3025,7 +3035,7 @@ it meets ([D193](../docs/DECISIONS.md#d193)):
 | `INBOX` | (none: `6D00`) | this week's inbox, to anyone | never sent by a 2.2 reader; a 2.3 reader that meets `6D00` reads no inbox |
 | `GROUP_KEYS`, `GET_CARD` P1 = `03` | (none) | the PIN or the grant; c sealed (to the refund key, or on a card with none to the PIN key and, with no owner, in its first set-up only) | never sent by a 2.2 reader; a 2.2 card ignores P1 and answers `GET_CARD` P1 = `03` with its record, so a 2.3 wallet checks `GET_INFO` P1 = `04` byte 56 bit 1 and the answer's length before it takes c |
 | `SPEND_ALL_AGAIN` P1 = `01` with no PIN | the signature, or `6982` | the signature of a no-PIN payment; `6A88` for any other hash | a till asks for a payment under the PIN with the PIN |
-| `SET_OWNER` on an open card | at once, `9000`, on an empty card | `6A97`, `6982`, or `6A98` five times; `6A8D` with anything unspent or owed, as 2.2; `6A91` past the first set-up | a set-up that asks once fails, with nothing written |
+| `SET_OWNER` on an open card | at once, `9000`, on an empty card | `6A97`, `6982`, or `6A98` three times (none right after `SET_CARD` under the PIN in the same tap, D215); `6A8D` with anything unspent or owed, as 2.2; `6A91` past the first set-up | a set-up that asks once fails, with nothing written |
 | `SET_OWNER` on an owned card | the new owner, nothing unspent | the same, no change owed too (`6A8D`), and a new c (drawn, or the next owner's after `SET_OWNER` P1 = `01`) | a 2.2 wallet replaces an owner as before, and the card draws c |
 | `SET_LIMIT` 4, 8, 12, 13 bytes | as 2.2 | the same meaning | unchanged |
 | `SET_LIMIT_PIN` 4, 8 | any value | the same meaning in the card's first set-up; after it `6A91` | a 2.2 wallet that sets a card with no owner's limits later is refused, with nothing written |

@@ -708,7 +708,9 @@ public class CashuApplet extends Applet implements TagSwitch {
      * the last is answered 6A98, keep holding, after a signature's work of the card's own, thrown away (`holdOn`), as a
      * payment's wait does it: about half a second an asking on a slower chip, so the hold is seconds the holder sees.
      *
-     *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fourth asking, about 2.6 seconds.
+     *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fourth asking, about 2.6 seconds; at the
+     *                    first where this first set-up's PIN was set and then its record written in this time in the field
+     *                    (TAP_SETUP, D215): SET_CARD's own seconds on the chip are the hold then.
      *   HISTORY_ASKINGS  GET_LOG, the log or the receipts, under the PIN on a card with no owner: answered at the seventh,
      *                    about three seconds (2.95 s measured); then open for the rest of the time in the field (TAP_READ).
      *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the seventeenth asking, about eight seconds
@@ -1199,8 +1201,9 @@ public class CashuApplet extends Applet implements TagSwitch {
      * full speed, unless the owner's grant is in this tap); [2] TAP_ARMED,
      * a VERIFY_PIN in it armed the no-PIN allowance (2.3, D186), which
      * a payment's commit takes back; TAP_PAID, TAP_CLAIMED and TAP_READ
-     * (D187, D189). RESET_CARD clears TAP_ARMED and TAP_READ, which were the
-     * PIN's it takes away, and keeps TAP_PAID and TAP_CLAIMED.
+     * (D187, D189); TAP_SETUP (D215). RESET_CARD clears TAP_ARMED, TAP_READ
+     * and TAP_SETUP, which were the PIN's it takes away, and keeps TAP_PAID
+     * and TAP_CLAIMED.
      */
     private byte[] tapOpen;
     static final byte TAP_ARMED   = (byte) 0x01;
@@ -1210,6 +1213,13 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte TAP_CLAIMED = (byte) 0x04;
     /** The history of a card with no owner was held for and read (a held tap): no payment in this time in the field, and the holder's say in it. */
     static final byte TAP_READ    = (byte) 0x08;
+    /**
+     * The card's first set-up had its PIN set and then its record written (SET_CARD, under that PIN) in this time in the field:
+     * a claim is then one asking (D215), the record's seconds of steady contact on the chip standing for the claim's hold. Set
+     * at the end of a SET_CARD that succeeds on a card with no owner whose PIN is set (in its first set-up, which SET_CARD
+     * checks), after the self-tests; cleared by RESET_CARD and by a SET_PIN that begins a set-up, so that a set-up earns its own.
+     */
+    static final byte TAP_SETUP   = (byte) 0x10;
     private MessageDigest sha;
     /** The hash of the message a payment's one signature is over, kept from SPEND_ALL_BEGIN to SPEND_ALL_SIGN. */
     private MessageDigest shaAll;
@@ -4627,6 +4637,10 @@ public class CashuApplet extends Applet implements TagSwitch {
          * n): each is leaned on only where its known answers held, here, and not otherwise. Also after the record. */
         fieldP = fieldPInit();
         schnorrHW.chipMul = schnorrHW.chipMulInit();
+        /* and, last of all, the claim of this first set-up is one asking (D215): its PIN was set in this selection (a PIN on a
+         * card with no owner passes the check at the top only in the first set-up) and the record is written now, after the
+         * self-tests' seconds of steady contact. A SET_CARD refused, or cut, sets nothing; one before the PIN sets nothing. */
+        if (!owned && pinState[0] != (byte) 0) tapOpen[2] |= TAP_SETUP;
     }
 
     /**
@@ -5226,6 +5240,8 @@ public class CashuApplet extends Applet implements TagSwitch {
             JCSystem.commitTransaction();
             // a new PIN has not been typed yet: any session that had verified the old one is over
             pinVerifiedFlag[0] = (byte) 0;
+            // and a set-up it begins has no record written under it yet (D215): its claim is held until its SET_CARD
+            if (first) tapOpen[2] &= (byte) ~TAP_SETUP;
             forgetOwed();
         } finally {
             forgetPin(buf, got, sealed);
@@ -5362,7 +5378,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * `6A91`: a card set up with no owner is never claimed), no payment signed in this time in the field (`6985`), and an
      * empty card, as on 2.2: nothing unspent and no change owed (`6A8D`). A holder with no phone who wants a phone as owner
      * moves the money to a phone, resets the card by the PIN, and sets it up again with the phone. The same data is asked for CLAIM_ASKINGS times
-     * in a row: each asking but the last is answered `6A98`, keep holding,
+     * in a row, or once where this set-up's PIN was set and then its record written in this time in the field (TAP_SETUP, D215,
+     * SET_CARD's own seconds on the chip the hold): each asking but the last is answered `6A98`, keep holding,
      * after a signature's work of the card's own (`holdOn`); the last sets the
      * owner. Other data begins the count again, and so does any other command
      * (`process`); a SET_OWNER refused for its own data neither counts nor ends
@@ -5449,7 +5466,8 @@ public class CashuApplet extends Applet implements TagSwitch {
                 Util.arrayCopyNonAtomic(allSlots, (short) 32, allSlots, (short) 0, (short) 32);
                 asked = 0;
             }
-            holdOn(buf, (short)(asked + 1), CLAIM_ASKINGS, (byte) 0);
+            // one asking after this set-up's record written under its PIN in this time in the field (D215), CLAIM_ASKINGS otherwise
+            holdOn(buf, (short)(asked + 1), (tapOpen[2] & TAP_SETUP) != 0 ? (short) 1 : CLAIM_ASKINGS, (byte) 0);
         }
         requireOwnerPoint(buf, at);
         if (given) {
@@ -6092,7 +6110,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         loadGrant[0] = (byte) 0;
         tapOpen[0] = (byte) 0;
         tapOpen[1] = (byte) 0;
-        // and the hold and the arming with the PIN that gave them: a new PIN in this selection has no hold it did not ask for
+        // and the hold, the arming and the set-up's record (D215) with the PIN that gave them: a new PIN in this selection has no hold it did not ask for
         tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED);
     }
 
