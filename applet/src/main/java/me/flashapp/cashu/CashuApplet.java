@@ -512,6 +512,9 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short C_CHECK_LEN   = (short) 16;
     /** chain[C_COUNT, +4): how many owners' c the card has taken (D202), big-endian; nothing resets it. */
     static final short C_COUNT       = (short) 64;
+    /** The tag's code (D216): R, the random of one selection, and M, its MAC's first bytes. */
+    static final short TAG_R_LEN     = (short) 16;
+    static final short TAG_MAC_LEN   = (short) 8;
     static final short KEYS_MOST     = (short) 64;
     static final short KEY_WIRE      = (short) 41;   // amount (8) || K (33)
     static final short TAIL_MOST     = (short) 64;
@@ -963,6 +966,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         'C','a','s','h','u','C','a','r','d','/','i','n','b','o','x' };
     private static final byte[] LABEL_TAG = {   // CashuCard/tag
         'C','a','s','h','u','C','a','r','d','/','t','a','g' };
+    /** The tag's address (D216): its key K = SHA-256(this || c), its code HMAC-SHA256(K, R)'s first eight bytes. */
+    private static final byte[] LABEL_TAG_ADDRESS = {   // CashuCard/tag-address
+        'C','a','s','h','u','C','a','r','d','/','t','a','g','-','a','d','d','r','e','s','s' };
     /** The assisted-settlement descriptor's tag (2.2, D175): the descriptor signs SHA-256(tag || tag || body), tag = SHA-256(this). */
     private static final byte[] LABEL_ASSISTED = {   // CashuCard/assisted-settlement/v1
         'C','a','s','h','u','C','a','r','d','/','a','s','s','i','s','t','e','d','-','s','e','t','t','l','e','m','e','n','t','/','v','1' };
@@ -1159,6 +1165,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     //   136..155 a log entry made whole before it is written (`logEntry`), and a payment's part of it (SPEND_ALL_SIGN)
     //   156..163 the day of loads, its count and the change counted, as pinMarks has them from PM_LOAD_DAY (`roomToLoad`);
     //            zeros for them at a reset (RESET_CARD)
+    //   164..187 the NFC tag's code for its selection, R and M (D216, `tagCode`): written only while the tag is selected, read by
+    //            the tag, and cleared at this applet's own selection, so this applet never finds it
     private static final short X_HEX   = (short) 0;
     private static final short X_MSG   = (short) 66;
     private static final short X_DEC   = (short) 98;
@@ -1172,6 +1180,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     private static final short X_ADD   = (short) 132;
     private static final short X_ENTRY = (short) 136;
     private static final short X_LOADS = (short) 156;
+    private static final short X_TAG   = (short) 164;
     // a point of LOAD_CHANGE's arithmetic, 65 bytes, over X_DEC .. X_NOPIN, which nothing else uses while it runs
     private static final short X_PT    = (short) 98;
     /* SPEND_ALL_SIGN's figures in the card's unit (2.3, D184, `inCardUnit`): the whole of the pieces at X_CONV, what leaves the
@@ -1485,6 +1494,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     /** Every selection, made by a SELECT or by the chip at power-up, ends a first set-up (D195). One byte, written once. */
     public boolean select() {
         if (pinMarks[PM_FIRST] != (byte) 0) pinMarks[PM_FIRST] = (byte) 0;
+        // the tag's code of its last selection (D216), in this applet's working memory: not left for this one to find
+        Util.arrayFillNonAtomic(scratch, X_TAG, (short)(TAG_R_LEN + TAG_MAC_LEN), (byte) 0);
         return true;
     }
 
@@ -6220,6 +6231,45 @@ public class CashuApplet extends Applet implements TagSwitch {
     /** Whether the card is to answer as an NFC tag: asked by the tag applet at each of its selections (`TagSwitch`). */
     public boolean tagIsOn() {
         return tagOff[0] == (byte) 0;
+    }
+
+    /**
+     * The tag's code for this selection of it (D216, `TagSwitch.tagCode`): on a card with an owner and a holder's record,
+     * R, sixteen bytes of the chip's secure random, and after it M, the first eight bytes of HMAC-SHA256(K, R) with
+     * K = SHA-256("CashuCard/tag-address" || c); true. On any other card nothing, and false: the tag says `#new`. The code is
+     * kept in this applet's working memory (scratch[X_TAG], 24 bytes, cleared on deselect and at this applet's own
+     * selection), so the tag asks for no transient memory of its own; `tagCodeCopy` gives it to the tag at each READ BINARY.
+     * K is worked out from c at every selection and kept nowhere, so a new c (a hand-over, a reset, the next claim) is a new
+     * key at once. The room w[at .. at + 96) is the tag's APDU buffer; K is held there only as the HMAC's pad block, and all of
+     * it is cleared before the return. Nothing is written that lasts and nothing counted; the PIN is not asked and no state of
+     * a tap is touched.
+     */
+    public boolean tagCode(byte[] w, short at) {
+        if (ownerSet[0] != (byte) 1 || !holderRecord()) return false;
+        rng.generateData(scratch, X_TAG, TAG_R_LEN);
+        short k = (short)(at + 64);
+        // K, in the second part of the room; the pad block in the first: K, 32 zeros, each byte XOR 36
+        sha.reset();
+        sha.update(LABEL_TAG_ADDRESS, (short) 0, (short) LABEL_TAG_ADDRESS.length);
+        sha.doFinal(chain, (short) 0, (short) 32, w, k);
+        Util.arrayFillNonAtomic(w, at, (short) 64, (byte) 0x36);
+        for (short i = 0; i < (short) 32; i++) w[(short)(at + i)] ^= w[(short)(k + i)];
+        // the inner hash over the pad and R, over K (no longer needed: the pad holds it); then the pad turned to the outer's (XOR 5C)
+        sha.reset();
+        sha.update(w, at, (short) 64);
+        sha.doFinal(scratch, X_TAG, TAG_R_LEN, w, k);
+        for (short i = 0; i < (short) 64; i++) w[(short)(at + i)] ^= (byte)(0x36 ^ 0x5C);
+        sha.reset();
+        sha.update(w, at, (short) 64);
+        sha.doFinal(w, k, (short) 32, w, at);
+        Util.arrayCopyNonAtomic(w, at, scratch, (short)(X_TAG + TAG_R_LEN), TAG_MAC_LEN);
+        Util.arrayFillNonAtomic(w, at, (short) 96, (byte) 0);
+        return true;
+    }
+
+    /** This selection's code, R and M (24 bytes, `tagCode`), copied to to[off]: the tag reads it at each READ BINARY. */
+    public void tagCodeCopy(byte[] to, short off) {
+        Util.arrayCopyNonAtomic(scratch, X_TAG, to, off, (short)(TAG_R_LEN + TAG_MAC_LEN));
     }
 
     /**

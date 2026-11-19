@@ -8222,3 +8222,96 @@ written before its PIN (`claimableHeld`). The transcript's two claims, each righ
 (`spec/vectors/transcript.json`). The load file is 40,412 bytes (47 more than D214's 40,365, 220 past a multiple of 256), sha256 `05c9b847…`. The bench J3R180
 installed and ran it on 2026-11-15 (`tools/refcheck.py` keeps its size and its hash), and it is the tracked CAP's load file since the
 commit after this one: a rebuild of the same source, byte for byte the load file that ran, with its own manifest time.
+
+---
+
+## <a id="d216"></a>D216: The tag's address changes at every read, and only the owner's phone can tell it is its card
+
+**Decided (protocol 2.3, 2026-11-15, the project owner; amends the tag of software 1.19, `FOXY-CARD-SPEC.md` 5.8
+and `SECURITY-MODEL.md` threat 15, whose address was the same on every card).** The card's NFC tag answers a phone's background read with one of two addresses:
+
+    https://getfoxy.io/card#new                   a card with no owner or no holder's record (new, or just reset)
+    https://getfoxy.io/card#<R><M>                a card with an owner and a holder's record
+
+R is 16 bytes of the chip's secure random (`RandomData.ALG_SECURE_RANDOM`), drawn afresh at every selection of the tag, and
+M the first 8 bytes of HMAC-SHA256(K, R), with K = SHA-256(`CashuCard/tag-address` ‖ c), c the card's secret of
+[D202](#d202) as the card keeps it. Both are written in lowercase hex, 32 and 16 characters. The owner's phone, which
+works c out from its words for each of its cards (or reads it sealed with `GET_CARD` P1 = `03` where a claim brought none),
+checks M under each of its cards' K and opens that card; any other phone finds no match and treats the card as someone
+else's (a payment to it); `#new` is a card to set up. The wire is in
+[The NFC tag application](../spec/APDU.md#the-nfc-tag-application), with test vectors.
+
+**Why.** The fixed address told a reader only that this is a Cashu card, the same for every card; but the same address
+on every read is also what a reader would need to follow a card if it ever named it, and the owner's phone could not tell
+its own card from a stranger's without a further tap to the card's applet. With a code that changes at every read, a
+stranger's reader that records the address learns nothing that ties one read to the next, while the owner's phone
+recognises the card at the background read itself.
+
+**What a tracker can still learn.** Written down so that nobody takes the tag's rotation for more than it is:
+
+- **The state.** `#new` (no owner, or no record) against a code: whether a card is set up. A set-up card's file is 71 bytes,
+  a new card's 26, so the lengths say the same; nothing else is in either.
+- **The switch.** A card whose owner switched the tag off refuses the tag's name (`6999`): a reader learns that this card's
+  tag is off, one bit shared by every card so switched.
+- **Timing.** A set-up card's selection does the code's work (about 10 to 20 ms by the chip's SHA-256 figures, not yet
+  measured on a chip), a new card's none: the same bit as the state again. Every set-up card does the same work, whatever
+  its owner, money or history.
+- **Everything outside the tag.** The tag protects what a phone reads in the background. A reader that speaks to the
+  card's applet still reads, with no PIN, the card's own key (`GET_PUBKEY`), which is fixed for the card's life, and the
+  week's inbox (`INBOX`, fixed for a week): either follows a card as well as a fixed tag address would. The chip's radio
+  identifier (its ISO 14443 UID), where the chip is not set to draw a random one, is fixed too and is read before any
+  applet answers. The rotation stops a phone's ordinary tag read from being a tracker; it does not make the card
+  untraceable to a reader built to follow it. Those are separate decisions.
+- **A reader with c.** Whoever holds c (the owner's phone, and anyone the owner's words reach) recognises every read of
+  that card; nobody else can. A hand-over or a reset draws or takes a new c, and the last owner's phone no longer
+  recognises the card from that moment.
+
+**How (applet).** The tag applet holds no key and no code of its own: at the `SELECT` by name it asks the card's applet,
+through the same unexported shareable interface as the switch (`TagSwitch.tagCode`), to make this selection's code. The
+card's applet, on a card with an owner and a record, draws R, works K out from c and M from K and R, and keeps R and M in
+24 bytes of its own working memory (`scratch`, CLEAR_ON_DESELECT, cleared again at its own `select`); the room for the
+HMAC is the APDU buffer, K is held there only as the pad block, and all of it is cleared before the call returns. At each
+`READ BINARY` of the NDEF file the tag asks for the 24 bytes (`tagCodeCopy`) and writes the file from the offset asked:
+every read of one selection, in any pieces, is the one address, and the next selection is another. The capability
+container's NDEF file size grows from 22 to 71 bytes; MLe stays 59, so a phone takes the coded file in two reads, as Type 4
+readers do.
+
+- **No write.** Nothing that lasts is written at a read: no persistent array, no key, no counter (the tear harness counts
+  none through a phone's whole sequence, three times over). The random is the chip's; whether the chip's own generator
+  touches its own memory is the chip's affair.
+- **No new transient memory.** The card's applet holds 941 bytes of deselect RAM, the figure of the build that installs on
+  the chip, and a larger figure has been refused (1,030). The tag keeps its one byte (the file chosen, and now a bit for
+  whether the address carries a code), and the code lives in the card's applet's existing scratch, in bytes no command of
+  its own uses. So deselect RAM is unchanged: 941 + 1.
+- **No stale key.** K is worked out from c at every selection and kept nowhere. A reset (which clears the owner: `#new`),
+  a hand-over (a new c) or the next claim (the next owner's c) changes the answer at the next read.
+- **The switch** is as it was: off, the tag's name is refused before any code is made.
+- **No crypto of its own.** HMAC-SHA256 is two SHA-256 passes over the card's existing `MessageDigest`; the card makes
+  no new primitive, and the phone's side is the platform's HMAC.
+
+**Rejected.**
+
+- *A counter instead of random* (address = MAC of a count): a write at every read, and the count itself a tracker's
+  clock.
+- *Encrypting the card's key into the address*: more work for the same result, and a key in the address is a key to lose.
+- *The whole SHA-256 output as M*: 8 bytes make a forged match (a stranger's tag that opens the owner's card screen) a
+  2⁻⁶⁴ chance, and keep the address short; the screen it opens holds nothing a forgery could take.
+- *A transient array of the tag's own for the code* (25 bytes more): the deselect RAM ceiling is measured, not known, and
+  the code fits in the card's applet's scratch at no cost.
+- *Keeping the fixed address for set-up cards and `#new` only for new ones*: the owner's phone could not tell its card from
+  another, which is the point.
+
+**Cost accepted.** The load file is 625 bytes larger (41,037 against D215's 40,412, sha256 `a507f181…`; 77 past a
+multiple of 256 where the D215 file is 220, the Method component 33,460), a size no chip has installed, and the chip has
+refused some sizes by where they end against a page (refcheck's table): it is not the tracked load file until a chip run installs it and
+reads its tag. A selection of a set-up card's tag takes about 10 to 20 ms more (estimate). Phones that read the old fixed
+address keep working: the address without a fragment opens the same page.
+
+**Built (applet).** `Tag.java` (the capability container to 71 bytes, the two NDEF files, the code written from the
+card's applet's 24 bytes, the card's applet looked up in one place, `card()`, at select, at the `SELECT`'s process and at a
+read of a code), `TagSwitch.java` (`tagCode`, `tagCodeCopy`), `CashuApplet.java` (`LABEL_TAG_ADDRESS`, `X_TAG` at
+scratch 164 to 187, cleared at `select`, `tagCode`, `tagCodeCopy`). Tests (simulator only): `TagAddressTest` (the
+vectors; the fixed address gone; twenty reads, twenty addresses; the MAC checks with the card's c and not with another
+card's; one selection one address in any pieces; `#new` on a new card, a card with a record and no owner and after a
+reset; a hand-over's new c at once and the old one no longer; no persistent write under the tear harness; the switch;
+the room cleared and the code gone at the card's applet's selection) and `TagTest` brought to the new files.
