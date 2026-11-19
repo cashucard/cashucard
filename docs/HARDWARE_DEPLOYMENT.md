@@ -88,12 +88,15 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 2.3 build is **40,365 bytes** by refcheck's measure (173 past a multiple of 256;
-the Method component 32,917), in 164 blocks of 247 bytes, the last 104: the load file inside the
+The 2.3 build is **40,412 bytes** by refcheck's measure (220 past a multiple of 256;
+the Method component 32,960), in 164 blocks of 247 bytes, the last 151: the load file inside the
 tracked CAP (`applet/target/cashu-javacard-2.3.0.cap`), whose own sha256 is not the
 CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
-exact file has run on a chip: a bench J3R180 (09301220) in the run of 2026-11-14 (the fifth run of the day) below, which
-installed it at the first try every time, the card's applet created at the first try. It is the file of the fourth run of that day
+exact file has run on a chip: the bench J3R180 (09301220) on 2026-11-15, three installs in three steps (load 17 to 18 s, the
+card's applet 2 s), `selftest` 13 of 13, the set-up's claim at the first asking and a 9-piece payment with change at the test mint
+(refcheck keeps its size and its load file's sha256). It is the file of the run of 2026-11-14 below (40,365 bytes, load file
+`8aefa0db…`, the fifth run of that day, which installed it at the first try every time) with [D215](DECISIONS.md#d215) added (the claim
+right after the set-up's record is one asking; 47 bytes more). That file was the file of the fourth run of that day
 (39,343 bytes, load file sha256 `c79b30a7...`, [D207](DECISIONS.md#d207) to [D210](DECISIONS.md#d210), whose size and hash refcheck also keeps) with
 [D211](DECISIONS.md#d211) to [D214](DECISIONS.md#d214) added (1,022 bytes more): the signature's product in two shares, every signature checked on
 the card, the set-up's known answers made wider, and a taught keyset kept until its first piece. The fourth run's file was itself the file of the third run of that day
@@ -178,7 +181,7 @@ taking money back after D with the refund key at a mint (it needs a wait past D)
 tears, a phone and a production mint ([the hardware
 report](reports/HARDWARE_TEST_REPORT_2026-11-13_J3R180_2.3.md)).
 
-The chip run of the tracked file (40,365 bytes, load file `8aefa0db…`, with [D211](DECISIONS.md#d211) to [D214](DECISIONS.md#d214)),
+The chip run of the file before D215 (40,365 bytes, load file `8aefa0db…`, with [D211](DECISIONS.md#d211) to [D214](DECISIONS.md#d214)),
 on 2026-11-14 (03:00 to 03:30 UTC on the 15th), a fifth time that day, on the bench
 J3R180 of the earlier runs, CPLC serial 09301220 (checked by the install script before anything was sent; the public default test key),
 through the same reader. The CAP `20b6d726…` was installed four times in three steps (load 17 to 18 s, the card's applet 1 to 3 s, created
@@ -434,10 +437,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 2.3**, sha256
-`20b6d72633d4ebdc074802d5eec924adcc8dca8421c6ca695060312b59d44a29`
+`676fa7aedde4c25fe112ab0d70ee4ad9f05bc0bdaf55a3d9c2808bb4c416838e`
 (`applet/target/cashu-javacard-2.3.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 40,365 bytes), has sha256
-`8aefa0db7ba81c0c9a3832e33e301110d6fa5d52b7a52a1434eda6ac9ee206aa`: the hash the
+is LOADed with (refcheck's measure, 40,412 bytes), has sha256
+`05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation

@@ -8,17 +8,24 @@ the merged pull requests besides.
 ## `firmware-v2.3.0`: Cashu Card protocol 2.3 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-2.3.0.cap`, sha256
-`20b6d72633d4ebdc074802d5eec924adcc8dca8421c6ca695060312b59d44a29`. Its load file,
-the bytes a card is LOADed with, is 40,365 bytes by `tools/refcheck.py`'s measure,
-sha256 `8aefa0db7ba81c0c9a3832e33e301110d6fa5d52b7a52a1434eda6ac9ee206aa`. `SELECT`
+`676fa7aedde4c25fe112ab0d70ee4ad9f05bc0bdaf55a3d9c2808bb4c416838e`. Its load file,
+the bytes a card is LOADed with, is 40,412 bytes by `tools/refcheck.py`'s measure,
+sha256 `05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3`. `SELECT`
 and `GET_INFO` answer `02 03`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D214](DECISIONS.md#d214), and the wire is in
+[D183](DECISIONS.md#d183) to [D215](DECISIONS.md#d215), and the wire is in
 [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This file ran on a chip on 2026-11-14
+This file ran on a chip on 2026-11-15: it is the file below (40,365 bytes, `8aefa0db…`) with [D215](DECISIONS.md#d215) added (the
+claim right after the set-up's record is one asking; 47 bytes more, 220 past a multiple of 256). The bench J3R180 09301220
+installed it three times in three steps (17 to 18 s to load, 2 s for the card's applet) and, at the testnut test mint with fake sats,
+passed `cardctl selftest` 13 of 13, claimed the card at the set-up's first asking, and signed a 9-piece payment with change
+(`tools/refcheck.py` keeps its size and its load file's sha256). The tracked CAP is a rebuild of the same source: its load file is
+byte for byte the one that ran, its manifest's build time is not.
+
+The file before it ran on a chip on 2026-11-14
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
 [its report](reports/HARDWARE_TEST_REPORT_2026-11-14e_J3R180_2.3.md)): it is the file before it (39,343 bytes, `c79b30a7…`) with
 [D211](DECISIONS.md#d211) to [D214](DECISIONS.md#d214) added (the signature's product in two shares, so that no operand of the chip's RSA is a

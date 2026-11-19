@@ -39,7 +39,7 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 40,365-byte
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 40,412-byte
   load file in 164 blocks, the opener, the card's applet, then the tag under
   `D2760000850101`. Then it checks the card's applet answers `02 03`, `GET_INFO`
   (30 bytes), `GET_PUBKEY` (33 bytes) and the tag's SELECT.
@@ -187,11 +187,11 @@ cancellation during key prefetch prevents NFC from opening later.
 
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
-chip has installed and the operator approved. The 2.3 load file (40,365 bytes,
-sha256 `8aefa0db…`) is not on it yet, so a build from this tree installs no card
-and resets none. A bench J3R180 installed and ran it on 2026-11-14 with real signatures and
+chip has installed and the operator approved. The 2.3 load file (40,412 bytes,
+sha256 `05c9b847…`) is not on it yet, so a build from this tree installs no card
+and resets none. A bench J3R180 installed and ran it on 2026-11-15 with real signatures and
 real change verified at a test mint, and `tools/refcheck.py` keeps its size and its hash (as
-it keeps the files before it, 35,466, 36,953, 36,950 and 37,269 bytes); it goes on `VALIDATED_LOAD_FILE_SHA256S` once the operator
+it keeps the files before it, 35,466, 36,953, 36,950, 37,269, 39,343 and 40,365 bytes); it goes on `VALIDATED_LOAD_FILE_SHA256S` once the operator
 approves it, with the run's hardware report, in a change that also updates
 `__tests__/releaseGates.test.ts`. Both batch creation
 and programming enforce the gate; software-only record recovery and explicit

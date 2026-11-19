@@ -8219,6 +8219,6 @@ in a transaction or out of one. Tests: `ClaimAfterSetUpTest` (one asking after t
 PIN or in an earlier tap; nothing after a field or a `SELECT` breaks the set-up; a reset clears it; a refused `SET_CARD` sets
 nothing; the mark opens no other door). `HolderTest`'s and `OwnerCTest`'s counts of askings use a card whose record was
 written before its PIN (`claimableHeld`). The transcript's two claims, each right after the set-up's record, are one asking
-(`spec/vectors/transcript.json`). The load file is 40,412 bytes (47 more than D214's 40,365), sha256 `05c9b847…`; it has not
-run on a chip, and no chip has installed a file of its size (220 past a multiple of 256). The tracked CAP stays the file before
-it until a chip run installs this one.
+(`spec/vectors/transcript.json`). The load file is 40,412 bytes (47 more than D214's 40,365, 220 past a multiple of 256), sha256 `05c9b847…`. The bench J3R180
+installed and ran it on 2026-11-15 (`tools/refcheck.py` keeps its size and its hash), and it is the tracked CAP's load file since the
+commit after this one: a rebuild of the same source, byte for byte the load file that ran, with its own manifest time.

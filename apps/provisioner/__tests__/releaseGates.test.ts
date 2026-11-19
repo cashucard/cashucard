@@ -23,9 +23,9 @@ test('installation follows the load file this build carries, never a bare switch
 });
 
 test('the 2.3 load file is not validated until the operator approves it', () => {
-  // 40,365 bytes; it ran on a chip on 2026-11-14 (tools/refcheck.py). Its sha256 goes on the list with
+  // 40,412 bytes; it ran on a chip on 2026-11-15 (tools/refcheck.py). Its sha256 goes on the list with
   // the operator's approval and the run's report.
-  expect(CASHU_LOAD_FILE.size).toBe(40365);
+  expect(CASHU_LOAD_FILE.size).toBe(40412);
   expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(false);
   expect(CARD_INSTALLATION_VALIDATED).toBe(false);
   // the 2.2 load file the chip took on 2026-11-06 stays validated
