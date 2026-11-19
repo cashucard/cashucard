@@ -2323,7 +2323,9 @@ A third applet of the package, instantiated under the NFC Forum's
 `SELECT` of files `E103` and `E104` and `READ BINARY`, and nothing else. It finds
 the card's applet by the AID `F0 43 41 53 48 55 43 41 52 44 01` to ask whether the
 owner has switched it off and, since [D216](../docs/DECISIONS.md#d216), for the code
-its address carries.
+its address carries. The card's applet hands that interface only to the tag: the
+caller's AID must be `D2 76 00 00 85 01 01` or the tag's class AID
+`F0 43 41 53 48 55 43 41 52 44 54`, and any other applet gets nothing.
 
 **The address ([D216](../docs/DECISIONS.md#d216)).** One URI record, prefix code `04`
 (`https://`):
@@ -2348,7 +2350,17 @@ A phone that holds c for a card checks a coded address by taking R (the first 32
 and M (the last 16), working K out and comparing M with HMAC-SHA256(K, R)'s first
 eight bytes in constant time. A match is that card; no match for any card it holds is
 someone else's card; `#new` is a card to set up; the address with no fragment is a card
-of earlier software.
+of earlier software. The c is the one the phone kept for the card (given at the claim or
+the hand-over, or read with `GET_CARD` P1 = `03`): a phone restored from its words keeps
+none until it reads the card once, and until then sees its own card's tag as someone
+else's.
+
+The rotation is the tag's only. The card's applet still answers, with no PIN, values
+that follow a card as well as a fixed address would (its key, the certificate, which
+survives a reset, the record's refund key, mint and design, the balance, the pieces, the
+week's inbox), and the chip's radio identifier may be fixed: the full list, and the open
+question of a read address shown again to the owner's phone, are in
+[D216](../docs/DECISIONS.md#d216).
 
 Test vectors:
 

@@ -714,7 +714,7 @@ class TagTest {
     }
 
     @Test
-    @DisplayName("The source of the switch: SET_TAG writes the byte only when it would change, in no transaction, after the proof; RESET_CARD writes it in its own; the interface answers any caller, for the one parameter 0")
+    @DisplayName("The source of the switch: SET_TAG writes the byte only when it would change, in no transaction, after the proof; RESET_CARD writes it in its own; the interface answers only the tag, for the one parameter 0")
     void testSwitchSource() throws Exception {
         String code = new String(java.nio.file.Files.readAllBytes(SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), StandardCharsets.UTF_8);
         int from = code.indexOf("private void processSetTag("), to = code.indexOf("public boolean tagIsOn()");
@@ -731,8 +731,8 @@ class TagTest {
         assertFalse(body.contains("pinVerifiedFlag") || body.contains("pinState") || body.contains("pin."), "it asks no PIN");
         assertTrue(code.contains("case INS_SET_TAG:          processSetTag(apdu);         break;"), "it is dispatched");
         String shared = code.substring(code.indexOf("public Shareable getShareableInterfaceObject("), code.indexOf("// Guard helpers"));
-        assertTrue(shared.contains("parameter == (byte) 0 ? this : null"), "any caller, the one parameter");
-        assertFalse(shared.contains("clientAID."), "the caller is not looked at");
+        assertTrue(shared.contains("parameter != (byte) 0 || clientAID == null) return null;"), "the one parameter, and a caller with a name");
+        assertTrue(shared.contains("clientAID.equals(TAG_AID,") && shared.contains("clientAID.equals(TAG_CLASS_AID,"), "the caller must be the tag (TagCallerTest runs it)");
         java.util.regex.Matcher writes = java.util.regex.Pattern.compile("tagOff\\[0\\] =(?!=)").matcher(code);
         int assigned = 0;
         while (writes.find()) assigned++;

@@ -20,8 +20,8 @@ import javacard.framework.Util;
  *     https://getfoxy.io/card#<R><M>                  a card with an owner and a holder's record
  *
  * R is 16 bytes of the chip's secure random, drawn afresh at each selection of the tag, and M the first 8 bytes of
- * HMAC-SHA256(K, R), K = SHA-256("CashuCard/tag-address" || c), c the card's secret of D202, which the owner's phone works
- * out from its words; both in lowercase hex, 32 and 16 characters. The card's applet makes them (`TagSwitch.tagCode`):
+ * HMAC-SHA256(K, R), K = SHA-256("CashuCard/tag-address" || c), c the card's secret of D202, which the owner's phone kept
+ * when it gave it to the card or read it; both in lowercase hex, 32 and 16 characters. The card's applet makes them (`TagSwitch.tagCode`):
  * this applet holds no key. It is a well-known URI record, prefix code 04 ("https://") and then the rest as text (NDEF
  * below).
  *

@@ -8235,10 +8235,12 @@ and `SECURITY-MODEL.md` threat 15, whose address was the same on every card).** 
 
 R is 16 bytes of the chip's secure random (`RandomData.ALG_SECURE_RANDOM`), drawn afresh at every selection of the tag, and
 M the first 8 bytes of HMAC-SHA256(K, R), with K = SHA-256(`CashuCard/tag-address` ‖ c), c the card's secret of
-[D202](#d202) as the card keeps it. Both are written in lowercase hex, 32 and 16 characters. The owner's phone, which
-works c out from its words for each of its cards (or reads it sealed with `GET_CARD` P1 = `03` where a claim brought none),
-checks M under each of its cards' K and opens that card; any other phone finds no match and treats the card as someone
-else's (a payment to it); `#new` is a card to set up. The wire is in
+[D202](#d202) as the card keeps it. Both are written in lowercase hex, 32 and 16 characters. The owner's phone checks M
+under the K of the c it kept for each of its cards (the c it gave the card at the claim or the hand-over, or read sealed
+with `GET_CARD` P1 = `03`) and opens that card; any other phone finds no match and treats the card as someone else's (a
+payment to it); `#new` is a card to set up. The phone does not work c out from its words at the read: a phone restored
+from its words, which keeps no c yet, must read the card once (`GET_CARD` P1 = `03`) before its tag is recognised; until
+then the card's tag looks to it like someone else's. The wire is in
 [The NFC tag application](../spec/APDU.md#the-nfc-tag-application), with test vectors.
 
 **Why.** The fixed address told a reader only that this is a Cashu card, the same for every card; but the same address
@@ -8257,20 +8259,41 @@ recognises the card at the background read itself.
   measured on a chip), a new card's none: the same bit as the state again. Every set-up card does the same work, whatever
   its owner, money or history.
 - **Everything outside the tag.** The tag protects what a phone reads in the background. A reader that speaks to the
-  card's applet still reads, with no PIN, the card's own key (`GET_PUBKEY`), which is fixed for the card's life, and the
-  week's inbox (`INBOX`, fixed for a week): either follows a card as well as a fixed tag address would. The chip's radio
-  identifier (its ISO 14443 UID), where the chip is not set to draw a random one, is fixed too and is read before any
-  applet answers. The rotation stops a phone's ordinary tag read from being a tracker; it does not make the card
-  untraceable to a reader built to follow it. Those are separate decisions.
+  card's applet still reads, with no PIN, values that are fixed for a long time, and any one of them follows a card as
+  well as a fixed tag address would:
+  - the card's own key (`GET_PUBKEY`), fixed for the card's life;
+  - the certificate (`CERT_READ`, [D192](#d192)), public in any state, which **survives a reset**: a reset does not
+    stop a certified card being followed;
+  - the holder's record (`GET_CARD` P1 = `00`): the refund key, the mint, the design code and the limits, fixed until
+    the owner changes them;
+  - the balance (`GET_BALANCE`), fixed between payments and loads;
+  - the pieces (`GET_PROOF`, `GET_PIECES`, `GET_DLEQ`): each piece's mint signature and proof, fixed until it is spent;
+  - the week's inbox (`INBOX`), fixed for a week;
+  - the chip's radio identifier (its ISO 14443 UID), where the chip is not set to draw a random one, fixed too and read
+    before any applet answers.
+
+  The rotation stops a phone's ordinary tag read from being a tracker; it does not make the card untraceable to a reader
+  built to follow it. Those are separate decisions.
 - **A reader with c.** Whoever holds c (the owner's phone, and anyone the owner's words reach) recognises every read of
   that card; nobody else can. A hand-over or a reset draws or takes a new c, and the last owner's phone no longer
   recognises the card from that moment.
+- **The owner's phone as a test of ownership (open, for the project owner).** Someone who read a set-up card's address
+  once (a few centimetres, once) can show that same address again to the owner's phone, as a tag, a link or a QR code,
+  until the card's next hand-over or reset. The phone recognises its card and opens that card's screen instead of the
+  screen for someone else's card, so whoever watches the screen learns that this person owns the card read earlier. The
+  replay gains nothing else: the screen opens as last seen, and everything after it is decided by reading the card
+  itself, as with the plain address and the list of the owner's cards. Whether to accept this or to change the phone's
+  side (for example, to open the same screen for a match and a non-match until the card itself is read) is open.
 
 **How (applet).** The tag applet holds no key and no code of its own: at the `SELECT` by name it asks the card's applet,
 through the same unexported shareable interface as the switch (`TagSwitch.tagCode`), to make this selection's code. The
 card's applet, on a card with an owner and a record, draws R, works K out from c and M from K and R, and keeps R and M in
-24 bytes of its own working memory (`scratch`, CLEAR_ON_DESELECT, cleared again at its own `select`); the room for the
-HMAC is the APDU buffer, K is held there only as the pad block, and all of it is cleared before the call returns. At each
+24 bytes of its own working memory (`scratch`, CLEAR_ON_DESELECT; on a chip that memory is not cleared when the tag, an
+applet of the same package, is selected after it, so the card's applet clears the 24 bytes at its own `select`); the room
+for the HMAC is the APDU buffer, K is held there only as the pad block. The room is checked to lie inside the caller's
+array before anything is worked out, and all of it is cleared on every way out, a failure's included. The card's applet
+hands the interface only to the tag: the caller's AID must be the tag's (the NFC Forum's name it is installed under, or
+its class AID); any other applet gets nothing. At each
 `READ BINARY` of the NDEF file the tag asks for the 24 bytes (`tagCodeCopy`) and writes the file from the offset asked:
 every read of one selection, in any pieces, is the one address, and the next selection is another. The capability
 container's NDEF file size grows from 22 to 71 bytes; MLe stays 59, so a phone takes the coded file in two reads, as Type 4
@@ -8304,7 +8327,9 @@ readers do.
 **Cost accepted.** The load file is 625 bytes larger (41,037 against D215's 40,412, sha256 `a507f181…`; 77 past a
 multiple of 256 where the D215 file is 220, the Method component 33,460), a size no chip has installed, and the chip has
 refused some sizes by where they end against a page (refcheck's table): it is not the tracked load file until a chip run installs it and
-reads its tag. A selection of a set-up card's tag takes about 10 to 20 ms more (estimate). Phones that read the old fixed
+reads its tag. The checks added after it (the interface handed only to the tag's AID, the working room checked first and
+cleared on every way out) bring it to 41,205 bytes (245 past a multiple of 256, sha256 `6f0e3a06…`), likewise untried on a
+chip. A selection of a set-up card's tag takes about 10 to 20 ms more (estimate). Phones that read the old fixed
 address keep working: the address without a fragment opens the same page.
 
 **Built (applet).** `Tag.java` (the capability container to 71 bytes, the two NDEF files, the code written from the
