@@ -8255,8 +8255,8 @@ recognises the card at the background read itself.
   a new card's 26, so the lengths say the same; nothing else is in either.
 - **The switch.** A card whose owner switched the tag off refuses the tag's name (`6999`): a reader learns that this card's
   tag is off, one bit shared by every card so switched.
-- **Timing.** A set-up card's selection does the code's work (about 10 to 20 ms by the chip's SHA-256 figures, not yet
-  measured on a chip), a new card's none: the same bit as the state again. Every set-up card does the same work, whatever
+- **Timing.** A set-up card's selection does the code's work (about 45 ms measured on a J3R180: a whole tag read takes about
+  39 ms on a new card and 84 ms on a set-up card), a new card's none: the same bit as the state again. Every set-up card does the same work, whatever
   its owner, money or history.
 - **Everything outside the tag.** The tag protects what a phone reads in the background. A reader that speaks to the
   card's applet still reads, with no PIN, values that are fixed for a long time, and any one of them follows a card as
@@ -8328,8 +8328,10 @@ readers do.
 multiple of 256 where the D215 file is 220, the Method component 33,460), a size no chip has installed, and the chip has
 refused some sizes by where they end against a page (refcheck's table): it is not the tracked load file until a chip run installs it and
 reads its tag. The checks added after it (the interface handed only to the tag's AID, the working room checked first and
-cleared on every way out) bring it to 41,205 bytes (245 past a multiple of 256, sha256 `6f0e3a06…`), likewise untried on a
-chip. A selection of a set-up card's tag takes about 10 to 20 ms more (estimate). Phones that read the old fixed
+cleared on every way out) bring it to 41,205 bytes (245 past a multiple of 256, sha256 `6f0e3a06…`), which a J3R180
+has installed and run (self-tests, the tag before and after set-up, a hand-over, a reset, the switch, and a tag read in
+the middle of a payment, which drops the payment cleanly with nothing spent). A selection of a set-up card's tag takes
+about 45 ms more (measured). Phones that read the old fixed
 address keep working: the address without a fragment opens the same page.
 
 **Built (applet).** `Tag.java` (the capability container to 71 bytes, the two NDEF files, the code written from the
