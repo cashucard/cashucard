@@ -8132,7 +8132,9 @@ constant (the twist's y) is added.
 
 ## <a id="d214"></a>D214: A taught keyset is kept until its first piece; a teaching makes its entry at its end
 
-**Decided (same day, the same review).** D207 made a keyset's entry at the begin of its teaching, and the reclaim, which
+**Decided (same day, the same review).** *Amended by [D219](#d219): the reclaim spares an entry taught and never loaded
+only while it was entered in the card's first set-up or taught in this time in the field, and an entry of the first set-up
+does not count toward the two without the mark.* D207 made a keyset's entry at the begin of its teaching, and the reclaim, which
 frees every entry no piece or opening names, let it go again: on a card with the PIN alone (entries unmarked, two at most) the
 third keyset taught before any piece erased the first one's keys and answered `9000`, and the wallet found out at its first
 change (`6A9F`). And a PIN-holder's begin with a real keyset's ID and a tail of the wrong unit planted a nameless entry of that
@@ -8222,3 +8224,120 @@ written before its PIN (`claimableHeld`). The transcript's two claims, each righ
 (`spec/vectors/transcript.json`). The load file is 40,412 bytes (47 more than D214's 40,365, 220 past a multiple of 256), sha256 `05c9b847…`. The bench J3R180
 installed and ran it on 2026-11-15 (`tools/refcheck.py` keeps its size and its hash), and it is the tracked CAP's load file since the
 commit after this one: a rebuild of the same source, byte for byte the load file that ran, with its own manifest time.
+
+## <a id="d219"></a>D219: A keyset waiting for its first piece is kept only if the set-up or this tap taught it
+
+**Decided (protocol 2.3, 2026-11-19, the project owner; amends [D214](#d214)).** The red team of 2026-11-19 (round one, F1
+and F3, at 4d057fb) found that D214's reclaim spared every entry taught and never loaded, for good. A till with the PIN for one
+tap teaches keysets of its own making (keys it made up, the ID worked out from them as NUT-02 says, free to make) and loads none:
+on an owned card, PIN alone, one entry beside the holder's, and the holder's next new keyset with the PIN alone is `6A9C` until a
+reset; on a card with no owner, a till that holds the tap has the say (D189) and takes five, and the mint's second keyset change
+is `6A9C` for good. The owner decided the same day that the phone keeps teaching the card's own currency's keys at set-up
+(Foxy's `cardTeachAtSetUp`, one of the two entries without the mark: the firstload note of 2026-11-18 found it unmarked, state
+`42`/`43`), and that the card frees what a till plants.
+
+**The rule.** (1) A new entry made in the card's first set-up (`PM_FIRST`: the selection in which the card's first PIN was set,
+by whoever is setting the card up, its holder) carries a fourth state bit, **set-up** (`08`). (2) Every teaching's end sets a
+fifth, **fresh** (`10`), on its entry, in the transaction that keeps the top; the first teaching of a time in the field first
+takes the fresh bit off every other entry, a byte each, outside any transaction, and then sets `TAP_TAUGHT` (`20`, a sixth bit of
+the CLEAR_ON_RESET `tapOpen[2]`). So the fresh entries are this time in the field's teachings while `TAP_TAUGHT` is set, and
+none is while it is not. (3) The reclaim spares an entry whose keys are known and that has never been loaded only where it has
+the set-up bit, or the fresh bit while `TAP_TAUGHT` is set. Every other entry that nothing on the card names is let go, as
+before D214. (4) An entry with the set-up bit does not count toward `UNMARKED_MOST` (`freeEntry`), and `GET_INFO` P1 = 3 byte 49
+counts as `freeEntry` does. (5) Keys already taught are replaced only by the same keys (the same top, `9000`, nothing changes),
+or under the holder's say in the tap: other keys whose ID shares the entry's 8 bytes are `6A9D` at the finish, with the top kept.
+`GET_CARD` P1 = 2 shows the state byte as before: the loaded, set-up and fresh bits are the card's own (`ENTRY_OWN`).
+
+**Why this and not the red team's two ideas.** Sparing only while the entry carries the holder's mark frees the till's keysets
+on an owned card, but not on a card with no owner, whose till holds the tap and marks its entries; and the set-up's entry is
+unmarked, so it would need the phone to give the owner's grant at set-up (an asking and a signature more in the set-up tap).
+Sparing at most one keeps the till's first keyset when it comes before the holder's, and undoes D214 for the third keyset taught
+in one tap. Keeping what the set-up taught, and what this tap taught, is what the two honest teachers do: the phone's set-up
+teaches the card's own currency once, and every other teaching (the first deposit of the other currency, a mint's new keyset,
+another mint's card) comes in the tap that loads it. A till's keysets are spared while it holds the card and let go at the
+first reclaim after. The set-up's entry, unmarked as before, does not count toward the two, so a set-up entry left waiting (the
+mint moved to a new keyset before the first deposit) blocks nothing: the holder's new keysets go in beside it with the PIN alone.
+For (5): a version 01 ID is 33 bytes and the card keeps 8 of it, so a teaching is held to 56 bits of the ID's hash; new keys that
+match there (about 2^56 work) would replace the top and the holder's change would no longer be finished. The same keys taught
+again are still taken, so a wallet that teaches again does not break.
+
+**Cases checked.**
+
+- A till with the PIN and no grant, owned card: one made-up keyset in its tap (a second `6A9C`, the cap as before), kept through
+  a reclaim in its own tap, let go at the first reclaim after it (`CLEAR_SPENT`, or the holder's load or teaching of a new keyset
+  that finds no room). The holder's top-up into the mint's new keyset, PIN alone, teaching first or loading first: `9000`.
+- A till with the PIN and a held tap, card with no owner: five, the table full in its tap; all let go after it; two more
+  rotations of the mint's keyset go in.
+- The holder's set-up (the claim right after the record, D215, then the teaching): the entry has the set-up bit, survives any
+  number of taps and reclaims, takes the first deposit, pays with change whose key is shown from it. A till's tap beside it plants
+  two (the set-up's does not count) and they go. A mint keyset change after it goes in under the PIN alone.
+- D214's own case: three keysets taught in one tap with the PIN alone, the third `6A9C` and nothing forgotten; six with the grant
+  and a seventh refused. Unchanged, the fresh bit keeping them. A keyset taught in one tap and loaded in a later one with no
+  reclaim between is kept; with a reclaim between it is let go and the wallet finds it untaught (`GET_CARD`'s keys-known bit,
+  `6A9F` at a change): a wallet teaches in the tap that loads, as Foxy does.
+- A tear: the fresh bits taken off a byte at a time, outside any transaction; torn halfway, `TAP_TAUGHT` (RAM) is gone with the
+  power and the next tap's first teaching takes the rest off. The entry's own bits are written in the teaching's transaction.
+- `RESET_CARD` and a hand-over clear `TAP_TAUGHT` with the PIN's other bits; the reset clears the table too.
+- A first set-up is one selection (D195) of a card with no PIN, which a till reaches only through a reset of an empty card, after
+  which the card is the till's.
+
+| Site | Writes outside a transaction | Why a tear there is safe |
+|---|---|---|
+| `processKeysetKeys` (P1 = 2) | new: at the first teaching of a time in the field, the fresh bit off each entry that has it, one byte each, before the teaching's transaction | One byte each is whole. Torn halfway, some entries keep the bit, and `TAP_TAUGHT` (RAM) was not set, so no reclaim spares them for it; the next teaching takes the rest off. The new entry's bits are written in the transaction with its top. |
+| `reclaim` | as [D214](#d214), one state byte `00` each | Unchanged: it frees more entries (waiting ones no tap of the set-up's and no teaching of this time in the field made), each a byte. |
+
+**What it costs.** No RAM (a sixth bit of `tapOpen[2]`) and no persistent memory (two bits of the state byte). The load file is
+40,635 bytes (223 more than D215's 40,412, with [D220](#d220)), not yet installed on a chip.
+
+**App change: none needed.** Foxy's `cardTeachAtSetUp` teaches in the set-up's tap, in the selection that set the PIN, so its
+entry gets the set-up bit with no change; a phone that re-selects the applet between `SET_PIN` and the teaching ends the first
+set-up, and its entry is then an ordinary waiting one, let go at the first reclaim after the set-up tap if no piece came (the
+first deposit teaches again where `GET_CARD` says the keys are not known, as Foxy does).
+
+**Built (applet).** `ENTRY_SETUP`, `ENTRY_FRESH`, `ENTRY_OWN`, `TAP_TAUGHT`, `newState`, `freeEntry`, `reclaim`,
+`processKeysetKeys` (P1 = 2), `processGetCard` (P1 = 2), `processGetInfo` (byte 49). Tests: `TillKeysetsTest` (the red team's
+`RT23TableTest` made a test that fails on 4d057fb: the owned card in both orders, the card with no owner, the set-up's entry and a
+keyset change after it, a set-up entry left waiting, a card with no owner's set-up entry, a keyset taught in an earlier tap let go,
+what a reader is told, keys not replaced without the say); `UnitsTest.stateOf` masks the card's own bits.
+
+## <a id="d220"></a>D220: A payment that makes the card's change is not signed in a shape that leaves no record
+
+**Decided (protocol 2.3, 2026-11-19, the project owner).** The card refuses to sign a payment that makes the card's own change
+(`SPEND_ALL_CHANGE`) and cannot leave a settlement record. A reader had two ways to choose a payment's shape so that it left none:
+a seventeenth output or an output of 0 (the review of 2026-11-18, L5), and 33 or more pieces (the red team of 2026-11-19, O1 on
+outbox-lean, which applies here: `writeOutbox`'s `n > OUT_IN_MOST`, with or without outbox-lean's bit). And the red team's F2 (round
+one, `RT23TearTest`): a payment torn after its commit, before `writeOutbox`, left the previous payment's record whole and served
+as the last.
+
+**The rule.** (1) At the first `SPEND_ALL_SIGN`, after `6A99` and before the PIN and the limits, a payment with the card's own
+change (`allState[6]` not 0) is refused `6AA0` and given up, nothing written or signed, where it names more than `OUT_IN_MOST`
+(32) places or its staged outputs are marked not recordable (`stageOutput`: a seventeenth output, or an output of 0). A payment
+with no change of the card's is paid as before, with no record. (2) The payment's commit sets the record's status to 0, one byte
+beside `burnPending`: a payment torn after its commit has no record, never the one before it. `writeOutbox` still clears the
+status and the descriptor's mark in its own transaction before the body.
+
+**Why only these.** The keeper's words were "whatever the reason". The other ways a payment leaves no record are the card's own
+state, not a shape the reader chooses: dated pieces (the packet has no field for a date: every payment of a card with a refund
+key, which is how Foxy loads a card it owns, `cardDateAhead`), a mint that is not `https://` (the local test mints of
+`tools/cardsim`), a receipt count or generation stopped at `FFFFFFFF`, and a card refused the record's room (D176). Refusing
+them would refuse every payment with change from a card Foxy owns. They sign as before, and this is for the owner to decide
+again if a record of dated payments is wanted (the packet would need the date and the refund key). Also left: a receipt the chip's
+transaction cannot hold (`finishBurn` false) and a chip fault inside `writeOutbox`, both after the commit, where nothing can be
+refused.
+
+**What a wallet must do.** Pay with change in at most 32 pieces and at most 16 outputs, the till's and the change together, none
+of 0. Foxy pays with at most 20 pieces; its own outputs are at most `CARD_OUTPUTS_MOST` (12), but the card's change is up to 8
+more (`CARD_CHANGE_MOST`), and the exact path (`o.exact`) is held only to the mint's array cap: Foxy must cap the till's outputs
+and the change together at 16 before this file ships (the review's decision 10: "cap the app's outputs first").
+
+**Cost accepted.** About 30 bytes of code; the payment's commit one byte more: the worst `SIGN` transaction is 18 writes and
+139 bytes (17 and 138 before), under `TransactionSizeTest`'s 20 and 140, one byte left; the chip's commit buffer is to be checked
+on a chip with the largest payment. The
+load file with [D219](#d219): 40,635 bytes.
+
+**Built (applet).** `SW_NO_RECORD` (`6AA0`), `processSpendAllSign`, `writeOutbox`'s comment. Tests: `ChangeRecordTest` (a
+seventeenth output, an output of 0 and 33 pieces with change refused with nothing written, each paid as before with no change;
+16 outputs and 32 pieces with change recorded; Foxy's largest shape, 20 pieces with 12 outputs and 4 of change, undated and
+dated, signed; 12 and 8 refused; the red team's `RT23TearTest` made a test that fails on 4d057fb). `cardctl` and the cardsim
+client translate `6AA0`. **Still owed:** outbox-lean (913a422) needs the same refusal when it is merged; its bit 2 changes
+nothing about it.

@@ -736,6 +736,7 @@ class SlotWriteOrderTest {
         { "processSetTag", "1", "one byte" },
         { "logEntry", "2", "a helper: every caller holds a transaction around it: the count of taps, and a new entry made whole in scratch and written with one copy (its clock, told time and unit bit, D184)" },
         { "enter", "2", "a new keyset's entry (D184): its eight bytes, then its state byte, the entry's commit; torn between, the entry is still free (loadOne and SPEND_ALL_CHANGE write it before anything that names it); a teaching (D214) calls it with the state byte 00, holding the room: the eight bytes of the keyset in a free entry, which nothing reads, the entry made at the end of the teaching in its transaction" },
+        { "processKeysetKeys", "1", "D219: the fresh bit taken off each entry that has it at the first teaching of a time in the field, one byte each, before the teaching's transaction; torn halfway, some keep it and TAP_TAUGHT (RAM) is not set, so they are spared by no reclaim and the next teaching takes the rest off" },
         { "reclaim", "1", "one state byte per entry nothing names (D184), each atomic; torn halfway, some dead entries are freed and the next reclaim frees the rest; a live entry is never freed" },
         { "armAllowance", "1", "one byte (D20, D186)" },
         { "endNoPinWindow", "2", "the no-PIN window's count to nothing, then its start (D186): the count alone says whether a window runs, so torn between, none runs and the stale start is written over by the next window's beginning; then armAllowance's one byte" },

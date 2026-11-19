@@ -681,7 +681,7 @@ class KeysetKeysTest {
     }
 
     @Test
-    @DisplayName("The keys go with their entry: let go by the reclaim and entered again, a keyset's keys are not known (6A9F) until taught again; taught again, a top that was not the keys' is replaced; RESET_CARD wipes every top")
+    @DisplayName("The keys go with their entry: let go by the reclaim and entered again, a keyset's keys are not known (6A9F) until taught again; taught again, a top that was not the keys' is replaced under the holder's say (6A9D without it, D219); RESET_CARD wipes every top")
     void theKeysGoWithTheirEntry() throws Exception {
         UnitsTest.Card c = card();
         int place = c.put(-1, A.id8(), 64);
@@ -704,6 +704,8 @@ class KeysetKeysTest {
         int e = c.entryOf(A.id8());
         c.book()[e * UnitsTest.ENTRY + 9] ^= 1;
         assertEquals(SW_WRONG_DATA, show(c, row[0], A, 8));
+        assertEquals(UnitsTest.SW_NOT_THIS_TAP, teach(c, A).getSW(), "other keys than the entry's, the PIN alone (D219)");
+        c.grant();
         taught(c, A);
         assertArrayEquals(top(A), topKept(c, A.id8()));
         assertEquals(SW_OK, show(c, row[0], A, 8));

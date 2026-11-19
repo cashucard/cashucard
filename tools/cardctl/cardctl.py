@@ -317,9 +317,11 @@ SW_MEANINGS = {
     0x6A9A: "two units in one payment, or a place whose keyset is in no entry",
     0x6A9B: "the other unit — the keyset is in the table as the other unit than the command names",
     0x6A9C: "no room in the keyset table, or a label of the other unit on a card with no table",
-    0x6A9D: "not this tap's to start — a new keyset of the other unit without the holder's say",
+    0x6A9D: "not this tap's to start — a new keyset of the other unit, or other keys for a keyset already taught, without the holder's say",
     0x6A9E: "limit reached, enter the PIN — past what the no-PIN window has left",
     0x6A9F: "keys not shown — the keyset's keys not taught to the card, or the opening's key not shown to be one of them",
+    0x6AA0: "no record — a payment that makes the card's own change in a shape that leaves no settlement record "
+            "(more than 32 pieces, a 17th output, an output of 0): pay in 32 pieces and 16 outputs or fewer",
     0x6B00: "wrong P1/P2",
     0x6D00: "instruction not supported",
     0x6E00: "class not supported",
