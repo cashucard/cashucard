@@ -8253,8 +8253,10 @@ recognises the card at the background read itself.
 
 - **The state.** `#new` (no owner, or no record) against a code: whether a card is set up. A set-up card's file is 71 bytes,
   a new card's 26, so the lengths say the same; nothing else is in either.
-- **The switch.** A card whose owner switched the tag off refuses the tag's name (`6999`): a reader learns that this card's
-  tag is off, one bit shared by every card so switched.
+- **The switch.** A card whose owner switched the tag off refuses the tag's name. The simulator answers `6999`; the J3R180
+  answered `6A82` (the chip run of 2026-11-19, check 4), the answer for a name the card does not hold. Either way a reader
+  learns that this card's tag is off, one bit shared by every card so switched, and `GET_INFO` P1 = 2 byte 42 says it to
+  any reader too: the switch is not a privacy setting, and the app does not offer it as one.
 - **Timing.** A set-up card's selection does the code's work (about 45 ms measured on a J3R180: a whole tag read takes about
   39 ms on a new card and 84 ms on a set-up card), a new card's none: the same bit as the state again. Every set-up card does the same work, whatever
   its owner, money or history.
@@ -8277,19 +8279,25 @@ recognises the card at the background read itself.
 - **A reader with c.** Whoever holds c (the owner's phone, and anyone the owner's words reach) recognises every read of
   that card; nobody else can. A hand-over or a reset draws or takes a new c, and the last owner's phone no longer
   recognises the card from that moment.
-- **The owner's phone as a test of ownership (open, for the project owner).** Someone who read a set-up card's address
-  once (a few centimetres, once) can show that same address again to the owner's phone, as a tag, a link or a QR code,
-  until the card's next hand-over or reset. The phone recognises its card and opens that card's screen instead of the
-  screen for someone else's card, so whoever watches the screen learns that this person owns the card read earlier. The
-  replay gains nothing else: the screen opens as last seen, and everything after it is decided by reading the card
-  itself, as with the plain address and the list of the owner's cards. Whether to accept this or to change the phone's
-  side (for example, to open the same screen for a match and a non-match until the card itself is read) is open.
+- **The owner's phone as a test of ownership (accepted, the project owner, 2026-11-19).** Someone who read a set-up
+  card's address once (a few centimetres, once) can show that same address again to the owner's phone, as a tag, a link
+  or a QR code, until the card's next hand-over or reset. The phone recognises its card and opens that card's screen
+  instead of the screen for someone else's card, so whoever watches the screen learns that this person owns the card read
+  earlier. The replay gains nothing else: the screen opens as last seen, and everything after it is decided by reading the
+  card itself, as with the plain address and the list of the owner's cards. The project owner accepted this so that the
+  owner's phone still opens its own card at the tag read. Rejected: the phone remembering the codes it has seen (the
+  attacker's own read was never seen by the phone, so the first replay still works), and one screen for every tag until
+  the card is read (it removes the reason for the code). Telling a tag read from a link or a QR code would close it, but
+  iOS does not say how a universal link arrived.
 
 **How (applet).** The tag applet holds no key and no code of its own: at the `SELECT` by name it asks the card's applet,
 through the same unexported shareable interface as the switch (`TagSwitch.tagCode`), to make this selection's code. The
 card's applet, on a card with an owner and a record, draws R, works K out from c and M from K and R, and keeps R and M in
-24 bytes of its own working memory (`scratch`, CLEAR_ON_DESELECT; on a chip that memory is not cleared when the tag, an
-applet of the same package, is selected after it, so the card's applet clears the 24 bytes at its own `select`); the room
+24 bytes of its own working memory (`scratch`, CLEAR_ON_DESELECT; the card's applet also clears the 24 bytes at its own `select`, for a chip
+that does not clear that memory when the tag, an applet of the same package, is selected after it. The J3R180 does clear
+it: a tag read between `SPEND_ALL_BEGIN` and `SPEND_ALL_SIGN` ended the payment, and SIGN answered `6985` with nothing
+spent, in the chip run of 2026-11-19. The applet comment at `tagCode` still says the opposite and is to be corrected with
+the next change to the applet's code); the room
 for the HMAC is the APDU buffer, K is held there only as the pad block. The room is checked to lie inside the caller's
 array before anything is worked out, and all of it is cleared on every way out, a failure's included. The card's applet
 hands the interface only to the tag: the caller's AID must be the tag's (the NFC Forum's name it is installed under, or

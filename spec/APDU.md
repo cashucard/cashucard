@@ -2332,7 +2332,7 @@ caller's AID must be `D2 76 00 00 85 01 01` or the tag's class AID
 
 | Card | Address | NDEF file (`E104`) |
 |---|---|---|
-| Tag switched off (`SET_TAG` `01`) | none: the tag's name is refused, `6999` | |
+| Tag switched off (`SET_TAG` `01`) | none: the tag's name is refused (`6999` in the simulator; the J3R180 answers `6A82`) | |
 | No owner, or no holder's record (new, or reset) | `https://getfoxy.io/card#new` | 26 bytes: `00 18 D1 01 14 55 04` and `getfoxy.io/card#new` |
 | An owner and a holder's record | `https://getfoxy.io/card#` and 48 lowercase hex | 71 bytes: `00 45 D1 01 41 55 04`, `getfoxy.io/card#`, then hex(R ‖ M) |
 
