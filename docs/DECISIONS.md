@@ -8778,6 +8778,27 @@ again are still taken, so a wallet that teaches again does not break.
 | `processKeysetKeys` (P1 = 2) | new: at the first teaching of a time in the field, the fresh bit off each entry that has it, one byte each, before the teaching's transaction | One byte each is whole. Torn halfway, some entries keep the bit, and `TAP_TAUGHT` (RAM) was not set, so no reclaim spares them for it; the next teaching takes the rest off. The new entry's bits are written in the transaction with its top. |
 | `reclaim` | as [D220](#d220), one state byte `00` each | Unchanged: it frees more entries (waiting ones no tap of the set-up's and no teaching of this time in the field made), each a byte. |
 
+**The limit: pieces loaded under made-up keysets (round two, R3).** The red team's second round (`RT23R2TableTest`'s second
+proof, at 6864627) found what this rule does not reach. The card checks no mint's signature at `LOAD_PROOF`, so a till with the
+PIN (and on a card with no owner the say, a held tap) need not teach: it loads one made-up piece under each made-up keyset, and
+each entry is then named by an unspent place, which no reclaim frees. On a card with no owner five such, and the holder's next
+keyset is `6A9C` even with the say; on an owned card the cap of two without the mark holds it to the two (`MEDIUM` with no
+owner, `LOW` owned). It is left in the card: a reclaim that freed an entry an unspent place names would leave that place in no
+entry, and a place in no entry pays nothing (`6A9A`); the card cannot tell a made-up piece from real money it has not proved.
+The one card-side idea looked at, freeing an entry whose every piece is under a keyset never taught, was rejected for that
+reason: a wallet that loads without teaching (every 2.2 wallet, Flash's, a top-up made before a teaching) holds real money under
+untaught keysets. **The way out is the holder's:** pay the made-up pieces away, as any payment of the card's (they are of one
+unit, so one payment takes them all), and the next reclaim frees their entries (`TableWayOutTest`). In the Foxy app today
+(main, `build/wallet/08a-flashcard.js`, 2026-11-19) that way exists only in part: a piece loaded with **no** mint's proof is
+answered `none` by `cardPayProve` and, when its owner's phone empties the card it set up (`cardMine`, the PIN given, all of the
+card), is let go with the owner's yes to that very set (`unchecked-drop`, "Remove it so the card can be emptied?"), signed for
+apart (`burnPieces`); a piece loaded **with** a made-up proof under a keyset the mint does not list is answered `away` (its keys
+are asked for and never come), and emptying the card is refused "The mint didn't send the keys ... Try again" every time; one
+whose proof is all zeros or fails against keys the phone has is put aside (`asideNow`), never named, and the card then cannot be
+reset (`6A8D`). A card the phone did not set up (`cardMine` false), which includes every card with no owner that Foxy did not
+set up, has no way out in the app. Owed in the app, not decided here: let the owner (and the holder of a card with no owner,
+under the PIN) remove pieces of keysets the mint does not list, as `unchecked-drop` does for pieces with no proof.
+
 **What it costs.** No RAM (a sixth bit of `tapOpen[2]`) and no persistent memory (two bits of the state byte). The load file is
 40,635 bytes (223 more than D221's 40,412, with [D224](#d224)), not yet installed on a chip.
 
