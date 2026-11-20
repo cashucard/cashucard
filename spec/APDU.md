@@ -1113,7 +1113,8 @@ and a swap the mint refuses for its amounts cannot be undone on the card: an und
 piece so burned is lost, since only the card could sign for it, a dated one comes
 back to the refund key after its date, and the payment's change stays owed until
 the holder lets it go ([RESET_CARD](#reset_card-0x51)). `6985` with no payment begun; `6985` after the card's own
-change (`SPEND_ALL_CHANGE`: the reader's outputs come first), the payment given up;
+change (`SPEND_ALL_CHANGE`: the reader's outputs come first), or once the payment's first `SPEND_ALL_SIGN` has been
+asked (its shape is fixed there, [D221](../docs/DECISIONS.md#d221)), the payment given up;
 `6700` for a length not a multiple of 37 (after the keyset), and the payment is
 dropped.
 
@@ -1155,7 +1156,9 @@ The day's limit counts the pieces whole, this change with them, until the change
 is back on the card ([LOAD_CHANGE](#load_change-0x27)); the no-PIN allowance counts
 the whole of the pieces; the wait is held to what leaves the card, the pieces less
 this change ([The clock and the limits](#the-clock-and-the-limits)). In order:
-`6A97`, `6985` as `SPEND_ALL_BEGIN`; `6985` with no payment begun; `6700` for any
+`6A97`, `6985` as `SPEND_ALL_BEGIN`; `6985` with no payment begun; `6985` once the
+payment's first `SPEND_ALL_SIGN` has been asked, in its wait or after (the payment given
+up: the shape the first `SIGN` checked is the shape signed, [D221](../docs/DECISIONS.md#d221)); `6700` for any
 length but 45; `6A80` for an amount of 0, for change that with the outputs and the
 change before it would come to more than the pieces, or for a K that is not a
 compressed point of the curve (`02` or `03`, and an x under p that has a point);
@@ -1201,7 +1204,8 @@ with any limit set and no rate (the payment given up, nothing written); `6AA0` f
 payment that makes the card's own change (`SPEND_ALL_CHANGE`) in a shape that leaves
 no settlement record ([GET_OUTBOX](#get_outbox-0x1b)): more than 32 pieces, more than
 16 outputs with the change, or an output of 0 (the payment given up, nothing written or
-signed, [D220](../docs/DECISIONS.md#d220)); `6A94`
+signed, [D220](../docs/DECISIONS.md#d220); asked again at the `SIGN` that signs after a wait, where
+no output or change can have come since the first, [D221](../docs/DECISIONS.md#d221)); `6A94`
 with a PIN set and not given in this tap, and an allowance of 0 or a blocked PIN
 (the payment given up, nothing written in the log); `6A9E` with a PIN set and not
 given, where the no-PIN window's count and the whole of this payment's pieces
@@ -2875,7 +2879,7 @@ certificate profile's and the reader's: the card has no part in it.
 | 6982 | Security status not satisfied: the PIN (or a grant, or a held tap) needed and not given in this tap; the last payment's record or its scope (`GET_OUTBOX`), c (`GET_CARD` P1 = `03`) or a date's keys (`GROUP_KEYS`) asked by a reader not given them |
 | 6983 | PIN blocked (a card with an owner): the counter spent, or the PIN state 2 |
 | 6984 | PIN not set |
-| 6985 | Conditions not satisfied: already spent, no payment begun, already locked; a clock that has taken no header (`INBOX`); outputs after the card's own change (`SPEND_ALL_OUTPUTS`); no sixteen bytes live (a sealed command, `GET_CARD` P1 = `03`); no owner's c kept for a claim or hand-over that gives its check (`SET_OWNER`); a teaching not begun (`KEYSET_KEYS` P1 = 1 or 2); an allowance on a card with no PIN (`SET_LIMIT`); a payment in a time in the field that claimed an owner or read a history, and a claim, a history, a rewrite or another key in one that paid; a certificate sealed, or a card that has had a PIN (`CERT_WRITE`) |
+| 6985 | Conditions not satisfied: already spent, no payment begun, already locked; a clock that has taken no header (`INBOX`); outputs after the card's own change (`SPEND_ALL_OUTPUTS`); outputs or change after the payment's first `SPEND_ALL_SIGN` (`SPEND_ALL_OUTPUTS`, `SPEND_ALL_CHANGE`, D221); no sixteen bytes live (a sealed command, `GET_CARD` P1 = `03`); no owner's c kept for a claim or hand-over that gives its check (`SET_OWNER`); a teaching not begun (`KEYSET_KEYS` P1 = 1 or 2); an allowance on a card with no PIN (`SET_LIMIT`); a payment in a time in the field that claimed an owner or read a history, and a claim, a history, a rewrite or another key in one that paid; a certificate sealed, or a card that has had a PIN (`CERT_WRITE`) |
 | 6986 | Card locked |
 | 6A80 | Wrong data: not a point, a bad refund key or unit, a factory record on a card that has had a PIN or holds a holder's record, bits no header could carry, a budget outside 1–30, a key not bound, a proof that does not hold, a path that does not reach the top, an owner's c that does not open or a check that is not its (`SET_OWNER`), a certificate that does not name the card or is not the one hashed, outputs and change past the pieces, a keyset's unit or amounts not its ID's |
 | 6A82 | Not found (the card's runtime): no applet of this name (an earlier 0.x or 1.x applet is one possible cause) |

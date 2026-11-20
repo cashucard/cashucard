@@ -8341,3 +8341,35 @@ seventeenth output, an output of 0 and 33 pieces with change refused with nothin
 dated, signed; 12 and 8 refused; the red team's `RT23TearTest` made a test that fails on 4d057fb). `cardctl` and the cardsim
 client translate `6AA0`. **Still owed:** outbox-lean (913a422) needs the same refusal when it is merged; its bit 2 changes
 nothing about it.
+
+## <a id="d221"></a>D221: The shape the first SIGN checked is the shape signed
+
+**Decided (protocol 2.3, 2026-11-19; amends [D220](#d220)).** *Numbered on `card23-fixes`: a merge into 3.0 renumbers it.*
+The red team of 2026-11-19, round two (R1, `RT23R2WaitTest` at 6864627), found that D220's `6AA0` was asked only at the first
+`SPEND_ALL_SIGN`. While a payment waits (a second payment in the time in the field, or one over the limit on one payment) the
+card still took `SPEND_ALL_CHANGE`, and `SPEND_ALL_OUTPUTS` before any change. A till passed the check and then added a
+seventeenth output, or the card's change to a payment of 33 pieces: the card signed, its change owed, and no settlement record
+was written. The day's limit and the wait were worked out at the first `SIGN` too, so change added after it also left the
+wait's discount and the day's room as the first `SIGN` saw them.
+
+**The rule.** (1) From the payment's first `SPEND_ALL_SIGN` (the wait's count, `allState[2..3]`, is -1 from `SPEND_ALL_BEGIN`
+until that `SIGN` sets it: `shapeFixed`), `SPEND_ALL_OUTPUTS` and `SPEND_ALL_CHANGE` give the payment up, `6985`, nothing
+written. The payment's openings drafted before are let go at the next `SPEND_ALL_BEGIN`, as any payment given up. (2) D220's
+check is asked at every `SIGN` that works out the figures (the first, and the one that signs after the wait), not only at the
+first: a second line, which (1) leaves nothing to find.
+
+**Why this.** Checking again at the signing `SIGN` alone would refuse the till's added output there, but the wait's figures
+and the day's room would still be the first `SIGN`'s, worked out for another shape. Fixing the shape at the first `SIGN`
+makes everything that `SIGN` worked out true of what is signed. An honest reader names every output and all the card's change
+before its first `SIGN` (the swap's outputs are known before it asks the card to sign), so nothing honest is refused: a
+waiting payment is signed with what it named, as before.
+
+**Cases checked.** `ShapeAfterSignTest`: the red team's two proofs made tests that fail on 6864627 (the card's change added in
+a second payment's wait, and change added to 33 pieces in the wait, each now `6985` with nothing burned and nothing owed); an
+output added in the wait; a second payment with the card's change that waits and is signed, its change owed and its record
+written; one with no change that waits and is signed; the signing `SIGN` refusing `6AA0` where the staged outputs are found not
+recordable after the wait (the second line, reached by setting the stage in the test).
+
+**What it costs.** Two comparisons and a short method; no RAM and no persistent memory.
+
+**Built (applet).** `shapeFixed`, `processSpendAllOutputs`, `processSpendAllChange`, `processSpendAllSign`.
