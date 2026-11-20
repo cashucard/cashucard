@@ -2636,7 +2636,7 @@ mint, told apart by keyset.
   bit 1 the keys known (a top kept). The keyset's 8 bytes are written, then the
   state byte, the entry's commit. The card also keeps bit 2, loaded, set at the first piece
   loaded under the keyset ([D220](../docs/DECISIONS.md#d220)); bit 3, entered in the card's
-  first set-up (for a keyset taught and not loaded, only the first of its unit while it waits,
+  first set-up (only a keyset taught and not loaded, the first of its unit while it waits; never an entry a load makes,
   [D226](../docs/DECISIONS.md#d226); taken off every entry at a hand-over); and bit 4, taught in the last time in the field that taught
   ([D223](../docs/DECISIONS.md#d223)). `GET_CARD` shows none of the three.
 - **Every piece is of one unit.** `LOAD_PROOF` P2 = 1 names the pieces' unit; P2 = 0
@@ -2644,7 +2644,7 @@ mint, told apart by keyset.
   entry is entered: under the PIN alone as the card's unit or the last payment's,
   and as either unit with the holder's say in the tap (the owner's grant; with no
   owner, a held tap), which marks it (`6A9D` otherwise). At most two live entries
-  lack the mark, not counting those entered in the card's first set-up ([D223](../docs/DECISIONS.md#d223));
+  lack the mark, not counting a set-up's keyset taught there ([D223](../docs/DECISIONS.md#d223), [D226](../docs/DECISIONS.md#d226));
   a new keyset with no entry free, or that would be a third without
   the mark, runs the reclaim and looks again (`6A9C` if it still finds none).
   `LOAD_CHANGE` enters nothing: change is in its opening's keyset.

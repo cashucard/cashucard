@@ -8905,8 +8905,8 @@ count toward the two without the mark, and the mint's next keyset was `6A9C` eve
 **The rule.** (1) A keyset taught in the first set-up (`KEYSET_KEYS` making its entry while `PM_FIRST`) gets the set-up bit only
 where no entry of its unit is a set-up's still waiting for its first piece (in use, set-up bit, never loaded): one such entry a
 unit, the **first**. A second taught there is an ordinary entry: it counts toward the two without the mark and is let go at the
-first reclaim after the set-up tap if no piece came. A keyset whose first piece is loaded in the set-up (`LOAD_PROOF`) still gets
-the bit as before: a loaded entry is never spared for it, only kept by the pieces that name it. (2) A hand-over (`SET_OWNER` on
+first reclaim after the set-up tap if no piece came. An entry a load makes (`LOAD_PROOF`) never gets the bit (round three, R5,
+below). (2) A hand-over (`SET_OWNER` on
 an owned card, `forgetOwed`) takes the set-up bit off every entry, a byte each, before its reclaim, so the last owner's set-up
 keyset that never got a piece is let go with the rest. `RESET_CARD` empties the table as before.
 
@@ -8928,6 +8928,18 @@ units under a held tap (each keeps the bit and survives taps and reclaims; a sec
 in the set-up leaves the bit to the next; a hand-over lets the set-up keyset go; a reset empties the table and the next set-up's
 one keyset has the bit again. The red team's second proof (made-up pieces loaded under made-up keysets) is [D223](#d223)'s
 limit, below.
+
+**Round three (R5, the review of 82ddd3b, `RT23R3Test`).** As first written, an entry a load made in the first set-up still
+got the set-up bit (state `4C`). On a loaded entry the bit is never a reason to spare it, but it kept the entry out of the two
+without the mark, so a relay in the owner's set-up tap loaded one made-up piece under each of five made-up keysets and filled
+the table: the holder's next keyset was `6A9C`, the owner's grant too. Now only a keyset taught and not loaded gets the bit; a
+load's entry is an ordinary one, so the set-up selection plants no more than the two without the mark, as any tap with the PIN
+alone does, and the owner's grant still finds room. What a load's set-up bit did for an honest set-up was spare a keyset loaded
+there from the count of two; a set-up that teaches its keyset first (Foxy's `cardTeachAtSetUp`, then the first load of up to 45
+pieces) keeps the bit on that entry, taught first and loaded after. One that loads with no teaching has an ordinary entry, the
+first of the two, and the holder's next keyset still goes in with the PIN alone. Tests in `SetUpEntriesTest`: the reviewer's
+proof (two made-up keysets, not five, none with the bit; the next keyset with the grant), a set-up that teaches and loads 45
+pieces, one that loads without teaching, a card with no owner's set-up; the hand-over and reset cases unchanged.
 
 **What it costs.** A loop over the six state bytes at a set-up teaching, and one at a hand-over; no RAM and no persistent memory.
 

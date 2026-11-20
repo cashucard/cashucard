@@ -7136,19 +7136,18 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /**
      * A new entry's state byte: in use, of `unit`, marked where the holder has the say in this tap, ENTRY_LOADED for a piece's
-     * (`loaded`), and ENTRY_SETUP in the card's first set-up (D223), but for a keyset taught and not loaded only where no entry
-     * of `unit` is a set-up's still waiting for its first piece (D226): one such a unit, the first, which is the honest set-up's
-     * one teaching of the unit, so that whoever speaks in the set-up selection cannot keep more of the table for good.
+     * (`loaded`), and ENTRY_SETUP only for a keyset taught in the card's first set-up and not loaded (D223), and only where no
+     * entry of `unit` is a set-up's still waiting for its first piece (D226): one such a unit, the first, which is the honest
+     * set-up's one teaching of the unit. An entry a load makes never has it (D226, round three): on a loaded entry the bit only
+     * kept it out of the two without the mark, so whoever spoke in the set-up selection could fill the table with loads.
      */
     private byte newState(short unit, boolean loaded) {
         byte st = (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0) | (loaded ? ENTRY_LOADED : 0));
-        if (pinMarks[PM_FIRST] != (byte) 1) return st;
-        if (!loaded) {
-            for (short e = 0; e < BOOK_ENTRIES; e++) {
-                byte o = book[(short)(e * ENTRY_LEN + ENTRY_STATE)];
-                if ((byte)(o & (byte)(ENTRY_USED | ENTRY_SETUP | ENTRY_LOADED)) == (byte)(ENTRY_USED | ENTRY_SETUP)
-                    && (short)(o & 1) == unit) return st;
-            }
+        if (loaded || pinMarks[PM_FIRST] != (byte) 1) return st;
+        for (short e = 0; e < BOOK_ENTRIES; e++) {
+            byte o = book[(short)(e * ENTRY_LEN + ENTRY_STATE)];
+            if ((byte)(o & (byte)(ENTRY_USED | ENTRY_SETUP | ENTRY_LOADED)) == (byte)(ENTRY_USED | ENTRY_SETUP)
+                && (short)(o & 1) == unit) return st;
         }
         return (byte)(st | ENTRY_SETUP);
     }
