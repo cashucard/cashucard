@@ -1,5 +1,7 @@
 # Protocol 2.3 with D219 and D220 on the reader's sample card 58206920: the chip run of card23-fixes (2026-11-19)
 
+> Note added at the 3.0 merge (2026-11-19): decision numbers here are from before the 3.0 merge. card23-fixes' D219 and D220 are now D223 and D224, and its D221 and D222 are D225 and D226; this repo's D205 to D215 are D211 to D221 (D205 to D210 now name the other maintainer's 3.0 decisions, and links to them below land on those). The record itself is unchanged.
+
 The 2.3 file of `card23-fixes` (6864627): [D219](../DECISIONS.md#d219) (a keyset taught and never loaded is kept only where the card's
 first set-up entered it or this time in the field taught it; keys already taught are replaced only under the holder's say, `6A9D`) and
 [D220](../DECISIONS.md#d220) (a payment that makes the card's own change is refused `6AA0` at its first `SIGN` for more than 32 pieces, a

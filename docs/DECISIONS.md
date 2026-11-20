@@ -6393,8 +6393,8 @@ change, set-up and top-up.
 **The cards.** A 2.2 card moves to 3.0 as a 2.1 card moved to 2.2: swept, then a new
 install, which makes a new key.
 
-**The size.** The 3.0 file of the merge (D183 to D224) is a load file of 41,742 bytes by refcheck's
-measure (14 past a multiple of 256), against 21,631 for 2.2. It has run only in a simulator: its own chip
+**The size.** The 3.0 file of the merge (D183 to D226) is a load file of 41,887 bytes by refcheck's
+measure (159 past a multiple of 256), against 21,631 for 2.2. It has run only in a simulator: its own chip
 run comes before it ships, its size first. On 2026-11-13 a J3R180 installed earlier source, numbered 2.3 then, padded to
 33,647 and 35,213 bytes and refused the card's applet padded to 32,777 (`6F00`, twice), so refcheck refuses a build from
 32,700 to 32,850. No file since is padded. On the same day the same J3R180 installed the file this source made before
@@ -7902,12 +7902,12 @@ the 2.x spec, with no change to any of them.
 two runs will be reinstalled with the tracked file for the run that proves it.
 
 **At the merge (2026-11-19).** The speed and safety work built on the wire numbered 2.3 (this repo's D205 to D215 then,
-now [D211](#d211) to [D221](#d221)), the rotating tag ([D222](#d222)) and the fixes [D223](#d223) and [D224](#d224) were
+now [D211](#d211) to [D221](#d221)), the rotating tag ([D222](#d222)) and the fixes [D223](#d223) to [D226](#d226) were
 merged into this wire and ship as 3.0 too, not 3.1: no 3.0 file had been installed on any chip or read by any app, so
 nothing is broken by folding them in. Strictly, some of them change answers a 3.0 reader of the file before the merge
 would get (a keyset taught before its first piece no longer answers `6A88`, a claim right after the set-up's record
 answers `9000` at once, no "not yet" within the limit, `6AA0` for a change-making payment of a shape that leaves no
-record); by this entry's rule that would want 4.0 had 3.0 shipped. It had not. 3.0 is D183 to D224. *Open with the other
+record); by this entry's rule that would want 4.0 had 3.0 shipped. It had not. 3.0 is D183 to D226. *Open with the other
 maintainer (M3): whether the merged work rides in 3.0 or in 3.1.* The bench cards 09301220 and 09312320 answer `02 03`
 until they are reinstalled with the 3.0 file.
 
@@ -8864,7 +8864,7 @@ nothing about it.
 
 ## <a id="d225"></a>D225: The shape the first SIGN checked is the shape signed
 
-**Decided (protocol 2.3, 2026-11-19; amends [D224](#d224)).** *Numbered on `card23-fixes`: a merge into 3.0 renumbers it.*
+**Decided (protocol 3.0, 2026-11-19; amends [D224](#d224)).** *D221 on `card23-fixes`; D225 since the 3.0 merge.*
 The red team of 2026-11-19, round two (R1, `RT23R2WaitTest` at 6864627), found that D224's `6AA0` was asked only at the first
 `SPEND_ALL_SIGN`. While a payment waits (a second payment in the time in the field, or one over the limit on one payment) the
 card still took `SPEND_ALL_CHANGE`, and `SPEND_ALL_OUTPUTS` before any change. A till passed the check and then added a
@@ -8896,7 +8896,7 @@ recordable after the wait (the second line, reached by setting the stage in the 
 
 ## <a id="d226"></a>D226: One set-up keyset of each unit waits; a hand-over lets it go
 
-**Decided (protocol 2.3, 2026-11-19; amends [D223](#d223)).** *Numbered on `card23-fixes`: a merge into 3.0 renumbers it.*
+**Decided (protocol 3.0, 2026-11-19; amends [D223](#d223)).** *D222 on `card23-fixes`; D226 since the 3.0 merge.*
 The red team of 2026-11-19, round two (R2, `RT23R2TableTest` at 6864627), found that nothing limited how many entries got
 D223's set-up bit. Whoever speaks in the card's first set-up selection (a relay in the holder's set-up tap, or a seller who sets
 the card up and hands it over) taught five made-up keysets beside the real one; every reclaim spared them for good, they did not

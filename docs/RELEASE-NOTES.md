@@ -8,12 +8,12 @@ the merged pull requests besides.
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
-`dc9bdee911817b76f7dd0ef8dfcf2bc44bb7bc9e06858ef48a6994522c9b9508`. Its load file,
-the bytes a card is LOADed with, is 41,742 bytes by `tools/refcheck.py`'s measure,
-sha256 `2b51ae1ca0da8640a0b977ef906d6dc4663b869fee058190a3487287c70bcf27`. `SELECT`
+`43a3569dd6c98db28a8f89f504bfe94a70787f65dd9c7ed6597f9a17b7133d38`. Its load file,
+the bytes a card is LOADed with, is 41,887 bytes by `tools/refcheck.py`'s measure,
+sha256 `71642e44ba2499fc5e84fd1348bd3e80cecc07c9a0f9b6a2adfdfe054496812b`. `SELECT`
 and `GET_INFO` answer `03 00`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D224](DECISIONS.md#d224) (numbered 3.0 by
+[D183](DECISIONS.md#d183) to [D226](DECISIONS.md#d226) (numbered 3.0 by
 [D205](DECISIONS.md#d205); the decisions this repo's 2.3 files carried as D205 to D215 are D211 to D221
 since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
@@ -25,7 +25,7 @@ moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206]
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
 path; the no-PIN allowance armed by the owner's proof or a held tap and not by the PIN alone; `GET_INFO`'s paid-list
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
-settlement record fixes ([D223](DECISIONS.md#d223), [D224](DECISIONS.md#d224)). The run is to be
+settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)). The run is to be
 repeated on it, its size first
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)).
 

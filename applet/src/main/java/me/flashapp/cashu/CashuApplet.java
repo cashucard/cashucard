@@ -7383,7 +7383,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private static void sizeTheFile(byte[] a) {
         /* 3.0: no lines here, and the load file is unpadded, the least this source comes to; refcheck prints its size at every build.
-         * The 3.0 file of the merge is 41,742 bytes (14 past a multiple of 256) and no chip has been given it. The last 2.3
+         * The 3.0 file of the merge is 41,887 bytes (159 past a multiple of 256) and no chip has been given it. The last 2.3
          * file (D221, 40,412 bytes, 220 past) ran on a J3R180 on 2026-11-15, and the file with D217 to D220 (40,365, 173 past) the day
          * before; the file with D213 to D216 (39,343, 175 past) installed on 2026-11-14, where a study build of its source was refused
          * (6F00) at 38,791 and 38,809 bytes (135 and 153 past) and installed at 38,893 (237 past); the files with D212 (37,269, 149
