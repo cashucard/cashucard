@@ -23,6 +23,13 @@ Info.plist. Historical `v2.1.0` and `provisioner-v1.0.0-beta.1` releases remain
 valid historical records; do not move or retag them. Corrected firmware Maven
 metadata does not alter the CAP.
 
+Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
+answer `03 00`, and the decisions are D183 to D224 (spec/APDU.md). The tracked
+`cashu-javacard-3.0.0.cap` of that merge has run only in a simulator; no
+`firmware-v3.0.0` release is cut before its chip run. The last firmware a chip ran
+was numbered 2.3 (`02 03`, `cashu-javacard-2.3.0.cap`, load file `05c9b847…`), never
+released under a tag.
+
 Firmware's protocol major/minor follows SELECT/GET_INFO. An applet behavior change
 ships its rebuilt CAP, hash and generated load-file pins together, with hardware
 evidence as required by AGENTS. A host API change uses cardkit's independent

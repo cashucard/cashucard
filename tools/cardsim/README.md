@@ -135,8 +135,8 @@ is now. Anything the applet would refuse because of the fixture's own shape is a
 1. `pin`: `SET_PIN` if the card has no PIN (which begins its first set-up), then `VERIFY_PIN`.
 2. `mint` and `refundKey`: `SET_CARD`, with the owner's proof if the card already has an owner.
 3. `owner` or `ownerKey`, with `anchor`: `SET_OWNER`. On an owned card, with the old
-   owner's proof. On a card with no owner, the claim: the same `SET_OWNER` six times,
-   the first five answered `6A98` (keep holding); then the card is taken out of the
+   owner's proof. On a card with no owner, the claim: the same `SET_OWNER` four times,
+   the first three answered `6A98` (keep holding; once, right after the set-up's record, D221); then the card is taken out of the
    field and back, selected, and `VERIFY_PIN` sent again, since a card claimed in a
    time in the field pays nothing in it.
 4. `headers`: `SET_HEADER`, in order.
