@@ -8181,6 +8181,11 @@ Supersedes [D188](#d188) and sets the counts of [D187](#d187), [D189](#d189) and
 *At the merge of 2026-11-19: the other maintainer's 3.0 file before the merge kept D188's floor; this entry takes it
 away on the shared 3.0 wire too, which is open with him (M1). The shorter history's hold also shortens the held tap that
 arms a card with no owner under [D208](#d208) (about 3 s; M5).*
+*What each side costs (the independent review of the merge, by count, not measured on a chip): 3.0's payment signature does
+as many point operations as 2.3's, each wait, held asking and `AUTH` one fewer (D207's check reads the key object where
+D218's made P = d·G), and SIGN's commit writes one byte more in the same transaction (D224). The other maintainer's floor,
+`WAIT_FLOOR_SIGNS` = 4, would add three waits to a payment with no change, about 1.5 to 1.8 s on every such payment at the
+asking times measured on a J3R180; no floor costs that nothing and keeps a brush of a tap within the limit unslowed.*
 
 - **The payment floor is gone.** A payment within its limit, the first in its time in the field,
   is signed at its first `SPEND_ALL_SIGN`: no "not yet". `WAIT_FLOOR_SIGNS` is removed. 2.2's waits

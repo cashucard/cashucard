@@ -479,6 +479,12 @@ a few hundred taps. Treat simulator results accordingly, see
      after D, by the network's tip; an owner that takes a piece back early, while a
      reader with a slow clock pays it, has the whole payment refused by the mint after
      the card burned every piece in it.
+9. **One chip-path failure slows the card until its next `SET_CARD`** (3.0, D218; the independent review of the 3.0 merge,
+   C1): a signature whose chip product fails the check, or a chip that refuses the product once, turns `chipMul` off, and
+   every signature after it is made by the bytecode product, about 0.4 s slower, until a `SET_CARD` runs the known answers
+   again; a holder's card rarely sees another `SET_CARD`. Nothing is wrong in what it signs: it is slower. To do: run the
+   squaring's self-test again at the card's next selection after a failure (or at the next `SET_CARD`-free tap that has the
+   time) and turn the chip path back on where it holds.
 
 ## Reporting a vulnerability
 

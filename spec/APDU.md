@@ -1083,7 +1083,9 @@ begun), and `6A9B` where the first slot's unit is the other unit than the card's
 and P1 has not bit 0 (`01`): a payment in the card's other unit is begun only for a reader
 that says it reads units, so that software that reads none never pays cents as
 sats; then, for a sum that wraps past four bytes only, `6A94` with a PIN set
-and not given, or `6A8F` where a daily limit is set. Any opening of change drafted
+and not given, or `6A8F` where a daily limit is set; last, `6F00` where the chip's
+arithmetic fails working out the date's key and refund key (P + t·G, R + u·G), with no
+payment begun and nothing burned. Any opening of change drafted
 for a payment never signed is let go. Two keysets of one unit pay together; the
 card never chooses a unit: the payment's is the one of the places named.
 
@@ -1109,7 +1111,7 @@ it is not the `6985` of a spent place.
 | INS | `23` |
 | P1 | `00`, or `01`: the keyset the outputs are in comes first |
 | P2 | `00` |
-| Lc | a multiple of 37, and 8 more with P1 = `01` |
+| Lc | one output or more: a multiple of 37, at least 37, and 8 more with P1 = `01` |
 | Data | [with P1 = `01`: the keyset (8)] ‖ for each output: amount (4) ‖ blinded message B_ (33) |
 
 Hashed into the message as they come (the amount in decimal, then B_ in hex). The
@@ -1134,8 +1136,8 @@ back to the refund key after its date, and the payment's change stays owed until
 the holder lets it go ([RESET_CARD](#reset_card-0x51)). `6985` with no payment begun; `6985` after the card's own
 change (`SPEND_ALL_CHANGE`: the reader's outputs come first), or once the payment's first `SPEND_ALL_SIGN` has been
 asked (its shape is fixed there, [D225](../docs/DECISIONS.md#d225)), the payment given up;
-`6700` for a length not a multiple of 37 (after the keyset), and the payment is
-dropped.
+`6700` for no output (Lc 0, or P1 = `01` with the keyset's 8 bytes alone) or a length not a multiple of 37 (after the
+keyset), and the payment is given up.
 
 ### SPEND_ALL_CHANGE (0x26)
 
@@ -1201,9 +1203,9 @@ card has not been taught; `6A9B` for one of the other unit than the payment's;
 this payment (300 pieces a day, [The paid list](#the-paid-list)): change is counted
 when the payment is signed and its `LOAD_CHANGE` is never refused for the count
 ([D200](../docs/DECISIONS.md#d200)), so the card makes none it could not take back;
-`6F00` if the chip's arithmetic fails, or if the signature does not check against the card's key ([D218](../docs/DECISIONS.md#d218): every signature the card makes is checked before it
-leaves, a failing chip path is redone by the bytecode, and one that still fails is not released). Every refusal but the first three gives the
-payment up. A reader that meets `6A8F` here begins the payment again with pieces that
+`6F00` if the chip's arithmetic fails in the change's hash to the curve or its blinding, whether the chip refuses
+or the card's own checks of its answers do (no opening is drafted, nothing is burned). Every refusal but the first three gives the
+payment up, `6F00` among them. A reader that meets `6A8F` here begins the payment again with pieces that
 need no change, or no more change outputs than the card made before the refusal; or
 the holder pays after the day of loads has turned. The `6A8F` comes before any PIN is
 asked, so it tells a stranger how many loads are left today where fewer than 8 are
@@ -1224,7 +1226,7 @@ no keyset; a 3.0 card answers both `6700`.
 is burned, the counts charged, the openings of change made owed and the log
 written in the same commit. Until the payment has waited, the card answers `00 01`
 ("not yet") and the reader sends `SIGN` again: a payment within its limit, the first in its time in the field, is
-signed at its first `SIGN` (2.3 has no floor, [D211](../docs/DECISIONS.md#d211)), and
+signed at its first `SIGN` (no floor, [D211](../docs/DECISIONS.md#d211)), and
 one over the limit on one payment, or a second payment in a time in the field,
 waits ([The clock and the limits](#the-clock-and-the-limits)). The wait is
 the card's own work and burns nothing, and the card never says how many answers
@@ -1236,7 +1238,9 @@ with any limit set and no rate (the payment given up, nothing written); `6AA0` f
 payment that makes the card's own change (`SPEND_ALL_CHANGE`) in a shape that leaves
 no settlement record ([GET_OUTBOX](#get_outbox-0x1b)): more than 32 pieces, more than
 16 outputs with the change, or an output of 0 (the payment given up, nothing written or
-signed, [D224](../docs/DECISIONS.md#d224); asked again at the `SIGN` that signs after a wait, where
+signed, [D224](../docs/DECISIONS.md#d224); on a card that was refused the room for the record
+([D176](../docs/DECISIONS.md#d176)), which writes no record whatever the shape, only more than 32 pieces is
+refused, and the seventeenth output and the output of 0 are not looked at; asked again at the `SIGN` that signs after a wait, where
 no output or change can have come since the first, [D225](../docs/DECISIONS.md#d225)); `6A94`
 with a PIN set and not given in this tap, and an allowance of 0 or a blocked PIN
 (the payment given up, nothing written in the log); `6A9E` with a PIN set and not
@@ -1789,8 +1793,8 @@ and into a tree whose leaves are `SHA-256(0x00 ‖ amount (8) ‖ K)`, in the or
 given. P1 = 2 finishes: the card ends the ID, and keeps the tree's top (padded to
 the next power of two with `SHA-256(0x02)`, nodes `SHA-256(0x01 ‖ left ‖ right)`)
 in the keyset's entry only where the ID's first 8 bytes are the keyset's; it
-answers the ID it worked out (8 or 33 bytes). Any other command between gives the
-teaching up. A keyset taught again with the same keys keeps its top; with other keys
+answers the ID it worked out (8 or 33 bytes); P1 = 2 with any data is `6700`, and the teaching is given up. Any other
+command between gives the teaching up. A keyset taught again with the same keys keeps its top; with other keys
 (whose ID shares its 8 bytes: the card holds the ID to 56 bits of its hash) it is `6A9D`
 at the finish without the holder's say in this tap, and its top replaced with it
 ([D223](../docs/DECISIONS.md#d223)).
@@ -3013,7 +3017,7 @@ tell it is the same card under every holder, and no reset changes that.
 | 6A90 | No owner |
 | 6A91 | The owner's proof missing, wrong or used, or a command not open to an owned card; on a card with no owner past its first set-up, a record (`SET_CARD`), a number (`SET_LIMIT_PIN`) or a claim (`SET_OWNER`), which are set once |
 | 6A93 | Too little work in a block header |
-| 6A94 | A piece already on the card or on the paid list (`LOAD_PROOF`), or an opening's piece already on it; the PIN needed for this payment (`SPEND_ALL_SIGN`: an allowance of 0 or a blocked PIN) |
+| 6A94 | A piece already on the card or on the paid list (`LOAD_PROOF`), or an opening's piece already on it; the PIN needed for this payment (`SPEND_ALL_SIGN`: an allowance of 0 or a blocked PIN; `SPEND_ALL_BEGIN`: a sum past four bytes with a PIN set and not given) |
 | 6A96 | Too many places for one signature; a payment's, a record's (`SET_CARD`) or an owner's (`SET_OWNER`) transaction the chip cannot hold, nothing written |
 | 6A97 | No PIN: the card takes and pays nothing until it is given one |
 | 6A98 | Keep holding: a held count not yet through (an owner's claim, a history, a reset by the PIN, the PIN's wait on a card with no owner); send the same command again |
@@ -3024,11 +3028,11 @@ tell it is the same card under every holder, and no reset changes that.
 | 6A9D | Not this tap's to start: a new keyset of the other unit without the holder's say; keys other than those an entry already has (`KEYSET_KEYS`, [D223](../docs/DECISIONS.md#d223)) |
 | 6A9E | Limit reached, enter the PIN: a payment with no PIN past what the no-PIN window has left |
 | 6A9F | Keys not shown: the keyset's keys not taught to the card (change is made only in a taught keyset), or the opening's key not shown to be one of them |
-| 6AA0 | No record: a payment that makes the card's own change in a shape that leaves no settlement record, more than 32 pieces or more than 16 outputs or an output of 0 (`SPEND_ALL_SIGN`, [D224](../docs/DECISIONS.md#d224)) |
-| 6B00 | Wrong P1/P2: a missing confirmation byte (`LOCK_CARD`, `RESET_CARD`), a number that is not P2 (`RESET_CARD` P1 = 1), a load's P2 with a bit past bit 1 (`LOAD_PROOF`), a tag switch other than `00` or `01` or a byte that is not P1 (`SET_TAG`), a P1 or P2 other than `00` (`INBOX`), a P1 other than `00` or `01` or a P2 other than `00` (`SET_OWNER`), a P1 other than `00` or `01` (`REFRESH`) |
+| 6AA0 | No record: a payment that makes the card's own change in a shape that leaves no settlement record, more than 32 pieces or more than 16 outputs or an output of 0; on a card refused the record's room, more than 32 pieces only (`SPEND_ALL_SIGN`, [D224](../docs/DECISIONS.md#d224)) |
+| 6B00 | Wrong P1/P2: a missing confirmation byte (`LOCK_CARD`, `RESET_CARD`), a number that is not P2 (`RESET_CARD` P1 = 1), a load's P2 with a bit other than bits 0, 1 and 3, or bit 3 (`08`, C whole) on a card whose key agreement failed its set-up test (`LOAD_PROOF`, [D212](../docs/DECISIONS.md#d212)), a tag switch other than `00` or `01` or a byte that is not P1 (`SET_TAG`), a P1 or P2 other than `00` (`INBOX`), a P1 other than `00` or `01` or a P2 other than `00` (`SET_OWNER`), a P1 other than `00` or `01` (`REFRESH`) |
 | 6D00 | Instruction not supported |
 | 6E00 | Class not supported |
-| 6F00 | The chip's arithmetic failed, or a signature did not pass the card's own check before leaving it: nothing is given |
+| 6F00 | The chip's arithmetic failed, or a signature did not pass the card's own check before leaving it: nothing is given (`SPEND_ALL_BEGIN`: no payment begun; `SPEND_ALL_CHANGE`: the payment given up) |
 | 63CX | Wrong PIN: X tries left on a card with an owner; X wrong tries in a row on a card with none (`F` for fifteen or more), the next try waiting |
 
 ---
