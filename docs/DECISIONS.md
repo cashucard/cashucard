@@ -8865,3 +8865,43 @@ recordable after the wait (the second line, reached by setting the stage in the 
 **What it costs.** Two comparisons and a short method; no RAM and no persistent memory.
 
 **Built (applet).** `shapeFixed`, `processSpendAllOutputs`, `processSpendAllChange`, `processSpendAllSign`.
+
+## <a id="d226"></a>D226: One set-up keyset of each unit waits; a hand-over lets it go
+
+**Decided (protocol 2.3, 2026-11-19; amends [D223](#d223)).** *Numbered on `card23-fixes`: a merge into 3.0 renumbers it.*
+The red team of 2026-11-19, round two (R2, `RT23R2TableTest` at 6864627), found that nothing limited how many entries got
+D223's set-up bit. Whoever speaks in the card's first set-up selection (a relay in the holder's set-up tap, or a seller who sets
+the card up and hands it over) taught five made-up keysets beside the real one; every reclaim spared them for good, they did not
+count toward the two without the mark, and the mint's next keyset was `6A9C` even with the owner's grant, until a reset.
+
+**The rule.** (1) A keyset taught in the first set-up (`KEYSET_KEYS` making its entry while `PM_FIRST`) gets the set-up bit only
+where no entry of its unit is a set-up's still waiting for its first piece (in use, set-up bit, never loaded): one such entry a
+unit, the **first**. A second taught there is an ordinary entry: it counts toward the two without the mark and is let go at the
+first reclaim after the set-up tap if no piece came. A keyset whose first piece is loaded in the set-up (`LOAD_PROOF`) still gets
+the bit as before: a loaded entry is never spared for it, only kept by the pieces that name it. (2) A hand-over (`SET_OWNER` on
+an owned card, `forgetOwed`) takes the set-up bit off every entry, a byte each, before its reclaim, so the last owner's set-up
+keyset that never got a piece is let go with the rest. `RESET_CARD` empties the table as before.
+
+**Why the first, not the newest.** An honest set-up teaches the card's own currency once (Foxy's `cardTeachAtSetUp`), and on a
+card with no owner under a held tap perhaps the other unit's once: the first of each unit is the only one, so it is never hurt.
+"The newest" would move the bit, a write to an older entry and a tear to reason about, and a relay that speaks after the phone
+would take it from the phone's keyset just as one that speaks first takes it under "the first". Either way a relay in the
+middle chooses; what the rule bounds is the reach: at most one made-up keyset a unit (two of the six entries on a card of both
+units) is kept past the set-up tap, and the holder keeps four entries, its own keysets going in with the PIN alone. Where a
+relay took the bit, the phone's own set-up keyset is still kept through the set-up tap (D223's fresh bit) and let go after it
+if no piece came; the first deposit teaches it again where `GET_CARD` says the keys are not known, as Foxy does. The bit is
+for waiting entries only, so a set-up that loads its first keyset and then teaches the mint's next one gives the next the bit.
+
+**Cases checked.** `SetUpEntriesTest`: the red team's first proof made a test that fails on 6864627 (six made-up keysets taught
+after the phone's in the set-up selection: two go in, none has the bit, all are let go after the set-up tap, and the mint's
+next keyset goes in with the PIN alone); a relay that teaches first (its one kept; the phone's let go after the tap; the
+holder teaches its keysets again with the PIN alone); the honest set-up of one keyset a unit, owned, and with no owner both
+units under a held tap (each keeps the bit and survives taps and reclaims; a second sat keyset does not); a set-up keyset loaded
+in the set-up leaves the bit to the next; a hand-over lets the set-up keyset go; a reset empties the table and the next set-up's
+one keyset has the bit again. The red team's second proof (made-up pieces loaded under made-up keysets) is [D223](#d223)'s
+limit, below.
+
+**What it costs.** A loop over the six state bytes at a set-up teaching, and one at a hand-over; no RAM and no persistent memory.
+
+**Built (applet).** `newState` (now told whether the entry is a piece's), `forgetOwed`, `ENTRY_SETUP`'s comment; the comment
+on `forgetOwed` no longer says every entry nothing names goes while set-up entries were kept (round two's R4b).

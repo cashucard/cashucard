@@ -1768,7 +1768,10 @@ holder's say, `6A9C` with no entry free after a reclaim, and `6A88` on a card
 with no keyset table. Only the room is held at the begin ([D220](../docs/DECISIONS.md#d220)): the entry is made at the finish, with the keys, in the one transaction
 that writes them, so a teaching refused or given up makes none and the table is as it was. An entry taught and never loaded is not let go by the reclaim
 while it was entered in the card's first set-up or taught in this time in the field ([D223](../docs/DECISIONS.md#d223)): it waits for its first
-piece, so a card with no entry free answers `6A9C` at the begin and forgets nothing. One taught in an earlier tap and never loaded is let go by a
+piece, so a card with no entry free answers `6A9C` at the begin and forgets nothing. Of the keysets taught in the first set-up
+and not loaded, only one of each unit is entered as the set-up's, the first: a second taught there while the first still waits
+is an ordinary entry, counted toward the two without the mark and let go after the set-up tap if no piece comes
+([D226](../docs/DECISIONS.md#d226)). One taught in an earlier tap and never loaded is let go by a
 reclaim after that tap: a wallet teaches a keyset in the tap that loads it, or at set-up. The tail is the bytes NUT-02 hashes after the
 keys for the ID's version (none for version `00`), at most 64. A version `01`
 tail names the unit first, `|unit:sat` or `|unit:usd` followed by the end or `|`,
@@ -2025,7 +2028,8 @@ signatures), which it keeps where its restore reaches them:
   - the last payment's settlement record ([GET_OUTBOX](#get_outbox-0x1b) answers
     `6A88` until the next payment); the record's generation steps;
   - the keyset table's history (the last payment's unit, the other unit's count, the
-    receipts' units), and every keyset entry nothing on the card names;
+    receipts' units), and every keyset entry nothing on the card names, the set-up's
+    keysets never loaded among them (the set-up bit is taken off first, [D226](../docs/DECISIONS.md#d226));
   - the spent places, the mint's proofs kept with them, the staged outputs and the
     openings;
   - the paid list: its rows are of pieces locked to the last c's keys, which the
@@ -2628,7 +2632,8 @@ mint, told apart by keyset.
   bit 1 the keys known (a top kept). The keyset's 8 bytes are written, then the
   state byte, the entry's commit. The card also keeps bit 2, loaded, set at the first piece
   loaded under the keyset ([D220](../docs/DECISIONS.md#d220)); bit 3, entered in the card's
-  first set-up; and bit 4, taught in the last time in the field that taught
+  first set-up (for a keyset taught and not loaded, only the first of its unit while it waits,
+  [D226](../docs/DECISIONS.md#d226); taken off every entry at a hand-over); and bit 4, taught in the last time in the field that taught
   ([D223](../docs/DECISIONS.md#d223)). `GET_CARD` shows none of the three.
 - **Every piece is of one unit.** `LOAD_PROOF` P2 = 1 names the pieces' unit; P2 = 0
   means the card's. A keyset in an entry of the other unit is `6A9B`. A keyset in no
@@ -2644,7 +2649,9 @@ mint, told apart by keyset.
   keys are known and which has never been loaded ([D220](../docs/DECISIONS.md#d220): a keyset taught before its first piece)
   while it was entered in the card's first set-up or taught in this time in the field
   ([D223](../docs/DECISIONS.md#d223)). It runs at
-  `CLEAR_SPENT`, at a load that finds the table full, and at `SET_CARD`. A live
+  `CLEAR_SPENT`, at a load that finds the table full, at `SET_CARD`, and at a hand-over (`SET_OWNER` on an owned
+  card), which first takes the set-up bit off every entry, so the last owner's set-up keyset goes too
+  ([D226](../docs/DECISIONS.md#d226)). A live
   entry is never freed or changed in place, so no command moves a piece from one
   unit to the other.
 - **One unit a payment.** `SPEND_ALL_BEGIN` refuses places of both units, or a place
@@ -2896,7 +2903,7 @@ that ties two dates, or a date to the card.
     it must not be a third without the mark: otherwise the load is `6A9C`, and stays
     so while older keysets still hold pieces or openings, since the reclaim frees only
     entries nothing names (and, after the tap that taught them, keysets never loaded but
-    the set-up's). A wallet that finds no room swaps into a keyset the card
+    the set-up's, one of each unit, [D226](../docs/DECISIONS.md#d226)). A wallet that finds no room swaps into a keyset the card
     has, or asks for the holder's say, or waits until the older pieces are paid;
   - the unit: `GET_CARD` byte 2. Pieces of the other unit need the holder's say in
     the tap for a new keyset (`6A9D`), and on a card with a limit set a rate
