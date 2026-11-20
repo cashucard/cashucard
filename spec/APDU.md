@@ -2333,11 +2333,59 @@ card key.
 ## The NFC tag application
 
 A third applet of the package, instantiated under the NFC Forum's
-`D2 76 00 00 85 01 01`: a read-only NFC Forum Type 4 Tag carrying one web address,
-the same on every card (`FOXY-CARD-SPEC.md` 5.8). It answers its own `SELECT`,
+`D2 76 00 00 85 01 01`: a read-only NFC Forum Type 4 Tag carrying one web address
+(`FOXY-CARD-SPEC.md` 5.8 for the commands). It answers its own `SELECT`,
 `SELECT` of files `E103` and `E104` and `READ BINARY`, and nothing else. It finds
 the card's applet by the AID `F0 43 41 53 48 55 43 41 52 44 01` to ask whether the
-owner has switched it off.
+owner has switched it off and, since [D216](../docs/DECISIONS.md#d216), for the code
+its address carries. The card's applet hands that interface only to the tag: the
+caller's AID must be `D2 76 00 00 85 01 01` or the tag's class AID
+`F0 43 41 53 48 55 43 41 52 44 54`, and any other applet gets nothing.
+
+**The address ([D216](../docs/DECISIONS.md#d216)).** One URI record, prefix code `04`
+(`https://`):
+
+| Card | Address | NDEF file (`E104`) |
+|---|---|---|
+| Tag switched off (`SET_TAG` `01`) | none: the tag's name is refused (`6999` in the simulator; the J3R180 answers `6A82`) | |
+| No owner, or no holder's record (new, or reset) | `https://getfoxy.io/card#new` | 26 bytes: `00 18 D1 01 14 55 04` and `getfoxy.io/card#new` |
+| An owner and a holder's record | `https://getfoxy.io/card#` and 48 lowercase hex | 71 bytes: `00 45 D1 01 41 55 04`, `getfoxy.io/card#`, then hex(R ‖ M) |
+
+    R = 16 bytes of the chip's secure random, new at every selection of the tag
+    K = SHA-256("CashuCard/tag-address" ‖ c)          c: the card's 32 bytes of D202
+    M = HMAC-SHA256(K, R), its first 8 bytes
+
+R and M are made at the `SELECT` by name and held for that selection: every
+`READ BINARY` of it, from any offset and in any pieces, reads the one address, and
+the next selection makes another. Nothing that lasts is written. The capability
+container (`E103`) is `00 0F 20 00 3B 00 34 04 06 E1 04 00 47 00 FF`: the NDEF file at
+most 71 bytes, MLe 59, so a phone reads a coded file in two `READ BINARY`s.
+
+A phone that holds c for a card checks a coded address by taking R (the first 32 hex)
+and M (the last 16), working K out and comparing M with HMAC-SHA256(K, R)'s first
+eight bytes in constant time. A match is that card; no match for any card it holds is
+someone else's card; `#new` is a card to set up; the address with no fragment is a card
+of earlier software. The c is the one the phone kept for the card (given at the claim or
+the hand-over, or read with `GET_CARD` P1 = `03`): a phone restored from its words keeps
+none until it reads the card once, and until then sees its own card's tag as someone
+else's.
+
+The rotation is the tag's only. The card's applet still answers, with no PIN, values
+that follow a card as well as a fixed address would (its key, the certificate, which
+survives a reset, the record's refund key, mint and design, the balance, the pieces, the
+week's inbox), and the chip's radio identifier may be fixed: the full list, and the open
+question of a read address shown again to the owner's phone, are in
+[D216](../docs/DECISIONS.md#d216).
+
+Test vectors:
+
+| c | R | K | fragment |
+|---|---|---|---|
+| `000102…1e1f` (bytes 0 to 31) | 16 bytes of `00` | `d535d7590e7a1459ef2501f958b06e2683ca196848454ba969ac10462db7c9d0` | `00000000000000000000000000000000` `4fe881e85d9bc23e` |
+| the same | `0123456789abcdeffedcba9876543210` | the same | `0123456789abcdeffedcba9876543210` `63564fb9e14298a1` |
+| `509bc5c1b9803489c07206216ea710d04a28f3a296d23a6332ff8c505c17fb4e` | 16 bytes of `ff` | `ecc8d6316ab43774812f78edc5384b2b7912fc19971216a5455369d29986900f` | `ffffffffffffffffffffffffffffffff` `bcb614027c0522f5` |
+
+(the fragment is the two parts written together, 48 characters).
 
 ---
 

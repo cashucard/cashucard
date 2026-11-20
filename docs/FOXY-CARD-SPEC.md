@@ -816,6 +816,11 @@ Type 4 Tag (mapping version 2.0), read only, carrying one address:
 
 so that a phone with Foxy opens the app and a phone without it opens that page.
 
+*Amended by `DECISIONS.md` D216 (2.3): the address now ends `#new` on a card with no
+owner or no record, and on a set-up card carries a code that is new at every read and that
+only the owner's phone can tie to the card; the files below are 1.19's (the capability
+container now allows 71 bytes). `spec/APDU.md`, The NFC tag application, has the wire.*
+
 **The same on every card.** There is nothing per card in the address and there never
 will be: an address that named the card, its key, its owner or its balance would be an
 identifier that anyone with a phone could read with no PIN. Two cards answer a reader
