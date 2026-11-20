@@ -48,7 +48,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * What a 2.3 card says to software that knows only 2.2 and to a reader it cannot trust: ALLOW_LOAD's warning, a payment in the
+ * What a 3.0 card says to software that knows only 2.2 and to a reader it cannot trust: ALLOW_LOAD's warning, a payment in the
  * other unit only to a reader that reads units, a C that is a point, sealed PIN commands that say nothing of whether they
  * opened, a certificate sealed only as its writer hashed it, no claim on a card on its way to its holder, a locked card whose
  * PIN is blocked given a new one by its owner, and a PIN whose tries are all gone counted as blocked everywhere.

@@ -11,7 +11,7 @@ how the card behaves.
 ## What this repo is, and what cashucard/javacard was
 
 `cashucard/cashucard` is the working repository of the shared Cashu card
-(protocol 2.3, one wire for Flash and for Foxy's wallet): the JavaCard applet,
+(protocol 3.0, one wire for Flash and for Foxy's wallet): the JavaCard applet,
 its host tools and simulator, the command reference in `spec/`, the TypeScript card
 library with the bench-spike app that installs the card from a phone, the provisioning app and its ops-service. It began as a copy of
 `cashucard/javacard` main with its whole history. `cashucard/javacard` is
@@ -27,7 +27,7 @@ the core starts there, before this repo implements it.
 | Path                                                | What is there                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `applet/`                                           | The card's firmware: JavaCard 3.0.5, the floor ([D6](docs/DECISIONS.md#d6)), package `me.flashapp.cashu`. One load file holds three applets, installed in this order: the opener (`Opener`, AID `F0 43 41 53 48 55 43 41 52 44 4D`, which does nothing and comes first because the J3R180 will not take the card's applet as the package's first instance), the card's applet (`CashuApplet`, with `SchnorrHW`; `F0 43 41 53 48 55 43 41 52 44 01`) and the NFC tag (`Tag`). The jCardSim suite is `applet/src/test/java/`.                                                                                                                                                                              |
-| `applet/target/cashu-javacard-2.3.0.cap`            | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, unless the guide publishes the tracked file's sha256, and unless `tools/cardkit/make-assets.py`'s pins and `apps/provisioner/src/assets/cashu.ts` match it.                                                                                                                                                                                                                                                                     |
+| `applet/target/cashu-javacard-3.0.0.cap`            | The tracked CAP: the file [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) has an operator install, by its sha256. CI's `cap` job converts the source again and fails unless every entry but `META-INF/MANIFEST.MF` is byte-identical to the tracked file's, unless the guide publishes the tracked file's sha256, and unless `tools/cardkit/make-assets.py`'s pins and `apps/provisioner/src/assets/cashu.ts` match it.                                                                                                                                                                                                                                                                     |
 | `tools/cardctl/`                                    | The reference host driver, Python over PC/SC: `cardctl.py`, the BIP-340 verifier `bip340.py`, the owner's P-256 `p256.py`, and eleven test files that need no reader, no card and no pyscard. `read_registry.py` reads a card's registry listing with an allowlist that refuses every non-read command; on a card that holds a package the plain channel answers `6982`, so it needs the authenticated channel the phased install opens, not a wider allowlist. Its venv is the one [`tools/cardctl/README.md`](tools/cardctl/README.md) documents: a Homebrew Python, `.venv` in `tools/cardctl/`, never the macOS system Python 3.9 (pyscard installs there and fails at import).                      |
 | `tools/cardsim/`                                    | The real applet in jCardSim on `http://127.0.0.1:9876`, for the apps' end-to-end runs: the HTTP bridge, its Node client `client.cjs`, the Cashu arithmetic `cashu-crypto.cjs` and the mint e2e `e2e-swap.test.cjs`. flash-pos and flash-mobile pin it by `CASHU_JAVACARD_REF`, so its routes, fixtures and client are a contract with both apps ([`tools/cardsim/README.md`](tools/cardsim/README.md)). `run.sh` and `ctl.sh` are Foxy's line-protocol simulator on port 47431.                                                                                                                                                                                                                          |
 | `tools/chip/`                                       | On-chip checks, Foxy's bench scripts for a card in a reader: `run.sh` puts the card on a loopback port, `reset.sh` resets a card the reader gave up on, `proofstore.sh` checks the store of the mint's proofs on a blank card. They drive a real card (the rules below).                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -78,7 +78,7 @@ mvn -B -f tools/cardsim/pom.xml package
 java -jar tools/cardsim/target/cardsim.jar --port 9876 &
 for i in $(seq 1 60); do curl -sf localhost:9876/state >/dev/null && break; sleep 0.5; done
 curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}' \
-  | grep -q '"hex":"02039000"'
+  | grep -q '"hex":"03009000"'
 curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
   | grep -q '"hex":"9000"'
 CARDSIM_URL=http://127.0.0.1:9876 node --test tools/cardsim/client.test.cjs
@@ -140,7 +140,7 @@ the hello applet and runs `make-assets.py --check` on the set-aside CAP. CI-only
 `$RUNNER_TEMP` and `$GITHUB_WORKSPACE` are the runner's, and unset anywhere else.
 
 ```bash
-mv applet/target/cashu-javacard-2.3.0.cap "$RUNNER_TEMP/tracked.cap"
+mv applet/target/cashu-javacard-3.0.0.cap "$RUNNER_TEMP/tracked.cap"
 ant -f applet/build.xml cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
 ant -f applet/build.xml hello-cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
 python3 tools/cardkit/make-assets.py --check --cap "$RUNNER_TEMP/tracked.cap"
@@ -154,11 +154,11 @@ CAP aside first, as CI does: `ant cap` rewrites its manifest build time, so a
 ```bash
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
-cp applet/target/cashu-javacard-2.3.0.cap "${TMPDIR:-/tmp}/tracked.cap"   # the committed CAP, before ant touches it
+cp applet/target/cashu-javacard-3.0.0.cap "${TMPDIR:-/tmp}/tracked.cap"   # the committed CAP, before ant touches it
 ant -f applet/build.xml cap
 ant -f applet/build.xml hello-cap
 python3 tools/cardkit/make-assets.py --check --cap "${TMPDIR:-/tmp}/tracked.cap"
-git checkout -- applet/target/cashu-javacard-2.3.0.cap                     # restore the tracked CAP; never commit a local rebuild
+git checkout -- applet/target/cashu-javacard-3.0.0.cap                     # restore the tracked CAP; never commit a local rebuild
 ```
 
 The README also has the tests, which CI runs in the jobs above:
@@ -205,11 +205,15 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
 ## Implementation conventions
 
 - **SELECT answers the applet's version, and a wire change moves it.** The
-  card's applet answers `SELECT` with `02 03 90 00` (2.3), and `GET_INFO`
+  card's applet answers `SELECT` with `03 00 90 00` (3.0), and `GET_INFO`
   begins with the same two bytes. `CashuApplet.VERSION_MAJOR` and
   `VERSION_MINOR` move with every wire-visible change of behaviour and every
   fix a card in the field has to be told apart by (the comment above them;
-  [D26](docs/DECISIONS.md#d26) is 2.1's). `AidVersionTest` pins them, the CAP's
+  [D26](docs/DECISIONS.md#d26) is 2.1's). The major is the line a reader holds
+  to ([D205](docs/DECISIONS.md#d205)): a change that alters what a reader of the
+  current major sends or is answered moves the major, and the minor moves only
+  for what such a reader never meets (a new command, a new form asked for by a
+  new P1 or P2). `AidVersionTest` pins them, the CAP's
   name carries the version, and a change to the wire is a change to Foxy's
   wallet too: agree it with them first.
 - **Readers select the applet's whole AID, `F043415348554341524401`, never the
@@ -235,7 +239,7 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   `docs/reports/HARDWARE_TEST_REPORT_<YYYY-MM-DD>.<chip>.md`: the card, the
   environment, the CAP's sha256, what ran, and what was not covered.
 - **An applet change ships its CAP.** The rebuilt
-  `applet/target/cashu-javacard-2.3.0.cap` (JDK 17, `jc305u4_kit`) is committed
+  `applet/target/cashu-javacard-3.0.0.cap` (JDK 17, `jc305u4_kit`) is committed
   with its new sha256 in `docs/HARDWARE_DEPLOYMENT.md`, or the `cap` job fails.
   A local `ant` run rewrites the tracked file (the manifest records the build
   time), so with no applet change, restore it from git rather than commit it.
@@ -245,7 +249,7 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   `tools/cardkit/gp/test/load.test.ts` and `provision.test.ts` and in the
   provisioner's `__tests__/session.test.ts` and `cardkit-in-the-app.test.ts`,
   and on a version move the CAP's path and name in `make-assets.py` and the
-  `02 03` in `gp/provision.ts`'s checks, `CARD_VERSION` in `gp/aids.ts`, `testing/fake-card.ts`, and the
+  `03 00` in `gp/provision.ts`'s checks, `CARD_VERSION` in `gp/aids.ts`, `testing/fake-card.ts`, and the
   provisioner's `src/copy.ts` and its test (`gp/test/provision.test.ts` holds
   the first two to `CashuApplet.java`'s version). `H0_LOAD_FILE_SHA256` in
   `gp/test/transcripts.test.ts` stays: it is the load file in the owner's

@@ -281,7 +281,7 @@ test('reader startup failure retains reviewed state and reports its safe phase',
 test('a card owed change is not reset: the runner stops before authorization or keys, and says why', async () => {
   for (const state of [
     {owner: 1, pin: 1, record: 1, change: 1},
-    {owner: 1, pin: 1, record: 1, change: 2, minor: 2},
+    {owner: 1, pin: 1, record: 1, change: 2, version: [2, 2] as const},
   ]) {
     const {directory, options, card, tx} = await fixture();
     try {

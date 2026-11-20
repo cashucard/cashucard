@@ -22,10 +22,10 @@ test('installation follows the load file this build carries, never a bare switch
   expect(loadFileValidated('')).toBe(false);
 });
 
-test('the 2.3 load file is not validated until the operator approves it', () => {
-  // 40,412 bytes; it ran on a chip on 2026-11-15 (tools/refcheck.py). Its sha256 goes on the list with
-  // the operator's approval and the run's report.
-  expect(CASHU_LOAD_FILE.size).toBe(40412);
+test('the 3.0 load file is not validated until the operator approves it', () => {
+  // 41,742 bytes, not yet tried on a chip, nor a file of its size (tools/refcheck.py). Its sha256 goes on the list with
+  // the operator's approval and the run's report, after its chip run.
+  expect(CASHU_LOAD_FILE.size).toBe(41742);
   expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(false);
   expect(CARD_INSTALLATION_VALIDATED).toBe(false);
   // the 2.2 load file the chip took on 2026-11-06 stays validated
@@ -45,7 +45,7 @@ test('the bench installs the Cashu card only where this build may install its lo
   for (const action of ['hello', 'cashu', 'rotate'] as const) {
     expect(benchActionAllowed(action, false, true)).toBe(false);
   }
-  // this build: the bench is off, and the 2.3 load file is not validated
+  // this build: the bench is off, and the 3.0 load file is not validated
   expect(benchActionAllowed('cashu')).toBe(
     BENCH_RUNS_ENABLED && CARD_INSTALLATION_VALIDATED,
   );

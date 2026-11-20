@@ -16,19 +16,19 @@ export const OPENER_AID = fromHex('F04341534855434152444D');
 export const CARD_AID = fromHex('F043415348554341524401');
 /**
  * The card applet's versions this kit reads, as SELECT and GET_INFO's first two bytes answer them: 2.1 (D26), 2.2
- * (D175), which adds the public GET_OUTBOX and changes nothing a 2.1 card does, and 2.3 (D183 to D198), which the
+ * (D175), which adds the public GET_OUTBOX and changes nothing a 2.1 card does, and 3.0 (D183 to D198), which the
  * tracked CAP installs.
  */
 export const CARD_VERSIONS: readonly (readonly [number, number])[] = [
   [2, 1],
   [2, 2],
-  [2, 3],
+  [3, 0],
 ];
 /**
- * The versions whose holder commands (holderCommands) and settled-entry cleanup this kit sends: 2.1 and 2.2. A 2.3
+ * The versions whose holder commands (holderCommands) and settled-entry cleanup this kit sends: 2.1 and 2.2. A 3.0
  * card takes money only under its PIN, answers the owner's grant with 6200 and locks every piece to its key for the
  * piece's date (spec/APDU.md, "PIN before money" and "Keys per load"), so 2.2's owner commands and the secrets the
- * cleanup builds are not a 2.3 card's: this kit installs and reads a 2.3 card, and sends it neither.
+ * cleanup builds are not a 3.0 card's: this kit installs and reads a 3.0 card, and sends it neither.
  */
 export const ADMINISTERED_CARD_VERSIONS: readonly (readonly [
   number,
@@ -37,8 +37,8 @@ export const ADMINISTERED_CARD_VERSIONS: readonly (readonly [
   [2, 1],
   [2, 2],
 ];
-/** The version the tracked CAP installs (applet/target/cashu-javacard-2.3.0.cap), which provisioning verifies. */
-export const CARD_VERSION: readonly [number, number] = [2, 3];
+/** The version the tracked CAP installs (applet/target/cashu-javacard-3.0.0.cap), which provisioning verifies. */
+export const CARD_VERSION: readonly [number, number] = [3, 0];
 function listed(
   versions: readonly (readonly [number, number])[],
   v: readonly number[],

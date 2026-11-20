@@ -1,6 +1,6 @@
 # Hardware Deployment Guide
 
-GlobalPlatform packaging and deployment for the Cashu card applet, protocol 2.3
+GlobalPlatform packaging and deployment for the Cashu card applet, protocol 3.0
 ([D18](DECISIONS.md#d18), [D19](DECISIONS.md#d19), [D26](DECISIONS.md#d26),
 [D175](DECISIONS.md#d175), D183 to [D198](DECISIONS.md#d198)).
 
@@ -53,8 +53,8 @@ cd cashucard/applet
 ant cap
 ant cap -Djc.sdk=/path/to/jc305u4_kit   # explicit form
 
-# Output: target/cashu-javacard-2.3.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
-ls -lh target/cashu-javacard-2.3.0.cap
+# Output: target/cashu-javacard-3.0.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
+ls -lh target/cashu-javacard-3.0.0.cap
 ```
 
 The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
@@ -88,11 +88,39 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 2.3 build is **40,412 bytes** by refcheck's measure (220 past a multiple of 256;
+The 3.0 build is **41,742 bytes** by refcheck's measure (14 past a multiple of 256;
+the Method component 34,061), in 169 blocks of 247 bytes, the last 246: the load file
+inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
+not the CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
+exact file has run only in a simulator so far, and no card has installed it or a file of its size. Its source is
+the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
+moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
+[D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
+path; the no-PIN allowance armed by the owner's proof or a held tap and not by the PIN alone; `GET_INFO`'s paid-list
+bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
+settlement record fixes ([D223](DECISIONS.md#d223), [D224](DECISIONS.md#d224)). Its own run, as the checklist below, is still to come, its size
+first; if the chip refuses its size, it is moved with `sizeTheFile` (below). The other maintainer's 3.0 file before
+the merge (37,413 bytes, 37 past) was never given to a chip either.
+
+On 2026-11-13 a J3R180 was given earlier source, numbered 2.3 then, padded to three
+sizes: it installed the files of 33,647 and 35,213 bytes and refused the card's applet in
+the one of 32,777 (`6F00`, twice), so refcheck refuses any build from 32,700 to
+32,850. Its constructor asks for 30,056 bytes of persistent memory,
+and its first `SET_CARD` reserves 26,619 more: the mint's proofs (12,288), the
+record (4,293), the paid list with the signatures it keeps (9,235), the openings'
+keys (536) and the keyset table (267) (D176, D183, D184, D191); a certified card reserves
+the certificate's 1,027 bytes at its first `CERT_WRITE` (D192). refcheck's table
+keeps the sizes and the hash of the files of that day's run (below). A file is released by
+a chip run, which installs it first, as the three steps below, and adds its answer to
+refcheck's table.
+If a later build lands on a size the chip refuses, move it with
+`CashuApplet.sizeTheFile` to a size known to install and add the answer to
+refcheck's table.
+
+The last 2.3 file, answering `02 03`, was **40,412 bytes** by refcheck's measure (220 past a multiple of 256;
 the Method component 32,960), in 164 blocks of 247 bytes, the last 151: the load file inside the
-tracked CAP (`applet/target/cashu-javacard-2.3.0.cap`), whose own sha256 is not the
-CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
-exact file has run on a chip: the bench J3R180 (09301220) on 2026-11-15, three installs in three steps (load 17 to 18 s, the
+CAP tracked then (`applet/target/cashu-javacard-2.3.0.cap`). Unpadded, that
+exact file ran on the bench J3R180 (09301220) on 2026-11-15, three installs in three steps (load 17 to 18 s, the
 card's applet 2 s), `selftest` 13 of 13, the set-up's claim at the first asking and a 9-piece payment with change at the test mint
 (refcheck keeps its size and its load file's sha256). It is the file of the run of 2026-11-14 below (40,365 bytes, load file
 `8aefa0db…`, the fifth run of that day, which installed it at the first try every time) with [D221](DECISIONS.md#d221) added (the claim
@@ -109,23 +137,8 @@ had been refused at the card's applet's create (`6F00`) at 38,791 and 38,809 byt
 38,893 (237 past); the fourth run's file, at 175 past, was created at the first try, and so was this one, at 173 past (the chip had refused 135 and 153 past and installed 175 and 237 past); refcheck keeps all five sizes.
 refcheck keeps its size as one that installs and its load file's sha256 on its list of hashes, from the fifth run (the checklist below).
 
-On 2026-11-13 a J3R180 was given earlier 2.3 source padded to three sizes: it
-installed the files of 33,647 and 35,213 bytes and refused the card's applet in
-the one of 32,777 (`6F00`, twice), so refcheck refuses any build from 32,700 to
-32,850. Its constructor asks for 30,056 bytes of persistent memory,
-and its first `SET_CARD` reserves 26,619 more: the mint's proofs (12,288), the
-record (4,293), the paid list with the signatures it keeps (9,235), the openings'
-keys (536) and the keyset table (267) (D176, D183, D184, D191); a certified card reserves
-the certificate's 1,027 bytes at its first `CERT_WRITE` (D192). refcheck's table
-keeps the sizes and the hash of the files of that day's run (below). A file is released by
-a chip run, which installs it first, as the three steps below, and adds its answer to
-refcheck's table.
-If a later build lands on a size the chip refuses, move it with
-`CashuApplet.sizeTheFile` to a size known to install and add the answer to
-refcheck's table.
-
-The 2.3 chip run, on 2026-11-13, on the bench J3R180 09312320 (CPLC serial
-checked first; the public default GlobalPlatform test key), through
+The chip run of 2026-11-13, of the source then numbered 2.3, on the bench J3R180
+09312320 (CPLC serial checked first; the public default GlobalPlatform test key), through
 an ACS ACR39U contact reader, times as the reader's round trip. The CAP tracked
 then, before D200 (sha256 `b1711046…`, load file 35,466 bytes, `48b8597c…`), loaded in 16 s and the
 card's applet was created in 2 s; `SELECT` answered `02 03` and the tag
@@ -336,7 +349,7 @@ Not run: `LOCK_CARD`, taking money back after D with the refund key, a header fa
 production mint ([the hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)). The card was then installed
 again from the same file and left fresh (no PIN, no owner).
 
-The chip run of the file before D211 (36,953 bytes, load file `f216644a…`), on 2026-11-14, on the same bench J3R180 09312320
+The chip run of the file before D211 (36,953 bytes, load file `f216644a…`, the source with D200 to D204, then numbered 2.3), on 2026-11-14, on the same bench J3R180 09312320
 (CPLC serial checked first; the default test key), through the same reader. The CAP
 `30c7bb8d…` (load file 36,953 bytes, `f216644a…`, the file before D211) was installed three times, each in
 three steps (load 16 to 17 s, card's applet 2 s), `SELECT` `02 03` and the tag
@@ -387,7 +400,10 @@ anchor. After the run a sealed `VERIFY_PIN` answered `9000` in 273 ms and `selft
 passed 21 of 21 with the PIN. Not run: `LOCK_CARD` (the owner's reset of a locked
 card), taking money back after D with the refund key, a header far ahead or a weak
 clock (no real header makes either), tears, a phone and a production mint ([the
-hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)).
+hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
+file is that day's source with the version moved to 3.0 ([D205](DECISIONS.md#d205)) and
+D206 to D210 added. This exact file has run only in a simulator so far, and no card has
+installed it or a file of its size; the run is to be repeated on it.
 
 > **Three applets, installed in order.** The chip refuses the card's applet as the
 > first instantiated from its package (no answer, or `6F00`); it takes it once a
@@ -418,7 +434,7 @@ hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)).
 > lacks either refuses the card's applet at install. JCOP4 cards are sold in more
 > than one configuration, so a J3R180 is not enough by its name: a J3R180 whose
 > configuration lacks either algorithm cannot run the card. The bench card of the
-> 2.3 chip run has both.
+> chip runs of 2026-11-13 and 2026-11-14 has both.
 
 ---
 
@@ -436,11 +452,11 @@ gp --list
 
 ## Install
 
-The CAP tracked in this repo is **applet version 2.3**, sha256
-`676fa7aedde4c25fe112ab0d70ee4ad9f05bc0bdaf55a3d9c2808bb4c416838e`
-(`applet/target/cashu-javacard-2.3.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 40,412 bytes), has sha256
-`05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3`: the hash the
+The CAP tracked in this repo is **applet version 3.0**, sha256
+`dc9bdee911817b76f7dd0ef8dfcf2bc44bb7bc9e06858ef48a6994522c9b9508`
+(`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
+is LOADed with (refcheck's measure, 41,742 bytes), has sha256
+`2b51ae1ca0da8640a0b977ef906d6dc4663b869fee058190a3487287c70bcf27`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -451,20 +467,20 @@ installing your own build, compare every entry except `META-INF/MANIFEST.MF`
 against the tracked CAP:
 
 ```bash
-# From applet/, after `ant cap` has overwritten target/cashu-javacard-2.3.0.cap
-git show HEAD:applet/target/cashu-javacard-2.3.0.cap > /tmp/tracked.cap
+# From applet/, after `ant cap` has overwritten target/cashu-javacard-3.0.0.cap
+git show HEAD:applet/target/cashu-javacard-3.0.0.cap > /tmp/tracked.cap
 rm -rf /tmp/cap-tracked /tmp/cap-built
 unzip -q /tmp/tracked.cap -d /tmp/cap-tracked
-unzip -q target/cashu-javacard-2.3.0.cap -d /tmp/cap-built
+unzip -q target/cashu-javacard-3.0.0.cap -d /tmp/cap-built
 diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built && echo "same CAP as the tracked one"
 ```
 
 Any output from `diff` means the two CAPs differ; do not install. After
-installing, `SELECT` must answer `02 03` for the card's applet's whole AID (below).
+installing, `SELECT` must answer `03 00` for the card's applet's whole AID (below).
 
 ```bash
 # Load the file and instantiate the opener (gp installs one applet of a file at a time)...
-gp --install target/cashu-javacard-2.3.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
 # ...then create the card's applet from the loaded package
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 # ...then the NFC tag, under the NFC Forum's own name as its instance AID
@@ -486,7 +502,7 @@ gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E
 
 A card straight from the install has no PIN, no record and no owner: it holds
 nothing and cannot be loaded, and any reader in range can set it up. Set it up
-before it leaves your hands. A 2.3 card is set up in one selection, its first
+before it leaves your hands. A 3.0 card is set up in one selection, its first
 set-up ([D196](DECISIONS.md#d196)): the PIN, the record, the owner (claimed, with
 the tip block header as the anchor, [D20](DECISIONS.md#d20)) and the limits, all
 sent by one `cardctl setup` while the card stays on the reader. Each cardctl
@@ -516,9 +532,9 @@ python3 cardctl.py selftest --pin 1234
   that a phone restored from the words has c (a lost card's take-back needs the card's
   key P and the pieces too); without it the card keeps the c it drew.
 - **The card's clock** ([D204](DECISIONS.md#d204)). `--anchor` is required: setup sends
-  nothing without it. On a 2.3 card the claim's anchor, the first set-up's of an empty
+  nothing without it. On a 3.0 card the claim's anchor, the first set-up's of an empty
   card, becomes the clock even where the card's clock was later (a header far ahead set
-  it), and setup says it brought it back; a card older than 2.3 with such a clock is
+  it), and setup says it brought it back; a card older than 3.0 with such a clock is
   refused, naming `cardctl reset --pin <a PIN> --anchor <the tip header>` on the empty
   card, then setup ([D203](DECISIONS.md#d203)). `card-secret --owner-seed <it>` checks the c the card holds against
   the seed alone, and says which owner's c of the card it is.
@@ -543,7 +559,7 @@ python3 cardctl.py selftest --pin 1234
 # SELECT the card's applet by its whole AID, F0 CASHUCARD 01
 gp --apdu 00A404000BF043415348554341524401
 
-# Response: 0203 9000  (applet version 2.3 + SW_OK = applet responding)
+# Response: 0300 9000  (applet version 3.0 + SW_OK = applet responding)
 # A card that answers 6A82 has no 2.x applet: it is a 0.x or Foxy 1.x card and needs an update.
 # Do not SELECT the package AID alone (00A404000AF0434153485543415244): on the chip that
 # partial name reaches the opener, instantiated first, which answers 9000 with no version
@@ -552,8 +568,8 @@ gp --apdu 00A404000BF043415348554341524401
 # GET_INFO (INS 0x01)
 gp --apdu B0010000
 
-# Response: 02 03 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-#   v2.3 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change owed
+# Response: 03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+#   v3.0 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change owed
 # SW: 9000
 
 # GET_PUBKEY (INS 0x10)
@@ -562,7 +578,7 @@ gp --apdu B0100000
 # Response: 33-byte compressed secp256k1 public key + SW 9000
 ```
 
-`cardctl selftest` passes a card answering `02 01`, `02 02` or `02 03`, the versions it
+`cardctl selftest` passes a card answering `02 01`, `02 02` or `03 00`, the versions it
 knows, and fails any other, a later 2.x among them (use a cardctl of that version): a card on v2.0.0 is swept and reinstalled ([D26](DECISIONS.md#d26)). cardctl
 selects the whole AID first and takes a `9000` without a version as no answer.
 
@@ -580,7 +596,7 @@ whole AID first, and `AUTH` took 833 to 854 ms a signature on an ACR122U (0.4 to
 
 **A card is reinstalled only when it holds nothing and is owed nothing.** Spend or
 move every piece first (`GET_INFO` bytes 3 and 4 both `00`), then bring home any
-change the card is owed: on a 2.3 card `GET_INFO` byte 29 is `01` while a payment's
+change the card is owed: on a 3.0 card `GET_INFO` byte 29 is `01` while a payment's
 change has not come back to it; on a 2.1 or 2.2 card, whose byte 29 means something
 else, `GET_CHANGE` (`B0 19 00 00 00`) answers a count above `00`. The holder's wallet
 brings the change home: it reads the opening with `GET_CHANGE`, asks the mint for it
@@ -599,7 +615,7 @@ gp --delete F04341534855434152444D   # the opener
 gp --delete F0434153485543415244     # the package
 
 # Re-install: the opener first, the tag last
-gp --install target/cashu-javacard-2.3.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
 ```
@@ -616,8 +632,8 @@ asks for a shareable interface at each selection and keeps nothing of it).
 There is no in-place upgrade: 2.0 is a new AID and a new wire, and a reinstall
 makes a new card key. **Every piece on a card is P2PK-locked to its key, so a
 card is swept before it is deleted.** The same holds for an upgrade between 2.x
-versions (2.1 or 2.2 to 2.3): a 2.x card is also owed no change before it is
-deleted (`GET_INFO` byte 29 on 2.3, `GET_CHANGE` on 2.1 and 2.2, as in
+versions (2.1 or 2.2 to 3.0): a 2.x card is also owed no change before it is
+deleted (`GET_INFO` byte 29 on 3.0, `GET_CHANGE` on 2.1 and 2.2, as in
 [Reinstall](#reinstall-delete--install)). The v0.2 reinstall on the J3R180 stranded
 5 sat this way (see the [hardware test report](reports/HARDWARE_TEST_REPORT_2026-09-22.j3r180.md)).
 
@@ -674,10 +690,11 @@ arithmetic helpers as explicit `(work, workOff)` parameters.
 
 D21 changes the multiply's timing: re-measure `cardctl --timing selftest` (AUTH)
 and a payment's `SPEND_ALL_SIGN` on the J3R180 before release. AUTH was measured on
-2.0 (ENG-681, above: 833 to 854 ms on an ACR122U, about 3% over 0.4), and on 2.3 at
-626 ms (2026-11-13, an ACR39U contact reader, before and after the chip run);
-2.3's `SPEND_ALL_SIGN` answered its one "not yet" in 596 ms and the signature in
-845 ms (the 2.3 chip run, above). Readers differ: compare like with like.
+2.0 (ENG-681, above: 833 to 854 ms on an ACR122U, about 3% over 0.4), and on the
+source of 3.0, then numbered 2.3, at 626 ms (2026-11-13, an ACR39U contact reader,
+before and after the chip run) and 632 ms (2026-11-14); its `SPEND_ALL_SIGN` answered
+its one "not yet" in 596 ms and the signature in 845 ms (the chip run of 2026-11-13,
+above). Readers differ: compare like with like.
 
 ### ECDH framing probe, at SET_CARD
 
@@ -768,15 +785,18 @@ that asks for more than the chip gives at install ([D17](DECISIONS.md#d17),
 [D176](DECISIONS.md#d176)). If the first `SET_CARD` answers `6F00`, suspect the
 framing.
 
-### The 2.3 chip run's checklist
+<a id="the-23-chip-runs-checklist"></a>
+
+### The 3.0 chip run's checklist
 
 The run of 2026-11-13 (above) did each item but the last five, for the file before
 D200, with two differences: `INBOX` for last week was read after a reinstall anchored
 in that week, as no reader's header moves the clock back; and the sealed `VERIFY_PIN`
 ran once, after the run, while `selftest` ran before and after. The run of 2026-11-14
-(above) did them all for the file before D211, but the owner's reset of a locked card,
-which would lock the bench card for good; `INBOX` for last week was read after a reset
-by the PIN anchored in that week. Write the sha256 of every file sent to the chip in the
+(above) did them all for the file before D211, numbered 2.3 then (`f216644a…`), but the owner's
+reset of a locked card, which would lock the bench card for good; `INBOX` for last week
+was read after a reset by the PIN anchored in that week. The run on the 3.0 file of the merge
+is to do them all again, and the size first. Write the sha256 of every file sent to the chip in the
 run's log.
 
 - Install the three applets in order, and add the load file's size to refcheck's
@@ -909,7 +929,7 @@ build tells.
 
 | Card | JC API | Notes |
 |------|--------|-------|
-| NXP JCOP4 SmartMX3 P71 (J3R180) | 3.0.5 | ✅ Primary target, where its configuration has `ALG_EC_SVDP_DH_PLAIN_XY` and `ALG_EC_PACE_GM` (the bench card of the 2.3 chip run does); a J3R180 whose configuration lacks either cannot run the card: the card's applet is refused at install |
+| NXP JCOP4 SmartMX3 P71 (J3R180) | 3.0.5 | ✅ Primary target, where its configuration has `ALG_EC_SVDP_DH_PLAIN_XY` and `ALG_EC_PACE_GM` (the bench card of the chip runs of 2026-11-13 and 2026-11-14 does); a J3R180 whose configuration lacks either cannot run the card: the card's applet is refused at install |
 | Feitian JavaCard 3.0.4 | 3.0.4 | ❌ No `ALG_EC_SVDP_DH_PLAIN_XY` (3.0.5+ only); the CAP will not convert or load |
 | Generic JC 3.0.5+ | 3.0.5 | ⚠️  May work; verify the custom EC-FP curve, `ALG_EC_SVDP_DH_PLAIN_XY` and `ALG_EC_PACE_GM` |
 | JavaCard ≤ 3.0.4 | ≤ 3.0.4 | ❌ No ECDH plain-XY |

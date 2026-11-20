@@ -594,13 +594,13 @@ class TearSweepTest {
     }
 
     @Test
-    void verifyRightPinArms() throws Exception {
-        sweep("VERIFY_PIN right (arming)", c -> {
+    void verifyRightPinArmsNothing() throws Exception {
+        sweep("VERIFY_PIN right (arms nothing, D208)", c -> {
                 ready(c, 0);
                 byte[] n = c.send(new CommandAPDU(CLA, INS_GET_NONCE, 0, 0, 16)).getData();
                 byte[] v = concat(u32(100_000), u32(0), u32(5_000));
                 assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SET_LIMIT_OWNER, 0, 0, ownerData(ownerProof(L_LIMIT, OWNER, n, v), v))));
-                c.f("cardRecord")[158] = 0;   // disarmed, as after a no-PIN window began
+                c.f("cardRecord")[158] = 0;   // disarmed, so that an arming by the PIN would show
                 c.sim.reset();
                 c.select();
                 TearHook.refresh();
@@ -609,6 +609,7 @@ class TearSweepTest {
             c -> {
                 int sw = c.sw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, TEST_PIN));
                 if (sw != SW_OK) c.wrong(String.format("the right PIN after a torn one answers %04X", sw));
+                if (c.f("cardRecord")[158] != 0) c.wrong("a VERIFY_PIN armed the no-PIN allowance (D208)");
             });
     }
 

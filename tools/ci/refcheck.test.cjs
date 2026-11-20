@@ -77,7 +77,7 @@ test("a size known to install passes, and an untried one is named untried", () =
   assert.doesNotMatch(untried.out, /~\//, "no path in a home folder");
 });
 
-// 2.3: a build of 32,777 bytes failed to install, and builds of 33,647 and
+// 2.3 (the source now numbered 3.0, D205): a build of 32,777 bytes failed to install, and builds of 33,647 and
 // 35,213 installed. A build inside 32,700 to 32,850 is refused, at both ends.
 test("2.3 sizes: 32,700 to 32,850 refused, 33,647 and 35,213 known to install", () => {
   for (const size of [32700, 32777, 32850]) {
@@ -187,21 +187,9 @@ test("35,466 bytes, the 2.3 build before D200, is known to install, and its hash
   assert.match(readFileSync(REFCHECK, "utf8"), /'48b8597cfd23ace73c6451a962541bfa09534a312f225ebcf382a8769fe01c96': '2\.3, 35,466 bytes/);
 });
 
-// The tracked CAP adds D213 to D216 (a keyset taught at set-up, the field on p padded, LOAD_CHANGE's points by the key agreement,
-// e*d on the chip's RSA) to the file that ran on a chip on 2026-11-14 (37,269 bytes, load file sha256 fe156f4f..., D212), and ran on
-// a chip itself the same day (39,343 bytes, load file sha256 c79b30a7..., a J3R180 at a test mint: real signatures and real change
-// verified on the chip). The files before it stay on refcheck's lists. The tracked CAP now adds D217 to D220 (the signature's product in two
-// shares, every signature checked, wider known answers, a taught keyset kept) and ran on a chip the same day (40,365 bytes, load file sha256
-// 8aefa0db..., real signatures and real change verified on the chip). The tracked CAP now adds D221 (the claim after the set-up's record
-// is one asking) and ran on a chip on 2026-11-15 (40,412 bytes, load file sha256 05c9b847..., real signatures and real change verified on
-// the chip); the file before it stays on the lists.
-test("the tracked 2.3 CAP's load file has run on a chip: its size and its hash are on the lists, and the files before D213 stay proven", () => {
-  const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-2.3.0.cap");
-  const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 40412 bytes/);
-  assert.match(r.stdout, /load file sha256: 05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3; this exact file has run on a chip\.\n/);
-  assert.doesNotMatch(r.stdout, /not yet tried on a chip/);
+// The 2.3 files that ran on a chip (D200 to D204, then this repo's D211 to D221, numbered D205 to D215 before the 3.0
+// merge) stay on refcheck's lists as 2.3 files, with real signatures and real change verified on the chip.
+test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes are on the lists", () => {
   const source = readFileSync(REFCHECK, "utf8");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes/);
   assert.match(source, /'075448e44e080d05e7dde270ec246e469796083ce7f70cf94c70fc19054d012a': '2\.3 with D200 to D204 and D211[^']*36,950 bytes[^']*'\s*'2026-11-14, J3R180 09301220 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
@@ -215,4 +203,25 @@ test("the tracked 2.3 CAP's load file has run on a chip: its size and its hash a
   assert.match(source, /40365: True/);
   assert.match(source, /'05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3': '2\.3 with D200 to D204, D211 to D221[^;]*40,412 bytes[^;]*real signatures and real change verified on the chip'/);
   assert.match(source, /40412: True/);
+});
+
+// The tracked CAP is the 3.0 file of the merge of 2026-11-19: the last 2.3 file (40,412 bytes, D221) with the version moved
+// to 3.0 (D205), D206 to D210, the rotating tag (D222) and D223 and D224 added: a load file of 41,742 bytes, a size no chip has
+// been given. No card has installed it, so its hash
+// is not on PROVEN, and refcheck says it has run only in a simulator and no card has installed it or a file of its size,
+// and names the size untried. The 2.3 file's hash stays on PROVEN as that file's, with real signatures and real change
+// verified on the chip.
+test("the tracked 3.0 CAP's load file has run only in a simulator, at a size not yet tried on a chip", () => {
+  const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.0.0.cap");
+  const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /load file: 41742 bytes/);
+  assert.match(r.stdout, /load file sha256: 2b51ae1ca0da8640a0b977ef906d6dc4663b869fee058190a3487287c70bcf27; this exact file has run only in a simulator so far, and no card has installed it or a file of its size\.\n/);
+  assert.doesNotMatch(r.stdout, /this exact file has run on a chip/);
+  assert.doesNotMatch(r.stdout, /a size known to install/);
+  assert.match(r.stdout, /not yet tried on a chip \(the nearest size known to install is 41205 bytes, -537 from this\)/);
+  const source = readFileSync(REFCHECK, "utf8");
+  assert.doesNotMatch(source, /2b51ae1ca0da8640a0b977ef906d6dc4663b869fee058190a3487287c70bcf27/, "the tracked file's hash is not on PROVEN");
+  assert.doesNotMatch(source, /^ {4}41742:/m, "the tracked file's size is not in SIZES");
+  assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes, 2026-11-14, J3R180 '\n +'09312320 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
 });

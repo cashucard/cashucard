@@ -563,7 +563,8 @@ class ChipEnginesTest {
         rnd.nextBytes(msg);
         byte[] sig = new byte[64];
         ECPrivateKey priv = ecPriv(be(d));
-        assertEquals(64, s.sign(priv, null, g, (short) 0, msg, (short) 0, sig, (short) 0));
+        // the card's own public key object is given too: D207's check makes Q = W + t*G from it and holds it to the point named
+        assertEquals(64, s.sign(priv, ecPub(point65(ecMulTest(d, SECP_GX, SECP_GY))), g, (short) 0, msg, (short) 0, sig, (short) 0));
         assertTrue(schnorrVerify(be(pd[0]), msg, sig), "the date's key");
     }
 

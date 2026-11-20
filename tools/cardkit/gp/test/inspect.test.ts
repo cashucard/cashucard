@@ -48,28 +48,32 @@ test('inspection reads the full applet identity and tag without authentication',
     '00A4040007D276000085010100',
   ]);
 });
-test('a 2.2 card (D175: GET_OUTBOX added) and a 2.3 card are inspected as a 2.1 card is', async () => {
-  for (const minor of [2, 3]) {
-    const info2x = [2, minor, ...Array(28).fill(0)];
-    // a 2.3 card says the change owed in GET_INFO byte 29 and is not asked GET_CHANGE
+test('a 2.2 card (D175: GET_OUTBOX added) and a 3.0 card are inspected as a 2.1 card is', async () => {
+  for (const version of [
+    [2, 2],
+    [3, 0],
+  ]) {
+    const info = [...version, ...Array(28).fill(0)];
+    const two = version[0] === 2;
+    // a 3.0 card says the change owed in GET_INFO byte 29 and is not asked GET_CHANGE
     const {tx, log} = script([
-      ok([2, minor]),
-      ok(info2x),
-      ...(minor === 2 ? [change(0)] : []),
+      ok(version),
+      ok(info),
+      ...(two ? [change(0)] : []),
       ok(fromHex(key)),
       ok(),
     ]);
     assert.equal((await inspectInstallation(tx)).state, 'present');
-    assert.equal(log.includes('B019000000'), minor === 2);
+    assert.equal(log.includes('B019000000'), two);
   }
 });
-// GET_INFO P1 0 of a 2.3 card in jCardSim: a 100 piece paid with 40 change owed, the till gone before LOAD_CHANGE,
+// GET_INFO P1 0 of a 3.0 card in jCardSim: a 100 piece paid with 40 change owed, the till gone before LOAD_CHANGE,
 // then CLEAR_SPENT under the PIN. No unspent and no spent place; byte 29 = 1.
-const OWED_23 = fromHex(
-  '020380000080ff0104030001000003e8016b49d2006b49d2000000006401',
+const OWED_30 = fromHex(
+  '030080000080ff0104030001000003e8016b49d2006b49d2000000006401',
 );
-test('a 2.3 card that owes change is not empty, though it has no unspent and no spent place', async () => {
-  const {tx, log} = script([ok([2, 3]), ok(OWED_23), ok(fromHex(key)), ok()]);
+test('a 3.0 card that owes change is not empty, though it has no unspent and no spent place', async () => {
+  const {tx, log} = script([ok([3, 0]), ok(OWED_30), ok(fromHex(key)), ok()]);
   const seen = await inspectInstallation(tx);
   assert.equal(seen.state, 'present');
   if (seen.state !== 'present') return;
@@ -84,9 +88,9 @@ test('a 2.3 card that owes change is not empty, though it has no unspent and no 
   );
   assert.equal(log.includes('B019000000'), false);
   // the same card with byte 29 = 0 owes nothing
-  const settled = OWED_23.slice();
+  const settled = OWED_30.slice();
   settled[29] = 0;
-  const clear = script([ok([2, 3]), ok(settled), ok(fromHex(key)), ok()]);
+  const clear = script([ok([3, 0]), ok(settled), ok(fromHex(key)), ok()]);
   const none = await inspectInstallation(clear.tx);
   assert.ok(none.state === 'present' && !none.publicState.changeOwed);
 });
@@ -156,8 +160,13 @@ test('absence, nonempty state and a missing tag remain distinct inspection evide
 test('unknown versions, malformed responses and card refusal stop without retries', async () => {
   for (const replies of [
     [ok([2, 0])],
+    [ok([2, 3])],
     [ok([2, 4])],
+    [ok([3, 1])],
+    [ok([4, 0])],
     [ok([2, 1, 0])],
+    // a 3.0 card's GET_INFO saying 2.x
+    [ok([3, 0]), ok(info)],
     // GET_INFO's version not SELECT's
     [ok([2, 2]), ok(info)],
     [ok([2, 1]), ok(info.slice(1))],

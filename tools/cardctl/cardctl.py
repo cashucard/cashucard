@@ -15,14 +15,14 @@ exhaustion, ECDH output framing, or a card whose getS returns short;
 `selftest` is the evidence from silicon.
 
 A 2.0 card has an owner (a P-256 key) whose proofs administer it: set-owner,
-set-limit, change-pin, refresh, the owner's grant (ALLOW_LOAD: on 2.3 it opens
+set-limit, change-pin, refresh, the owner's grant (ALLOW_LOAD: on 3.0 it opens
 no load; a load wants the PIN) and lock sign them with `--owner-key`, a
 32-byte private key in hex, or, by default, the fixed TEST key in p256.py,
 which anyone with this repository holds. Use the test key on bench cards only.
 The key a card is given (setup, set-owner, set-owner-url) has no default:
 `--owner-key`, or the TEST key under `--test-owner-key` alone.
 
-Protocol 2.3 locks every piece to the card's key for its date, P + t*G
+Protocol 3.0 locks every piece to the card's key for its date, P + t*G
 (spec/APDU.md, Keys per load): `group-keys` reads a date's keys, `card-secret`
 opens the card's secret c, and `load --date-keys` is the loader's word that a
 piece was minted to them. The card finishes its own change: `change` lists the
@@ -89,8 +89,8 @@ INS_GET_CHANGE = 0x19
 INS_GET_DLEQ = 0x1A
 INS_GET_OUTBOX = 0x1B
 INS_CERT_READ = 0x1C
-INS_GROUP_KEYS = 0x1D   # 2.3 (D197): a date's keys, t, P + t*G and R + u*G
-INS_INBOX = 0x1E        # 2.3 (D199): this week's inbox, SHA-256("CashuCard/inbox" || c || W) and W, to anyone
+INS_GROUP_KEYS = 0x1D   # 3.0 (D197): a date's keys, t, P + t*G and R + u*G
+INS_INBOX = 0x1E        # 3.0 (D199): this week's inbox, SHA-256("CashuCard/inbox" || c || W) and W, to anyone
 INS_SPEND_ALL_BEGIN = 0x22
 INS_SPEND_ALL_OUTPUTS = 0x23
 INS_SPEND_ALL_SIGN = 0x24
@@ -98,7 +98,7 @@ INS_SPEND_ALL_AGAIN = 0x25
 INS_SPEND_ALL_CHANGE = 0x26
 INS_LOAD_CHANGE = 0x27
 INS_LOAD_PROOF = 0x30
-# LOAD_PROOF and LOAD_CHANGE P2 bit 1 (protocol 2.3): the loader's word that each piece is locked to the card's key
+# LOAD_PROOF and LOAD_CHANGE P2 bit 1 (protocol 3.0): the loader's word that each piece is locked to the card's key
 # for its date, P + t*G (Keys per load). Sent only when the user says so (`load --date-keys`).
 LOAD_DATE_KEYS = 0x02
 # LOAD_PROOF P2 bit 3 (D212): each piece's C whole, 04 || x || y (65 bytes), which the card holds to the curve with its
@@ -138,12 +138,27 @@ PIN_STATE_NAMES = {0: "none", 1: "set", 2: "blocked"}
 # The lowest applet version selftest passes: the shared protocol (D18) as 2.1
 # has it (D26: a payment of nothing spends no roll, and SET_LIMIT without the
 # budget's byte leaves the budget). A 2.0 card is swept and reinstalled. A 0.x
-# or Foxy 1.x card does not answer the 2.x AID at all. 2.2 (D175) only adds a
-# read, GET_OUTBOX, so a 2.1 card in the field still passes: nothing about it
-# calls for a sweep.
+# or Foxy 1.x card does not answer the shared AID (D19) at all. 2.2 (D175) only
+# adds a read, GET_OUTBOX, so a 2.1 card in the field still passes: nothing about
+# it calls for a sweep. 3.0 is a new major (a 2.2 reader cannot read it), and
+# moves no floor: 2.1 and 2.2 cards stay what they are.
 SELFTEST_MIN_VERSION = (2, 1)
-# The versions selftest knows, and so passes: a later 2.x is not passed on trust.
-SELFTEST_VERSIONS = ((2, 1), (2, 2), (2, 3))
+# The versions selftest knows, and so passes: a later minor of a major it knows,
+# or a later major, is not passed on trust.
+SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0))
+# The majors cardctl speaks outside the card file tools: those of SELFTEST_VERSIONS.
+PROTOCOL_MAJORS = tuple(sorted({v[0] for v in SELFTEST_VERSIONS}))
+# The versions cardctl drives a card as (`driven_as`, `connect`): those selftest knows, and 2.0, the release D26
+# replaced, whose wire cardctl's 2.x paths were written for (selftest refuses it for the card's sake, not the wire's).
+DRIVEN_VERSIONS = ((2, 0),) + SELFTEST_VERSIONS
+# The majors D205's rule holds for: a reader takes every minor of such a major it was built for. Major 2 came before
+# the rule, and a 2.x above 2.2 is no release (a 02 03 card is 3.0's wire before its renumbering).
+RULED_MAJORS = (3,)
+# The commands that move no money and set nothing up: `connect` lets them read a card of a version it would otherwise
+# refuse, with a note; `apdu` too, whose bytes are the operator's own. Every other command (and one it cannot name) is
+# refused there. `selftest` selects for itself and gives its own verdict (`_select_verdict`).
+READ_ONLY_COMMANDS = frozenset({"info", "pubkey", "balance", "auth", "slots", "proof", "change", "cert", "outbox",
+                                "group-keys", "card-secret", "verify-pin", "apdu"})
 
 # GET_OUTBOX (2.2, spec/APDU.md, D175): the scope's length, one page's most, the
 # descriptor's tag, and the packet's magic and format.
@@ -152,11 +167,11 @@ OUTBOX_PAGE = 255
 OUTBOX_TAG = "CashuCard/assisted-settlement/v1"
 OUTBOX_MAGIC = b"CCP-AS\x01"
 FORMAT = 4
-FORMAT_TWO_UNITS = 5  # 2.3: GET_INFO byte 8 and GET_CARD byte 0 where the keyset table holds the other unit
+FORMAT_TWO_UNITS = 5  # 3.0: GET_INFO byte 8 and GET_CARD byte 0 where the keyset table holds the other unit
 
 LOCK_CONFIRM_BYTE = 0xDE
 
-# GET_INFO (spec/APDU.md, GET_INFO): the form cardctl asks for, P1 = 4 (59 bytes) from a card SELECT says is 2.3 or
+# GET_INFO (spec/APDU.md, GET_INFO): the form cardctl asks for, P1 = 4 (59 bytes) from a card SELECT says is 3.0 or
 # later and P1 = 2 (43 bytes) from an older one; and the profile bits of bytes 55 and 56, P1 = 4.
 INFO_P1_LONG = 0x02
 INFO_P1_LONGEST = 0x04
@@ -167,7 +182,7 @@ PROFILE_NAMES = (
 )
 LAST_UNIT_NAMES = {0x00: "none", 0x80: "the card's", 0xA0: "the other"}
 
-# The card's own change (2.3): GET_CHANGE answers a count and up to three openings of 83 bytes (number 1, amount 4,
+# The card's own change (3.0): GET_CHANGE answers a count and up to three openings of 83 bytes (number 1, amount 4,
 # keyset 8, date 4, B_ 33, K 33); LOAD_CHANGE takes C_ (65) || K (65) || e (32) || s (32) for one of the eight
 # openings, P2 02 (the word on keys per load), and answers the slot, the kept-proof byte and the piece (81);
 # SPEND_ALL_CHANGE takes the amount (4) || K (33) || the keyset (8) and answers the change output's B_ (33).
@@ -177,7 +192,7 @@ CHANGE_MOST = 8
 LOAD_CHANGE_LEN = 194
 LOAD_CHANGE_ANSWER_LEN = 83
 SPEND_ALL_CHANGE_LEN = 45
-# KEYSET_KEYS (2.3): a key on the wire is amount (8) || K (33), one to six to a command, 64 to a keyset; a tail of
+# KEYSET_KEYS (3.0): a key on the wire is amount (8) || K (33), one to six to a command, 64 to a keyset; a tail of
 # at most 64 bytes; a path of at most 6 nodes. The tree: leaves SHA-256(00 || amount || K), padded to a power of two
 # with SHA-256(02), nodes SHA-256(01 || left || right).
 KEYSET_KEY_WIRE = 41
@@ -186,7 +201,7 @@ KEYSET_KEYS_MOST = 64
 KEYSET_TAIL_MOST = 64
 KEYSET_PATH_MOST = 6
 KEYSET_UNITS = ("sat", "usd")
-# CERT_READ (2.3): P1 FF the state (4 bytes), P1 00 to 03 pages of 256.
+# CERT_READ (3.0): P1 FF the state (4 bytes), P1 00 to 03 pages of 256.
 CERT_STATE = 0xFF
 CERT_PAGE = 256
 CERT_PAGES = 4
@@ -203,7 +218,7 @@ EC_POINT_LEN = 65            # 04 || x || y
 # SHA-256(PINKEY_LABEL || PIN key).
 SEAL_LABEL = "CashuCard/seal"
 PINKEY_LABEL = "CashuCard/pinkey"
-# The owner's c (2.3, D202): s = HMAC-SHA256(the 64-byte BIP-39 seed, LABEL_C || 00 || P (33)); SET_OWNER P1 = 1 gives
+# The owner's c (3.0, D202): s = HMAC-SHA256(the 64-byte BIP-39 seed, LABEL_C || 00 || P (33)); SET_OWNER P1 = 1 gives
 # the card s sealed to its PIN key Q (GET_NONCE P1 = 1, signed by P), E (65) || s XOR block 1 || block 0's first 16,
 # block i = SHA-256(LABEL_C || i || x(e*Q) || E [|| the sealed bytes]); SET_OWNER's value ends with SHA-256(LABEL_C ||
 # s)'s first 16; c = SHA-256(LABEL_C || s || n (4)), n the owners' c the card has taken, this one with them.
@@ -289,7 +304,7 @@ MAX_SLOT_AMOUNT = 2 ** 32
 
 SW_MEANINGS = {
     0x9000: "success",
-    0x6200: "ALLOW_LOAD: the owner's grant given for this tap (2.3: a warning; it opens no load)",
+    0x6200: "ALLOW_LOAD: the owner's grant given for this tap (3.0: a warning; it opens no load)",
     0x6700: "wrong length",
     0x6982: "security condition not satisfied (the PIN, or the owner's grant, not given in this tap)",
     0x6983: "PIN blocked — the owner's change-pin unblocks it",
@@ -300,7 +315,7 @@ SW_MEANINGS = {
     0x6A82: "not found — no 2.0 applet on this card (a 0.x or 1.x card needs an update)",
     0x6A83: "slot index out of range",
     0x6A84: "no space — all slots occupied",
-    0x6A86: "incorrect P1/P2 (LOAD_PROOF on 2.3: no word that the pieces are locked to the card's key for their date: load --date-keys)",
+    0x6A86: "incorrect P1/P2 (LOAD_PROOF on 3.0: no word that the pieces are locked to the card's key for their date: load --date-keys)",
     0x6A88: "slot is empty",
     0x6A8C: "no card record — run set-card first",
     0x6A8D: "card in use — something unspent where only an empty card may be changed",
@@ -311,7 +326,7 @@ SW_MEANINGS = {
     0x6A93: "too little work in the block header",
     0x6A94: "already on the card (LOAD_PROOF) / the PIN needed for this payment (SPEND_ALL_SIGN)",
     0x6A96: "too many places for one signature",
-    0x6A97: "no PIN — the card takes and pays nothing until it is given one (a 2.3 card: run setup)",
+    0x6A97: "no PIN — the card takes and pays nothing until it is given one (a 3.0 card: run setup)",
     0x6A98: "keep holding — the card counts this tap; ask again",
     0x6A99: "no rate — a payment or a load of the other unit on a card with a limit and no rate",
     0x6A9A: "two units in one payment, or a place whose keyset is in no entry",
@@ -553,7 +568,7 @@ class Card:
 
     def held(self, ins: int, p1: int = 0, p2: int = 0, data: bytes = b"", le: Optional[int] = None,
              context: str = "", most: int = 10, note: str = "") -> bytes:
-        """A command the card holds for (2.3: an owner's claim, D187; a history of a card with no owner, D189; a
+        """A command the card holds for (3.0: an owner's claim, D187; a history of a card with no owner, D189; a
         VERIFY_PIN serving the wait of wrong tries, D195): the same command sent again for as long as the card answers
         6A98, keep holding, and no more than `most` times. `note` goes to stderr once, at the first 6A98."""
         for _ in range(most - 1):
@@ -601,12 +616,12 @@ class Card:
             f"SELECT failed: {last}\n"
             "No 2.0 applet answers on this card. A card on the 0.x or Foxy 1.x applet needs an\n"
             "update (sweep it first, then reinstall: docs/HARDWARE_DEPLOYMENT.md):\n"
-            "  applet/target/cashu-javacard-2.3.0.cap"
+            "  applet/target/cashu-javacard-3.0.0.cap"
         )
 
     # ── read commands ─────────────────────────────────────────────────────────
     def get_info(self) -> dict:
-        """GET_INFO, the longest form the card speaks: P1 = 4 (59 bytes) on a card SELECT says is 2.3 or later, P1 = 2
+        """GET_INFO, the longest form the card speaks: P1 = 4 (59 bytes) on a card SELECT says is 3.0 or later, P1 = 2
         (43 bytes) on an older 2.x; the 0.x answer (8 or 9 bytes) in legacy mode."""
         if self.legacy:
             b = self.send(INS_GET_INFO, le=0x00, context="GET_INFO")
@@ -614,7 +629,7 @@ class Card:
                 raise SystemExit(f"GET_INFO returned {len(b)} bytes, expected 8 or 9: {_hex(b)}")
             return {"version": f"{b[0]}.{b[1]}", "max_slots": b[2], "unspent": b[3], "spent": b[4],
                     "empty": b[5], "caps_raw": b[6], "pin_state": PIN_STATE_NAMES.get(b[7], f"unknown({b[7]})")}
-        p1 = INFO_P1_LONGEST if self.at_least(2, 3) else INFO_P1_LONG
+        p1 = INFO_P1_LONGEST if self.at_least(3, 0) else INFO_P1_LONG
         b = self.send(INS_GET_INFO, p1=p1, le=0x00, context="GET_INFO")
         if len(b) < 30:
             raise SystemExit(f"GET_INFO returned {len(b)} bytes, expected {59 if p1 == INFO_P1_LONGEST else 43}: "
@@ -672,7 +687,7 @@ class Card:
 
     def get_card_secret(self, e_pub: Optional[bytes] = None) -> bytes:
         """
-        GET_CARD P1 = 3 (2.3): the card's secret c, sealed, right after GET_NONCE P1 = 1 (`get_pin_key`), whose sixteen
+        GET_CARD P1 = 3 (3.0): the card's secret c, sealed, right after GET_NONCE P1 = 1 (`get_pin_key`), whose sixteen
         bytes it uses up. With `e_pub` None (a card with a refund key): no data; the answer is K = k*G (65) and c XOR
         block 1 of the seal over x(k*R), 97 bytes. With `e_pub`, the reader's one-time key E (65, 04 || x || y; a card
         with no refund key): the answer is c XOR block 1 of the seal over x(e*PIN key), 32 bytes. Opened by
@@ -691,7 +706,7 @@ class Card:
         return b
 
     def group_keys(self, date: int) -> dict:
-        """GROUP_KEYS (1D, 2.3): a date's keys, t (32), P + t*G (33) and R + u*G (33, zeros with no refund key and for
+        """GROUP_KEYS (1D, 3.0): a date's keys, t (32), P + t*G (33) and R + u*G (33, zeros with no refund key and for
         the date 0). Wants the PIN given in this tap or the owner's grant (6982 otherwise)."""
         if not 0 <= date < 2 ** 32:
             raise SystemExit(f"the date must fit four bytes, got {date}")
@@ -703,9 +718,9 @@ class Card:
     def _the_card_finishes_its_change(self, what: str) -> None:
         """A card SELECT says is 2.2 or earlier answers 80-byte openings and has no LOAD_CHANGE: refused here, before
         anything is sent. (Before a SELECT, nothing is known and nothing is refused.)"""
-        if self.version and not self.at_least(2, 3):
+        if self.version and not self.at_least(3, 0):
             raise SystemExit(f"{what}: this card answers version {_version_text(self.version)}; the card's own change "
-                             "is read and loaded this way from 2.3 on (a 2.2 card answers 80-byte openings, which a "
+                             "is read and loaded this way from 3.0 on (a 2.2 card answers 80-byte openings, which a "
                              "reader finishes itself)")
 
     def get_change(self, page: int = 0) -> List[dict]:
@@ -819,7 +834,7 @@ class Card:
         return self.send(ins, p1=p1, p2=p2, data=p256.owner_data(proof, value), le=le, context=context)
 
     def stage_owner_c(self, s: bytes, pin_key: bytes) -> None:
-        """SET_OWNER P1 = 1 (2.3, D202): the owner's s, sealed to the card's PIN key, kept by the card for the
+        """SET_OWNER P1 = 1 (3.0, D202): the owner's s, sealed to the card's PIN key, kept by the card for the
         SET_OWNER that comes next (any other command between lets it go)."""
         self.send(INS_SET_OWNER, p1=1, data=owner_c_envelope(s, pin_key), context="SET_OWNER P1 1 (the owner's c)")
 
@@ -834,7 +849,7 @@ class Card:
     def set_owner(self, owner_pub: bytes, anchor: Optional[bytes] = None, old_owner: Optional[int] = None,
                   s: Optional[bytes] = None) -> None:
         """SET_OWNER: the key, and the anchor header after it (D20); the old owner's proof on an owned card. With `s`
-        (2.3, D202), the owner's c: its envelope first (SET_OWNER P1 = 1, after the nonce on a hand-over), and its
+        (3.0, D202), the owner's c: its envelope first (SET_OWNER P1 = 1, after the nonce on a hand-over), and its
         check at the end of the value, under the proof."""
         if len(owner_pub) != OWNER_KEY_LEN or owner_pub[0] != 0x04:
             raise SystemExit("an owner key is 65 bytes beginning 04")
@@ -842,7 +857,7 @@ class Card:
             raise SystemExit(f"the anchor is a block header, {HEADER_LEN} bytes; got {len(anchor)}")
         value = owner_pub + (anchor or b"") + (owner_c_check(s) if s is not None else b"")
         if old_owner is None:
-            # 2.3 (D187): a claim wants the PIN given in this tap and is held for; the card answers 6A98, keep holding,
+            # 3.0 (D187): a claim wants the PIN given in this tap and is held for; the card answers 6A98, keep holding,
             # to the first three askings (D211)
             if s is not None:
                 # the PIN key, then the envelope: a command between the envelope and SET_OWNER lets it go
@@ -885,7 +900,7 @@ class Card:
         self.owner_command(INS_CHANGE_PIN, LABEL_CHANGE_PIN, new_pin, owner, context="CHANGE_PIN")
 
     def allow_load(self, owner: int) -> None:
-        """ALLOW_LOAD, the owner's grant for this tap. A 2.3 card answers 6200 where the grant is given (a warning: it
+        """ALLOW_LOAD, the owner's grant for this tap. A 3.0 card answers 6200 where the grant is given (a warning: it
         opens no load), a card of 2.2 or earlier 9000; both are the grant given."""
         try:
             self.owner_command(INS_ALLOW_LOAD, LABEL_LOAD, b"", owner, context="ALLOW_LOAD")
@@ -971,10 +986,13 @@ class Card:
         elif date:
             raise SystemExit("a 0.x card has no date in its slot")
         # P2 bit 1 (02), `date_keys`: the loader's word that the piece was minted locked to the card's key for its
-        # date, P + t*G (and R + u*G), never to the card's main key P (protocol 2.3, Keys per load). Sent only when the
-        # caller says so; a 2.3 card answers 6A86 to a load without it and writes nothing. A 0.x card takes P2 00.
+        # date, P + t*G (and R + u*G), never to the card's main key P (protocol 3.0, Keys per load). Sent only when the
+        # caller says so; a 3.0 card answers 6A86 to a load without it and writes nothing. A 0.x card takes P2 00.
         if date_keys and self.legacy:
             raise SystemExit("a 0.x card has no keys per date")
+        if date_keys and self.version and not self.at_least(3, 0):
+            raise SystemExit(f"a card of version {_version_text(self.version)} has no keys per date (3.0's): it "
+                             "could never pay a piece locked to one")
         p2 = LOAD_DATE_KEYS if date_keys else 0
         if uncompressed:
             # D212: C whole, the date after it; a card that answers 6B00 (its chip's key agreement failed the card's install
@@ -988,7 +1006,7 @@ class Card:
     def clear_spent(self) -> int:
         return self.send(INS_CLEAR_SPENT, le=0x01, context="CLEAR_SPENT")[0]
 
-    # ── the card's own change (2.3) ───────────────────────────────────────────
+    # ── the card's own change (3.0) ───────────────────────────────────────────
     def load_change(self, k: int, c_blind65: bytes, k65: bytes, e: bytes, s: bytes) -> dict:
         """
         LOAD_CHANGE (27): opening `k` (0 to 7) made into its piece from the mint's answer for its B_: C_ and K (65
@@ -1012,9 +1030,14 @@ class Card:
             raise SystemExit(f"LOAD_CHANGE returned {len(b)} bytes, expected {LOAD_CHANGE_ANSWER_LEN}")
         return {"slot": b[0], "proof_kept": b[1] == 1, "piece": decode_piece(b[2:])}
 
-    def spend_all_change(self, amount: int, k33: bytes, keyset8: bytes) -> bytes:
+    def spend_all_change(self, amount: int, k33: bytes, keyset8: bytes, mint_info: dict) -> bytes:
         """SPEND_ALL_CHANGE (26), in a payment begun: a change output of `amount` for the card itself, bound to the
-        mint's key K for that amount (33, compressed) and made in `keyset8`. Answers the output's B_ (33)."""
+        mint's key K for that amount (33, compressed) and made in `keyset8`. Answers the output's B_ (33).
+
+        `mint_info` is the GET /v1/info answer of the mint the payment will be swapped at (`fetch_mint_info`), and it
+        is required: the change is asked for only where it says NUT-12 and NUT-09 are supported (`check_change_mint`),
+        since at any other mint the change could never be loaded. Without it the till pays the exact amount."""
+        check_change_mint(mint_info)
         if not 0 < amount < 2 ** 32:
             raise SystemExit(f"the change is 1 to 2^32 - 1, got {amount}")
         if len(k33) != 33 or k33[0] not in (0x02, 0x03):
@@ -1028,7 +1051,7 @@ class Card:
             raise SystemExit(f"SPEND_ALL_CHANGE returned {len(b)} bytes, expected 33")
         return b
 
-    # ── a keyset's keys (2.3) ─────────────────────────────────────────────────
+    # ── a keyset's keys (3.0) ─────────────────────────────────────────────────
     def keyset_keys_begin(self, keyset8: bytes, tail: bytes = b"") -> None:
         """KEYSET_KEYS P1 0, under the PIN given in this tap: the keyset (an entry of the card's table) and the tail
         NUT-02 hashes after its keys: none for a version 00 ID; for version 01 `|unit:sat` or `|unit:usd` first, then
@@ -1080,7 +1103,7 @@ class Card:
 
     # ── the PIN ───────────────────────────────────────────────────────────────
     def verify_pin(self, pin: bytes) -> None:
-        """VERIFY_PIN, sent again for as long as the card answers 6A98 (2.3, a card with no owner serving the wait its
+        """VERIFY_PIN, sent again for as long as the card answers 6A98 (3.0, a card with no owner serving the wait its
         wrong tries left: keep holding it)."""
         self.held(INS_VERIFY_PIN, data=pin, context="VERIFY_PIN", most=PIN_WAIT_MOST,
                   note="the card is serving the wait its wrong tries left: keep holding it on the reader")
@@ -1192,7 +1215,7 @@ def decode_piece(b: bytes) -> dict:
 
 
 def decode_change(b: bytes) -> List[dict]:
-    """GET_CHANGE's answer (2.3): a count, then that many openings of 83 bytes: the opening's number (1), amount (4),
+    """GET_CHANGE's answer (3.0): a count, then that many openings of 83 bytes: the opening's number (1), amount (4),
     keyset (8), date (4), B_ (33) and K, the mint's key it is bound to (33)."""
     if not b or b[0] > CHANGE_PAGE or len(b) != 1 + b[0] * CHANGE_ROW_LEN:
         raise SystemExit(f"GET_CHANGE returned {len(b)} bytes, not a count of 0 to {CHANGE_PAGE} and "
@@ -1253,11 +1276,34 @@ def parse_hex(value: str, expected_len: Optional[int] = None, what: str = "value
     return b
 
 
+def driven_as(version: bytes) -> Optional[Tuple[int, int]]:
+    """
+    The version cardctl drives a card as, from the two bytes SELECT answered, or None for one it would drive by the
+    wrong wire. A version it knows (DRIVEN_VERSIONS) is itself. A later minor of a major from D205 on (3.1, 3.2, ...)
+    is too: D205's rule is that a reader takes every minor of a major it was built for, since a minor never changes what
+    a reader of an earlier minor sends or is answered, and `at_least(3, 0)` holds for it. Major 2 is older than that
+    rule and closed: a `02 03` card is a build of 3.0's wire from before its renumbering (D205), which a 2.2 reader
+    would drive wrongly (GET_INFO P1 2, GET_PUBKEY as the outbox key, the old clock check), and no other 2.x is known.
+    """
+    if len(version) < 2:
+        return None
+    ver = (version[0], version[1])
+    if ver in DRIVEN_VERSIONS:
+        return ver
+    if ver[0] in RULED_MAJORS and ver > max(v for v in DRIVEN_VERSIONS if v[0] == ver[0]):
+        return ver
+    return None
+
+
 def connect(args) -> Card:
     """
     A card with the applet selected. The card file tools ask for the 0.x applet
     (`legacy`) and refuse a card that answers any other major version; every
-    other command speaks 2.0 and refuses any other.
+    other command speaks majors 2 and 3 (PROTOCOL_MAJORS) and refuses any other.
+    Within those, a command that moves money or sets a card up (any not in
+    READ_ONLY_COMMANDS) is refused on a version cardctl would drive by the wrong
+    wire (`driven_as`), before anything after SELECT is sent; a read-only one
+    goes on, with a note.
     """
     legacy = bool(getattr(args, "legacy", False))
     card = Card(reader_index=args.reader, verbose=args.verbose)
@@ -1265,9 +1311,33 @@ def connect(args) -> Card:
     major = version[0] if version else None
     if legacy and major != 0:
         raise SystemExit(f"this card answers version {_version_text(version)}; card files are 0.x-only (spec/CARD-FILE.md)")
-    if not legacy and major != 2:
-        raise SystemExit(f"this card answers version {_version_text(version)}; cardctl speaks protocol 2.0")
+    if not legacy and major not in PROTOCOL_MAJORS:
+        raise SystemExit(f"this card answers version {_version_text(version)}; cardctl speaks protocols 2.x and 3.x")
+    if not legacy and driven_as(version) is None:
+        command = getattr(args, "command", None)
+        why = unknown_version_text(version)
+        if command not in READ_ONLY_COMMANDS:
+            raise SystemExit(f"{why}. {command or 'this command'} moves money or sets the card up, so cardctl sends "
+                             "it to none but a version it knows; nothing was sent after SELECT. The reads (info, "
+                             "balance, slots, proof, auth) still answer")
+        print(f"note: {why}; read anyway, as the {version[0]}.x it knows is read, so what it says may be wrong",
+              file=sys.stderr)
     return card
+
+
+def unknown_version_text(version: bytes) -> str:
+    """What a card whose version `driven_as` refuses answered, and what cardctl knows."""
+    known = ", ".join(f"{a}.{b}" for a, b in DRIVEN_VERSIONS)
+    text = (f"this card answers version {_version_text(version)}; cardctl knows {known}, and every later minor of "
+            f"major {', '.join(str(m) for m in RULED_MAJORS)} (D205)")
+    if len(version) >= 2 and version[0] == 2:
+        text += f". No 2.x above 2.2 was released: {PRE_RENUMBERING}"
+    return text
+
+
+PRE_RENUMBERING = ("a card answering 02 03 is a build of 3.0's wire from before its renumbering (D205), which a 2.2 "
+                   "reader drives wrongly; once it holds nothing, reinstall it with the tracked CAP "
+                   "(docs/HARDWARE_DEPLOYMENT.md)")
 
 
 def _version_text(version: bytes) -> str:
@@ -1539,12 +1609,12 @@ def owner_c_envelope(s: bytes, pin_key: bytes, e: Optional[int] = None) -> bytes
 
 
 def _owner_seed(args) -> Optional[bytes]:
-    """--owner-seed HEX (2.3, D202): the owner's 64-byte BIP-39 seed, from which the card's c is worked out."""
+    """--owner-seed HEX (3.0, D202): the owner's 64-byte BIP-39 seed, from which the card's c is worked out."""
     value = getattr(args, "owner_seed", None)
     return parse_hex(value, BIP39_SEED_LEN, "--owner-seed") if value else None
 
 
-# ── a keyset's keys and the tree the card keeps of them (2.3, KEYSET_KEYS) ───
+# ── a keyset's keys and the tree the card keeps of them (3.0, KEYSET_KEYS) ───
 KEYSET_PAD = hashlib.sha256(b"\x02").digest()
 
 
@@ -1708,8 +1778,77 @@ def whole_c(c: bytes) -> bytes:
     return b"\x04" + x.to_bytes(32, "big") + y.to_bytes(32, "big")
 
 
+# ── a mint the card's change may be asked at (3.0) ──────────────────────────
+# The card finishes its own change: LOAD_CHANGE takes the mint's blind signature only with the mint's NUT-12 proof
+# (e, s), and GET_CHANGE never gives the opening's nonce or blinding factor out, so nobody but the card can make the
+# change a piece. A mint that gives no DLEQ takes the payment's inputs and answers change that can never be loaded: it
+# is lost for good. And a swap answer lost on the way back is asked for again by NUT-09 restore, by the opening's B_,
+# the only way back to it. So a reader asks the card for change (SPEND_ALL_CHANGE) only at a mint whose GET /v1/info
+# says it supports both; at any other it pays the exact amount, with no change output, or not at all.
+CHANGE_NUTS = (("12", "NUT-12, the DLEQ proof LOAD_CHANGE needs"),
+               ("9", "NUT-09, restore, the way back to a swap answer lost on its way"))
+
+
+def change_mint_problem(info) -> Optional[str]:
+    """Why the card's change must not be asked for at the mint whose GET /v1/info answered `info`, or None: its `nuts`
+    must say `"supported": true` for both NUT-12 and NUT-09. A mint that does not say so is taken not to."""
+    nuts = info.get("nuts") if isinstance(info, dict) else None
+    if not isinstance(nuts, dict):
+        return "its /v1/info names no nuts"
+    missing = [what for nut, what in CHANGE_NUTS
+               if not (isinstance(nuts.get(nut), dict) and nuts[nut].get("supported") is True)]
+    if missing:
+        return "its /v1/info does not say it supports " + " or ".join(missing)
+    return None
+
+
+def check_change_mint(info, mint: str = "the mint") -> None:
+    """Refuse, before anything is sent, to ask the card for change at a mint that will not give it back (above)."""
+    problem = change_mint_problem(info)
+    if problem:
+        raise SystemExit(
+            f"no change asked of the card at {mint}: {problem}. The card loads its change only with the mint's DLEQ "
+            "proof, and nobody else can unblind it, so change swapped at this mint would be lost for good. Pay the "
+            "exact amount, with no change output, or pay at a mint that supports both; nothing was sent.")
+
+
+def fetch_mint_info(url: str) -> dict:
+    """GET {url}/v1/info (NUT-06), the mint's own word on the NUTs it supports. Test-injectable."""
+    import urllib.request
+
+    req = urllib.request.Request(url.rstrip("/") + "/v1/info")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001, the transport's own words are the message
+        raise SystemExit(f"the mint at {url} did not answer /v1/info: {exc}")
+    if not isinstance(body, dict):
+        raise SystemExit(f"the mint at {url} answered /v1/info with no object")
+    return body
+
+
+def change_signature(sig, what: str = "the change") -> Tuple[bytes, bytes, bytes]:
+    """
+    C_, e and s from the mint's blind signature for one change output: an entry of a swap's `signatures`, or of a
+    NUT-09 restore's, `{"amount", "id", "C_", "dleq": {"e", "s"}}`. A signature with no DLEQ is said plainly: the card
+    cannot load it, and the way on is restore, not a retry of LOAD_CHANGE.
+    """
+    if not isinstance(sig, dict) or not isinstance(sig.get("C_"), str):
+        raise SystemExit(f"{what}: the mint's signature is not an object with a C_")
+    dleq = sig.get("dleq")
+    if not isinstance(dleq, dict) or not isinstance(dleq.get("e"), str) or not isinstance(dleq.get("s"), str):
+        raise SystemExit(
+            f"{what}: the mint's signature carries no DLEQ proof (NUT-12, its \"dleq\": e and s). The card loads its "
+            "change only with that proof (LOAD_CHANGE checks it, and nobody but the card can unblind the change), so "
+            "nothing was sent and the opening stays owed on the card. Ask the mint for the signature again by NUT-09 "
+            "restore (POST /v1/restore with the opening's B_, which `change` lists): a mint that supports NUT-12 "
+            "answers it with the proof. A mint that never gives one cannot give this change back.")
+    return parse_point_65(sig["C_"], "C_"), parse_hex(dleq["e"], 32, "the DLEQ's e"), parse_hex(dleq["s"], 32,
+                                                                                                "the DLEQ's s")
+
+
 def placeholder_c(nonce: bytes) -> bytes:
-    """A placeholder C for `load` without --c: a point of the curve (a 2.3 card refuses one that is not, 6A80), found
+    """A placeholder C for `load` without --c: a point of the curve (a 3.0 card refuses one that is not, 6A80), found
     from the nonce by SHA-256("cardctl/placeholder-C" || nonce || counter) until its x is on the curve. Nobody knows
     its discrete log and no mint signed it: it cannot be redeemed."""
     for counter in range(256):
@@ -1855,12 +1994,12 @@ def cmd_info(args) -> int:
 
 
 def _owner_words(card, i: dict) -> str:
-    """`info`'s owner line. On 2.3 (D196) a card with no owner is open to a claim only in its first set-up: one with no
+    """`info`'s owner line. On 3.0 (D196) a card with no owner is open to a claim only in its first set-up: one with no
     PIN is open to the first phone that sets it up; one with a PIN is a holder's card with no phone, which takes an
     owner only after a reset by its PIN. A 2.2 card with no owner and nothing on it takes a claim at any time."""
     if i["has_owner"]:
         return "yes"
-    if card.at_least(2, 3) and i["pin_state"] != "none":
+    if card.at_least(3, 0) and i["pin_state"] != "none":
         return ("none — a card with a PIN and no owner, past its first set-up: an owner comes only by a reset by its "
                 "PIN and a new set-up")
     return "none — open to the first phone that sets it up"
@@ -1989,12 +2128,18 @@ def cmd_load(args) -> int:
         raise SystemExit(f"--date must fit four bytes, got {args.date}")
     owner = owner_key(args) if args.owner else None
     card = connect(args)
-    if owner is not None and not args.pin and card.at_least(2, 3):
+    if args.date_keys and not card.at_least(3, 0):
+        # before VERIFY_PIN: a card of 2.2 or earlier signs with its key P alone, so a piece locked to a date's key
+        # P + t*G is one it can never pay, and its P2 bit 1 is no word it reads
+        raise SystemExit(f"--date-keys is protocol 3.0's word (LOAD_PROOF P2 02): this card answers version "
+                         f"{_version_text(card.version)} and signs with its key P alone, so a piece locked to a date's "
+                         "key could never be paid from it; nothing was sent")
+    if owner is not None and not args.pin and card.at_least(3, 0):
         raise SystemExit("the owner's grant opens no load on this card: a load wants the PIN given in this tap (--pin)")
     if args.pin:
         card.verify_pin(args.pin.encode())
     if owner is not None:
-        # the owner's grant (ALLOW_LOAD): on a card of 2.2 or earlier it opens a load with no PIN; on 2.3 it opens
+        # the owner's grant (ALLOW_LOAD): on a card of 2.2 or earlier it opens a load with no PIN; on 3.0 it opens
         # none, and the PIN given above opens it
         card.allow_load(owner)
     try:
@@ -2010,7 +2155,7 @@ def cmd_load(args) -> int:
     except CardError as exc:
         if exc.sw == 0x6A86 and not args.date_keys:
             raise SystemExit(
-                "error: LOAD_PROOF answered 6A86, and nothing was written. A 2.3 card loads a piece only on the "
+                "error: LOAD_PROOF answered 6A86, and nothing was written. A 3.0 card loads a piece only on the "
                 "loader's word that it was minted locked to the card's key for its date, P + t*G (group-keys, or c "
                 "from card-secret), never to the card's main key P. Pass --date-keys only when that is so: ecash "
                 "locked to P alone can never be spent by the card.")
@@ -2489,15 +2634,15 @@ def cmd_set_pin(args) -> int:
     check_pin(pin)
     card = connect(args)
     if args.owner:
-        if card.at_least(2, 3):
-            raise SystemExit("a 2.3 card with an owner refuses SET_PIN (6A91): its PIN is changed by change-pin, "
+        if card.at_least(3, 0):
+            raise SystemExit("a 3.0 card with an owner refuses SET_PIN (6A91): its PIN is changed by change-pin, "
                              "with the owner's proof")
         # ADD PIN, on a card of 2.2 or earlier: a card with an owner and no PIN takes one under the owner's grant
         card.allow_load(owner_key(args))
-    elif card.at_least(2, 3) and card.get_info()["pin_state"] == "none":
+    elif card.at_least(3, 0) and card.get_info()["pin_state"] == "none":
         # D196: this SET_PIN would begin the card's first set-up, and the next selection would end it with no record
         # and no owner, which nothing but a reset by the PIN can then change
-        raise SystemExit("a 2.3 card with no PIN is set up in one selection: run setup (PIN, record, owner and "
+        raise SystemExit("a 3.0 card with no PIN is set up in one selection: run setup (PIN, record, owner and "
                          "limits); set-pin alone would leave a card with a PIN, no record and no owner")
     card.set_pin(pin)
     print("PIN set")
@@ -2541,7 +2686,7 @@ def cmd_set_owner(args) -> int:
         checked = _owner_c_line(owner_c_count_on_card(card, s))
     print("owner set" + (f"; the clock is anchored at {card.get_info()['now']}" if anchor else
                          " (no anchor: the card's clock is as it was; pass --anchor with the tip header)") + checked)
-    if old is not None and card.at_least(2, 3):
+    if old is not None and card.at_least(3, 0):
         # a hand-over (D197): the PIN the last owner knows opens nothing, and the refund key went with it
         print("handed over. Until the new owner's change-pin (python3 cardctl.py change-pin NEW --owner-key <the new "
               "owner key>), verify-pin answers 6982; until its set-card (python3 cardctl.py set-card --mint <the mint> "
@@ -2609,13 +2754,13 @@ def _design_kept(record: dict) -> bytes:
 
 def cmd_setup(args) -> int:
     """
-    A card's first set-up in one selection (2.3, D196: the first set-up is the selection of the card's first SET_PIN,
+    A card's first set-up in one selection (3.0, D196: the first set-up is the selection of the card's first SET_PIN,
     and every SELECT ends it, so separate commands cannot make it): SET_PIN, VERIFY_PIN, SET_CARD, the owner claimed
     (SET_OWNER, held for, with the anchor), then, with --day, the owner's limits. The anchor is required (D204): on a
-    2.3 card the claim's anchor, the first set-up's of an empty card, is its clock even where the clock was later, and
+    3.0 card the claim's anchor, the first set-up's of an empty card, is its clock even where the clock was later, and
     its hardest where it is harder. Everything that can be checked here is checked before the card is written to: the
     PIN, the owner key, the mint, the refund key, the anchor's work (its own, the floor, and a quarter of the hardest
-    header the card has taken; on a card older than 2.3 the clock too) and the limits. A card that is not fresh
+    header the card has taken; on a card older than 3.0 the clock too) and the limits. A card that is not fresh
     from its install or a reset (a factory record allowed) is refused before anything is written. A failure after
     SET_PIN says what the card now holds and the way back.
     """
@@ -2647,9 +2792,9 @@ def cmd_setup(args) -> int:
         raise SystemExit("setup is for a card fresh from its install or a reset (no PIN, no owner, and no record but "
                          f"a factory one); this one has PIN {info['pin_state']}, record "
                          f"{'none' if not info['record_set'] else record['mint']!r}, owner {info['has_owner']}")
-    # a 2.3 card takes the claim's anchor even where it is older than its clock (D204); an older card moves it only forward
+    # a 3.0 card takes the claim's anchor even where it is older than its clock (D204); an older card moves it only forward
     problem = header_work_problem(anchor, record["hardest_bits"]) or (
-        None if card.at_least(2, 3) else clock_ahead_problem(info["now"], anchor))
+        None if card.at_least(3, 0) else clock_ahead_problem(info["now"], anchor))
     if problem:
         raise SystemExit(f"--anchor: {problem}. Nothing was written to the card.")
     far = info["now"] > header_time(anchor) + CLOCK_AHEAD_MOST
@@ -2688,13 +2833,13 @@ def cmd_setup(args) -> int:
 
 def _setup_stopped(card, step: str, exc: BaseException, design: bytes = b"") -> str:
     """What setup says when it stops at `step`: the card's state, read in the same selection where the card still
-    answers, and the way on from it. A card older than 2.3 has no first set-up and no reset by the PIN: one with a PIN
+    answers, and the way on from it. A card older than 3.0 has no first set-up and no reset by the PIN: one with a PIN
     and no owner is claimed at any later tap (set-owner --pin)."""
     why = str(exc) or type(exc).__name__
     lines = [f"setup stopped at {step}: {why}"]
     # a reset clears the record, a factory record's design with it: the next setup is given it again
     again = f"setup again with --design {design.decode()}" if design else "setup again"
-    if not card.at_least(2, 3):
+    if not card.at_least(3, 0):
         lines.append(f"This card answers version {_version_text(card.version)}: it has no reset by the PIN, and a card "
                      "with a PIN and no owner is claimed at any later tap.")
         claim = ("python3 cardctl.py set-owner --pin <the PIN> --owner-key <the owner key> --anchor <the tip header>, "
@@ -2752,9 +2897,20 @@ def _setup_stopped(card, step: str, exc: BaseException, design: bytes = b"") -> 
     return "\n".join(lines)
 
 
+# A reset draws the card a new c (spec/APDU.md, Keys per load), and with it new keys for every date. The card being empty
+# says nothing of eCash a wallet has already swapped to this card's keys and not yet loaded: no card will ever sign for it
+# again. Undated (the date 0), it has no refund and is lost for good; dated, only the refund key takes it back, after its
+# date, with r + u, and u comes from the c the card holds now. So the warning is given before every reset, --yes or not.
+RESET_LOSES_SWAPPED = (
+    "a reset gives the card a new c, so new keys for every date. eCash already swapped to this card's keys and not yet "
+    "loaded can never be loaded or paid after it: undated (the date 0), it is lost for good; dated, only the refund key "
+    "takes it back, after its date, with r + u, where u comes from the c the card holds now. Load such eCash first, or "
+    "read c and keep it with the refund key's r (card-secret) before the reset")
+
+
 def cmd_reset(args) -> int:
     """
-    RESET_CARD on a card with no owner (2.3, D196): the reset by the PIN. The PIN given, a held tap (GET_LOG held for),
+    RESET_CARD on a card with no owner (3.0, D196): the reset by the PIN. The PIN given, a held tap (GET_LOG held for),
     then RESET_CARD seventeen times in a row (24 askings with the history's, about 11 seconds in all on a J3R180), all in one selection. Only an empty card that is
     owed nothing: the card is then as from its install, with a new card key and a new c, for setup. With --owner-key, a
     card with an owner is reset by its owner's proof instead (the PIN too where the card is locked). With --anchor
@@ -2793,6 +2949,7 @@ def cmd_reset(args) -> int:
         problem = header_work_problem(anchor, card.get_card()["hardest_bits"])
         if problem:
             raise SystemExit(f"--anchor: {problem}. Nothing was written to the card.")
+    print(f"warning: {RESET_LOSES_SWAPPED}", file=sys.stderr)
     if not args.yes:
         print("RESET_CARD makes the card as new: no PIN, no record, a new card key. It holds nothing now.")
         if input("Type 'reset' to confirm: ").strip() != "reset":
@@ -2822,6 +2979,7 @@ def _reset_by_owner(args, card, info: dict, pin: Optional[bytes], anchor: Option
         problem = header_work_problem(anchor, card.get_card()["hardest_bits"])
         if problem:
             raise SystemExit(f"--anchor: {problem}. Nothing was written to the card.")
+    print(f"warning: {RESET_LOSES_SWAPPED}", file=sys.stderr)
     if not args.yes:
         print("RESET_CARD makes the card as new: no PIN, no record, no owner, a new card key. It holds nothing now.")
         if input("Type 'reset' to confirm: ").strip() != "reset":
@@ -2973,9 +3131,9 @@ def cmd_outbox(args) -> int:
         card = connect(args)
         _holders_say(card, args, owner)
         packet, scope = card.get_outbox()
-        # the packet names the card's key for the date 0, P + t*G, on 2.3 (GROUP_KEYS, under the PIN or the grant
+        # the packet names the card's key for the date 0, P + t*G, on 3.0 (GROUP_KEYS, under the PIN or the grant
         # given above); the card's main key P on 2.2
-        card_key = card.group_keys(0)["key"] if card.at_least(2, 3) else card.get_pubkey()
+        card_key = card.group_keys(0)["key"] if card.at_least(3, 0) else card.get_pubkey()
     try:
         p = decode_outbox(packet)
     except (ValueError, UnicodeDecodeError) as exc:
@@ -2995,7 +3153,7 @@ def _holders_say(card, args, owner: Optional[int]) -> None:
 
 
 def cmd_group_keys(args) -> int:
-    """GROUP_KEYS (2.3): the keys of one date's pieces, after the PIN or the owner's grant; checked against GET_PUBKEY."""
+    """GROUP_KEYS (3.0): the keys of one date's pieces, after the PIN or the owner's grant; checked against GET_PUBKEY."""
     if not 0 <= args.date < 2 ** 32:
         raise SystemExit(f"--date must fit four bytes, got {args.date}")
     if not args.pin and not args.owner:
@@ -3035,7 +3193,7 @@ def _refund_private(args) -> Optional[int]:
 
 def cmd_card_secret(args) -> int:
     """
-    GET_CARD P1 = 3 (2.3): the card's secret c, sealed, opened here. On a card with a refund key the answer is sealed
+    GET_CARD P1 = 3 (3.0): the card's secret c, sealed, opened here. On a card with a refund key the answer is sealed
     to the refund key and opened with its private key r (--refund-key or --refund-key-file); on a card with none it is
     sealed to the PIN key (GET_NONCE P1 = 1, checked by the card key's signature) under a one-time key this command
     makes. c is checked against GROUP_KEYS for the date 0 before anything is said of it, and printed only with --show.
@@ -3117,7 +3275,7 @@ def cmd_card_secret(args) -> int:
 
 
 def info_23_lines(i: dict) -> List[str]:
-    """GET_INFO's fields of P1 = 3 and 4 (2.3), as `info` and `selftest` print them. The rate, the last unit, the
+    """GET_INFO's fields of P1 = 3 and 4 (3.0), as `info` and `selftest` print them. The rate, the last unit, the
     no-PIN window's start and the loads left are zeros to a reader not given the PIN or the owner's grant."""
     lines = []
     if "keyset_table" in i:
@@ -3144,12 +3302,12 @@ def parse_point_65(value: str, what: str) -> bytes:
 
 
 def _needs_23(card, what: str) -> None:
-    if not card.at_least(2, 3):
-        raise SystemExit(f"{what} is protocol 2.3's: this card answers version {_version_text(card.version)}")
+    if not card.at_least(3, 0):
+        raise SystemExit(f"{what} is protocol 3.0's: this card answers version {_version_text(card.version)}")
 
 
 def cmd_change(args) -> int:
-    """GET_CHANGE (2.3): every opening of the card's own change owed, paging until a short answer."""
+    """GET_CHANGE (3.0): every opening of the card's own change owed, paging until a short answer."""
     card = connect(args)
     _needs_23(card, "change")
     rows = card.owed_change()
@@ -3175,16 +3333,38 @@ LOAD_CHANGE_NEXT = {
 
 def cmd_load_change(args) -> int:
     """
-    LOAD_CHANGE (2.3): opening N made into its piece from the mint's answer for its B_. C_ and K in either form, e and
+    LOAD_CHANGE (3.0): opening N made into its piece from the mint's answer for its B_. C_ and K in either form, e and
     s in hex. The opening is read first (GET_CHANGE): K must be the key it is bound to and the mint's proof must hold
     for its B_, both checked here before the card is asked.
     """
     if not 0 <= args.opening < CHANGE_MOST:
         raise SystemExit(f"an opening is 0 to {CHANGE_MOST - 1}, got {args.opening}")
-    c_ = parse_point_65(args.c, "C_")
+    if args.signature is not None:
+        # the mint's own answer for the opening's B_, as its swap or its NUT-09 restore gives it: one with no DLEQ is
+        # said plainly here, before the card is asked
+        if args.c or args.e or args.s:
+            raise SystemExit("--signature gives C_, e and s: not with --c, --e or --s")
+        text = args.signature
+        if not text.lstrip().startswith("{"):
+            try:
+                with open(text, encoding="utf-8") as f:
+                    text = f.read()
+            except OSError as exc:
+                raise SystemExit(f"--signature: {exc}")
+        try:
+            sig = json.loads(text)
+        except ValueError as exc:
+            raise SystemExit(f"--signature is not JSON: {exc}")
+        c_, e, s = change_signature(sig, f"opening {args.opening}")
+    else:
+        if not (args.c and args.e and args.s):
+            raise SystemExit("give the mint's answer for the opening: --signature (its JSON, with the DLEQ), or --c, "
+                             "--e and --s (e and s are its NUT-12 proof: a mint that gave none cannot have its change "
+                             "loaded; ask it again by NUT-09 restore)")
+        c_ = parse_point_65(args.c, "C_")
+        e = parse_hex(args.e, 32, "e")
+        s = parse_hex(args.s, 32, "s")
     k = parse_point_65(args.k, "K")
-    e = parse_hex(args.e, 32, "e")
-    s = parse_hex(args.s, 32, "s")
     card = connect(args)
     _needs_23(card, "load-change")
     row = next((r for r in card.owed_change() if r["number"] == args.opening), None)
@@ -3214,7 +3394,7 @@ def cmd_load_change(args) -> int:
 
 def cmd_keyset_keys(args) -> int:
     """
-    KEYSET_KEYS (2.3): teach the card a keyset's keys from a file of the mint's keys (P1 0 to 2, under --pin), the ID
+    KEYSET_KEYS (3.0): teach the card a keyset's keys from a file of the mint's keys (P1 0 to 2, under --pin), the ID
     it answers checked against the file's; and with --show N, show opening N's key to be one of them by its path
     (P1 3, no PIN). --rebind binds the opening to the file's key for its amount, and moves it to the file's keyset
     where it is in another: under the PIN and the owner's grant, in a tap that paid nothing.
@@ -3272,7 +3452,7 @@ def cmd_keyset_keys(args) -> int:
 
 
 def cmd_cert(args) -> int:
-    """CERT_READ (2.3): the certificate's state and, where one is sealed, its container and the container's SHA-256."""
+    """CERT_READ (3.0): the certificate's state and, where one is sealed, its container and the container's SHA-256."""
     card = connect(args)
     _needs_23(card, "cert")
     cert = card.cert_read()
@@ -3318,13 +3498,13 @@ def cmd_selftest(args) -> int:
     record("GET_INFO", len(info) > 0 and info["max_slots"] == MAX_PROOFS,
            f"v{info['version']}, {info['max_slots']} slots, PIN {info['pin_state']}, "
            f"owner {'yes' if info['has_owner'] else 'none'}")
-    # 2.3: format 5 is a card whose keyset table holds a keyset of the other unit (two units on one card)
-    formats = (FORMAT, FORMAT_TWO_UNITS) if card.at_least(2, 3) else (FORMAT,)
+    # 3.0: format 5 is a card whose keyset table holds a keyset of the other unit (two units on one card)
+    formats = (FORMAT, FORMAT_TWO_UNITS) if card.at_least(3, 0) else (FORMAT,)
     record("format 4 (SIG_ALL pieces)" + (", or 5 with two units" if len(formats) > 1 else ""),
            info["format"] in formats, f"format {info['format']}")
     record("Schnorr capability advertised", info["schnorr"], f"caps=0x{info['caps_raw']:02X}")
-    # 2.3: GET_INFO P1 = 4 names the profiles the card keeps; keys per load (byte 56 bit 1) is part of every 2.3 card
-    if card.at_least(2, 3):
+    # 3.0: GET_INFO P1 = 4 names the profiles the card keeps; keys per load (byte 56 bit 1) is part of every 3.0 card
+    if card.at_least(3, 0):
         record("keys per load (GET_INFO byte 56 bit 1)", "keys per load" in info.get("profiles", []),
                f"profiles {info['profiles_raw'].hex().upper()}" if "profiles_raw" in info
                else "GET_INFO P1 4 answered fewer than 57 bytes: no profiles")
@@ -3404,18 +3584,27 @@ def cmd_selftest(args) -> int:
 def _select_verdict(version: bytes) -> Tuple[bool, str]:
     """
     Whether the applet version SELECT answered is a build selftest can pass:
-    protocol 2.1, 2.2 or 2.3 (SELFTEST_VERSIONS). The 2.x AID answers nothing
-    below 2.0, and a 2.0 card is the v2.0.0 release, which D26 replaced: it is
-    reinstalled. A later 2.x is one this tool does not know, and is refused.
+    protocol 2.1, 2.2 or 3.0 (SELFTEST_VERSIONS). The shared AID (D19) answers
+    nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26 replaced:
+    it is reinstalled. A later minor of a major this tool knows (2.3, 3.1), or a
+    later major (4.0), is one it does not know, and is refused. That is a
+    statement about the test, not the wire: a 3.1 is still driven as 3.0 by the
+    other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
+    before the renumbering, is not, and is said so here.
     """
     if len(version) < 2:
         return False, "SELECT returned no applet version"
     ver = tuple(version[:2])
-    if ver[0] == SELFTEST_MIN_VERSION[0] and ver > SELFTEST_VERSIONS[-1]:
+    newest_of_major = max((v for v in SELFTEST_VERSIONS if v[0] == ver[0]), default=None)
+    if driven_as(version) is None and newest_of_major is not None and ver > newest_of_major:
+        # 02 03: no release, but 3.0's wire before its renumbering (D205); the other commands refuse to drive it
+        return False, (f"applet {ver[0]}.{ver[1]} is no released version, and the commands that move money or set a "
+                       f"card up refuse it: {PRE_RENUMBERING}")
+    if ver > SELFTEST_VERSIONS[-1] or (newest_of_major is not None and ver > newest_of_major):
         return False, (f"applet {ver[0]}.{ver[1]} is a version this cardctl does not know (it knows 2.1, 2.2 and "
-                       f"2.3): use a cardctl of that version")
+                       f"3.0): use a cardctl of that version")
     if ver not in SELFTEST_VERSIONS:
-        return False, (f"applet {ver[0]}.{ver[1]} is not protocol 2.1, 2.2 or 2.3: sweep the balance, then "
+        return False, (f"applet {ver[0]}.{ver[1]} is not protocol 2.1, 2.2 or 3.0: sweep the balance, then "
                        f"reinstall the tracked CAP (docs/HARDWARE_DEPLOYMENT.md)")
     return True, f"version {ver[0]}.{ver[1]}"
 
@@ -3446,7 +3635,7 @@ def _holder_owner_args(s) -> None:
 
 
 def _owner_seed_arg(s) -> None:
-    s.add_argument("--owner-seed", help="2.3 (D202): the owner's 64-byte BIP-39 seed, hex; the card's c is worked out "
+    s.add_argument("--owner-seed", help="3.0 (D202): the owner's 64-byte BIP-39 seed, hex; the card's c is worked out "
                                         "from it and the card's key, and given sealed with the claim or hand-over, so "
                                         "that a phone restored from the words has it (default: the card keeps its own)")
 
@@ -3489,12 +3678,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--nonce", help="32-byte P2PK nonce as hex (random if omitted)")
     s.add_argument("--c", help="33-byte C point as hex (placeholder if omitted)")
     s.add_argument("--date", type=int, default=0, help="the piece's locktime, seconds (default 0: none)")
-    s.add_argument("--pin", help="verify this PIN first (a 2.3 card loads only under the PIN given in this tap)")
+    s.add_argument("--pin", help="verify this PIN first (a 3.0 card loads only under the PIN given in this tap)")
     s.add_argument("--owner", action="store_true",
-                   help="the owner's grant (ALLOW_LOAD) too; on 2.3 it opens no load: give --pin")
+                   help="the owner's grant (ALLOW_LOAD) too; on 3.0 it opens no load: give --pin")
     s.add_argument("--date-keys", action="store_true",
                    help="the piece was minted locked to the card's key for its date, P + t*G (from group-keys or "
-                        "from c), never to the card's main key P: sends P2 02, which a 2.3 card wants (6A86 without)")
+                        "from c), never to the card's main key P: sends P2 02, which a 3.0 card wants (6A86 without)")
     s.add_argument("--uncompressed", action="store_true",
                    help="send C whole, 04 || x || y (P2 bit 3, D212): the card checks it with its chip's key agreement, "
                         "faster than its check of a 33-byte C; on 6B00 (a card that does not) the 33-byte form is sent")
@@ -3527,7 +3716,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("set-pin", help="set the PIN on a card with no owner; an owned card's PIN is changed by change-pin")
     s.add_argument("pin")
     s.add_argument("--owner", action="store_true",
-                   help="2.2 and earlier: ADD PIN under the owner's grant; a 2.3 card with an owner refuses SET_PIN "
+                   help="2.2 and earlier: ADD PIN under the owner's grant; a 3.0 card with an owner refuses SET_PIN "
                         "(6A91): use change-pin")
     _owner_arg(s)
     s.set_defaults(func=cmd_set_pin)
@@ -3565,7 +3754,7 @@ def build_parser() -> argparse.ArgumentParser:
     _owner_arg(s)
     s.set_defaults(func=cmd_set_card)
 
-    s = sub.add_parser("setup", help="2.3: a fresh card's first set-up in one selection: PIN, record, owner (claimed, "
+    s = sub.add_parser("setup", help="3.0: a fresh card's first set-up in one selection: PIN, record, owner (claimed, "
                                      "with the anchor), and the owner's limits with --day")
     s.add_argument("--pin", required=True, help="the card's PIN, 4 to 8 digits")
     s.add_argument("--mint", required=True, help="the mint's URL, 1 to 77 printable ASCII characters")
@@ -3584,7 +3773,7 @@ def build_parser() -> argparse.ArgumentParser:
     _holder_owner_args(s)
     s.set_defaults(func=cmd_setup)
 
-    s = sub.add_parser("reset", help="2.3: the reset of an empty card: by the PIN on a card with no owner (a held tap, "
+    s = sub.add_parser("reset", help="3.0: the reset of an empty card: by the PIN on a card with no owner (a held tap, "
                                      "then seventeen askings, about 11 seconds in all), by the owner's proof (--owner-key) on one "
                                      "with an owner: no PIN, no record, a new card key, for setup")
     s.add_argument("--pin", help="the card's PIN: a card with no owner (on a fresh card reset with --anchor, set here "
@@ -3631,15 +3820,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_lock)
 
     s = sub.add_parser("outbox", help="GET_OUTBOX (2.2): the last payment's settlement packet, its signatures checked; "
-                                      "on 2.3 the scope wants the PIN or the owner's grant")
+                                      "on 3.0 the scope wants the PIN or the owner's grant")
     s.add_argument("--file", help="decode a packet saved as hex instead of reading a card")
-    s.add_argument("--pin", help="verify this PIN first (2.3: the scope; the packet wants the owner's grant, or on a "
+    s.add_argument("--pin", help="verify this PIN first (3.0: the scope; the packet wants the owner's grant, or on a "
                                  "card with no owner the PIN in a held tap, which cardctl does not make)")
-    s.add_argument("--owner", action="store_true", help="the owner's grant (ALLOW_LOAD) first (2.3: the scope and the packet)")
+    s.add_argument("--owner", action="store_true", help="the owner's grant (ALLOW_LOAD) first (3.0: the scope and the packet)")
     _owner_arg(s)
     s.set_defaults(func=cmd_outbox)
 
-    s = sub.add_parser("group-keys", help="GROUP_KEYS (2.3): the keys of one date's pieces, t, P + t*G and R + u*G, "
+    s = sub.add_parser("group-keys", help="GROUP_KEYS (3.0): the keys of one date's pieces, t, P + t*G and R + u*G, "
                                           "under the PIN or the owner's grant")
     s.add_argument("--date", type=int, required=True, help="the pieces' date (locktime, seconds); 0 for undated pieces")
     s.add_argument("--pin", help="verify this PIN first")
@@ -3647,7 +3836,7 @@ def build_parser() -> argparse.ArgumentParser:
     _owner_arg(s)
     s.set_defaults(func=cmd_group_keys)
 
-    s = sub.add_parser("card-secret", help="GET_CARD P1 3 (2.3): the card's secret c, sealed, opened here and checked "
+    s = sub.add_parser("card-secret", help="GET_CARD P1 3 (3.0): the card's secret c, sealed, opened here and checked "
                                            "against GROUP_KEYS; printed only with --show")
     s.add_argument("--refund-key", help="the refund key's private key r, 32 bytes hex (a card with a refund key: c is "
                                         "sealed to it)")
@@ -3663,19 +3852,22 @@ def build_parser() -> argparse.ArgumentParser:
                                             "(r + u, u from the restored c) against the card's refund key for it")
     s.set_defaults(func=cmd_card_secret)
 
-    s = sub.add_parser("change", help="GET_CHANGE (2.3): the openings of the card's own change owed, every page")
+    s = sub.add_parser("change", help="GET_CHANGE (3.0): the openings of the card's own change owed, every page")
     s.set_defaults(func=cmd_change)
 
-    s = sub.add_parser("load-change", help="LOAD_CHANGE (2.3): an opening of the card's change made into its piece "
+    s = sub.add_parser("load-change", help="LOAD_CHANGE (3.0): an opening of the card's change made into its piece "
                                            "from the mint's answer for its B_; any reader, no PIN")
     s.add_argument("opening", type=int, help="the opening's number, 0 to 7, as change lists it")
-    s.add_argument("--c", required=True, help="C_, the mint's blind signature: 33 bytes (02/03) or 65 (04) of hex")
+    s.add_argument("--signature", help="the mint's answer for the opening's B_, one entry of its swap's or NUT-09 "
+                                       "restore's signatures, {\"C_\", \"dleq\": {\"e\", \"s\"}, ...}: JSON, or a file "
+                                       "holding it; in place of --c, --e and --s")
+    s.add_argument("--c", help="C_, the mint's blind signature: 33 bytes (02/03) or 65 (04) of hex")
     s.add_argument("--k", required=True, help="K, the mint's key for the opening's amount: 33 or 65 bytes of hex")
-    s.add_argument("--e", required=True, help="e of the mint's proof (NUT-12), 32 bytes hex")
-    s.add_argument("--s", required=True, help="s of the mint's proof (NUT-12), 32 bytes hex")
+    s.add_argument("--e", help="e of the mint's proof (NUT-12), 32 bytes hex")
+    s.add_argument("--s", help="s of the mint's proof (NUT-12), 32 bytes hex")
     s.set_defaults(func=cmd_load_change)
 
-    s = sub.add_parser("keyset-keys", help="KEYSET_KEYS (2.3): teach the card a keyset's keys from the mint's (NUT-01 "
+    s = sub.add_parser("keyset-keys", help="KEYSET_KEYS (3.0): teach the card a keyset's keys from the mint's (NUT-01 "
                                            "JSON) under --pin; --show N shows opening N's key to be one of them")
     s.add_argument("file", help="the mint's keys for one keyset: {\"id\", \"unit\", \"keys\": {\"1\": \"02..\", ...}}")
     s.add_argument("--pin", help="verify this PIN first: teaching wants it")
@@ -3689,7 +3881,7 @@ def build_parser() -> argparse.ArgumentParser:
     _owner_arg(s)
     s.set_defaults(func=cmd_keyset_keys)
 
-    sub.add_parser("cert", help="CERT_READ (2.3): the certificate's state, its container and the container's "
+    sub.add_parser("cert", help="CERT_READ (3.0): the certificate's state, its container and the container's "
                                 "SHA-256").set_defaults(func=cmd_cert)
 
     s = sub.add_parser("apdu", help="send a raw APDU (hex)")

@@ -5,25 +5,35 @@ One entry per component release, newest first, as
 in the reviewed pull request, and the tag follows the merge. A GitHub release lists
 the merged pull requests besides.
 
-## `firmware-v2.3.0`: Cashu Card protocol 2.3 (not yet tagged)
+## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
-The tracked CAP is `applet/target/cashu-javacard-2.3.0.cap`, sha256
-`676fa7aedde4c25fe112ab0d70ee4ad9f05bc0bdaf55a3d9c2808bb4c416838e`. Its load file,
-the bytes a card is LOADed with, is 40,412 bytes by `tools/refcheck.py`'s measure,
-sha256 `05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3`. `SELECT`
-and `GET_INFO` answer `02 03`. The core is revision `03` of
+The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
+`dc9bdee911817b76f7dd0ef8dfcf2bc44bb7bc9e06858ef48a6994522c9b9508`. Its load file,
+the bytes a card is LOADed with, is 41,742 bytes by `tools/refcheck.py`'s measure,
+sha256 `2b51ae1ca0da8640a0b977ef906d6dc4663b869fee058190a3487287c70bcf27`. `SELECT`
+and `GET_INFO` answer `03 00`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D221](DECISIONS.md#d221), and the wire is in
-[`spec/APDU.md`](../spec/APDU.md).
+[D183](DECISIONS.md#d183) to [D224](DECISIONS.md#d224) (numbered 3.0 by
+[D205](DECISIONS.md#d205); the decisions this repo's 2.3 files carried as D205 to D215 are D211 to D221
+since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This file ran on a chip on 2026-11-15: it is the file below (40,365 bytes, `8aefa0db…`) with [D221](DECISIONS.md#d221) added (the
+This exact file has run only in a simulator so far, and no card has installed it or a file of its size. Its source is
+the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
+moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
+[D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
+path; the no-PIN allowance armed by the owner's proof or a held tap and not by the PIN alone; `GET_INFO`'s paid-list
+bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
+settlement record fixes ([D223](DECISIONS.md#d223), [D224](DECISIONS.md#d224)). The run is to be
+repeated on it, its size first
+([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)).
+
+The last 2.3 file (answering `02 03`, 40,412 bytes, load file `05c9b847…`) ran on a chip on 2026-11-15: it is the file below (40,365 bytes, `8aefa0db…`) with [D221](DECISIONS.md#d221) added (the
 claim right after the set-up's record is one asking; 47 bytes more, 220 past a multiple of 256). The bench J3R180 09301220
 installed it three times in three steps (17 to 18 s to load, 2 s for the card's applet) and, at the testnut test mint with fake sats,
 passed `cardctl selftest` 13 of 13, claimed the card at the set-up's first asking, and signed a 9-piece payment with change
-(`tools/refcheck.py` keeps its size and its load file's sha256). The tracked CAP is a rebuild of the same source: its load file is
-byte for byte the one that ran, its manifest's build time is not.
+(`tools/refcheck.py` keeps its size and its load file's sha256).
 
 The file before it ran on a chip on 2026-11-14
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
@@ -132,8 +142,8 @@ list, the PIN's waits, a dollar card, a production mint and a phone.
 
 On 2026-11-13 a
 J3R180 (the bench card the [deployment guide](HARDWARE_DEPLOYMENT.md) names) installed
-the file before D200 (35,466 bytes, load file sha256 `48b8597c…`, which refcheck keeps
-as proven) in three steps (16 s to load, 2 s for the card's applet) and, at a
+the file before D200, numbered 2.3 then and answering `02 03` (35,466 bytes, load file
+sha256 `48b8597c…`, which refcheck keeps as proven), in three steps (16 s to load, 2 s for the card's applet) and, at a
 FakeWallet test mint with fake sats:
 
 - passed `cardctl selftest` 20 of 20 (`AUTH` 626 ms through a contact reader);
@@ -193,8 +203,11 @@ a J3R180 whose configuration lacks either cannot run the card.
   the PIN. After a mint moves to new keys, a till pays exactly until the holder's
   phone teaches the new keyset ([D190](DECISIONS.md#d190)).
 - **The no-PIN allowance counts whole pieces** and renews only when the owner's
-  phone visits or the PIN is typed in a tap that pays nothing; the 24-hour window is
-  the owner's switch ([D186](DECISIONS.md#d186)).
+  phone gives its proof or, on a card with no owner, in a held tap under the PIN. The
+  PIN alone renews nothing, so a PIN typed at a till, for a payment or a top-up, opens
+  no allowance for whoever taps next; a wallet that wants the allowance back at a
+  top-up sends the owner's proof in that tap ([D186](DECISIONS.md#d186),
+  [D208](DECISIONS.md#d208)).
 - **Set-up finishes in one tap, and its claim waits no longer than its record**: right
   after `SET_CARD` under the PIN in the same tap, the owner is claimed at the first
   asking, `SET_CARD`'s own seconds on the chip being the hold; otherwise by four
@@ -240,6 +253,8 @@ a J3R180 whose configuration lacks either cannot run the card.
   leak, give c too ([D202](DECISIONS.md#d202)).
 - **A certificate** can say who made a card; a certified card keeps its key
   through a reset ([D192](DECISIONS.md#d192), [`CERTIFIER.md`](CERTIFIER.md)).
+  Whoever holds a card that has never had a PIN can write one, so the holder's wallet
+  says so where it finds one it does not believe ([D209](DECISIONS.md#d209)).
 - **Money can wait for a card** under its inbox name until a till with the holder's
   PIN loads it ([D199](DECISIONS.md#d199)).
 
@@ -253,7 +268,8 @@ a J3R180 whose configuration lacks either cannot run the card.
   bytes (amount, the mint's key K, the keyset); `GET_CHANGE` rows are 83 bytes and
   carry no blinding factor; `SET_LIMIT` and `SET_LIMIT_PIN` take 4, 8, 12, 13, 17 or
   18 bytes (budget, then rate, then the window switch); `GET_INFO` P1 = 3 answers 51
-  bytes and P1 = 4 59 bytes (profiles `FF 03`, then the loads left today); new
+  bytes and P1 = 4 59 bytes (profiles `FF 03`, or `7F 03` on a card refused its paid
+  list, then the loads left today); new
   `GET_CARD` P1 = 2 and 3, `GET_BALANCE` P1 = 1, `GET_LOG` P1 = 2 and 3,
   `RESET_CARD` P1 = 1, `REFRESH` P1 = 1, `SPEND_ALL_AGAIN` by hash for the last 16
   payments; `RESET_CARD` P1 = 0 takes an anchor header, and a hand-over's anchor sets
@@ -280,18 +296,32 @@ a J3R180 whose configuration lacks either cannot run the card.
   `SPEND_ALL_SIGN` answer `6A8F` for change past the day's 300 loads; `LOAD_CHANGE` is
   never refused for them. A reader makes no more change outputs than `GET_INFO` P1 = 4
   bytes 57 and 58 allow.
+- **The card's change only at a mint that proves its signatures (D206):** a reader
+  sends `SPEND_ALL_CHANGE` only for a mint whose info lists NUT-12 and NUT-09; at any
+  other it names outputs for the whole of the pieces, or does not pay. A change
+  signature with no `dleq` is asked for again by B_ (NUT-09) before it is called lost.
+- **Before a swap (D210):** the card is not locked, its record is a holder's, and
+  `GET_INFO` P1 = 4 byte 55 bit 7 is set (a card refused its paid list takes no piece,
+  `6A84`); in the tap that loads, the date's keys are compared with `GROUP_KEYS` again
+  before the first `LOAD_PROOF`. An `ALLOW_LOAD` with bytes after its proof answers
+  `6700` before the proof is read.
+- **Certificates (D209):** a wallet that sets a card up reads `CERT_READ` P1 = `FF`
+  before the first `SET_PIN`, and tells the holder of a sealed certificate it does not
+  believe that the card keeps one key for its life.
 - **New status words:** `6A97` no PIN, `6A98` keep holding (send the same command
   again), `6A99` no rate, `6A9A` two units, `6A9B` the other unit, `6A9C` no room in
   the keyset table, `6A9D` the holder's say needed, `6A9E` limit reached (enter the
   PIN), `6A9F` keys not shown; `6200` from `ALLOW_LOAD` (the grant given, no load
   opened); `63CX` on a card with no owner counts wrong tries in a row.
-- **A 2.2 reader** can read a 2.3 card and cannot pay from it, load it, finish its
-  change or set it up, and stops before burning anything. A 2.2 loader swaps a
-  top-up before the card refuses it, so a wallet checks the version first:
+- **A 2.2 reader** that holds to the major, as flash-pos, flash-mobile and cardctl
+  do, refuses a 3.0 card at `SELECT` and sends nothing after it
+  ([D205](DECISIONS.md#d205)). One that goes on can read a 3.0 card and cannot pay
+  from it, load it, finish its change or set it up, and stops before burning
+  anything, but a 2.2 loader swaps a top-up before the card refuses it:
   [What a 2.2 reader sees](../spec/APDU.md#what-a-22-reader-sees). flash-pos and
-  flash-mobile move to 2.3 before a 2.3 card is handed out; the cardsim contract
-  they pin by `CASHU_JAVACARD_REF` is 2.3's
-  ([`tools/cardsim/README.md`](../tools/cardsim/README.md#what-changed-for-23)).
+  flash-mobile move to 3.0 before a 3.0 card is handed out; the cardsim contract
+  they pin by `CASHU_JAVACARD_REF` is 3.0's
+  ([`tools/cardsim/README.md`](../tools/cardsim/README.md#what-changed-for-30)).
 - **Rules a reader keeps:** leave a dated piece whose date is less than a day after
   your own time out of every payment, online or not, and, online, ask the mint the state of every input before
   `SPEND_ALL_SIGN`; never give a card a block header more than two hours ahead of
@@ -315,35 +345,41 @@ instructions for every value ([D21](DECISIONS.md#d21),
 [`SECURITY-MODEL.md`](SECURITY-MODEL.md) item 5); and every `SET_CARD` first checks
 both chip engines at seventeen points, so a chip that frames or computes them
 otherwise is never set up ([ECDH framing probe](HARDWARE_DEPLOYMENT.md#ecdh-framing-probe-at-set_card)).
+Every signature that leaves the card (`AUTH`, a payment's, the settlement record's,
+the PIN key's) is verified on the card under its key before it is given; one that
+fails is not given (`6F00`), and a payment so refused burns and counts nothing
+([D207](DECISIONS.md#d207)). The waits keep their length.
 
 ### Moving from 2.2
 
 There is no upgrade in place. Spend or move every piece, bring home any change owed
-(`GET_CHANGE` on a 2.2 card), delete the package and install 2.3: the card gets a
+(`GET_CHANGE` on a 2.2 card), delete the package and install 3.0: the card gets a
 new key ([Reinstall](HARDWARE_DEPLOYMENT.md#reinstall-delete--install)). Readers and
-wallets move to the 2.3 wire before a 2.3 card is handed out.
+wallets move to the 3.0 wire before a 3.0 card is handed out.
 
 ### Host components in the same change
 
-- **cardkit 0.3.0** reads and installs the 2.3 card and refuses to reset one that is
-  owed change ([`tools/cardkit/README.md`](../tools/cardkit/README.md)).
-- **cardctl** speaks 2.3 (`setup`, `reset`, `change`, `load-change`, `keyset-keys`,
+- **cardkit 0.3.0** reads and installs the 3.0 card, and refuses to reset or clean
+  up one that is owed change ([`tools/cardkit/README.md`](../tools/cardkit/README.md)).
+- **cardctl** speaks 3.0 (`setup`, `reset`, `change`, `load-change`, `keyset-keys`,
   `group-keys`, `card-secret`, `cert`) and `selftest` takes 2.1 and later.
-- **The provisioner** carries the 2.3 load file and keeps installation switched off
-  for it until the operator approves it (`src/releaseGates.ts`).
+- **The provisioner** carries the 3.0 load file and keeps installation switched off
+  for it until the operator approves it (`src/releaseGates.ts`). That gate holds back
+  only what loads the file: an owned-card reset, which loads nothing, is not held to it.
 - **ops** `local-reset` refuses a card owed change.
 
-## `cardkit-v0.3.0`: protocol 2.3, change owed, and SCP03 (not yet tagged)
+## `cardkit-v0.3.0`: protocol 3.0, change owed, and SCP03 (not yet tagged)
 
 `tools/cardkit/package.json` moves to 0.3.0, a minor release for changes that are not
 compatible ([`tools/cardkit/README.md`](../tools/cardkit/README.md) has the migration):
 
-- **Protocol 2.3.** `CARD_VERSION` is `[2, 3]`; the kit reads and installs the 2.3
-  card and knows 2.1, 2.2 and 2.3 (`CARD_VERSIONS`). It refuses 2.2's owner commands
-  on a 2.3 card.
+- **Protocol 3.0.** `CARD_VERSION` is `[3, 0]`; the kit reads and installs the 3.0
+  card and knows 2.1, 2.2 and 3.0 (`CARD_VERSIONS`). It refuses 2.2's owner commands
+  on a 3.0 card.
 - **Change owed.** A card owed its own change is not empty: every reset and every
-  "empty" test holds to it (`changeOwed`, `readChangeOwed`, `GET_CHANGE`), and the
-  probe never sweeps such a card.
+  "empty" test holds to it (`changeOwed`, `readChangeOwed`, `GET_CHANGE`), the
+  probe never sweeps such a card, and the settled-entry cleanup stops on it
+  (`card-not-empty`), reading the change owed from the card, never from a saved review.
 - **SCP03 beside SCP02** ([D181](DECISIONS.md#d181), [D182](DECISIONS.md#d182)):
   `openSession` opens either; `putKeys` takes the session.
 - **The outbox-spike runners** (`tools/outbox-spike/run-compact.cjs`,

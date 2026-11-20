@@ -182,7 +182,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D218: a signature that cannot be shown to be the key's is not released, on either path: a private key whose public key is another's gives 6F00 with the output zeroed (bytecode path), and the chip path is given up first and ends the same way")
+    @DisplayName("D218: a signature that cannot be shown to be the key's is not released, on either path: a private key whose public key is another's gives 6F00 with the output as it was, not a byte written (bytecode path, D207), and the chip path is given up first, the signature made again by the bytecode, and ends the same way")
     void aSignatureNotTheKeysIsWithheld() throws Exception {
         BigInteger d = BigInteger.valueOf(0xCAFEBABEL), other = BigInteger.valueOf(0xDEADBEEFL);
         BigInteger[] wrong = ecMulTest(other, SECP_GX, SECP_GY);
@@ -196,7 +196,9 @@ class SignHardeningTest {
             Arrays.fill(sig, (byte) 0x55);
             ISOException t = assertThrows(ISOException.class, () -> s.sign(ecPriv(be(d)), ecPub(point65(wrong)), msg, (short) 0, sig, (short) 0));
             assertEquals(CashuApplet.SW_CRYPTO_ERROR, t.getReason());
-            assertArrayEquals(new byte[64], sig, "nothing of a signature is left in the output");
+            byte[] was = new byte[64];
+            Arrays.fill(was, (byte) 0x55);
+            assertArrayEquals(was, sig, "nothing of a signature is written to the output (D207: s is kept in the scratch until the check passes)");
             assertFalse(flag(s, SchnorrHW.class, "chipMul"));
             assertTrue(isZero(get(s, SchnorrHW.class, "work"), 0));
             assertTrue(isZero(get(s, SchnorrHW.class, "sc"), 0));
@@ -204,8 +206,8 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D218: the check is the engines' and costs a bounded number of them: one signature is three runs of the chip's key agreement (the nonce's R, P and -e*P) and one of its point addition (s*G - e*P)")
-    void theCheckCostsFourEngineRuns() throws Exception {
+    @DisplayName("D207, D218: the check is the engines' and costs a bounded number of them: one signature under a public key object of 65 bytes is two runs of the chip's key agreement (the nonce's R and the check's [e]Q) and one of its point addition (s*G - e*Q); D218's own check had a third key agreement (P = d*G), which D207's reads from the key object instead")
+    void theCheckCostsThreeEngineRuns() throws Exception {
         BigInteger d = BigInteger.valueOf(0x1234567L);
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
         byte[] msg = new byte[32];
@@ -218,8 +220,8 @@ class SignHardeningTest {
         byte[] sig = new byte[64];
         s.sign(ecPriv(be(d)), ecPub(point65(pt)), msg, (short) 0, sig, (short) 0);
         assertTrue(schnorrVerify(be(pt[0]), msg, sig));
-        assertEquals(3, c1.made, "R = k*G, P = d*G and -e*P");
-        assertEquals(1, c2.made, "s*G - e*P");
+        assertEquals(2, c1.made, "R = k*G and [e]Q");
+        assertEquals(1, c2.made, "s*G - e*Q");
     }
 
     // ---- LOW-4, -5: the known answers ----

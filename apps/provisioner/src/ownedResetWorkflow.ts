@@ -177,7 +177,7 @@ function validateReview(r: ResetReview) {
   check(
     saved02 ||
       (typeof r.changeOwed === 'boolean' &&
-        ['2.1', '2.2', '2.3'].includes(r.version)),
+        ['2.1', '2.2', '3.0'].includes(r.version)),
   );
   check(
     /^cplc-v1:[0-9a-f]{24}$/.test(r.chipId) &&
@@ -359,9 +359,9 @@ export class OwnedResetWorkflow {
       consent.erase &&
         consent.valueHandled &&
         review.unspent === 0 &&
-        // change owed is lost with the applet; a 2.3 card's spent entries are its holder wallet's to free
+        // change owed is lost with the applet; a 3.0 card's spent entries are its holder wallet's to free
         review.changeOwed === false &&
-        !(review.version === '2.3' && review.spent > 0) &&
+        !(review.version === '3.0' && review.spent > 0) &&
         !review.locked &&
         !review.pinBlocked &&
         review.tag,

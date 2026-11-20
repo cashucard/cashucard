@@ -11,7 +11,7 @@ authorities. Do not generate replacement signing keys to make CI pass.
 
 | Component   | Current manifest identity                                        | New release tag              |
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
-| Firmware    | `applet/pom.xml`: 2.3.0; tracked CAP `cashu-javacard-2.3.0.cap`, APDU version 2.3 | `firmware-v2.3.0`            |
+| Firmware    | `applet/pom.xml`: 3.0.0; tracked CAP `cashu-javacard-3.0.0.cap`, APDU version 3.0 | `firmware-v3.0.0`            |
 | cardkit     | `tools/cardkit/package.json`: 0.3.0                              | `cardkit-v0.3.0`             |
 | Ops-service | `ops/package.json`: 0.2.0                                        | `ops-v0.2.0`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 15                  | `provisioner-v1.0.0-build.15` |

@@ -411,7 +411,7 @@ class PerPaymentKeyTest {
     }
 
     @Test
-    @DisplayName("What keys per load cost, counted: SPEND_ALL_BEGIN two SHA-256 and two point additions with a refund key (one and one without), SIGN one point addition and two key agreements more a signature (the check of D218), GROUP_KEYS the same as BEGIN, SET_CARD with a refund key three powers of the chip's RSA")
+    @DisplayName("What keys per load cost, counted: SPEND_ALL_BEGIN two SHA-256 and two point additions with a refund key (one and one without), SIGN nothing more of keys per load, and every signature checked (the waits' and the payment's, D207 with D218 and K1): a key agreement and a point addition a signature, one point addition more for the date's Q = W + [t]G, and [d]G where getW gives 33 bytes; GROUP_KEYS the same as BEGIN, SET_CARD with a refund key three powers of the chip's RSA")
     void whatItCosts() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         Object applet = c.applet();
@@ -434,10 +434,14 @@ class PerPaymentKeyTest {
         int waits = c.waits;
         int[] signed = { sha.done - s0[0], shaAll.done - s0[1], rsa.powers - s0[2], gm.made - s0[3], ecdh.made - s0[4], signSha.done - s0[5] };
         assertEquals(0, signed[0], "SIGN: no SHA-256 of keys per load");
-        // D218: every signature (the waits' and the payment's) is checked on the card: s*G - e*P is one point addition, and with k*G
-        // (as before) P = d*G and -e*P two key agreements more
-        assertEquals(waits + 1, signed[3], "one point addition a signature, the check's (D218), and no other");
-        assertEquals(3 * (waits + 1), signed[4], "three key agreements a signature: k*G as before, and the check's d*G and -e*P");
+        // every signature is checked on the card (SchnorrHW.sign's step 8, D207; the waits too, D218 and the keeper's K1):
+        // [e]Q one key agreement and [s]G - T one point addition a signature beside k*G as before; the payment's, under its
+        // date's key, one point addition more for Q = W + [t]G; and [d]G a signature where the chip's getW gives 33 bytes
+        java.lang.reflect.Field pk = CashuApplet.class.getDeclaredField("cardPubKey");
+        pk.setAccessible(true);
+        boolean w33 = ((javacard.security.ECPublicKey) pk.get(applet)).getW(new byte[65], (short) 0) == 33;
+        assertEquals(waits + 2, signed[3], "one point addition a signature, the check's, and the payment's Q");
+        assertEquals((2 + (w33 ? 1 : 0)) * (waits + 1), signed[4], "two key agreements a signature: k*G as before and the check's [e]Q" + (w33 ? ", and [d]G" : ""));
         int g0 = gm.made, h0 = sha.done;
         assertEquals(SW_OK, groupKeys(c, D2).getSW());
         assertEquals(2, gm.made - g0, "GROUP_KEYS: two point additions");

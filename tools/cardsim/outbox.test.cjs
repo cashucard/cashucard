@@ -9,7 +9,7 @@
 // Like client.test.cjs it resets the bridge: run the two one after the other (--test-concurrency=1), never at once.
 //
 // The bridge case also holds the recorded packet, tools/assisted-relay/fixtures/packet-2in2out-494.hex (a packet this
-// test verified, written by it), to the bytes the simulator serves for the same payment. On protocol 2.3 some fields
+// test verified, written by it), to the bytes the simulator serves for the same payment. On protocol 3.0 some fields
 // differ on every run of the bridge or with the keyset the card was taught: the payment's key (the card's key for the
 // date 0, P + t*G, whose t comes from the card's secret c, drawn at install), the installation (drawn at install), the
 // keyset of each input and output (a keyset whose keys the test holds, so the card makes change in it), the change's B_
@@ -17,7 +17,7 @@
 // 494, must be the fixture's. ENG-820 builds on that file and never invents bytes. To write it again after a
 // deliberate change to the packet: CARDSIM_URL=... OUTBOX_WRITE_FIXTURE=1 node --test tools/cardsim/outbox.test.cjs
 //
-// 2.3 says the scope (P1 0) and the packet (P1 1) in the time in the field that signed the payment, where the till that
+// 3.0 says the scope (P1 0) and the packet (P1 1) in the time in the field that signed the payment, where the till that
 // took it reads them; after the card has left the field (a fixture takes it out and back), the scope wants the PIN or
 // the owner's grant and the packet the holder's say (the owner's grant on an owned card), 6982 otherwise.
 const test = require("node:test")

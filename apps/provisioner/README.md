@@ -39,17 +39,17 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 40,412-byte
-  load file in 164 blocks, the opener, the card's applet, then the tag under
-  `D2760000850101`. Then it checks the card's applet answers `02 03`, `GET_INFO`
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 41,742-byte
+  load file in 152 blocks, the opener, the card's applet, then the tag under
+  `D2760000850101`. Then it checks the card's applet answers `03 00`, `GET_INFO`
   (30 bytes), `GET_PUBKEY` (33 bytes) and the tag's SELECT.
 - **Rotate keys and back.** The card manager from its factory keys (`40` to `4F`)
   to the spike's public test set (ENC `10` to `1F`, MAC `20` to `2F`, DEK `30` to
   `3F`) and back, each proved by a fresh login.
 - **Replace existing install (spare card only).** Off by default. With it on, an
   installed card applet is removed first, and only if it is a version the app
-  knows (2.1, 2.2 or 2.3), its `GET_INFO` is empty and it is owed no change
-  (`GET_INFO` byte 29 on 2.3, `GET_CHANGE` on 2.1 and 2.2).
+  knows (2.1, 2.2 or 3.0), its `GET_INFO` is empty and it is owed no change
+  (`GET_INFO` byte 29 on 3.0, `GET_CHANGE` on 2.1 and 2.2).
 
 Every run starts from the card as it is: it checks for an installed applet, logs
 in, removes whatever a torn run left (newest instance first, then the package) and
@@ -187,12 +187,17 @@ cancellation during key prefetch prevents NFC from opening later.
 
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
-chip has installed and the operator approved. The 2.3 load file (40,412 bytes,
-sha256 `05c9b847…`) is not on it yet, so a build from this tree installs no card
-and resets none. A bench J3R180 installed and ran it on 2026-11-15 with real signatures and
-real change verified at a test mint, and `tools/refcheck.py` keeps its size and its hash (as
-it keeps the files before it, 35,466, 36,953, 36,950, 37,269, 39,343 and 40,365 bytes); it goes on `VALIDATED_LOAD_FILE_SHA256S` once the operator
-approves it, with the run's hardware report, in a change that also updates
+chip has installed and the operator approved. The 3.0 load file (41,742 bytes,
+sha256 `2b51ae1c…`) is not on it yet, so a build from this tree installs no card.
+The gate holds back only what loads the file: an owned-card reset removes an
+installation and restores the manager keys, loads nothing, and is not held to it.
+No chip has installed the 3.0 file, or a file of its size, yet. Earlier sources ran on
+a J3R180 while they were numbered 2.3, answering `02 03`: the file before D200
+(35,466 bytes, `48b8597c…`) on 2026-11-13, and the file with D200 to D204
+(36,953 bytes, `f216644a…`) on 2026-11-14; `tools/refcheck.py` keeps their sizes and
+hashes. The 3.0 file is that source renumbered (D205) with D206 to D210 added. The 3.0 file goes on `VALIDATED_LOAD_FILE_SHA256S` after its
+own chip run, once the operator approves it, with the run's hardware report, in a
+change that also updates
 `__tests__/releaseGates.test.ts`. Both batch creation
 and programming enforce the gate; software-only record recovery and explicit
 disposition remain usable. Reauthentication, foregrounding and a 30-second timer
@@ -223,7 +228,7 @@ perform mint/owner/PIN personalization or report holder readiness.
 The read-only cardkit inspector returns the full installation key, empty-state
 and tag evidence. A card owed change from a payment is never empty: the status
 and reset screens send the operator to the holder wallet to bring the change home,
-and the reset stops before anything is saved or deleted. A 2.3 card's spent entries
+and the reset stops before anything is saved or deleted. A 3.0 card's spent entries
 are freed by its holder wallet; this app's settlement check is a 2.1 and 2.2 card's. An interrupted complete new installation can be adopted;
 absent, partial or untouched old states quarantine without a recovery sweep.
 The saved intent names the verified pre-install inspection state separately

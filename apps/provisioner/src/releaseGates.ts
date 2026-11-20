@@ -24,7 +24,12 @@ export function loadFileValidated(sha256: string): boolean {
   return VALIDATED_LOAD_FILE_SHA256S.includes(sha256.toLowerCase());
 }
 
-/** Operator-approved installation for distributed internal testing (D74): this build's load file is a validated one. */
+/**
+ * Operator-approved installation for distributed internal testing (D74): this
+ * build's load file is a validated one. It gates what LOADs that file (a batch
+ * and its installs), never an owned-card reset, which removes an installation
+ * and restores the manager keys without loading anything.
+ */
 export const CARD_INSTALLATION_VALIDATED = loadFileValidated(
   CASHU_LOAD_FILE.sha256,
 );

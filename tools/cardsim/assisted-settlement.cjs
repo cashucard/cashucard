@@ -85,7 +85,7 @@ async function capture(dir, mintOrigin, simOrigin) {
   await sim.waitReady();
   await sim.reset();
   await sim.fixture({pin: '1234', mint: mintOrigin, owner: true});
-  // Protocol 2.3: pieces are locked to the card's key for their date (here the date 0), read under the PIN.
+  // Protocol 3.0: pieces are locked to the card's key for their date (here the date 0), read under the PIN.
   await sim.select();
   await sim.verifyPin('1234');
   const paymentKey = cc.hexOf((await sim.groupKeys(0)).key);

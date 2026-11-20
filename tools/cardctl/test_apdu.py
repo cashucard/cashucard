@@ -56,6 +56,9 @@ def make_card(responses=None):
 
 import p256
 
+# A mint's GET /v1/info that says NUT-09 and NUT-12: SPEND_ALL_CHANGE is asked only at such a mint.
+CHANGE_MINT = {"nuts": {"9": {"supported": True}, "12": {"supported": True}}}
+
 # A GET_INFO answer of 2.0 (P1 = 2, 43 bytes): version 2.0, 128 slots, 3 unspent,
 # 1 spent, 124 empty, caps FF, PIN set, format 4, 3 tries, not locked, record set,
 # a daily limit of 5000, an owner, now 1791814824, window 1791800000, 100 spent
@@ -66,10 +69,10 @@ INFO_43 = (bytes([2, 0, 128, 3, 1, 124, 0xFF, 1, 4, 3, 0, 1]) + (5000).to_bytes(
            + b"\x00" + (0).to_bytes(4, "big") + (250).to_bytes(4, "big") + (50).to_bytes(4, "big") + b"\x00")
 assert len(INFO_43) == 43
 
-# A GET_INFO answer of 2.3 (P1 = 4, 59 bytes): INFO_43's bytes as a 2.3 card says them, then the keyset table kept,
+# A GET_INFO answer of 3.0 (P1 = 4, 59 bytes): INFO_43's bytes as a 3.0 card says them, then the keyset table kept,
 # a rate of 95000, 3 entries in use, 1 of them unmarked, the last payment in the card's unit (80), the no-PIN window
 # begun at 1791700000, the profiles FF 03 and 298 loads left today.
-INFO_59 = (b"\x02\x03" + INFO_43[2:] + b"\x01" + (95000).to_bytes(4, "big") + bytes([3, 1, 0x80])
+INFO_59 = (b"\x03\x00" + INFO_43[2:] + b"\x01" + (95000).to_bytes(4, "big") + bytes([3, 1, 0x80])
            + (1791700000).to_bytes(4, "big") + bytes([0xFF, 0x03]) + (298).to_bytes(2, "big"))
 assert len(INFO_59) == 59
 
@@ -207,8 +210,9 @@ def test_connect_refuses_a_card_of_the_wrong_major_version():
         verbose = False
         legacy = False
     real = cardctl.Card
-    for legacy, answer, ok in ((False, b"\x02\x00", True), (False, b"\x01\x14", False),
-                                (True, b"\x00\x06", True), (True, b"\x02\x00", False)):
+    for legacy, answer, ok in ((False, b"\x02\x00", True), (False, b"\x02\x02", True), (False, b"\x03\x00", True),
+                                (False, b"\x01\x14", False), (False, b"\x04\x00", False),
+                                (True, b"\x00\x06", True), (True, b"\x02\x00", False), (True, b"\x03\x00", False)):
         card = make_card([(answer, 0x9000)])
         cardctl.Card = lambda *a, **kw: card
         Args.legacy = legacy
@@ -579,7 +583,7 @@ def test_set_owner_with_and_without_the_anchor_and_the_old_owners_proof():
 
 
 def test_a_claim_is_sent_again_while_the_card_says_keep_holding():
-    """2.3 (D187): SET_OWNER on a card with no owner answers 6A98 to the first three askings (four in all, D211); the claim is sent until it stops."""
+    """3.0 (D187): SET_OWNER on a card with no owner answers 6A98 to the first three askings (four in all, D211); the claim is sent until it stops."""
     with contextlib.redirect_stderr(io.StringIO()):  # the hold note
         pub = p256.public_key(OWNER)
         card = make_card([(b"", 0x6A98)] * 3 + [(b"", 0x9000)])
@@ -1050,8 +1054,8 @@ def test_selftest_fails_a_blocked_pin_and_names_the_owners_change_pin():
         assert ins in applet.ins_sent, f"INS {ins:02X} was not sent"
 
 
-def test_selftest_fails_a_card_that_is_not_2_0():
-    for version in ((1, 20), (0, 6), (3, 0)):
+def test_selftest_fails_a_card_of_a_version_it_does_not_know():
+    for version in ((1, 20), (0, 6), (2, 0), (2, 3), (3, 1), (4, 0)):
         rc, out = run_selftest(FakeApplet(version=version, pin_state=0))
         assert rc == 1, (version, out)
         assert "FAIL  SELECT applet" in out, out
@@ -1063,18 +1067,22 @@ def test_selftest_fails_a_card_whose_signatures_repeat_their_nonce():
     assert "FAIL  fresh nonce across identical requests" in out, out
 
 
-def test_select_verdict_passes_only_2_x_at_or_over_2_1():
+def test_select_verdict_passes_only_2_1_2_2_and_3_0():
     assert cardctl._select_verdict(bytes([2, 1])) == (True, "version 2.1")
-    assert cardctl._select_verdict(bytes([2, 3]))[0] is True
-    # 2.0 is the v2.0.0 release, whose day a payment of nothing rolled (D26): swept and reinstalled
     assert cardctl._select_verdict(bytes([2, 2]))[0] is True
-    for version in (bytes([2, 0]), bytes([1, 20]), bytes([0, 6]), bytes([3, 0])):
+    assert cardctl._select_verdict(bytes([3, 0])) == (True, "version 3.0")
+    # 2.0 is the v2.0.0 release, whose day a payment of nothing rolled (D26): swept and reinstalled
+    for version in (bytes([2, 0]), bytes([1, 20]), bytes([0, 6])):
         ok, detail = cardctl._select_verdict(version)
-        assert ok is False and "not protocol 2.1, 2.2 or 2.3" in detail and "reinstall the tracked CAP" in detail, detail
-    # a later 2.x is a version this tool does not know: refused, not passed
-    for version in (bytes([2, 4]), bytes([2, 0xFF])):
+        assert ok is False and "not protocol 2.1, 2.2 or 3.0" in detail and "reinstall the tracked CAP" in detail, detail
+    # a later minor of a major this tool knows, or a later major, is a version it does not know: refused, not passed
+    for version in (bytes([3, 1]), bytes([4, 0])):
         ok, detail = cardctl._select_verdict(version)
         assert ok is False and "a version this cardctl does not know" in detail, detail
+    # a 2.x above 2.2 is no release: 02 03 is 3.0's wire before its renumbering (D205), said as such
+    for version in (bytes([2, 3]), bytes([2, 4]), bytes([2, 0xFF])):
+        ok, detail = cardctl._select_verdict(version)
+        assert ok is False and "no released version" in detail and "02 03" in detail and "D205" in detail, detail
     ok, detail = cardctl._select_verdict(b"")
     assert ok is False and "no applet version" in detail, detail
 
@@ -1282,7 +1290,7 @@ def test_cmd_outbox_prints_valid_for_the_card_and_invalid_for_a_tampered_packet(
     pathlib.Path(f.name).unlink()
 
 
-# ── protocol 2.3: keys per load, the sealed c, the held PIN ───────────────────
+# ── protocol 3.0: keys per load, the sealed c, the held PIN ───────────────────
 # Independent secp256k1 for the vectors below: affine, most significant bit first, inverses by pow(x, -1, p). It shares
 # no code with bip340.py, which cardctl uses, so a vector computed here checks cardctl's arithmetic, not repeats it.
 _SP = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
@@ -1361,7 +1369,7 @@ def _group_keys_answer(c, card_key, refund_key, date):
 
 class Card23(FakeConnection):
     """
-    A 2.3 card as far as card-secret, group-keys and the PIN go: SELECT 02 03, GET_INFO, GET_CARD P1 0 with or without
+    A 3.0 card as far as card-secret, group-keys and the PIN go: SELECT 03 00, GET_INFO, GET_CARD P1 0 with or without
     a refund key, VERIFY_PIN and SET_PIN, ALLOW_LOAD (6200), GET_PUBKEY, GET_NONCE P1 1, GET_CARD P1 3 in both forms and
     GROUP_KEYS, each gated as the applet gates it. Its answers are worked out with the independent arithmetic above.
     """
@@ -1388,10 +1396,10 @@ class Card23(FakeConnection):
         data = apdu[5:5 + apdu[4]] if len(apdu) > 5 else b""
         if apdu[:2] == b"\x00\xA4":
             self.verified = self.grant = self.first = self.nonce_live = False
-            return getattr(self, "version_answer", b"\x02\x03"), 0x9000
+            return getattr(self, "version_answer", b"\x03\x00"), 0x9000
         if ins == cardctl.INS_GET_INFO:
             info = bytearray(INFO_59 if p1 == 4 else INFO_43[:43 if p1 == 2 else 30])
-            info[0:2] = getattr(self, "version_answer", b"\x02\x03")
+            info[0:2] = getattr(self, "version_answer", b"\x03\x00")
             info[7] = self.pin_state
             info[16] = int(self.has_owner)
             return bytes(info), 0x9000
@@ -1566,9 +1574,9 @@ class FirstSetUpCard(Card23):
                 return b"", sw
             self.has_owner = True
             if len(data) in (65 + 80, 65 + 80 + 16):
-                # the claim's anchor: on 2.3 the first set-up's, the clock even where it is older (D204); before, forward only
+                # the claim's anchor: on 3.0 the first set-up's, the clock even where it is older (D204); before, forward only
                 t = cardctl.header_time(data[65:145])
-                self.now = t if getattr(self, "version_answer", b"\x02\x03") >= b"\x02\x03" else max(self.now, t)
+                self.now = t if getattr(self, "version_answer", b"\x03\x00") >= b"\x03\x00" else max(self.now, t)
             return b"", 0x9000
         if ins == cardctl.INS_SET_LIMIT:
             if not self.has_owner:
@@ -1616,7 +1624,7 @@ class FirstSetUpCard(Card23):
 
 def test_setup_is_one_selection_and_the_separate_commands_are_not():
     """
-    2.3 (D196): a card's first set-up is the selection of its first SET_PIN. `setup` makes the PIN, the record, the
+    3.0 (D196): a card's first set-up is the selection of its first SET_PIN. `setup` makes the PIN, the record, the
     owner (claimed, held for) and the owner's limits in that one selection; the same steps as separate commands each
     select the card again, and SET_CARD is then refused (6A91).
     """
@@ -1915,7 +1923,7 @@ def test_set_owner_wants_the_new_owners_key_or_the_test_keys_own_flag():
 
 
 def test_a_hand_over_says_what_waits_for_the_new_owner():
-    """After a hand-over of a 2.3 card, cardctl says that verify-pin answers 6982 until the new owner's change-pin, and
+    """After a hand-over of a 3.0 card, cardctl says that verify-pin answers 6982 until the new owner's change-pin, and
     a dated load 6A8E until set-card --refund names the new owner's refund key."""
     card = make_card()
     card.connection = HandOverCard()
@@ -2023,8 +2031,8 @@ def test_setup_that_loses_the_card_at_set_card_still_names_its_design():
 
 
 def test_setup_on_a_2_2_card_that_stops_names_the_claim_not_the_reset():
-    """On a card older than 2.3 a card with a PIN and no owner may still be claimed (set-owner --pin): there is no
-    reset by the PIN (reset is 2.3's), so setup's stop advice names the claim."""
+    """On a card older than 3.0 a card with a PIN and no owner may still be claimed (set-owner --pin): there is no
+    reset by the PIN (reset is 3.0's), so setup's stop advice names the claim."""
     for lift in (False, True):
         conn = FirstSetUpCard(refuse=None if lift else {cardctl.INS_SET_CARD: 0x6F00}, lift_at=1 if lift else None)
         conn.version_answer = b"\x02\x02"
@@ -2265,9 +2273,9 @@ def test_setup_wants_the_anchor_and_sends_nothing_without_it():
 
 
 def test_setup_brings_back_a_far_clock_on_2_3_and_refuses_it_on_an_older_card():
-    """setup (D204): on a 2.3 card the claim's anchor, the first set-up's of an empty card, is the clock even where
+    """setup (D204): on a 3.0 card the claim's anchor, the first set-up's of an empty card, is the clock even where
     the clock was later: a card a far header set is set up, and setup says the anchor brought the clock back. A card
-    older than 2.3 moves its clock only forward: there a clock more than two hours past the anchor's time is refused
+    older than 3.0 moves its clock only forward: there a clock more than two hours past the anchor's time is refused
     before anything is written, naming the reset with the tip as its anchor (D203); two hours or less is set up."""
     t = cardctl.header_time(_ANCHOR)
     conn, card = _setup_card()
@@ -2344,7 +2352,7 @@ def test_setup_and_set_owner_read_the_owners_c_back_before_they_say_it_is_the_ow
 
 
 def test_set_pin_on_a_fresh_2_3_card_is_refused_and_names_setup():
-    """On 2.3 a SET_PIN on a card with no PIN begins its first set-up, which the next selection ends: alone, it leaves
+    """On 3.0 a SET_PIN on a card with no PIN begins its first set-up, which the next selection ends: alone, it leaves
     a card with a PIN, no record and no owner. set-pin names setup instead; a 2.2 card still takes it."""
     conn, card = _setup_card()
     try:
@@ -2380,7 +2388,7 @@ def test_card_secret_never_begins_a_first_set_up():
 
 
 def test_info_says_open_to_the_first_phone_only_where_it_is():
-    for pin_state, version, open_ in ((0, b"\x02\x03", True), (1, b"\x02\x03", False), (1, b"\x02\x02", True)):
+    for pin_state, version, open_ in ((0, b"\x03\x00", True), (1, b"\x03\x00", False), (1, b"\x02\x02", True)):
         card = _card23(has_owner=False, pin_state=pin_state)
         card.connection.version_answer = version
         card.select()
@@ -2392,7 +2400,7 @@ def test_info_says_open_to_the_first_phone_only_where_it_is():
 
 
 def test_selftest_passes_a_2_3_card_of_two_units():
-    applet = FakeApplet(version=(2, 3), pin_state=1)
+    applet = FakeApplet(version=(3, 0), pin_state=1)
     applet.info_59 = INFO_59[:8] + b"\x05" + INFO_59[9:]
     rc, out = run_selftest(applet, "--pin", "1234")
     assert "PASS  format" in out and rc == 0, out
@@ -2412,6 +2420,7 @@ def test_load_sends_p2_02_only_with_date_keys():
     assert card.connection.last[:4] == bytes.fromhex("B0300000"), card.connection.last[:4].hex()
     for flags, p2 in (([], 0x00), (["--date-keys"], 0x02)):
         card = make_card([(b"\x03", 0x9000)])
+        card.version = b"\x03\x00"
         assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", *flags])[0] == 0
         assert card.connection.last[3] == p2, (flags, card.connection.last.hex())
 
@@ -2421,6 +2430,7 @@ def test_the_loaders_y_is_gone():
     --with-y, no LOAD_WITH_Y, and a piece is sent as it was in fix 19, P2 02 and 81 bytes."""
     assert not hasattr(cardctl, "y_of_c") and not hasattr(cardctl, "LOAD_WITH_Y")
     card = make_card([(b"\x03", 0x9000)])
+    card.version = b"\x03\x00"  # --date-keys is 3.0's word (his gate, kept at the merge)
     assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys"])[0] == 0
     assert card.connection.last[3] == 0x02 and card.connection.last[4] == 81, card.connection.last.hex()
     with contextlib.redirect_stderr(io.StringIO()):
@@ -2438,6 +2448,7 @@ def test_load_uncompressed_sends_c_whole():
     nonce = bytes(range(32))
     c33 = cardctl.placeholder_c(nonce)
     card = make_card([(b"\x05", 0x9000)])
+    card.version = b"\x03\x00"
     assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--nonce", nonce.hex(), "--date-keys", "--uncompressed"])[0] == 0
     apdu = card.connection.last
     assert apdu[:4] == bytes.fromhex("B030000A"), apdu[:4].hex()
@@ -2458,6 +2469,7 @@ def test_load_uncompressed_falls_back_on_6b00():
     """D212: a card whose key agreement failed its install test (or one before D212) answers the 04 form 6B00 with nothing
     written; `load --uncompressed` then sends the same piece in the 33-byte form, and says so."""
     card = make_card([(b"", 0x6B00), (b"\x02", 0x9000)])
+    card.version = b"\x03\x00"
     code, out, err = _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys", "--uncompressed"])
     assert code == 0
     first, second = card.connection.sent[-2], card.connection.sent[-1]
@@ -2478,6 +2490,7 @@ def test_load_without_date_keys_explains_the_6a86():
     else:
         raise AssertionError("a 6A86 to a load without --date-keys was not explained")
     card = make_card([(b"", 0x6A86)])
+    card.version = b"\x03\x00"
     try:
         _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys"])
     except cardctl.CardError as exc:
@@ -2487,7 +2500,7 @@ def test_load_without_date_keys_explains_the_6a86():
 
 
 def test_the_placeholder_c_is_a_point_of_the_curve():
-    """A 2.3 card refuses a C that is not a point (6A80): a random x is one only about half the time."""
+    """A 3.0 card refuses a C that is not a point (6A80): a random x is one only about half the time."""
     for i in range(64):
         nonce = secrets.token_bytes(32)
         card = make_card([(b"\x03", 0x9000)])
@@ -2506,7 +2519,7 @@ def test_on_2_3_the_grant_alone_opens_no_load_and_6200_is_the_grant():
     except SystemExit as exc:
         assert "--pin" in str(exc), str(exc)
     else:
-        raise AssertionError("a load under the grant alone was sent to a 2.3 card")
+        raise AssertionError("a load under the grant alone was sent to a 3.0 card")
     assert len(card.connection.sent) == sent, "nothing sent"
     card = make_card([(NONCE, 0x9000), (b"", 0x6200)])
     card.allow_load(OWNER)
@@ -2521,7 +2534,7 @@ def test_set_pin_with_the_owner_is_refused_on_a_2_3_card_before_anything_is_sent
     except SystemExit as exc:
         assert "change-pin" in str(exc), str(exc)
     else:
-        raise AssertionError("set-pin --owner went to a 2.3 card")
+        raise AssertionError("set-pin --owner went to a 3.0 card")
     assert len(card.connection.sent) == sent
 
 
@@ -2663,9 +2676,9 @@ def test_card_secret_opens_the_e_form_against_an_independent_vector():
     assert 0x40 not in [a[1] for a in card.connection.sent[1:]]
 
 
-# ── protocol 2.3: GET_INFO's longest form ────────────────────────────────────
+# ── protocol 3.0: GET_INFO's longest form ────────────────────────────────────
 def test_get_info_asks_p1_4_of_a_2_3_card_and_p1_2_of_an_older_one():
-    for version, p1, answer in ((b"\x02\x03", 4, INFO_59), (b"\x02\x04", 4, INFO_59), (b"\x02\x02", 2, INFO_43),
+    for version, p1, answer in ((b"\x03\x00", 4, INFO_59), (b"\x03\x01", 4, INFO_59), (b"\x02\x02", 2, INFO_43),
                                 (b"\x02\x01", 2, INFO_43)):
         card = make_card([(version, 0x9000), (answer, 0x9000)])
         card.select()
@@ -2679,7 +2692,7 @@ def test_get_info_asks_p1_4_of_a_2_3_card_and_p1_2_of_an_older_one():
 
 def test_get_info_decodes_the_59_and_51_byte_answers():
     i = cardctl.decode_info(INFO_59)
-    assert i["version_tuple"] == (2, 3) and i["tag_off"] is False and i["allowance"] == 250
+    assert i["version_tuple"] == (3, 0) and i["tag_off"] is False and i["allowance"] == 250
     assert i["keyset_table"] is True and i["rate"] == 95000 and i["entries"] == 3 and i["unmarked"] == 1
     assert i["last_unit"] == "the card's" and i["nopin_window_start"] == 1791700000
     assert i["profiles_raw"] == b"\xff\x03" and i["loads_left"] == 298
@@ -2713,15 +2726,15 @@ def test_cmd_info_prints_the_2_3_fields():
 
 
 def test_selftest_on_a_2_3_card_checks_keys_per_load_and_prints_the_profiles():
-    rc, out = run_selftest(FakeApplet(version=(2, 3)))
+    rc, out = run_selftest(FakeApplet(version=(3, 0)))
     assert rc == 0, out
     assert "PASS  keys per load (GET_INFO byte 56 bit 1)  — profiles FF03" in out, out
     assert "note  loads left today : 298 of 300" in out and "All 13 checks passed" in out, out
-    applet = FakeApplet(version=(2, 3))
+    applet = FakeApplet(version=(3, 0))
     applet.info_59 = INFO_59[:55] + b"\xff\x01" + INFO_59[57:]
     rc, out = run_selftest(applet)
     assert rc == 1 and "FAIL  keys per load" in out, out
-    applet = FakeApplet(version=(2, 3))
+    applet = FakeApplet(version=(3, 0))
     applet.info_59 = INFO_43
     rc, out = run_selftest(applet)
     assert rc == 1 and "fewer than 57 bytes" in out, out
@@ -2730,7 +2743,7 @@ def test_selftest_on_a_2_3_card_checks_keys_per_load_and_prints_the_profiles():
     assert rc == 0 and "keys per load" not in out and "All 12 checks passed" in out, out
 
 
-# ── protocol 2.3: the card's own change ──────────────────────────────────────
+# ── protocol 3.0: the card's own change ──────────────────────────────────────
 def _change_row(n, amount, keyset, date, b_, k):
     return bytes([n]) + amount.to_bytes(4, "big") + keyset + date.to_bytes(4, "big") + b_ + k
 
@@ -2850,21 +2863,21 @@ def test_load_change_refusals_say_what_they_mean():
 def test_spend_all_change_encoding_and_argument_checks():
     k = _sec33(_smul(9))
     card = make_card([(_sec33(_smul(10)), 0x9000)])
-    assert card.spend_all_change(64, k, _KS8) == _sec33(_smul(10))
+    assert card.spend_all_change(64, k, _KS8, CHANGE_MINT) == _sec33(_smul(10))
     assert card.connection.last == bytes.fromhex("B02600002D") + (64).to_bytes(4, "big") + k + _KS8 + b"\x21", \
         card.connection.last.hex()
     for args in ((0, k, _KS8), (2 ** 32, k, _KS8), (64, _g65(9), _KS8), (64, b"\x02" + bytes(32), _KS8),
                  (64, k, _KS8[:7])):
         card = make_card([(bytes(33), 0x9000)])
         try:
-            card.spend_all_change(*args)
+            card.spend_all_change(*args, CHANGE_MINT)
         except SystemExit:
             pass
         else:
             raise AssertionError(f"SPEND_ALL_CHANGE sent with {args}")
         assert card.connection.sent == []
     try:
-        make_card([(bytes(32), 0x9000)]).spend_all_change(64, k, _KS8)
+        make_card([(bytes(32), 0x9000)]).spend_all_change(64, k, _KS8, CHANGE_MINT)
     except SystemExit:
         pass
     else:
@@ -2894,7 +2907,7 @@ def test_the_applets_recorded_load_change_is_the_wire_cardctl_speaks():
     assert v["K"] == _sec33(_smul(8)), "the mint's key for 8 is 8*G"
     keyset = v["spend_all_change"][-9:-1]
     card = make_card([(v["spend_all_change_response"], 0x9000)])
-    assert card.spend_all_change(8, v["K"], keyset) == v["spend_all_change_response"]
+    assert card.spend_all_change(8, v["K"], keyset, CHANGE_MINT) == v["spend_all_change_response"]
     assert card.connection.last == v["spend_all_change"], card.connection.last.hex()
     row = make_card([(v["get_change_response"], 0x9000)]).get_change()[0]
     assert (row["number"], row["amount"], row["keyset"], row["date"]) == (0, 8, keyset, 0)
@@ -2933,7 +2946,7 @@ def test_dleq_holds_for_the_mints_proof_and_for_nothing_else():
     assert not cardctl.dleq_holds(_sec33(b_pt), _sec65(c_), k, _xor(e, b"\x01" + bytes(31)), s)
 
 
-# ── protocol 2.3: a keyset's keys ─────────────────────────────────────────────
+# ── protocol 3.0: a keyset's keys ─────────────────────────────────────────────
 import hashlib as _hashlib
 import pathlib as _pathlib
 import re as _re
@@ -3120,7 +3133,7 @@ def test_read_keyset_file_checks_the_keys_against_the_id():
                 raise AssertionError(f"{path} was taken")
 
 
-# ── protocol 2.3: the certificate ─────────────────────────────────────────────
+# ── protocol 3.0: the certificate ─────────────────────────────────────────────
 def test_cert_read_reads_the_state_then_the_pages_to_the_length():
     container = bytes(range(256)) * 2 + bytes(range(76))
     card = make_card([(b"\x01\x01\x02\x4c", 0x9000), (container[:256], 0x9000), (container[256:512], 0x9000),
@@ -3146,7 +3159,7 @@ def test_cert_read_reads_the_state_then_the_pages_to_the_length():
             raise AssertionError(f"CERT_READ answers {answers[0][0].hex()} were taken")
 
 
-# ── protocol 2.3: a model card that owes change and is taught keys ───────────
+# ── protocol 3.0: a model card that owes change and is taught keys ───────────
 class Card23Change(Card23):
     """
     Card23, and as far as the card's own change goes: GET_CHANGE of its openings, LOAD_CHANGE checking the bound key,
@@ -3417,6 +3430,275 @@ def test_load_change_checks_the_bound_key_and_the_mints_proof_before_the_card():
         assert fresh.connection.sent == []
 
 
+# ── the card's change only at a mint that gives it back (NUT-12 and NUT-09) ───
+# Nutshell 0.20.3's own GET /v1/info `nuts`, as a local FakeWallet mint answered it (2026-11-14).
+NUTSHELL_INFO = {"name": "Cashu mint", "version": "Nutshell/0.20.3", "nuts": {
+    "4": {"methods": [{"method": "bolt11", "unit": "sat"}], "disabled": False},
+    "5": {"methods": [{"method": "bolt11", "unit": "sat"}], "disabled": False},
+    "7": {"supported": True}, "8": {"supported": True}, "9": {"supported": True}, "10": {"supported": True},
+    "11": {"supported": True}, "12": {"supported": True}, "14": {"supported": True}, "20": {"supported": True}}}
+
+
+def _without(info, nut, value=None):
+    """A copy of a mint's info whose `nuts` lack `nut`, or hold `value` for it."""
+    import copy
+    out = copy.deepcopy(info)
+    if value is None:
+        del out["nuts"][nut]
+    else:
+        out["nuts"][nut] = value
+    return out
+
+
+def test_the_cards_change_is_asked_only_at_a_mint_that_says_nut_12_and_nut_09():
+    """A mint that gives no DLEQ burns the inputs and answers change nobody can load; one with no restore leaves a lost
+    swap answer lost. SPEND_ALL_CHANGE is refused, with nothing sent, unless the mint's /v1/info says both."""
+    k = _sec33(_smul(9))
+    assert cardctl.change_mint_problem(NUTSHELL_INFO) is None
+    card = make_card([(_sec33(_smul(10)), 0x9000)])
+    assert card.spend_all_change(64, k, _KS8, NUTSHELL_INFO) == _sec33(_smul(10))
+    for info, words in ((_without(NUTSHELL_INFO, "12"), "NUT-12"),
+                        (_without(NUTSHELL_INFO, "12", {"supported": False}), "NUT-12"),
+                        (_without(NUTSHELL_INFO, "12", {"supported": "yes"}), "NUT-12"),
+                        (_without(NUTSHELL_INFO, "9"), "NUT-09"),
+                        ({"name": "a mint", "nuts": {}}, "NUT-12, the DLEQ proof LOAD_CHANGE needs or NUT-09"),
+                        ({"name": "a mint"}, "names no nuts"),
+                        (None, "names no nuts")):
+        assert words in (cardctl.change_mint_problem(info) or ""), (info, cardctl.change_mint_problem(info))
+        card = make_card([(_sec33(_smul(10)), 0x9000)])
+        try:
+            card.spend_all_change(64, k, _KS8, info)
+        except SystemExit as exc:
+            assert words in str(exc) and "exact amount" in str(exc) and "lost for good" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"SPEND_ALL_CHANGE asked at a mint whose info is {info}")
+        assert card.connection.sent == [], "nothing sent"
+
+
+def test_fetch_mint_info_reads_the_mints_own_word_on_its_nuts():
+    """A till reads GET /v1/info before it asks for change: a fake mint that omits NUT-12 is refused by what it says."""
+    import json as _json
+    import urllib.request
+
+    asked = []
+
+    def fake(info):
+        class Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self):
+                return _json.dumps(info).encode()
+
+        def urlopen(req, timeout=None):
+            asked.append(req.full_url)
+            return Resp()
+        return urlopen
+
+    real = urllib.request.urlopen
+    try:
+        urllib.request.urlopen = fake(_without(NUTSHELL_INFO, "12"))
+        info = cardctl.fetch_mint_info("http://127.0.0.1:3338/")
+        assert asked == ["http://127.0.0.1:3338/v1/info"], asked
+        assert "NUT-12" in cardctl.change_mint_problem(info)
+        urllib.request.urlopen = fake(NUTSHELL_INFO)
+        assert cardctl.change_mint_problem(cardctl.fetch_mint_info("http://127.0.0.1:3338")) is None
+        urllib.request.urlopen = fake(["not", "an", "object"])
+        try:
+            cardctl.fetch_mint_info("http://127.0.0.1:3338")
+        except SystemExit as exc:
+            assert "no object" in str(exc), str(exc)
+        else:
+            raise AssertionError("a /v1/info that is no object was taken")
+
+        def down(req, timeout=None):
+            raise OSError("connection refused")
+        urllib.request.urlopen = down
+        try:
+            cardctl.fetch_mint_info("http://127.0.0.1:3338")
+        except SystemExit as exc:
+            assert "did not answer /v1/info" in str(exc) and "connection refused" in str(exc), str(exc)
+        else:
+            raise AssertionError("a mint that did not answer was taken")
+    finally:
+        urllib.request.urlopen = real
+
+
+def test_load_change_takes_the_mints_answer_and_one_with_no_dleq_points_at_restore():
+    """load-change --signature: one entry of the swap's (or a NUT-09 restore's) signatures. With its DLEQ the card loads
+    it; without, cardctl says so plainly and names NUT-09 restore, with nothing sent to the card."""
+    import json as _json
+    import tempfile
+    keys, ks_id, priv = _mint_v01()
+    ks8 = bytes.fromhex(ks_id[:16])
+    c_, e, s = _mint_answer(priv[8], _smul(0xB2))
+    with_dleq = {"amount": 8, "id": ks_id, "C_": _sec33(c_).hex(), "dleq": {"e": e.hex(), "s": s.hex()}}
+    no_dleq = {"amount": 8, "id": ks_id, "C_": _sec33(c_).hex()}
+    for sig in (no_dleq, dict(no_dleq, dleq=None), dict(no_dleq, dleq={"e": e.hex()})):
+        card = _change_card()
+        card.connection.owe(2, 8, ks8, keys[3][1], r=0x5151, b=0xB2)
+        before = len(card.connection.sent)
+        try:
+            _run(card, ["load-change", "2", "--k", keys[3][1].hex(), "--signature", _json.dumps(sig)])
+        except SystemExit as exc:
+            text = str(exc)
+            assert "no DLEQ proof (NUT-12" in text and "NUT-09" in text and "/v1/restore" in text, text
+            assert "opening 2" in text and "stays owed" in text, text
+        else:
+            raise AssertionError(f"a signature with no DLEQ was taken: {sig}")
+        assert card.connection.sent[before:] == [], "nothing sent, not even SELECT"
+        assert 2 in card.connection.openings
+    # with its DLEQ, from a file as the mint's answer is kept: the card loads it
+    card = _change_card()
+    card.connection.owe(2, 8, ks8, keys[3][1], r=0x5151, b=0xB2)
+    card.connection.openings[2]["shown"] = True
+    with tempfile.TemporaryDirectory() as tmp:
+        path = f"{tmp}/sig.json"
+        with open(path, "w") as f:
+            _json.dump(with_dleq, f)
+        code, out, _ = _run(card, ["load-change", "2", "--k", keys[3][1].hex(), "--signature", path])
+    assert code == 0 and "loaded into slot 12" in out and 2 not in card.connection.openings, out
+    assert card.connection.sent[-1][5:70] == _sec65(c_)
+    # the mint's answer is given once: --signature with --c, or neither, is refused before the reader
+    for argv in (["load-change", "2", "--k", keys[3][1].hex(), "--signature", _json.dumps(with_dleq), "--c",
+                  _sec33(c_).hex()],
+                 ["load-change", "2", "--k", keys[3][1].hex(), "--c", _sec33(c_).hex()]):
+        fresh = make_card()
+        try:
+            _run(fresh, argv)
+        except SystemExit as exc:
+            assert "--signature" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"{argv} was taken")
+        assert fresh.connection.sent == []
+
+
+# ── the versions cardctl drives (D205) ───────────────────────────────────────
+def _connect_with(answer, command):
+    """The real connect, its SELECT answered `answer`, for `command`: (card or the SystemExit, stderr, APDUs sent)."""
+    card = make_card([(answer, 0x9000)])
+    real = cardctl.Card
+    cardctl.Card = lambda *a, **kw: card
+    err = io.StringIO()
+    args = types.SimpleNamespace(reader=0, verbose=False, legacy=False, command=command)
+    try:
+        with contextlib.redirect_stderr(err):
+            try:
+                got = cardctl.connect(args)
+            except SystemExit as exc:
+                got = exc
+    finally:
+        cardctl.Card = real
+    return got, err.getvalue(), card.connection.sent
+
+
+def test_connect_drives_no_02_03_card_as_2_2_for_a_command_that_moves_money_or_sets_up():
+    """A card answering 02 03 speaks 3.0's wire from before its renumbering (D205). Driven as 2.2 it would be read with
+    GET_INFO P1 2, its outbox checked against GET_PUBKEY, and set up with the old clock check: every command that moves
+    money or sets a card up is refused at SELECT, saying what it answered and what cardctl knows. The reads go on."""
+    commands = set(cardctl.build_parser()._subparsers._group_actions[0].choices)
+    writes = commands - cardctl.READ_ONLY_COMMANDS - {"readers", "tip", "selftest", "dump", "load-file"}
+    assert {"load", "load-change", "keyset-keys", "clear-spent", "setup", "set-pin", "set-card", "set-owner",
+            "set-owner-url", "set-limit", "change-pin", "reset", "refresh", "lock", "set-header"} == writes, writes
+    for answer in (b"\x02\x03", b"\x02\x04", b"\x02\xFF"):
+        for command in sorted(writes) + [None]:
+            got, _, sent = _connect_with(answer, command)
+            assert isinstance(got, SystemExit), (answer, command)
+            text = str(got)
+            assert f"answers version 2.{answer[1]}" in text and "knows 2.0, 2.1, 2.2, 3.0" in text, text
+            assert "02 03" in text and "D205" in text and "nothing was sent after SELECT" in text, text
+            assert len(sent) == 1 and sent[0][1] == 0xA4, [a.hex() for a in sent]
+        for command in sorted(cardctl.READ_ONLY_COMMANDS):
+            got, err, _ = _connect_with(answer, command)
+            assert isinstance(got, cardctl.Card) and not got.at_least(3, 0), (answer, command)
+            assert "note:" in err and "may be wrong" in err and "02 03" in err, err
+
+
+def test_connect_takes_every_minor_of_3_as_3_0_and_the_known_versions_as_before():
+    """D205: a reader takes every minor of a major it was built for. A 3.1 card is driven as 3.0 by every command
+    (at_least(3, 0) holds), while selftest still refuses to pass a version it does not know: a statement about the test,
+    not the wire. 2.0, 2.1, 2.2 and 3.0 connect for every command as before, with no note; 4.0 and 1.x for none."""
+    for answer in (b"\x02\x00", b"\x02\x01", b"\x02\x02", b"\x03\x00", b"\x03\x01", b"\x03\x07"):
+        for command in ("load", "setup", "reset", "info", None):
+            got, err, _ = _connect_with(answer, command)
+            assert isinstance(got, cardctl.Card), (answer, command, got)
+            assert err == "", err
+            assert got.at_least(3, 0) == (answer[0] == 3)
+    assert cardctl.driven_as(b"\x03\x01") == (3, 1) and cardctl.driven_as(b"\x02\x03") is None
+    assert cardctl._select_verdict(b"\x03\x01")[0] is False
+    for answer in (b"\x04\x00", b"\x01\x14"):
+        for command in ("load", "info"):
+            got, _, _ = _connect_with(answer, command)
+            assert isinstance(got, SystemExit) and "speaks protocols 2.x and 3.x" in str(got), (answer, command)
+
+
+def test_load_with_date_keys_is_refused_on_a_card_older_than_3_0_before_the_pin():
+    """--date-keys is 3.0's word (LOAD_PROOF P2 02). A 2.2 card signs with P alone, so a piece locked to a date's key is
+    one it can never pay: refused before VERIFY_PIN, so no try is spent and nothing is written."""
+    for version in (b"\x02\x01", b"\x02\x02"):
+        card = make_card([(b"", 0x9000), (b"\x03", 0x9000)])
+        card.version = version
+        try:
+            _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--pin", "1234", "--date-keys"])
+        except SystemExit as exc:
+            assert "--date-keys is protocol 3.0's" in str(exc) and f"version 2.{version[1]}" in str(exc), str(exc)
+        else:
+            raise AssertionError("a 2.x card was sent P2 02")
+        assert card.connection.sent == [], [a.hex() for a in card.connection.sent]
+        card = make_card([(b"\x03", 0x9000)])
+        card.version = version
+        try:
+            card.load_proof(bytes.fromhex("0059534ce0bfa19a"), 8, bytes(32), cardctl.placeholder_c(bytes(32)), 0,
+                            date_keys=True)
+        except SystemExit as exc:
+            assert "no keys per date" in str(exc), str(exc)
+        else:
+            raise AssertionError("load_proof sent P2 02 to a 2.x card")
+        assert card.connection.sent == []
+        # without --date-keys, a 2.2 card loads as it did (P2 00)
+        card = make_card([(b"", 0x9000), (b"\x03", 0x9000)])
+        card.version = version
+        assert _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--pin", "1234"])[0] == 0
+        assert card.connection.last[:4] == bytes.fromhex("B0300000"), card.connection.last.hex()
+
+
+def test_reset_warns_that_ecash_swapped_to_the_cards_keys_and_not_loaded_is_lost():
+    """A reset draws a new c: eCash a wallet swapped to this card's keys and has not loaded can never be loaded after it,
+    lost for good undated, the refund key's after its date where dated. Said before every reset, --yes or not, by the
+    PIN and by the owner's proof."""
+    def said(err):
+        assert "warning:" in err and "new c" in err and "not yet loaded" in err, err
+        assert "undated (the date 0), it is lost for good" in err and "refund key" in err and "card-secret" in err, err
+
+    conn, card = _setup_card(refuse={cardctl.INS_SET_CARD: 0x6F00})
+    try:
+        _run(card, _setup_args())
+    except SystemExit:
+        pass
+    card.select()
+    code, _, err = _run(card, ["reset", "--pin", "1234", "--yes"])
+    assert code == 0 and conn.pin_state == 0
+    said(err)
+    conn, card = _owned_reset_card()
+    code, _, err = _run(card, ["reset", "--owner-key", f"{OWNER:064x}", "--yes"])
+    assert code == 0 and conn.got
+    said(err)
+    # asked, and declined: the warning is given before the question, and nothing is reset
+    import builtins
+    conn, card = _owned_reset_card()
+    real = builtins.input
+    builtins.input = lambda prompt="": "no"
+    try:
+        code, out, err = _run(card, ["reset", "--owner-key", f"{OWNER:064x}"])
+    finally:
+        builtins.input = real
+    assert code == 1 and "aborted" in out and not conn.got, (out, conn.got)
+    said(err)
+
+
 def test_a_holder_rebinds_an_opening_to_the_mints_key_and_moves_it_to_another_keyset():
     import tempfile
     keys, ks_id, priv = _mint_v01()
@@ -3460,11 +3742,11 @@ def test_keyset_keys_refuses_a_2_2_card_and_a_card_that_works_out_another_id():
         try:
             _run(card, ["keyset-keys", path, "--pin", "1234"])
         except SystemExit as exc:
-            assert "2.3" in str(exc), str(exc)
+            assert "3.0" in str(exc), str(exc)
         else:
             raise AssertionError("a 2.2 card was taught")
         assert len(card.connection.sent) == 1
-        card = make_card([(b"\x02\x03", 0x9000)] + [(b"", 0x9000)] * 4 + [(bytes(33), 0x9000)])
+        card = make_card([(b"\x03\x00", 0x9000)] + [(b"", 0x9000)] * 4 + [(bytes(33), 0x9000)])
         card.select()
         code, out, _ = _run(card, ["keyset-keys", path, "--pin", "1234"])
         assert code == 1 and "not the file's" in out, out
@@ -3560,7 +3842,7 @@ def test_the_pickup_vector_is_the_label_the_nonces_and_rand16_and_the_auth_verif
     assert not bip340.verify(p[1:], hashlib.sha256(t + t + bytes(16) + answer[:16] + p).digest(), answer[16:]), "and over m only"
 
 
-# ── the owner's c (2.3, D202) ────────────────────────────────────────────────
+# ── the owner's c (3.0, D202) ────────────────────────────────────────────────
 def _owner_c_vector():
     import json as _json_c
     import pathlib as _pathlib_c

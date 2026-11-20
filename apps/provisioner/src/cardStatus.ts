@@ -30,7 +30,7 @@ export async function readCardStatus(tx: Transceiver): Promise<CardReadout> {
   if (reply.sw !== 0x9000) {
     throw new CardError(reply.sw, 0xa4);
   }
-  // 2.1, 2.2 (D175), which only adds a public read, or 2.3: the cardkit's CARD_VERSIONS
+  // 2.1, 2.2 (D175), which only adds a public read, or 3.0: the cardkit's CARD_VERSIONS
   if (!supportedCardVersion(reply.data)) {
     return {
       state: 'unsupported',
@@ -141,8 +141,8 @@ export function cardStatus(
     };
   }
   if (c.spent > 0) {
-    // the settlement cleanup is a 2.1 and 2.2 card's: a 2.3 card's holder wallet frees its spent places
-    return c.version === '2.3'
+    // the settlement cleanup is a 2.1 and 2.2 card's: a 3.0 card's holder wallet frees its spent places
+    return c.version === '3.0'
       ? {
           title: 'Check earlier payments',
           detail: `${c.spent} spent entries remain. On this card the holder wallet frees spent entries once the mint has settled them; this app does not clear them. Reset is unavailable until they are freed.`,

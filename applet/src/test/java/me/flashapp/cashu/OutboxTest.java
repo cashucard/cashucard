@@ -251,7 +251,7 @@ class OutboxTest {
     // ---- the tests -------------------------------------------------------
 
     @Test
-    @DisplayName("2.3 (D183): a till's output is under the first piece's keyset in the record even where its B_ is an owed opening's of an earlier payment: only the payment's own change is looked up among the openings")
+    @DisplayName("3.0 (D183): a till's output is under the first piece's keyset in the record even where its B_ is an owed opening's of an earlier payment: only the payment's own change is looked up among the openings")
     void aTillsOutputIsNeverTakenForChange() throws Exception {
         int[] first = load(8, 16);
         byte[] moved = hexToBytes("00aabbccddeeff01");
@@ -267,7 +267,7 @@ class OutboxTest {
     }
 
     @Test
-    @DisplayName("2.3 (D183): the card's own change carries its opening's keyset in the record: the one SPEND_ALL_CHANGE's 45-byte form named, or the first piece's; the till's outputs carry the first piece's")
+    @DisplayName("3.0 (D183): the card's own change carries its opening's keyset in the record: the one SPEND_ALL_CHANGE's 45-byte form named, or the first piece's; the till's outputs carry the first piece's")
     void theChangeCarriesItsOwnKeyset() throws Exception {
         int[] places = load(8, 16);
         byte[] moved = hexToBytes("00aabbccddeeff01");
@@ -446,6 +446,25 @@ class OutboxTest {
         ResponseAPDU again = tx(new CommandAPDU(CLA, INS_SPEND_ALL_AGAIN, 0, 0, 64));
         assertEquals(SW_OK, again.getSW());
         assertArrayEquals(again.getData(), Arrays.copyOfRange(body, body.length - 64, body.length), "the witness is the signature the card gave");
+    }
+
+    @Test
+    @DisplayName("a descriptor whose signature the card's check refuses (SchnorrHW.sign's step 8: here the public key object names another key) is not given: both forms of GET_OUTBOX answer 6F00 with nothing, the record stays unsigned (its flag 0) and nothing of it is kept; once the key agrees, the next read signs it and it verifies")
+    void aRefusedDescriptorIsNotKept() throws Exception {
+        Payment p = twoByTwo();
+        byte[] before = field("outbox").clone();
+        Object applet = runtime.appletAt(AIDUtil.create(AID_HEX));
+        java.lang.reflect.Field k = CashuApplet.class.getDeclaredField("cardPubKey");
+        k.setAccessible(true);
+        Object key = k.get(applet);
+        k.set(applet, new SignatureCheckTest.ChipPublicKey(SchnorrHWSignTest.xy(hexToBytes((String) SchnorrHWSignTest.KEYS[0][1]), 0), false));
+        assertEquals(CashuApplet.SW_CRYPTO_ERROR & 0xFFFF, scope().getSW(), "the scope");
+        assertEquals(0, scope().getData().length);
+        assertEquals(CashuApplet.SW_CRYPTO_ERROR & 0xFFFF, page(0, 255).getSW(), "a page");
+        assertArrayEquals(before, field("outbox"), "nothing written: the flag 0, no descriptor");
+        k.set(applet, key);
+        assertRecord(expectedBody(p, MINT, 1, 1), packet());
+        assertEquals(1, field("outbox")[1], "signed once the key agrees");
     }
 
     @Test

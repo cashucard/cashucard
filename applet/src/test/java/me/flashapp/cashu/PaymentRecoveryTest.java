@@ -57,7 +57,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * A payment and its change come back (2.3): the signature of each kept receipt is asked for again by its message; a swap whose
+ * A payment and its change come back (3.0): the signature of each kept receipt is asked for again by its message; a swap whose
  * outputs and change come to more than its pieces is refused before anything is signed; the change is made only in a keyset
  * named, held and taught, and the holder's mend moves an opening to another taught keyset of its unit; the till's outputs carry
  * the keyset it names in the payment's record; and the day's limit counts the change until it is back on the card.

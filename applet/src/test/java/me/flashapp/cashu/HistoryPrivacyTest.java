@@ -25,7 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * What the card tells a reader that has given neither the PIN nor the owner's grant in its tap (2.3): no history. GET_OUTBOX's
+ * What the card tells a reader that has given neither the PIN nor the owner's grant in its tap (3.0): no history. GET_OUTBOX's
  * packet goes only to the reader in the time in the field that signed the payment, or with the holder's say; GET_PROOF
  * answers a spent place as an empty one; GET_INFO says zeros for the day's window, what the day signed for, the last
  * payment's unit and the no-PIN window's start, and the counts of places as they are (D196).

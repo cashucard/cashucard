@@ -217,10 +217,7 @@ async function runCompact(options, dependencies = {}) {
     throw Error(
       "pinned runner, absolute Python/new journal and factory reset confirmation required",
     );
-  if (
-    !dependencies.sdk &&
-    require("../cardkit/package.json").version !== "0.2.0"
-  )
+  if (require("../cardkit/package.json").version !== "0.2.0")
     throw Error("reviewed cardkit required");
   const parent = fs.lstatSync(path.dirname(options.journal));
   if (

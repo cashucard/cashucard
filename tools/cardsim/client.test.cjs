@@ -69,10 +69,10 @@ test("select uses the applet's 11-byte AID, F0 CASHUCARD 01, with the 10-byte pa
   assert.deepEqual(constants.APPLET_AID, Buffer.concat([constants.PACKAGE_AID, Buffer.from([0x01])]))
   assert.deepEqual(constants.OLD_AIDS.upstream0x, hex("D2760000850102"))
   assert.deepEqual(constants.OLD_AIDS.foxy1x, hex("F0464F585943415244"))
-  assert.deepEqual(constants.VERSION, { major: 2, minor: 3 }, "SELECT answers 02 03")
+  assert.deepEqual(constants.VERSION, { major: 3, minor: 0 }, "SELECT answers 03 00")
 })
 
-test("the INS of 2.3 (spec/APDU.md, Commands, by INS)", () => {
+test("the INS of 3.0 (spec/APDU.md, Commands, by INS)", () => {
   const want = {
     GET_INFO: 0x01, GET_PUBKEY: 0x10, GET_BALANCE: 0x11, GET_PROOF_COUNT: 0x12, GET_PROOF: 0x13, GET_SLOT_STATUS: 0x14,
     AUTH: 0x15, GET_CARD: 0x16, GET_PIECES: 0x17, GET_LOG: 0x18, GET_CHANGE: 0x19, GET_DLEQ: 0x1a, GET_OUTBOX: 0x1b,
@@ -86,7 +86,7 @@ test("the INS of 2.3 (spec/APDU.md, Commands, by INS)", () => {
 })
 
 test("read command encodings match spec/APDU.md", () => {
-  assert.deepEqual(encode.getInfo(), hex("B0010400 00"), "the longest form, P1 = 4 (59 bytes on 2.3)")
+  assert.deepEqual(encode.getInfo(), hex("B0010400 00"), "the longest form, P1 = 4 (59 bytes on 3.0)")
   assert.deepEqual(encode.getInfo(2), hex("B0010200 00"))
   assert.deepEqual(encode.getInfo(0), hex("B0010000 00"))
   assert.deepEqual(encode.getPubkey(), hex("B0100000 21"))
@@ -366,7 +366,7 @@ test("limitValue is 4, 8, 12, 13, 17 or 18 bytes, and refuses a form that would 
 const u32be = n => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b }
 const INFO_43 = Buffer.concat([Buffer.from([2, 0, 128, 3, 1, 124, 0xff, 1, 4, 3, 0, 1]), u32be(5000), Buffer.from([1]),
   u32be(1791814824), u32be(1791800000), u32be(100), Buffer.from([0]), u32be(0), u32be(250), u32be(50), Buffer.from([0])])
-const INFO_59 = Buffer.concat([Buffer.from([2, 3]), INFO_43.subarray(2), Buffer.from([1]), u32be(95000), Buffer.from([3, 1, 0x80]),
+const INFO_59 = Buffer.concat([Buffer.from([3, 0]), INFO_43.subarray(2), Buffer.from([1]), u32be(95000), Buffer.from([3, 1, 0x80]),
   u32be(1791700000), Buffer.from([0xff, 0x03]), Buffer.from([298 >> 8, 298 & 0xff])])
 
 test("parseInfo reads 30, 42, 43, 51 and 59 bytes (test_apdu.py's INFO_43 and INFO_59)", () => {
@@ -389,7 +389,7 @@ test("parseInfo reads 30, 42, 43, 51 and 59 bytes (test_apdu.py's INFO_43 and IN
   assert.equal(i.tagOff, false)
   assert.equal(parseInfo(INFO_43.subarray(0, 30)).allowance, undefined)
   const j = parseInfo(INFO_59)
-  assert.equal(j.version, "2.3")
+  assert.equal(j.version, "3.0")
   assert.equal(j.keysetTable, true)
   assert.equal(j.rate, 95000)
   assert.equal(j.entries, 3)
@@ -422,7 +422,7 @@ test("parseProof decodes the 82-byte slot with the full 16-char keyset id and th
   assert.throws(() => parseProof(0, body.subarray(4)), /expected 82/)
 })
 
-test("parseCard reads 2.3's 109 bytes and the mint: the rollover bytes, the no-PIN window's start and switch", () => {
+test("parseCard reads 3.0's 109 bytes and the mint: the rollover bytes, the no-PIN window's start and switch", () => {
   const mint = Buffer.from("http://m")
   const rec = Buffer.alloc(109 + mint.length)
   hex("040101 00001388").copy(rec, 0)
@@ -446,7 +446,7 @@ test("parseCard reads 2.3's 109 bytes and the mint: the rollover bytes, the no-P
   assert.equal(c.noPinWindow, 1)
   assert.equal(c.mint, "http://m")
   assert.equal(c.design, "FX1")
-  assert.throws(() => parseCard(rec.subarray(0, 106 + mint.length)), /109/, "the design's three bytes are part of 2.3's answer")
+  assert.throws(() => parseCard(rec.subarray(0, 106 + mint.length)), /109/, "the design's three bytes are part of 3.0's answer")
 })
 
 test("parseChange reads 83-byte openings (number, amount, keyset, date, B_, K) and refuses 2.2's 80-byte ones (test_apdu.py's rows)", () => {
@@ -487,7 +487,7 @@ test("parseBegin reads 69 bytes (the worth, t, R + u*G); parseGroupKeys 98; pars
   assert.throws(() => parseLoadChange(hex(LC_VECTOR.load_change_response).subarray(0, 82)), /expected 83/)
 })
 
-test("describeSw names the words of 2.3: 6200, 6A86, 6A97 to 6A9F", () => {
+test("describeSw names the words of 3.0: 6200, 6A86, 6A97 to 6A9F", () => {
   assert.match(describeSw(0x63c2), /wrong PIN — 2/)
   assert.match(describeSw(0x6983), /change-pin/)
   assert.match(describeSw(0x6a8f), /day's limit.*300 pieces/)
@@ -560,7 +560,7 @@ test("validateFixture mirrors the server's checks on the body, and refuses the 0
   assert.throws(() => validateFixture({ limits: { rollBudget: 31 } }), /1 to 30/)
   assert.throws(() => validateFixture({ limits: { noPinWindow: 2 } }), /noPinWindow/)
   assert.throws(() => validateFixture({ limits: { rate: -1 } }), /rate/)
-  assert.throws(() => validateFixture({ mint: "http://m", owner: true, proofs: [proof] }), /proofs need pin/, "2.3: a load wants the PIN in its tap")
+  assert.throws(() => validateFixture({ mint: "http://m", owner: true, proofs: [proof] }), /proofs need pin/, "3.0: a load wants the PIN in its tap")
   assert.throws(() => validateFixture({ pin: "1234", proofs: [{ ...proof, C: "05" + "11".repeat(32) }] }), /02\/03 prefix/)
   assert.throws(() => validateFixture({ pin: "1234", proofs: [{ ...proof, amount: 2 ** 32 }] }), /amount/)
   assert.throws(() => validateFixture({ pin: "1234", proofs: [{ ...proof, spent: false }] }), /unknown key in proofs\[0\]: spent/)
@@ -572,7 +572,7 @@ test("validateFixture mirrors the server's checks on the body, and refuses the 0
   assert.throws(() => validateFixture(null), /must be an object/)
 })
 
-// ── 2.3's flows on a fake transport: the bytes in order ──────────────────────
+// ── 3.0's flows on a fake transport: the bytes in order ──────────────────────
 
 /** A fake bridge that expects `script` ([apdu hex, answer hex]) in order and fails the test on any other APDU. */
 const scripted = (script, seen = []) => async (url, init) => {
@@ -788,11 +788,11 @@ test("select tries the applet's whole AID first, falls back to the package AID a
   const sent = []
   const fetch = async (url, init) => {
     sent.push(JSON.parse(init.body).hex)
-    const answer = sent.length === 1 ? { hex: "6A82", sw: "6A82" } : { hex: "02039000", sw: "9000" }
+    const answer = sent.length === 1 ? { hex: "6A82", sw: "6A82" } : { hex: "03009000", sw: "9000" }
     return { ok: true, status: 200, text: async () => JSON.stringify(answer) }
   }
   const sim = new CardSim("http://127.0.0.1:9", { fetch })
-  assert.deepEqual(await sim.select(), { major: 2, minor: 3 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
   assert.deepEqual(sent, ["00a404000bf043415348554341524401", "00a404000af0434153485543415244"])
 
   const dead = new CardSim("http://127.0.0.1:9", { fetch: async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ hex: "6A82", sw: "6A82" }) }) })
@@ -803,7 +803,7 @@ test("select tries the applet's whole AID first, falls back to the package AID a
 const chipFetch = sent => async (url, init) => {
   const h = JSON.parse(init.body).hex.toUpperCase()
   sent.push(h)
-  const answer = h === "00A404000BF043415348554341524401" ? { hex: "02039000", sw: "9000" }
+  const answer = h === "00A404000BF043415348554341524401" ? { hex: "03009000", sw: "9000" }
     : h === "00A404000AF0434153485543415244" ? { hex: "9000", sw: "9000" }
     : { hex: "6D00", sw: "6D00" }
   return { ok: true, status: 200, text: async () => JSON.stringify(answer) }
@@ -812,12 +812,12 @@ const chipFetch = sent => async (url, init) => {
 test("on a chip's answers, select reaches the card's applet with its first SELECT, never the opener", async () => {
   const sent = []
   const sim = new CardSim("http://127.0.0.1:9", { fetch: chipFetch(sent) })
-  assert.deepEqual(await sim.select(), { major: 2, minor: 3 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
   assert.deepEqual(sent, ["00A404000BF043415348554341524401"])
 })
 
 test("a 9000 with no version falls through to the next AID, and is no answer when it is the last", async () => {
-  // the whole AID is not answered and the package AID reaches the opener: no 2.0 applet
+  // the whole AID is not answered and the package AID reaches the opener: no card applet
   let n = 0
   const opener = new CardSim("http://127.0.0.1:9", {
     fetch: async () => ({ ok: true, status: 200, text: async () => JSON.stringify(n++ === 0 ? { hex: "6A82", sw: "6A82" } : { hex: "9000", sw: "9000" }) }),
@@ -828,10 +828,10 @@ test("a 9000 with no version falls through to the next AID, and is no answer whe
   const empty = new CardSim("http://127.0.0.1:9", {
     fetch: async (url, init) => {
       sent.push(JSON.parse(init.body).hex)
-      return { ok: true, status: 200, text: async () => JSON.stringify(sent.length === 1 ? { hex: "9000", sw: "9000" } : { hex: "02039000", sw: "9000" }) }
+      return { ok: true, status: 200, text: async () => JSON.stringify(sent.length === 1 ? { hex: "9000", sw: "9000" } : { hex: "03009000", sw: "9000" }) }
     },
   })
-  assert.deepEqual(await empty.select(), { major: 2, minor: 3 })
+  assert.deepEqual(await empty.select(), { major: 3, minor: 0 })
   assert.deepEqual(sent, ["00a404000bf043415348554341524401", "00a404000af0434153485543415244"])
 })
 
@@ -898,7 +898,7 @@ function testMint(n = 8, salt = 7000) {
   return { ks, keyset: ks.keyset8.toString("hex"), key: amount => cc.hexOf(keys[Math.log2(amount)][1]), sign }
 }
 
-/** A card set up as a wallet sets one up on 2.3: the first set-up in one fixture, then the date's keys read under the PIN. */
+/** A card set up as a wallet sets one up on 3.0: the first set-up in one fixture, then the date's keys read under the PIN. */
 async function setUp(sim, extra = {}) {
   const fresh = await sim.reset()
   await sim.fixture({ pin: "1234", mint: "http://127.0.0.1:3338", owner: true, ...extra })
@@ -908,7 +908,7 @@ async function setUp(sim, extra = {}) {
   return { P: fresh.pubkey, ...keys }
 }
 
-test("the bridge answers both SELECTs as the chip does: the whole AID 02 03, the package AID the opener's bare 9000", integration, async () => {
+test("the bridge answers both SELECTs as the chip does: the whole AID 03 00, the package AID the opener's bare 9000", integration, async () => {
   const sim = new CardSim(URL)
   await sim.waitReady()
   await sim.reset()
@@ -918,13 +918,13 @@ test("the bridge answers both SELECTs as the chip does: the whole AID 02 03, the
   assert.equal((await sim.apdu(encode.getInfo())).sw, constants.SW.INS_NOT_SUPPORTED, "and refuses the next command")
   const whole = await sim.apdu(encode.select(constants.APPLET_AID))
   assert.equal(whole.sw, constants.SW.OK)
-  assert.deepEqual(whole.data, Buffer.from([2, 3]))
+  assert.deepEqual(whole.data, Buffer.from([3, 0]))
   const info = await sim.getInfo()
-  assert.equal(info.version, "2.3")
+  assert.equal(info.version, "3.0")
   assert.equal(info.keysPerLoad, true, "GET_INFO P1 4 byte 56 bit 1")
   assert.equal(info.profilesRaw, 0xff03)
   await sim.apdu(encode.select(constants.PACKAGE_AID))
-  assert.deepEqual(await sim.select(), { major: 2, minor: 3 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
 })
 
 test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the owner's changePin → verifyPin; a card with no PIN takes nothing (6A97)", integration, async () => {
@@ -933,8 +933,8 @@ test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the ow
   const fresh = await sim.reset()
   assert.equal(fresh.pubkey.length, 66)
   assert.equal(fresh.slots.length, 128)
-  assert.equal(fresh.version, "2.3")
-  assert.deepEqual(await sim.select(), { major: 2, minor: 3 })
+  assert.equal(fresh.version, "3.0")
+  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
   await assert.rejects(sim.loadProof("0059534ce0bfa19a", 8, "11".repeat(32), pointHex(5)), e => e instanceof CardError && e.sw === constants.SW.NO_PIN)
   await assert.rejects(sim.spendAllBegin([0]), e => e.sw === constants.SW.NO_PIN)
   const state = await sim.fixture({ pin: "1234", mint: "http://m", owner: true, blockedPin: true })

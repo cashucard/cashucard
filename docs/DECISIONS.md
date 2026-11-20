@@ -731,8 +731,8 @@ page a 2.0 card's tag opens is a product decision left open.
 
 ## <a id="d20"></a>D20: The clock walk is bounded: a rollover budget, REFRESH, an armed allowance, an anchored owner
 
-*Amended by [D200](#d200) (2.3): the anchor of the owner's reset or hand-over of an empty card
-sets the clock even where it is older than the card's. Amended by [D201](#d201) (2.3): `REFRESH`
+*Amended by [D200](#d200) (3.0): the anchor of the owner's reset or hand-over of an empty card
+sets the clock even where it is older than the card's. Amended by [D201](#d201) (3.0): `REFRESH`
 (and a claim's anchor) brings back a clock a weak header set, and the owner's `REFRESH` back form
 any clock; at a weak clock no day ends.*
 
@@ -740,9 +740,10 @@ any clock; at a weak clock no day ends.*
 a `SET_LIMIT` without the budget's byte leaves the budget as it is. The text
 below is 2.0's.*
 
-*Amended by [D186](#d186) (2.3): the no-PIN allowance has a window of its own,
+*Amended by [D186](#d186) (3.0): the no-PIN allowance has a window of its own,
 counts whole pieces, and is armed by a `VERIFY_PIN` only in a time in the field
-that signs no payment; the rollover budget is unchanged.*
+that signs no payment; the rollover budget is unchanged. And by [D208](#d208): by no
+`VERIFY_PIN` at all.*
 
 **Found (Foxy's reply, question 3; our shelved 0.7 plan, its decision 9),
 fixed (ENG-673, fix 4a).** In 1.20 the day's window rolls whenever a payment
@@ -873,7 +874,7 @@ about 3% more; [D25](#d25)). What this did not
 reach at first: the modular reductions on the same signing path, which
 branched on values derived from the key and the nonce (`reduce512toModN` over
 e·d, `addModN` over k + e·d, `reduceModN` over k, the `sub32` and `cmp32` they
-called, and `mulSmallByDelta`'s overflow check). Since 2.3 those run the same
+called, and `mulSmallByDelta`'s overflow check). Since 3.0 those run the same
 instructions for every value too (SECURITY-MODEL item 5), and
 `SchnorrHWMathTest` scans their bodies as it scans the multiplies. What this
 does not reach: the chip's own `KeyAgreement` and RSA engines, which do the
@@ -1031,9 +1032,9 @@ applet alone, where either SELECT reaches it.
 
 ## <a id="d26"></a>D26: Only a payment that moves value turns the day; a SET_LIMIT without the budget's byte leaves it (amends D20)
 
-*Amended by [D186](#d186) (2.3): the no-PIN allowance counts whole pieces in a window of
+*Amended by [D186](#d186) (3.0): the no-PIN allowance counts whole pieces in a window of
 its own, which only an arming renews, and a `VERIFY_PIN` arms it only in a time in the field
-that signs no payment. The text below is 2.1's.*
+that signs no payment (by [D208](#d208), never). The text below is 2.1's.*
 
 **Found (Mike Greff's review of 2.0, ENG-699), fixed in 2.1.** Each finding was
 first written as a test that failed on 2.0; the names are `ClockWalkTest`'s.
@@ -1211,7 +1212,7 @@ repository is internal to Flash.)*
 
 ## <a id="d28"></a>D28: 2.1 holds; the 1.21 gaps are kept, with triggers
 
-*Superseded in part by 2.3 ([D183](#d183) to [D190](#d190)): gaps 1 and 6 are
+*Superseded in part by 3.0 ([D183](#d183) to [D190](#d190)): gaps 1 and 6 are
 closed by [D185](#d185), gaps 2 and 3 by [D183](#d183), gap 4 by [D186](#d186)
 and gap 5 by [D187](#d187). The text below is 2.1's.*
 
@@ -5468,7 +5469,7 @@ of an incompatible change, would stop `tools/outbox-spike/run-compact.cjs` and
 `run-probe.cjs`, which refuse any cardkit but the reviewed 0.2.0, and
 `run-compact.cjs` is a protected source of the pending `recover-unset-up-v3`
 audit, so moving their pin fails that plan's admission. The owner decides the
-bump with the review of those runners. *2.3: cardkit is 0.3.0; the two runners keep
+bump with the review of those runners. *3.0: cardkit is 0.3.0; the two runners keep
 their pin to the reviewed 0.2.0 and refuse 0.3.0 until they are reviewed against it
 (`tools/outbox-spike/reviewed-cardkit.test.cjs`).* Also not here: protocol choice in the
 apps, first contact with a seller-keyed card (PUT KEY with P1 = 00 at version
@@ -5594,7 +5595,7 @@ untouched card among them. A J3R452 still on the seller's keys stops at
 `wrongKeys` and is quarantined (`authentication-failed`), its reservation used:
 importing the seller's key file waits until a seller-keyed batch is bought (the
 brief's D2). cardkit stays 0.2.0, as [D181](#d181) left it; the bump moves with
-the review of the outbox-spike runners (2.3: it is 0.3.0; the runners keep their 0.2.0 pin, and refuse it,
+the review of the outbox-spike runners (3.0: it is 0.3.0; the runners keep their 0.2.0 pin, and refuse it,
 until that review).
 
 **Rejected.** Deleting the seller's tag by default in cardkit (the delete
@@ -5610,9 +5611,9 @@ version, and the app records the version it observes).
 
 ---
 
-## <a id="d183"></a>D183: The card finishes its own change (2.3: GET_CHANGE bound to the mint's key, LOAD_CHANGE at 27)
+## <a id="d183"></a>D183: The card finishes its own change (3.0: GET_CHANGE bound to the mint's key, LOAD_CHANGE at 27)
 
-**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gaps 2 and 3).** Only the
+**Decided (protocol 3.0, 2026-11-12; closes [D28](#d28)'s gaps 2 and 3).** Only the
 card can finish its own change, and it writes a change piece only when the mint's
 DLEQ proof holds under the key named at the payment.
 
@@ -5668,7 +5669,7 @@ an ordinary load, its gate is different (no PIN), and a separate instruction kee
 
 **Cost accepted.** A reader that pays with change sends the mint's key at the payment
 and, later, `C_`, `K`, `e` and `s` instead of a finished piece: two more fields it
-already has from the mint. A 2.2 reader cannot finish a 2.3 card's change ([D193](#d193)).
+already has from the mint. A 2.2 reader cannot finish a 3.0 card's change ([D193](#d193)).
 The card keeps each opening's `B_` and `K` (66 bytes more for each of 8 openings),
 reserved at the first `SET_CARD`, and `LOAD_CHANGE` costs about two signatures'
 work on a chip.
@@ -5709,7 +5710,7 @@ the time in the field and then wants a held tap ([D189](#d189)).
 
 ## <a id="d184"></a>D184: Units in the core, two units on one card, and one SET_LIMIT layout
 
-**Decided (protocol 2.3, 2026-11-12).**
+**Decided (protocol 3.0, 2026-11-12).**
 
 - **Unit codes are core** (NUT-CCP, "Units"): `00` sat, `01` usd. On a usd card every
   amount, the balance and every limit is in cents. Other codes are reserved.
@@ -5733,7 +5734,7 @@ the time in the field and then wants a held tap ([D189](#d189)).
 - **One `SET_LIMIT` layout** for the owner's form (`34`) and the PIN form (`33`):
   daily limit (4), payment limit (4), no-PIN allowance (4), rollover budget (1),
   rate (4), and with [D186](#d186) the no-PIN window's switch (1). A value of 4, 8, 12,
-  13, 17 or 18 bytes sets the fields it carries and leaves the rest. 2.2's 13 bytes are a prefix of it, so every 2.2 write means on 2.3 what it
+  13, 17 or 18 bytes sets the fields it carries and leaves the rest. 2.2's 13 bytes are a prefix of it, so every 2.2 write means on 3.0 what it
   meant on 2.2.
 - **`GET_CARD`'s record offsets are settled for 2.x:** 76 rolls, 77 budget, 78 armed
   ([D20](#d20)); 79 to 82 the rate, answered as zeros (`GET_INFO` P1 = 3 tells it to
@@ -5793,7 +5794,7 @@ entered without the mark where it is new, and runs no reclaim (the reclaim runs 
 
 ## <a id="d185"></a>D185: PIN before money; the core no longer asks that the tap after a payment may load
 
-**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gaps 1 and 6).** A card is
+**Decided (protocol 3.0, 2026-11-12; closes [D28](#d28)'s gaps 1 and 6).** A card is
 given its PIN before anything goes on it or leaves it.
 
 - A card with no PIN refuses `LOAD_PROOF`, `CLEAR_SPENT`, `LOAD_CHANGE`, `KEYSET_KEYS`,
@@ -5851,7 +5852,12 @@ nothing (`6A97`), and the owner gives it a PIN by `CHANGE_PIN`, `SET_PIN` being
 
 ## <a id="d186"></a>D186: The no-PIN allowance counts whole pieces in a window of its own (amends D20 and D26)
 
-**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gap 4).**
+**Decided (protocol 3.0, 2026-11-12; closes [D28](#d28)'s gap 4).**
+
+*Amended by [D208](#d208) (3.0, before the merge): the PIN alone arms nothing. On a card
+with an owner only the owner's proof arms the allowance, and on a card with no owner a
+held tap does. Where the text below has a `VERIFY_PIN` arm it, a payment's commit take an
+arming back, or `TAP_ARMED`, D208 stands in its place.*
 
 - **Whole pieces.** A payment signed with no PIN counts against the allowance as the
   whole of its pieces, the card's own change included. The day's limit still counts
@@ -5929,7 +5935,7 @@ of the CLEAR_ON_RESET `tapOpen`: 7 bytes on reset in all, under the 8 of D22's b
 The day's window is the daily limit's alone: a payment with no limit set begins none, and
 `SET_LIMIT` no longer clears the no-PIN count when the day's number changes. `SET_HEADER`
 anchors a window begun with no clock. `GET_INFO` P1 = 4 answers 57 bytes, the profile bits
-`FF 01` at 55 and 56, every profile of 2.3 (since [D196](#d196) 59 bytes, the loads left today
+`FF 01` at 55 and 56, every profile of 3.0 (since [D196](#d196) 59 bytes, the loads left today
 after them, and `FF 03` with keys per load, [D197](#d197)). The constructor is unchanged.
 
 **Writes outside a transaction ([D23](#d23)), and why a tear is safe.**
@@ -5947,7 +5953,7 @@ after them, and `FF 03` with keys per load, [D197](#d197)). The constructor is u
 
 ## <a id="d187"></a>D187: An owner is claimed slowly, under the PIN
 
-**Decided (protocol 2.3, 2026-11-12; closes [D28](#d28)'s gap 5).** `SET_OWNER` on a
+**Decided (protocol 3.0, 2026-11-12; closes [D28](#d28)'s gap 5).** `SET_OWNER` on a
 card with no owner is a claim (*amended by [D202](#d202): the claim may bring the owner's c,
 sealed in a `SET_OWNER` P1 = `01` just before it, and its check at the end of the data*): the PIN set and given in this tap, the card in its first
 set-up ([D196](#d196): a card set up with no owner is never claimed, `6A91`), no payment
@@ -6016,7 +6022,7 @@ the key, the flag and the anchor are one transaction, as in 2.2.
 **Taken away by [D211](#d211) (the project owner, 2026-11-14):** a payment within its limit, the first of its time in
 the field, is signed at its first `SPEND_ALL_SIGN` again. What follows is what D188 decided, kept as it was.
 
-**Decided (protocol 2.3, 2026-11-12).** Every payment, within its limit or not, is at
+**Decided (protocol 3.0, 2026-11-12).** Every payment, within its limit or not, is at
 least four signatures of the card's work from `SPEND_ALL_BEGIN` to its signature, its
 own among them (`WAIT_FLOOR_SIGNS`): the card answers `00 01` to `SPEND_ALL_SIGN` until
 then. The change outputs the card made in the payment count toward it, two waits for
@@ -6050,7 +6056,7 @@ is set where W is above 0. The waits write nothing that lasts, as 2.2's did.
 
 ## <a id="d189"></a>D189: A holder with no phone: the PIN and a held tap stand for the owner
 
-**Decided (protocol 2.3, 2026-11-12).** A card with a PIN and no owner is the card of a
+**Decided (protocol 3.0, 2026-11-12).** A card with a PIN and no owner is the card of a
 holder with no phone of their own. It is set up, loaded and freed under its PIN
 (`LOAD_PROOF` no longer asks for an owner), and its numbers are set under its PIN
 (`SET_LIMIT_PIN`: in its first set-up, and after it none, [D196](#d196)). Its history is the PIN's, and **held for**: `GET_LOG` answers `6A98`,
@@ -6122,7 +6128,7 @@ and answers `6A8C` to a factory record.
 
 ## <a id="d190"></a>D190: The card holds the keys it writes change under to their keyset's ID
 
-**Decided (protocol 2.3, 2026-11-12).** `KEYSET_KEYS` (`38`) teaches the card a keyset's
+**Decided (protocol 3.0, 2026-11-12).** `KEYSET_KEYS` (`38`) teaches the card a keyset's
 keys, under the PIN (the owner's grant alone since [D194](#d194) teaches nothing): P1 = 0 names the keyset (one in the card's
 keyset table) and the bytes NUT-02 hashes after the keys; P1 = 1 sends the keys in order
 of amount, six to a command, 64 at most; P1 = 2 finishes. The card works the keyset's ID
@@ -6191,7 +6197,7 @@ holder's say for another key is the held tap ([D189](#d189)).
 
 ## <a id="d191"></a>D191: The paid list: a piece the card signed for is not signed again
 
-**Decided (protocol 2.3, 2026-11-12).** The card keeps the first 8 bytes of the nonce of
+**Decided (protocol 3.0, 2026-11-12).** The card keeps the first 8 bytes of the nonce of
 each of the last 1,024 pieces it has signed for, in a ring of 8,192 bytes the first
 `SET_CARD` reserves. The rows are written for every place a payment burns, after the
 payment's commit, as the burn is (rows written twice are the same rows, so a tear is
@@ -6267,7 +6273,9 @@ row holds) is no piece signed for.
 
 ## <a id="d192"></a>D192: The certificate profile; RESET_CARD keeps a certified card's key
 
-**Decided (protocol 2.3, 2026-11-12).** A certificate for the card key, kept on the card for any
+*See [D209](#d209) for who may write one, and what a wallet does about it.*
+
+**Decided (protocol 3.0, 2026-11-12).** A certificate for the card key, kept on the card for any
 reader to fetch, in NUT-CCP's
 [certificate profile](https://github.com/cashucard/nut/blob/main/profiles/certificate.md) format.
 No single certifier: each card maker vouches for its own cards, and each reader decides whom it
@@ -6332,7 +6340,7 @@ at install. A certificate shows where a key was made, not that the chip is hones
 **Built (applet).**
 
 - `hadPin` (1 byte, made in the constructor: 29,842 bytes of persistent arrays there when it
-  was built, one more than before; 30,052 with the rest of 2.3) is set in `SET_PIN`'s transaction, beside the PIN's state byte, and nothing
+  was built, one more than before; 30,052 with the rest of 3.0) is set in `SET_PIN`'s transaction, beside the PIN's state byte, and nothing
   clears it.
 - `cert` is `CERT_LEN` = 1,027 bytes: the container at 0 to 1,023, the seal's byte at 1,024 and
   the length at 1,025. It is reserved at the first `CERT_WRITE` that passes the checks of state
@@ -6358,9 +6366,10 @@ at install. A certificate shows where a key was made, not that the chip is hones
 
 ---
 
-## <a id="d193"></a>D193: Version 2.3: SELECT answers 02 03; the instruction and status map
+## <a id="d193"></a>D193: Version 3.0: SELECT answers 03 00; the instruction and status map
 
-**Decided (protocol 2.3, 2026-11-12).** `SELECT` and `GET_INFO` answer `02 03`. New
+**Decided (2026-11-12, as protocol 2.3 answering `02 03`; renumbered 3.0 by [D205](#d205)
+before the merge).** `SELECT` and `GET_INFO` answer `03 00`. New
 instructions: `1C` `CERT_READ`, `1D` `GROUP_KEYS`, `1E` `INBOX` ([D199](#d199)), `27` `LOAD_CHANGE`, `38` `KEYSET_KEYS`, `54` `CERT_WRITE`; `2E`
 and `2F` kept for a later profile. New status words, in the `6A9X` range NUT-CCP leaves to
 profiles: `6A97` no PIN, `6A98` keep holding, `6A99` no rate, `6A9A` two units in one payment,
@@ -6372,30 +6381,33 @@ and 3, `LOAD_PROOF` P2 = 1 and 2, `RESET_CARD` P1 = 1, `REFRESH` P1 = 1, `SPEND_
 `SET_LIMIT` 17 and 18 bytes. The core changes go to cashucard/nut first (`CCP.md`, the vectors and the
 certificate profile), as CONTRIBUTING requires.
 
-**What a 2.2 reader sees** ([`spec/APDU.md`](../spec/APDU.md#what-a-22-reader-sees)): a card it
+**What a 2.2 reader sees** ([`spec/APDU.md`](../spec/APDU.md#what-a-22-reader-sees)): a reader
+that holds to the major refuses the card at `SELECT` ([D205](#d205)). One that goes on meets a card it
 can read and not pay from (`SPEND_ALL_BEGIN` without P1 bit 1 is `6A86`, [D197](#d197)), nor load
 (`LOAD_PROOF` without P2 bit 1 is `6A86`, after a 2.2 loader has swapped to the card key: an
 undated top-up so swapped is lost); a 4-byte `SPEND_ALL_CHANGE` is `6700`, 83-byte openings it
 cannot finish, and a claim that answers `6A98`. Nothing it sends writes a wrong piece or burns one. flash-pos and flash-mobile,
-which check the major alone, must move to the 2.3 wire for change, set-up and top-up before
-2.3 cards are handed out.
+which check the major alone, refuse a 3.0 card at `SELECT` until they move to the 3.0 wire for
+change, set-up and top-up.
 
-**The cards.** A 2.2 card moves to 2.3 as a 2.1 card moved to 2.2: swept, then a new
+**The cards.** A 2.2 card moves to 3.0 as a 2.1 card moved to 2.2: swept, then a new
 install, which makes a new key.
 
-**The size.** A load file of 37,269 bytes by refcheck's measure (149 past a multiple of 256),
-against 21,631 for 2.2. On 2026-11-13 a J3R180 installed earlier 2.3 source padded to 33,647
-and 35,213 bytes and refused the card's applet padded to 32,777 (`6F00`, twice), so refcheck
-refuses a build from 32,700 to 32,850. This file is not padded. On the same day the same
-J3R180 installed the file this source made before [D200](#d200) (35,466 bytes, load file
-sha256 `48b8597c…`), and that file's chip run had real signatures and real change verified at
-a test mint ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md)): refcheck keeps its size and
-its hash. The file before [D211](#d211) (36,953 bytes, load file sha256 `f216644a…`, D200 to D204)
-ran on the same J3R180 on 2026-11-14 with real signatures and real change verified, and refcheck keeps
-its size and its hash too. The file with D211 (no payment floor, shorter holds; 36,950 bytes, load file sha256 `075448e4…`, 3 bytes fewer, the loader's y
-having been tried and taken out) ran on a second J3R180 the same day with real signatures and real change verified, and refcheck
-keeps its size and its hash. This file adds [D212](#d212) (`LOAD_PROOF`'s 04 form, 319 bytes more) and ran on that J3R180 the
-same day with real signatures and real change verified: refcheck keeps its size and its hash.
+**The size.** The 3.0 file of the merge (D183 to D224) is a load file of 41,742 bytes by refcheck's
+measure (14 past a multiple of 256), against 21,631 for 2.2. It has run only in a simulator: its own chip
+run comes before it ships, its size first. On 2026-11-13 a J3R180 installed earlier source, numbered 2.3 then, padded to
+33,647 and 35,213 bytes and refused the card's applet padded to 32,777 (`6F00`, twice), so refcheck refuses a build from
+32,700 to 32,850. No file since is padded. On the same day the same J3R180 installed the file this source made before
+[D200](#d200) (35,466 bytes, load file sha256 `48b8597c…`, answering `02 03`), and that file's chip run had real
+signatures and real change verified at a test mint ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md)): refcheck keeps
+its size and its hash. Every later file a chip ran was numbered 2.3 too and answered `02 03`: the file with D200 to D204
+(36,953 bytes, 89 past, load file sha256 `f216644a…`) ran on the same J3R180 on 2026-11-14 with real signatures and real
+change verified; the file with [D211](#d211) (no payment floor, shorter holds; 36,950 bytes, load file sha256
+`075448e4…`, 3 bytes fewer, the loader's y having been tried and taken out) ran on a second J3R180 the same day; the file
+with [D212](#d212) (`LOAD_PROOF`'s 04 form, 37,269 bytes, 149 past) ran on that J3R180 the same day; and the files with
+D213 to D216, D217 to D220 and D221 after it (39,343, 40,365 and 40,412 bytes), each with real signatures and real change
+verified: refcheck keeps each size and hash. The other maintainer's 3.0 file before the merge ([D205](#d205) to
+[D210](#d210) on D200 to D204, 37,413 bytes, 37 past) was never given to a chip.
 The constructor asks for 30,056 bytes of persistent memory, 214 more than 2.2's 29,842
 (the PIN's marks and the day's loads, the receipt's figures kept with the last signature, c,
 the refund key's y and the count of the owners' c); the openings' keys, the keyset table and the paid list are
@@ -6403,13 +6415,15 @@ reserved at the first `SET_CARD`, and the certificate's store at the first `CERT
 [D176](#d176) does for the settlement record. The install and a payment on a real card are
 recorded in a hardware report before the tag.
 
-**Rejected.** A major version 3: the AID, the slot, the secret and the signed message are 2.x's,
-and a reader that checks the major still reads and pays. Profile bits in the capabilities byte:
-all eight are taken.
+**Rejected.** Profile bits in the capabilities byte: all eight are taken. (This entry also
+rejected a major version 3, on the ground that the AID, the slot, the secret and the signed
+message are 2.x's and that a reader that checks the major would still read and pay. That a
+2.2 reader goes on is the reason [D205](#d205) took the major after all: it reads, and what
+it then sends to load loses money.)
 
 ## <a id="d194"></a>D194: A payment and its change come back; the keyset table is the holder's; the day counts change; less to a stranger and to software of 2.2
 
-**Decided (protocol 2.3, 2026-11-13).** Amends [D175](#d175), [D183](#d183), [D184](#d184),
+**Decided (protocol 3.0, 2026-11-13).** Amends [D175](#d175), [D183](#d183), [D184](#d184),
 [D185](#d185), [D186](#d186), [D190](#d190), [D191](#d191), [D192](#d192) and [D26](#d26).
 
 - **The signature of every kept receipt is asked for again.** The paid list closed 2.2's way
@@ -6459,7 +6473,7 @@ all eight are taken.
 - **What software of 2.2 meets.** `ALLOW_LOAD` gives the grant and answers `6200`: ISO 7816-4's
   warning that lasting memory is unchanged (the grant is the tap's alone), so a 2.2 wallet that
   waits for `9000` before it swaps an owner's top-up to the card key stops before swapping, and a
-  2.3 wallet reads the warning as the grant given. A payment in the other unit than the card's is
+  3.0 wallet reads the warning as the grant given. A payment in the other unit than the card's is
   begun only with `SPEND_ALL_BEGIN` P1 = 1 (`6A9B` otherwise), so a reader that reads no unit
   never pays cents as sats. `LOAD_PROOF` checks that C is a point of the curve itself (`6A80`).
 - **The sealed PIN.** `unseal` checks the reader's point is on the curve before the agreement,
@@ -6540,7 +6554,7 @@ to the words and rules above.
 signed, and its `LOAD_CHANGE` is never refused for the count; `RESET_CARD` begins the day of loads
 again.*
 
-**Decided (protocol 2.3, 2026-11-13).** Amends [D186](#d186), [D187](#d187),
+**Decided (protocol 3.0, 2026-11-13).** Amends [D186](#d186), [D187](#d187),
 [D189](#d189) and [D191](#d191).
 
 - **A claim wants an empty card, as 2.2 had it** (and, since [D196](#d196), a first set-up: a card
@@ -6668,13 +6682,13 @@ no owner and of a wait of two stretches pulled at every write.
 
 ## <a id="d196"></a>D196: Simple cards; no load over the day's limit; the receipt from the payment's commit; change back to the day that counted it; GET_INFO's counts
 
-**Decided (protocol 2.3, 2026-11-13: simple cards).** Amends [D186](#d186),
+**Decided (protocol 3.0, 2026-11-13: simple cards).** Amends [D186](#d186),
 [D187](#d187), [D189](#d189), [D191](#d191), [D194](#d194) and [D195](#d195).
 
 - **A simple card.** A card with no owner has its limits, its no-PIN allowance and window
   switch, its rollover budget, its rate, its mint, its unit and its refund key set once, in
   its first set-up, and never again. After it `SET_LIMIT_PIN` and `SET_CARD` answer `6A91`
-  (the word 2.3 gives what the PIN alone may not do), with nothing written; the PIN form's
+  (the word 3.0 gives what the PIN alone may not do), with nothing written; the PIN form's
   "only tighter" ([D195](#d195)) is gone with the rest. A claim (`SET_OWNER` on a card with no
   owner) is made only in a first set-up (`6A91` after it), after the PIN (`6A97`, `6982`)
   and the holder's record (`6A8C`), and, as before, never in a time in the field that paid
@@ -6833,7 +6847,7 @@ forgotten PIN, the first set-up, `LOAD_CHANGE` giving the day back, a reset by t
 
 ## <a id="d197"></a>D197: Keys per load: every piece is locked to the card's key for its date
 
-**Decided (protocol 2.3, 2026-11-13: privacy from the mint).** Amends [D175](#d175),
+**Decided (protocol 3.0, 2026-11-13: privacy from the mint).** Amends [D175](#d175),
 [D184](#d184) and [D192](#d192). *Amended by [D202](#d202): the owner's phone gives the card a c made
 from its words at the claim or the hand-over (`SET_OWNER` P1 = `01`, then the check), with the card's
 count of the owners' c in it; a card with no owner, a reset and a claim or hand-over that brings none
@@ -6881,13 +6895,13 @@ draw or keep the card's own, as below.*
   Undated pieces are one date, the date 0, for the card's life (until a reset or an owner
   replaced); a card with no refund key takes only those (`6A8E`) and so gains nothing from keys
   per load.
-- **Part of the 2.3 card format.** Keys per load is not a profile a card may leave out: every 2.3
-  card keeps it (`GET_INFO` byte 56 bit 1), and a reader of 2.3 cards loads and pays only this
+- **Part of the 3.0 card format.** Keys per load is not a profile a card may leave out: every 3.0
+  card keeps it (`GET_INFO` byte 56 bit 1), and a reader of 3.0 cards loads and pays only this
   way. Nobody may lock ecash to P itself, the key `GET_PUBKEY` answers and a certificate names:
   the card signs a payment only with d + t, never with d alone, so such ecash is never the card's
   to pay; undated it is lost, dated it is the refund key's after its date. The proof format byte
   stays `04` (`05` with two units): a reader of 2.2 that reads it is stopped at `SPEND_ALL_BEGIN`
-  and `LOAD_PROOF` (`6A86`), and a 2.3 wallet checks the version and byte 56 before it swaps.
+  and `LOAD_PROOF` (`6A86`), and a 3.0 wallet checks the version and byte 56 before it swaps.
 - **The pieces and the payment.** A piece of date D is the card proof secret with `data` P + t·G
   and, dated, `["refund", R + u·G]`; the card builds every secret of a payment so, signs it with
   d + t mod n (BIP-340 sets the parity, as for d), and makes its own change in the payment's date,
@@ -6896,7 +6910,7 @@ draw or keep the card's own, as below.*
 - **The wire.** `SPEND_ALL_BEGIN` takes P1 bit 1 (`02`): the reader's word that it builds the
   secrets with the keys per load. Without it the card answers `6A86` before it reads a place or
   writes anything, so a reader that builds the secrets with P never has pieces burned for a swap
-  no mint takes. [D184](#d184)'s P1 = 1 is bit 0 beside it: a reader of 2.3 sends `03` where it
+  no mint takes. [D184](#d184)'s P1 = 1 is bit 0 beside it: a reader of 3.0 sends `03` where it
   reads units, `02` otherwise. It is the bit `GET_INFO` byte 56 says keys per load with, so a
   reader sends back the bit the card shows. `SPEND_ALL_BEGIN` answers 69 bytes: the worth (4), t
   (32), R + u·G (33, zeros with no refund key or for the date 0). `LOAD_PROOF` and `LOAD_CHANGE`
@@ -6954,7 +6968,7 @@ signing each date's key: a signature per payment, and it ties the date to the ca
 secret only the card holds: the phone could not refund a lost card's pieces. A counter instead of
 the date: a table on the card, and a payment could no longer take two loads' pieces of one date.
 `SPEND_ALL_BEGIN` as 2.2 had it, with no word from the reader: a reader of 2.2 would have the
-card sign and burn for secrets the mint refuses, and the money would wait for a reader of 2.3 or
+card sign and burn for secrets the mint refuses, and the money would wait for a reader of 3.0 or
 the date. `LOAD_PROOF` with no word: a loader of 2.2 locks to P, and the card would take a piece
 it could never pay. `GROUP_KEYS` to anyone: with the mint's list of dates and keys, one tap would
 tie every spent date to the card. `GROUP_KEYS` to the tap that paid: a payment within the no-PIN
@@ -6973,11 +6987,11 @@ self-test), so it would stop none of them before a swap. A fresh date for each l
 more than one load's pieces took one signature a date, each after the first slowed as a second
 payment in the tap.
 
-**Cost accepted.** A reader of 2.2 does not pay a 2.3 card: it sends `SPEND_ALL_BEGIN` with P1 =
+**Cost accepted.** A reader of 2.2 does not pay a 3.0 card: it sends `SPEND_ALL_BEGIN` with P1 =
 `00` and is refused (`6A86`) with nothing begun, written or burned. Nor does it load one: `LOAD_PROOF`
 with P2 = `00` or `01` is refused (`6A86`) before the data is read; but a 2.2 loader swaps to P
-first, so its undated top-up is lost (a dated one is the refund key's after its date): a 2.3 card
-is loaded by a 2.3 wallet. A reader given the PIN can link every date since the last reset with the
+first, so its undated top-up is lost (a dated one is the refund key's after its date): a 3.0 card
+is loaded by a 3.0 wallet. A reader given the PIN can link every date since the last reset with the
 mint's help (it reads the spent pieces whole as well). A wallet that loses c reads it again with r
 and the holder's say on a card with a refund key; on one with none it cannot refund a lost card's
 dated pieces (and that card takes none). A reader that sets bit 1 and
@@ -7074,7 +7088,7 @@ seal's point checks); every test loads through helpers that set P2 bit 1.
 
 ## <a id="d198"></a>D198: History behind the PIN: spent places, the clock's last header, the rolls, the arming, the no-PIN window's start and the last payment's scope
 
-**Decided (protocol 2.3, 2026-11-13: privacy in 2.3).** Amends [D194](#d194) and
+**Decided (protocol 3.0, 2026-11-13: privacy in 3.0).** Amends [D194](#d194) and
 [D196](#d196).
 
 To a reader that has given neither the PIN nor the owner's grant in its tap:
@@ -7132,7 +7146,7 @@ suites that read spent places or the rolls as a stranger read them with the PIN 
 
 ## <a id="d199"></a>D199: The inbox: where money waits for the card, read with no PIN
 
-**Decided (protocol 2.3, 2026-11-13).**
+**Decided (protocol 3.0, 2026-11-13).**
 
 A new command, `INBOX` (`1E`), answers anyone, with no PIN and no grant, 36 bytes:
 SHA-256("CashuCard/inbox" ‖ c ‖ W) and W (4 bytes, big-endian), where c is the card's secret
@@ -7292,7 +7306,7 @@ refusals).
 
 ## <a id="d200"></a>D200: A header far ahead: change counted when it is made, and the owner's anchor brings the clock back on an empty card
 
-**Decided (protocol 2.3, 2026-11-13).** Amends [D20](#d20) (the clock moves only forward),
+**Decided (protocol 3.0, 2026-11-13).** Amends [D20](#d20) (the clock moves only forward),
 [D195](#d195) (300 loads a day, `LOAD_CHANGE` among them) and [D199](#d199) (the clock's limits).
 *Amended by [D201](#d201): the far clock holds the day's limit too, and where no one can change the
 limit the card cannot be emptied by paying ("Why" below); D201 makes a header at the floor's work
@@ -7382,7 +7396,7 @@ taken on a card that holds money, the anchor's checks, nothing else moving the c
 
 ## <a id="d201"></a>D201: A weak header begins and ends no day; REFRESH brings a weak clock back, and the owner's REFRESH any clock
 
-**Decided (protocol 2.3, 2026-11-13).** Amends [D20](#d20) (`REFRESH` moves the clock only
+**Decided (protocol 3.0, 2026-11-13).** Amends [D20](#d20) (`REFRESH` moves the clock only
 forward), [D186](#d186) (the no-PIN window), [D195](#d195) (the day of loads) and [D200](#d200) (the
 way back from a header far ahead).
 
@@ -7486,7 +7500,7 @@ vectors (the anchored reset and the back form, `spec/vectors/owner.json`).
 
 ## <a id="d202"></a>D202: The card's secret c comes from the owner's words
 
-**Decided (protocol 2.3, 2026-11-13).** Amends [D197](#d197) (c drawn at install, at every reset
+**Decided (protocol 3.0, 2026-11-13).** Amends [D197](#d197) (c drawn at install, at every reset
 and when an owner is replaced) and [D187](#d187) (the claim).
 
 A wallet keeps nothing but its words. A phone restored from them has the refund key's private key r
@@ -7621,7 +7635,7 @@ transactions), `SchnorrHWMathTest` (the four bytes).
 
 ## <a id="d203"></a>D203: No header lowers the bar: a card with no hardest holds a far header to twice the floor's work; the owner's back form brings back the day of loads; a day's margin around D
 
-**Decided (protocol 2.3, 2026-11-13); three of its choices are recommended and wait for the
+**Decided (protocol 3.0, 2026-11-13); three of its choices are recommended and wait for the
 keeper's word:** the hardest kept through `SET_CARD` and every reset; no older header raising the
 hardest, the bar of a card with none fixed at twice the floor's work instead; and the owner's back
 form giving the card a new day of loads each time. Their costs are below. Amends the header ratchet let go at `SET_CARD` and
@@ -7751,7 +7765,7 @@ begun with no clock, a harder anchor and the owner's c), the owner's vectors (`S
 
 ## <a id="d204"></a>D204: The first set-up's anchor: the tip a card is set up with is its clock and its hardest
 
-**Decided (protocol 2.3, 2026-11-14).** Amends [D203](#d203) (a card with no hardest; set-up) and
+**Decided (protocol 3.0, 2026-11-14).** Amends [D203](#d203) (a card with no hardest; set-up) and
 [D201](#d201) (the claim's anchor).
 
 - **The first set-up's anchor.** In a card's first set-up (the selection of the `SET_PIN` that
@@ -7826,12 +7840,347 @@ clock back). `cardctl setup` wants `--anchor`, and says when the claim's anchor 
 
 ---
 
+## <a id="d205"></a>D205: The wire of D183 to D204 is version 3.0, and a minor never breaks a reader
+
+**Decided (2026-11-14, before the merge).** The applet of [D183](#d183) to [D204](#d204)
+answers `SELECT` and `GET_INFO` with `03 00`. Until this entry it was built and tested as
+2.3, answering `02 03`; the entries above, the spec, the vectors, the tools and the tracked
+file are renumbered, and nothing else on the wire moves. The file's name is
+`cashu-javacard-3.0.0.cap`, and the release is `firmware-v3.0.0`.
+
+The rule from here on: **the major is the line a reader holds to.** A reader takes every
+minor of a major it was built for, and refuses any other major at `SELECT`, before it sends
+a command that moves money. A minor adds to the wire: a new command, a new form of an
+answer asked for by a new P1 or P2, a new status word in the range kept for profiles. It
+never changes what a reader of an earlier minor of the same major sends or is answered. A
+change that does is the next major.
+
+**Why.** Readers already hold to the major. flash-pos (`getInfo`, `PROTOCOL_MAJOR`) and
+flash-mobile (`checkVersion`) take any `02 xx` as a card they speak and answer any other
+major with "needs an update"; cardctl's `connect` refuses by the major too. To such a
+reader a card answering `02 03` is a card it knows, and what follows is the table of
+[`spec/APDU.md`](../spec/APDU.md#what-a-22-reader-sees): a payment is refused before
+anything burns, but a top-up is swapped to the card key first and then refused by the
+card, and an undated top-up so swapped is lost ([D193](#d193), [D197](#d197)). The same
+card answering `03 00` is refused by the same reader at `SELECT`, with nothing sent after
+it. That holds for every build already on a phone, and for a reader someone else wrote to
+the 2.x spec, with no change to any of them.
+
+**Rejected.**
+
+- *Keep 2.3 and have each reader refuse a minor of 3 or more.* It protects only the readers
+  that are updated. The builds already installed, and readers this project does not know
+  of, keep taking the card as one they speak.
+- *Keep 2.3 and say in the spec that a 2.2 reader must check the minor.* The spec of 2.1
+  and 2.2 told readers the opposite, "a reader takes any `02 xx` as the shared protocol",
+  and readers were built on it.
+- *A new AID for the new wire.* A reader would find no applet and could not tell an updated
+  card from a blank one or from another product; the version is what the two bytes of
+  `SELECT` are for.
+
+**What it costs.**
+
+- The tracked file is a new file. Its source differs from the file of the run of 2026-11-14
+  (load file `f216644a…4440`) in the two version constants, and its CAP in those bytes and
+  in the package's own version, which the converter writes into the Header component
+  (`build.xml`, `version="3.0"`). The size is the same, 36,953 bytes. The new load file's
+  sha256 is not on refcheck's `PROVEN` list: by that list's rule a hash goes on it only once
+  the chip run that installs that exact file has had real signatures and real change
+  verified on the chip. Until that run, the guides say of the tracked file what refcheck
+  says of it: it has run only in a simulator. The reports of 2026-11-13 and 2026-11-14 stand
+  as they were written, of files that answered `02 03`. *Since then [D206](#d206) to
+  [D210](#d210) have changed the applet: the tracked file's load file is 37,413 bytes
+  (`d4a897d8…`), and it differs from the file of 2026-11-14 in more than its version. No chip
+  has been given a file of its size.*
+- NUT-CCP's revision is its own number and stays `03` (cashucard/nut#7).
+- cardkit stays 0.3.0, not yet released: `CARD_VERSIONS` is 2.1, 2.2 and 3.0, and
+  `CARD_VERSION` is `[3, 0]`.
+- The Fedimint card's applet is also at 3.0. The two are different applets under different
+  AIDs and nothing on the wire meets; in words, say which card.
+
+**The cards.** No card was issued with a file that answers `02 03`. The bench card of the
+two runs will be reinstalled with the tracked file for the run that proves it.
+
+**At the merge (2026-11-19).** The speed and safety work built on the wire numbered 2.3 (this repo's D205 to D215 then,
+now [D211](#d211) to [D221](#d221)), the rotating tag ([D222](#d222)) and the fixes [D223](#d223) and [D224](#d224) were
+merged into this wire and ship as 3.0 too, not 3.1: no 3.0 file had been installed on any chip or read by any app, so
+nothing is broken by folding them in. Strictly, some of them change answers a 3.0 reader of the file before the merge
+would get (a keyset taught before its first piece no longer answers `6A88`, a claim right after the set-up's record
+answers `9000` at once, no "not yet" within the limit, `6AA0` for a change-making payment of a shape that leaves no
+record); by this entry's rule that would want 4.0 had 3.0 shipped. It had not. 3.0 is D183 to D224. *Open with the other
+maintainer (M3): whether the merged work rides in 3.0 or in 3.1.* The bench cards 09301220 and 09312320 answer `02 03`
+until they are reinstalled with the 3.0 file.
+
+---
+
+## <a id="d206"></a>D206: A reader asks the card for change only at a mint that proves its signatures
+
+**Decided (protocol 3.0, 2026-11-14).** A reader **MUST NOT** send `SPEND_ALL_CHANGE` for a
+mint it does not know to list NUT-12 and NUT-09 as supported in its info (NUT-06), read
+when the reader was last online with that mint. At any other mint it names outputs for
+the whole of the pieces and makes no change output of the card's, or does not pay. A
+reader given a change signature with no `dleq` asks the mint again by B_ (NUT-09) before
+it tells the holder the change is lost. The rule is in
+[`spec/APDU.md`](../spec/APDU.md#spend_all_change-0x26); the card is unchanged.
+
+**Why.** Since [D183](#d183) the card finishes its own change: `LOAD_CHANGE` wants the
+mint's NUT-12 proof (e and s) and checks it against the key the opening is bound to, and
+`GET_CHANGE` gives out neither the nonce nor the blinding factor. That is what keeps a
+reader from loading a change piece no mint signed. It also means that a signature with no
+proof can be turned into a piece by no one, the card included. NUT-12 is optional for a
+mint. A till that pays with the card's change at a mint whose swap answers carry no
+`dleq` has the card spend its pieces for change that can never come back. Nothing on the
+card can tell such a mint from another before the payment is signed, and after it the
+pieces are spent, so the check is the reader's and it comes before the change is asked
+for. A till offline at the payment knows the mint from its last time online, as it knows
+the mint's keys.
+
+**Rejected.**
+
+- *The card gives the blinding factor to the PIN, so that a wallet finishes a change with
+  no proof as 2.2 did.* It brings back what D183 closed: whoever is given the PIN makes
+  a piece of whatever a mint, or anyone, signed.
+- *The card takes a change signature with no proof.* It could not tell the mint's
+  signature from any point, and would count as money what is not.
+- *Leave it to each reader.* It is the one way a careful reader of the spec as it stood
+  lost a holder's money with every command answered `9000`.
+
+**Built.** `cardctl`'s `spend_all_change` takes the mint's info and refuses, before it
+sends anything, a mint that does not list both; `load-change` reads the mint's own answer
+and says so where a change signature has no proof, pointing at NUT-09. Its tests have a
+mint that leaves NUT-12 out and one whose swap answer does. The cardsim client encodes
+commands and reaches no mint, so the rule is in its README, and the real-mint run reads
+the mint's info before every `SPEND_ALL_CHANGE`.
+
+---
+
+## <a id="d207"></a>D207: A signature is verified on the card before it leaves
+
+**Decided (protocol 3.0, 2026-11-14).** `SchnorrHW.sign` ends as BIP-340's default
+signing ends, "if Verify fails, abort": before anything is written to the caller's
+buffer the card works out R' = s·G − e·Q with the chip's own point arithmetic and gives
+the signature only where R' is R (its x, and an even Y). Q is the key the signature is
+under, whole and with an even Y: the card's own point from its public key object, or
+[d]G by the key agreement where the chip gives that object's point in its short form;
+for a date's key ([D197](#d197)) W + [t]G, which must be the point the caller named, x
+and parity. Q's x must be the x that went into the challenge. A signature that fails
+any of it is not given: `6F00`, with nothing of s left in the signer's scratch. Every
+signature that leaves the card is made this way: `AUTH`, a payment's `SIG_ALL`
+signature, the settlement record's descriptor and the signature over the PIN key
+(`GET_NONCE` P1 = 1).
+
+**Why.** The card key is in RAM while a signature is made, and e·d is a multiplication
+in bytecode: neither is the chip's protected arithmetic. `AUTH` signs for any reader,
+with no PIN, as often as it is asked. A signature made with one fault in that
+multiplication, or with one bit of d flipped, still has R = k·G, so its error
+s'·G − R − e·P is e·δ·G for a δ of few values (a bit of d, or a byte of it times a power
+of 256): whoever holds the card and can glitch it learns a bit or a byte of d for each
+such signature, and d after some tens or hundreds of them. With d every date's key is
+known (t is given to any reader, D197) and every piece on the card can be spent. The
+aux randomness ([D9](#d9)) answers a different attack, the same nonce used twice, and
+does nothing here. A signature that is checked under the public key before it leaves
+gives a faulted one no way out.
+
+**What a refusal leaves.** `AUTH`: nothing written, no data. A payment: the signature is
+made and checked before the commit, so nothing is burned, counted, logged, kept or put on
+the paid list; the payment is given up, its change openings stay drafts until the next
+`SPEND_ALL_BEGIN`, and `SPEND_ALL_AGAIN` answers as if it had never been asked for. The
+settlement record: the descriptor is not kept, both forms of `GET_OUTBOX` answer `6F00`,
+and the next read signs again. `GET_NONCE` P1 = 1: no nonce is given.
+
+**The waits keep their length.** A held tap's asking, a PIN's wait and a payment's floor
+are each "a signature's work", thrown away ([D187](#d187), [D188](#d188), [D189](#d189),
+[D195](#d195)). They use `signatureWork`, the signing without the check, whose 64 bytes
+never leave the card, so every duration the spec gives in that unit is what it was.
+*Amended at the merge by [D218](#d218) (the project owner's answer K1 of 2026-11-18): the waits are checked signatures
+too, `sign()` check and all, and `signatureWork` is gone. The holds of [D211](#d211) were measured on the chip with a check
+in every asking, and the project owner kept those seconds; the floor this paragraph names is gone ([D211](#d211)).*
+
+**Rejected.**
+
+- *Sign twice and compare.* Two signatures have two nonces and cannot be compared, and
+  one nonce used twice is what D9 forbids.
+- *Work s out a second way and compare.* It catches a fault in one multiplication and not
+  a flipped bit of d, which both ways would read.
+- *Take the key's Y from its x by a square root.* The check would then take on trust the
+  parity that the signing took: Q comes of the card's own point, or of d by the chip.
+- *Check the waits' signatures too.* They never leave, and it would lengthen every held
+  tap and every wait by the check's time.
+
+**Cost accepted.** Each signature that leaves the card costs two more of the chip's
+point operations (one key agreement, one point addition), three for a date's key, and
+one more key agreement on a chip whose key object gives the short form. Its time on a
+chip is not measured: the chip runs of 2026-11-13 and 2026-11-14 signed without it
+(`AUTH` 626 and 632 ms). Not covered: two faults in one signature, one of them in the
+check; and what the card leaks by power or timing
+([`SECURITY-MODEL.md`](SECURITY-MODEL.md), #10 and #19).
+
+**Built (applet).** `SchnorrHW.verify`, called from `signOnce` where `checked`; s and R's
+x are kept in `work` until it passes, and `sc` (d, k, e·d) is zeroed and the nonce taken
+out of the temporary key before it begins. `SignatureCheckTest`: a public key object
+that names another key, in both of `getW`'s forms; d with one bit flipped; a wrong
+point or parity for a date's key; an odd P + t·G with both parities of R; the output
+buffer untouched at every refusal; `signatureWork` doing one key agreement and no point
+addition; and a payment, `AUTH`, the descriptor and the PIN key's signature each refused
+with the state above. jCardSim cannot show the chip's answer for a scalar of 0 or a sum
+at infinity, which no key or message reaches but by chance ([D10](#d10)).
+
+---
+
+## <a id="d208"></a>D208: The PIN alone does not arm the no-PIN allowance (amends D186)
+
+**Decided (protocol 3.0, 2026-11-14).** `VERIFY_PIN` arms nothing. The no-PIN allowance
+is armed:
+
+- on a card with an owner, by the owner's good proof and by nothing else (every proof,
+  whatever its command, and a `SET_LIMIT` that carries the allowance, as before);
+- on a card with no owner, by a `SET_LIMIT_PIN` that carries the allowance in its first
+  set-up, as before, and by a **held tap** gone through: the PIN given, and the
+  history's askings held (seven since [D211](#d211); ten when this was written), in a time in the field that has signed no payment and
+  signs none after ([D189](#d189)). It arms and ends no window, as the PIN's arming did.
+
+The mark that a `VERIFY_PIN` armed in this time in the field (`TAP_ARMED`) and the
+payment's taking back of that arming are gone with it: there is nothing left to take
+back. `GET_CARD` byte 78 means what it meant.
+
+**Why.** [D186](#d186) set out that a PIN typed at a reader to pay must not open the
+allowance again for whoever taps the card next, and had a payment's commit take back an
+arming made in the same time in the field. The mark was in memory that goes with the
+power and the arming in memory that stays. A till given the PIN sends `VERIFY_PIN`,
+drops its field, raises it, sends `VERIFY_PIN` again (the allowance is armed already, so
+no mark is set) and takes its payment under the PIN: the arming stays, and the next
+reader with no PIN is given a new allowance. A tap that breaks between the PIN and the
+payment does the same with no one meaning it. And a till that pays first and gives the
+PIN again in a second field is, to the card, a holder's phone in a tap that pays
+nothing. While the PIN alone arms, no rule about which tap it was typed in can hold:
+the card cannot tell a holder's phone from a till. The owner's proof is what a till
+never has, and D189 already has a held tap stand where that proof stands on a card with
+no owner.
+
+**What it changes for a wallet.**
+
+- A top-up under the PIN no longer brings the allowance back by itself. An owner's phone
+  that wants it back sends a proof in the same tap (`ALLOW_LOAD`, whose answer is `6200`,
+  or the limits again). A till or a kiosk that loads a card with no owner brings it back
+  only with a held tap.
+- On a card with an owner the allowance comes back at the proof: a proof ends the window
+  that runs and arms in one, so the state "armed while a window runs" cannot arise there,
+  and the window's switch ([D186](#d186), `SET_LIMIT`'s eighteenth byte) changes nothing
+  on such a card. The window of 24 hours holds back only a card with no owner, whose held
+  tap arms and ends no window. The byte is kept, and read as before.
+- A holder who uses the allowance up and whose card meets neither is asked for the PIN
+  at each payment ("limit reached, enter the PIN") until one of them arms it. That is
+  the safe side of the same rule.
+
+**Rejected.**
+
+- *Keep the PIN's arming and keep the mark in lasting memory, so that a payment under the
+  PIN in a later field takes it back.* It closes the sequence above and not the one that
+  pays first and arms after, and it adds a write to every `VERIFY_PIN`.
+- *Keep D186 as written and say in the security model that a reader with the PIN can
+  arm.* D186's own cost paragraph argues it: whoever has the PIN could pay with it
+  anyway. But what the PIN-holder gains by arming is not its own payment: it is an
+  allowance for a later reader with no PIN, a thief the till works with or one who
+  finds the card, and the holder who typed a PIN to pay did not agree to that.
+- *Arm on a card with an owner by a held tap too.* The owner's phone has the proof, and
+  a second way in for the PIN is what this entry takes away.
+
+**Cost accepted.** A card with no owner needs a tap of some seconds to bring its
+allowance back, where a PIN in any tap did; and a till that holds such a card under its
+PIN for those seconds can still arm it, in a time in the field in which it can take no
+payment. The wallets written to D186 (Foxy's, and the apps of the 3.0 wire to come) add
+the proof to their top-up. *At the merge: the history's hold is seven askings ([D211](#d211)), not ten, about 3 s on
+a J3R180, so a till given the PIN arms a card with no owner in about 3 s where this entry first counted 6 to 7 s
+(open with the other maintainer, M5).*
+
+**Built (applet).** `processVerifyPin` arms nothing; `requireHistory` arms where it sets
+`TAP_READ`; the payment's commit spends the arming where the payment begins a window
+and does nothing else to it. Tests: the PIN, the field dropped, the PIN again and a
+payment under it leave no new window for a reader with no PIN; on an owned card the PIN
+in a tap that pays nothing arms nothing and the proof does; on a card with no owner the
+PIN arms nothing, a held tap gone through does, one given up does not, and no payment
+follows a held tap in its time in the field; the window of 24 hours and the switch `01`
+are each reached by a held tap; and the new write is torn at every point
+(`TearSweepMoreTest`).
+
+---
+
+## <a id="d209"></a>D209: Who may write a certificate: anyone before the first PIN, and the wallet says so
+
+**Decided (protocol 3.0, 2026-11-14).** `CERT_WRITE` is left as [D192](#d192) made it:
+it asks for no proof, and whoever holds a card that has never had a PIN, has no owner and
+holds nothing may write and seal a container that names the card's key. What changes is
+what is said of it and what a wallet does. The spec says who may write
+([`spec/APDU.md`](../spec/APDU.md#the-certificate)); a wallet that sets a card up
+**MUST** read `CERT_READ` P1 = `FF` before the first `SET_PIN` and, where a certificate
+is sealed that it does not believe, tell the holder before going on that this card keeps
+one key for its life; and the threat is in
+[`SECURITY-MODEL.md`](SECURITY-MODEL.md) (#29) as accepted, not closed.
+
+**Why it matters.** A certificate no reader believes vouches for nothing, so writing one
+gains its writer no trust. Its other effect is the one D192 gives a certified card on
+purpose: the card keeps its key and its paid list through every reset. A card sold
+blank can be sealed by a courier or a reseller with two commands, and is then the same
+card to every reader under every later holder, whatever the holder resets; and its
+maker can no longer certify it. A card that left its maker certified is not open to
+this.
+
+**Why not closed on the card now.** A proof of who writes needs the card to know its
+certifier: a GlobalPlatform secure channel (the card manager's keys, which the maker
+holds), or an issuer's key given at install. The first imports the GlobalPlatform API
+into the load file, which jCardSim cannot run and which changes what the J3R180 is asked
+to install, on a chip that has refused files for reasons not yet understood
+([D176](#d176), `tools/refcheck.py`). The second fixes one issuer for a card's life and
+changes the install for every tool that installs. Either is a release of its own, with a
+chip campaign. Until then the holder is told.
+
+**Rejected.** *Let a reset under the PIN or the owner's proof drop a certificate.* It
+gives the holder the way out, and it gives a thief of a certified card a way to make it
+look like an uncertified one with a new key; D192 keeps the key so that the card can
+always be checked. *Close writing at install unless the installer says otherwise.* It
+needs an install parameter, as the issuer's key does.
+
+**Open.** The on-card rule (who, by what proof) is for the maintainers to settle before
+cards are sold blank through hands that are not the maker's or the holder's.
+
+---
+
+## <a id="d210"></a>D210: What a loader reads before it swaps: the paid list's bit; a malformed ALLOW_LOAD writes nothing
+
+**Decided (protocol 3.0, 2026-11-14).** Three small things, each closing a way to lose
+money or to write with nothing proven.
+
+- **The paid list's bit.** `GET_INFO` P1 = 4 byte 55 bit 7 is `0` on a card whose record
+  is set and whose first `SET_CARD` could not reserve the paid list, and `1` otherwise.
+  Such a card refuses every `LOAD_PROOF` (`6A84`, [D191](#d191)), and until now nothing a
+  loader could read before it swapped said so: its first top-up was minted to the card's
+  keys and then refused. A card before its first `SET_CARD`, and every card that got its
+  room, answers `FF 03` as before.
+- **The loader's checks, in the spec.** Before a swap: the card is not locked
+  (`GROUP_KEYS` answers a locked card, and `LOAD_PROOF` refuses it), its record is a
+  holder's, the paid list's bit is set, and the checks of [D197](#d197). And the keys of
+  the date are compared with `GROUP_KEYS` again in the tap that loads, before the first
+  `LOAD_PROOF`: the card cannot check what a piece is locked to, so a card reset between
+  the swap and the load would take pieces it can never sign for, and a payment that names
+  one is refused by the mint after the card has spent the good pieces with it.
+- **`ALLOW_LOAD`'s length before its proof.** An `ALLOW_LOAD` with bytes after its proof
+  answers `6700` before the proof is read: the nonce is spent and nothing is written. It
+  used to take the proof first, which ends the no-PIN window and arms the allowance, and
+  then refuse. The spec no longer says that `6200` leaves lasting memory unchanged: a
+  good `ALLOW_LOAD` writes what every good proof writes, and the grant itself is in RAM.
+
+**Built.** `CashuApplet.processGetInfo` and `processAllowLoad`; tests for a card refused
+its paid list (`7F 03`, and `6A84` at the load) and for both forms of a bad `ALLOW_LOAD`.
+
 ## <a id="d211"></a>D211: No payment floor; shorter holds (the claim 3 s, the history 4 s, the reset by the PIN 15 s; the loader's y tried and taken out)
 
-**Decided (protocol 2.3, 2026-11-14, the project owner).** "Do not slow down payments for 'pickpocket'
+**Decided (protocol 3.0, 2026-11-14, the project owner).** "Do not slow down payments for 'pickpocket'
 security. Those extra padding calculations should be removed." Then: "Reset pin should only be 15
 seconds", "History should take 4 seconds", "Owner claim should be brought down so it's 3 seconds."
 Supersedes [D188](#d188) and sets the counts of [D187](#d187), [D189](#d189) and [D196](#d196).
+*At the merge of 2026-11-19: the other maintainer's 3.0 file before the merge kept D188's floor; this entry takes it
+away on the shared 3.0 wire too, which is open with him (M1). The shorter history's hold also shortens the held tap that
+arms a card with no owner under [D208](#d208) (about 3 s; M5).*
 
 - **The payment floor is gone.** A payment within its limit, the first in its time in the field,
   is signed at its first `SPEND_ALL_SIGN`: no "not yet". `WAIT_FLOOR_SIGNS` is removed. 2.2's waits
@@ -7892,7 +8241,7 @@ the old counts or the floor moved to the new ones.
 
 ## <a id="d212"></a>D212: `LOAD_PROOF`'s 04 form: C sent whole and held to the curve by the chip's key agreement
 
-**Decided (protocol 2.3, 2026-11-14, the project owner).** After a study on a J3R180 of what its EC engine checks
+**Decided (protocol 3.0, 2026-11-14, the project owner).** After a study on a J3R180 of what its EC engine checks
 ("holy moly!!!"): "Test it out, load 45 pieces in first load, tell me how long it takes."
 
 **What the chip showed** (a measurement-only build, 2026-11-14, J3R180 09301220). `ECPublicKey.setW` checks nothing: it
@@ -7949,7 +8298,7 @@ only the 33-byte form).
 
 ## <a id="d213"></a>D213: A keyset is taught before its first piece
 
-**Decided (protocol 2.3, 2026-11-14, the project owner),** so that a first load's tap has no teaching in it. D212's file left
+**Decided (protocol 3.0, 2026-11-14, the project owner),** so that a first load's tap has no teaching in it. D212's file left
 it out for its 129 bytes; a reader taught the keys after the first piece, in the same tap (1.3 s).
 
 **The rule.** `KEYSET_KEYS` P1 `00` for a keyset in no entry of the keyset table is no longer `6A88`. The keyset is entered as
@@ -8080,28 +8429,43 @@ card; a payment burns its pieces with it, and the mint refuses it, so the money 
 together with a repeated nonce (a faulted random generator) gives d from two signatures: a test proved it with a stuck generator
 and one flipped input bit.
 
-**The rule.** At the end of every signature, on the chip path and on the bytecode path alike, the card checks it against the
-key, BIP-340's own check: s·G − e·P is a point whose x is Rx and whose y is even. P is the key's x with the y that makes it even,
-made as d_eff·G (one key agreement of the chip's EC engine, which also shows d to be the key's: its x must be the stored x, its y
-even), then −e·P by a second agreement and s·G + (−e·P) by the point addition: **three runs of the EC engine, about 0.24 s** a
-signature on a J3R180 (0.27 s with D217's two squarings: `AUTH` took 264 ms and then 532 ms). Where the check fails on the chip path (or any exception comes out
-of the chip path: the engine refuses after its set-up, a failing RSA, the check's own engine), the chip path is given up for
-good (`chipMul` false, until the next `SET_CARD` runs the known answers again), the shares and the work memory are cleared, and
-the product is made again by the bytecode `mulModN` and checked again. A signature that fails then is **never released**: the
-output is zeroed and the command is `6F00`. So a faulted squaring gives a slower signature, not a bad one, and the stuck-generator
-fault gives two good signatures and no d (the attack finds nothing in them).
+*Rewritten at the merge of 2026-11-19 as the join of [D207](#d207) and this entry, and amending D207 (the merge plan's
+clash A; the project owner's answer K1; open with the other maintainer as M2).*
 
-**What it costs.** About 0.24 s on every signature (a payment, `AUTH`, each asking of a held tap or a payment's wait), and the
-holds are counts of signing work, so they are longer in seconds by the same amount (see D211's table, now re-measured).
+**The rule.** Every signature is checked by D207's `verify()`, BIP-340's own last step: s·G − e·Q is a point whose x is
+Rx and whose y is even, Q the card's own point from its key object (or [d]G where the chip's key object gives the short
+form), and for a date's key Q = W + t·G, which must be the point the caller named, x and parity. s is kept in the signer's
+scratch and written to the caller's buffer only once the check has passed (D207); the check zeroes d, k and e·d first.
+**On the chip path** (`chipMul`: e·d by the chip's RSA in two shares, [D216](#d216), [D217](#d217)), a signature the
+check refuses, or any exception out of the chip's product, gives the chip path up for good (`chipMul` false, until the next
+`SET_CARD` runs the known answers again) and the **whole signature is made again by the bytecode**, from step 1 with a
+fresh nonce (the check wiped d; the refused signature never left the card, so the second nonce gives nothing away), then
+checked again. **On the bytecode path**, a signature that fails the check is `6F00`, with nothing written to the caller's
+buffer. A key object that names another key, or a date's point that is not P + t·G, is `6F00` at once on either path:
+signing again would not mend it. So a faulted squaring gives a slower signature, not a bad one, and the stuck-generator
+fault gives two good signatures and no d (the attack finds nothing in them). **The waits are checked too** (K1, amending
+D207's `signatureWork`): every held asking, a PIN's wait and a payment's wait over the limit is `sign()`, so the holds
+keep the seconds measured on the chip with a check in every asking.
 
-**What it trusts.** The chip's EC engine and the stored key. The check is not independent of the EC engine that made R, but a
-fault in the RSA engine or in the bytecode product is caught by it, and a fault in the EC engine that gives a wrong R and a wrong
-check the same way is not. d is in the EC engine's key for the one agreement of P (as k is for R); `mul` puts the key back after.
+**What it costs.** D207's check is one key agreement ([e]Q) and one point addition beside R's key agreement, one more point
+addition for a date's key, and one more key agreement where the key object gives the short form. This entry's own check
+before the merge was three key agreements and a point addition (it made P = d·G each time): about 0.24 s a signature on a
+J3R180 (0.27 s with D217's two squarings: `AUTH` took 264 ms and then 532 ms). The joined check is one key agreement
+fewer for a signature under the card's own key, so an asking is somewhat shorter than the 0.49 to 0.58 s measured: the
+holds' seconds are to be measured again on the 3.0 file (its chip run).
 
-**Built.** `SchnorrHW.holds`, `signOnce` (step 7). Tests: `SignHardeningTest` (a fault in each of the four squarings, input or
-output, at eight bit places each: the answer verifies and `chipMul` is cleared; the stuck generator with a fault gives two good
-signatures and no d; a private key that is not the public key's is `6F00` with the output zeroed on both paths; the cost three
-agreements and one addition); `PerPaymentKeyTest.whatItCosts` (a signature's engine runs counted).
+**What it trusts.** The chip's EC engine and the stored key object. The check is not independent of the EC engine that
+made R, but a fault in the RSA engine or in the bytecode product is caught by it, and a fault in the EC engine that gives a
+wrong R and a wrong check the same way is not.
+
+**Built.** `SchnorrHW.sign` (the chip path, then the bytecode's, each `signOnce`), `verify` (D207's, answering whether R'
+is R); `holds` is gone. Tests: `SignHardeningTest` (a fault in each of the four squarings, input or output, at eight bit
+places each: the answer verifies and `chipMul` is cleared; the stuck generator with a fault gives two good signatures and no
+d; a private key that is not the public key's is `6F00` with the output untouched on both paths; the cost two agreements and
+one addition); `SignatureCheckTest` (D207's cases; the waits checked; on the chip path a refused signature made again with a
+second R); `PerPaymentKeyTest.whatItCosts` (a signature's engine runs counted).
+
+---
 
 ## <a id="d219"></a>D219: The set-up's known answers reach further
 
@@ -8163,7 +8527,7 @@ the entry D213 left behind is no longer left), `UnitsTest` (the state byte the t
 
 ## <a id="d221"></a>D221: A claim right after the set-up's record is one asking
 
-**Decided (protocol 2.3, 2026-11-15, the project owner; amends [D187](#d187)).** A claim (`SET_OWNER` on a card with no
+**Decided (protocol 3.0, 2026-11-15, the project owner; amends [D187](#d187)).** A claim (`SET_OWNER` on a card with no
 owner) sets the owner at its first asking where, in this time in the field, the card's first set-up set its PIN (`SET_PIN`
 on a card with no PIN) and then wrote its record (`SET_CARD` succeeded under that PIN). Otherwise it is held for four askings
 (`CLAIM_ASKINGS`), as before. Nothing else about the claim changes: the PIN set and given in this tap, a record of the
@@ -8229,7 +8593,7 @@ commit after this one: a rebuild of the same source, byte for byte the load file
 
 ## <a id="d222"></a>D222: The tag's address changes at every read, and only the owner's phone can tell it is its card
 
-**Decided (protocol 2.3, 2026-11-15, the project owner; amends the tag of software 1.19, `FOXY-CARD-SPEC.md` 5.8
+**Decided (protocol 3.0, 2026-11-15, the project owner; amends the tag of software 1.19, `FOXY-CARD-SPEC.md` 5.8
 and `SECURITY-MODEL.md` threat 15, whose address was the same on every card).** The card's NFC tag answers a phone's background read with one of two addresses:
 
     https://getfoxy.io/card#new                   a card with no owner or no holder's record (new, or just reset)
@@ -8355,7 +8719,7 @@ the room cleared and the code gone at the card's applet's selection) and `TagTes
 
 ## <a id="d223"></a>D223: A keyset waiting for its first piece is kept only if the set-up or this tap taught it
 
-**Decided (protocol 2.3, 2026-11-19, the project owner; amends [D220](#d220)).** The red team of 2026-11-19 (round one, F1
+**Decided (protocol 3.0, 2026-11-19, the project owner; amends [D220](#d220)).** The red team of 2026-11-19 (round one, F1
 and F3, at 4d057fb) found that D220's reclaim spared every entry taught and never loaded, for good. A till with the PIN for one
 tap teaches keysets of its own making (keys it made up, the ID worked out from them as NUT-02 says, free to make) and loads none:
 on an owned card, PIN alone, one entry beside the holder's, and the holder's next new keyset with the PIN alone is `6A9C` until a
@@ -8430,7 +8794,7 @@ what a reader is told, keys not replaced without the say); `UnitsTest.stateOf` m
 
 ## <a id="d224"></a>D224: A payment that makes the card's change is not signed in a shape that leaves no record
 
-**Decided (protocol 2.3, 2026-11-19, the project owner).** The card refuses to sign a payment that makes the card's own change
+**Decided (protocol 3.0, 2026-11-19, the project owner).** The card refuses to sign a payment that makes the card's own change
 (`SPEND_ALL_CHANGE`) and cannot leave a settlement record. A reader had two ways to choose a payment's shape so that it left none:
 a seventeenth output or an output of 0 (the review of 2026-11-18, L5), and 33 or more pieces (the red team of 2026-11-19, O1 on
 outbox-lean, which applies here: `writeOutbox`'s `n > OUT_IN_MOST`, with or without outbox-lean's bit). And the red team's F2 (round

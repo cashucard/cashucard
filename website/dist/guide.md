@@ -1,8 +1,8 @@
 # Install the Cashu Card applet: the guide for AI agents
 
-This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 2.3, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
+This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.0, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
-The 2.3 build: this exact file has run on a chip. It ran on the bench J3R180 of 2026-11-14, at a test mint. If the install in step 4 fails, stop and tell the person.
+The 3.0 build: this exact file has run only in a simulator so far, and no card has installed it or a file of its size. If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
@@ -49,18 +49,18 @@ chmod +x /usr/local/bin/gp
 
 ## 2. Get the applet
 
-The applet ships as one CAP file, `applet/target/cashu-javacard-2.3.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
+The applet ships as one CAP file, `applet/target/cashu-javacard-3.0.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
 
 ```sh
 git clone https://github.com/cashucard/cashucard
 cd cashucard/applet
-sha256sum target/cashu-javacard-2.3.0.cap
+sha256sum target/cashu-javacard-3.0.0.cap
 ```
 
-On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-2.3.0.cap`. Expected:
+On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.0.0.cap`. Expected:
 
 ```
-676fa7aedde4c25fe112ab0d70ee4ad9f05bc0bdaf55a3d9c2808bb4c416838e  target/cashu-javacard-2.3.0.cap
+dc9bdee911817b76f7dd0ef8dfcf2bc44bb7bc9e06858ef48a6994522c9b9508  target/cashu-javacard-3.0.0.cap
 ```
 
 Stop if the hash differs.
@@ -99,7 +99,7 @@ If gp reports that the login failed, stop and tell the person to put that card a
 The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. From `cashucard/applet`:
 
 ```sh
-gp --install target/cashu-javacard-2.3.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
 ```
@@ -120,7 +120,7 @@ APP: D2760000850101 (SELECTABLE)
 
 ## 5. Check the install
 
-Select the card's applet by its whole AID. It answers with its version, 2.3, and `9000` for success:
+Select the card's applet by its whole AID. It answers with its version, 3.0, and `9000` for success:
 
 ```sh
 gp --apdu 00A404000BF043415348554341524401
@@ -129,7 +129,7 @@ gp --apdu 00A404000BF043415348554341524401
 Expected:
 
 ```
-0203 9000
+0300 9000
 ```
 
 Read its state with GET_INFO:
@@ -141,7 +141,7 @@ gp --apdu B0010000
 Expected on a new card, with 128 empty slots and its PIN, owner and record still unset:
 
 ```
-02 03 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 SW: 9000
 ```
 
@@ -173,7 +173,7 @@ A card fresh from the install is empty and unowned, and any reader in range can 
 
 ## Troubleshooting
 
-- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the chip next: this exact file has run on a chip, a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and tell the person.
+- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the chip next: no card has installed this exact file or a file of its size, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and tell the person.
 - SELECT answers `6A82`: the requested applet was not found. An earlier 0.x or 1.x applet is one possible cause. Stop and ask the person.
 - SELECT answers `9000` with no version: that SELECT named the package AID alone, `F0434153485543415244`, which reaches the opener. Select the whole AID, `F043415348554341524401`, as in step 5.
 - The card refuses gp's keys: stop, as step 3 says.

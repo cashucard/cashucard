@@ -2,8 +2,8 @@
 
 > Historical Foxy design, recorded at software 1.20 and incorporated into
 > shared protocol 2.0 ([D18](DECISIONS.md#d18)). The current applet wire is
-> [protocol 2.3](../spec/APDU.md): readers SELECT the full applet AID
-> `F043415348554341524401`, which answers `02 03`. Owner labels use
+> [protocol 3.0](../spec/APDU.md): readers SELECT the full applet AID
+> `F043415348554341524401`, which answers `03 00`. Owner labels use
 > `CashuCard/…`; [D20](DECISIONS.md#d20) through [D26](DECISIONS.md#d26)
 > record the shared protocol changes. Use the current APDU reference when
 > implementing a reader.
@@ -153,7 +153,7 @@ a newer block can end is a bound it cannot walk round (5).
    a different time key cleared it, as the way out of a wrongly signed time.
    There is no signed time now, and so no such way out: a forged header dated
    far ahead would freeze the clock, and what the owner can do then is set the
-   limit again, which gives the day its whole limit (5.2). (Since 2.3 the clock
+   limit again, which gives the day its whole limit (5.2). (Since 3.0 the clock
    comes back as well: a header with less than half the work of the hardest the
    card has taken begins and ends no day, and `REFRESH` brings the clock back to a
    real header, [D201](DECISIONS.md#d201); an empty card's anchored reset or
@@ -958,9 +958,9 @@ nothing else. An envelope that does not open (a point that is no point, a tag
 that is not this sum's) has used the nonce up, and on `VERIFY_PIN` it **costs
 a try of the PIN**, as a wrong PIN does: without that a terminal could put
 points to the PIN key without end. On `SET_PIN` and `CHANGE_PIN` it changes
-nothing, and since 2.3 answers `6700` and `6A91`, the words of an envelope that
+nothing, and since 3.0 answers `6700` and `6A91`, the words of an envelope that
 opens to the wrong length or to a proof not the owner's, so that the answer says
-nothing of whether it opened (before 2.3, `6A80`); and since 2.3 the card checks
+nothing of whether it opened (before 3.0, `6A80`); and since 3.0 the card checks
 itself that the point is on the curve. Those two have no try to cost, which leaves a
 terminal free to put points to the PIN key through them: were the chip's key
 agreement not to check that a point is on the curve, enough askings could
@@ -1224,8 +1224,8 @@ or changed from `FOXY-CARD-SPEC.md` 5.2 and the allowance draft.
 | `36` | **SET_HEADER** | nothing: no PIN, no owner, no record, any state | a Bitcoin block header, 80 bytes, as the network carries it (5.1) | the card's `now` (4, big-endian), whether the header was taken or was no later than the clock. `6A93` for too little work (its own, the floor's, or a quarter of the hardest taken); `6A80` for a `bits` no header could carry; `6700` for any length but 80. Drops a payment begun |
 | `37` | **TELL_TIME** | nothing: no PIN, no owner, no record, any state | the terminal's own clock, 4 bytes, big-endian seconds | nothing. `6700` for any length but 4. Kept for this time in the field and written into the receipts and the log entries made in it (5.3). Drops a payment begun |
 | `40` | VERIFY_PIN | | the PIN, 4 to 8 bytes; or, with **P1 = 1**, the PIN sealed (6e) | changes nothing about spending. Sealed: `6985` with no nonce asked for; an envelope that does not open costs a try, as a wrong PIN does. Any other P1 is `6A86` |
-| `41` | **SET_PIN** | **a card with no owner**, nothing unspent. No PIN, no proof. Or (**ADD PIN**, 1.16) **a card with an owner and no PIN**, the owner's grant (`ALLOW_LOAD`) given in this tap, any funds | the PIN; or, with **P1 = 1**, the PIN sealed (6e) | sets or replaces the PIN and unblocks; `6A91` on a card with an owner that has a PIN, or has none and no grant (use `42`); `6A8D` if anything is unspent on a card with no owner; `6986` locked. The allowance is nothing. Sealed: `6985` with no nonce, `6700` for an envelope that does not open (2.3: the word of one that opens to the wrong length) |
-| `42` | **CHANGE_PIN** | the owner's proof. **No PIN, no session, any PIN state, any funds** | proof length (1), proof (DER), the new PIN; or, with **P1 = 1**, the same sealed, the PIN as its nine-byte block (6e) | sets the PIN and resets the tries; ends any verified session; `6A90`, `6A91`; `6986` locked. Sealed: the proof is over the PIN itself and the same nonce the seal is under; `6985` with no nonce, `6A91` for an envelope that does not open (2.3: the word of a proof not the owner's) |
+| `41` | **SET_PIN** | **a card with no owner**, nothing unspent. No PIN, no proof. Or (**ADD PIN**, 1.16) **a card with an owner and no PIN**, the owner's grant (`ALLOW_LOAD`) given in this tap, any funds | the PIN; or, with **P1 = 1**, the PIN sealed (6e) | sets or replaces the PIN and unblocks; `6A91` on a card with an owner that has a PIN, or has none and no grant (use `42`); `6A8D` if anything is unspent on a card with no owner; `6986` locked. The allowance is nothing. Sealed: `6985` with no nonce, `6700` for an envelope that does not open (3.0: the word of one that opens to the wrong length) |
+| `42` | **CHANGE_PIN** | the owner's proof. **No PIN, no session, any PIN state, any funds** | proof length (1), proof (DER), the new PIN; or, with **P1 = 1**, the same sealed, the PIN as its nine-byte block (6e) | sets the PIN and resets the tries; ends any verified session; `6A90`, `6A91`; `6986` locked. Sealed: the proof is over the PIN itself and the same nonce the seal is under; `6985` with no nonce, `6A91` for an envelope that does not open (3.0: the word of a proof not the owner's) |
 | `43` | **SET_OWNER** | no owner: nothing unspent. Owner: the owner's proof, nothing unspent | 65 bytes, the owner's public key, uncompressed; with an owner, proof length (1) and the proof first | sets or replaces the owner; `6A8D` if anything is unspent; `6A91` with an owner and no good proof; `6A80` for a key not beginning `04`; `6700` other length; `6986` locked |
 | `44` | GET_NONCE | a card with an owner. No PIN | | 16 bytes, or `6A90`. With **P1 = 1**, on any card: the 16 bytes, the PIN key (33, compressed) and the card key's signature over it (64), for sealing a PIN (6e) |
 | `45` | **ALLOW_LOAD** | the owner's proof, over `FoxyCard/load` and no value | proof length (1), proof | for the rest of this tap: `LOAD_PROOF` and `CLEAR_SPENT` need no verified PIN. `6A90`, `6A91`; `6986` locked |

@@ -84,8 +84,8 @@ export function ResetCardScreen({
   };
   const card = pending ? visible.review : flow.resetReview?.card;
   const lookup = flow.resetReview?.source;
-  // a 2.3 card's spent entries are freed by its holder wallet, not by this app's settlement check
-  const cleanable = !!card && card.version !== '2.3';
+  // a 3.0 card's spent entries are freed by its holder wallet, not by this app's settlement check
+  const cleanable = !!card && card.version !== '3.0';
   const allowed =
     !!card &&
     card.unspent === 0 &&
@@ -332,7 +332,6 @@ export function ResetCardScreen({
                   danger={visible.journal.stage !== 'factory_verified'}
                   disabled={
                     flow.busy ||
-                    !flow.hardwareValidated ||
                     (visible.review.spent > 0 && !/^[0-9]{4,8}$/.test(pin))
                   }
                   onPress={() => {
@@ -362,12 +361,7 @@ export function ResetCardScreen({
                       title="PREPARE THIS CARD FOR RESET"
                       testID="reset-prepare"
                       danger
-                      disabled={
-                        flow.busy ||
-                        !erase ||
-                        !valueHandled ||
-                        !flow.hardwareValidated
-                      }
+                      disabled={flow.busy || !erase || !valueHandled}
                       onPress={() => flow.prepareReset({erase, valueHandled})}
                     />
                   </View>
