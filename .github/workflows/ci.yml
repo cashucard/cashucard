@@ -667,8 +667,12 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backup_copy == 'true'
     name: encrypted backup copier (Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    # 24.04, not ubuntu-latest: Python 3.9 (the copier's stated minimum,
+    # tools/backup-copy/README.md) has no build for ubuntu-26.04, which
+    # ubuntu-latest became in November 2026.
+    runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.9", "3.13"]
     steps:
