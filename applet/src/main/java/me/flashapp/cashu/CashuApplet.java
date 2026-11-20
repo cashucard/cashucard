@@ -624,7 +624,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte  ENTRY_LOADED   = (byte) 0x04;
     /**
      * Entered in the card's first set-up (D219: `PM_FIRST`, whoever set the card's first PIN in this selection, the holder): the
-     * reclaim spares such an entry taught and never loaded across taps, and it does not count toward UNMARKED_MOST.
+     * reclaim spares such an entry taught and never loaded across taps, and it does not count toward UNMARKED_MOST. A keyset
+     * taught there gets it only as the first of its unit still waiting (D222, `newState`); a hand-over takes it off every entry.
      */
     static final byte  ENTRY_SETUP    = (byte) 0x08;
     /**
@@ -4005,7 +4006,7 @@ public class CashuApplet extends Applet implements TagSwitch {
                  * transaction that writes them, so that a teaching cut or refused leaves nothing and no entry of the wrong unit
                  * is planted */
                 enter(e, buf, in, (byte) 0);
-                made = newState(unit);
+                made = newState(unit, false);
             }
             Util.arrayCopyNonAtomic(buf, (short)(in + 8), scratch, T_TAIL, (short)(len - 8));
             Util.arrayFillNonAtomic(allOut, (short) 0, (short) 8, (byte) 0);
@@ -4402,7 +4403,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             } else {
                 entry = newEntry(unit);
                 if (entry >= BOOK_ENTRIES) return entry;
-                state = (byte)(newState(unit) | ENTRY_LOADED);
+                state = newState(unit, true);
             }
         }
         /* Not a piece that is here already. What the card signs is the piece's
@@ -5320,7 +5321,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * A forgotten PIN's history taken down, where SET_PIN has left it owed (PM_FORGET): `forget`, then the mark, one byte. After
      * an owner replaced (FORGET_PLACES), first what was the last owner's and is no one's now: the spent places and their kept
      * proofs, the staged outputs and the openings, the record's refund key and its y, the day's counts, the day of loads, the
-     * clock's last header hash, the rolls and the arming, the paid list and the keyset entries nothing names. Outside any transaction, each write whole or finished by the next
+     * clock's last header hash, the rolls and the arming, the paid list, and the keyset entries nothing names: the set-up bit
+     * taken off every entry first (D222), so the last owner's set-up's waiting entry goes too (the hand-over has taken
+     * TAP_TAUGHT off, so no fresh entry is spared either: on the empty card a hand-over needs, every entry goes). Before D222
+     * the set-up's waiting entries were kept here. Outside any transaction, each write whole or finished by the next
      * command, which runs this first: nothing reads any of it until the mark is down.
      */
     private void forgetOwed() {
@@ -5355,7 +5359,14 @@ public class CashuApplet extends Applet implements TagSwitch {
                 paid[PAID_ROUND] = (byte) 0;
                 Util.setShort(paid, PAID_NEXT, (short) 0);
             }
-            // and every keyset entry that nothing on the card names now
+            /* and every keyset entry that nothing on the card names now, the last owner's set-up's among them (D222): the set-up
+             * bit taken off every entry first, a byte each (torn halfway, the mark is not down and the next command does the rest) */
+            if (book != null) {
+                for (short e = 0; e < BOOK_ENTRIES; e++) {
+                    short st = (short)(e * ENTRY_LEN + ENTRY_STATE);
+                    if ((book[st] & ENTRY_SETUP) != 0) book[st] &= (byte)~ENTRY_SETUP;
+                }
+            }
             reclaim();
         }
         forget();
@@ -7015,11 +7026,22 @@ public class CashuApplet extends Applet implements TagSwitch {
     }
 
     /**
-     * A new entry's state byte: in use, of `unit`, marked where the holder has the say in this tap, and ENTRY_SETUP in the card's
-     * first set-up (D219).
+     * A new entry's state byte: in use, of `unit`, marked where the holder has the say in this tap, ENTRY_LOADED for a piece's
+     * (`loaded`), and ENTRY_SETUP in the card's first set-up (D219), but for a keyset taught and not loaded only where no entry
+     * of `unit` is a set-up's still waiting for its first piece (D222): one such a unit, the first, which is the honest set-up's
+     * one teaching of the unit, so that whoever speaks in the set-up selection cannot keep more of the table for good.
      */
-    private byte newState(short unit) {
-        return (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0) | (pinMarks[PM_FIRST] == (byte) 1 ? ENTRY_SETUP : 0));
+    private byte newState(short unit, boolean loaded) {
+        byte st = (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0) | (loaded ? ENTRY_LOADED : 0));
+        if (pinMarks[PM_FIRST] != (byte) 1) return st;
+        if (!loaded) {
+            for (short e = 0; e < BOOK_ENTRIES; e++) {
+                byte o = book[(short)(e * ENTRY_LEN + ENTRY_STATE)];
+                if ((byte)(o & (byte)(ENTRY_USED | ENTRY_SETUP | ENTRY_LOADED)) == (byte)(ENTRY_USED | ENTRY_SETUP)
+                    && (short)(o & 1) == unit) return st;
+            }
+        }
+        return (byte)(st | ENTRY_SETUP);
     }
 
     /**
