@@ -229,10 +229,10 @@ class UnitsTest {
         /** The state byte of the entry whose keyset is `keyset`, or -1 where none in use has it. */
         int stateOf(String keyset) throws Exception {
             int e = rawStateOf(keyset);
-            // the loaded (D214), set-up and fresh (D219) bits are the card's own and not part of what a reader is told
+            // the loaded (D220), set-up and fresh (D223) bits are the card's own and not part of what a reader is told
             return e < 0 ? -1 : e & ~0x1C;
         }
-        /** The state byte as the card keeps it, the loaded bit (0x04, D214) and the set-up and fresh bits (0x08, 0x10, D219) with it. */
+        /** The state byte as the card keeps it, the loaded bit (0x04, D220) and the set-up and fresh bits (0x08, 0x10, D223) with it. */
         int rawStateOf(String keyset) throws Exception {
             int e = entryOf(keyset);
             return e < 0 ? -1 : book()[e * ENTRY + 8] & 0xFF;
@@ -478,7 +478,7 @@ class UnitsTest {
         Map<String, byte[]> before = c.snapshot();
         assertEquals(SW_WRONG_DATA, c.loadAs(2, c.piece(SAT_A, 5)).getSW(), "unit 02");
         assertEquals(SW_WRONG_DATA, c.loadAs(0xFF, c.piece(SAT_A, 5)).getSW(), "unit FF");
-        // P2 08 is D206's bit (C whole), 6A86 here without bit 1 (LoadWordTest, FullPointLoadTest); 04 is 6B00
+        // P2 08 is D212's bit (C whole), 6A86 here without bit 1 (LoadWordTest, FullPointLoadTest); 04 is 6B00
         for (int p2 : new int[] { 4, 0x80, 0xFF }) {
             assertEquals(SW_WRONG_P1P2, c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, p2, concat(new byte[] { 0 }, c.piece(SAT_A, 5)), 256)), "P2 = " + p2);
         }
@@ -1118,7 +1118,7 @@ class UnitsTest {
     }
 
     @Test
-    @DisplayName("Only these methods name the table: SET_CARD, RESET_CARD, the load and its one step, SPEND_ALL_CHANGE, SPEND_ALL_SIGN, the readers of GET_INFO, GET_CARD and GET_LOG, KEYSET_KEYS (its top kept in a transaction, and read to show a key, D190; for a keyset in no entry the entry made by `newEntry`, D207) and the table's own helpers, and the forget of the history (its tail: the last unit, the other unit's count, the receipts' units); and it is written outside a transaction only by `enter`, the reclaim, the forget, RESET_CARD's wipe and KEYSET_KEYS' fresh bits (D219)")
+    @DisplayName("Only these methods name the table: SET_CARD, RESET_CARD, the load and its one step, SPEND_ALL_CHANGE, SPEND_ALL_SIGN, the readers of GET_INFO, GET_CARD and GET_LOG, KEYSET_KEYS (its top kept in a transaction, and read to show a key, D190; for a keyset in no entry the entry made by `newEntry`, D213) and the table's own helpers, and the forget of the history (its tail: the last unit, the other unit's count, the receipts' units); and it is written outside a transaction only by `enter`, the reclaim, the forget, RESET_CARD's wipe and KEYSET_KEYS' fresh bits (D223)")
     void onlyTheseMethodsNameTheTable() throws Exception {
         String code = SchnorrHWMathTest.stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(
             SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -1126,7 +1126,7 @@ class UnitsTest {
         assertEquals(new java.util.TreeSet<>(Arrays.asList("(class body)", "processGetInfo", "processGetCard", "processSpendAllChange", "processSpendAllSign",
             "processLoadProof", "loadOne", "processSetCard", "processResetCard", "processGetLog", "processGetReceipts",
             "processKeysetKeys", "showKey", "entryOf", "placeUnit", "cardFormat", "freeEntry", "newEntry", "enter", "reclaim", "finishBurn", "forget")), names);
-        assertEquals(1, (int) outside(code).get("processKeysetKeys"), "KEYSET_KEYS writes the entry in its transaction alone; outside it, only the fresh bits taken off at the first teaching of a tap (D219)");
+        assertEquals(1, (int) outside(code).get("processKeysetKeys"), "KEYSET_KEYS writes the entry in its transaction alone; outside it, only the fresh bits taken off at the first teaching of a tap (D223)");
         java.util.Map<String, Integer> outside = SlotWriteOrderTest.writesOutsideTransactions(code);
         assertEquals(2, (int) outside.get("enter"));
         assertEquals(1, (int) outside.get("reclaim"));

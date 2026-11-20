@@ -13,12 +13,12 @@ the bytes a card is LOADed with, is 40,412 bytes by `tools/refcheck.py`'s measur
 sha256 `05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3`. `SELECT`
 and `GET_INFO` answer `02 03`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D215](DECISIONS.md#d215), and the wire is in
+[D183](DECISIONS.md#d183) to [D221](DECISIONS.md#d221), and the wire is in
 [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This file ran on a chip on 2026-11-15: it is the file below (40,365 bytes, `8aefa0db…`) with [D215](DECISIONS.md#d215) added (the
+This file ran on a chip on 2026-11-15: it is the file below (40,365 bytes, `8aefa0db…`) with [D221](DECISIONS.md#d221) added (the
 claim right after the set-up's record is one asking; 47 bytes more, 220 past a multiple of 256). The bench J3R180 09301220
 installed it three times in three steps (17 to 18 s to load, 2 s for the card's applet) and, at the testnut test mint with fake sats,
 passed `cardctl selftest` 13 of 13, claimed the card at the set-up's first asking, and signed a 9-piece payment with change
@@ -28,7 +28,7 @@ byte for byte the one that ran, its manifest's build time is not.
 The file before it ran on a chip on 2026-11-14
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
 [its report](reports/HARDWARE_TEST_REPORT_2026-11-14e_J3R180_2.3.md)): it is the file before it (39,343 bytes, `c79b30a7…`) with
-[D211](DECISIONS.md#d211) to [D214](DECISIONS.md#d214) added (the signature's product in two shares, so that no operand of the chip's RSA is a
+[D217](DECISIONS.md#d217) to [D220](DECISIONS.md#d220) added (the signature's product in two shares, so that no operand of the chip's RSA is a
 function of the key alone; every signature checked on the card against the key before it leaves, a failing chip path redone by the bytecode;
 the set-up's known answers made wider; a taught keyset kept until its first piece, a teaching's entry made at its end; 1,022 bytes more,
 173 past a multiple of 256). The bench J3R180 09301220 installed it each time at the first try (17 to 18 s to load, 1 to 3 s for the card's
@@ -41,10 +41,10 @@ applet) and, at the testnut test mint with fake sats:
   four of the set-up's new points among them, and a changed C_, K or proof at `LOAD_CHANGE`, each `6A80` with nothing stored; passed
   `cardctl selftest` 13 of 13;
 - held the card longer in seconds, **at the same counts**: an asking is 0.49 to 0.58 s now (0.23 to 0.31 s before it), so the claim takes
-  2.6 s (D205's target 3 s), the history 3.0 s (4 s) and the reset by the PIN 8.3 s, 11.3 s with the history's (15 s).
+  2.6 s (D211's target 3 s), the history 3.0 s (4 s) and the reset by the PIN 8.3 s, 11.3 s with the history's (15 s).
 
-The file before D211 ran on a chip the same day: it is the file before D207 with
-[D207](DECISIONS.md#d207) to [D210](DECISIONS.md#d210) added (a keyset taught at set-up; the field's arithmetic on the chip's RSA
+The file before D217 ran on a chip the same day: it is the file before D213 with
+[D213](DECISIONS.md#d213) to [D216](DECISIONS.md#d216) added (a keyset taught at set-up; the field's arithmetic on the chip's RSA
 with p padded to 64 bytes for the modulus; `LOAD_CHANGE`'s points held to the curve by the chip's key agreement; the signature's
 e·d mod n on the chip's RSA with n padded, two squarings). The bench J3R180 09301220 installed it each time at the first try (17 s
 to load, 2 s for the card's applet) and, at the testnut test mint with fake sats:
@@ -58,11 +58,11 @@ to load, 2 s for the card's applet) and, at the testnut test mint with fake sats
 - refused 13 bad points in the 04 form, a twist point among them, and a changed C_, K or proof at `LOAD_CHANGE`, each `6A80`
   with nothing stored, the right answer then loading; passed `cardctl selftest` 20 of 20;
 - ran the holds shorter in seconds: an asking was 0.23 to 0.31 s then (0.59 to 0.66 s before), so the claim (1.8 s), the history
-  (1.4 s) and the reset by the PIN (about 6 s) are about 40 percent of the time D205 chose, at the same counts.
+  (1.4 s) and the reset by the PIN (about 6 s) are about 40 percent of the time D211 chose, at the same counts.
 
-The file before D207 (37,269 bytes, `fe156f4f…`, D183 to D206) ran on a chip the same day
-([its report](reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)): it is the file before D206 with
-[D206](DECISIONS.md#d206) added (`LOAD_PROOF`'s 04 form: each piece's C sent whole, `04` ‖ x ‖ y, and held to the curve by
+The file before D213 (37,269 bytes, `fe156f4f…`, D183 to D204, D211 to D212) ran on a chip the same day
+([its report](reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)): it is the file before D212 with
+[D212](DECISIONS.md#d212) added (`LOAD_PROOF`'s 04 form: each piece's C sent whole, `04` ‖ x ‖ y, and held to the curve by
 the chip's key agreement in place of the card's own square-root test). The bench J3R180 09301220 installed it five times,
 each in three steps (16 to 17 s to load, 2 to 3 s for the card's applet, created at the first try every time), and, at a
 FakeWallet test mint with fake sats:
@@ -82,9 +82,9 @@ Not covered by that run: the day of loads, dated pieces in the 04 form, a chip w
 (the simulator's tests cover both outcomes), `LOCK_CARD`, tears, the certificate, a dollar card, a production mint and a
 phone.
 
-The file before D206 (36,950 bytes, load file sha256 `075448e4…`, D183 to D205) ran on a chip on 2026-11-14
-([its report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)): it is the file before D205 with
-[D205](DECISIONS.md#d205) added (no payment floor, shorter holds). A second bench J3R180 (not the card of the run
+The file before D212 (36,950 bytes, load file sha256 `075448e4…`, D183 to D204 and D211) ran on a chip on 2026-11-14
+([its report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)): it is the file before D211 with
+[D211](DECISIONS.md#d211) added (no payment floor, shorter holds). A second bench J3R180 (not the card of the run
 below) installed it twice, each in three steps (16 to 17 s to load, 2 s for the card's applet, created at the first
 try), and, at a FakeWallet test mint with fake sats:
 
@@ -94,16 +94,16 @@ try), and, at a FakeWallet test mint with fake sats:
   `SPEND_ALL_BEGIN` with five change outputs, 5.2 s with eight), the mint taking each swap, and paid on with the change
   loaded back with no PIN; a payment over the limit on one payment still waited (10 "not yet" for 150 with a limit of
   100, 14 for 250), and so did a second payment in a time in the field;
-- held as D205 says: the owner's claim answered at the 4th asking (2.9 s), the history of a card with a PIN and no
+- held as D211 says: the owner's claim answered at the 4th asking (2.9 s), the history of a card with a PIN and no
   owner at the 7th (3.6 s), and the reset by the PIN at the 17th after the history's 7 (24 askings, 14.8 s in all);
 - refused `LOAD_PROOF` with P2 `04`, `06` or `07` (`6B00`), and loaded a piece in 226 to 235 ms;
-- kept what the run of the file before D205 showed of the clock, the owner's c and the refusals.
+- kept what the run of the file before D211 showed of the clock, the owner's c and the refusals.
 
 Not covered by that run: the day of loads (not rerun, the code unchanged), `LOCK_CARD`, a dated piece taken back after
 its date by the refund key, a header far ahead or a weak clock, tears, the certificate, a dollar card, a production mint
 and a phone.
 
-The file before D205 (36,953 bytes, load file sha256 `f216644a…`, D183 to D204) ran on a chip on 2026-11-14
+The file before D211 (36,953 bytes, load file sha256 `f216644a…`, D183 to D204) ran on a chip on 2026-11-14
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-23-chip-runs-checklist),
 [its report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)): the bench J3R180
 installed it three times in three steps (16 to 17 s to load, 2 s for the card's applet)
@@ -159,29 +159,29 @@ a J3R180 whose configuration lacks either cannot run the card.
 
 ### What a holder notices
 
-- **A payment, an `AUTH`, a first load and a change come back faster** ([D207](DECISIONS.md#d207) to
-  [D210](DECISIONS.md#d210)): a payment with five change outputs is signed 2.2 s after it begins where it took 4.0 s; the
+- **A payment, an `AUTH`, a first load and a change come back faster** ([D213](DECISIONS.md#d213) to
+  [D216](DECISIONS.md#d216)): a payment with five change outputs is signed 2.2 s after it begins where it took 4.0 s; the
   change is written back in 0.58 s a piece where it took 1.04 s; a first load of 45 pieces is 7.8 s; the card's first set-up is
   0.6 s longer (it tests its engines then). The keyset's keys are taught at set-up, so a first load has no teaching in it.
-  **The holds are shorter in seconds than D205 measured them** (they are counts of the card's signing work, which is faster than it was
+  **The holds are shorter in seconds than D211 measured them** (they are counts of the card's signing work, which is faster than it was
   then): the owner's claim holds the card about 2.6 s, a history 3.0 s and a reset by the PIN about 8.3 s (11.3 s with the history's),
-  until the counts are raised; the file before D211 held them 1.8 s, 1.4 s and about 6 s, before every signature was checked.
-- **A signature takes 0.27 s longer, and is never a bad one** ([D211](DECISIONS.md#d211), [D212](DECISIONS.md#d212)): the card checks every
+  until the counts are raised; the file before D217 held them 1.8 s, 1.4 s and about 6 s, before every signature was checked.
+- **A signature takes 0.27 s longer, and is never a bad one** ([D217](DECISIONS.md#d217), [D218](DECISIONS.md#d218)): the card checks every
   signature against its key before it leaves, and makes the signature again by the slower route where the chip's engine gave a wrong
   answer; a payment, an `AUTH` and a held asking take that long more, so the holds and waits are longer in seconds at the same counts.
-  A card taught keysets before any piece keeps them until the first piece is loaded under each ([D214](DECISIONS.md#d214)).
-- **A first load is about a third quicker** ([D206](DECISIONS.md#d206)): a reader that sends each piece's C whole (`LOAD_PROOF`
+  A card taught keysets before any piece keeps them until the first piece is loaded under each ([D220](DECISIONS.md#d220)).
+- **A first load is about a third quicker** ([D212](DECISIONS.md#d212)): a reader that sends each piece's C whole (`LOAD_PROOF`
   P2 bit 3) has it checked by the chip's key agreement, about 80 ms a piece less on a J3R180 (152 against 233 ms with the
   proof kept); 45 pieces in one selection take 8.2 s where they took 11.8. A card whose chip's agreement does not hold to the
   curve at its set-up answers that form `6B00`, and the reader sends the 33-byte form, which is checked as before.
 - **A payment within its limit is signed at its first `SIGN`**: no floor, so no wait added
-  for the card's own change either ([D205](DECISIONS.md#d205), which took away
+  for the card's own change either ([D211](DECISIONS.md#d211), which took away
   [D188](DECISIONS.md#d188)'s floor on the project owner's word). A payment over the limit on one
   payment, and a second payment in a time in the field, wait as 2.2's did. A brush of a tap
   within the limit is no longer slowed: the limits hold.
 - **Loading is faster with the piece's y**: a loader that sends each piece's C's y
   (`LOAD_PROOF` P2 bit 2) saves about 108 ms a piece on a J3R180; the old form still works
-  ([D205](DECISIONS.md#d205)).
+  ([D211](DECISIONS.md#d211)).
 - **A top-up always asks for the PIN.** A card with no PIN holds nothing and pays
   nothing (`6A97`), and the owner's phone loads under the PIN too
   ([D185](DECISIONS.md#d185)).
@@ -199,7 +199,7 @@ a J3R180 whose configuration lacks either cannot run the card.
   after `SET_CARD` under the PIN in the same tap, the owner is claimed at the first
   asking, `SET_CARD`'s own seconds on the chip being the hold; otherwise by four
   askings, about 2.6 seconds on a J3R180 ([D187](DECISIONS.md#d187),
-  [D205](DECISIONS.md#d205), [D215](DECISIONS.md#d215)).
+  [D211](DECISIONS.md#d211), [D221](DECISIONS.md#d221)).
 - **A card with no phone owner is a simple card**: its limits, mint and unit are set
   once, at its first set-up. Its PIN never blocks: each wrong try makes the next wait
   twice as long, and an empty card whose PIN was forgotten takes a new one. It is

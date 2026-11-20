@@ -74,7 +74,7 @@ import java.util.Arrays;
 
 /**
  * The owner claimed slowly (2.3, D187) and a holder with no phone (2.3, D189): SET_OWNER on a card with no owner is a claim of
- * four askings under the PIN (one right after the set-up's record under the PIN, D215: ClaimAfterSetUpTest), never in a time in the field that paid, after which that time in the field pays nothing; the
+ * four askings under the PIN (one right after the set-up's record under the PIN, D221: ClaimAfterSetUpTest), never in a time in the field that paid, after which that time in the field pays nothing; the
  * card of a holder with no phone is loaded and set under its PIN, its history held for over five askings, and a held tap
  * stands where the owner's grant or proof stands; a factory record is no record; REFRESH P1 = 1. And the owner's key is a
  * point of P-256, which the card checks itself.
@@ -115,7 +115,7 @@ class HolderTest {
     /**
      * The same card with its record written before its PIN, in the same tap: in its first set-up, and with no record written
      * under the PIN in this time in the field, so its claim is held for CLAIM_ASKINGS askings (D187). A record written under the
-     * PIN, as `claimable` writes it, makes the claim one asking (D215, ClaimAfterSetUpTest).
+     * PIN, as `claimable` writes it, makes the claim one asking (D221, ClaimAfterSetUpTest).
      */
     static UnitsTest.Card claimableHeld() {
         UnitsTest.Card c = new UnitsTest.Card();
@@ -134,7 +134,7 @@ class HolderTest {
     // =========================================================================
 
     @Test
-    @DisplayName("A claim is four askings of the same data where no record was written under the PIN in this time in the field (D215): the first three answered 6A98 with nothing, no owner set; the fourth sets it on the empty card; and no payment is taken for the rest of that time in the field, through a SELECT, until the card leaves the field")
+    @DisplayName("A claim is four askings of the same data where no record was written under the PIN in this time in the field (D221): the first three answered 6A98 with nothing, no owner set; the fourth sets it on the empty card; and no payment is taken for the rest of that time in the field, through a SELECT, until the card leaves the field")
     void theClaimIsHeldForFourAskings() throws Exception {
         UnitsTest.Card c = claimableHeld();
         for (int k = 1; k < CLAIM_ASKINGS; k++) {

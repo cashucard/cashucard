@@ -232,7 +232,7 @@ the same bytes on the wire as `tools/cardctl/cardctl.py`.
 | `spendAllBegin(slots, {units})` | `SPEND_ALL_BEGIN` | P1 `02` (`03` with `units`), Le `45`; answers `{total, t, refund}`: the payment's key is `cashu-crypto.tweakedKey(P, t)` |
 | `spendAllOutputs(outputs, keyset?)` | `SPEND_ALL_OUTPUTS` | with a keyset, P1 `01` and the keyset first |
 | `spendAllChange(amount, K, keyset)` | `SPEND_ALL_CHANGE` | 45 bytes: the amount, the mint's key K for it (33), the keyset (8); Le `21` |
-| `spendAllSign()`, `spendAllAgain(hash?)` | `24`, `25` | `00 01` answers only for a payment over its limit or a second one in the time in the field (no floor, D205); AGAIN P1 `01` by the message's hash |
+| `spendAllSign()`, `spendAllAgain(hash?)` | `24`, `25` | `00 01` answers only for a payment over its limit or a second one in the time in the field (no floor, D211); AGAIN P1 `01` by the message's hash |
 | `getChange(page)`, `owedChange()` | `GET_CHANGE` | 83-byte openings `{number, amount, keysetId, date, B_, K}`, no blinding factor |
 | `keysetKeysBegin/Keys/Finish/Show`, `teachKeyset(ks)`, `showOpeningKey(opening, ks)` | `KEYSET_KEYS` (`38`) | teach a keyset under the PIN (the card checks the keys against the ID); show an opening's key by its path, any reader |
 | `loadChange(k, C_, K, e, s)` | `LOAD_CHANGE` (`27`) | P2 `02`, Lc `C2`, C_ and K written in the `04` form (02/03 accepted), Le `53`; answers `{slot, proofKept, piece}` |

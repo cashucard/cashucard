@@ -228,7 +228,7 @@ const SW_MEANINGS = {
   0x6a83: "slot or opening out of range, or an offset at or past the end",
   0x6a84: "no space — no slot, no change opening, or no room the card could reserve",
   0x6a86: "incorrect P1/P2: a payment begun without P1 bit 1, or a load without P2 bit 1 (no word on keys per load)",
-  0x6a88: "slot is empty (or spent, to a reader with neither the PIN nor the grant), an opening not owed, a card with no keyset table (a keyset in no entry is entered at its teaching, D207), no record",
+  0x6a88: "slot is empty (or spent, to a reader with neither the PIN nor the grant), an opening not owed, a card with no keyset table (a keyset in no entry is entered at its teaching, D213), no record",
   0x6a8c: "no card record (or a factory record) — set the card up first",
   0x6a8d: "card in use — something unspent, or change owed, where only an empty card may be changed",
   0x6a8e: "a dated piece on a card with no refund key",
@@ -1161,7 +1161,7 @@ class CardSim {
     if (b.length !== 33) throw new Error(`SPEND_ALL_CHANGE returned ${b.length} bytes, expected 33`)
     return b
   }
-  /** SPEND_ALL_SIGN, sent again for as long as the card answers "not yet" (00 01; only over the limit or a second payment, 2.3 has no floor, D205). Answers { signature, waits }. Not idempotent. */
+  /** SPEND_ALL_SIGN, sent again for as long as the card answers "not yet" (00 01; only over the limit or a second payment, 2.3 has no floor, D211). Answers { signature, waits }. Not idempotent. */
   async spendAllSign({ maxWaits = 1100 } = {}) {
     for (let waits = 0; waits <= maxWaits; waits++) {
       const b = await this.send(encode.spendAllSign(), "SPEND_ALL_SIGN")

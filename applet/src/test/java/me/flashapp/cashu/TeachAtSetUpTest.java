@@ -15,7 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * D207: a keyset is taught before its first piece. KEYSET_KEYS for a keyset in no entry of the table enters it as its first
+ * D213: a keyset is taught before its first piece. KEYSET_KEYS for a keyset in no entry of the table enters it as its first
  * piece would (the PIN given in the tap; the card's unit or the last payment's without the holder's say, either with it), of
  * the unit its version 01 tail names or the card's (version 00). The entry is made at the teaching's begin, after every other
  * check of it; the keys are marked known only at the end, with the top, in one transaction, and only when they are the ID's. A
@@ -33,7 +33,7 @@ class TeachAtSetUpTest {
     static final int ENTRY = UnitsTest.ENTRY;
 
     @Test
-    @DisplayName("D207: an owner's card just set up is taught testnut-like keysets with no piece on it (version 01 with its fee, version 00): each answers its ID, is entered in use of the card's unit and marked (the owner's grant), its keys known; the first load of the keyset goes into that entry, keys still known; a second teaching replaces the top in the same entry")
+    @DisplayName("D213: an owner's card just set up is taught testnut-like keysets with no piece on it (version 01 with its fee, version 00): each answers its ID, is entered in use of the card's unit and marked (the owner's grant), its keys known; the first load of the keyset goes into that entry, keys still known; a second teaching replaces the top in the same entry")
     void anOwnersCardIsTaughtAtSetUp() throws Exception {
         UnitsTest.Card c = card();
         assertEquals(0, c.inUse(), "nothing on the card, no entry");
@@ -54,7 +54,7 @@ class TeachAtSetUpTest {
     }
 
     @Test
-    @DisplayName("D207: a simple card (no owner) is taught its own unit's keyset under the PIN alone, unmarked; the other unit's (a usd tail on a sat card) needs the holder's say (6A9D, nothing entered), and with the owner's grant it is entered as usd")
+    @DisplayName("D213: a simple card (no owner) is taught its own unit's keyset under the PIN alone, unmarked; the other unit's (a usd tail on a sat card) needs the holder's say (6A9D, nothing entered), and with the owner's grant it is entered as usd")
     void unitsAndTheSay() throws Exception {
         UnitsTest.Card simple = new UnitsTest.Card().ready(UnitsTest.SAT, false);
         taught(simple, V1);
@@ -72,7 +72,7 @@ class TeachAtSetUpTest {
     }
 
     @Test
-    @DisplayName("D207, D214: a teaching refused at its begin enters nothing (a tail of no unit 6A80, an ID version the card cannot hash 6A80, no PIN in the tap 6982: the table as it was); one that began is entered only at its end, once its keys hold (D214; D207 entered it at the begin), so one refused at the end (keys that are not the ID's, out of order) or cut by another command (6985) leaves no entry at all")
+    @DisplayName("D213, D220: a teaching refused at its begin enters nothing (a tail of no unit 6A80, an ID version the card cannot hash 6A80, no PIN in the tap 6982: the table as it was); one that began is entered only at its end, once its keys hold (D220; D213 entered it at the begin), so one refused at the end (keys that are not the ID's, out of order) or cut by another command (6985) leaves no entry at all")
     void aTeachingRefusedEntersNothing() throws Exception {
         UnitsTest.Card c = card();
         Map<String, byte[]> before = c.snapshot();
@@ -82,7 +82,7 @@ class TeachAtSetUpTest {
         assertEquals(SW_SECURITY_NOT_SATIS, begin(c, V1.id8(), V1.tail).getSW(), "no PIN in this tap");
         c.assertUnchanged(before, "nothing entered, not a byte of the table");
         assertEquals(0, c.inUse());
-        // begun, then refused at the end or cut: no entry is made (D214, which made the entry at the end; D207 left one that the reclaim let go)
+        // begun, then refused at the end or cut: no entry is made (D220, which made the entry at the end; D213 left one that the reclaim let go)
         byte[][] off = wires(V1);
         off[3] = off[4];
         c.pin();
@@ -100,7 +100,7 @@ class TeachAtSetUpTest {
     }
 
     @Test
-    @DisplayName("D207, D214: within the table's six entries: a card whose six entries each name a piece answers 6A9C to a seventh keyset taught, nothing written; an entry a teaching made that names no piece and has had none is kept by the reclaim (D214: it waits for its first piece; D207 let it go), keys known, and a teaching again of it is taken")
+    @DisplayName("D213, D220: within the table's six entries: a card whose six entries each name a piece answers 6A9C to a seventh keyset taught, nothing written; an entry a teaching made that names no piece and has had none is kept by the reclaim (D220: it waits for its first piece; D213 let it go), keys known, and a teaching again of it is taken")
     void withinTheSixEntries() throws Exception {
         UnitsTest.Card c = card();
         for (int i = 1; i <= 6; i++) c.put(-1, "00aa00000000000" + i, 1);
@@ -110,13 +110,13 @@ class TeachAtSetUpTest {
         UnitsTest.Card d = card();
         taught(d, V1);
         assertEquals(SW_OK, d.clearSpent(), "CLEAR_SPENT reclaims");
-        assertTrue(d.entryOf(V1.id8()) >= 0 && keysKnown(d, V1.id8()), "a keyset taught and not yet loaded is kept (D214)");
+        assertTrue(d.entryOf(V1.id8()) >= 0 && keysKnown(d, V1.id8()), "a keyset taught and not yet loaded is kept (D220)");
         taught(d, V1);
         assertTrue(keysKnown(d, V1.id8()));
     }
 
     @Test
-    @DisplayName("D207: KEYSET_KEYS on a card with no table yet (no SET_CARD) is 6A88 as before, with nothing written")
+    @DisplayName("D213: KEYSET_KEYS on a card with no table yet (no SET_CARD) is 6A88 as before, with nothing written")
     void noTableNoEntry() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));

@@ -1,5 +1,7 @@
 # Protocol 2.3 with D207 to D210 on a J3R180: the tracked file's chip run (2026-11-14, fourth run)
 
+> Note added at the 3.0 merge (2026-11-19): decision numbers here are from before the 3.0 merge. D205 to D215 are now D211 to D221 (D205 to D210 now name the other maintainer's 3.0 decisions, and the links below land on those). The record itself is unchanged.
+
 The tracked 2.3 CAP, with [D207](../DECISIONS.md#d207) (a keyset's keys taught at set-up, before its first piece),
 [D208](../DECISIONS.md#d208) (the field's arithmetic on the chip's RSA with p padded to 64 bytes for the modulus),
 [D209](../DECISIONS.md#d209) (`LOAD_CHANGE`'s points held to the curve by the chip's key agreement) and

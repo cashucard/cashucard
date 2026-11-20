@@ -1,5 +1,7 @@
 # Protocol 2.3 with D211 to D214 on a J3R180: the tracked file's chip run (2026-11-14, fifth run)
 
+> Note added at the 3.0 merge (2026-11-19): decision numbers here are from before the 3.0 merge. D205 to D215 are now D211 to D221 (D205 to D210 now name the other maintainer's 3.0 decisions, and the links below land on those). The record itself is unchanged.
+
 The tracked 2.3 CAP, with [D211](../DECISIONS.md#d211) (the signature's product made in two shares, so that no operand of the chip's RSA
 is a function of the card's key alone), [D212](../DECISIONS.md#d212) (every signature checked on the card against the key before it
 leaves, a failing chip path given up and redone by the bytecode), [D213](../DECISIONS.md#d213) (the set-up's known answers made wider:

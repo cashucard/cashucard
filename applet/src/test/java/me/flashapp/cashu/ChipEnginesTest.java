@@ -33,14 +33,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * D208, D209, D210 (and D207 beside them): what the card asks of the chip's own engines, and what it does where a chip does
+ * D214, D215, D216 (and D213 beside them): what the card asks of the chip's own engines, and what it does where a chip does
  * not hold to them.
  *
- *   D208  the field's arithmetic on the chip's RSA with p itself, padded to 64 bytes, for the modulus: the answer is under p at
+ *   D214  the field's arithmetic on the chip's RSA with p itself, padded to 64 bytes, for the modulus: the answer is under p at
  *         once (no reduction by bytecode); keys made and held to known answers at SET_CARD, the p*p keys kept as the fallback;
- *   D209  LOAD_CHANGE's K, C_ and the unblinded C held to the curve by the chip's key agreement (D206's), where the set-up's
+ *   D215  LOAD_CHANGE's K, C_ and the unblinded C held to the curve by the chip's key agreement (D212's), where the set-up's
  *         test of the agreement held;
- *   D210  e*d mod n in the signature by two squarings on the RSA engine (modulus n padded), 4ab = (a+b)^2 - (a-b)^2, its inputs
+ *   D216  e*d mod n in the signature by two squarings on the RSA engine (modulus n padded), 4ab = (a+b)^2 - (a-b)^2, its inputs
  *         reduced below n first, the bytecode multiplication kept as the fallback; its known answers held at SET_CARD.
  *
  * jCardSim refuses a padded modulus ("not composite"), so a test of the engine path puts an engine of its own in the card's
@@ -171,7 +171,7 @@ class ChipEnginesTest {
     // =========================================================================
 
     @Test
-    @DisplayName("D208, D210: the simulator refuses the padded keys: a SET_CARD on it succeeds all the same, and leaves fieldP and chipMul false (the p*p keys and the bytecode multiplication stay in use); false before any SET_CARD; a payment with change and its LOAD_CHANGE are then right as ever (the change's C is k * hash_to_curve(its secret))")
+    @DisplayName("D214, D216: the simulator refuses the padded keys: a SET_CARD on it succeeds all the same, and leaves fieldP and chipMul false (the p*p keys and the bytecode multiplication stay in use); false before any SET_CARD; a payment with change and its LOAD_CHANGE are then right as ever (the change's C is k * hash_to_curve(its secret))")
     void theSimulatorKeepsTheOldPaths() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         assertFalse(flag(c.applet(), CashuApplet.class, "fieldP"), "nothing known before the first SET_CARD");
@@ -214,11 +214,11 @@ class ChipEnginesTest {
     }
 
     // =========================================================================
-    // D208: the field's arithmetic on the chip's RSA with p padded
+    // D214: the field's arithmetic on the chip's RSA with p padded
     // =========================================================================
 
     @Test
-    @DisplayName("D208: on an engine that holds, SET_CARD makes the three padded keys (modulus p, 32 zero bytes before it, 64 in all; the exponents of the cube, Euler's test and the root), runs their known answers (2^3, Euler 4, root 4, and the cube, Euler's test and root of G's curve side) and sets fieldP; a payment with change then makes every change point (hash_to_curve, NUT-00) and writes it back through the padded keys alone: not one power of the p*p keys")
+    @DisplayName("D214: on an engine that holds, SET_CARD makes the three padded keys (modulus p, 32 zero bytes before it, 64 in all; the exponents of the cube, Euler's test and the root), runs their known answers (2^3, Euler 4, root 4, and the cube, Euler's test and root of G's curve side) and sets fieldP; a payment with change then makes every change point (hash_to_curve, NUT-00) and writes it back through the padded keys alone: not one power of the p*p keys")
     void thePaddedKeysDoTheField() throws Exception {
         Engines e = new Engines();
         UnitsTest.Card c = unsetCard(e);
@@ -245,7 +245,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D208/D210: where the padded keys fail their known answers (an engine that answers wrong, one that refuses every power, one that answers 8 for the cube of 2 but is wrong on a full-width value), fieldP stays false, the SET_CARD succeeds, and the change is right on the p*p keys")
+    @DisplayName("D214/D216: where the padded keys fail their known answers (an engine that answers wrong, one that refuses every power, one that answers 8 for the cube of 2 but is wrong on a full-width value), fieldP stays false, the SET_CARD succeeds, and the change is right on the p*p keys")
     void aFieldEngineThatFailsIsNotUsed() throws Exception {
         for (String how : new String[] { "lie", "refuse", "wide" }) {
             Engines e = new Engines();
@@ -271,7 +271,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D208: a padded power of an x at or over p is refused (6F00, nothing computed): the chip answers garbage for it, so the card never asks; the callers' x are under p, and a value at p and over p is stopped where the card would otherwise take the garbage")
+    @DisplayName("D214: a padded power of an x at or over p is refused (6F00, nothing computed): the chip answers garbage for it, so the card never asks; the callers' x are under p, and a value at p and over p is stopped where the card would otherwise take the garbage")
     void aValueAtOrOverPIsNeverGivenToThePaddedKeys() throws Exception {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
@@ -296,7 +296,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D208: the padded powers against Python's: 75 values (0, 1, 2, p - 1, p - 2, G's x and y, the half of p, and random ones) each cubed, raised to (p - 1)/2 and to (p + 1)/4, the answers under p at once and equal to pow(x, e, p)")
+    @DisplayName("D214: the padded powers against Python's: 75 values (0, 1, 2, p - 1, p - 2, G's x and y, the half of p, and random ones) each cubed, raised to (p - 1)/2 and to (p + 1)/4, the answers under p at once and equal to pow(x, e, p)")
     void paddedPowersAreRight() throws Exception {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
@@ -324,7 +324,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D208: hash_to_curve through the padded keys, NUT-00's way: 40 change secrets' points (five payments of eight outputs, each with its own random nonce, so the counters run from 0 to several) found by the card are k * the reference's Y (see changeIsRight), the Euler test taking a counter only where x^3 + 7 is a square")
+    @DisplayName("D214: hash_to_curve through the padded keys, NUT-00's way: 40 change secrets' points (five payments of eight outputs, each with its own random nonce, so the counters run from 0 to several) found by the card are k * the reference's Y (see changeIsRight), the Euler test taking a counter only where x^3 + 7 is a square")
     void hashToCurveByThePaddedKeys() throws Exception {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
@@ -338,7 +338,7 @@ class ChipEnginesTest {
     }
 
     // =========================================================================
-    // D209: the curve test of LOAD_CHANGE's points by the chip's key agreement
+    // D215: the curve test of LOAD_CHANGE's points by the chip's key agreement
     // =========================================================================
 
     /** A LOAD_CHANGE of a payment of 64 with one change output of 8, run on `c` after wrapping the card's engines: the counts it made. */
@@ -360,7 +360,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D209: LOAD_CHANGE's K, C_ and the unblinded C are held to the curve by the chip's key agreement (three agreements, and no Euler test of theirs: the RSA does only the opening's own B_, a cube and a root); where the set-up's agreement test did not hold, the old tests run (ten powers, no extra agreement)")
+    @DisplayName("D215: LOAD_CHANGE's K, C_ and the unblinded C are held to the curve by the chip's key agreement (three agreements, and no Euler test of theirs: the RSA does only the opening's own B_, a cube and a root); where the set-up's agreement test did not hold, the old tests run (ten powers, no extra agreement)")
     void loadChangeChecksByAgreement() throws Exception {
         int[] by = loadChangeCounts(KeysetKeysTest.card(), true), old = loadChangeCounts(KeysetKeysTest.card(), false);
         assertEquals(2, by[0], "by the agreement: the RSA powers are B_'s cube and root alone");
@@ -369,7 +369,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D209: a K or a C_ off the curve is refused 6A80 by the agreement path and by the old path alike, with the opening still owed; so is a C_ that is no point at all, and the unblinded C's own check never takes a bad C (a K moved off by one on the wrong curve side): the piece is not written")
+    @DisplayName("D215: a K or a C_ off the curve is refused 6A80 by the agreement path and by the old path alike, with the opening still owed; so is a C_ that is no point at all, and the unblinded C's own check never takes a bad C (a K moved off by one on the wrong curve side): the piece is not written")
     void offCurvePointsAreRefusedEitherWay() throws Exception {
         for (boolean byAgreement : new boolean[] { true, false }) {
             UnitsTest.Card c = KeysetKeysTest.card();
@@ -396,7 +396,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D209: a chip whose key agreement takes every point fails the set-up's test: curveByAgreement false, so LOAD_CHANGE tests its points by Euler's test and refuses an off-curve C_ 6A80, which the lying agreement would have taken")
+    @DisplayName("D215: a chip whose key agreement takes every point fails the set-up's test: curveByAgreement false, so LOAD_CHANGE tests its points by Euler's test and refuses an off-curve C_ 6A80, which the lying agreement would have taken")
     void aLyingAgreementIsNotLeanedOn() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         SchnorrHW s = signerOf(c);
@@ -417,7 +417,7 @@ class ChipEnginesTest {
     }
 
     // =========================================================================
-    // D210: e * d mod n on the chip's RSA
+    // D216: e * d mod n on the chip's RSA
     // =========================================================================
 
     static byte[] be(BigInteger v) { return unsigned32(v); }
@@ -434,7 +434,7 @@ class ChipEnginesTest {
     static BigInteger product(byte[] a, byte[] b) { return new BigInteger(1, a).multiply(new BigInteger(1, b)).mod(N); }
 
     @Test
-    @DisplayName("D210: the chip's multiplication mod n (two squarings, 4ab = (a+b)^2 - (a-b)^2, two halvings) against Python's: 340 products (0, 1, 2, n - 1, n - 2, n/2, (n+1)/2, 2^255 and the like in every pairing, a*a, and random ones), each the same as a * b mod n; the engine is asked for exactly two squarings, both of inputs under n (it answers garbage over the modulus, and none was given)")
+    @DisplayName("D216: the chip's multiplication mod n (two squarings, 4ab = (a+b)^2 - (a-b)^2, two halvings) against Python's: 340 products (0, 1, 2, n - 1, n - 2, n/2, (n+1)/2, 2^255 and the like in every pairing, a*a, and random ones), each the same as a * b mod n; the engine is asked for exactly two squarings, both of inputs under n (it answers garbage over the modulus, and none was given)")
     void theChipsProductsAreRight() throws Exception {
         Engine eng = new Engine(null);
         SchnorrHW s = signerWith(eng);
@@ -467,7 +467,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D210: inputs at or over n (n, n + 1, 2^256 - 1: a 256-bit value can be over n) are reduced below n before the engine sees them: the product is the product of their residues, and the engine is never given a value at or over its modulus (it answers garbage there); the inputs are reduced where they are, as the doc says")
+    @DisplayName("D216: inputs at or over n (n, n + 1, 2^256 - 1: a 256-bit value can be over n) are reduced below n before the engine sees them: the product is the product of their residues, and the engine is never given a value at or over its modulus (it answers garbage there); the inputs are reduced where they are, as the doc says")
     void inputsOverNAreReducedFirst() throws Exception {
         Engine eng = new Engine(null);
         SchnorrHW s = signerWith(eng);
@@ -487,7 +487,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D210: the self-test of the squaring (3^2 = 9, (n - 1)^2 = 1, G's x times G's y both ways round) holds on an engine that holds; an engine that lies, refuses, or is wrong only on a full-width value fails it, and chipMul is then false")
+    @DisplayName("D216: the self-test of the squaring (3^2 = 9, (n - 1)^2 = 1, G's x times G's y both ways round) holds on an engine that holds; an engine that lies, refuses, or is wrong only on a full-width value fails it, and chipMul is then false")
     void theSquaringSelfTest() throws Exception {
         for (String how : new String[] { "ok", "lie", "refuse", "wide" }) {
             Engine eng = new Engine(null) {
@@ -529,7 +529,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D210, D211: BIP-340 signatures by the chip's multiplication verify: 30 signatures under keys of both P.y parities (and the date form, d + t), 0, 1 and n - 1 among the keys, over random messages; each verified with the BIP-340 reference (schnorrVerify), four squarings a signature (the split of D211), nothing of d or k left in the signer's work or scratch afterwards")
+    @DisplayName("D216, D217: BIP-340 signatures by the chip's multiplication verify: 30 signatures under keys of both P.y parities (and the date form, d + t), 0, 1 and n - 1 among the keys, over random messages; each verified with the BIP-340 reference (schnorrVerify), four squarings a signature (the split of D217), nothing of d or k left in the signer's work or scratch afterwards")
     void signaturesByTheChipVerify() throws Exception {
         Engine eng = new Engine(null);
         SchnorrHW s = signerWith(eng);
@@ -553,7 +553,7 @@ class ChipEnginesTest {
             assertTrue(isZero(get(s, SchnorrHW.class, "work"), 0), "work is cleared after the signature");
         }
         assertTrue(odd > 3 && even > 3, "both parities: " + odd + " odd, " + even + " even");
-        assertEquals(4 * ds.size(), eng.powers, "four squarings a signature (D211: two products, e*d1 and e*d2, of two each; D210 made it two)");
+        assertEquals(4 * ds.size(), eng.powers, "four squarings a signature (D217: two products, e*d1 and e*d2, of two each; D216 made it two)");
         assertEquals(0, eng.garbage, "of inputs under n alone");
         // keys per load: d + t, the public key P + t*G given after t
         BigInteger d = BigInteger.valueOf(0x123456789ABCDEFL), t = N.subtract(BigInteger.valueOf(5));
@@ -568,7 +568,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D210: with chipMul false (a failed self-test, or a chip with no such keys) the signature is by the bytecode multiplication, as before, and verifies; the engine is not asked for anything")
+    @DisplayName("D216: with chipMul false (a failed self-test, or a chip with no such keys) the signature is by the bytecode multiplication, as before, and verifies; the engine is not asked for anything")
     void withoutTheChipTheBytecodeSigns() throws Exception {
         Engine eng = new Engine(null);
         SchnorrHW s = signerWith(eng);
@@ -586,7 +586,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D210: SET_CARD on an engine that holds makes the signature's squaring key (modulus n padded to 64 bytes, exponent 2) and sets chipMul; a payment's SIGN, a held asking's work and AUTH are then signed through it (two squarings each), and the payment's signature is the card's own: it verifies under P + t*G; on a SET_CARD whose engine fails the squaring's test chipMul is false")
+    @DisplayName("D216: SET_CARD on an engine that holds makes the signature's squaring key (modulus n padded to 64 bytes, exponent 2) and sets chipMul; a payment's SIGN, a held asking's work and AUTH are then signed through it (two squarings each), and the payment's signature is the card's own: it verifies under P + t*G; on a SET_CARD whose engine fails the squaring's test chipMul is false")
     void aCardSignsThroughTheChip() throws Exception {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
@@ -616,7 +616,7 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D210: the signature through the chip is the same as the bytecode's for the same nonce: with the randomness fixed, s = k + e*d mod n is byte for byte the same either way")
+    @DisplayName("D216: the signature through the chip is the same as the bytecode's for the same nonce: with the randomness fixed, s = k + e*d mod n is byte for byte the same either way")
     void theSameSignatureEitherWay() throws Exception {
         BigInteger d = BigInteger.valueOf(0x7777777777L).shiftLeft(100).add(BigInteger.valueOf(31337));
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);

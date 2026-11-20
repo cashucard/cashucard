@@ -12,11 +12,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * D219, from the red team of 2026-11-19 (card 2.3 at 4d057fb, finding F1 and F3; its proofs RT23TableTest and the reading of
- * KEYSET_KEYS' end). D214's reclaim spared every keyset taught and never loaded, for good: a till with the PIN for one tap
+ * D223, from the red team of 2026-11-19 (card 2.3 at 4d057fb, finding F1 and F3; its proofs RT23TableTest and the reading of
+ * KEYSET_KEYS' end). D220's reclaim spared every keyset taught and never loaded, for good: a till with the PIN for one tap
  * taught keysets of its own making and held the keyset table until a reset, and the holder's next new keyset was refused
  * 6A9C. Now an entry waiting for its first piece is spared only while it was entered in the card's first set-up (the holder's
- * own, which the phone teaches at set-up and loads later) or taught in this time in the field (D214's case: three taught in a
+ * own, which the phone teaches at set-up and loads later) or taught in this time in the field (D220's case: three taught in a
  * tap); the set-up's entry does not count toward the two without the mark. And keys already taught are replaced by other keys
  * only under the holder's say.
  */
@@ -41,13 +41,13 @@ class TillKeysetsTest {
         return n;
     }
 
-    /** A card set up as Foxy sets one up, in one selection: the PIN, the record, the claim (one asking, D215) when `owner`, and its own currency's keyset `ks` taught there (the set-up's teaching); then a new tap with the PIN. */
+    /** A card set up as Foxy sets one up, in one selection: the PIN, the record, the claim (one asking, D221) when `owner`, and its own currency's keyset `ks` taught there (the set-up's teaching); then a new tap with the PIN. */
     static UnitsTest.Card setUpTeaching(boolean owner, Keyset ks) throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
         c.pin();
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, UnitsTest.recordIn(SAT))));
-        if (owner) assertEquals(SW_OK, c.sw(setOwnerOpenCommand(OWNER)), "the claim right after the record: one asking (D215)");
+        if (owner) assertEquals(SW_OK, c.sw(setOwnerOpenCommand(OWNER)), "the claim right after the record: one asking (D221)");
         assertEquals(SW_OK, c.sw(setTimeCommand(T0)));
         taught(c, ks);
         assertEquals(0x08, c.rawStateOf(ks.id8()) & 0x08, "entered in the first set-up");
@@ -57,7 +57,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219 (red team F1, owned card): a till with the PIN and no grant plants one made-up keyset (the cap of two unmarked holds in its tap); after its tap the entry is freed, and the holder's top-up into the mint's new keyset, PIN alone, answers 9000, teaching first as Foxy does or loading straight away")
+    @DisplayName("D223 (red team F1, owned card): a till with the PIN and no grant plants one made-up keyset (the cap of two unmarked holds in its tap); after its tap the entry is freed, and the holder's top-up into the mint's new keyset, PIN alone, answers 9000, teaching first as Foxy does or loading straight away")
     void ownedCard_aTillsKeysetIsFreedAfterItsTap() throws Exception {
         for (boolean teachFirst : new boolean[] { true, false }) {
             UnitsTest.Card c = new UnitsTest.Card().ready(SAT, true);
@@ -69,7 +69,7 @@ class TillKeysetsTest {
             assertEquals(1, ok, "one made-up keyset: A and it are the two unmarked");
             assertEquals(NO_ROOM, teach(c, junk(4)).getSW(), "a second is refused in the till's own tap");
             assertEquals(SW_OK, c.clearSpent(), "a reclaim in the till's tap");
-            assertEquals(1, planted(c, 1, 4), "keeps the keyset it taught in this tap (D214)");
+            assertEquals(1, planted(c, 1, 4), "keeps the keyset it taught in this tap (D220)");
 
             for (int i = 0; i < 2; i++) {                         // later taps: the holder pays and loads A again
                 c.tap();
@@ -88,7 +88,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219 (red team F1, owned card, the proof's order): the till's keyset still in the table when the holder comes (no reclaim between): the holder's load of a new keyset with the PIN alone frees it there and goes in")
+    @DisplayName("D223 (red team F1, owned card, the proof's order): the till's keyset still in the table when the holder comes (no reclaim between): the holder's load of a new keyset with the PIN alone frees it there and goes in")
     void ownedCard_theHoldersLoadFreesTheTillsKeyset() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card().ready(SAT, true);
         c.put(-1, A.id8(), 64);
@@ -96,13 +96,13 @@ class TillKeysetsTest {
         assertEquals(SW_OK, teach(c, junk(1)).getSW());
         c.tap();
         assertEquals(1, planted(c, 1, 1), "still there: nothing has reclaimed since");
-        assertEquals(SW_OK, c.load(c.piece(B.id8(), 32)).getSW(), "the holder's load of B, the PIN alone (6A9C before D219)");
+        assertEquals(SW_OK, c.load(c.piece(B.id8(), 32)).getSW(), "the holder's load of B, the PIN alone (6A9C before D223)");
         assertEquals(0, planted(c, 1, 1));
         assertEquals(0x40 | 0x04, c.rawStateOf(B.id8()) & 0xC7, "B: in use, loaded, unmarked");
     }
 
     @Test
-    @DisplayName("D219 (red team F1, simple card): a till with the PIN and a held tap (the say: marked entries) fills the table with five made-up keysets; after its tap they are freed, and the holder's next two rotations (B, then C while B holds money) go in")
+    @DisplayName("D223 (red team F1, simple card): a till with the PIN and a held tap (the say: marked entries) fills the table with five made-up keysets; after its tap they are freed, and the holder's next two rotations (B, then C while B holds money) go in")
     void simpleCard_aTillCannotFillTheTable() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card().ready(SAT, false);
         int a = c.put(-1, A.id8(), 64);
@@ -128,12 +128,12 @@ class TillKeysetsTest {
         c.tap();
         HolderTest.hold(c);
         taught(c, cKs);
-        assertEquals(SW_OK, c.load(c.piece(cKs.id8(), 32)).getSW(), "the next rotation while B holds money (6A9C before D219)");
+        assertEquals(SW_OK, c.load(c.piece(cKs.id8(), 32)).getSW(), "the next rotation while B holds money (6A9C before D223)");
         assertTrue(c.entryOf(B.id8()) >= 0 && c.entryOf(cKs.id8()) >= 0);
     }
 
     @Test
-    @DisplayName("D219: the holder's set-up entry (taught in the first set-up, Foxy's cardTeachAtSetUp) stays through any number of taps and reclaims until its first piece, does not count toward the two unmarked, and the till's keysets beside it go; the first deposit goes into it, and a later mint keyset change goes in under the PIN alone")
+    @DisplayName("D223: the holder's set-up entry (taught in the first set-up, Foxy's cardTeachAtSetUp) stays through any number of taps and reclaims until its first piece, does not count toward the two unmarked, and the till's keysets beside it go; the first deposit goes into it, and a later mint keyset change goes in under the PIN alone")
     void theSetUpEntryStaysAndAKeysetChangeGoesIn() throws Exception {
         UnitsTest.Card c = setUpTeaching(true, A);
         int setUp = c.entryOf(A.id8());
@@ -175,7 +175,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219: a set-up entry left waiting (the mint moved to K1 before the first deposit) does not block the holder: K1 and then K2, each under the PIN alone, go in beside it while K1 holds money, and a till's keyset between them is freed")
+    @DisplayName("D223: a set-up entry left waiting (the mint moved to K1 before the first deposit) does not block the holder: K1 and then K2, each under the PIN alone, go in beside it while K1 holds money, and a till's keyset between them is freed")
     void aStaleSetUpEntryBlocksNothing() throws Exception {
         UnitsTest.Card c = setUpTeaching(true, A);
         Keyset k1 = new Keyset(0, powers(32), 31, ""), k2 = new Keyset(0, powers(32), 32, "");
@@ -191,7 +191,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219: a simple card's set-up entry (no owner) is the holder's as well: kept across taps, never loaded")
+    @DisplayName("D223: a simple card's set-up entry (no owner) is the holder's as well: kept across taps, never loaded")
     void aSimpleCardsSetUpEntry() throws Exception {
         UnitsTest.Card c = setUpTeaching(false, A);
         c.tap();
@@ -204,7 +204,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219: a keyset taught in an earlier tap and never loaded is let go by a reclaim after that tap (only the set-up's waits across taps), and the same keyset taught again in the tap that loads it goes in")
+    @DisplayName("D223: a keyset taught in an earlier tap and never loaded is let go by a reclaim after that tap (only the set-up's waits across taps), and the same keyset taught again in the tap that loads it goes in")
     void anOldWaitingKeysetIsLetGo() throws Exception {
         UnitsTest.Card c = KeysetKeysTest.card();
         taught(c, V1);
@@ -218,7 +218,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219: GET_CARD's table and GET_INFO's count say the state as before: the set-up and fresh bits are the card's own; byte 49 counts the entries that count toward the two")
+    @DisplayName("D223: GET_CARD's table and GET_INFO's count say the state as before: the set-up and fresh bits are the card's own; byte 49 counts the entries that count toward the two")
     void whatAReaderIsTold() throws Exception {
         UnitsTest.Card c = setUpTeaching(true, A);
         byte[] t = c.send(new CommandAPDU(CLA, INS_GET_CARD, 2, 0, 256)).getData();
@@ -232,7 +232,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219 (red team F3): keys already taught are not replaced under the PIN alone: the same keys taught again keep the top (9000); other keys whose ID shares the 8 bytes (a 56-bit match, stood in for by the top changed on the card) are refused 6A9D with the top kept, and taken with the owner's grant")
+    @DisplayName("D223 (red team F3): keys already taught are not replaced under the PIN alone: the same keys taught again keep the top (9000); other keys whose ID shares the 8 bytes (a 56-bit match, stood in for by the top changed on the card) are refused 6A9D with the top kept, and taken with the owner's grant")
     void taughtKeysAreNotReplacedWithoutTheSay() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card().ready(SAT, true);
         c.put(-1, A.id8(), 64);
@@ -255,7 +255,7 @@ class TillKeysetsTest {
     }
 
     @Test
-    @DisplayName("D219: in the source, the reclaim spares a waiting entry only with the set-up bit, or the fresh bit while this time in the field taught")
+    @DisplayName("D223: in the source, the reclaim spares a waiting entry only with the set-up bit, or the fresh bit while this time in the field taught")
     void theSourceSaysSo() throws Exception {
         String code = new String(java.nio.file.Files.readAllBytes(SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8);
         String reclaim = code.substring(code.indexOf("private void reclaim("), code.indexOf("private boolean limitWithNoRate("));

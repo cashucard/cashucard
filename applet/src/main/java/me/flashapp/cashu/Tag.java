@@ -13,7 +13,7 @@ import javacard.framework.Util;
  * The card as an NFC Forum Type 4 Tag (mapping version 2.0), read only, carrying one web address.
  *
  * A phone with its screen on reads NFC tags by itself and offers to open the address a tag holds, so that a phone with the
- * app opens the app and a phone without it opens the page. Since D216 the address is never the same twice for a card that
+ * app opens the app and a phone without it opens the page. Since D222 the address is never the same twice for a card that
  * is set up, so that a reader cannot follow a card by its tag, while the owner's phone can still tell its own card:
  *
  *     https://getfoxy.io/card#new                     a card with no owner or no holder's record (new, or reset)

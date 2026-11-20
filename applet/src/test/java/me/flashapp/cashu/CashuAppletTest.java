@@ -128,7 +128,7 @@ class CashuAppletTest {
     static final int SW_ENTER_PIN           = 0x6A9E;
     /** 2.3 (D187, D189): keep holding, a held count not yet through (an owner's claim, a history of a card with no owner): ask again. */
     static final int SW_KEEP_HOLDING        = 0x6A98;
-    /** The askings of a claim (D187), of a history of a card with no owner (D189) and of the reset by the PIN of a card with no owner (D196), as D205 sets them (the project owner, 2026-11-14): the last goes through. About 0.75 s an asking on the J3R180: 3, 4 and 11 seconds (15 with the history's). */
+    /** The askings of a claim (D187), of a history of a card with no owner (D189) and of the reset by the PIN of a card with no owner (D196), as D211 sets them (the project owner, 2026-11-14): the last goes through. About 0.75 s an asking on the J3R180: 3, 4 and 11 seconds (15 with the history's). */
     static final int CLAIM_ASKINGS = 4, HISTORY_ASKINGS = 7, RESET_ASKINGS = 17;
     /** The wait (6a) in answers of SPEND_ALL_SIGN: the applet's two sizes, for the first limit's worth over the limit and for every further one. */
     static final int WAIT_OVER_SIGNS = 10, WAIT_MORE_SIGNS = 4;
@@ -148,7 +148,7 @@ class CashuAppletTest {
     static int waitsRule(long limit, long net, int made, boolean second) {
         return Math.max(0, waitBeforeCredit(limit, net, second) - changeCredit(made));
     }
-    /** W: 2.2's wait, before the change outputs' credit (D205 took away 2.3's floor, D188): 0 within the limit, and none for a first payment with no limit. */
+    /** W: 2.2's wait, before the change outputs' credit (D211 took away 2.3's floor, D188): 0 within the limit, and none for a first payment with no limit. */
     static int waitBeforeCredit(long limit, long net, boolean second) {
         if (limit <= 0) return second ? WAIT_OVER_SIGNS : 0;
         long units = net <= limit + limit / 32 ? 1 : Math.min(WAIT_UNITS_MOST, (net + limit - 1) / limit);
@@ -2426,7 +2426,7 @@ class CashuAppletTest {
             ResponseAPDU r = signAll();
             assertEquals(SW_OK, r.getSW(), what);
             assertEquals(64, r.getData().length, what + ": a signature");
-            assertEquals(waitsRule(0, 0, 0), waitsTaken(), what + ": no wait: there is no limit on a payment (D205)");
+            assertEquals(waitsRule(0, 0, 0), waitsTaken(), what + ": no wait: there is no limit on a payment (D211)");
             byte[] sig = r.getData();
             assertTrue(signedForAll(sig, named, outputs, REFUND), what + ": signed over secret and C of every place named, in order, and then the outputs");
             byte[][] swapped = named.clone();
@@ -8388,8 +8388,8 @@ class CashuAppletTest {
     @DisplayName("A payment is counted for 255 limits' worth at most: it never waits more than 1022 times, however large, and every wait says only 00 01")
     void testTheWaitHasAMost() throws Exception {
         assertEquals(1022, WAITS_MOST, "the most a payment waits is pinned: ten for the first limit's worth over, and four for each of the 253 after it");
-        assertEquals(WAITS_MOST, CashuApplet.WAIT_SIGNS_MOST, "and it is the applet's own most, the wait of a sum that wraps (D205: no floor on top of it)");
-        assertFalse(Arrays.stream(CashuApplet.class.getDeclaredFields()).anyMatch(x -> x.getName().equals("WAIT_FLOOR_SIGNS")), "2.3's payment floor is gone (D205)");
+        assertEquals(WAITS_MOST, CashuApplet.WAIT_SIGNS_MOST, "and it is the applet's own most, the wait of a sum that wraps (D211: no floor on top of it)");
+        assertFalse(Arrays.stream(CashuApplet.class.getDeclaredFields()).anyMatch(x -> x.getName().equals("WAIT_FLOOR_SIGNS")), "2.3's payment floor is gone (D211)");
         assertEquals(waitsRule(1, 254, 0), payWaits(1, 254), "254 limits' worth");
         assertEquals(WAITS_MOST, payWaits(1, 255), "255 is the most");
         assertEquals(WAITS_MOST, payWaits(1, 256), "256 would be one more, and is not counted");
@@ -9314,7 +9314,7 @@ class CashuAppletTest {
         // a load's one step reads it once, for the holder's say over a new keyset's entry (D184): it marks the entry and lets nothing on
         String one = body(code, "private short loadOne(", "private void processClearSpent(");
         assertEquals(0, count(one, "loadGrant"), "loadOne reads no grant itself");
-        // D207: the entry of a new keyset is made by `newEntry`, which a load and a teaching share, and it reads the say there
+        // D213: the entry of a new keyset is made by `newEntry`, which a load and a teaching share, and it reads the say there
         assertTrue(one.contains("newEntry(unit)"), "a new keyset's entry is made by newEntry");
         assertTrue(body(code, "private short newEntry(", "private byte newState(").contains("boolean say = holderSays();"), "which asks for the holder's say, and for nothing else");
         String getInfo = body(code, "private void processGetInfo(", "private void processGetPubkey(");
@@ -11070,7 +11070,7 @@ class CashuAppletTest {
         int agree = hwCode.indexOf("short agree(ECPrivateKey priv, byte[] pub, short pubOff, short pubLen, byte[] out, short outOff) {");
         assertTrue(agree > 0 && hwCode.startsWith("short agree(ECPrivateKey priv, byte[] pub, short pubOff, short pubLen, byte[] out, short outOff) { if (pubLen != (short)65) ISOException.throwIt(ISO7816.SW_WRONG_DATA); try { ecdh.init(priv); framed(ecdh.generateSecret(pub, pubOff, pubLen, out, outOff), out, outOff); } finally { rest(); } return (short)65; }", agree),
             "SchnorrHW.agree: 65 bytes (its callers hold the point to the curve), sets the given key, agrees, holds the answer to its framing, and gives the agreement G's x again on every way out");
-        assertEquals(5, count(hwCode, "ecdh.init("), "the signer's agreement is initialised in sign (its own key, every time), in agree, in mul (LOAD_CHANGE, D183, and the framing check), in rest (G's x, after each secret use) and in agrees (D206: G's x, the public scalar, and nothing else)");
+        assertEquals(5, count(hwCode, "ecdh.init("), "the signer's agreement is initialised in sign (its own key, every time), in agree, in mul (LOAD_CHANGE, D183, and the framing check), in rest (G's x, after each secret use) and in agrees (D212: G's x, the public scalar, and nothing else)");
         assertTrue(hwCode.contains("boolean agrees(byte[] p, short off) { ready(); tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32); ecdh.init(tmpPriv);"), "agrees gives the agreement G's x, a public number, and no key of the card's");
         assertTrue(hwCode.contains("private void rest() { ready(); tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32); ecdh.init(tmpPriv); gm.init(tmpPriv); if (keyInRam) tmpPriv.clearKey(); }"), "rest puts a public scalar back in the key and in both agreements, and clears a key in RAM");
         assertTrue(hwCode.indexOf("tmpPriv.setS(k, kOff, (short) 32); ecdh.init(tmpPriv);") > 0, "mul sets its own scalar in the signer's key before it initialises the agreement with it");
@@ -11079,7 +11079,7 @@ class CashuAppletTest {
 
     // ---- the transcript ------------------------------------------------------
 
-    /** The waits (D205 took away 2.3's floor), each a SPEND_ALL_SIGN answered "not yet", written down. */
+    /** The waits (D211 took away 2.3's floor), each a SPEND_ALL_SIGN answered "not yet", written down. */
     private void sayTheWaits(StringBuilder out, int waits) {
         for (int k = 1; k <= waits; k++) assertNotYet(say(out, "the wait: " + k + ": not yet", "exact", SW_OK, SIGN_ALL), "wait " + k);
     }
@@ -11112,11 +11112,11 @@ class CashuAppletTest {
 
     /**
      * A claim (D187), written down as a phone makes it. Both claims here come right after the set-up's record, written under
-     * its PIN in the same time in the field, so each is one asking (D215); a claim with no such record is held for
+     * its PIN in the same time in the field, so each is one asking (D221); a claim with no such record is held for
      * CLAIM_ASKINGS askings, each but the last answered 6A98, keep holding (HolderTest, ClaimAfterSetUpTest).
      */
     private void sayClaim(StringBuilder out, String name, CommandAPDU claim) {
-        say(out, name + ": right after the set-up's record, one asking sets the owner (D215)", "exact", SW_OK, claim);
+        say(out, name + ": right after the set-up's record, one asking sets the owner (D221)", "exact", SW_OK, claim);
     }
 
     /** The card taken out of the field and put back, written down as that: a model is to do the same, and send nothing. */
@@ -11639,7 +11639,7 @@ class CashuAppletTest {
         int changeAgainAt = out.length();
         changeA = say(out, "the card's own change: 40, a fresh output", "exact", SW_OK, changeCommand(40, mintKey()));
         changeB = say(out, "and 20, another", "exact", SW_OK, changeCommand(20, mintKey()));
-        // no floor (D205): within the limit, change or no change, the first SIGN is the signature
+        // no floor (D211): within the limit, change or no change, the first SIGN is the signature
         assertEquals(0, waitsRule(0, 90, 2));
         ResponseAPDU changeSigned = say(out, "90 leaves the card, within the limit: no wait; the signature, over the pieces, the terminal's output and the card's two", "sigall", SW_OK, SIGN_ALL);
         assertEquals(64, changeSigned.getData().length);
@@ -12121,7 +12121,7 @@ class CashuAppletTest {
         say(out, "CERT_READ P1 = 04", "exact", SW_INCORRECT_P1P2, new CommandAPDU(CLA, CashuApplet.INS_CERT_READ, 4, 0, 256));
         say(out, "KEYSET_KEYS P1 = 04", "exact", SW_INCORRECT_P1P2, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 4, 0, new byte[8]));
         say(out, "KEYSET_KEYS keys with no teaching begun", "exact", SW_CONDITIONS_NOT_SATIS, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 1, 0, new byte[41]));
-        say(out, "KEYSET_KEYS begun for a keyset in no entry of the table (D207: entered, as its first piece would be)", "exact", SW_OK, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 0, 0, hexToBytes("00ffffffffffffff")));
+        say(out, "KEYSET_KEYS begun for a keyset in no entry of the table (D213: entered, as its first piece would be)", "exact", SW_OK, new CommandAPDU(CLA, CashuApplet.INS_KEYSET_KEYS, 0, 0, hexToBytes("00ffffffffffffff")));
         sayReset(out, "taken away and put back, by a reader with no PIN");
         say(out, "select", "exact", SW_OK, select);
         say(out, "GROUP_KEYS with no PIN: refused", "exact", SW_SECURITY_NOT_SATIS, new CommandAPDU(CLA, CashuApplet.INS_GROUP_KEYS, 0, 0, u32(0), 0x62));
@@ -12579,7 +12579,7 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("D205: a payment within its limit, the first of its time in the field, is signed at its first SPEND_ALL_SIGN, with no limit as with one (2.3's floor of three 'not yet' answers, D188, is gone); the card's change outputs take two waits off an over-the-limit wait for every three, never below none; a payment with no wait is not marked in the log as one that waited")
+    @DisplayName("D211: a payment within its limit, the first of its time in the field, is signed at its first SPEND_ALL_SIGN, with no limit as with one (2.3's floor of three 'not yet' answers, D188, is gone); the card's change outputs take two waits off an over-the-limit wait for every three, never below none; a payment with no wait is not marked in the log as one that waited")
     void testAPaymentWithinItsLimitIsSignedAtTheFirstSign() throws Exception {
         readyWithLimit(0);
         assertEquals(SW_OK, setLimits(0, 1000));
@@ -12602,7 +12602,7 @@ class CashuAppletTest {
         assertEquals(SW_OK, sw(beginCommand(0)));
         assertEquals(SW_OK, transmit(SIGN_ALL).getSW(), "no limit on a payment: signed at the first SIGN too");
         // the card's change outputs take two waits off for every three of them from a wait that is owed, never below none:
-        // 150 under a limit of 100 owes ten (W of D205), and n outputs of 1 take off n * 2 / 3
+        // 150 under a limit of 100 owes ten (W of D211), and n outputs of 1 take off n * 2 / 3
         int[][] cases = { { 1, 10 }, { 2, 9 }, { 3, 8 }, { 5, 7 }, { 7, 6 } };
         for (int[] c : cases) {
             simulator = freshCard();

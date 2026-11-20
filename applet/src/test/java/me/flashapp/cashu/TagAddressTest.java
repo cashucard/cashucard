@@ -39,7 +39,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * The tag's address that changes at every read (D216). A card with no owner or no holder's record says
+ * The tag's address that changes at every read (D222). A card with no owner or no holder's record says
  * `https://getfoxy.io/card#new`; a set-up card says `https://getfoxy.io/card#` and 48 lowercase hex characters, R (16 bytes of
  * the chip's random, new at each selection) and M = HMAC-SHA256(K, R)[0..8), K = SHA-256("CashuCard/tag-address" || c). The
  * owner's phone, which has c, knows its card by M; anyone else sees a new address at every read. Simulator only.

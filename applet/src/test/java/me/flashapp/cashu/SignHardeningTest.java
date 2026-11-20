@@ -20,10 +20,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The review's findings on the signature's path, made permanent. D211 the product of e and d is never given to the chip's
- * RSA as a function of d alone (a fresh random split of d, four squarings); D212 every signature is checked on the card against
+ * The review's findings on the signature's path, made permanent. D217 the product of e and d is never given to the chip's
+ * RSA as a function of d alone (a fresh random split of d, four squarings); D218 every signature is checked on the card against
  * the key before it leaves (a failing chip path is given up and redone by the bytecode, and a signature that fails then is not
- * released); D213 the set-up's known answers ask the engines for distinct operands at full width; and a sign-time engine failure
+ * released); D219 the set-up's known answers ask the engines for distinct operands at full width; and a sign-time engine failure
  * falls back and clears chipMul. Each test failed on the 7d760e5 file first (see the fix-24 report).
  */
 class SignHardeningTest {
@@ -82,7 +82,7 @@ class SignHardeningTest {
     // ---- MEDIUM-1: d is never alone in the engine ----
 
     @Test
-    @DisplayName("D211: no operand the RSA engine is given is a function of d alone: with e public (it is the signature's own challenge), none of the four inputs of a signature, 25 signatures under random keys, gives d, n - d, or any of e + d, e - d, d - e, e + (n - d) (what the masks of D210 gave: u = e + d and v = |e - d|), and the same key and message sign with other inputs each time")
+    @DisplayName("D217: no operand the RSA engine is given is a function of d alone: with e public (it is the signature's own challenge), none of the four inputs of a signature, 25 signatures under random keys, gives d, n - d, or any of e + d, e - d, d - e, e + (n - d) (what the masks of D216 gave: u = e + d and v = |e - d|), and the same key and message sign with other inputs each time")
     void theEngineNeverSeesDAlone() throws Exception {
         Random rnd = new Random(24);
         for (int i = 0; i < 25; i++) {
@@ -112,7 +112,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D211: the shares are zeroed on every way out: after a signature, after one whose engine refuses, and after one whose engine is faulted, sc and work hold nothing (the shares sat in them)")
+    @DisplayName("D217: the shares are zeroed on every way out: after a signature, after one whose engine refuses, and after one whose engine is faulted, sc and work hold nothing (the shares sat in them)")
     void theSharesAreClearedOnEveryWayOut() throws Exception {
         BigInteger d = BigInteger.valueOf(0xC0FFEE).shiftLeft(100).add(BigInteger.valueOf(5));
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
@@ -133,7 +133,7 @@ class SignHardeningTest {
     // ---- MEDIUM-2 and -3: every signature is checked, none unchecked leaves ----
 
     @Test
-    @DisplayName("D212: a fault in any one of the four squarings, in its input or its output, in 8 bit places each, never lets a bad signature leave: the card withholds it and signs again by the bytecode, the answer verifies, and chipMul is cleared")
+    @DisplayName("D218: a fault in any one of the four squarings, in its input or its output, in 8 bit places each, never lets a bad signature leave: the card withholds it and signs again by the bytecode, the answer verifies, and chipMul is cleared")
     void aFaultedSquaringReleasesNoBadSignature() throws Exception {
         BigInteger d = new BigInteger("123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 16);
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
@@ -152,7 +152,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D212: a fault in a squaring's input with the randomness stuck (the same nonce twice) gives no bad signature and no d: both signatures verify, and the attack of the review (the difference of the two, 256 bit places and both signs) finds nothing")
+    @DisplayName("D218: a fault in a squaring's input with the randomness stuck (the same nonce twice) gives no bad signature and no d: both signatures verify, and the attack of the review (the difference of the two, 256 bit places and both signs) finds nothing")
     void aFaultAndARepeatedNonceGiveNothing() throws Exception {
         BigInteger d = new BigInteger("0badc0ffee0ddf00d123456789abcdef0123456789abcdef0123456789abcd", 16);
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
@@ -182,7 +182,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D212: a signature that cannot be shown to be the key's is not released, on either path: a private key whose public key is another's gives 6F00 with the output zeroed (bytecode path), and the chip path is given up first and ends the same way")
+    @DisplayName("D218: a signature that cannot be shown to be the key's is not released, on either path: a private key whose public key is another's gives 6F00 with the output zeroed (bytecode path), and the chip path is given up first and ends the same way")
     void aSignatureNotTheKeysIsWithheld() throws Exception {
         BigInteger d = BigInteger.valueOf(0xCAFEBABEL), other = BigInteger.valueOf(0xDEADBEEFL);
         BigInteger[] wrong = ecMulTest(other, SECP_GX, SECP_GY);
@@ -204,7 +204,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D212: the check is the engines' and costs a bounded number of them: one signature is three runs of the chip's key agreement (the nonce's R, P and -e*P) and one of its point addition (s*G - e*P)")
+    @DisplayName("D218: the check is the engines' and costs a bounded number of them: one signature is three runs of the chip's key agreement (the nonce's R, P and -e*P) and one of its point addition (s*G - e*P)")
     void theCheckCostsFourEngineRuns() throws Exception {
         BigInteger d = BigInteger.valueOf(0x1234567L);
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
@@ -225,7 +225,7 @@ class SignHardeningTest {
     // ---- LOW-4, -5: the known answers ----
 
     @Test
-    @DisplayName("D213: the squaring's known answers ask the engine for distinct squarings (3, n - 1, and the sum and the difference of each of three pairs: eight in all, no two the same), and most of them of the full width, at or above 2^255 and under n")
+    @DisplayName("D219: the squaring's known answers ask the engine for distinct squarings (3, n - 1, and the sum and the difference of each of three pairs: eight in all, no two the same), and most of them of the full width, at or above 2^255 and under n")
     void theSquaringKnownAnswersAreDistinctAndWide() throws Exception {
         Rec eng = new Rec();
         SchnorrHW s = signerWith(eng);
@@ -238,7 +238,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D213: an engine wrong for one of the new pairs' operands alone (the sum of G's y and n less G's x, which D210's test never asked for) fails the set-up: chipMul false")
+    @DisplayName("D219: an engine wrong for one of the new pairs' operands alone (the sum of G's y and n less G's x, which D216's test never asked for) fails the set-up: chipMul false")
     void anEngineWrongOnTheSecondPairIsRefused() throws Exception {
         BigInteger bad = GY.add(N.subtract(GX)).mod(N);
         Engine eng = new Engine(null) {
@@ -253,7 +253,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D213: the field's known answers (D208) reach the top of the range: p - 1 and p - 2 (above 2^255 and under p) are cubed, taken by Euler's test and rooted, so an engine wrong for every x of 2^255 and over (which the old answers, all of them with the top bit clear, passed) leaves fieldP false, the change right on the p*p keys; and an engine that holds is taken")
+    @DisplayName("D219: the field's known answers (D214) reach the top of the range: p - 1 and p - 2 (above 2^255 and under p) are cubed, taken by Euler's test and rooted, so an engine wrong for every x of 2^255 and over (which the old answers, all of them with the top bit clear, passed) leaves fieldP false, the change right on the p*p keys; and an engine that holds is taken")
     void theFieldKnownAnswersReachTheTop() throws Exception {
         for (boolean wrongHigh : new boolean[] { true, false }) {
             Engines e = new Engines();
@@ -281,7 +281,7 @@ class SignHardeningTest {
     // ---- LOW-6: a sign-time failure falls back ----
 
     @Test
-    @DisplayName("D211/D212: an engine that refuses after the set-up (chipMul true) does not stop signing: the signature is made by the bytecode, verifies, chipMul is cleared, and the next signature is the bytecode's with no asking of the engine")
+    @DisplayName("D217/D218: an engine that refuses after the set-up (chipMul true) does not stop signing: the signature is made by the bytecode, verifies, chipMul is cleared, and the next signature is the bytecode's with no asking of the engine")
     void aSignTimeEngineFailureFallsBack() throws Exception {
         Rec eng = new Rec();
         SchnorrHW s = chipSigner(eng);

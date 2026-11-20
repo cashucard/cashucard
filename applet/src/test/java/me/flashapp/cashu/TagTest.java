@@ -65,12 +65,12 @@ class TagTest {
     /** What the install command carries for the tag: the instance AID's length and the AID, then no privileges and no parameters. */
     static final byte[] TAG_INSTALL = hexToBytes("07" + TAG_HEX + "0000");
 
-    /** The capability container (file E103), as the card's specification lists it: the NDEF file at most 71 bytes (D216). */
+    /** The capability container (file E103), as the card's specification lists it: the NDEF file at most 71 bytes (D222). */
     static final byte[] CC = hexToBytes("000f20003b00340406e104004700ff");
     /** The NDEF file (E104) of a card with no owner or no record: NLEN, then one well-known URI record with prefix code 04 and "getfoxy.io/card#new". */
     static final byte[] NDEF = hexToBytes("0018d101145504" + "676574666f78792e696f2f63617264236e6577");
     static final String ADDRESS = "https://getfoxy.io/card#new";
-    /** A set-up card's address (D216): 32 hex of R and 16 of M, lowercase. */
+    /** A set-up card's address (D222): 32 hex of R and 16 of M, lowercase. */
     static final String CODED = "https://getfoxy\\.io/card#[0-9a-f]{48}";
     static { if (!toHex("getfoxy.io/card#new".getBytes(StandardCharsets.US_ASCII)).equals("676574666f78792e696f2f63617264236e6577")) throw new IllegalStateException("the address's hex"); }
     static { if (!toHex(NDEF).equals("0018d101145504676574666f78792e696f2f63617264236e6577")) throw new IllegalStateException("the NDEF file's hex"); }
@@ -317,7 +317,7 @@ class TagTest {
     }
 
     @Test
-    @DisplayName("Nothing fixed per card is in the tag (D216): two new cards answer the same bytes, #new; a set-up card answers a fresh address that carries neither the card's key nor the owner's")
+    @DisplayName("Nothing fixed per card is in the tag (D222): two new cards answer the same bytes, #new; a set-up card answers a fresh address that carries neither the card's key nor the owner's")
     void testTheSameOnEveryCard() {
         byte[][] fresh = aPhoneReadsTheTag();
         sim = freshCardWithTheTag();
@@ -344,7 +344,7 @@ class TagTest {
         CardSimulator s = new CardSimulator(fresh);
         s.installApplet(AIDUtil.create(TAG_HEX), Tag.class, TAG_INSTALL, (short) 0, (byte) TAG_INSTALL.length);
         long[] after = transientHeldOnDeselect(fresh);
-        assertEquals(1, after[0] - before[0], "one byte of transient memory that is cleared on deselect (the file chosen and whether there is a code; the code is the card's applet's, D216)");
+        assertEquals(1, after[0] - before[0], "one byte of transient memory that is cleared on deselect (the file chosen and whether there is a code; the code is the card's applet's, D222)");
         assertEquals(1, after[1] - before[1], "in one array");
         for (java.lang.reflect.Field f : Tag.class.getDeclaredFields()) {
             if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;

@@ -1,5 +1,7 @@
 # Protocol 2.3 with D205 on a J3R180: the tracked file's chip run (2026-11-14, second run)
 
+> Note added at the 3.0 merge (2026-11-19): decision numbers here are from before the 3.0 merge. D205 to D215 are now D211 to D221 (D205 to D210 now name the other maintainer's 3.0 decisions, and the links below land on those). The record itself is unchanged.
+
 The tracked 2.3 CAP, with [D205](../DECISIONS.md#d205) (no payment floor, shorter holds),
 installed on a second bench J3R180 at the first try and, at a FakeWallet test mint (fake sats),
 paid with real signatures under the card's date keys, wrote its own change back with

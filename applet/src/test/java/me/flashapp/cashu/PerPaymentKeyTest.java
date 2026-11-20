@@ -411,7 +411,7 @@ class PerPaymentKeyTest {
     }
 
     @Test
-    @DisplayName("What keys per load cost, counted: SPEND_ALL_BEGIN two SHA-256 and two point additions with a refund key (one and one without), SIGN one point addition and two key agreements more a signature (the check of D212), GROUP_KEYS the same as BEGIN, SET_CARD with a refund key three powers of the chip's RSA")
+    @DisplayName("What keys per load cost, counted: SPEND_ALL_BEGIN two SHA-256 and two point additions with a refund key (one and one without), SIGN one point addition and two key agreements more a signature (the check of D218), GROUP_KEYS the same as BEGIN, SET_CARD with a refund key three powers of the chip's RSA")
     void whatItCosts() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         Object applet = c.applet();
@@ -434,9 +434,9 @@ class PerPaymentKeyTest {
         int waits = c.waits;
         int[] signed = { sha.done - s0[0], shaAll.done - s0[1], rsa.powers - s0[2], gm.made - s0[3], ecdh.made - s0[4], signSha.done - s0[5] };
         assertEquals(0, signed[0], "SIGN: no SHA-256 of keys per load");
-        // D212: every signature (the waits' and the payment's) is checked on the card: s*G - e*P is one point addition, and with k*G
+        // D218: every signature (the waits' and the payment's) is checked on the card: s*G - e*P is one point addition, and with k*G
         // (as before) P = d*G and -e*P two key agreements more
-        assertEquals(waits + 1, signed[3], "one point addition a signature, the check's (D212), and no other");
+        assertEquals(waits + 1, signed[3], "one point addition a signature, the check's (D218), and no other");
         assertEquals(3 * (waits + 1), signed[4], "three key agreements a signature: k*G as before, and the check's d*G and -e*P");
         int g0 = gm.made, h0 = sha.done;
         assertEquals(SW_OK, groupKeys(c, D2).getSW());

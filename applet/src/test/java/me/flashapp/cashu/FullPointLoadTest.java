@@ -21,7 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * D206: LOAD_PROOF's P2 bit 3 (08), each piece's C whole (04 || x || y), held to the curve by the chip's key agreement in place
+ * D212: LOAD_PROOF's P2 bit 3 (08), each piece's C whole (04 || x || y), held to the curve by the chip's key agreement in place
  * of Euler's test of x, and stored compressed exactly as the 33-byte form stores it. At each SET_CARD the card tests the agreement
  * (G taken, G with y one more refused); where that fails, the 04 form is 6B00 and the reader sends the 33-byte form.
  */
@@ -124,7 +124,7 @@ class FullPointLoadTest {
     // =========================================================================
 
     @Test
-    @DisplayName("D206: good points in the 04 form go on (G, -G, four of testnut's keys, two real pieces' C), each stored exactly as the same piece in the 33-byte form is, on a twin card; one a command (two in one are 6700), and with the mint's proof (P1 = 1), with the unit first (P2 0B)")
+    @DisplayName("D212: good points in the 04 form go on (G, -G, four of testnut's keys, two real pieces' C), each stored exactly as the same piece in the 33-byte form is, on a twin card; one a command (two in one are 6700), and with the mint's proof (P1 = 1), with the unit first (P2 0B)")
     void goodPointsGoOnStoredTheSame() throws Exception {
         UnitsTest.Card a = UnitsTest.owned(UnitsTest.SAT), b = UnitsTest.owned(UnitsTest.SAT);
         assertTrue(curveByAgreement(a), "the simulator's agreement holds to the curve: the set-up's test passed");
@@ -162,7 +162,7 @@ class FullPointLoadTest {
     }
 
     @Test
-    @DisplayName("D206: a piece loaded in the 04 form pays as the same piece loaded in the 33-byte form does: the same signature on twin cards, the place spent")
+    @DisplayName("D212: a piece loaded in the 04 form pays as the same piece loaded in the 33-byte form does: the same signature on twin cards, the place spent")
     void aPieceLoadedWholePays() throws Exception {
         UnitsTest.Card a = UnitsTest.owned(UnitsTest.SAT), b = UnitsTest.owned(UnitsTest.SAT);
         byte[] piece = withC(a.piece(UnitsTest.SAT_A, 64), hexToBytes(GOOD[5]));
@@ -181,7 +181,7 @@ class FullPointLoadTest {
     // =========================================================================
 
     @Test
-    @DisplayName("D206: every case the chip was tried with that is no point of the curve in its one encoding is refused 6A80 with nothing written: no-curve x, the twist, wrong y, y +- 1, the other root + 1, y = 0, x = p, x = 2^256 - 1, y = p, y = p + 1, y = 2^256 - 1, wraps, zeros, P-256's G and y, every other prefix")
+    @DisplayName("D212: every case the chip was tried with that is no point of the curve in its one encoding is refused 6A80 with nothing written: no-curve x, the twist, wrong y, y +- 1, the other root + 1, y = 0, x = p, x = 2^256 - 1, y = p, y = p + 1, y = 2^256 - 1, wraps, zeros, P-256's G and y, every other prefix")
     void badPointsAreRefused() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         Map<String, byte[]> before = kept(c);
@@ -201,7 +201,7 @@ class FullPointLoadTest {
     }
 
     @Test
-    @DisplayName("D206: lengths are the card's own: a piece of 112 or 114 bytes, the 33-byte C sent with P2 08 (81 bytes, and 81 + 96 with P1 = 1), a 33-byte C of prefix 04, a C of 66 bytes, three and a half pieces, a proof a byte short or long: 6700, nothing written; P2 08 without bit 1 is 6A86, bit 2 (04) and bits past 3 are 6B00")
+    @DisplayName("D212: lengths are the card's own: a piece of 112 or 114 bytes, the 33-byte C sent with P2 08 (81 bytes, and 81 + 96 with P1 = 1), a 33-byte C of prefix 04, a C of 66 bytes, three and a half pieces, a proof a byte short or long: 6700, nothing written; P2 08 without bit 1 is 6A86, bit 2 (04) and bits past 3 are 6B00")
     void lengthsAndBits() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         Map<String, byte[]> before = kept(c);
@@ -244,7 +244,7 @@ class FullPointLoadTest {
         f.setAccessible(true);
         return f.get(c.applet());
     }
-    /** SchnorrHW.checksCurve, the set-up's test, run again (by reflection: this file is compiled against the build before D206 too, to fail first). */
+    /** SchnorrHW.checksCurve, the set-up's test, run again (by reflection: this file is compiled against the build before D212 too, to fail first). */
     static boolean checks(SchnorrHW s) throws Exception {
         java.lang.reflect.Method m = SchnorrHW.class.getDeclaredMethod("checksCurve");
         m.setAccessible(true);
@@ -277,7 +277,7 @@ class FullPointLoadTest {
     }
 
     @Test
-    @DisplayName("D206: the set-up's test of the agreement: false before the first SET_CARD (none in the constructor), then the simulator's holds (G taken, G with y + 1 refused); an agreement that takes every point fails it, and so does one that refuses every point; a SET_CARD on such a chip keeps the 04 form refused (6B00)")
+    @DisplayName("D212: the set-up's test of the agreement: false before the first SET_CARD (none in the constructor), then the simulator's holds (G taken, G with y + 1 refused); an agreement that takes every point fails it, and so does one that refuses every point; a SET_CARD on such a chip keeps the 04 form refused (6B00)")
     void theInstallTestsTheAgreement() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         assertFalse(curveByAgreement(c), "nothing known before the first SET_CARD: the constructor runs no agreement (the chip's first create is kept light)");
@@ -313,7 +313,7 @@ class FullPointLoadTest {
     }
 
     @Test
-    @DisplayName("D206: on a chip whose agreement failed the set-up's test the 04 form is 6B00 before anything is read (one piece, two, with a proof) and nothing is written; the 33-byte form goes on as ever and the same piece is stored as it would be")
+    @DisplayName("D212: on a chip whose agreement failed the set-up's test the 04 form is 6B00 before anything is read (one piece, two, with a proof) and nothing is written; the 33-byte form goes on as ever and the same piece is stored as it would be")
     void aChipThatFailedTheTestTakesOnlyTheShortForm() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         setCurveByAgreement(c, false);

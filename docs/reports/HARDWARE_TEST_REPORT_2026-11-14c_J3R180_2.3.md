@@ -1,5 +1,7 @@
 # Protocol 2.3 with D206 on a J3R180: the tracked file's chip run (2026-11-14, third run)
 
+> Note added at the 3.0 merge (2026-11-19): decision numbers here are from before the 3.0 merge. D205 to D215 are now D211 to D221 (D205 to D210 now name the other maintainer's 3.0 decisions, and the links below land on those). The record itself is unchanged.
+
 The tracked 2.3 CAP, with [D206](../DECISIONS.md#d206) (`LOAD_PROOF`'s 04 form: each piece's C sent whole,
 `04` ‖ x ‖ y, and held to the curve by the chip's key agreement in place of the card's square-root test), installed
 on the bench J3R180 of the second run at the first try, five times. On each of four fresh set-ups made as the app

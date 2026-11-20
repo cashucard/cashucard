@@ -14,7 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * A claim right after the set-up's record is one asking (D215, amending D187): where the card's first set-up had its PIN set
+ * A claim right after the set-up's record is one asking (D221, amending D187): where the card's first set-up had its PIN set
  * and then its record written (SET_CARD) in this time in the field, SET_OWNER on the card with no owner sets the owner at its
  * first asking. Everywhere else the claim is held for CLAIM_ASKINGS askings, as before. Each test here pairs what the mark
  * leaves held with what it lets through, so that each fails on a card without the mark.
@@ -56,7 +56,7 @@ class ClaimAfterSetUpTest {
         assertEquals(1, c.field("ownerSet")[0], what + ": the owner set");
     }
 
-    /** The claim at its first asking (D215). */
+    /** The claim at its first asking (D221). */
     static void quickClaim(UnitsTest.Card c, String what) throws Exception {
         assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW(), what + ": the first asking sets the owner");
         assertEquals(1, c.field("ownerSet")[0], what + ": the owner set");

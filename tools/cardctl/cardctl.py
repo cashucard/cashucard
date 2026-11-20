@@ -101,7 +101,7 @@ INS_LOAD_PROOF = 0x30
 # LOAD_PROOF and LOAD_CHANGE P2 bit 1 (protocol 2.3): the loader's word that each piece is locked to the card's key
 # for its date, P + t*G (Keys per load). Sent only when the user says so (`load --date-keys`).
 LOAD_DATE_KEYS = 0x02
-# LOAD_PROOF P2 bit 3 (D206): each piece's C whole, 04 || x || y (65 bytes), which the card holds to the curve with its
+# LOAD_PROOF P2 bit 3 (D212): each piece's C whole, 04 || x || y (65 bytes), which the card holds to the curve with its
 # chip's key agreement in place of Euler's test of x (about 100 ms a piece less on a J3R180). `load --uncompressed`.
 LOAD_FULL_C = 0x08
 INS_CLEAR_SPENT = 0x31
@@ -215,7 +215,7 @@ PIN_KEY_ANSWER_LEN = 113
 # VERIFY_PIN on a card with no owner answers 6A98, keep holding, while it serves the wait its wrong tries left: at
 # most 16,384 askings, in stretches of 16 with one asking more at the end of each, then the try.
 PIN_WAIT_MOST = 16384 + 16384 // 16 + 2
-# SET_OWNER on a card with no owner (a claim): four askings, the first three answered 6A98 (D205; about 3 s on a J3R180).
+# SET_OWNER on a card with no owner (a claim): four askings, the first three answered 6A98 (D211; about 3 s on a J3R180).
 # The bound is more than the card's count, so a card of an earlier build is held for as before.
 CLAIM_MOST = 10
 
@@ -263,7 +263,7 @@ MINT_MOST = 77
 FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
-# the seventeenth asking after the history's seven (24 askings, about 11 s in all), D205: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D205 measured it).
+# the seventeenth asking after the history's seven (24 askings, about 11 s in all), D211: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D211 measured it).
 LOG_HOLD_MOST = 7
 RESET_MOST = 17
 RESET_CONFIRM_BYTE = 0xAD
@@ -350,7 +350,7 @@ SW_COMMAND_MEANINGS = {
                 "a version 00 amount not 2^n, more than 64, or keys that do not hash to the keyset's ID; showing: "
                 "a path that does not reach the keyset's top",
         0x6A83: "no opening past 7",
-        0x6A88: "a card with no keyset table (teaching; a keyset in no entry is entered, D207), or an opening not owed (showing)",
+        0x6A88: "a card with no keyset table (teaching; a keyset in no entry is entered, D213), or an opening not owed (showing)",
         0x6A9B: "the keyset named is of the other unit than the opening's",
         0x6A9F: "the keyset's keys have not been taught to the card",
     },
@@ -843,7 +843,7 @@ class Card:
         value = owner_pub + (anchor or b"") + (owner_c_check(s) if s is not None else b"")
         if old_owner is None:
             # 2.3 (D187): a claim wants the PIN given in this tap and is held for; the card answers 6A98, keep holding,
-            # to the first three askings (D205)
+            # to the first three askings (D211)
             if s is not None:
                 # the PIN key, then the envelope: a command between the envelope and SET_OWNER lets it go
                 self.stage_owner_c(s, self._signed_pin_key()[1])
@@ -977,8 +977,8 @@ class Card:
             raise SystemExit("a 0.x card has no keys per date")
         p2 = LOAD_DATE_KEYS if date_keys else 0
         if uncompressed:
-            # D206: C whole, the date after it; a card that answers 6B00 (its chip's key agreement failed the card's install
-            # test, or a card before D206) wrote nothing, and the caller sends the 33-byte form
+            # D212: C whole, the date after it; a card that answers 6B00 (its chip's key agreement failed the card's install
+            # test, or a card before D212) wrote nothing, and the caller sends the 33-byte form
             if self.legacy:
                 raise SystemExit("a 0.x card takes C in 33 bytes only")
             payload = payload[:44] + whole_c(c) + payload[77:]
@@ -1698,7 +1698,7 @@ def dleq_holds(b_: bytes, c_: bytes, k: bytes, e: bytes, s: bytes) -> bool:
 
 
 def whole_c(c: bytes) -> bytes:
-    """A compressed point (02/03 || x) whole, 04 || x || y, y of its parity (D206's form of C at LOAD_PROOF)."""
+    """A compressed point (02/03 || x) whole, 04 || x || y, y of its parity (D212's form of C at LOAD_PROOF)."""
     point = bip340.lift_x(int.from_bytes(c[1:], "big")) if len(c) == 33 and c[0] in (2, 3) else None
     if point is None:
         raise SystemExit(f"C is not a compressed point of the curve: {_hex(c)}")
@@ -3496,7 +3496,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="the piece was minted locked to the card's key for its date, P + t*G (from group-keys or "
                         "from c), never to the card's main key P: sends P2 02, which a 2.3 card wants (6A86 without)")
     s.add_argument("--uncompressed", action="store_true",
-                   help="send C whole, 04 || x || y (P2 bit 3, D206): the card checks it with its chip's key agreement, "
+                   help="send C whole, 04 || x || y (P2 bit 3, D212): the card checks it with its chip's key agreement, "
                         "faster than its check of a 33-byte C; on 6B00 (a card that does not) the 33-byte form is sent")
     _owner_arg(s)
     s.set_defaults(func=cmd_load)

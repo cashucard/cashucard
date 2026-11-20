@@ -31,7 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The edges of the tag's changing address (D216): what a reader can ask the tag for at the ends of the file, what the card's
+ * The edges of the tag's changing address (D222): what a reader can ask the tag for at the ends of the file, what the card's
  * applet's work for the tag touches, who the card's applet hands its interface to, and that the tag key K is never left
  * behind in its caller's array, whatever the caller passes and whatever fails. Simulator only.
  */

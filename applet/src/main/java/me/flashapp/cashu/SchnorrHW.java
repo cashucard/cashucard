@@ -423,9 +423,9 @@ final class SchnorrHW {
         reduceModN(sc, SC_E);         // e = e mod n
 
         // ── Step 7: s = (k + e·d) mod n, and the signature held to the key before it leaves ──────
-        // e·d by the chip's RSA where the set-up's test of it held (D210, D211: d is never given to the engine alone, but as
+        // e·d by the chip's RSA where the set-up's test of it held (D216, D217: d is never given to the engine alone, but as
         // two shares of a fresh random split), by the bytecode where not; every signature, either way, is checked on the card
-        // against the public key (D212) and is withheld if it fails: a failing chip path is given up (chipMul false) and the
+        // against the public key (D218) and is withheld if it fails: a failing chip path is given up (chipMul false) and the
         // product made again by the bytecode, and a signature that fails then is not released at all.
         boolean good = false;
         if (chipMul) {
@@ -458,13 +458,13 @@ final class SchnorrHW {
         return (short)64;
     }
 
-    // ── The signature's product by the chip, in two shares, and the check of the signature (D211, D212) ─────
+    // ── The signature's product by the chip, in two shares, and the check of the signature (D217, D218) ─────
 
     /**
      * SC_ED = e·d mod n by the chip, d never alone: a fresh random d1 (under n) and d2 = d - d1 mod n, then e·d = e·d1 + e·d2,
      * each product by two squarings (`mulModNChip`), four squarings in all. Every operand the engine sees, e + d1 and |e - d1|,
      * e + d2 and |e - d2|, is uniform and independent of d taken alone, whatever e is (e is public in every signature: a mask
-     * by it only, as D210 had it, hid nothing). The shares sit in sc[SC_TMP + 32, SC_TMP + 96) (Rx is below them) and the
+     * by it only, as D216 had it, hid nothing). The shares sit in sc[SC_TMP + 32, SC_TMP + 96) (Rx is below them) and the
      * second product in work[256, 288); the caller clears the shares and `work` after, on every way out (and sign()'s finally
      * does again). d at sc[SC_D] is read and left as it is.
      */
@@ -544,7 +544,7 @@ final class SchnorrHW {
 
     /**
      * Whether the chip's key agreement takes the 65 bytes at p[off] (04 || x || y, its caller has held them to that form,
-     * x and y under p: the agreement reduces both) as a point of the curve (D206): one key agreement with the temporary key
+     * x and y under p: the agreement reduces both) as a point of the curve (D212): one key agreement with the temporary key
      * at its resting scalar, G's x, a public number, so that the answer, [G.x]p, which goes into sc and nowhere else,
      * tells nothing of any key, and a point of another curve or of the twist learns nothing either. The J3R180 refuses
      * every point off the curve at generateSecret (CryptoException); a simulator throws its own exception: any is a
@@ -575,7 +575,7 @@ final class SchnorrHW {
     };
 
     /**
-     * The install's test of the agreement (D206, D213): G is taken, and each of six points that are not on the curve is not:
+     * The install's test of the agreement (D212, D219): G is taken, and each of six points that are not on the curve is not:
      * G with y one more; an x with no root (5) with G's y; the twist's point (5 and the y of the twist's equation); G's x with
      * G's y and its top bit flipped (a valid x with a wrong y); G's x with y = p - 1 (a y near p); and 04 with zeros. Where any
      * one fails the card never leans on the agreement for a piece's point and refuses the 04 form (6B00): a chip whose agreement
@@ -1191,7 +1191,7 @@ final class SchnorrHW {
         return carry;
     }
 
-    // ── e·d mod n on the chip's RSA engine (D210) ─────────────────────────
+    // ── e·d mod n on the chip's RSA engine (D216) ─────────────────────────
 
     /**
      * Whether the chip's RSA held to the squaring's known answers at the last SET_CARD (`chipMulInit`): worked out there and
@@ -1213,7 +1213,7 @@ final class SchnorrHW {
     /**
      * The squaring key and its known answers, at every SET_CARD: modulus n padded to 64 bytes (32 zeros before it: the chip's
      * RSA is of its modulus' length and takes an input under it, and answers garbage, with no error, for one at or over it),
-     * exponent 2; then 3^2 = 9, (n - 1)^2 = 1, and three products by `mulModNChip` whole (D213): G's x times G's y, G's y times n less
+     * exponent 2; then 3^2 = 9, (n - 1)^2 = 1, and three products by `mulModNChip` whole (D219): G's x times G's y, G's y times n less
      * G's x (n less the first), and n - 1 times n - 2 (2), whose squarings are eight distinct numbers of the full width, each worked
      * out beforehand. True where all hold; false on any wrong answer or any exception (a chip that refuses
      * the key, the room for it or the use), and `chipMul` is then false: the signature is made as before. `work` and `sc` are
@@ -1237,7 +1237,7 @@ final class SchnorrHW {
             work[63]--;
             square(work, (short)0, (short)64);
             if (work[127] != (byte)1 || !allZero(work, (short)64, (short)63)) return false;
-            // three products, each with squarings of its own, of full-width operands (D213): a·b for a = G's x, b = G's y; for
+            // three products, each with squarings of its own, of full-width operands (D219): a·b for a = G's x, b = G's y; for
             // a = G's y, b = n - G's x (the product is n less the first); and for a = n - 1, b = n - 2 (the product is 2).
             // Their squared values, a + b and |a - b|, are six different numbers, all but one at or above 2^255.
             for (short r = 0; r < 3; r++) {

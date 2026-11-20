@@ -95,14 +95,14 @@ CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
 exact file has run on a chip: the bench J3R180 (09301220) on 2026-11-15, three installs in three steps (load 17 to 18 s, the
 card's applet 2 s), `selftest` 13 of 13, the set-up's claim at the first asking and a 9-piece payment with change at the test mint
 (refcheck keeps its size and its load file's sha256). It is the file of the run of 2026-11-14 below (40,365 bytes, load file
-`8aefa0db…`, the fifth run of that day, which installed it at the first try every time) with [D215](DECISIONS.md#d215) added (the claim
+`8aefa0db…`, the fifth run of that day, which installed it at the first try every time) with [D221](DECISIONS.md#d221) added (the claim
 right after the set-up's record is one asking; 47 bytes more). That file was the file of the fourth run of that day
-(39,343 bytes, load file sha256 `c79b30a7...`, [D207](DECISIONS.md#d207) to [D210](DECISIONS.md#d210), whose size and hash refcheck also keeps) with
-[D211](DECISIONS.md#d211) to [D214](DECISIONS.md#d214) added (1,022 bytes more): the signature's product in two shares, every signature checked on
+(39,343 bytes, load file sha256 `c79b30a7...`, [D213](DECISIONS.md#d213) to [D216](DECISIONS.md#d216), whose size and hash refcheck also keeps) with
+[D217](DECISIONS.md#d217) to [D220](DECISIONS.md#d220) added (1,022 bytes more): the signature's product in two shares, every signature checked on
 the card, the set-up's known answers made wider, and a taught keyset kept until its first piece. The fourth run's file was itself the file of the third run of that day
-(37,269 bytes, load file sha256 `fe156f4f…`, [D200](DECISIONS.md#d200) to [D206](DECISIONS.md#d206), whose size and hash
+(37,269 bytes, load file sha256 `fe156f4f…`, [D200](DECISIONS.md#d200) to [D212](DECISIONS.md#d212), whose size and hash
 refcheck keeps on its lists, as it keeps those of the earlier runs' files, 36,950 bytes `075448e4…` and 36,953 bytes `f216644a…`) with
-[D207](DECISIONS.md#d207) to [D210](DECISIONS.md#d210) added: a keyset taught at set-up, the field's arithmetic on the chip's RSA with p
+[D213](DECISIONS.md#d213) to [D216](DECISIONS.md#d216) added: a keyset taught at set-up, the field's arithmetic on the chip's RSA with p
 padded to 64 bytes for the modulus, `LOAD_CHANGE`'s points held to the curve by the chip's key agreement, and the signature's e·d
 mod n on the chip's RSA with n padded (2,074 bytes more). The size was tried with care: a study build of the same source
 had been refused at the card's applet's create (`6F00`) at 38,791 and 38,809 bytes (135 and 153 past a multiple of 256) and installed at
@@ -181,7 +181,7 @@ taking money back after D with the refund key at a mint (it needs a wait past D)
 tears, a phone and a production mint ([the hardware
 report](reports/HARDWARE_TEST_REPORT_2026-11-13_J3R180_2.3.md)).
 
-The chip run of the file before D215 (40,365 bytes, load file `8aefa0db…`, with [D211](DECISIONS.md#d211) to [D214](DECISIONS.md#d214)),
+The chip run of the file before D221 (40,365 bytes, load file `8aefa0db…`, with [D217](DECISIONS.md#d217) to [D220](DECISIONS.md#d220)),
 on 2026-11-14 (03:00 to 03:30 UTC on the 15th), a fifth time that day, on the bench
 J3R180 of the earlier runs, CPLC serial 09301220 (checked by the install script before anything was sent; the public default test key),
 through the same reader. The CAP `20b6d726…` was installed four times in three steps (load 17 to 18 s, the card's applet 1 to 3 s, created
@@ -196,7 +196,7 @@ teaching in it (the 04 form, proof kept):
 |---|---:|
 | SELECT | 22 |
 | GET_INFO (the read) | 42 |
-| AUTH | 532 (264 before D211 and D212) |
+| AUTH | 532 (264 before D217 and D218) |
 | GET_NONCE P1 1 (PIN key) | 45 |
 | VERIFY_PIN sealed | 144 |
 | GROUP_KEYS (date 0) | 100 |
@@ -218,8 +218,8 @@ flipped, G's x with y = p − 1, and the 13 of the run before), wrong lengths `6
 zeros, prefix 03, x = p), K changed (y + 1, y + 2) or the proof's e changed, each `6A80` (81 to 126 ms, 490 ms for the proof), the opening
 still owed. `selftest` passed 13 of 13 on physical hardware. The card with a PIN and no owner: the history's hold (6 held askings of 491 ms,
 the log at the 7th, 2.95 s in all), the reset by the PIN in 11.3 s (the history's 7 askings and 17 of `RESET_CARD` at 502 ms: 8.26 s), the wait
-after wrong tries 493 ms an asking. **The holds and waits are counts of the card's signing work (D205) and that work is now twice what
-it was in the fourth run: an asking is 0.49 to 0.58 s (0.23 to 0.31 s in the fourth run, 0.59 to 0.66 s in the run of D205), so the claim
+after wrong tries 493 ms an asking. **The holds and waits are counts of the card's signing work (D211) and that work is now twice what
+it was in the fourth run: an asking is 0.49 to 0.58 s (0.23 to 0.31 s in the fourth run, 0.59 to 0.66 s in the run of D211), so the claim
 is 2.6 s (target 3 s), the history 3.0 s (4 s) and the reset by the PIN 8.3 s, 11.3 s with the history's (15 s).** The counts were not
 changed: it is the project owner's to say. Not run: `LOCK_CARD`, the day of loads, dated pieces in the 04 form, tears, a fault in an engine
 (no chip can be made to: the simulator's tests fault each squaring), a chip whose engines fail their set-up tests (the simulator, which
@@ -227,7 +227,7 @@ refuses the padded keys, runs the fallbacks in every test, and a test engine of 
 production mint ([the hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14e_J3R180_2.3.md)). The card was then installed again from
 the same file and left fresh (no PIN, no owner).
 
-The chip run of the file before D211 (39,343 bytes, load file `c79b30a7…`, with [D207](DECISIONS.md#d207) to [D210](DECISIONS.md#d210)),
+The chip run of the file before D217 (39,343 bytes, load file `c79b30a7…`, with [D213](DECISIONS.md#d213) to [D216](DECISIONS.md#d216)),
 on 2026-11-14 (01:30 to 01:45 UTC on the 15th), a fourth time that day, on the bench J3R180 of the second and third runs, CPLC
 serial 09301220 (checked by the install script before anything was sent; the public default test key), through the same
 reader. The CAP `b304d938…` was installed four times in three steps (load 17 s, the card's applet 2 s, created at the first try
@@ -235,15 +235,15 @@ every time); `SELECT` `02 03`, the tag `getfoxy.io/card`. The mint `testnut.cash
 (blocks 975,830, 975,841 and 975,859), the TEST owner key, a made-up seed and a test refund key. Set-up as the app does it
 (`cardctl setup`): the first `SET_CARD` answered `9000` in 1,777 ms (it was about 1.0 to 1.2 s: the set-up now runs the
 self-tests of the padded keys and of the squaring, and makes their keys), the owner's claim at the 4th
-asking (305, 309, 308 and 859 ms: 1.8 s in all, where D205's holds were measured at 2.9 s). The keyset's 32 keys were taught
-at set-up, with no piece on the card ([D207](DECISIONS.md#d207): 1.53 s with the process start), the card working out the
+asking (305, 309, 308 and 859 ms: 1.8 s in all, where D211's holds were measured at 2.9 s). The keyset's 32 keys were taught
+at set-up, with no piece on the card ([D213](DECISIONS.md#d213): 1.53 s with the process start), the card working out the
 keyset's ID. 45 real pieces (2,555 fake sats) were then loaded in one selection with no teaching in it (the 04 form, proof kept):
 
 | Step | ms |
 |---|---:|
 | SELECT | 22 |
 | GET_INFO (the read) | 42 |
-| AUTH | 264 (626 before D210) |
+| AUTH | 264 (626 before D216) |
 | GET_NONCE P1 1 (PIN key) | 45 |
 | VERIFY_PIN sealed | 144 (278 before) |
 | GROUP_KEYS (date 0) | 100 |
@@ -251,11 +251,11 @@ keyset's ID. 45 real pieces (2,555 fake sats) were then loaded in one selection 
 | LOAD_PROOF #2 to #45 | 6,753 |
 | GET_INFO (the final read) | 43 |
 | GET_BALANCE | 69 |
-| **The whole contact** | **7.75 s** (8.22 s without teaching, 9.50 s with it, on the D206 file) |
+| **The whole contact** | **7.75 s** (8.22 s without teaching, 9.50 s with it, on the D212 file) |
 
 A piece took 146 to 163 ms (median 154); one card, alternately: the 04 form 166 ms and the 33-byte form 157 ms (the 33-byte form's
-curve test fell from 116 ms to 27 with D208, so the 04 form is no longer the quicker). Real signatures and real change: a payment
-of nine pieces with five change outputs: `SPEND_ALL_BEGIN` 193 ms, `SPEND_ALL_CHANGE` 226 to 287 ms an output (443 to 676 before D208),
+curve test fell from 116 ms to 27 with D214, so the 04 form is no longer the quicker). Real signatures and real change: a payment
+of nine pieces with five change outputs: `SPEND_ALL_BEGIN` 193 ms, `SPEND_ALL_CHANGE` 226 to 287 ms an output (443 to 676 before D214),
 `SPEND_ALL_SIGN` 678 ms at its first send (no "not yet"; 2.23 s from `BEGIN`, where it was 3.96 s; good under P + t·G and not under P);
 a payment of three pieces with no change signed in 446 ms (706 ms from `BEGIN`); one with three change outputs 519 ms; testnut took every
 swap (`200`, every input `SPENT`); the change came back by `LOAD_CHANGE` with no PIN in 577 to 587 ms a piece (1,033 to 1,043 before),
@@ -267,8 +267,8 @@ right answer then written back. `selftest` passed 20 of 20, `AUTH` 264 ms. The c
 (6 held askings of 229 ms, the log at the 7th, 1.4 s in all, where it was measured at 2.4 to 3.6 s), the reset by the PIN in about 6 s
 (the history's 7 askings and 17 of `RESET_CARD` at 292 ms, where the target was 15 s in all), the wait after wrong tries 231 ms an asking;
 the first set-up's `SET_HEADER` (a later tip, then an older header, the clock going back, nothing moved after a `SELECT`) and the claim
-checks (`6B00`, `6985`, `6A80` as expected; `INBOX`) as before. **The holds and waits are counts of the card's signing work (D205) and
-that work was then about 2.5 times quicker: an asking was 0.23 to 0.31 s where D205's holds were measured at 0.59 to 0.66 s, so the claim,
+checks (`6B00`, `6985`, `6A80` as expected; `INBOX`) as before. **The holds and waits are counts of the card's signing work (D211) and
+that work was then about 2.5 times quicker: an asking was 0.23 to 0.31 s where D211's holds were measured at 0.59 to 0.66 s, so the claim,
 the history and the reset by the PIN are about 40 percent of the time the project owner chose (3 s, 4 s, 15 s). At the same targets the
 counts would be about 11 for the claim (4 now), 17 for the history (7) and 38 for the reset (17), 55 in all with the history's, in a count
 held in six bits (63 at the most).** The counts were not changed: it is the project owner's to say. Not run: `LOCK_CARD`, the day of loads, dated pieces in the 04 form, tears, a
@@ -276,7 +276,7 @@ chip whose engines fail their set-up tests (the simulator, which refuses the pad
 engine of the tests' own runs the padded paths), a phone and a production mint ([the hardware
 report](reports/HARDWARE_TEST_REPORT_2026-11-14d_J3R180_2.3.md)). The card was then installed again from the same file and left fresh (no PIN, no owner).
 
-The chip run of the file before D207 (37,269 bytes, load file `fe156f4f…`, with [D206](DECISIONS.md#d206): `LOAD_PROOF`'s 04 form,
+The chip run of the file before D213 (37,269 bytes, load file `fe156f4f…`, with [D212](DECISIONS.md#d212): `LOAD_PROOF`'s 04 form,
 C held to the curve by the chip's key agreement), on 2026-11-14 (23:51 to 00:05 UTC), a third time that day, on the bench
 J3R180 of the second run, CPLC serial 09301220 (checked by the install script before anything was sent; the public default
 test key), through the same reader. The CAP `55614a2f…` was installed five times in three steps (load 16 to 17 s, the card's
@@ -302,11 +302,11 @@ pieces in the 04 form, tears, a chip whose key agreement fails the set-up's test
 a phone and a production mint ([the hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)). The card
 was then installed again from the same file and left fresh (no PIN, no owner).
 
-The chip run of the file before D206 (36,950 bytes, load file `075448e4…`, with [D205](DECISIONS.md#d205): no payment floor and
+The chip run of the file before D212 (36,950 bytes, load file `075448e4…`, with [D211](DECISIONS.md#d211): no payment floor and
 shorter holds), on 2026-11-14, a second time that day, on a second bench J3R180, CPLC serial 09301220 (checked by the
 install script before anything was sent; the public default test key), through the same reader. The CAP `01edad4c…` was
 installed twice in three steps (load 16 to 17 s, the card's applet 2 s, created at the first try both times; a first build
-of D205 with the loader's y, 37,573 bytes, had been refused at that create with `6F00` and is not this file); `SELECT`
+of D211 with the loader's y, 37,573 bytes, had been refused at that create with `6F00` and is not this file); `SELECT`
 `02 03`, the tag `getfoxy.io/card`. Real mainnet headers from mempool.space (blocks 975,750 to 975,841), the mint
 `testnut.cashu.space`, the TEST owner key, a second test key and two made-up seeds. The first `SET_CARD` answered `9000`
 in 1,208 ms (1,008 ms in a later set-up); `selftest` passed 20 of 20, `AUTH` 631 ms. The owner's claim with the owner's c
@@ -331,14 +331,14 @@ back, a hand-over to a second seed's owner read back the second c (1,236 ms), th
 (`RESET_CARD` 374 ms) and `REFRESH`'s back form worked, and with pieces on the card the hand-over and the owner's reset with an
 older anchor each answered `6A8D`; `REFRESH` P1 02, `SET_OWNER` P1 02 and P2 55 answered `6B00`, a claim with another seed's
 check `6A80`, one with no envelope before it `6985`; `INBOX` answered week 2967; the hardest's bits stayed `73160217`; a
-sealed `VERIFY_PIN` answered `9000` in 278 ms. The day of loads was not run again (its code is as in the file before D205).
+sealed `VERIFY_PIN` answered `9000` in 278 ms. The day of loads was not run again (its code is as in the file before D211).
 Not run: `LOCK_CARD`, taking money back after D with the refund key, a header far ahead or a weak clock, tears, a phone and a
 production mint ([the hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)). The card was then installed
 again from the same file and left fresh (no PIN, no owner).
 
-The chip run of the file before D205 (36,953 bytes, load file `f216644a…`), on 2026-11-14, on the same bench J3R180 09312320
+The chip run of the file before D211 (36,953 bytes, load file `f216644a…`), on 2026-11-14, on the same bench J3R180 09312320
 (CPLC serial checked first; the default test key), through the same reader. The CAP
-`30c7bb8d…` (load file 36,953 bytes, `f216644a…`, the file before D205) was installed three times, each in
+`30c7bb8d…` (load file 36,953 bytes, `f216644a…`, the file before D211) was installed three times, each in
 three steps (load 16 to 17 s, card's applet 2 s), `SELECT` `02 03` and the tag
 `getfoxy.io/card` each time; the headers were real mainnet headers from
 mempool.space (blocks 974,766 to 975,777), the mint `testnut.cashu.space`, the
@@ -774,7 +774,7 @@ The run of 2026-11-13 (above) did each item but the last five, for the file befo
 D200, with two differences: `INBOX` for last week was read after a reinstall anchored
 in that week, as no reader's header moves the clock back; and the sealed `VERIFY_PIN`
 ran once, after the run, while `selftest` ran before and after. The run of 2026-11-14
-(above) did them all for the file before D205, but the owner's reset of a locked card,
+(above) did them all for the file before D211, but the owner's reset of a locked card,
 which would lock the bench card for good; `INBOX` for last week was read after a reset
 by the PIN anchored in that week. Write the sha256 of every file sent to the chip in the
 run's log.
@@ -845,47 +845,47 @@ run's log.
   hours older>`: `info` says the older header's time (the claim's anchor brought the clock
   back; where the clock was more than two hours past the anchor, setup says so); in the next
   tap `cardctl set-header` with a header older still moves nothing, and the tip moves it on.
-The run of the tracked file with D205 (above) did every item below for it but the day of loads and the owner's reset of a
+The run of the tracked file with D211 (above) did every item below for it but the day of loads and the owner's reset of a
 locked card.
 
-- No payment floor ([D205](DECISIONS.md#d205)): a payment within its limit, the first of its
+- No payment floor ([D211](DECISIONS.md#d211)): a payment within its limit, the first of its
   time in the field, is signed at its first `SPEND_ALL_SIGN` (time `SPEND_ALL_BEGIN` to the
   signature); one over the limit on one payment still waits, and so does a second payment in
   a time in the field.
-- The holds ([D205](DECISIONS.md#d205)), measured at about 0.6 s an asking (0.59 to 0.66 s; 0.49 to 0.58 s on the file of D211 to D214, which checks every
+- The holds ([D211](DECISIONS.md#d211)), measured at about 0.6 s an asking (0.59 to 0.66 s; 0.49 to 0.58 s on the file of D217 to D220, which checks every
   signature): the owner's claim answers `9000` at the 4th asking (about 2.6 s), the history of a card with no owner at the
   7th (about 3 s), the reset by the PIN at the 17th (24 askings and about 11 s in all with the history's 7).
-- `LOAD_PROOF` takes P2 `02`, `03`, `0A` and `0B` only: a P2 with bit 2 (the loader's y, tried and taken out, [D205](DECISIONS.md#d205)) is `6B00`.
+- `LOAD_PROOF` takes P2 `02`, `03`, `0A` and `0B` only: a P2 with bit 2 (the loader's y, tried and taken out, [D211](DECISIONS.md#d211)) is `6B00`.
 
-The run of the tracked file with D206 (above) did every item below.
+The run of the tracked file with D212 (above) did every item below.
 
-- `LOAD_PROOF`'s 04 form ([D206](DECISIONS.md#d206)): on a card set up as the app sets one up, real pieces loaded with P2
+- `LOAD_PROOF`'s 04 form ([D212](DECISIONS.md#d212)): on a card set up as the app sets one up, real pieces loaded with P2
   `0A` and the mint's proof kept answer their place and `01`, and pay at a mint; the same pieces in the 33-byte form (P2
   `02`) too; time one piece in each form, and a first load of 45 pieces in one selection in each form.
 - Bad points in the 04 form (a point off the curve, the twist, x or y of p or more, a wrong prefix) answer `6A80`, and wrong
   lengths `6700`, with nothing stored (`info`'s unspent count and the balance as before).
 
-The run of the tracked file with D207 to D210 (above) did every item above and these:
+The run of the tracked file with D213 to D216 (above) did every item above and these:
 
-- A keyset taught at set-up ([D207](DECISIONS.md#d207)): `KEYSET_KEYS` for the testnut keyset on a card with no piece on it answers
+- A keyset taught at set-up ([D213](DECISIONS.md#d213)): `KEYSET_KEYS` for the testnut keyset on a card with no piece on it answers
   the ID the card works out; a first load of 45 pieces then has no teaching in it (7.75 s).
-- The padded keys and the squaring key ([D208](DECISIONS.md#d208), [D210](DECISIONS.md#d210)): the first `SET_CARD` makes them and holds
+- The padded keys and the squaring key ([D214](DECISIONS.md#d214), [D216](DECISIONS.md#d216)): the first `SET_CARD` makes them and holds
   them to their known answers (1.78 s in all); the change's points are right (every `LOAD_CHANGE` is `UNSPENT` with its proof by
   testnut's key), and every signature verifies under BIP-340 (payments, `AUTH`, `selftest`).
-- `LOAD_CHANGE`'s points ([D209](DECISIONS.md#d209)): C_ or K changed, or the proof, answers `6A80` with the opening still owed,
+- `LOAD_CHANGE`'s points ([D215](DECISIONS.md#d215)): C_ or K changed, or the proof, answers `6A80` with the opening still owed,
   and the right answer is then written back; a twist point in the 04 form of `LOAD_PROOF` answers `6A80`.
-- The holds are timed: an asking is 0.23 to 0.31 s (0.49 to 0.58 s after D211 and D212), so the claim, the history and the reset by the PIN took about 40 percent of the
-  time chosen in D205 at the same counts (about 85 to 95 percent after D211 and D212).
+- The holds are timed: an asking is 0.23 to 0.31 s (0.49 to 0.58 s after D217 and D218), so the claim, the history and the reset by the PIN took about 40 percent of the
+  time chosen in D211 at the same counts (about 85 to 95 percent after D217 and D218).
 
-The run of the tracked file with D211 to D214 (above) did every item above and these:
+The run of the tracked file with D217 to D220 (above) did every item above and these:
 
-- The signature's two shares and its check ([D211](DECISIONS.md#d211), [D212](DECISIONS.md#d212)): every signature the card made (payments with and
+- The signature's two shares and its check ([D217](DECISIONS.md#d217), [D218](DECISIONS.md#d218)): every signature the card made (payments with and
   without change, `AUTH`, `selftest`, the held askings) verified under BIP-340 and under the key, at 0.27 s more a signature than before (`AUTH`
   532 ms, 264 before); testnut took every swap. A fault cannot be made on a chip; the simulator's tests fault each squaring.
-- The set-up's known answers ([D213](DECISIONS.md#d213)): the first `SET_CARD` ran them all (2.03 s, 1.78 before) and the chip held to every one: the
+- The set-up's known answers ([D219](DECISIONS.md#d219)): the first `SET_CARD` ran them all (2.03 s, 1.78 before) and the chip held to every one: the
   04 form of `LOAD_PROOF` was taken (`curveByAgreement` true: the chip refused the six points off the curve), `fieldP` and `chipMul` true (the
   load, change and signing times are those of the engines' paths). The set-up's six points were also sent as pieces in the 04 form: each `6A80`.
-- A keyset taught and kept ([D214](DECISIONS.md#d214)): taught at set-up with no piece on the card (1.53 s), 45 pieces loaded with no teaching in the tap.
+- A keyset taught and kept ([D220](DECISIONS.md#d220)): taught at set-up with no piece on the card (1.53 s), 45 pieces loaded with no teaching in the tap.
 
 ### The signer's temporary key
 

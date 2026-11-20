@@ -579,7 +579,7 @@ def test_set_owner_with_and_without_the_anchor_and_the_old_owners_proof():
 
 
 def test_a_claim_is_sent_again_while_the_card_says_keep_holding():
-    """2.3 (D187): SET_OWNER on a card with no owner answers 6A98 to the first three askings (four in all, D205); the claim is sent until it stops."""
+    """2.3 (D187): SET_OWNER on a card with no owner answers 6A98 to the first three askings (four in all, D211); the claim is sent until it stops."""
     with contextlib.redirect_stderr(io.StringIO()):  # the hold note
         pub = p256.public_key(OWNER)
         card = make_card([(b"", 0x6A98)] * 3 + [(b"", 0x9000)])
@@ -2417,7 +2417,7 @@ def test_load_sends_p2_02_only_with_date_keys():
 
 
 def test_the_loaders_y_is_gone():
-    """D205 took the loader's y out again (slower on the chip, and a file too large for the card's applet to be created): no
+    """D211 took the loader's y out again (slower on the chip, and a file too large for the card's applet to be created): no
     --with-y, no LOAD_WITH_Y, and a piece is sent as it was in fix 19, P2 02 and 81 bytes."""
     assert not hasattr(cardctl, "y_of_c") and not hasattr(cardctl, "LOAD_WITH_Y")
     card = make_card([(b"\x03", 0x9000)])
@@ -2433,7 +2433,7 @@ def test_the_loaders_y_is_gone():
 
 
 def test_load_uncompressed_sends_c_whole():
-    """D206: `load --uncompressed` sends each piece's C whole (04 || x || y, 113 bytes a piece) with P2 bit 3 (08), the card
+    """D212: `load --uncompressed` sends each piece's C whole (04 || x || y, 113 bytes a piece) with P2 bit 3 (08), the card
     holding it to the curve by its key agreement; the 33 bytes it stores are the compressed form of the same point."""
     nonce = bytes(range(32))
     c33 = cardctl.placeholder_c(nonce)
@@ -2455,7 +2455,7 @@ def test_load_uncompressed_sends_c_whole():
 
 
 def test_load_uncompressed_falls_back_on_6b00():
-    """D206: a card whose key agreement failed its install test (or one before D206) answers the 04 form 6B00 with nothing
+    """D212: a card whose key agreement failed its install test (or one before D212) answers the 04 form 6B00 with nothing
     written; `load --uncompressed` then sends the same piece in the 33-byte form, and says so."""
     card = make_card([(b"", 0x6B00), (b"\x02", 0x9000)])
     code, out, err = _run(card, ["load", "--keyset", "0059534ce0bfa19a", "--amount", "16", "--date-keys", "--uncompressed"])
@@ -2534,7 +2534,7 @@ def test_set_owner_gives_the_pin_in_the_same_tap_before_the_held_claim():
 
 
 def test_the_history_and_the_reset_are_asked_for_no_more_than_their_counts_of_askings():
-    """D205: the history's hold is seven askings and the reset's seventeen after it (the owner's 4 s and 15 s in all on a J3R180), and a card
+    """D211: the history's hold is seven askings and the reset's seventeen after it (the owner's 4 s and 15 s in all on a J3R180), and a card
     that never stops holding is asked for no more than that: the bounds are the counts, not the old ten and sixty."""
     for call, count in (("hold_history", 7), ("reset_by_pin", 17)):
         card = make_card([(b"", 0x6A98)] * 100)

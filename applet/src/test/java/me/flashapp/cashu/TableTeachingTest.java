@@ -17,9 +17,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The review's findings on the chip's key agreement and the keyset table, made permanent. D213: the set-up's test of the
+ * The review's findings on the chip's key agreement and the keyset table, made permanent. D219: the set-up's test of the
  * agreement asks seven points (G taken; six off the curve refused), and a chip that takes any one of the six is not leaned on.
- * D214: a keyset taught and not yet loaded is not forgotten by the reclaim; an entry is made at the end of a teaching, when its
+ * D220: a keyset taught and not yet loaded is not forgotten by the reclaim; an entry is made at the end of a teaching, when its
  * keys hold, so that a teaching cut or refused leaves none.
  */
 class TableTeachingTest {
@@ -63,7 +63,7 @@ class TableTeachingTest {
     }
 
     @Test
-    @DisplayName("D213: the set-up's test of the agreement asks six points off the curve (G with y + 1, an x with no root, a twist point, a valid x with a wrong y, y near p, 04 with zeros) and G: a chip that takes any one of the six is not leaned on (curveByAgreement false, the 04 form refused 6B00), whichever it is; the simulator, which refuses all six, holds")
+    @DisplayName("D219: the set-up's test of the agreement asks six points off the curve (G with y + 1, an x with no root, a twist point, a valid x with a wrong y, y near p, 04 with zeros) and G: a chip that takes any one of the six is not leaned on (curveByAgreement false, the 04 form refused 6B00), whichever it is; the simulator, which refuses all six, holds")
     void theSelfTestAsksMorePoints() throws Exception {
         byte[][] bad = sixBad();
         for (int i = 0; i < bad.length; i++) {
@@ -80,7 +80,7 @@ class TableTeachingTest {
     }
 
     @Test
-    @DisplayName("D213: a chip that refuses G itself fails the self-test too (the old check kept)")
+    @DisplayName("D219: a chip that refuses G itself fails the self-test too (the old check kept)")
     void aChipThatRefusesGFails() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         SchnorrHW s = (SchnorrHW) FullPointLoadTest.schnorr(c);
@@ -89,10 +89,10 @@ class TableTeachingTest {
         assertFalse(s.checksCurve());
     }
 
-    // ---------------- D214 ----------------
+    // ---------------- D220 ----------------
 
     @Test
-    @DisplayName("D214: a card with the PIN alone (entries unmarked, two at most) taught two keysets before any piece keeps both: a third teaching is refused 6A9C at its first command, with nothing forgotten, in place of erasing the first one's keys and answering 9000")
+    @DisplayName("D220: a card with the PIN alone (entries unmarked, two at most) taught two keysets before any piece keeps both: a third teaching is refused 6A9C at its first command, with nothing forgotten, in place of erasing the first one's keys and answering 9000")
     void aThirdTeachingEvictsNothing() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card().ready(UnitsTest.SAT, false);
         taught(c, V1);
@@ -109,7 +109,7 @@ class TableTeachingTest {
     }
 
     @Test
-    @DisplayName("D214: with the grant (entries marked) six keysets are taught and kept before any piece; a seventh is refused 6A9C, and nothing is forgotten")
+    @DisplayName("D220: with the grant (entries marked) six keysets are taught and kept before any piece; a seventh is refused 6A9C, and nothing is forgotten")
     void sixTaughtSevenRefused() throws Exception {
         UnitsTest.Card c = KeysetKeysTest.card();
         Keyset[] ks = new Keyset[7];
@@ -121,7 +121,7 @@ class TableTeachingTest {
     }
 
     @Test
-    @DisplayName("D214: a keyset that has had pieces and has none now is let go by the reclaim as before (CLEAR_SPENT), its keys with it: the sparing is for a keyset waiting for its first piece, so the table does not fill for good")
+    @DisplayName("D220: a keyset that has had pieces and has none now is let go by the reclaim as before (CLEAR_SPENT), its keys with it: the sparing is for a keyset waiting for its first piece, so the table does not fill for good")
     void aPaidKeysetIsStillReclaimed() throws Exception {
         UnitsTest.Card c = KeysetKeysTest.card();
         taught(c, A);
@@ -133,7 +133,7 @@ class TableTeachingTest {
     }
 
     @Test
-    @DisplayName("D214: a teaching's entry is made at its end, with its keys, in one write: after the first command it names nothing and a keyset in no entry has none; a teaching cut by another command, or by a power cycle, or given false keys, leaves no entry at all, and a load of that keyset goes into a fresh one as the card's own unit")
+    @DisplayName("D220: a teaching's entry is made at its end, with its keys, in one write: after the first command it names nothing and a keyset in no entry has none; a teaching cut by another command, or by a power cycle, or given false keys, leaves no entry at all, and a load of that keyset goes into a fresh one as the card's own unit")
     void aCutOrRefusedTeachingLeavesNoEntry() throws Exception {
         UnitsTest.Card c = KeysetKeysTest.card();
         assertEquals(SW_OK, begin(c, V1.id8(), V1.tail).getSW());
@@ -159,7 +159,7 @@ class TableTeachingTest {
     }
 
     @Test
-    @DisplayName("D214: the planted entry (a PIN-holder's begin of a real sat keyset's ID with a usd tail, after a usd payment) plants nothing now: a legitimate load of the keyset answers 9000, with no CLEAR_SPENT between")
+    @DisplayName("D220: the planted entry (a PIN-holder's begin of a real sat keyset's ID with a usd tail, after a usd payment) plants nothing now: a legitimate load of the keyset answers 9000, with no CLEAR_SPENT between")
     void noPlantedEntry() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         c.grant();
@@ -174,7 +174,7 @@ class TableTeachingTest {
     }
 
     @Test
-    @DisplayName("D214: a taught keyset's entry is what it was (marked as the tap marks it, the unit its tail names, keys known) once its keys hold, and its first piece loaded sets the loaded bit")
+    @DisplayName("D220: a taught keyset's entry is what it was (marked as the tap marks it, the unit its tail names, keys known) once its keys hold, and its first piece loaded sets the loaded bit")
     void theEntryAtTheEnd() throws Exception {
         UnitsTest.Card c = KeysetKeysTest.card();
         taught(c, V1);

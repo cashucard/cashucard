@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * D220, from the red team of 2026-11-19 and the keeper's decision of the same day. (1) A payment that makes the card's own
+ * D224, from the red team of 2026-11-19 and the keeper's decision of the same day. (1) A payment that makes the card's own
  * change is refused at SIGN (6AA0, given up, nothing written or signed) in a shape that leaves no settlement record: a
  * seventeenth output, an output of nothing (the earlier review's L5), or more than 32 pieces (the red team's O1 on
  * outbox-lean, which applies here too). (2) The last payment's record is let go in the payment's own commit (red team F2,
@@ -64,7 +64,7 @@ class ChangeRecordTest {
     static final int ISO7816_CONDITIONS = 0x6985;
 
     @Test
-    @DisplayName("D220: a payment with the card's change and a seventeenth output is refused 6AA0 at SIGN, nothing written or signed; sixteen are signed with their record; and with no change of the card's, seventeen are still paid, with no record, as before")
+    @DisplayName("D224: a payment with the card's change and a seventeenth output is refused 6AA0 at SIGN, nothing written or signed; sixteen are signed with their record; and with no change of the card's, seventeen are still paid, with no record, as before")
     void aSeventeenthOutputWithChange() throws Exception {
         Card c = cardWith(4, 100, 0);
         assertEquals(NO_RECORD, pay(c, 2, 16, 1, false), "16 + the card's change: 17 outputs");
@@ -77,7 +77,7 @@ class ChangeRecordTest {
     }
 
     @Test
-    @DisplayName("D220: a payment with the card's change and an output of nothing (the review's L5) is refused 6AA0; with no change it is paid with no record, as before")
+    @DisplayName("D224: a payment with the card's change and an output of nothing (the review's L5) is refused 6AA0; with no change it is paid with no record, as before")
     void anOutputOfNothingWithChange() throws Exception {
         Card c = cardWith(3, 100, 0);
         assertEquals(NO_RECORD, pay(c, 1, 2, 1, true));
@@ -87,7 +87,7 @@ class ChangeRecordTest {
     }
 
     @Test
-    @DisplayName("D220 (red team O1, on this branch too): 33 pieces with the card's change are refused 6AA0, nothing written or signed; 32 pieces with change are signed and recorded; 33 with no change are paid with no record, as before")
+    @DisplayName("D224 (red team O1, on this branch too): 33 pieces with the card's change are refused 6AA0, nothing written or signed; 32 pieces with change are signed and recorded; 33 with no change are paid with no record, as before")
     void thirtyThreePiecesWithChange() throws Exception {
         Card c = cardWith(33, 10, 0);
         assertEquals(NO_RECORD, pay(c, 33, 1, 1, false));
@@ -100,7 +100,7 @@ class ChangeRecordTest {
     }
 
     @Test
-    @DisplayName("D220: Foxy's largest real shape is never refused: 20 pieces, 12 outputs of the till and 4 of the card's change (16), undated (recorded) and dated (no record: what the card is refuses nothing)")
+    @DisplayName("D224: Foxy's largest real shape is never refused: 20 pieces, 12 outputs of the till and 4 of the card's change (16), undated (recorded) and dated (no record: what the card is refuses nothing)")
     void foxysLargestShape() throws Exception {
         Card c = cardWith(20, 100, 0);
         assertEquals(SW_OK, pay(c, 20, 12, 4, false));
@@ -114,7 +114,7 @@ class ChangeRecordTest {
     }
 
     @Test
-    @DisplayName("D220 (red team F2, RT23TearTest): a payment torn right after its commit has its receipt from the next command, and no record is served as the last payment's: the record before it was let go in the commit")
+    @DisplayName("D224 (red team F2, RT23TearTest): a payment torn right after its commit has its receipt from the next command, and no record is served as the last payment's: the record before it was let go in the commit")
     void aPaymentTornAfterItsCommitLeavesNoOldRecord() throws Exception {
         Card c = new Card();
         ready(c, 0);
@@ -141,7 +141,7 @@ class ChangeRecordTest {
         assertEquals(SW_OK, c.sw(TransactionSizeTest.VERIFY));   // the next command finishes the burn and the receipt
         assertEquals(2, readUint32(c.f("cardReceipts"), 0), "payment 2 is committed and has its receipt");
         long[] s2 = TransactionSizeTest.scope(c);
-        assertEquals(SW_SLOT_EMPTY, s2[0], "no record: payment 1's is not served as the last (it was before D220)");
+        assertEquals(SW_SLOT_EMPTY, s2[0], "no record: payment 1's is not served as the last (it was before D224)");
 
         // the next payment records as ever
         c.powerCycle();

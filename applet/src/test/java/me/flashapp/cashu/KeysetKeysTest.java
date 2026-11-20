@@ -350,7 +350,7 @@ class KeysetKeysTest {
     }
 
     @Test
-    @DisplayName("Keys that do not hash to the keyset's ID are never kept: one key off, the tail off, a key left out (6A80 at the end); keys out of order, an amount twice or of 0, a 65th key (6A80 at the key, the teaching given up: 6985 at the end); a keyset of version 00 with a tail, another length (6700); an ID version not 00 or 01 (6A80); a keyset in no entry begun (D207); another P1 (6A86); nothing kept")
+    @DisplayName("Keys that do not hash to the keyset's ID are never kept: one key off, the tail off, a key left out (6A80 at the end); keys out of order, an amount twice or of 0, a 65th key (6A80 at the key, the teaching given up: 6985 at the end); a keyset of version 00 with a tail, another length (6700); an ID version not 00 or 01 (6A80); a keyset in no entry begun (D213); another P1 (6A86); nothing kept")
     void keysThatDoNotHashToTheIdAreNeverKept() throws Exception {
         UnitsTest.Card c = card();
         c.put(-1, A.id8(), 64);
@@ -383,7 +383,7 @@ class KeysetKeysTest {
         assertEquals(SW_WRONG_LENGTH, c.sw(new CommandAPDU(CLA, INS_KEYSET_KEYS, 0, 0, hexToBytes(A.id8()).clone(), 0, 7)), "seven bytes");
         assertEquals(SW_WRONG_LENGTH, begin(c, V1.id8(), new String(new char[65]).replace('\0', 'x')).getSW(), "a tail of 65 bytes");
         assertEquals(SW_OK, begin(c, V1.id8(), "|unit:sat|" + new String(new char[54]).replace('\0', 'x')).getSW(), "64 is the most");
-        // a keyset in no entry is no longer refused (D207: it is entered at the end, once its keys are its ID's; TeachAtSetUpTest)
+        // a keyset in no entry is no longer refused (D213: it is entered at the end, once its keys are its ID's; TeachAtSetUpTest)
         assertEquals(SW_OK, begin(c, B.id8(), "").getSW(), "a keyset in no entry: begun");
         c.put(-1, "02aa000000000001", 1);
         assertEquals(SW_WRONG_DATA, begin(c, "02aa000000000001", "").getSW(), "an ID version the card cannot hash");
@@ -681,7 +681,7 @@ class KeysetKeysTest {
     }
 
     @Test
-    @DisplayName("The keys go with their entry: let go by the reclaim and entered again, a keyset's keys are not known (6A9F) until taught again; taught again, a top that was not the keys' is replaced under the holder's say (6A9D without it, D219); RESET_CARD wipes every top")
+    @DisplayName("The keys go with their entry: let go by the reclaim and entered again, a keyset's keys are not known (6A9F) until taught again; taught again, a top that was not the keys' is replaced under the holder's say (6A9D without it, D223); RESET_CARD wipes every top")
     void theKeysGoWithTheirEntry() throws Exception {
         UnitsTest.Card c = card();
         int place = c.put(-1, A.id8(), 64);
@@ -704,7 +704,7 @@ class KeysetKeysTest {
         int e = c.entryOf(A.id8());
         c.book()[e * UnitsTest.ENTRY + 9] ^= 1;
         assertEquals(SW_WRONG_DATA, show(c, row[0], A, 8));
-        assertEquals(UnitsTest.SW_NOT_THIS_TAP, teach(c, A).getSW(), "other keys than the entry's, the PIN alone (D219)");
+        assertEquals(UnitsTest.SW_NOT_THIS_TAP, teach(c, A).getSW(), "other keys than the entry's, the PIN alone (D223)");
         c.grant();
         taught(c, A);
         assertArrayEquals(top(A), topKept(c, A.id8()));
@@ -769,7 +769,7 @@ class KeysetKeysTest {
     }
 
     @Test
-    @DisplayName("LOAD_CHANGE gives the chip no point that is not on the curve for arithmetic: the mint's C_ or K with y moved by two (the same x and parity) is refused 6A80 by the key agreement's own curve test (D209: once) and is given to nothing else; the mint's good answer then loads")
+    @DisplayName("LOAD_CHANGE gives the chip no point that is not on the curve for arithmetic: the mint's C_ or K with y moved by two (the same x and parity) is refused 6A80 by the key agreement's own curve test (D215: once) and is given to nothing else; the mint's good answer then loads")
     void loadChangeGivesTheChipNoPointOffTheCurve() throws Exception {
         UnitsTest.Card c = card();
         int p = c.put(-1, A.id8(), 1024);
@@ -792,7 +792,7 @@ class KeysetKeysTest {
             System.arraycopy(CashuAppletTest.unsigned32(y), 0, bad, at + 33, 32);
             assertEquals(SW_WRONG_DATA, c.sw(CashuAppletTest.loadChangeCommand(row[0], bad)), (at == 0 ? "C_" : "K") + " off the curve");
             byte[] off = Arrays.copyOfRange(bad, at, at + 65);
-            // D209: the point is given to the chip's key agreement once, as the curve test itself (which refuses it, and the command ends),
+            // D215: the point is given to the chip's key agreement once, as the curve test itself (which refuses it, and the command ends),
             // and to nothing that does arithmetic with it: not the generic mapping, not a second agreement
             assertEquals(1, ecdh.given.stream().filter(g -> Arrays.equals(g, off)).count(), (at == 0 ? "C_" : "K") + ": the point off the curve is given to the chip's agreement once, as its curve test");
             assertFalse(gm.given.stream().anyMatch(g -> Arrays.equals(g, off)), (at == 0 ? "C_" : "K") + ": the point off the curve is not given to the generic mapping");
