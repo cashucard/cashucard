@@ -671,9 +671,9 @@ describe('provision: the Cashu card', () => {
     }[];
     assert.deepEqual(
       blocks.map(b => b.index),
-      Array.from({length: 152}, (_, i) => i + 1),
+      Array.from({length: 170}, (_, i) => i + 1),
     );
-    assert.ok(blocks.every(b => b.of === 152));
+    assert.ok(blocks.every(b => b.of === 170));
     assert.equal(
       events.filter(e => e.type === 'apdu').length,
       INSTALL_ORDER.length,
@@ -721,7 +721,7 @@ describe('provision: the Cashu card', () => {
       options(),
     );
     assert.equal(r.ok, true, r.reason);
-    assert.equal(card.insLog().filter(i => i === 0xe8).length, 188);
+    assert.equal(card.insLog().filter(i => i === 0xe8).length, 210);
     assertInstalled(card);
   });
 });
