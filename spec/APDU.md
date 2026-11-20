@@ -746,8 +746,11 @@ since that payment did not step the receipt count. The payment is made and
 answered in all of these as it would be without the record, except that a payment
 that makes the card's own change is refused `6AA0` at its first `SIGN`, nothing written
 or signed, for more than 32 pieces, more than 16 outputs or an output of 0, the shapes a
-reader chooses ([D220](../docs/DECISIONS.md#d220)); for dated pieces, a mint that is not
+reader chooses ([D220](../docs/DECISIONS.md#d220)), fixed at that `SIGN` ([D221](../docs/DECISIONS.md#d221)); for dated pieces, a mint that is not
 `https://`, a stopped count or a card with no room for a record, it is signed as before.
+A payment of dated pieces never has a record, so on a card loaded with dated pieces (Foxy
+loads every card it owns that way) the `6AA0` refusal changes nothing; whether dated
+payments should have a record is open ([D220](../docs/DECISIONS.md#d220)).
 
 **Tears.** The record's status goes to 0 in the payment's commit, again before the
 body is written, and to 1, with the body's length, in one transaction after it: a card pulled away in between has

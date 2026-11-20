@@ -8342,7 +8342,14 @@ state, not a shape the reader chooses: dated pieces (the packet has no field for
 key, which is how Foxy loads a card it owns, `cardDateAhead`), a mint that is not `https://` (the local test mints of
 `tools/cardsim`), a receipt count or generation stopped at `FFFFFFFF`, and a card refused the record's room (D176). Refusing
 them would refuse every payment with change from a card Foxy owns. They sign as before, and this is for the owner to decide
-again if a record of dated payments is wanted (the packet would need the date and the refund key). Also left: a receipt the chip's
+again if a record of dated payments is wanted (the packet would need the date and the refund key).
+
+**Said plainly (round two, R4): on a card loaded with dated pieces, D220 protects nothing new.** A payment of dated pieces never
+gets a settlement record, whatever its shape, so the refusal above never decides anything for it: it already had no record.
+Foxy loads every card it owns with dated pieces (`cardDateAhead`), so on Foxy's cards this decision changes nothing today; it
+protects undated cards (Flash's, the cardsim's). **Open, for the keeper:** whether dated payments should have a record (a
+packet with the date and the refund key), and until then whether a payment with the card's change and no record should be
+refused on dated cards too, which would refuse every Foxy payment with change. Not decided here. Also left: a receipt the chip's
 transaction cannot hold (`finishBurn` false) and a chip fault inside `writeOutbox`, both after the commit, where nothing can be
 refused.
 
