@@ -63,7 +63,7 @@ SIZES = {
     39343: True,   # 2.3 (CAP sha256 b304d938..., load file c79b30a7...), unpadded, D200 to D204, D211 to D216 (D213 keyset taught at set-up, D214 the field on p padded, D215 LOAD_CHANGE's points by the key agreement, D216 e*d on the chip's RSA), 2026-11-14, J3R180 09301220: three steps, opener first, load 17 s, card applet 2 s at the first create, installed three times; SELECT 0203, selftest 20/20
     40365: True,   # 2.3 (CAP sha256 20b6d726..., load file 8aefa0db...), unpadded, D200 to D204, D211 to D220 (D217 the product in two shares, D218 every signature checked on the card, D219 wider known answers, D220 a taught keyset kept), 2026-11-14, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 1 to 3 s at the first create, four installs (173 past a multiple of 256; 135 and 153 past failed and 175 and 237 past installed); SELECT 0203, selftest 13/13, real signatures and real change verified on the chip
     40412: True,   # 2.3 (CAP sha256 11104ceb..., load file 05c9b847...), unpadded, D200 to D204, D211 to D221 (the claim after the set-up's record is one asking), 2026-11-15, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 2 s; selftest 13/13, set-up claim at the first asking, 9-piece payment with change, installed three times
-    41205: True,   # 2.3 with the rotating tag (D222, load file 6f0e3a06...; never tracked), unpadded, 245 past a multiple of 256, a J3R180: installed and ran (self-tests, the tag, a hand-over, a reset; D222's own words); not on PROVEN
+    41205: True,   # 2.3 with the rotating tag (190c5ab, load file 6f0e3a06..., never tracked), unpadded, 245 past a multiple of 256, J3R180 58206920: installed and left there, selftest 13 of 13 and the tag read (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920.md, its files table and the row Left); not on PROVEN
     38791: False,  # 2.3 study build of D213 to D216 (ecdh study, never shipped), 2026-11-14, J3R180 09301220: loaded, opener made, card applet 6F00 at create (135 past a multiple of 256)
     38809: False,  # the same study source at this size, 2026-11-14, J3R180 09301220: card applet 6F00 at create (153 past a multiple of 256)
     38893: True,   # the same study source at this size (load file 92b67948..., never shipped), 2026-11-14, J3R180 09301220: installed at the first try (237 past a multiple of 256); passed the study's chip tests
@@ -107,6 +107,24 @@ EARLIER = frozenset({
     '28ddfb9d47af16e565f565149a91fddfa7af94ca4bed0ef686e7a6c2fe0285d3',
 })
 PAGE = 256
+# where in its 256-byte page a load file ended when the chip refused the card's applet (2.3 study builds at 135 and 153 past;
+# 1.x builds at 139, 164 and 176 past): refcheck's SIZES compares whole sizes only, so a new size near one of these places is
+# warned of, unless that very place has installed (`place_warning`)
+REFUSED_PAST = (135, 139, 153, 164, 176)
+NEAR_PAST = 8  # bytes either side of a refused place
+
+
+def place_warning(size):
+    """A warning when `size` ends at or within NEAR_PAST bytes of a page place in REFUSED_PAST and no size in SIZES that
+    installed ended at that very place, else None."""
+    past = size % PAGE
+    installed = {s % PAGE for s, ok in SIZES.items() if ok}
+    near = [r for r in REFUSED_PAST if abs(past - r) <= NEAR_PAST]
+    if not near or past in installed:
+        return None
+    return ('WARNING: %d past a multiple of %d is %s %d past, where the chip refused the card\'s applet before, and no size '
+            'that installed ended here: move CashuApplet.sizeTheFile to a place known to install (%s past) before a chip run.'
+            % (past, PAGE, 'at' if past in near else 'near', near[0], ', '.join(str(x) for x in sorted(installed))))
 LINE = 6  # bytes one line of sizeTheFile adds, about: five to seven, so the lines advised are an estimate
 
 
@@ -183,6 +201,9 @@ def main(argv):
     if not listed or listed[0] != OPENER:
         print('REFUSED: the opener (%s) must be the first applet listed, so that it is instantiated first.' % OPENER.hex().upper())
         return 1
+    warning = place_warning(size)
+    if warning:
+        print(warning)
     good = sorted(s for s, ok in SIZES.items() if ok)
     bad = sorted(s for s, ok in SIZES.items() if not ok)
     for first, last in AVOID:

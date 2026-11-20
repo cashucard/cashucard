@@ -7382,8 +7382,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.0: no lines here, and the load file is unpadded, the least this source comes to; refcheck prints its size at every build.
-         * The 3.0 file of the merge is 41,887 bytes (159 past a multiple of 256) and no chip has been given it. The last 2.3
+        /* 3.0: four writes here, 16 bytes, so the load file is 41,903 bytes, 175 past a multiple of 256, a place the J3R180 installed
+         * at (D213 to D216's file); unpadded, the merge came to 41,887 (159 past, six from the refused 153), and no chip has been given either. The last 2.3
          * file (D221, 40,412 bytes, 220 past) ran on a J3R180 on 2026-11-15, and the file with D217 to D220 (40,365, 173 past) the day
          * before; the file with D213 to D216 (39,343, 175 past) installed on 2026-11-14, where a study build of its source was refused
          * (6F00) at 38,791 and 38,809 bytes (135 and 153 past) and installed at 38,893 (237 past); the files with D212 (37,269, 149
@@ -7394,5 +7394,9 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the sizes not to be shipped untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
+        a[0] = 1;
+        a[1] = 2;
+        a[2] = 3;
+        a[3] = 4;
     }
 }

@@ -88,10 +88,10 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 3.0 build is **41,887 bytes** by refcheck's measure (159 past a multiple of 256;
-the Method component 34,193), in 170 blocks of 247 bytes, the last 144: the load file
+The 3.0 build is **41,903 bytes** by refcheck's measure (175 past a multiple of 256;
+the Method component 34,209), in 170 blocks of 247 bytes, the last 160: the load file
 inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
-not the CAP's ([Install](#install) gives both). Unpadded (`sizeTheFile` is empty), this
+not the CAP's ([Install](#install) gives both). Padded by `sizeTheFile` (below), this
 exact file has run only in a simulator so far, and no card has installed it or a file of its size. Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
@@ -100,7 +100,9 @@ path; the no-PIN allowance armed by the owner's proof or a held tap and not by t
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
 settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)). Its own run, as the checklist below, is still to come, its size
 first; if the chip refuses its size, it is moved with `sizeTheFile` (below). The other maintainer's 3.0 file before
-the merge (37,413 bytes, 37 past) was never given to a chip either.
+the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by four writes, 16 bytes, from 41,887 (159 past, six bytes from
+153 past, where the chip refused a study build) to 175 past, a place refcheck's SIZES knows to install (the file with D213 to D216);
+refcheck now warns of a size at or near a refused place.
 
 On 2026-11-13 a J3R180 was given earlier source, numbered 2.3 then, padded to three
 sizes: it installed the files of 33,647 and 35,213 bytes and refused the card's applet in
@@ -453,10 +455,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.0**, sha256
-`43a3569dd6c98db28a8f89f504bfe94a70787f65dd9c7ed6597f9a17b7133d38`
+`c31a2ef7db55353233529c43fdee939dffe0c1381ce327b313d632d87c5cfc1d`
 (`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 41,887 bytes), has sha256
-`71642e44ba2499fc5e84fd1348bd3e80cecc07c9a0f9b6a2adfdfe054496812b`: the hash the
+is LOADed with (refcheck's measure, 41,903 bytes), has sha256
+`9446aad1d234d2cf92b231b75c362fe08f88ff2cc246c2c446f349f8ea1681a5`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation

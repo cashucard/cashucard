@@ -8,9 +8,9 @@ the merged pull requests besides.
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
-`43a3569dd6c98db28a8f89f504bfe94a70787f65dd9c7ed6597f9a17b7133d38`. Its load file,
-the bytes a card is LOADed with, is 41,887 bytes by `tools/refcheck.py`'s measure,
-sha256 `71642e44ba2499fc5e84fd1348bd3e80cecc07c9a0f9b6a2adfdfe054496812b`. `SELECT`
+`c31a2ef7db55353233529c43fdee939dffe0c1381ce327b313d632d87c5cfc1d`. Its load file,
+the bytes a card is LOADed with, is 41,903 bytes by `tools/refcheck.py`'s measure,
+sha256 `9446aad1d234d2cf92b231b75c362fe08f88ff2cc246c2c446f349f8ea1681a5`. `SELECT`
 and `GET_INFO` answer `03 00`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
 [D183](DECISIONS.md#d183) to [D226](DECISIONS.md#d226) (numbered 3.0 by

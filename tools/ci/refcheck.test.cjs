@@ -206,7 +206,7 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
 });
 
 // The tracked CAP is the 3.0 file of the merge of 2026-11-19: the last 2.3 file (40,412 bytes, D221) with the version moved
-// to 3.0 (D205), D206 to D210, the rotating tag (D222) and D223 to D226 added: a load file of 41,887 bytes, a size no chip has
+// to 3.0 (D205), D206 to D210, the rotating tag (D222) and D223 to D226 added: a load file of 41,903 bytes, a size no chip has
 // been given. No card has installed it, so its hash
 // is not on PROVEN, and refcheck says it has run only in a simulator and no card has installed it or a file of its size,
 // and names the size untried. The 2.3 file's hash stays on PROVEN as that file's, with real signatures and real change
@@ -215,13 +215,32 @@ test("the tracked 3.0 CAP's load file has run only in a simulator, at a size not
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.0.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 41887 bytes/);
-  assert.match(r.stdout, /load file sha256: 71642e44ba2499fc5e84fd1348bd3e80cecc07c9a0f9b6a2adfdfe054496812b; this exact file has run only in a simulator so far, and no card has installed it or a file of its size\.\n/);
+  assert.match(r.stdout, /load file: 41903 bytes/);
+  assert.match(r.stdout, /load file sha256: 9446aad1d234d2cf92b231b75c362fe08f88ff2cc246c2c446f349f8ea1681a5; this exact file has run only in a simulator so far, and no card has installed it or a file of its size\.\n/);
   assert.doesNotMatch(r.stdout, /this exact file has run on a chip/);
   assert.doesNotMatch(r.stdout, /a size known to install/);
-  assert.match(r.stdout, /not yet tried on a chip \(the nearest size known to install is 41205 bytes, -682 from this\)/);
+  assert.match(r.stdout, /not yet tried on a chip \(the nearest size known to install is 41205 bytes, -698 from this\)/);
   const source = readFileSync(REFCHECK, "utf8");
-  assert.doesNotMatch(source, /71642e44ba2499fc5e84fd1348bd3e80cecc07c9a0f9b6a2adfdfe054496812b/, "the tracked file's hash is not on PROVEN");
-  assert.doesNotMatch(source, /^ {4}41887:/m, "the tracked file's size is not in SIZES");
+  assert.doesNotMatch(source, /9446aad1d234d2cf92b231b75c362fe08f88ff2cc246c2c446f349f8ea1681a5/, "the tracked file's hash is not on PROVEN");
+  assert.doesNotMatch(source, /^ {4}41903:/m, "the tracked file's size is not in SIZES");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes, 2026-11-14, J3R180 '\n +'09312320 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
+});
+
+// SIZES compares whole sizes; a new size whose place in its 256-byte page is at or near one the chip refused (135, 139, 153,
+// 164, 176 past) is warned of, unless a size that installed ended at that very place: 159 past (the unpadded 3.0 merge,
+// 41,887 bytes) is warned of, 175 past (the tracked file, padded) is not, and neither is a size far from every refused place.
+test("a load file ending at or near a refused place in its 256-byte page is warned of, unless that place has installed", () => {
+  const warn = n => spawnSync("python3", ["-I", "-c",
+    "import sys; sys.path.insert(0, sys.argv[1]); import refcheck; print(refcheck.place_warning(int(sys.argv[2])))",
+    join(__dirname, ".."), String(n)], { encoding: "utf8" });
+  for (const n of [41887, 41881, 40839, 41139]) {
+    const r = warn(n);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /^WARNING: \d+ past a multiple of 256 is (at|near) (135|139|153|164|176) past/, `${n}: ${r.stdout}`);
+  }
+  for (const n of [41903, 41901, 40412, 41742, 41205]) {
+    const r = warn(n);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.trim(), "None", `${n}: ${r.stdout}`);
+  }
 });
