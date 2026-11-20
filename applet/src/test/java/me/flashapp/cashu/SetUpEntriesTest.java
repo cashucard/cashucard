@@ -152,4 +152,56 @@ class SetUpEntriesTest {
         assertEquals(SW_OK, teach(c, junk(1)).getSW());
         assertFalse(setUpBit(c, junk(1)), "and a second does not");
     }
+
+    @Test
+    @DisplayName("D222 (round three, R5, the reviewer's proof): made-up pieces loaded under made-up keysets in the set-up selection get no set-up bit and count toward the two unmarked: two go in, not five, and the holder's next keyset goes in with the owner's grant")
+    void loadsInTheSetUpSelectionCannotFillTheTable() throws Exception {
+        UnitsTest.Card c = setUpSelection();
+        taught(c, A);
+        int planted = 0;
+        for (int i = 1; i <= 6; i++) if (c.load(c.piece(junk(i).id8(), 1)).getSW() == SW_OK) planted++;
+        assertEquals(2, planted, "the two unmarked, as after the set-up (5 at 82ddd3b)");
+        for (int i = 1; i <= 6; i++) if (c.entryOf(junk(i).id8()) >= 0) assertFalse(setUpBit(c, junk(i)), "no bit for a load's entry " + i);
+        for (int i = 0; i < 3; i++) { c.tap(); assertEquals(SW_OK, c.clearSpent()); }
+        c.tap();
+        c.grant();
+        assertEquals(SW_OK, teach(c, B).getSW(), "the holder's next keyset with the owner's grant (6A9C at 82ddd3b)");
+        assertEquals(SW_OK, c.load(c.piece(B.id8(), 32)).getSW());
+    }
+
+    @Test
+    @DisplayName("D222, the honest set-up: one keyset taught and its first 45 pieces loaded in the same selection keeps the set-up bit, loaded; one loaded with no teaching first is an ordinary entry; either way the holder's next keyset goes in with the PIN alone")
+    void aSetUpThatTeachesAndLoads() throws Exception {
+        UnitsTest.Card c = setUpSelection();
+        taught(c, A);
+        for (int i = 0; i < 45; i++) assertEquals(SW_OK, c.load(c.piece(A.id8(), 1)).getSW(), "load " + i);
+        assertEquals(0x08 | 0x04, c.rawStateOf(A.id8()) & 0x0C, "set-up and loaded");
+        c.tap();
+        taught(c, B);
+        assertEquals(SW_OK, c.load(c.piece(B.id8(), 32)).getSW(), "the mint's next keyset, PIN alone");
+
+        UnitsTest.Card d = setUpSelection();
+        for (int i = 0; i < 45; i++) assertEquals(SW_OK, d.load(d.piece(A.id8(), 1)).getSW(), "load " + i);
+        assertFalse(setUpBit(d, A), "a load's entry has no set-up bit");
+        taught(d, A);
+        assertFalse(setUpBit(d, A), "nor does teaching it after");
+        d.tap();
+        taught(d, B);
+        assertEquals(SW_OK, d.load(d.piece(B.id8(), 32)).getSW(), "the next keyset, PIN alone: A and B the two unmarked");
+    }
+
+    @Test
+    @DisplayName("D222, a card with no owner: its set-up under a held tap teaches and loads its keyset, and pays from it after")
+    void aCardWithNoOwnerSetsUpAndLoads() throws Exception {
+        UnitsTest.Card d = new UnitsTest.Card();
+        assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
+        d.pin();
+        assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, UnitsTest.recordIn(SAT))));
+        assertEquals(SW_OK, d.sw(setTimeCommand(T0)));
+        taught(d, A);
+        assertTrue(setUpBit(d, A));
+        int p = d.put(-1, A.id8(), 64);
+        d.tap();
+        assertEquals(64, d.pay(p).getData().length);
+    }
 }
