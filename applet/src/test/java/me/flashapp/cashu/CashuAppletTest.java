@@ -8458,7 +8458,7 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("A payment that waited is signed over its pieces and its outputs as any other, whether the outputs come before the waits or among them; the signature can be asked for again; a payment given up leaves the last signature as it was")
+    @DisplayName("A payment that waited is signed over its pieces and its outputs as any other; outputs sent among the waits give the payment up (D225), and the payment begun again with them before the waits is signed over them; the signature can be asked for again; a payment given up leaves the last signature as it was")
     void testAWaitedPaymentIsSignedOverItsOutputs() throws Exception {
         readyWithLimit(0);
         assertEquals(SW_OK, setLimits(0, 100));
@@ -8476,20 +8476,25 @@ class CashuAppletTest {
         ResponseAPDU again = transmit(new CommandAPDU(CLA, INS_SPEND_ALL_AGAIN, 0, 0, 64));
         assertEquals(SW_OK, again.getSW());
         assertArrayEquals(a.getData(), again.getData(), "asked for again, it is the signature and not a wait");
-        // the outputs among the waits: OUTPUTS is a next step, as SIGN is, and does not give the payment up
+        /* the outputs among the waits (D225): the shape is fixed at the first SIGN, so OUTPUTS after it gives the payment up, nothing
+         * burned; begun again with the outputs before the waits, it is signed over them */
         byte[][] later = { output(300, blinded(3)) };
         int w2 = waitsRule(100, readUint32(before[3], 9) + readUint32(before[4], 9) + readUint32(before[5], 9), 0);
         assertEquals(SW_OK, sw(beginCommand(3, 4, 5)));
         assertNotYet(transmit(SIGN_ALL), "the first of " + w2 + " waits");
+        assertEquals(SW_CONDITIONS_NOT_SATIS, sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, later[0])), "no output after the first SIGN");
+        assertEquals(SW_CONDITIONS_NOT_SATIS, sw(SIGN_ALL), "the payment given up");
+        assertEquals(1, slot(3)[0], "nothing burned");
+        assertEquals(SW_OK, sw(beginCommand(3, 4, 5)));
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, later[0])));
-        for (int left = w2 - 2; left >= 0; left--) {
+        for (int left = w2 - 1; left >= 0; left--) {
             ResponseAPDU r = transmit(SIGN_ALL);
             assertNotYet(r, "still waiting");
         }
         ResponseAPDU b = transmit(SIGN_ALL);
         assertEquals(SW_OK, b.getSW());
         assertEquals(64, b.getData().length);
-        assertTrue(signedForAll(b.getData(), new byte[][] { before[3], before[4], before[5] }, later, REFUND), "over the outputs that came in the middle of the wait");
+        assertTrue(signedForAll(b.getData(), new byte[][] { before[3], before[4], before[5] }, later, REFUND), "over the outputs named before the waits");
         // a payment given up in its wait leaves the last signature as it was
         assertEquals(SW_OK, sw(beginCommand(6, 7, 8)));
         assertNotYet(transmit(SIGN_ALL), "the first of eight waits");
@@ -9303,7 +9308,7 @@ class CashuAppletTest {
         assertFalse(begin.contains("waitsFor("), "the beginning works out no wait: the change is not known yet");
         assertTrue(begin.contains("Util.setShort(allState, (short) 2, (short) -1);"), "and leaves it to be worked out");
         String sign = body(code, "private void processSpendAllSign(", "private boolean finishBurn(");
-        int net = sign.indexOf("if (waits <= 0) inCardUnit();");
+        int net = sign.indexOf("if (waits <= 0) {\n            inCardUnit();");
         int day = sign.indexOf("requireUnderLimits(scratch, X_CONV, (short) 0);");
         int wait = sign.indexOf("waitsFor(scratch, (short)(X_CONV + 4), allState[7] != (byte) 0,");
         int work = sign.indexOf("if (waits > 0) {");

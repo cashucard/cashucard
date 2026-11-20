@@ -192,7 +192,7 @@ class PaymentRecoveryTest {
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, concat(out(60, 1), out(30, 2)))));
         assertEquals(SW_OK, c.sw(changeCommand(10, mintKey(), hexToBytes(UnitsTest.SAT_A))), "change of 10: 100");
         assertEquals(64, c.sign().getData().length);
-        // an output sent among the waits is held to the same sum
+        // an output sent among the waits gives the payment up (D225: the shape is fixed at the first SIGN), whatever its sum
         int b = c.put(-1, UnitsTest.SAT_A, 100);
         assertEquals(SW_OK, c.ownerLimit(concat(u32(0), u32(1))), "a limit on one payment of 1: a payment waits");
         c.tap();
@@ -200,7 +200,7 @@ class PaymentRecoveryTest {
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, out(90, 3))));
         ResponseAPDU first = c.send(new CommandAPDU(CLA, INS_SPEND_ALL_SIGN, 0, 0, 64));
         assertEquals(2, first.getData().length, "a wait");
-        assertEquals(SW_WRONG_DATA, c.sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, out(11, 4))), "90 and 11 among the waits: 101");
+        assertEquals(SW_CONDITIONS_NOT_SATIS, c.sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, out(11, 4))), "90 and 11 among the waits: refused as any output there (D225)");
         // and the piece of the refused swap is still the card's to load again: it was never signed for
         assertEquals(1, c.slot(b)[0]);
         assertEquals(81, pieceA.length);
