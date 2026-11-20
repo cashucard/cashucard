@@ -2260,8 +2260,9 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private void processSpendAllOutputs(APDU apdu) {
         if (allState[0] != (byte) 1) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-        // the terminal's outputs come before the card's own change, as the swap will name them: none after it
-        if (allState[6] != (byte) 0) dropPayment(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        /* the terminal's outputs come before the card's own change, as the swap will name them: none after it; and none once
+         * the first SIGN has been asked (D225: the shape SIGN checked is the shape signed) */
+        if (allState[6] != (byte) 0 || shapeFixed()) dropPayment(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         short len = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
         short in = ISO7816.OFFSET_CDATA;
@@ -2348,6 +2349,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private void processSpendAllChange(APDU apdu) {
         if (allState[0] != (byte) 1) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        // none once the first SIGN has been asked (D225): the payment's shape is what that SIGN checked
+        if (shapeFixed()) dropPayment(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         short len = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
         if (len != CHANGE_ASK_KEYSET_LEN) dropPayment(ISO7816.SW_WRONG_LENGTH);
@@ -2592,6 +2595,15 @@ public class CashuApplet extends Applet implements TagSwitch {
     }
 
     /** The payment in hand is given up, and the command refused with `sw`. */
+    /**
+     * Whether the payment in hand has been asked its first SPEND_ALL_SIGN (D225): the wait's count (allState[2..3]) is -1 from
+     * SPEND_ALL_BEGIN until that SIGN sets it, and 0 or more after. From then SPEND_ALL_OUTPUTS and SPEND_ALL_CHANGE give the
+     * payment up (6985): what the first SIGN checked (D224) and held to the limits is what is signed.
+     */
+    private boolean shapeFixed() {
+        return Util.getShort(allState, (short) 2) >= (short) 0;
+    }
+
     private void dropPayment(short sw) {
         allState[0] = (byte) 0;
         ISOException.throwIt(sw);
@@ -3060,7 +3072,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      *
      * A payment that makes the card's own change in a shape that leaves no settlement record (more than OUT_IN_MOST pieces,
      * a seventeenth output, an output of nothing) is refused `6AA0` at the first SIGN, given up, with nothing written or
-     * signed (D224).
+     * signed (D224), and asked again at the SIGN that signs after a wait; from the first SIGN no output or change is taken
+     * (D225, `shapeFixed`).
      */
     private void processSpendAllSign(APDU apdu) {
         if (allState[0] != (byte) 1) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
@@ -3082,16 +3095,19 @@ public class CashuApplet extends Applet implements TagSwitch {
         short waits = Util.getShort(allState, (short) 2);
         /* The figures the limits are held to, in the card's unit (D184): at the first SIGN and at the last, and at no wait
          * between. A payment in the other unit on a card with a limit set and no rate is refused here (6A99), given up. */
-        if (waits <= 0) inCardUnit();
-        if (waits < 0) {
+        if (waits <= 0) {
+            inCardUnit();
             /* D224: a payment that makes the card's own change is not signed in a shape that leaves no settlement record (more
              * than OUT_IN_MOST pieces; a seventeenth output or an output of nothing, which `stageOutput` marks FF): refused
              * 6AA0 and given up, before anything is written or signed. What the card itself is (dated pieces, its mint, a card
-             * with no room for a record) refuses nothing here */
+             * with no room for a record) refuses nothing here. Asked at the first SIGN and again at the SIGN that signs after
+             * a wait (D225), where nothing can have changed the shape (`shapeFixed`): a second line */
             if (allState[6] != (byte) 0
                 && ((allState[1] & 0xFF) > OUT_IN_MOST || (outStage != null && (outStage[0] & 0xFF) > OUT_OUT_MOST))) {
                 dropPayment(SW_NO_RECORD);
             }
+        }
+        if (waits < 0) {
             /* The PIN, where one is set (1.16): the PIN given in this tap, or
              * the no-PIN allowance, which has to hold the whole of the pieces
              * (D186). Asked before the day's limit: an allowance of 0 or a
