@@ -455,10 +455,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.0**, sha256
-`c31a2ef7db55353233529c43fdee939dffe0c1381ce327b313d632d87c5cfc1d`
+`83051d41b0e17ee97fecdb66c09a81a94feb6c0b5c7d1b01c66cafae6af7e37e`
 (`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
 is LOADed with (refcheck's measure, 41,903 bytes), has sha256
-`9446aad1d234d2cf92b231b75c362fe08f88ff2cc246c2c446f349f8ea1681a5`: the hash the
+`e4b5cff04b01104d6c1dacdb35db6c29e7bac0842915686d1d355199cbb1a250`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation

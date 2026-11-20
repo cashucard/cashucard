@@ -216,12 +216,12 @@ test("the tracked 3.0 CAP's load file has run only in a simulator, at a size not
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /load file: 41903 bytes/);
-  assert.match(r.stdout, /load file sha256: 9446aad1d234d2cf92b231b75c362fe08f88ff2cc246c2c446f349f8ea1681a5; this exact file has run only in a simulator so far, and no card has installed it or a file of its size\.\n/);
+  assert.match(r.stdout, /load file sha256: e4b5cff04b01104d6c1dacdb35db6c29e7bac0842915686d1d355199cbb1a250; this exact file has run only in a simulator so far, and no card has installed it or a file of its size\.\n/);
   assert.doesNotMatch(r.stdout, /this exact file has run on a chip/);
   assert.doesNotMatch(r.stdout, /a size known to install/);
   assert.match(r.stdout, /not yet tried on a chip \(the nearest size known to install is 41205 bytes, -698 from this\)/);
   const source = readFileSync(REFCHECK, "utf8");
-  assert.doesNotMatch(source, /9446aad1d234d2cf92b231b75c362fe08f88ff2cc246c2c446f349f8ea1681a5/, "the tracked file's hash is not on PROVEN");
+  assert.doesNotMatch(source, /e4b5cff04b01104d6c1dacdb35db6c29e7bac0842915686d1d355199cbb1a250/, "the tracked file's hash is not on PROVEN");
   assert.doesNotMatch(source, /^ {4}41903:/m, "the tracked file's size is not in SIZES");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes, 2026-11-14, J3R180 '\n +'09312320 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
 });

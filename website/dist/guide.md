@@ -60,7 +60,7 @@ sha256sum target/cashu-javacard-3.0.0.cap
 On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.0.0.cap`. Expected:
 
 ```
-c31a2ef7db55353233529c43fdee939dffe0c1381ce327b313d632d87c5cfc1d  target/cashu-javacard-3.0.0.cap
+83051d41b0e17ee97fecdb66c09a81a94feb6c0b5c7d1b01c66cafae6af7e37e  target/cashu-javacard-3.0.0.cap
 ```
 
 Stop if the hash differs.

@@ -135,7 +135,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // payment leaves the one before it as it was. Nothing else on the wire moves.
     // 2.0 to 2.2 are major 2. 3.0 is the wire of D183 and after (the comment above VERSION_MINOR has it): a 2.2 reader
     // cannot read it, and readers take the major as the line they can read, so the major moves to 3 and the minor counts
-    // from 0 again. Cards in the field stay 2.1 and 2.2, and answer as they did. [M3: the merge's D211 to D224 ride in 03 00; 3.1 is open with the other maintainer.]
+    // from 0 again. Cards in the field stay 2.1 and 2.2, and answer as they did. [M3: the merge's D211 to D226 ride in 03 00; 3.1 is open with the other maintainer.]
     static final byte VERSION_MAJOR = (byte) 0x03;
     // 1.9 takes its PIN sealed: enciphered to a key the card keeps for that and nothing else, under
     // sixteen bytes of its own that are good once (see `unseal`). Capability bit 7 says so.
@@ -2400,7 +2400,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         Util.arrayCopyNonAtomic(proofStorage, (short)(first + PROOF_DATE_OFFSET), changeOpen, (short)(open + OPEN_DATE), (short) 4);
         try {
             blindChange(first, open, buf);
-        } catch (CryptoException x) {
+        } catch (CardRuntimeException x) {
+            // the chip refused (CryptoException) or the arithmetic's own checks answered 6F00 (an ISOException): either way the
+            // payment is given up, so allNet, which counts this change already, is never read again (review of merge-3.0, S2)
             dropPayment(SW_CRYPTO_ERROR);
         }
         // the blinded message is kept with the opening: GET_CHANGE gives it, and LOAD_CHANGE checks the mint's proof against it
