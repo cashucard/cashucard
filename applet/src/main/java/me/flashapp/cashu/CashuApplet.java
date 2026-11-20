@@ -601,7 +601,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     /* ---- the keyset table (2.3, D184) ------------------------------------------
      * Which unit each keyset the card holds is: BOOK_ENTRIES entries of ENTRY_LEN, each the keyset's eight bytes as a piece
      * holds them, a state byte (00 free; otherwise ENTRY_USED, ENTRY_MARK where it was entered with the holder's say in the
-     * tap, ENTRY_KEYS once the top of its keys' tree is kept (D190), and the unit code in bit 0: 0 sat, 1 usd) and the top
+     * tap, ENTRY_KEYS once the top of its keys' tree is kept (D190), ENTRY_LOADED, ENTRY_SETUP and ENTRY_FRESH, the card's own
+     * (D214, D219), and the unit code in bit 0: 0 sat, 1 usd) and the top
      * (32). Then the last payment's unit (BOOK_LAST), the other unit's count of what was signed for, ever (BOOK_OTHER, 4),
      * and each receipt's unit (BOOK_UNITS, one beside each of the sixteen). A unit said in one byte outside the table is
      * relative to the card's: UNIT_CARD, UNIT_OTHER, or 00 for none.
@@ -621,6 +622,19 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte  ENTRY_KEYS     = (byte) 0x02;
     /** A piece has been loaded under the entry's keyset (D214): set at the first, with the entry or after it; the reclaim spares an entry taught and never loaded. */
     static final byte  ENTRY_LOADED   = (byte) 0x04;
+    /**
+     * Entered in the card's first set-up (D219: `PM_FIRST`, whoever set the card's first PIN in this selection, the holder): the
+     * reclaim spares such an entry taught and never loaded across taps, and it does not count toward UNMARKED_MOST.
+     */
+    static final byte  ENTRY_SETUP    = (byte) 0x08;
+    /**
+     * Taught in the last time in the field that taught (D219): set by every teaching's end, and taken off every other entry at
+     * the first teaching of a time in the field. The reclaim spares an entry taught and never loaded that has it only while
+     * TAP_TAUGHT says this time in the field taught, so a reader's keysets are kept through its own tap and freed after it.
+     */
+    static final byte  ENTRY_FRESH    = (byte) 0x10;
+    /** The state bits the card keeps for itself, which GET_CARD's table does not show. */
+    static final byte  ENTRY_OWN      = (byte)(ENTRY_LOADED | ENTRY_SETUP | ENTRY_FRESH);
     /* The paid list (2.3, D191): the first PAID_ROW bytes of the nonce of each of the last PAID_ROWS pieces the card has signed
      * for, a ring filled from row 0, then the ring's next row (2), then 1 once it has gone round (1): the rows in use are the
      * rows before the next one until then, and all of them after. Reserved at the first SET_CARD. */
@@ -696,6 +710,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final short SW_NOT_THIS_TAP          = (short) 0x6A9D; // a new keyset of the other unit without the holder's say
     static final short SW_ENTER_PIN             = (short) 0x6A9E; // a payment with no PIN past what the no-PIN window has left
     static final short SW_KEYS_NOT_SHOWN        = (short) 0x6A9F; // the keyset's keys not taught, or the opening's key not shown to be one of them
+    static final short SW_NO_RECORD             = (short) 0x6AA0; // SPEND_ALL_SIGN: a payment that makes the card's own change in a shape that leaves no settlement record (D220)
     static final short SW_GRANT_GIVEN           = (short) 0x6200; // ALLOW_LOAD: the owner's grant is given for this tap, and no load is open by it
 
     // LOCK_CARD confirmation byte
@@ -1201,9 +1216,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * full speed, unless the owner's grant is in this tap); [2] TAP_ARMED,
      * a VERIFY_PIN in it armed the no-PIN allowance (2.3, D186), which
      * a payment's commit takes back; TAP_PAID, TAP_CLAIMED and TAP_READ
-     * (D187, D189); TAP_SETUP (D215). RESET_CARD clears TAP_ARMED, TAP_READ
-     * and TAP_SETUP, which were the PIN's it takes away, and keeps TAP_PAID
-     * and TAP_CLAIMED.
+     * (D187, D189); TAP_SETUP (D215); TAP_TAUGHT (D219). RESET_CARD clears
+     * TAP_ARMED, TAP_READ, TAP_SETUP and TAP_TAUGHT, which were the PIN's it
+     * takes away (the table goes with the reset), and keeps TAP_PAID and
+     * TAP_CLAIMED.
      */
     private byte[] tapOpen;
     static final byte TAP_ARMED   = (byte) 0x01;
@@ -1220,6 +1236,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * checks), after the self-tests; cleared by RESET_CARD and by a SET_PIN that begins a set-up, so that a set-up earns its own.
      */
     static final byte TAP_SETUP   = (byte) 0x10;
+    /** A teaching ended in this time in the field (D219): the entries marked ENTRY_FRESH are this time in the field's. */
+    static final byte TAP_TAUGHT  = (byte) 0x20;
     private MessageDigest sha;
     /** The hash of the message a payment's one signature is over, kept from SPEND_ALL_BEGIN to SPEND_ALL_SIGN. */
     private MessageDigest shaAll;
@@ -1712,7 +1730,8 @@ public class CashuApplet extends Applet implements TagSwitch {
                         byte state = book[(short)(e * ENTRY_LEN + ENTRY_STATE)];
                         if ((state & ENTRY_USED) == 0) continue;
                         buf[48]++;
-                        if ((state & ENTRY_MARK) == 0) buf[49]++;
+                        // the entries that count toward UNMARKED_MOST: no mark, and not entered in the first set-up (D219)
+                        if ((state & (byte)(ENTRY_MARK | ENTRY_SETUP)) == 0) buf[49]++;
                     }
                     if (told) buf[50] = book[BOOK_LAST];
                 }
@@ -2251,7 +2270,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * One output of the payment in hand, staged for its assisted-settlement record (2.2, D175): its amount (4) at `amountAt`
      * in `amounts` and its B_ (33) at `pointAt` in `points`, after the outputs staged before it. The terminal's outputs come first and then
      * the card's change, as they are hashed. The seventeenth, or an output of nothing (which no relay can submit), marks the
-     * payment as not recordable (FF): it is still paid, and leaves no record.
+     * payment as not recordable (FF): it is still paid, and leaves no record, unless it makes the card's own change, which
+     * SPEND_ALL_SIGN then refuses (6AA0, D220).
      */
     private void stageOutput(byte[] amounts, short amountAt, byte[] points, short pointAt) {
         // a card that has no room for a record (D176) stages nothing
@@ -2775,13 +2795,15 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /**
      * The assisted-settlement record of the payment just signed (2.2, D175), written over the last one. `n` is how many
-     * places it paid with (`allSlots`), and `buf` is working room. The old record is let go first, whatever follows: a
-     * payment that leaves no record leaves none of the one before it either. No record is left for a payment of more
-     * than OUT_IN_MOST pieces or more than OUT_OUT_MOST outputs (or none, or one of nothing), for dated pieces (the
-     * packet has no field for a locktime or a refund key, and the relay rebuilds an undated secret), for a mint whose
-     * address is not https, or when the payment id or the generation has stopped at FFFFFFFF. The body is written
-     * outside any transaction, and only then is the record marked whole, in one transaction with its length: a card
-     * pulled away before that has no record, never a mix of two.
+     * places it paid with (`allSlots`), and `buf` is working room. The last payment's record was let go in this payment's
+     * own commit (D220), so a payment torn after its commit, or one that leaves no record, never leaves the one before it
+     * served as the last; here it is let go again with the descriptor's mark, before the body. No record is left for a
+     * payment of more than OUT_IN_MOST pieces or more than OUT_OUT_MOST outputs (or none, or one of nothing), which
+     * SPEND_ALL_SIGN refuses where the payment makes the card's own change (D220), for dated pieces (the packet has no field
+     * for a locktime or a refund key, and the relay rebuilds an undated secret), for a mint whose address is not https, or
+     * when the payment id or the generation has stopped at FFFFFFFF. The body is written outside any transaction, and only
+     * then is the record marked whole, in one transaction with its length: a card pulled away before that has no record,
+     * never a mix of two.
      */
     private void writeOutbox(byte[] buf, short n) {
         // a card with no room for a record (D176) has none, and none of a payment before to let go
@@ -3006,6 +3028,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * loads in the same transaction (D200), so its LOAD_CHANGE is never refused
      * for the day's count; change the day has no room for is `6A8F` before
      * anything is signed, the payment given up.
+     *
+     * A payment that makes the card's own change in a shape that leaves no settlement record (more than OUT_IN_MOST pieces,
+     * a seventeenth output, an output of nothing) is refused `6AA0` at the first SIGN, given up, with nothing written or
+     * signed (D220).
      */
     private void processSpendAllSign(APDU apdu) {
         if (allState[0] != (byte) 1) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
@@ -3029,6 +3055,14 @@ public class CashuApplet extends Applet implements TagSwitch {
          * between. A payment in the other unit on a card with a limit set and no rate is refused here (6A99), given up. */
         if (waits <= 0) inCardUnit();
         if (waits < 0) {
+            /* D220: a payment that makes the card's own change is not signed in a shape that leaves no settlement record (more
+             * than OUT_IN_MOST pieces; a seventeenth output or an output of nothing, which `stageOutput` marks FF): refused
+             * 6AA0 and given up, before anything is written or signed. What the card itself is (dated pieces, its mint, a card
+             * with no room for a record) refuses nothing here */
+            if (allState[6] != (byte) 0
+                && ((allState[1] & 0xFF) > OUT_IN_MOST || (outStage != null && (outStage[0] & 0xFF) > OUT_OUT_MOST))) {
+                dropPayment(SW_NO_RECORD);
+            }
             /* The PIN, where one is set (1.16): the PIN given in this tap, or
              * the no-PIN allowance, which has to hold the whole of the pieces
              * (D186). Asked before the day's limit: an allowance of 0 or a
@@ -3153,6 +3187,9 @@ public class CashuApplet extends Applet implements TagSwitch {
              * From the moment this commits every place in the list is spent,
              * whether or not its status byte says so yet. */
             burnPending[0] = (byte) 1;
+            /* D220: and the last payment's record let go with it, so that a payment torn after this commit, before its own
+             * record is written, never leaves the one before it served as the last */
+            if (outbox != null) outbox[0] = (byte) 0;
             // the paid list's next row, past this payment's n rows, which finishBurn writes after the commit, and whether it went round (D191)
             short next = (short)(Util.getShort(paid, PAID_NEXT) + n);
             if (next >= PAID_ROWS) paid[PAID_ROUND] = (byte) 1;
@@ -3686,8 +3723,8 @@ public class CashuApplet extends Applet implements TagSwitch {
                 short from = (short)(e * ENTRY_LEN);
                 if ((book[(short)(from + ENTRY_STATE)] & ENTRY_USED) == 0) continue;
                 at = Util.arrayCopyNonAtomic(book, from, buf, at, (short)(ENTRY_STATE + 1));
-                // the loaded bit is the card's own (D214): the reader sees the state byte as it was
-                buf[(short)(at - 1)] &= (byte)~ENTRY_LOADED;
+                // the loaded, set-up and fresh bits are the card's own (D214, D219): the reader sees the state byte as it was
+                buf[(short)(at - 1)] &= (byte)~ENTRY_OWN;
             }
             buf[0] = (byte)((short)(at - 1) / (short)(ENTRY_STATE + 1));
             apdu.setOutgoingAndSend((short) 0, at);
@@ -3889,7 +3926,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      *   P1 = 2  the end: the ID's hash finished with the tail (00 || its first seven bytes, or 01 || all of it), and where its
      *           first eight bytes are the keyset's, the tree's top (leaves padded to the next power of two with SHA-256(02),
      *           nodes SHA-256(01 || left || right)) and the keys-known bit of the entry's state written in one transaction.
-     *           Answers the ID it worked out: 8 or 33 bytes. A keyset taught again has its top replaced.
+     *           Answers the ID it worked out: 8 or 33 bytes. A keyset taught again keeps its top with the same keys; other
+     *           keys replace it only under the holder's say (6A9D otherwise, D219).
      *
      * P1 = 3 shows an opening's key (`showKey`).
      *
@@ -3899,7 +3937,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * of it would be refused for (D207: it is entered as that piece would enter it, of the unit its version 01 tail names or the
      * card's, with no keys known until the end), `6A80` for an ID version not 00 or 01, a version 01 tail whose
      * unit is not the entry's, keys out of order, a version 00 key whose amount is not 2^n, more than 64, and (P1 = 2) no keys
-     * or an ID whose first 8 bytes are not the keyset's. A refusal at P1 = 1 or 2 gives the
+     * or an ID whose first 8 bytes are not the keyset's, `6A9D` (P1 = 2) for keys other than those an entry already has
+     * without the holder's say (D219). A refusal at P1 = 1 or 2 gives the
      * teaching up. A locked card is taught: it takes its own change.
      */
     private void processKeysetKeys(APDU apdu) {
@@ -4019,10 +4058,23 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         short h = 0;
         while ((short)(n >> h) != (short) 1) h++;
+        /* D219: keys already taught are replaced only by the same keys, or under the holder's say (6A9D): the ID holds the keys
+         * to 56 bits of its hash alone, and new keys would lose the holder's change */
+        if ((book[(short)(at + ENTRY_STATE)] & ENTRY_KEYS) != 0 && !holderSays()
+            && !sameBytes(nodeArr(h), nodeOff(h), book, (short)(at + ENTRY_TOP), (short) 32)) ISOException.throwIt(SW_NOT_THIS_TAP);
+        /* D219: the first teaching of this time in the field takes the fresh bit off every entry, a byte each, outside any
+         * transaction (torn, some keep it, and TAP_TAUGHT, RAM, is not set: the next teaching does it again) */
+        if ((tapOpen[2] & TAP_TAUGHT) == 0) {
+            for (short e = 0; e < BOOK_ENTRIES; e++) {
+                short st = (short)(e * ENTRY_LEN + ENTRY_STATE);
+                if ((book[st] & ENTRY_FRESH) != 0) book[st] &= (byte)~ENTRY_FRESH;
+            }
+        }
         JCSystem.beginTransaction();
         Util.arrayCopy(nodeArr(h), nodeOff(h), book, (short)(at + ENTRY_TOP), (short) 32);
-        book[(short)(at + ENTRY_STATE)] = (byte)(book[(short)(at + ENTRY_STATE)] | allState[5] | ENTRY_KEYS);
+        book[(short)(at + ENTRY_STATE)] = (byte)(book[(short)(at + ENTRY_STATE)] | allState[5] | ENTRY_KEYS | ENTRY_FRESH);
         JCSystem.commitTransaction();
+        tapOpen[2] |= TAP_TAUGHT;
         apdu.setOutgoingAndSend((short) 0, buf[0] == (byte) 0 ? (short) 8 : (short) 33);
     }
 
@@ -6917,7 +6969,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         for (short e = (short)(BOOK_ENTRIES - 1); e >= 0; e--) {
             byte state = book[(short)(e * ENTRY_LEN + ENTRY_STATE)];
             if ((state & ENTRY_USED) == 0) free = e;
-            else if ((state & ENTRY_MARK) == 0) unmarked++;
+            // D219: an entry of the first set-up is the holder's, as a marked one is: it does not count toward the two
+            else if ((state & (byte)(ENTRY_MARK | ENTRY_SETUP)) == 0) unmarked++;
         }
         return !marked && unmarked >= UNMARKED_MOST ? (short) -1 : free;
     }
@@ -6945,9 +6998,12 @@ public class CashuApplet extends Applet implements TagSwitch {
         return entry;
     }
 
-    /** A new entry's state byte: in use, of `unit`, and marked where the holder has the say in this tap. */
+    /**
+     * A new entry's state byte: in use, of `unit`, marked where the holder has the say in this tap, and ENTRY_SETUP in the card's
+     * first set-up (D219).
+     */
     private byte newState(short unit) {
-        return (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0));
+        return (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0) | (pinMarks[PM_FIRST] == (byte) 1 ? ENTRY_SETUP : 0));
     }
 
     /**
@@ -6964,7 +7020,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The reclaim: every entry that nothing on the card names is let go. One pass over the places (each unspent place marks
      * its entry, its keyset compared with the place before's first, so that a drawer of one keyset costs one comparison a
      * place) and one over the openings that are drafted or owed; then every entry left unmarked is set free by writing 00 to
-     * its state byte. The marks are six bits of a local. Outside any transaction, a byte at a time: torn halfway, it has freed
+     * its state byte, but an entry waiting for its first piece that the holder's set-up made or this time in the field taught
+     * (D214, D219). The marks are six bits of a local. Outside any transaction, a byte at a time: torn halfway, it has freed
      * some dead entries and not others, and the next one finishes. A live entry is never freed.
      */
     private void reclaim() {
@@ -6986,10 +7043,14 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         for (e = 0; e < BOOK_ENTRIES; e++) {
             short at = (short)(e * ENTRY_LEN + ENTRY_STATE);
-            // D214: a keyset taught and not yet loaded (its keys known, no piece ever under it) is waiting for its first piece
-            // and is not let go, so that a card taught three keysets does not forget the first
-            if ((byte)(book[at] & (byte)(ENTRY_KEYS | ENTRY_LOADED)) == ENTRY_KEYS) continue;
-            if ((short)(marks & (short)(1 << e)) == 0 && book[at] != (byte) 0) book[at] = (byte) 0;
+            byte st = book[at];
+            /* D214, D219: a keyset taught and not yet loaded (its keys known, no piece ever under it) waits for its first piece
+             * and is not let go while it was entered in the card's first set-up (the holder's, taught at set-up and loaded
+             * later) or taught in this time in the field (so that a card taught three keysets in a tap does not forget the
+             * first). Any other is let go: a reader that taught keysets and loaded none cannot hold the table after its tap */
+            if ((byte)(st & (byte)(ENTRY_KEYS | ENTRY_LOADED)) == ENTRY_KEYS
+                && ((st & ENTRY_SETUP) != 0 || ((st & ENTRY_FRESH) != 0 && (tapOpen[2] & TAP_TAUGHT) != 0))) continue;
+            if ((short)(marks & (short)(1 << e)) == 0 && st != (byte) 0) book[at] = (byte) 0;
         }
     }
 

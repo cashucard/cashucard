@@ -203,7 +203,9 @@ that card's key.
 `B'`, and given `r`, whoever has the mint's record of that issue can recompute `B'` and `C'`
 from the piece and tie the piece to the request that made it. That is so of any NUT-12 token
 that carries `r`; here, any reader can read `r` for every unspent piece that has a proof,
-with no PIN, as `GET_CHANGE` already gives it for the change the card made for itself. A
+with no PIN. (`GET_CHANGE` never gives it: since 2.3 an opening of the card's own change is
+its amount, keyset, date, `B_` and the mint's key, never the nonce or the blinding factor, and
+the card finishes the change itself, [D183](DECISIONS.md#d183).) A
 reader that hands `r` to the mint lets the mint make the tie; one that checks on its own
 side and sends the proof nowhere does not. The money is as safe as it was: a piece is
 spent only with the card's signature, and nothing here gives that.
