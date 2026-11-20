@@ -1103,8 +1103,9 @@ keyset): it goes into the payment's record ([GET_OUTBOX](#get_outbox-0x1b)) as t
 keyset of every output of the reader's, where 2.2 put the first slot's. A reader
 names the keyset it posts its outputs under, the mint's active one. The outputs and
 the card's own change together never come to more than the pieces: an output that
-would take them past is `6A80`, among the waits of `SIGN` as before them, and the
-payment is given up.
+would take them past is `6A80`, and the payment is given up. Every output comes before the
+payment's first `SIGN`: one sent among its waits gives the payment up, `6985`
+([D221](../docs/DECISIONS.md#d221)).
 
 **Fees.** The card does not know the mint's fees and checks none. At a keyset with an
 input fee ([NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md)
