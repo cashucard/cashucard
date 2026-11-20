@@ -1253,7 +1253,9 @@ the last, `6A8F` where the day of loads has no room for the payment's change, wh
 signature that does not pass the card's own check, made and checked before the
 commit, so that nothing is burned, counted or kept and the payment is given up
 ([D207](../docs/DECISIONS.md#d207)); `6A96` if the commit cannot hold it, with
-nothing changed. The change the payment makes is counted in the
+nothing changed. These nine words (`6A97`, `6985`, `6A99`, `6AA0`, `6A94`, `6A9E`, `6A8F`, `6F00`, `6A96`) are the ones
+after which the card has burned nothing; `6985` is also the answer to a second `SIGN` after a payment the card did burn,
+so a reader takes none of them alone as proof ([Reader requirements](#reader-requirements-what-the-cards-answers-do-not-prove)). The change the payment makes is counted in the
 day of loads in the commit, with the openings it makes owed
 ([D200](../docs/DECISIONS.md#d200)): a day over begins again at `now`, as at a load;
 a payment with no change leaves the day of loads as it is. A payment in the other
@@ -1310,7 +1312,9 @@ its receipt: the seventeenth payment back has none, and `RESET_CARD` and a
 forgotten PIN replaced ([SET_PIN](#set_pin-0x41)) let them all go. A payment is
 kept from its commit ([SPEND_ALL_SIGN](#spend_all_sign-0x24)), so P1 = `01` finds it
 after any pull. **A till asks at once:** any sixteen payments after its own push
-its signature out of the ring, a stranger's under the no-PIN allowance among them.
+its signature out of the ring, a stranger's under the no-PIN allowance among them. And it asks by the hash (P1 = `01`):
+P1 = `00` is the last signature the card gave, another till's where the card paid there since
+([Reader requirements](#reader-requirements-what-the-cards-answers-do-not-prove)).
 
 ### LOAD_CHANGE (0x27)
 
@@ -3152,7 +3156,102 @@ needed for the change. A payment is of one date: a till charging more than the p
 of one date hold pays date by date, in two or more payments. A till, online or not,
 leaves out of the payment a dated piece whose locktime is less than a day after its
 own time, and an online till
-asks the mint the state of every input (NUT-07) before `SPEND_ALL_SIGN`.
+asks the mint the state of every input (NUT-07) before `SPEND_ALL_SIGN`. From `SPEND_ALL_SIGN` on, the payment is an
+obligation the till keeps until [Reader requirements](#reader-requirements-what-the-cards-answers-do-not-prove) lets it end.
+
+---
+
+## Reader requirements: what the card's answers do not prove
+
+NUT-CCP's [reader requirements](https://github.com/cashucard/nut/blob/main/CCP.md#reader-requirements-what-the-cards-answers-do-not-prove)
+in this file's words, with the card's side of each. Nothing a reader is answered from the card's side of a tap is
+evidence that money may be let go: a status word, a read of places, `GET_CHANGE`'s list, `SPEND_ALL_AGAIN`'s `6A88`, a
+`9000` to a write. A relay between the reader and the card, or a device that answers as the card and names its key,
+can forge or replay each of them, and a challenge does not help: `AUTH` shows that the chip holding the card key took
+part in the tap, and a relay passes the challenge on and the answer back. The card's answers can only add work (ask
+again, ask for the PIN, wait, read again), finish a payment (a signature that verifies under the payment's key over the
+reader's own message), or let a till start another payment while it keeps what it is owed. What ends an obligation is
+what the reader itself did (a swap it completed) and what the mint says over the reader's own connection. An obligation
+is a payment the card may have signed (from the moment `SPEND_ALL_SIGN` is sent), a swap the card signed that the mint
+has not yet taken, the card's own change owed, and a leftover held for the card; a reader writes each down in lasting
+storage before the step that makes it (the payment, with the SHA-256 of its message, its pieces, its outputs and their
+blinding factors, before its first `SIGN`).
+
+1. **After `SPEND_ALL_SIGN` is sent.** The card may have burned the places whether or not its answer arrives. A reader
+   lets the payment go (the sale may be paid another way) only on one of the nine words after which the card has burned
+   nothing ([SPEND_ALL_SIGN](#spend_all_sign-0x24)) **and** a named read (`GET_PIECES` P2 = `02`) in the same tap,
+   after it, showing every place of the payment unspent:
+
+   | SW | At `SPEND_ALL_SIGN` |
+   |---|---|
+   | `6A97` | no PIN set: the card pays nothing |
+   | `6985` | no payment in hand: none begun, given up by another command, or an output or change after the first `SIGN` (D225); and the answer to a second `SIGN` after the signature was given |
+   | `6A99` | a payment in the other unit, on a card with a limit and no rate |
+   | `6AA0` | a payment with the card's change in a shape that leaves no record ([D224](../docs/DECISIONS.md#d224)) |
+   | `6A94` | the PIN needed for this payment |
+   | `6A9E` | the no-PIN allowance has not enough left; the PIN needed |
+   | `6A8F` | over the day's limit, or no room in the day of loads for the payment's change |
+   | `6F00` | the signature did not pass the card's own check ([D207](../docs/DECISIONS.md#d207), [D218](../docs/DECISIONS.md#d218)) |
+   | `6A96` | the payment's commit does not fit the chip's transaction |
+
+   Even then the reader keeps the payment as a claim and asks for it by its message's hash at the card's later taps
+   (item 2): a relay can answer any of these words and any read. Where the card answers with a signature after the sale
+   was paid another way, the money is the holder's: it goes back to the card, or is held for the holder, and is reported,
+   never kept silently or dropped. `6985` alone never lets a payment go: a transport that sends `SPEND_ALL_SIGN` twice, or a
+   reader that sends it again after an answer it lost, is answered `6985` for a payment the card burned. After any other
+   answer, no answer or an answer cut short the reader keeps the claim, asks again in the same tap and later, and begins
+   no second payment of the sale from the same card while the claim's places do not read unspent.
+2. **Ask again by the message's hash, never for the last signature.** `SPEND_ALL_AGAIN` P1 = `01` with the SHA-256 of the
+   reader's own `SIG_ALL` message. P1 = `00` gives the last signature the card gave, which is another till's where the
+   card paid there between the two taps: a till that takes it for its own posts a swap the mint refuses, and may decide
+   its payment was never signed when the card burned it. No attacker is needed for this. `6A88` to P1 = `01` says only
+   that the card did not answer: the payment was under the PIN and the PIN was not given (ask with the PIN, which the
+   holder may decline), or sixteen payments since have pushed it out of the ring, or the answer is forged. The ring is
+   why a till asks at once; a reader cannot tell today when it has rolled (open item 11).
+3. **A claim ends only on the reader's own completed swap, or on the mint's word repeated over time.** Never on a count
+   of the card's refusals or of `6A88` answers. While the mint answers any input `UNSPENT` the claim stays: only the
+   card's signature moves those pieces, and the card may hold it. Every input `SPENT` (NUT-07) by a swap this reader
+   completed for another payment ends it; every input `SPENT` and nothing of the claim's outputs restored (NUT-09), at
+   separate times, is reported as spent elsewhere, with its amount, and kept and asked again rarely. A reader bounds what a
+   claim costs a tap, asking an old one less often, but not one whose places read spent on the card at that tap: the
+   card burned them, and holds the signature or has rolled it out.
+4. **A swap the card signed is never closed on one answer.** A refusal, a lost answer or an HTTP `5xx` is followed by
+   NUT-07 on the inputs and NUT-09 restore of the outputs, then and later: inputs spent and the outputs restored, paid;
+   inputs unspent, the same signed swap posted again, with backoff; inputs spent and nothing restored is a fault of the
+   mint or the transport, not a payment spent elsewhere, because `SIG_ALL` binds the outputs and this swap is the only one
+   that can spend those inputs: kept, restore asked again later, reported as not yet restored.
+5. **The card's own change stays owed until a read shows it on the card, or the mint shows it spent.** An opening
+   missing from `GET_CHANGE`, `6A88` or `6A94` to `LOAD_CHANGE`, or a `9000` to it, is not that evidence. A read is: a
+   place whose nonce and date, with the r `GET_DLEQ` gives for it, rebuild the opening's B_ (hash_to_curve of the
+   secret, plus r·G), and whose C is the mint's C_ − r·K. Only the chip that made the opening knows that nonce and r. A
+   change written with `9000` and missing at a later read, the mint answering it `UNSPENT`, is owed again.
+6. **A piece is never dropped or called junk for a failed or missing stored proof.** A piece whose `GET_DLEQ` proof is
+   missing or does not hold is not let go, nor its place freed, on that alone: the mint decides. A reader that wants to
+   know pays that piece alone, to itself, one piece a swap, never with other pieces or with pieces whose standing it does
+   not know: the card burns every place named when it signs, and a swap the mint refuses for one input takes the good
+   pieces with it.
+7. **Leftovers, in this order:** pieces that pay exactly; the card's own change ([SPEND_ALL_CHANGE](#spend_all_change-0x26),
+   at a mint that proves its signatures, in the shapes the card signs); a load of the leftover back onto the card under
+   the PIN, which the holder authorises and may decline (a leftover not written back is the holder's, held for the card);
+   or no payment. Never a silent overpay.
+8. **A keyset retired between the signature and the swap.** The card signs the amounts and blinded messages of the
+   outputs, not their keyset (NUT-11's `SIG_ALL` message names none). A till fetches the mint's keysets just before
+   `SPEND_ALL_BEGIN` and does not begin a payment whose output keyset is not active. Where the mint retires it between the
+   card's signature and the swap, the till posts the same outputs under the keyset of their unit that is active then: the
+   signature still holds; the till unblinds its outputs under that keyset's keys, and the card's change comes back in
+   it, the holder moving the opening there ([KEYSET_KEYS](#keyset_keys-0x38) P1 = 3 with another key and that keyset)
+   before `LOAD_CHANGE`. Where no keyset of the unit is active, or the active one has no key for an output's amount, the
+   signed swap cannot be taken and the places are burned: the payment is lost unless the mint still signs in the retired
+   keyset. The till reports it with its amount, keeps the swap, and tries it again later, never deciding the loss on one
+   answer about the keysets. A mint should keep a retired keyset signing for a grace period (open item 13).
+9. **The mint's refusals.** The NUTs' error codes were renumbered, and mints in the field send both numberings: before,
+   `10002` outputs already signed, `10003` not verified, `11002` not balanced, `11005` unit not supported; after, `10001`
+   not verified, `11002` proofs pending, `11003` outputs already signed, `11004` outputs pending, `11005` not balanced,
+   `11013` unit not supported. Some mint versions answer many refusals with one generic code (`11000`, `9999`, `50000`
+   or `0`) and say what in words alone, some put the words in `error` rather than `detail`, and some answer every refusal
+   with HTTP `500`. A reader reads the code and the words, in both fields and by both numberings, and never ends an
+   obligation on a code it does not know, a `5xx`, a `429`, a lost answer or one answer of any kind; it takes `11002` as
+   "pending" only from a mint it knows to use the later numbering.
 
 ---
 
