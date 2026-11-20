@@ -39,7 +39,7 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 41,903-byte
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 41,973-byte
   load file in 152 blocks, the opener, the card's applet, then the tag under
   `D2760000850101`. Then it checks the card's applet answers `03 00`, `GET_INFO`
   (30 bytes), `GET_PUBKEY` (33 bytes) and the tag's SELECT.
@@ -187,8 +187,8 @@ cancellation during key prefetch prevents NFC from opening later.
 
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
-chip has installed and the operator approved. The 3.0 load file (41,903 bytes,
-sha256 `e4b5cff0…`) is not on it yet, so a build from this tree installs no card.
+chip has installed and the operator approved. The 3.0 load file (41,973 bytes,
+sha256 `2b9c6b02…`) is not on it yet, so a build from this tree installs no card.
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
 No chip has installed the 3.0 file, or a file of its size, yet. Earlier sources ran on

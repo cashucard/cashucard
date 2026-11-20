@@ -112,6 +112,16 @@ multiple of 256), eight more than 2.0. It installed on a J3R180 with the opener
 first on 2026-10-14, and `cardctl selftest` passed 12 of 12
 ([report](reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)).
 
+The 3.0 file of the merge (e2aac64), padded to 41,903 bytes by refcheck's measure
+(175 past a multiple of 256), was given to J3R180 58206920 on 2026-11-19: the card
+applet's create answered `6F00` once, and the same create, sent again with nothing
+changed, was taken. The install path is the same, line for line, as that of the
+tag's 2.3 file 190c5ab, 41,205 bytes (245 past), which the same card has created
+at the first try every time. So the place again looks like the cause: 175 past
+rested on one earlier install (39,343 bytes on 2026-11-14) and sits near 153 and
+164, where the chip refused. The file is now padded to 245 past instead, 41,973
+bytes, which has not yet been given to a chip.
+
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build
 can be moved to a size that is known to install; `tools/refcheck.py`, after

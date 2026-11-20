@@ -6393,8 +6393,8 @@ change, set-up and top-up.
 **The cards.** A 2.2 card moves to 3.0 as a 2.1 card moved to 2.2: swept, then a new
 install, which makes a new key.
 
-**The size.** The 3.0 file of the merge (D183 to D226) is a load file of 41,903 bytes by refcheck's
-measure (175 past a multiple of 256), against 21,631 for 2.2. It has run only in a simulator: its own chip
+**The size.** The 3.0 file of the merge (D183 to D226) is a load file of 41,973 bytes by refcheck's
+measure (245 past a multiple of 256), against 21,631 for 2.2. It has run only in a simulator: its own chip
 run comes before it ships, its size first. On 2026-11-13 a J3R180 installed earlier source, numbered 2.3 then, padded to
 33,647 and 35,213 bytes and refused the card's applet padded to 32,777 (`6F00`, twice), so refcheck refuses a build from
 32,700 to 32,850. No file since is padded. On the same day the same J3R180 installed the file this source made before

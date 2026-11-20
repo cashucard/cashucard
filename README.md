@@ -78,7 +78,7 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > source with the version moved to 3.0 ([D205](docs/DECISIONS.md#d205)), the other maintainer's
 > [D206](docs/DECISIONS.md#d206) to [D210](docs/DECISIONS.md#d210), the rotating tag
 > ([D222](docs/DECISIONS.md#d222)) and [D223](docs/DECISIONS.md#d223) to [D226](docs/DECISIONS.md#d226) added
-> (41,903 bytes, load file sha256 `e4b5cff0…`). This exact file has run only in a simulator so far,
+> (41,973 bytes, load file sha256 `2b9c6b02…`). This exact file has run only in a simulator so far,
 > and no card has installed it or a file of its size; the run is to be repeated on it, its size first. The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,

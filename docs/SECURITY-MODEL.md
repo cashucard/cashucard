@@ -485,6 +485,11 @@ a few hundred taps. Treat simulator results accordingly, see
    again; a holder's card rarely sees another `SET_CARD`. Nothing is wrong in what it signs: it is slower. To do: run the
    squaring's self-test again at the card's next selection after a failure (or at the next `SET_CARD`-free tap that has the
    time) and turn the chip path back on where it holds.
+10. **A create that the chip refuses once** (3.0; the independent review after the chip run of 2026-11-19): the 3.0 file at
+   175 past a multiple of 256 had its card applet's create answered `6F00` once and taken on an identical retry
+   ([`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md)). `tools/cardkit/gp/provision.ts` ends the run on any error, so a
+   provisioning would have stopped there. Proposed for the other maintainer, not built: retry the create once on `6F00`,
+   only after `GET STATUS` shows that no card applet was made, in a fresh secure session, logged, and once only.
 
 ## Reporting a vulnerability
 
