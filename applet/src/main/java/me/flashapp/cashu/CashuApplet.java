@@ -634,7 +634,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * Entered in the card's first set-up (D223: `PM_FIRST`, whoever set the card's first PIN in this selection, the holder): the
      * reclaim spares such an entry taught and never loaded across taps, and it does not count toward UNMARKED_MOST. A keyset
-     * taught there gets it only as the first of its unit still waiting (D226, `newState`); a hand-over takes it off every entry.
+     * taught there gets it only as the first of its unit in the set-up, loaded or not (D228, which narrows D226: `newState`); a
+     * hand-over takes it off every entry.
      */
     static final byte  ENTRY_SETUP    = (byte) 0x08;
     /**
@@ -7139,16 +7140,19 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * A new entry's state byte: in use, of `unit`, marked where the holder has the say in this tap, ENTRY_LOADED for a piece's
      * (`loaded`), and ENTRY_SETUP only for a keyset taught in the card's first set-up and not loaded (D223), and only where no
-     * entry of `unit` is a set-up's still waiting for its first piece (D226): one such a unit, the first, which is the honest
-     * set-up's one teaching of the unit. An entry a load makes never has it (D226, round three): on a loaded entry the bit only
-     * kept it out of the two without the mark, so whoever spoke in the set-up selection could fill the table with loads.
+     * entry of `unit` has ENTRY_SETUP at all, loaded or not (D228, which narrows D226's "still waiting for its first piece"): one
+     * a unit in the set-up, the first, which is the honest set-up's one teaching of the unit. Under D226 a load under the set-up's
+     * keyset freed the bit for the next one, so a relay in the set-up selection that taught and loaded made-up keysets one at a
+     * time filled the table with entries no reclaim lets go (applet-money-1). An entry a load makes never has it (D226, round
+     * three): on a loaded entry the bit only kept it out of the two without the mark, so whoever spoke in the set-up selection
+     * could fill the table with loads.
      */
     private byte newState(short unit, boolean loaded) {
         byte st = (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0) | (loaded ? ENTRY_LOADED : 0));
         if (loaded || pinMarks[PM_FIRST] != (byte) 1) return st;
         for (short e = 0; e < BOOK_ENTRIES; e++) {
             byte o = book[(short)(e * ENTRY_LEN + ENTRY_STATE)];
-            if ((byte)(o & (byte)(ENTRY_USED | ENTRY_SETUP | ENTRY_LOADED)) == (byte)(ENTRY_USED | ENTRY_SETUP)
+            if ((byte)(o & (byte)(ENTRY_USED | ENTRY_SETUP)) == (byte)(ENTRY_USED | ENTRY_SETUP)
                 && (short)(o & 1) == unit) return st;
         }
         return (byte)(st | ENTRY_SETUP);

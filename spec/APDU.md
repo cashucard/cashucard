@@ -2665,7 +2665,8 @@ mint, told apart by keyset.
   bit 1 the keys known (a top kept). The keyset's 8 bytes are written, then the
   state byte, the entry's commit. The card also keeps bit 2, loaded, set at the first piece
   loaded under the keyset ([D220](../docs/DECISIONS.md#d220)); bit 3, entered in the card's
-  first set-up (only a keyset taught and not loaded, the first of its unit while it waits; never an entry a load makes,
+  first set-up (only a keyset taught and not loaded, the first of its unit in the set-up, whether that one has since
+  been loaded or not, [D228](../docs/DECISIONS.md#d228); never an entry a load makes,
   [D226](../docs/DECISIONS.md#d226); taken off every entry at a hand-over); and bit 4, taught in the last time in the field that taught
   ([D223](../docs/DECISIONS.md#d223)). `GET_CARD` shows none of the three.
 - **Every piece is of one unit.** `LOAD_PROOF` P2 = 1 names the pieces' unit; P2 = 0
