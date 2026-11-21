@@ -252,7 +252,7 @@ test.each(['busy', 'foreign', 'loading', 'blocked'] as const)(
   },
 );
 
-test('installation-disabled builds still allow card checks while reset stays disabled', async () => {
+test('installation-disabled builds still allow card checks and reset, which loads nothing', async () => {
   const state = {...idle(), hardwareValidated: false};
   jest.mocked(useProvisioning).mockReturnValue(state);
   const tree = await signedIn();
@@ -261,7 +261,10 @@ test('installation-disabled builds still allow card checks while reset stays dis
     false,
   );
   expect(tree.root.findByProps({testID: 'home-reset'}).props.disabled).toBe(
-    true,
+    false,
+  );
+  expect(JSON.stringify(tree.toJSON())).not.toContain(
+    'Reset is unavailable in this build',
   );
 });
 
@@ -303,6 +306,8 @@ test('card check to reset returns through card check and then Cards, without sta
           sealed: false,
           mint: '',
           recordDigest: 'ab'.repeat(32),
+          changeOwed: false,
+          version: '2.2',
         },
       },
       source: {can_reset: true, lookup: {status: 'found'}},

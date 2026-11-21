@@ -434,7 +434,7 @@ export function selectAid(aid: Bytes): number[] {
   return concat([0x00, 0xa4, 0x04, 0x00, aid.length], aid, [0x00]);
 }
 
-/** GET DATA FF21, the card's free resources. Needs no key (docs/FOXY-CARD-HARDWARE.md). */
+/** GET DATA FF21, the card's free resources. Needs no key (docs/CASHU-CARD-HARDWARE.md). */
 export function getFreeMemory(): number[] {
   return [0x80, 0xca, 0xff, 0x21, 0x00];
 }

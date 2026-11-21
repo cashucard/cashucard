@@ -77,14 +77,23 @@ class FieldReductionTest {
     }
 
     @Test
-    @DisplayName("cmp256: the unsigned order of 32-byte numbers, where a signed compare would get the high bit wrong")
-    void cmp256IsUnsigned() throws Exception {
-        Method cmp = method("cmp256", byte[].class, short.class, byte[].class, short.class);
+    @DisplayName("cmp32: the unsigned order of 32-byte numbers, where a signed compare would get the high bit wrong")
+    void cmp32IsUnsigned() throws Exception {
         byte[] a = fixed(BigInteger.ONE.shiftLeft(255), 32), b = fixed(BigInteger.ONE, 32), p = fixed(P, 32);
-        assertEquals((short) 1, cmp.invoke(null, a, (short) 0, b, (short) 0), "2^255 is more than 1");
-        assertEquals((short) -1, cmp.invoke(null, b, (short) 0, a, (short) 0));
-        assertEquals((short) 0, cmp.invoke(null, p, (short) 0, p, (short) 0));
-        assertEquals((short) -1, cmp.invoke(null, fixed(P.subtract(BigInteger.ONE), 32), (short) 0, p, (short) 0), "p - 1 is under p");
-        assertEquals((short) 1, cmp.invoke(null, fixed(BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE), 32), (short) 0, p, (short) 0), "2^256 - 1 is over p");
+        assertTrue(SchnorrHW.cmp32(a, (short) 0, b, (short) 0) > 0, "2^255 is more than 1");
+        assertTrue(SchnorrHW.cmp32(b, (short) 0, a, (short) 0) < 0);
+        assertEquals((short) 0, SchnorrHW.cmp32(p, (short) 0, p, (short) 0));
+        assertTrue(SchnorrHW.cmp32(fixed(P.subtract(BigInteger.ONE), 32), (short) 0, p, (short) 0) < 0, "p - 1 is under p");
+        assertTrue(SchnorrHW.cmp32(fixed(BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE), 32), (short) 0, p, (short) 0) > 0, "2^256 - 1 is over p");
+    }
+
+    @Test
+    @DisplayName("sub32 returns its borrow: 1 where b was the larger, and the difference mod 2^256")
+    void sub32ReturnsItsBorrow() throws Exception {
+        byte[] p = fixed(P, 32), one = fixed(BigInteger.ONE, 32), out = new byte[32];
+        assertEquals((short) 0, SchnorrHW.sub32(p, (short) 0, one, (short) 0, out, (short) 0));
+        assertEquals(P.subtract(BigInteger.ONE), new BigInteger(1, out));
+        assertEquals((short) 1, SchnorrHW.sub32(one, (short) 0, p, (short) 0, out, (short) 0), "1 - p borrows");
+        assertEquals(BigInteger.ONE.subtract(P).mod(BigInteger.ONE.shiftLeft(256)), new BigInteger(1, out));
     }
 }

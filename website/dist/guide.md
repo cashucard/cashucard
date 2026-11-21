@@ -1,6 +1,8 @@
 # Install the Cashu Card applet: the guide for AI agents
 
-This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 2.2, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
+This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.0, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
+
+The 3.0 build: this exact file has run on a chip. It ran on the sample J3R180 of 2026-11-21, at a test mint. If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
@@ -9,8 +11,9 @@ Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT
 1. Run the commands in this file one at a time, exactly as written, and compare each output with the expected output before you run the next one.
 2. Stop and ask the person when a login to the card is refused, when the CAP's sha256 differs from the one below, or when any output differs from what this file expects. A refused login counts towards a lock that is permanent, so a refused card is put aside and its login is never tried again.
 3. Use gp's factory keys only, which is what gp does when it is given no key options. Keep to the commands in this file, and ask the person before anything else that writes to a card.
-4. Work on one card at a time. Ask the person to put a card on the reader before step 3, and before each further card.
-5. When a card is done, report what the last section lists.
+4. Before step 4, ask the person for the web address the card's NFC tag is to carry: theirs, beginning `https://`, at most 127 characters, with no `#`. A phone that reads the tag opens it. There is no default; if they want no tag, leave out the tag's command and its check.
+5. Work on one card at a time. Ask the person to put a card on the reader before step 3, and before each further card.
+6. When a card is done, report what the last section lists.
 
 ## What the person needs
 
@@ -47,18 +50,18 @@ chmod +x /usr/local/bin/gp
 
 ## 2. Get the applet
 
-The applet ships as one CAP file, `applet/target/cashu-javacard-2.1.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
+The applet ships as one CAP file, `applet/target/cashu-javacard-3.0.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
 
 ```sh
 git clone https://github.com/cashucard/cashucard
 cd cashucard/applet
-sha256sum target/cashu-javacard-2.1.0.cap
+sha256sum target/cashu-javacard-3.0.0.cap
 ```
 
-On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-2.1.0.cap`. Expected:
+On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.0.0.cap`. Expected:
 
 ```
-86839ccf74d9b7a2aa7f7b8d8d47af1e1649ae14f30a4ac135f285e277e1f66d  target/cashu-javacard-2.1.0.cap
+611b3478b82d4c1a3fb41878738087168b41a29c35343aafaa48fa8eeb297af4  target/cashu-javacard-3.0.0.cap
 ```
 
 Stop if the hash differs.
@@ -94,12 +97,12 @@ If gp reports that the login failed, stop and tell the person to put that card a
 
 ## 4. Install the applet
 
-The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. From `cashucard/applet`:
+The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. The tag carries the address the person gave (rule 4), in hex as its install parameters; the tag refuses an install without one. From `cashucard/applet`, with that address in place of `https://example.com/card`:
 
 ```sh
-gp --install target/cashu-javacard-2.1.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
-gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 --params "$(printf '%s' 'https://example.com/card' | xxd -p | tr -d '\n')"
 ```
 
 List the card again:
@@ -118,7 +121,7 @@ APP: D2760000850101 (SELECTABLE)
 
 ## 5. Check the install
 
-Select the card's applet by its whole AID. It answers with its version, 2.2, and `9000` for success:
+Select the card's applet by its whole AID. It answers with its version, 3.0, and `9000` for success:
 
 ```sh
 gp --apdu 00A404000BF043415348554341524401
@@ -127,7 +130,7 @@ gp --apdu 00A404000BF043415348554341524401
 Expected:
 
 ```
-0202 9000
+0300 9000
 ```
 
 Read its state with GET_INFO:
@@ -139,7 +142,7 @@ gp --apdu B0010000
 Expected on a new card, with 128 empty slots and its PIN, owner and record still unset:
 
 ```
-02 02 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 SW: 9000
 ```
 
@@ -154,13 +157,13 @@ Expected: a 33-byte compressed secp256k1 public key, then `9000`.
 Last, read the NFC tag the way a phone does: its name, the capability container and the NDEF file.
 
 ```sh
-gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000214
+gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000200
 ```
 
-Expected:
+Expected, for `https://example.com/card` (another address gives other lengths: the capability container's byte 13 is n + 56 and the NDEF file's length n + 9, n the address's length after `https://`):
 
 ```
-9000 / 9000 / 000F20003B00340406E104001600FF 9000 / 9000 / 0014 9000 / D101105504 + "getfoxy.io/card" 9000
+9000 / 9000 / 000F20003B00340406E104004800FF 9000 / 9000 / 0019 9000 / D101155504 + "example.com/card#new" 9000
 ```
 
 When every answer matches, the card is installed.
@@ -171,7 +174,7 @@ A card fresh from the install is empty and unowned, and any reader in range can 
 
 ## Troubleshooting
 
-- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the size of the load file next.
+- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the chip next: this exact file has run on one J3R180, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and tell the person.
 - SELECT answers `6A82`: the requested applet was not found. An earlier 0.x or 1.x applet is one possible cause. Stop and ask the person.
 - SELECT answers `9000` with no version: that SELECT named the package AID alone, `F0434153485543415244`, which reaches the opener. Select the whole AID, `F043415348554341524401`, as in step 5.
 - The card refuses gp's keys: stop, as step 3 says.

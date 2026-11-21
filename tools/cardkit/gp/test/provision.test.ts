@@ -29,6 +29,7 @@ import {
   cashuPlan,
   helloPlan,
   mayLeaveGuardedApplet,
+  notEmpty,
   provision,
   rotateKeys,
   type Plan,
@@ -47,10 +48,10 @@ import {
   selectAid,
   type Transceiver,
 } from '../scp02';
-import {CASHU_LOAD_FILE, HELLO_LOAD_FILE} from './assets';
+import {CASHU_LOAD_FILE, HELLO_LOAD_FILE, TEST_TAG_ADDRESS} from './assets';
 import {FakeCard, ISD, SELLER_APPLETS, pullAt} from '../../testing/fake-card';
 
-const CASHU = cashuPlan(CASHU_LOAD_FILE);
+const CASHU = cashuPlan(CASHU_LOAD_FILE, {tagAddress: TEST_TAG_ADDRESS});
 const HELLO = helloPlan(HELLO_LOAD_FILE);
 const OPENER = toHex(OPENER_AID);
 const CARD = toHex(CARD_AID);
@@ -85,14 +86,16 @@ const INSTALL_ORDER = [
   0xe4,
   0xe4, // sweep: tag, card, opener, package
   0xe6, // INSTALL [for load]
-  ...new Array(88).fill(0xe8), // LOAD
+  ...new Array(173).fill(0xe8), // LOAD
   0xe6,
   0xe6,
   0xe6, // the opener, the card's applet, the tag
   0xa4,
   0x01,
   0x10,
-  0xa4, // verify: 02 02, GET_INFO, GET_PUBKEY, the tag
+  0xa4, // verify: 03 00, GET_INFO, GET_PUBKEY, the tag
+  0xa4,
+  0xb0, // the tag's NDEF file: the address the install gave it
   0xa4,
   0xca, // FF21 again
 ];
@@ -153,7 +156,7 @@ describe('provision: the Cashu card', () => {
       PHASES,
     );
     assert.equal(r.apdus.length, card.log.length);
-    assert.deepEqual(r.blocks, {at: 88, of: 88});
+    assert.deepEqual(r.blocks, {at: 173, of: 173});
     assert.ok(
       r.freeBefore &&
         r.freeAfter &&
@@ -324,7 +327,7 @@ describe('provision: the Cashu card', () => {
       const first = await provision(pull.tx, CASHU, options());
       assert.equal(first.kind, 'pulled');
       assert.equal(first.phase, 'load');
-      assert.deepEqual(first.blocks, {at: 37, of: 88});
+      assert.deepEqual(first.blocks, {at: 37, of: 173});
       card.reset();
       assert.equal(card.partial.size, partialLoad === 'keep' ? 1 : 0);
       const again = await provision(card.transceive, CASHU, options());
@@ -343,7 +346,7 @@ describe('provision: the Cashu card', () => {
       options({onEvent: event => events.push(event)}),
     );
     assert.equal(result.kind, 'pulled');
-    assert.deepEqual(result.blocks, {at: 37, of: 88});
+    assert.deepEqual(result.blocks, {at: 37, of: 173});
     const written = events.filter(
       (event): event is Extract<RunEvent, {type: 'block'}> =>
         event.type === 'block',
@@ -448,6 +451,8 @@ describe('provision: the Cashu card', () => {
       {owner: 1},
       {pin: 1},
       {record: 1},
+      // change owed, said by a 3.0 card in GET_INFO byte 29
+      {change: 1},
     ];
     for (const state of states) {
       for (const replace of [false, true]) {
@@ -473,6 +478,79 @@ describe('provision: the Cashu card', () => {
     }
   });
 
+  it('asks a 2.1 or 2.2 card GET_CHANGE, and never sweeps one owed change: no DELETE, no login', async () => {
+    for (const version of [
+      [2, 1],
+      [2, 2],
+    ] as const) {
+      for (const replace of [false, true]) {
+        const card = new FakeCard();
+        assert.equal(
+          (await provision(card.transceive, CASHU, options())).ok,
+          true,
+        );
+        card.setCardState({version, change: 1});
+        card.reset();
+        const before = card.log.length;
+        const r = await provision(card.transceive, CASHU, options({replace}));
+        assert.equal(r.kind, 'guarded');
+        assert.equal(r.phase, 'probe');
+        assert.match(r.reason ?? '', /owed change/);
+        assert.deepEqual(
+          card.log.slice(before).map(a => a[1]),
+          [0xa4, 0x01, 0x19],
+          'SELECT, GET_INFO and GET_CHANGE, nothing more',
+        );
+        assertInstalled(card);
+      }
+    }
+  });
+
+  it('sweeps an empty 2.1 or 2.2 card applet with replace on, once GET_CHANGE says nothing is owed', async () => {
+    for (const version of [
+      [2, 1],
+      [2, 2],
+    ] as const) {
+      const card = new FakeCard();
+      assert.equal(
+        (await provision(card.transceive, CASHU, options())).ok,
+        true,
+      );
+      card.setCardState({version});
+      card.reset();
+      const r = await provision(
+        card.transceive,
+        CASHU,
+        options({replace: true}),
+      );
+      assert.equal(r.ok, true, r.reason);
+      assertInstalled(card);
+    }
+  });
+
+  it("names change owed from a 3.0 card's GET_INFO byte 29, and leaves a 2.1 or 2.2 card's byte 29 to GET_CHANGE", () => {
+    // a 3.0 card with no piece, no owner, no PIN and no record, owed change (byte 29 = 1)
+    const owed = [
+      3,
+      0,
+      0x80,
+      0,
+      0,
+      0x80,
+      0xff,
+      0,
+      4,
+      3,
+      ...Array(19).fill(0),
+      1,
+    ];
+    assert.equal(owed.length, 30);
+    assert.match(notEmpty(owed) ?? '', /owed change/);
+    assert.equal(notEmpty(owed.map((b, i) => (i === 29 ? 0 : b))), null);
+    // on 2.2 byte 29 says something else, which readChangeOwed asks GET_CHANGE about
+    assert.equal(notEmpty(owed.map((b, i) => (i < 2 ? 2 : b))), null);
+  });
+
   it('removes an empty card applet only with replace on', async () => {
     const card = new FakeCard();
     assert.equal((await provision(card.transceive, CASHU, options())).ok, true);
@@ -490,6 +568,38 @@ describe('provision: the Cashu card', () => {
     );
     assert.equal(on.ok, true, on.reason);
     assertInstalled(card);
+  });
+
+  it('leaves alone a card applet of a version this kit does not know (2.0, 2.3, 2.4, 3.1, 4.0), even empty and with replace on', async () => {
+    for (const version of [
+      [2, 0],
+      [2, 3],
+      [2, 4],
+      [3, 1],
+      [4, 0],
+    ] as const) {
+      const card = new FakeCard();
+      assert.equal(
+        (await provision(card.transceive, CASHU, options())).ok,
+        true,
+      );
+      card.setCardState({version});
+      card.reset();
+      const before = card.log.length;
+      const r = await provision(
+        card.transceive,
+        CASHU,
+        options({replace: true}),
+      );
+      assert.equal(r.kind, 'guarded');
+      assert.match(r.reason ?? '', /version this kit knows/);
+      assert.deepEqual(
+        card.log.slice(before).map(a => a[1]),
+        [0xa4],
+        'SELECT alone',
+      );
+      assertInstalled(card);
+    }
   });
 
   it('leaves alone an applet at the card AID that is not a 2.x card', async () => {
@@ -563,9 +673,9 @@ describe('provision: the Cashu card', () => {
     }[];
     assert.deepEqual(
       blocks.map(b => b.index),
-      Array.from({length: 88}, (_, i) => i + 1),
+      Array.from({length: 173}, (_, i) => i + 1),
     );
-    assert.ok(blocks.every(b => b.of === 88));
+    assert.ok(blocks.every(b => b.of === 173));
     assert.equal(
       events.filter(e => e.type === 'apdu').length,
       INSTALL_ORDER.length,
@@ -609,11 +719,11 @@ describe('provision: the Cashu card', () => {
     const card = new FakeCard();
     const r = await provision(
       card.transceive,
-      {...CASHU, blockSize: 128},
+      {...CASHU, blockSize: 200},
       options(),
     );
     assert.equal(r.ok, true, r.reason);
-    assert.equal(card.insLog().filter(i => i === 0xe8).length, 169);
+    assert.equal(card.insLog().filter(i => i === 0xe8).length, 213);
     assertInstalled(card);
   });
 });
@@ -648,7 +758,7 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
         `INS ${toHex([a[1]])} ends in Le 00`,
       );
     }
-    assert.deepEqual(r.blocks, {at: 88, of: 88});
+    assert.deepEqual(r.blocks, {at: 173, of: 173});
   });
 
   it('comes back from a pull at any APDU, before or after the card acts, with a run that sweeps and installs', async () => {
@@ -1013,8 +1123,8 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
     const sent = card.log.slice(before);
     assert.deepEqual(
       sent.filter(a => a[1] === 0xa4).map(a => toHex(a.slice(5, 5 + a[4]))),
-      [CARD, OTHER, CARD, TAG, OTHER],
-      'the probe, the security domain, the checks, the security domain',
+      [CARD, OTHER, CARD, TAG, 'E104', OTHER],
+      "the probe, the security domain, the checks (the tag's NDEF file among them), the security domain",
     );
     const forLoad = sent.find(a => a[1] === 0xe6 && a[2] === 0x02)!;
     assert.equal(

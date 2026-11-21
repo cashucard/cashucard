@@ -21,6 +21,8 @@ const card: ResetReview = {
   sealed: true,
   mint: 'https://mint.test',
   recordDigest: 'ab'.repeat(32),
+  changeOwed: false,
+  version: '2.2',
 };
 test('status reads are explicit; holder instructions and reset review do not start installation or mutate the card', async () => {
   const inspectStatus = jest.fn(),

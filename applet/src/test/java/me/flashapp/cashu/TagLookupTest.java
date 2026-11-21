@@ -75,7 +75,7 @@ class TagLookupTest {
     @DisplayName("beside a card under Foxy's old AID, the tag finds no card and stays on whatever the switch says: what a missed copy looks like")
     void aCardUnderTheOldAidIsNotFound() {
         sim = cardAndTag(AidVersionTest.OLD_FOXY_APPLET);
-        CashuAppletTest.readyOn(sim, 0);
+        CashuAppletTest.readyOn(sim, 0, true, CashuAppletTest.MINT, AidVersionTest.OLD_FOXY_APPLET);
         selectCard(AidVersionTest.OLD_FOXY_APPLET);
         assertEquals(CashuAppletTest.SW_OK, switchTag(true), "the card takes the switch");
         assertEquals(CashuAppletTest.SW_OK, selectTag(), "but the tag looks the card up by the new AID, finds nothing, and is on");

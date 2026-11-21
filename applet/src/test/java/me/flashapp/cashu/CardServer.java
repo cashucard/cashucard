@@ -17,8 +17,8 @@ import java.nio.charset.StandardCharsets;
  * One card, on a port of this machine: the applet itself, run in the JavaCard
  * simulator the tests use, for a phone that is itself simulated.
  *
- * The iOS Simulator has no NFC. Foxy's simulator build reaches a card over
- * loopback instead (Foxy/Flashcard/CardLink.swift, in the app's repository),
+ * The iOS Simulator has no NFC. A reader app's simulator build reaches a card over
+ * loopback instead (in Foxy's, Foxy/Flashcard/CardLink.swift, in that app's repository),
  * and this is the card it reaches: the same class that is built into the CAP
  * file, answering the same commands. Run it with tools/cardsim/run.sh.
  *

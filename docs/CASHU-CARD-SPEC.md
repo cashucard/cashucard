@@ -1,11 +1,12 @@
 <a id="foxy-card-a-specification-for-forking-cashu-javacard"></a>
 
-# Foxy card specification (historical)
+# Cashu Card 1.x specification (historical)
 
-> Historical Foxy design, recorded at software 1.20 and incorporated into
+> Historical design of the card's 1.x line, made in the Foxy wallet project
+> (where "Foxy" below names that wallet and its card of the time), recorded at software 1.20 and incorporated into
 > shared protocol 2.0 ([D18](DECISIONS.md#d18)). The current applet wire is
-> [protocol 2.1](../spec/APDU.md): readers SELECT the full applet AID
-> `F043415348554341524401`, which answers `02 01`. Owner labels use
+> [protocol 3.0](../spec/APDU.md): readers SELECT the full applet AID
+> `F043415348554341524401`, which answers `03 00`. Owner labels use
 > `CashuCard/…`; [D20](DECISIONS.md#d20) through [D26](DECISIONS.md#d26)
 > record the shared protocol changes. Use the current APDU reference when
 > implementing a reader.
@@ -14,7 +15,7 @@ A card that holds ecash and pays a Foxy by a tap, and the changes to make in a
 fork of `cashucard/javacard` and in Foxy to get there.
 
 The card's daily limit, its owner and its clock are specified in full in
-`FOXY-CARD-DAILY-LIMIT.md`. This document keeps the part of them that the rest
+`CASHU-CARD-DAILY-LIMIT.md`. This document keeps the part of them that the rest
 of the specification leans on, and refers to that one for the whole. An earlier
 draft had an allowance that only went down and an owner secret given to the
 card; both are gone, and where the two documents differ, that one is what is
@@ -91,7 +92,7 @@ cards from other issuers, a card without a PIN, units other than sats.
 
 ### 2.2 Menu › Flashcard (the holder's own phone)
 
-As built; the screens themselves are in `FOXY-CARD-SCREENS.md`.
+As built; the screens themselves are in `CASHU-CARD-SCREENS.md`.
 
 What the card keeps is a daily limit: the most it will sign for in one day
 (5.7). The screens call it the daily limit, or the limit, and its menu row
@@ -148,7 +149,7 @@ CHANGE LIMIT.
    for NO LIMIT, `YOU ARE REMOVING THIS CARD'S DAILY LIMIT.` and that the card
    will be able to spend everything on it; CONFIRM or CANCEL. The tap writes it
    to the card with the owner's proof; no PIN is asked. The exact words are in
-   B7 of `FOXY-CARD-SCREENS.md`. Nothing suggests a figure, and no screen says
+   B7 of `CASHU-CARD-SCREENS.md`. Nothing suggests a figure, and no screen says
    more of the limit than that it is the most the card will spend in one day.
 7. **The card's history**: what this phone has done with it. A card keeps no
    list of its own.
@@ -167,7 +168,7 @@ CHANGE LIMIT.
 | Owner's phone | the twelve words, and from them the card's owner key | with the card in hand: change the PIN, set or remove the limit, add funds, and so take everything. Without the card: nothing. It is a trustee, held on a leash of two things: its words and the card itself. For a holder with no phone of their own it is a friend's |
 | Receiving phone | sees the PIN, talks to the card | ask the card to sign more than the amount shown, up to what is left of today's limit; keep change; write pieces the mint will refuse |
 | Mint | decides what is spent | what any Cashu mint can |
-| Whoever shows the card a block header | a header | move the card's clock forward to the time the header carries, if it shows the work (5.7), and so end a day and begin the next, no sooner than that time. Never move a clock backward. A header dated later than the network's own time has to be forged, which costs work (`FOXY-CARD-DAILY-LIMIT.md` 5.2) |
+| Whoever shows the card a block header | a header | move the card's clock forward to the time the header carries, if it shows the work (5.7), and so end a day and begin the next, no sooner than that time. Never move a clock backward. A header dated later than the network's own time has to be forged, which costs work (`CASHU-CARD-DAILY-LIMIT.md` 5.2) |
 
 Three things shape the design. The receiver always goes to the mint before
 saying paid, so a copied or pretend card gains nothing. A terminal sees the
@@ -307,7 +308,7 @@ nothing is made specially for it. It is not upstream's text.
 | LOCK_CARD | the PIN if one is set | a PIN set and verified, and the owner's proof (5.6) |
 | **RESET_CARD** (`51`) | none | software 1.17: the owner's proof (and, on a locked card, the PIN given in this tap) wipes the card to what it was out of its packet, with a new key of its own, for another person to set up. Only with nothing unspent (5.6a) |
 | **SET_TAG** (`52`) | none | software 1.19: the owner's proof switches the card's NFC tag off or on (5.8). No PIN, any funds. The tag itself is a third applet of the package, under the NFC Forum's own name |
-| **SET_LIMIT** (`33`, `34`) | none | the daily limit (5.7): `34` by the owner's proof, on any card with an owner and any funds, with no PIN; `33` by the PIN, on a card with no owner while it is empty. 0 is no limit. Four bytes are the day's limit; eight are the day's and then the limit on ONE PAYMENT, which asks no clock and makes a larger payment wait (`FOXY-CARD-DAILY-LIMIT.md`, 6a); twelve (software 1.16) add the NO-PIN ALLOWANCE (5.7a), which a card with no PIN refuses (`6985`). None needs a clock to be set. (`33` was once a limit on one PIN entry, which a terminal that had the PIN walked round; it is not that) |
+| **SET_LIMIT** (`33`, `34`) | none | the daily limit (5.7): `34` by the owner's proof, on any card with an owner and any funds, with no PIN; `33` by the PIN, on a card with no owner while it is empty. 0 is no limit. Four bytes are the day's limit; eight are the day's and then the limit on ONE PAYMENT, which asks no clock and makes a larger payment wait (`CASHU-CARD-DAILY-LIMIT.md`, 6a); twelve (software 1.16) add the NO-PIN ALLOWANCE (5.7a), which a card with no PIN refuses (`6985`). None needs a clock to be set. (`33` was once a limit on one PIN entry, which a terminal that had the PIN walked round; it is not that) |
 | ~~SET_TIME~~ (`35`) | none | gone in software 1.15 (`6D00`). It told the card a time under the time key's signature |
 | **SET_HEADER** (`36`) | none | shows the card a Bitcoin block header (software 1.15). The card believes it for its work, and a later time in it moves the card's clock forward; it only moves forward (5.7) |
 | **TELL_TIME** (`37`) | none | gives the card the terminal's own clock, as a note for its receipts and log (software 1.15). The card trusts it for nothing |
@@ -325,10 +326,10 @@ has most of them as commands and answers):
 | `11` `12` `13` `14` | GET_BALANCE, GET_PROOF_COUNT, GET_PROOF, GET_SLOT_STATUS | | | as upstream, except that GET_PROOF returns the 82-byte slot |
 | `15` | AUTH | | 16 random bytes | 16 of the card's own and a signature |
 | `16` | GET_CARD | | | format, record set, unit, limit (4), refund key (33), then 65 bytes at offset 40: the hardest header's `bits` (4), the newest header's hash (32) and 29 zeros (a time key up to software 1.14), mint length, mint |
-| `17` | GET_PIECES | | P1 = the first slot to report | one page: the first slot the page does not cover (1), then for each slot in the range that is not empty a tag (1) and, for an unspent slot, its 81 bytes (FOXY-CARD-DAILY-LIMIT.md 8.1). `6A83` for a P1 of 64 or more |
-| `18` | GET_LOG | the PIN verified in this tap, or the owner's grant; with P1 = 1 (receipts) the owner's grant only | with P1 = 1, P2: how many receipts back from the newest to begin | the card's own account of its taps (`FOXY-CARD-DAILY-LIMIT.md` 6b): 16 bytes of counts, then up to eight taps of 20 bytes (16 before software 1.15), newest first: the clock (4), sats signed for (4), pieces signed (1), refused (1), flags (1), pieces put on (1), sats put on (4), the time the terminal told (4). With P1 = 1: the count of payments (4), then up to three receipts of 77 bytes (73 before 1.15), newest first: the clock (4), the time the terminal told (4), the sats (4), SHA-256 of the message signed (32), the first output's blinded message (33). `6982` to anyone else |
+| `17` | GET_PIECES | | P1 = the first slot to report | one page: the first slot the page does not cover (1), then for each slot in the range that is not empty a tag (1) and, for an unspent slot, its 81 bytes (CASHU-CARD-DAILY-LIMIT.md 8.1). `6A83` for a P1 of 64 or more |
+| `18` | GET_LOG | the PIN verified in this tap, or the owner's grant; with P1 = 1 (receipts) the owner's grant only | with P1 = 1, P2: how many receipts back from the newest to begin | the card's own account of its taps (`CASHU-CARD-DAILY-LIMIT.md` 6b): 16 bytes of counts, then up to eight taps of 20 bytes (16 before software 1.15), newest first: the clock (4), sats signed for (4), pieces signed (1), refused (1), flags (1), pieces put on (1), sats put on (4), the time the terminal told (4). With P1 = 1: the count of payments (4), then up to three receipts of 77 bytes (73 before 1.15), newest first: the clock (4), the time the terminal told (4), the sats (4), SHA-256 of the message signed (32), the first output's blinded message (33). `6982` to anyone else |
 | `20` | ~~SPEND_PROOF~~ | | | gone with format 4: `6D00`. Up to format 3 it signed for one slot, over that piece's secret alone |
-| `22` `23` `24` | SPEND_ALL_BEGIN, SPEND_ALL_OUTPUTS, SPEND_ALL_SIGN | `24`: no PIN set, or the PIN, or the no-PIN allowance (5.7a); `22` and `23` ask nothing | the places of a payment; then the swap's outputs, 37 bytes each; then nothing | **one** 64-byte signature over every piece and every output (NUT-11 `SIG_ALL`), with every place burned in the same transaction. The limits are held to what leaves the card: the pieces less the card's own change (`26`), worked out at the first SIGN, where the day refuses (`6A8F`) and the wait begins (00 01, "not yet"). Not opened by `ALLOW_LOAD` (FOXY-CARD-DAILY-LIMIT.md 6c) |
+| `22` `23` `24` | SPEND_ALL_BEGIN, SPEND_ALL_OUTPUTS, SPEND_ALL_SIGN | `24`: no PIN set, or the PIN, or the no-PIN allowance (5.7a); `22` and `23` ask nothing | the places of a payment; then the swap's outputs, 37 bytes each; then nothing | **one** 64-byte signature over every piece and every output (NUT-11 `SIG_ALL`), with every place burned in the same transaction. The limits are held to what leaves the card: the pieces less the card's own change (`26`), worked out at the first SIGN, where the day refuses (`6A8F`) and the wait begins (00 01, "not yet"). Not opened by `ALLOW_LOAD` (CASHU-CARD-DAILY-LIMIT.md 6c) |
 | `26` | SPEND_ALL_CHANGE | as `22`; a payment begun, its outputs (`23`) all given | the amount (4) | one change output the card makes for itself (software 1.12): a fresh nonce, the secret in the card's own form (its key, the payment's date and refund key, `SIG_ALL`), hashed to the curve as NUT-00 says and blinded with a fresh factor; hashed into the message as an output, after the terminal's; the opening (amount, keyset, date, nonce, blinding factor) is kept until the piece is written back. Answers the blinded message, 33 bytes. At most 8 openings on a card. `6985` with no payment begun; `6A80` for nothing, or more change than the pieces come to; `6A84` with no opening free; the terminal's outputs after it are `6985`, and the payment is given up |
 | `19` | GET_CHANGE | nothing | P1 = the page, from 0 | the openings of the change the card has made for itself and not yet been handed, three to a page: a count (1), then for each the amount (4), the keyset (8), the date (4), the nonce (32) and the blinding factor (32). An opening whose piece is on the card by now is let go first. The phone that owes the change finishes the pieces with these; the owner's phone finishes change a till never handed over (NUT-09 restore). What they say lets a reader finish a piece locked to the card's key, which nobody but the card can spend |
 | `1A` | GET_DLEQ (software 1.20) | nothing: no PIN, any state, locked or not | P1 = a place (0 to 127); P2 = a second place, or `FF` for none | for each place asked, in the order asked: `01` and the 96 bytes e, s and r where the place is unspent and its record is not zero, and otherwise the single byte `00` (empty, spent, a piece that came with no proof, or a card with no room for proofs). At most 194 bytes. `6A83` for a P1 over 127, or a P2 over 127 and not `FF`, before anything is answered. The card does not check what it gives (5.9) |
@@ -339,8 +340,8 @@ has most of them as commands and answers):
 | `33` | SET_LIMIT, PIN form | a card with no owner: PIN set and verified; nothing unspent. No clock | limit (4), or eight bytes: the day's and then the one payment's | `6A91` on a card with an owner (use `34`); `6A8D` if anything is unspent |
 | `34` | SET_LIMIT, owner's form | the owner's proof. No PIN, any funds. No clock | proof length (1), proof (DER), limit (4), or eight bytes, or twelve (software 1.16: the day's, the one payment's and the no-PIN allowance) | `6A90`, `6A91`; `6985` for a twelve-byte form with an allowance on a card with no PIN; `6700` for any other length; `6986` on a locked card |
 | `35` | ~~SET_TIME~~ | | | gone in software 1.15: `6D00`, and the instruction stays unassigned. Up to 1.14: a time (4), a signature length (1) and a signature (DER) by the time key, answered with the card's `now` |
-| `36` | SET_HEADER | nothing: no PIN, no owner, no record, any state | a Bitcoin block header, 80 bytes, as the network carries it | the card's `now` (4, big-endian), whether the header was taken or was no later than the clock. The card hashes the 80 bytes twice with SHA-256; the hash, read as a little-endian number, must be at or under the target the header's `bits` name, at or under the floor built into the applet (`bits` `0x17087BC0`) and, once a header has been taken, at or under four times the target of the hardest taken. `6A93` for too little work in any of the three senses; `6A80` for a `bits` no header could carry; `6700` for any length but 80. A header with a later time moves `now` to it, begins the window of a limit set before any header, and keeps the hardest `bits` and the newest hash. Drops a payment begun (`FOXY-CARD-DAILY-LIMIT.md` 5.1) |
-| `37` | TELL_TIME | nothing: no PIN, no owner, no record, any state | the terminal's own clock, 4 bytes, big-endian seconds | nothing. `6700` for any length but 4. Kept in RAM for this time in the field, and written into the receipts and the log entries made in it; trusted for nothing (`FOXY-CARD-DAILY-LIMIT.md` 5.3). Drops a payment begun |
+| `36` | SET_HEADER | nothing: no PIN, no owner, no record, any state | a Bitcoin block header, 80 bytes, as the network carries it | the card's `now` (4, big-endian), whether the header was taken or was no later than the clock. The card hashes the 80 bytes twice with SHA-256; the hash, read as a little-endian number, must be at or under the target the header's `bits` name, at or under the floor built into the applet (`bits` `0x17087BC0`) and, once a header has been taken, at or under four times the target of the hardest taken. `6A93` for too little work in any of the three senses; `6A80` for a `bits` no header could carry; `6700` for any length but 80. A header with a later time moves `now` to it, begins the window of a limit set before any header, and keeps the hardest `bits` and the newest hash. Drops a payment begun (`CASHU-CARD-DAILY-LIMIT.md` 5.1) |
+| `37` | TELL_TIME | nothing: no PIN, no owner, no record, any state | the terminal's own clock, 4 bytes, big-endian seconds | nothing. `6700` for any length but 4. Kept in RAM for this time in the field, and written into the receipts and the log entries made in it; trusted for nothing (`CASHU-CARD-DAILY-LIMIT.md` 5.3). Drops a payment begun |
 | `40` | VERIFY_PIN | | the PIN, 4 to 8 bytes | changes nothing about spending |
 | `41` | SET_PIN | a card with no owner, nothing unspent. No PIN, no proof. Or (ADD PIN, software 1.16) a card with an owner and no PIN, with the owner's grant (`ALLOW_LOAD`) in this tap, any funds | the PIN | sets or replaces the PIN and unblocks; `6A91` on a card with an owner that has a PIN, or has none and no grant (use `42`); `6A8D` if anything is unspent on a card with no owner; `6986` locked. The allowance is nothing |
 | `42` | CHANGE_PIN | the owner's proof. No PIN, no session, any PIN state, any funds | proof length (1), proof (DER), the new PIN | sets the PIN and resets the tries; ends any verified session; `6A90`, `6A91`; `6986` locked |
@@ -355,7 +356,7 @@ has most of them as commands and answers):
 `FORMAT` is 3; a phone that knows only an earlier format refuses the card, as it
 does now for anything but its own. (That is how the rows not marked with a later
 software version were first written. The applet is now at 1.20, `SELECT` answers
-`01 14`, and `FORMAT` is 4; where this table and `FOXY-CARD-DAILY-LIMIT.md`
+`01 14`, and `FORMAT` is 4; where this table and `CASHU-CARD-DAILY-LIMIT.md`
 section 8 differ, that one is what is built.)
 
 **Every command in every state.** "Open" means nothing is needed beyond what
@@ -431,7 +432,7 @@ bit set.
    is gone. The limit on one payment that the card has now is not that: it is
    a second number in permanent memory that refuses nothing and asks no clock;
    a payment over it waits, by the card's own work, for every limit's worth
-   past the first.) The whole text is `FOXY-CARD-DAILY-LIMIT.md`, sections 3 and 6.
+   past the first.) The whole text is `CASHU-CARD-DAILY-LIMIT.md`, sections 3 and 6.
 4. **Three tries**, then blocked, as upstream. The owner's proof unblocks it
    (`CHANGE_PIN`), and a wrong proof costs no tries. The refund path (6) is a
    second way out, for a card set up as recoverable.
@@ -508,7 +509,7 @@ bit set.
   never verifying as a spend; torn writes (the upstream slot-order tests,
   extended to the new fields).
 - The daily limit, the clock, the owner key and its proofs, and the takeover of
-  an emptied card, as `FOXY-CARD-DAILY-LIMIT.md` section 12 sets out. In short:
+  an emptied card, as `CASHU-CARD-DAILY-LIMIT.md` section 12 sets out. In short:
   a terminal that sends the PIN between four spends of one piece each, with a
   limit of one piece, takes one, however it is repeated, and takes a second only
   after a header a day later; exactly the limit goes and one sat more does
@@ -553,7 +554,7 @@ bit set.
 
 ### 5.6 The owner key, and the owner's proof
 
-The whole text is `FOXY-CARD-DAILY-LIMIT.md`, sections 7 and 8. An earlier draft
+The whole text is `CASHU-CARD-DAILY-LIMIT.md`, sections 7 and 8. An earlier draft
 gave the card a 32-byte owner secret, once, in the clear, and compared a hash
 against it. That is gone: nothing of the owner crosses the air now, and no
 secret is on the card.
@@ -650,7 +651,7 @@ nothing reads with no PIN set and `SET_PIN` replaces.
 **Who the owner is.** Whoever's words derived the key on the card: for a holder
 with a phone, their own; for a holder without one, the friend whose phone set the
 card up. That phone is a trustee who, with the card in hand, can do anything, and
-without it, nothing. Set-up says so in as many words (`FOXY-CARD-SCREENS.md`
+without it, nothing. Set-up says so in as many words (`CASHU-CARD-SCREENS.md`
 B3). An owner can be replaced only on a card with nothing unspent, and only with
 the old owner's proof. A card whose owner has lost their words cannot be taken
 over, empty or not.
@@ -668,7 +669,7 @@ owner secret stands in for the owner's proof.
 
 ### 5.7 The daily limit, the clock, and what they bound
 
-The whole text is `FOXY-CARD-DAILY-LIMIT.md`, sections 5 and 6. A card is cash.
+The whole text is `CASHU-CARD-DAILY-LIMIT.md`, sections 5 and 6. A card is cash.
 It holds what is put on it. The daily limit caps how much of it a terminal that
 has been handed the PIN can take in a day, honest or built to cheat: the card
 counts its day by Bitcoin block headers, which it believes for their work, and a
@@ -734,7 +735,7 @@ blocks of this version's time, on a card that has taken none). The card's time i
 block's, and not the second: a block's time can lead the true time by up to two
 hours, and the clock moves a block at a time, and only when someone shows the
 card a header. The numbers, and the reasons for them, are in
-`FOXY-CARD-DAILY-LIMIT.md` 5.2. `TELL_TIME` gives the card the terminal's own
+`CASHU-CARD-DAILY-LIMIT.md` 5.2. `TELL_TIME` gives the card the terminal's own
 clock as a note for its receipts and its log, and the card trusts it for
 nothing (there, 5.3).
 
@@ -770,7 +771,7 @@ What it does not do is listed in section 10.
 
 ### 5.7a The PIN is optional, and the no-PIN allowance (software 1.16)
 
-The whole text is `FOXY-CARD-DAILY-LIMIT.md`, section 6f.
+The whole text is `CASHU-CARD-DAILY-LIMIT.md`, section 6f.
 
 **A card may have no PIN.** It is set up with a record and an owner and no
 `SET_PIN`, and it pays without one: its daily limit and its limit on one payment
@@ -815,6 +816,11 @@ Type 4 Tag (mapping version 2.0), read only, carrying one address:
     https://getfoxy.io/card
 
 so that a phone with Foxy opens the app and a phone without it opens that page.
+
+*Amended by `DECISIONS.md` D222 (2.3): the address now ends `#new` on a card with no
+owner or no record, and on a set-up card carries a code that is new at every read and that
+only the owner's phone can tie to the card; the files below are 1.19's (the capability
+container now allows 71 bytes). `spec/APDU.md`, The NFC tag application, has the wire.*
 
 **The same on every card.** There is nothing per card in the address and there never
 will be: an address that named the card, its key, its owner or its balance would be an
@@ -936,7 +942,7 @@ builds and the message it signs are what they were, and no payment command write
 **It is reserved after install, by the first `SET_CARD`.** The chip will not install an applet
 whose constructor asks for this much more (a build whose constructor asked for 300 bytes
 more installed, and one that asked for 12,288 more did not), and it gave the same bytes
-asked for by a command after the install (`FOXY-CARD-HARDWARE.md`). So the store is not
+asked for by a command after the install (`CASHU-CARD-HARDWARE.md`). So the store is not
 there at install. The first `SET_CARD` that goes through reserves it, once, before the record
 is written and outside any transaction. If the card refuses the room, that `SET_CARD` goes
 on without it and the card works as a card with no room for proofs: the load answers `00` for
@@ -983,7 +989,7 @@ proof of a spent piece.
 and refund key) and the mint's keys. For a place `GET_DLEQ` answers:
 
 1. Rebuild the piece's secret, the NUT-10 text the card signs the hash of
-   (`FOXY-CARD-DAILY-LIMIT.md` 6c).
+   (`CASHU-CARD-DAILY-LIMIT.md` 6c).
 2. `Y = hash_to_curve(secret)` (NUT-00).
 3. `K` is the mint's public key for the piece's amount in the piece's keyset (NUT-01).
 4. `C' = C + r*K`, and `B' = Y + r*G`.
@@ -1215,7 +1221,7 @@ holds money, and a card that holds money is told to withdraw it first.
 
 ## 9. Foxy: the screens (app)
 
-`FOXY-CARD-SCREENS.md` lists them as built. In short:
+`CASHU-CARD-SCREENS.md` lists them as built. In short:
 
 - Receive: a CARD button beside TAP; the PIN pad with what is being paid
   under its title and on its button; the cards of 2.1.
@@ -1224,7 +1230,7 @@ holds money, and a card that holds money is told to withdraw it first.
 - Amounts are typed on the app's own amount screen. The PIN pad is the lock
   screen's, with its larger keys. A card PIN is 4 to 8 digits.
 - The limit is set from CHANGE LIMIT in three steps: a warning, the amount
-  screen, a confirmation (2.2; B7 of `FOXY-CARD-SCREENS.md`). Set-up asks for a
+  screen, a confirmation (2.2; B7 of `CASHU-CARD-SCREENS.md`). Set-up asks for a
   PIN twice and shows a notice that this phone will be the owner, and asks for
   no limit.
 - The card's screen shows the daily limit, what is left today and when the day
@@ -1266,7 +1272,7 @@ visit, where the owner has set one (5.7).
   stating an amount of 1 would have been spent for 1 and signed for the real
   piece. `LOAD_PROOF` refuses a nonce that is in any slot, spent or not (`6A94`).
   The card does not remember a nonce once `CLEAR_SPENT` has freed its slot (see
-  `FOXY-CARD-DAILY-LIMIT.md`, section 13).
+  `CASHU-CARD-DAILY-LIMIT.md`, section 13).
 - Any reader in range can send three wrong PINs and block the card (upstream's
   threat 14). The owner's phone unblocks it with a new PIN (5.6); a card whose
   owner has lost their words stays blocked.
@@ -1279,7 +1285,7 @@ visit, where the owner has set one (5.7).
   which the card signs for one more limit's worth until the owner sets the limit
   again. A card that has been shown no header spends its first day on trust, and
   a block's time can lead the true time by up to two hours
-  (`FOXY-CARD-DAILY-LIMIT.md` 5, 6 and 13).
+  (`CASHU-CARD-DAILY-LIMIT.md` 5, 6 and 13).
 - A card with no owner can be claimed by any reader in range. It holds nothing and
   cannot be loaded (5.4).
 - **The NFC tag (software 1.19) is read by any reader, with no PIN.** It says the same
@@ -1338,4 +1344,4 @@ applet and the wallet can be written and tested without a card; phases 1b and
    to a floor and a quarter (5.7). There is no signer and no key. Open: when the
    floor is raised, how long `SET_HEADER` takes on the chip (not yet measured),
    and whether the ECDSA verifier on the first card behaves (5.6); see
-   `FOXY-CARD-DAILY-LIMIT.md` section 14 for the rest of what is decided.
+   `CASHU-CARD-DAILY-LIMIT.md` section 14 for the rest of what is decided.

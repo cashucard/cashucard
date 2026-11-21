@@ -11,7 +11,14 @@ const evidence = {
     installationId,
     tagVerified: true,
     empty: false,
-    publicState: {unspent: 0, spent: 0, owner: true, pin: true, record: false},
+    publicState: {
+      unspent: 0,
+      spent: 0,
+      owner: true,
+      pin: true,
+      record: false,
+      changeOwed: false,
+    },
   },
   provenance: {chipId, installationId, keySourceRef: 'local-escrow:batch-1:0'},
   consent: {
@@ -51,6 +58,7 @@ test('proofs, missing applet and a different installation all stop', () => {
   for (const publicState of [
     {...evidence.installation.publicState, unspent: 1},
     {...evidence.installation.publicState, spent: 1},
+    {...evidence.installation.publicState, changeOwed: true},
   ]) {
     assert.equal(
       assessResetPreflight({
@@ -71,4 +79,17 @@ test('proofs, missing applet and a different installation all stop', () => {
     }).ok,
     false,
   );
+});
+
+test('a card owed change, with no unspent and no spent place, stops with words that send the holder to bring it home', () => {
+  const r = assessResetPreflight({
+    ...evidence,
+    installation: {
+      ...evidence.installation,
+      publicState: {...evidence.installation.publicState, changeOwed: true},
+    },
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.ok ? '' : r.reason, /owed change/);
+  assert.match(r.ok ? '' : r.reason, /holder's wallet brings it home/);
 });

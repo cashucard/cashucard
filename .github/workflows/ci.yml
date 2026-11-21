@@ -153,12 +153,12 @@ jobs:
           echo "::error::cardsim did not answer /state within 30 s"
           exit 1
 
-      # The card's applet's whole AID (F0 CASHUCARD 01) answers version 02 02. The package AID alone
+      # The card's applet's whole AID (F0 CASHUCARD 01) answers version 03 00. The package AID alone
       # reaches the opener, as on a J3R180 (D25): 9000 with no version.
       - name: Smoke-test SELECT over HTTP
         run: |
           curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}' \
-            | grep -q '"hex":"02029000"'
+            | grep -q '"hex":"03009000"'
           curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
             | grep -q '"hex":"9000"'
 
@@ -294,6 +294,7 @@ jobs:
           python test_reset_bridge.py
           python test_spent_audit.py
           python test_read_registry.py
+          python ../maker/test_maker.py
 
       # Prove requirements.txt is actually installable. pyscard ships a native
       # _scard module and is the one dependency that can install "successfully"
@@ -381,19 +382,19 @@ jobs:
       # move the tracked one aside first: the CAP the next steps look at is then
       # this commit's source, freshly converted, or nothing at all.
       - name: Set the tracked CAP aside
-        run: mv applet/target/cashu-javacard-2.1.0.cap "$RUNNER_TEMP/tracked.cap"
+        run: mv applet/target/cashu-javacard-3.0.0.cap "$RUNNER_TEMP/tracked.cap"
 
       # 3.0.5 is the floor: SchnorrHW needs ALG_EC_SVDP_DH_PLAIN_XY, which does
       # not exist in 3.0.4. The target also runs tools/stripcap.py (the
       # Descriptor component out) and tools/refcheck.py, the size check against
-      # what the J3R180 has installed (docs/FOXY-CARD-HARDWARE.md), which fails
+      # what the J3R180 has installed (docs/CASHU-CARD-HARDWARE.md), which fails
       # the build for the opener not first or a size known to fail on the chip.
       - name: Convert CAP
         run: ant -f applet/build.xml cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"
 
       - name: Assert CAP was produced
         run: |
-          cap=applet/target/cashu-javacard-2.1.0.cap
+          cap=applet/target/cashu-javacard-3.0.0.cap
           test -s "$cap" || { echo "::error::$cap was not produced"; exit 1; }
           ls -l "$cap"
 
@@ -408,9 +409,9 @@ jobs:
           tracked="$RUNNER_TEMP/tracked.cap"
           mkdir "$RUNNER_TEMP/tracked" "$RUNNER_TEMP/built"
           unzip -q "$tracked" -d "$RUNNER_TEMP/tracked"
-          unzip -q applet/target/cashu-javacard-2.1.0.cap -d "$RUNNER_TEMP/built"
+          unzip -q applet/target/cashu-javacard-3.0.0.cap -d "$RUNNER_TEMP/built"
           diff -r -x MANIFEST.MF "$RUNNER_TEMP/tracked" "$RUNNER_TEMP/built" || {
-            echo "::error::the tracked CAP was not built from this source: run ant cap, commit applet/target/cashu-javacard-2.1.0.cap, and publish its sha256 in docs/HARDWARE_DEPLOYMENT.md"
+            echo "::error::the tracked CAP was not built from this source: run ant cap, commit applet/target/cashu-javacard-3.0.0.cap, and publish its sha256 in docs/HARDWARE_DEPLOYMENT.md"
             exit 1
           }
           sha=$(sha256sum "$tracked" | cut -c1-64)
@@ -480,13 +481,13 @@ jobs:
           python3 tools/cardkit/make-assets.py --check --cap "$RUNNER_TEMP/tracked.cap"
 
       - name: Restore the pinned release CAP
-        run: cp "$RUNNER_TEMP/tracked.cap" applet/target/cashu-javacard-2.1.0.cap
+        run: cp "$RUNNER_TEMP/tracked.cap" applet/target/cashu-javacard-3.0.0.cap
 
       - name: Upload CAP
         uses: actions/upload-artifact@v5
         with:
           name: cashu-javacard-cap
-          path: applet/target/cashu-javacard-2.1.0.cap
+          path: applet/target/cashu-javacard-3.0.0.cap
           if-no-files-found: error
 
   cardkit:
@@ -667,8 +668,12 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backup_copy == 'true'
     name: encrypted backup copier (Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    # 24.04, not ubuntu-latest: Python 3.9 (the copier's stated minimum,
+    # tools/backup-copy/README.md) has no build for ubuntu-26.04, which
+    # ubuntu-latest became in November 2026.
+    runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.9", "3.13"]
     steps:

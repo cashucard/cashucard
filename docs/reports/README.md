@@ -10,6 +10,8 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 
 ## Card hardware
 
+> Note added at the 3.0 merge (2026-11-19): decision numbers in the four 2026-11-14 J3R180 2.3 rows below are from before the 3.0 merge. D205 to D215 are now D211 to D221 (D205 to D210 now name the other maintainer's 3.0 decisions, and the links in the four 2026-11-14 J3R180 2.3 rows below land on those). The record itself is unchanged.
+
 | Date       | Report                                                                                                        | Subject                                                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | 2026-09-01 | [J3R452](HARDWARE_TEST_REPORT_2026-09-01.j3r452.md) ([中文](HARDWARE_TEST_REPORT_2026-09-01.j3r452.zh-CN.md)) | Historical upstream report: the applet on an NXP JCOP4.5 J3R452          |
@@ -30,6 +32,12 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 | 2026-10-23 | [Owned-card reset](HARDWARE_TEST_REPORT_2026-10-23.j3r180-owned-reset.md)                                     | USB reset of card 09336320 to factory manager keys                       |
 | 2026-10-23 | [Physical end-to-end run](HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)                                 | Install, holder setup, funding, payments and settlement on card 09336320 |
 | 2026-10-23 | [Mobile reset and reuse](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)                              | Reset and reinstall of card 09336320 from a phone                        |
+| 2026-11-13 | [2.3 on J3R180](HARDWARE_TEST_REPORT_2026-11-13_J3R180_2.3.md)                                                | Protocol 2.3 pays and takes its change back at a test mint               |
+| 2026-11-14 | [2.3 with D200 to D204 on J3R180](HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md) | The clock, the owner's c and the day of loads at a test mint |
+| 2026-11-14 | [2.3 with D205 on a second J3R180](HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md) | No payment floor and the shorter holds, timed on the chip |
+| 2026-11-14 | [2.3 with D206 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md) | `LOAD_PROOF`'s 04 form checked by the chip's key agreement; a first load of 45 pieces timed in both forms |
+| 2026-11-14 | [2.3 with D207 to D210 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14d_J3R180_2.3.md) | A keyset taught at set-up; the field, the change's point checks and the signature on the chip's own engines; a first load in 7.8 s, a payment with change in 2.2 s, the holds timed |
+| 2026-11-14 | [2.3 with D211 to D214 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14e_J3R180_2.3.md) | The signature in two shares and checked on the card, wider known answers, a taught keyset kept; every signature 0.27 s longer, the holds timed again |
 
 ## Hardware plans
 

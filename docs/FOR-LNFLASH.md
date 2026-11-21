@@ -4,11 +4,15 @@
 
 > Historical Foxy design, recorded at software 1.20 and incorporated into
 > shared protocol 2.0 ([D18](DECISIONS.md#d18)). The current applet wire is
-> [protocol 2.1](../spec/APDU.md): readers SELECT the full applet AID
-> `F043415348554341524401`, which answers `02 01`. Owner labels use
+> [protocol 3.0](../spec/APDU.md): readers SELECT the full applet AID
+> `F043415348554341524401`, which answers `03 00`. Owner labels use
 > `CashuCard/…`; [D20](DECISIONS.md#d20) through [D26](DECISIONS.md#d26)
 > record the shared protocol changes. Use the current APDU reference when
-> implementing a reader.
+> implementing a reader. What this letter says of loading ("an ordinary locked
+> send from any NUT-11 wallet" to the card key) is true of 1.x and 2.x only:
+> a 3.0 card signs with its key for a piece's date, never with the card key
+> alone, and eCash locked to the card key is lost
+> ([Keys per load](../spec/APDU.md#keys-per-load)).
 
 From the Foxy wallet project (getfoxy), to the authors of `cashucard/javacard`.
 
@@ -32,7 +36,7 @@ version 1.1, and most of its tables still say so (29 bytes of `GET_INFO`, 64
 slots, a `SPEND` of one slot). The clock has been brought up to software 1.15,
 and the PIN made optional in 1.16: the rows and sentences that name them say what
 the card does now. For the rest,
-`docs/FOXY-CARD-SPEC.md` and `docs/FOXY-CARD-DAILY-LIMIT.md` are what is built.
+`docs/CASHU-CARD-SPEC.md` and `docs/CASHU-CARD-DAILY-LIMIT.md` are what is built.
 
 <a id="1-what-we-would-like-you-to-look-at"></a>
 
@@ -377,7 +381,7 @@ visit, where the owner has set one.
 Two public repositories.
 
 - `getfoxy/card` (https://github.com/getfoxy/card): the applet. Start with
-  `FORK.md`, then `docs/FOXY-CARD-SPEC.md`, and `docs/FOXY-CARD-DAILY-LIMIT.md`
+  `FORK.md`, then `docs/CASHU-CARD-SPEC.md`, and `docs/CASHU-CARD-DAILY-LIMIT.md`
   for the daily limit, the clock and the owner key in full. `spec/vectors/` has
   the secrets and a full conversation with the card. Your own `spec/`, `README`
   and `tools/cardctl` are still in the tree and still describe your wire.

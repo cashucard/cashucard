@@ -396,7 +396,7 @@ def test_rejects_an_amount_that_is_not_a_power_of_two():
 
 def test_rejects_a_keyset_id_that_is_not_nut02_v0():
     """
-    cashu-client runs `requireKeysetV0` on both the card path and the file path.
+    The 0.x client runs `requireKeysetV0` on the card file's ids.
     An id this side writes but that side refuses is a proof that dies at the
     boundary, so refuse it here where it costs nothing.
     """
@@ -405,14 +405,16 @@ def test_rejects_a_keyset_id_that_is_not_nut02_v0():
         d["slots"][0]["keysetId"] = bad
         _expect_exit(d, "NUT-02 v0 keyset id")
 
-    # The flag path takes the same rule — both entry points to LOAD_PROOF must
-    # agree about what a valid id is.
+    # The card file is the 0.x card's, whose client takes v0 alone. The 2.x load
+    # path (--keyset) takes a version 01 id too, by its first 8 bytes, as the card
+    # keeps it, and refuses any other version.
+    assert cardctl.parse_keyset_id("0159534ce0bfa19a") == bytes.fromhex("0159534ce0bfa19a")
     try:
-        cardctl.parse_keyset_id("0159534ce0bfa19a")
+        cardctl.parse_keyset_id("ff59534ce0bfa19a")
     except SystemExit as exc:
-        assert "NUT-02 v0 keyset id" in str(exc), str(exc)
+        assert "version 00 or 01" in str(exc), str(exc)
     else:
-        raise AssertionError("parse_keyset_id accepted a non-v0 keyset id")
+        raise AssertionError("parse_keyset_id accepted a keyset id of version ff")
 
 
 # ── strict readers: unknown fields are refused, never ignored ────────────────
@@ -1260,9 +1262,9 @@ def test_load_rejects_amounts_the_card_file_format_cannot_carry():
         _expect_load_arg_exit(base + ["--amount", bad], "amount must be a positive power of two")
 
 
-def test_load_rejects_a_non_v0_keyset_id_before_touching_the_card():
-    _expect_load_arg_exit(["--keyset", "0159534ce0bfa19a", "--amount", "8"],
-                          "NUT-02 v0 keyset id")
+def test_load_rejects_an_unknown_keyset_version_before_touching_the_card():
+    _expect_load_arg_exit(["--keyset", "0259534ce0bfa19a", "--amount", "8"],
+                          "version 00 or 01")
 
 
 def test_card_load_proof_bounds_the_amount_itself():
