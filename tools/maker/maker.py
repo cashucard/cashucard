@@ -12,6 +12,13 @@ prints what an install needs from it:
 
 `tag-params` and `gp-tag` refuse the shared repository's example file (`"example": true`) unless `--allow-example`
 says the card is a spare one on a bench: a card in the field must carry its maker's address, never example.com's.
+All three refuse an address that looks as if it names one card (`tag_address_warning`: a run of six digits or more, a
+run of eight hex digits or more, a UUID, or `serial` or `uid` in the path or the query) unless `--allow-per-card` is
+given. The tag's address is the installer's choice for each card and survives RESET_CARD, so an address of one card is
+a tracker a phone without the app hands to the maker's server at every read (D228). This is a guard rail at this tool
+only: a gp --params written by hand, or another installer, is not checked, and an address that names a card in a way
+the rule does not see passes. The check that holds is the maker's published address (docs/CARD-DESIGNS.md).
+
 `--file` reads another file in place of maker/maker.json (for tests). Python 3.9 or later, the standard library only.
 """
 import argparse
@@ -57,6 +64,28 @@ def tag_address_problem(address):
             return 'the tag address holds %r: only printable ASCII, no spaces' % ch
         if ch in BARRED:
             return 'the tag address holds %r, which may not stand in it (the card adds the # and its fragment)' % ch
+    return None
+
+
+def tag_address_warning(address):
+    """Why `address` looks as if it names one card (D228), or None. A heuristic: a run of six digits or more, a run of
+    eight hex digits or more, or a UUID anywhere after https:// (the host compared in lowercase), or `serial` or `uid`
+    as a word in the path or the query, in any case. It refuses some innocent addresses (a long number in a path) and
+    misses a per-card address that looks innocent; tag_address_problem's rules are the applet's and are separate."""
+    if not isinstance(address, str) or not address.startswith(HTTPS):
+        return None
+    rest = address[len(HTTPS):]
+    cut = min([i for i in (rest.find('/'), rest.find('?')) if i >= 0] or [len(rest)])
+    host, tail = rest[:cut].lower(), rest[cut:]
+    text = host + tail
+    if re.search(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', text):
+        return 'it holds a UUID'
+    if re.search(r'[0-9]{6,}', text):
+        return 'it holds a run of six digits or more'
+    if re.search(r'[0-9a-fA-F]{8,}', text):
+        return 'it holds a run of eight hex digits or more'
+    if re.search(r'(?<![a-z])(?:serial|uid(?![a-z]))', tail, re.IGNORECASE):
+        return 'its path or query names a serial or a uid'
     return None
 
 
@@ -153,9 +182,17 @@ def main(argv=None):
     p.add_argument('--file', default=DEFAULT, help='a maker file other than maker/maker.json')
     p.add_argument('--allow-example', action='store_true',
                    help='a spare card on a bench: use the example file\'s address (example.com) all the same')
+    p.add_argument('--allow-per-card', action='store_true',
+                   help='take a tag address that looks as if it names one card (D228) all the same')
     args = p.parse_args(argv)
     try:
         maker = load(args.file)
+        warning = tag_address_warning(maker['tagAddress'])
+        if warning and not args.allow_per_card:
+            raise MakerError('tagAddress %r looks as if it names one card (%s). The address is the same on every card '
+                             'of a maker and survives a reset: one per card is a tracker that every phone reading the '
+                             'tag hands to the address\'s server (D228). Give the maker\'s one address, or pass '
+                             '--allow-per-card if it names no card' % (maker['tagAddress'], warning))
         if args.command == 'check':
             problems = design_problems(maker)
             if problems:

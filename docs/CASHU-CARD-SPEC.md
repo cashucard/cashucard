@@ -822,9 +822,14 @@ owner or no record, and on a set-up card carries a code that is new at every rea
 only the owner's phone can tie to the card; the files below are 1.19's (the capability
 container now allows 71 bytes). `spec/APDU.md`, The NFC tag application, has the wire.*
 
-**The same on every card.** There is nothing per card in the address and there never
-will be: an address that named the card, its key, its owner or its balance would be an
-identifier that anyone with a phone could read with no PIN. Two cards answer a reader
+**The same on every card.** *Amended by `DECISIONS.md` D227 and D228 (3.0): the address
+before the fragment is the installer's choice for each card, given at install, and it
+survives `RESET_CARD`; the card cannot see other cards, so it cannot keep an installer from
+giving each card its own. The check is the maker's published address
+(`CARD-DESIGNS.md`), and `tools/maker/maker.py` refuses an address that looks per card.*
+A maker's cards carry one address and nothing per card: an address that named the card,
+its key, its owner or its balance would be an identifier that anyone with a phone could
+read with no PIN. Two cards answer a reader
 in the same bytes, and a card with money on it answers as one with none. What the tag
 tells a reader is that this is a card made for Foxy, and nothing else
 (`SECURITY-MODEL.md`, threat 15).

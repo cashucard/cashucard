@@ -21,6 +21,17 @@ The drawings are the wallets'; one wallet that draws all three is Foxy's
 (getfoxy/iOS, https://github.com/getfoxy/iOS: `FC_DESIGNS` in
 `build/app/26f-flashcard.js`, the drawing in `build/markup.html`).
 
+## The maker's tag address
+
+Each card maker publishes the one address its cards' NFC tag carries before the fragment
+(`tagAddress` in its `maker/maker.json`, [D227](DECISIONS.md#d227)), here or on its own
+site, so that anyone can check a card against it. The address is the installer's choice
+for each card and survives a reset, so nothing on the card stops an installer from giving
+each card its own, which would make the tag a tracker; a card whose address is not its
+maker's published one is suspect ([D228](DECISIONS.md#d228)). `python3 tools/maker/maker.py
+check` refuses an address that looks per card (a long run of digits or hex, a UUID, a
+serial or a uid in the path or the query) unless `--allow-per-card` is given.
+
 ## How a card names its design
 
 Since card software 1.10 the card's record carries the code: three bytes
