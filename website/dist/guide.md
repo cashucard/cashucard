@@ -2,7 +2,7 @@
 
 This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.0, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
-The 3.0 build: this exact file has been installed on a chip, and has not yet been proven with a payment at a mint. If the install in step 4 fails, stop and tell the person.
+The 3.0 build: this exact file has run on a chip. It ran on the sample J3R180 of 2026-11-21, at a test mint. If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
@@ -174,7 +174,7 @@ A card fresh from the install is empty and unowned, and any reader in range can 
 
 ## Troubleshooting
 
-- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the chip next: one J3R180 has installed this exact file, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and tell the person.
+- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the chip next: this exact file has run on one J3R180, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and tell the person.
 - SELECT answers `6A82`: the requested applet was not found. An earlier 0.x or 1.x applet is one possible cause. Stop and ask the person.
 - SELECT answers `9000` with no version: that SELECT named the package AID alone, `F0434153485543415244`, which reaches the opener. Select the whole AID, `F043415348554341524401`, as in step 5.
 - The card refuses gp's keys: stop, as step 3 says.

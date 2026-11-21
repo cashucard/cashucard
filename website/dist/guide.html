@@ -154,7 +154,7 @@ chmod +x /usr/local/bin/gp</code></pre>
           <section id="applet" aria-labelledby="applet-title">
             <h2 id="applet-title"><span class="step-no" aria-hidden="true">02</span>Get the applet</h2>
             <p>The applet ships as one CAP file, applet version 3.0, at <code>applet/target/cashu-javacard-3.0.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
-            <p class="note"><b>On a card, not yet proven.</b> The 3.0 build: this exact file has been installed on a chip, and has not yet been proven with a payment at a mint. If the install in step 4 fails, stop.</p>
+            <p class="note"><b>On a card.</b> The 3.0 build: this exact file has run on a chip. It ran on the sample J3R180 of 2026-11-21, at a test mint. If the install in step 4 fails, stop.</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>git clone https://github.com/cashucard/cashucard
@@ -322,7 +322,7 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
           <section id="troubleshooting" aria-labelledby="troubleshooting-title">
             <h2 id="troubleshooting-title">Troubleshooting</h2>
             <dl class="faults">
-              <div><dt><code>gp --install</code> fails with <code>6F00</code></dt><dd>Check the order in step 4: the chip takes the card's applet only after the opener. With the order right, suspect the chip next: one J3R180 has installed this exact file, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and report the answer.</dd></div>
+              <div><dt><code>gp --install</code> fails with <code>6F00</code></dt><dd>Check the order in step 4: the chip takes the card's applet only after the opener. With the order right, suspect the chip next: this exact file has run on one J3R180, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and report the answer.</dd></div>
               <div><dt>The first <code>SET_CARD</code> answers <code>6F00</code></dt><dd>The card checks how the chip frames its ECDH output at every <code>SET_CARD</code>, and a chip that frames it otherwise is never set up. Suspect the chip's ECDH framing: stop and report the answer.</dd></div>
               <div><dt>SELECT answers <code>6A82</code></dt><dd>The card has an earlier applet, 0.x or 1.x, and needs an update.</dd></div>
               <div><dt>SELECT answers <code>9000</code> with no version</dt><dd>That SELECT named the package AID alone, <code>F0434153485543415244</code>, which reaches the opener, and the opener answers <code>6D00</code> to every command after it. Select the whole AID, <code>F043415348554341524401</code>, as in step 5.</dd></div>

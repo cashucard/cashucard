@@ -3,6 +3,8 @@
 The 3.0 file of branch `neutral-cashu-card` at 9ac55c1, whose NFC tag takes its address from the install parameters (D227).
 It was put on the reader's sample card, tried, and left there, fresh, with the tag at `https://getfoxy.io/card`.
 
+> Later the same day the card was paid from at a test mint, and every money item passed: [Payments at a test mint](#payments-at-a-test-mint-the-same-day-the-same-card), below. The file is on refcheck's PROVEN.
+
 - **Every create was taken at the first try:** the card's applet 13 times of 13, the tag 19 times of 19 with a good address, the load twice of two.
   No `6F00`, no retry, no create that went mute.
 - **The tag's install parameters work on the chip as the simulator says:**
@@ -165,3 +167,79 @@ In the run's scratch folder (`chip-neutral`), which is not kept:
 - the cycles and memory: `70-rate.jsonl`, `71-tag-mem.txt`, `80-reload.txt`, `81-leak-c900.txt`, `83-after-setup-delete.txt`;
 - the end: `90-final.txt`, `91-selftest-final.txt`, `92-info-final.txt`;
 - the serial reads: `guard.log`.
+
+## Payments at a test mint (the same day, the same card)
+
+A second run on the same card and the same file, on the keeper's yes in chat: set up, load from a test mint, pay, check the
+change, check the mint's signatures. **Every item passed.** The file's hash moved from refcheck's INSTALLED to PROVEN.
+
+- **Mint:** `testnut.cashu.space`, CDK mintd 0.18.1, FakeWallet (no real money). Keyset `sat` `017bc604…`, input fee 100 ppk.
+- **Card:** ICSerialNumber **58206920**, read again with `gp -i` before every command that changed the card: 14 reads, every
+  one 58206920.
+- **Owner and keys:** cardctl's TEST owner key; a random owner seed and a random refund key, made by the run and held only
+  in its memory (never written or printed); the PIN 1234; the anchor block 976,817.
+- **Tools:** this branch's `tools/cardctl` (setup, card-secret, keyset-keys, selftest, reset) and `tools/cardsim/client.cjs`
+  and `cashu-crypto.cjs`, driven through `tools/chip`'s ChipBridge; the earlier runs' harness (`p19.cjs`, `mint45.cjs`,
+  `firstload.py`) in a private copy, pointed at this branch. A tap is a real reset of the card by the reader.
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Set-up | **pass.** `cardctl setup` in one selection (PIN, record with the refund key, the owner claimed with the owner's c, the anchor): 4.0 s with the process start. c read back with `card-secret` and checked against `GROUP_KEYS` for the date 0: the 1st owner's c the card has taken. Testnut's keyset taught (`keyset-keys`, 32 keys): the card worked out the same ID, 1.2 s |
+| 2 | Pieces minted | **pass.** 518 fake sats as 12 pieces (1 to 256), locked to the card's key for the date 0 as the owner works it out from c; each signature's DLEQ checked, blind and unblinded |
+| 3 | First load, one selection | **pass.** 12 pieces in the 04 form, the mint's proof kept: balance 518, 12 unspent. The whole contact **2,262 ms** (below) |
+| 4 | A payment that needs change | **pass.** 9 pieces (511) for 100 to the till as 3 outputs, fee 1, change 410 as 5 outputs: signed at the first `SPEND_ALL_SIGN`, 2,498 ms from `BEGIN`. Good under BIP-340 under P + t·G, not under P. Testnut's swap `200`, 8 signatures; the 9 inputs `SPENT` |
+| 5 | The change back on the card | **pass.** A new tap, no PIN: `GET_CHANGE` named the 5 openings (256, 128, 16, 8, 2); each `LOAD_CHANGE` took testnut's answer, into slots 12 to 16, the proof kept. Each piece's kept DLEQ checks under testnut's key; each `UNSPENT` at testnut. Balance 417, no opening left |
+| 6 | The change spent | **pass.** The 5 change pieces (410) paid out in one payment at the end: signed at the first `SIGN` (806 ms), testnut's swap `200`, all 5 `SPENT`. So testnut took the change in a later swap |
+| 7 | `SPEND_ALL_AGAIN` by digest | **pass.** Payment A (2 pieces) signed and its swap held back, as if its answer was lost; then payment B (1 piece) signed and swapped. In a new tap under the PIN: P1 `01` with A's message hash gave **A's signature** (20.6 ms); with B's hash, B's; P1 `00` gave **B's** (the last), not A's. P1 `01` with 32 zeros: `6A88`. P1 `01` with A's hash without the PIN: `6A88`. A's swap posted afterwards with the signature: `200`, its inputs `SPENT` |
+| 8 | `AUTH` | **pass.** `selftest --pin` on the set-up card: 14 of 14, AUTH verified under BIP-340 three times |
+| 9 | Left | **reset by the owner** (`cardctl reset --owner-key test`, 0.6 s) once the card was empty: fresh, no PIN, no record, no owner, a new card key, 0 pieces. The tag stays installed at `https://getfoxy.io/card` |
+
+### Timings (reader round trips)
+
+First load, 12 pieces in one selection:
+
+| Step | ms |
+| --- | ---: |
+| `SELECT` | 10.3 |
+| `GET_INFO` (the read) | 29.4 |
+| `AUTH` | 490.0 |
+| `GET_NONCE` P1 1 (the PIN key) | 19.8 |
+| `VERIFY_PIN` sealed | 132.6 |
+| `GROUP_KEYS` (date 0) | 76.4 |
+| `LOAD_PROOF` x 12 | 1,337.3 (min 108.2, median 111.7, max 113.8) |
+| `GET_INFO`, `GET_BALANCE` | 30.0, 30.1 |
+| **The whole contact** | **2,261.8** |
+
+Payments:
+
+| Payment | `BEGIN` | `OUTPUTS` | `CHANGE` (each) | `SIGN` | `BEGIN` to the signature |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 9 pieces, 3 till outputs, 5 change outputs | 175.2 | 74.9 | 209.2 to 329.2 (median 244.8) | 952.1 | 2,498 |
+| 2 pieces, 1 output (A) | 110.0 | 31.7 | | 682.2 | 874 |
+| 1 piece, 2 outputs (B) | 100.4 | 55.0 | | 674.9 | 882 |
+| 5 pieces, 5 outputs (the change spent) | 139.3 | 118.6 | | 805.9 | 1,114 |
+
+`LOAD_CHANGE`: 512.4 to 521.4 ms (median 519.5, n = 5), each after a `KEYSET_KEYS` show of 53 to 55 ms. `SPEND_ALL_AGAIN`:
+14 to 21 ms. `VERIFY_PIN` (plain) 16 ms. These are the 3.0 run of 2026-11-19's figures to within a few ms (`LOAD_CHANGE`
+530 to 556 ms there).
+
+### refcheck
+
+- **PROVEN:** `d69742d0…` added, with "real signatures and real change verified on the chip"; taken off INSTALLED, which
+  is now empty. refcheck says of the tracked file: "this exact file has run on a chip".
+- **SIZES:** 42,485 was already there (True).
+- The guides, README, the release notes, COMPONENT-RELEASES, SECURITY-MODEL, CASHU-CARD-HARDWARE and D227 say so; the
+  checklist's money items are ticked.
+- **The provisioner's `VALIDATED_LOAD_FILE_SHA256S`:** not changed. It takes a hash in a change of its own, with the
+  operator's approval.
+
+### Not run in this part
+
+The rest of the checklist: `INBOX`, the largest payment of eight change outputs, the day's 300 loads, the clock and the
+resets with an anchor, the holds, `LOCK_CARD`, tears, the certificate, a dollar card. No phone and no production mint was
+used.
+
+### Logs
+
+In the run's scratch folder (`chip-money`), not kept: `session-M.log` (every command, its status and time), `p19-M.log`,
+`state-M.json` (the play-money pieces and the payments), `bridge-M.log`, `guard.log`.

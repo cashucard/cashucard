@@ -125,8 +125,8 @@ bytes, which J3R180 58206920 then created 30 times of 30 at the first try
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md)). With the
 tag's address given at install ([D227](DECISIONS.md#d227)) the file came to 42,428
 bytes (188 past) and is padded to 245 past again: 42,485
-bytes, which J3R180 58206920 installed 13 times of 13 at the first try on 2026-11-21
-([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
+bytes, which J3R180 58206920 installed 13 times of 13 at the first try on 2026-11-21 and then paid from at a
+test mint ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build

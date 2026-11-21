@@ -8993,11 +8993,12 @@ length (237 on a 261-byte buffer, more than the largest file). No transient memo
 to 42,428 (188 past a multiple of 256), and `sizeTheFile` pads it to 42,485, 245 past, the place of the 3.0
 file before it, which J3R180 58206920 created 30 times of 30 at the first try. The new file (9ac55c1's, 42,485 bytes) installed 13
 times of 13 at the first try on J3R180 58206920 on 2026-11-21, with the tag's install parameters, its refusals and a
-127-byte address checked ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)); its payments at a
-mint, the rest of [the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist), are still to come.
+127-byte address checked, and the same day paid from at testnut with real signatures and real change verified on the chip
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)); the rest of
+[the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist) is still to come.
 
 **Built.** `Tag` (install, the two files from the address); `TagTest`, `TagAddressTest`, `TagEdgeTest` (installed with
 `https://example.com/card`), `TagInstallTest` (new); `tools/cardsim` (`--tag-address`, default example.com's); cardkit 0.4.0
 (`cashuPlan(loadFile, {tagAddress})`, the tag's `C9`, a check that reads the tag back; `parseMaker`); the provisioner (the
 address from `maker/maker.json`, and no install with the example file); `tools/maker/`; `spec/APDU.md`'s tag section and the
-deployment guide's commands. Not done: the payments at a mint on a chip.
+deployment guide's commands. Run on a chip: the install and a payment run at testnut (the report above).

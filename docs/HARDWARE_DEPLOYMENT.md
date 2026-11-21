@@ -92,9 +92,10 @@ The 3.0 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 
 the Method component 34,790), in 173 blocks of 247 bytes, the last 1: the load file
 inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
 not the CAP's ([Install](#install) gives both). Padded by `sizeTheFile` (below), this
-exact file has been installed on a chip, and has not yet been proven with a payment at a mint: J3R180 58206920 installed it
-13 times of 13 at the first try on 2026-11-21 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)),
-and the payments of the checklist below are still to come. Its source is
+exact file has run on a chip: J3R180 58206920 installed it 13 times of 13 at the first try on 2026-11-21, and then paid
+from it at a test mint, testnut, with real signatures and real change verified on the chip
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)); the rest of the checklist below is
+still to come. Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
@@ -408,8 +409,8 @@ card), taking money back after D with the refund key, a header far ahead or a we
 clock (no real header makes either), tears, a phone and a production mint ([the
 hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
 file is that day's source with the version moved to 3.0 ([D205](DECISIONS.md#d205)) and
-D206 to D210 added. The tracked file since is that source with D211 to D227 (above); its
-payments at a mint are still to come.
+D206 to D210 added. The tracked file since is that source with D211 to D227 (above); it has run on
+J3R180 58206920 at testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
 
 > **Three applets, installed in order.** The chip refuses the card's applet as the
 > first instantiated from its package (no answer, or `6F00`); it takes it once a
@@ -867,6 +868,11 @@ run's log.
 - Real change: take a payment's change back with `LOAD_CHANGE` and see the mint
   take the piece in a later swap; and a date's keys from `GROUP_KEYS` against the
   owner's own derivation from c.
+  - 2026-11-21, sample card 58206920, at testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
+    [x] four payments signed at the first `SPEND_ALL_SIGN`, each good under P + t·G and not under P, every swap taken
+    and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 14 of 14); [x] five change outputs back by
+    `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in a later swap;
+    [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c. The hash is on PROVEN.
 - `INBOX` for last week and this week, a real header of each given first
   (`SET_HEADER`), against the owner's derivation from c for each week.
 - `cardctl --timing selftest` (`AUTH`) and a sealed `VERIFY_PIN`, before and
