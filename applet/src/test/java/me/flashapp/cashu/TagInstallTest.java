@@ -117,23 +117,49 @@ class TagInstallTest {
         assertTrue(hex.size() >= 20, "the vectors are read");
         List<byte[]> installs = new ArrayList<>();
         for (String h : hex) installs.add(concat(hexToBytes("07" + TagTest.TAG_HEX + "00"), new byte[] { (byte) (h.length() / 2) }, hexToBytes(h)));
-        installs.add(hexToBytes("07" + TagTest.TAG_HEX + "00"));   // the parameters' length missing
+        // lengths that run past the bytes given: each refused 6A80 by the tag itself, never an exception of the runtime's
+        for (byte[] bad : shortInstalls()) installs.add(bad);
         for (byte[] install : installs) {
             CardSimulator sim = new CardSimulator(new CashuAppletTest.ExposedRuntime());
             sim.installApplet(AIDUtil.create(TagTest.OPENER_HEX), Opener.class);
             sim.installApplet(AIDUtil.create(TagTest.CARD_HEX), CashuApplet.class);
             Throwable t = assertThrows(Throwable.class,
                 () -> sim.installApplet(AIDUtil.create(TagTest.TAG_HEX), Tag.class, install, (short) 0, (byte) install.length), toHex(install));
-            if (install.length > 9) {
-                // jCardSim reports any failed install as its own SystemException: the tag's install, called by itself, says why
-                ISOException iso = assertThrows(ISOException.class, () -> Tag.install(install, (short) 0, (byte) install.length), toHex(install));
-                assertEquals((short) 0x6A80, iso.getReason(), toHex(install) + ": refused by the tag's check of the address");
-            }
+            // jCardSim reports any failed install as its own SystemException: the tag's install, called by itself, says why
+            ISOException iso = assertThrows(ISOException.class, () -> Tag.install(install, (short) 0, (byte) install.length), toHex(install));
+            assertEquals((short) 0x6A80, iso.getReason(), toHex(install) + ": refused by the tag's check of the address");
             // no tag: jCardSim answers 6999 where it holds the failed install's name, a chip 6A82; never 9000
             int sw = sim.transmitCommand(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(TagTest.TAG_HEX), 256)).getSW();
             assertTrue(sw == 0x6A82 || sw == 0x6999, toHex(install) + ": no tag, " + Integer.toHexString(sw));
             assertEquals(SW_OK, sim.transmitCommand(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(TagTest.CARD_HEX), 256)).getSW(), "the card's applet is untouched");
         }
+    }
+
+    /** Installs whose lengths run past the bytes given: no La; La 20 and nothing after; La 40 and 11 bytes; control-info length 1 and nothing after. */
+    static List<byte[]> shortInstalls() {
+        String aid = "07" + TagTest.TAG_HEX;
+        List<byte[]> out = new ArrayList<>();
+        out.add(hexToBytes(aid + "00"));
+        out.add(hexToBytes(aid + "00" + "14"));
+        out.add(concat(hexToBytes(aid + "00" + "28"), "https://exa".getBytes(StandardCharsets.US_ASCII)));
+        out.add(hexToBytes(aid + "01"));
+        return out;
+    }
+
+    @Test
+    @DisplayName("An install whose lengths run past the bytes given (no La, La 20 with nothing after, La 40 with 11 bytes, control information of 1 byte with nothing after) is refused 6A80 by the tag, never by an out-of-bounds read, even when the array holds more bytes past the install")
+    void shortInstalls6A80() {
+        for (byte[] bad : shortInstalls()) {
+            ISOException iso = assertThrows(ISOException.class, () -> Tag.install(bad, (short) 0, (byte) bad.length), toHex(bad));
+            assertEquals((short) 0x6A80, iso.getReason(), toHex(bad));
+        }
+        // La 40 with 11 bytes given, and the array going on with the 29 that would make a valid address: a tag that read past
+        // the bytes it was given would take them; it refuses
+        byte[] given = shortInstalls().get(2);
+        byte[] more = concat(given, "mple.com/aaaaaaaaaaaaaaaaaaaa".getBytes(StandardCharsets.US_ASCII));
+        assertEquals(given.length + 29, more.length);
+        ISOException iso = assertThrows(ISOException.class, () -> Tag.install(more, (short) 0, (byte) given.length));
+        assertEquals((short) 0x6A80, iso.getReason(), "the bytes past bLength are not the install's");
     }
 
     @Test

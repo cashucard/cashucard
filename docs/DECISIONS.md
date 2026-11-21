@@ -8989,8 +8989,8 @@ addresses. A reader that recognised its card by the address alone now misses eve
 
 **What it costs.** The tag keeps A (at most 119 bytes of persistent memory, at install) and builds its files byte by byte; a
 `READ BINARY` of a coded file puts the code at the end of the APDU buffer, so the answer stops 24 bytes short of the buffer's
-length (237 on a 261-byte buffer, more than the largest file). No transient memory is added. The load file grew by 407 bytes,
-to 42,380 (140 past a multiple of 256, near the refused 135), and `sizeTheFile` pads it to 42,485, 245 past, the place of the 3.0
+length (237 on a 261-byte buffer, more than the largest file). No transient memory is added. The load file grew by 455 bytes,
+to 42,428 (188 past a multiple of 256), and `sizeTheFile` pads it to 42,485, 245 past, the place of the 3.0
 file before it, which J3R180 58206920 created 30 times of 30 at the first try. The new file has run only in a simulator: its
 chip run is [the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)'s, the tag's install parameters among it.
 

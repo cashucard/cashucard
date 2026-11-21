@@ -7384,10 +7384,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.0 with the tag's address given at install (D227): thirty-three writes here, 191 bytes, so the load file is 42,485 bytes, 245
+        /* 3.0 with the tag's address given at install (D227): twenty-five writes here, 143 bytes, so the load file is 42,485 bytes, 245
          * past a multiple of 256, the place of the 3.0 file before it (41,973 bytes, fifteen writes, 86 bytes), which installed on J3R180
          * 58206920 30 times of 30 at the first try, and of 190c5ab's 41,205, which created at the first try every time there; D227's tag
-         * added 407 bytes, which came to 42,380 (140 past, near the refused 135) with the fifteen writes. Before them, 41,903 (175 past) was
+         * added 455 bytes with its install's checks, which came to 42,428 (188 past) with the fifteen writes. Before them, 41,903 (175 past) was
          * refused once (6F00) and created on the retry; unpadded, 41,887. The last 2.3
          * file (D221, 40,412 bytes, 220 past) ran on a J3R180 on 2026-11-15, and the file with D217 to D220 (40,365, 173 past) the day
          * before; the file with D213 to D216 (39,343, 175 past) installed on 2026-11-14, where a study build of its source was refused
@@ -7423,14 +7423,6 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[25] = 35;
         a[26] = 36;
         a[27] = 37;
-        a[28] = 38;
-        a[29] = 39;
-        a[30] = 40;
-        a[31] = 41;
-        a[32] = 42;
-        a[33] = 43;
-        a[34] = 44;
-        a[35] = 45;
         a[36] = 5;
     }
 }

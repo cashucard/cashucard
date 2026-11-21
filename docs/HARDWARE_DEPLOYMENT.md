@@ -99,9 +99,9 @@ moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206]
 path; the no-PIN allowance armed by the owner's proof or a held tap and not by the PIN alone; `GET_INFO`'s paid-list
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
 settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), and the tag's address taken from its install
-parameters ([D227](DECISIONS.md#d227): 407 bytes more, padded back to 245 past by eighteen more writes, 105 bytes). Its own run, as the checklist below, is still to come, its size
+parameters ([D227](DECISIONS.md#d227): 455 bytes more, padded back to 245 past by ten more writes, 57 bytes). Its own run, as the checklist below, is still to come, its size
 first; if the chip refuses its size, it is moved with `sizeTheFile` (below). The other maintainer's 3.0 file before
-the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by thirty-three writes, 191 bytes, from 42,294 (54 past; before D227 the file was 41,887, 159 past, six bytes from
+the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by twenty-five writes, 143 bytes, from 42,342 (102 past; before D227 the file was 41,887, 159 past, six bytes from
 153 past, where the chip refused a study build, and fifteen writes took it to 41,973) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been
 created at the first try on J3R180 58206920; a padding to 175 past (41,903 bytes, e2aac64) had its create refused `6F00` once
 and taken on the same retry ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). refcheck now warns of a size at or near a refused place.
@@ -457,10 +457,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.0**, sha256
-`0e3f6d804c0b63dafc9c0a13c9decb62044f715a99b8db633d011854b54d8a90`
+`611b3478b82d4c1a3fb41878738087168b41a29c35343aafaa48fa8eeb297af4`
 (`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
 is LOADed with (refcheck's measure, 42,485 bytes), has sha256
-`18389a1e65e5352d723eda68eab99f7371566f8c5a2500a7161cc388c19aac66`: the hash the
+`d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation

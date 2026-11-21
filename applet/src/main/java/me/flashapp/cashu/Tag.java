@@ -104,11 +104,15 @@ public final class Tag extends Applet {
      * data, the install parameters' length and the address (the class comment has its rules).
      */
     public static void install(byte[] bArray, short bOffset, byte bLength) {
+        // every length is held to the bytes the runtime gave (bLength), so a short or inconsistent install is 6A80 too
+        short last = (short)(bOffset + (bLength & 0xFF));
         short at = (short)(bOffset + 1 + (bArray[bOffset] & 0xFF));
+        if (at >= last) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         at = (short)(at + 1 + (bArray[at] & 0xFF));
+        if (at >= last) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         short n = (short)(bArray[at] & 0xFF);
         at++;
-        if (n < (short)(HTTPS.length + 1) || n > ADDRESS_MAX
+        if (n < (short)(HTTPS.length + 1) || n > ADDRESS_MAX || (short)(at + n) > last
                 || Util.arrayCompare(bArray, at, HTTPS, (short) 0, (short) HTTPS.length) != 0) {
             ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         }

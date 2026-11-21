@@ -65,10 +65,13 @@ export function parseMaker(value: unknown): MakerSettings {
   }
   if (
     typeof v.name !== 'string' ||
-    v.name.trim().length === 0 ||
-    v.name.length > 64
+    v.name.length > 64 ||
+    /[\u0000-\u001f\u007f]/.test(v.name) ||
+    !/[^\s]/.test(v.name)
   ) {
-    throw new MakerError('name is 1 to 64 characters');
+    throw new MakerError(
+      'name is 1 to 64 characters, no control characters, not only spaces',
+    );
   }
   const problem = tagAddressProblem(v.tagAddress as string);
   if (typeof v.tagAddress !== 'string' || problem) {

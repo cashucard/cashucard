@@ -81,8 +81,9 @@ def parse(value):
     if not isinstance(value['example'], bool):
         raise MakerError('example is true or false')
     name = value['name']
-    if not isinstance(name, str) or not name.strip() or len(name) > 64:
-        raise MakerError('name is 1 to 64 characters')
+    if (not isinstance(name, str) or len(name) > 64 or re.search(r'[\x00-\x1f\x7f]', name)
+            or not re.search(r'[^\s]', name)):
+        raise MakerError('name is 1 to 64 characters, no control characters, not only spaces')
     problem = tag_address_problem(value['tagAddress'])
     if problem:
         raise MakerError('tagAddress: ' + problem)

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "maker.schema.json",
   "title": "Card maker settings",
-  "description": "Everything about a card maker that the repository's tools need, in one file: maker/maker.json. The card's load file carries none of it. tools/maker/maker.py and tools/maker/maker.cjs check a file against these rules; maker/README.md explains each field.",
+  "description": "Everything about a card maker that the repository's tools need, in one file: maker/maker.json. The card's load file carries none of it. tools/maker/maker.py and tools/cardkit/gp/maker.ts (parseMaker) check a file against these rules; maker/README.md explains each field.",
   "type": "object",
   "additionalProperties": false,
   "required": ["example", "name", "tagAddress", "securityDomain", "designCodes"],
@@ -16,7 +16,8 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 64,
-      "description": "The card maker's name as tools show it, and as its rows in docs/CARD-DESIGNS.md name it."
+      "pattern": "^[^\\u0000-\\u001f\\u007f]*[^\\s\\u0000-\\u001f\\u007f][^\\u0000-\\u001f\\u007f]*$",
+      "description": "The card maker's name, 1 to 64 characters, no control characters, not only spaces, as tools show it, and as its rows in docs/CARD-DESIGNS.md name it."
     },
     "tagAddress": {
       "type": "string",

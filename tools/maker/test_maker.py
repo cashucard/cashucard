@@ -75,7 +75,8 @@ def test_a_makers_file():
 
 def test_refusals():
     bad = [([], 'not a JSON object'), (dict(GOOD, extra=1), 'unknown field'), (dict(GOOD, example='no'), 'example'),
-           (dict(GOOD, name=''), 'name'), (dict(GOOD, securityDomain={'aid': 'a0000001'}), 'securityDomain.aid'),
+           (dict(GOOD, name=''), 'name'), (dict(GOOD, name='   '), 'name'), (dict(GOOD, name='A\x1cB'), 'name'),
+           (dict(GOOD, name='A\tB'), 'name'), (dict(GOOD, name='x' * 65), 'name'), (dict(GOOD, securityDomain={'aid': 'a0000001'}), 'securityDomain.aid'),
            (dict(GOOD, securityDomain={'aid': 'A0000001515353', 'dapPublicKey': 'secret'}), 'dapPublicKey'),
            (dict(GOOD, designCodes=['fx1']), 'designCodes'), (dict(GOOD, designCodes=['ZZ1', 'ZZ1']), 'designCodes'),
            ({k: v for k, v in GOOD.items() if k != 'tagAddress'}, 'no tagAddress')]
