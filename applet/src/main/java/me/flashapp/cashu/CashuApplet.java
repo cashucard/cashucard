@@ -1046,9 +1046,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     // for the first limit's worth over the limit, and for every further limit's worth. Each change output
     // made (about 0.23 s) counts as one of them done. Within the limit there is no wait.
     static final short WAIT_OVER_SIGNS   = (short) 10;
-    /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14). [M1: the other
-     * maintainer has not yet agreed to take the floor away on the shared 3.0 wire; his pr254 kept WAIT_FLOOR_SIGNS = 4 here
-     * and in SPEND_ALL_SIGN's wait.] */
+    /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14), and GET_INFO's
+     * byte 55 bit 3 says so (D228). [M1, the other maintainer's floor of WAIT_FLOOR_SIGNS = 4, is closed by D228: D211 stands.] */
     static final short WAIT_MORE_SIGNS   = (short) 4;
     /** The most limits' worth a payment is counted as: past this it waits as 255 do (about twelve minutes). */
     static final short WAIT_UNITS_MOST = (short) 255;
@@ -1770,10 +1769,12 @@ public class CashuApplet extends Applet implements TagSwitch {
                 if (p1 == (byte) 4) {
                     Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_START_OFFSET, buf, (short) 51, (short) 4);
                     if (!told || isZero(cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4)) Util.arrayFillNonAtomic(buf, (short) 51, (short) 4, (byte) 0);
-                    /* every profile of byte 55, but bit 7, the paid list (D191), on a card set up whose chip refused its room
-                     * (SET_CARD reserves it, and writes the record all the same): such a card takes no piece (LOAD_PROOF 6A84), and
-                     * a loader reads this before it swaps at the mint. A card not yet set up has had no room asked for: FF. */
-                    buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x7F : (byte) 0xFF;
+                    /* every profile of byte 55 but bit 3, the wait on every payment, which 3.0 does not keep (D211: no floor, so
+                     * a payment within its limit waits for nothing; D228 clears the bit), and but bit 7, the paid list (D191), on a
+                     * card set up whose chip refused its room (SET_CARD reserves it, and writes the record all the same): such a
+                     * card takes no piece (LOAD_PROOF 6A84), and a loader reads this before it swaps at the mint. A card not yet set
+                     * up has had no room asked for: F7. */
+                    buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x77 : (byte) 0xF7;
                     // the certificate (bit 0) and keys per load (bit 1, D197)
                     buf[56] = (byte) 0x03;
                     short left = dayEnded(pinMarks, PM_LOAD_DAY) ? LOADS_A_DAY : (short)(LOADS_A_DAY - Util.getShort(pinMarks, PM_LOADS));
@@ -3132,7 +3133,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             /* No floor (D211, the project owner's choice of 2026-11-14: D188's floor is gone): a payment within its limit, the
              * first of its time in the field, is signed at its first SPEND_ALL_SIGN. 2.2's wait stays as it was, less what
              * the change outputs took, two waits for every three, and never below 0: waits = max(0, W - 2 * outputs / 3).
-             * [M1: not yet agreed by the other maintainer; his pr254 adds WAIT_FLOOR_SIGNS - 1 here.] */
+             * [M1 closed by D228: D211 stands, no WAIT_FLOOR_SIGNS - 1 here.] */
             waits -= (short)((short)((allState[6] & 0xFF) * 2) / 3);
             if (waits < 0) waits = 0;
             Util.setShort(allState, (short) 2, waits);

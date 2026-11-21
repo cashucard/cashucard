@@ -65,7 +65,7 @@ PASS  SELECT applet: version 3.0
 PASS  GET_INFO: v3.0, 128 slots, PIN set, owner yes
 PASS  format 4 (SIG_ALL pieces): format 4
 PASS  Schnorr capability advertised: caps=0xFF
-PASS  keys per load (GET_INFO byte 56 bit 1): profiles FF03
+PASS  keys per load (GET_INFO byte 56 bit 1): profiles F703
 PASS  GET_PUBKEY well-formed: 02a1b2c3d4e5f60718…  (33 bytes)
 PASS  AUTH + BIP-340 verify [1/3]
 ...

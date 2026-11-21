@@ -922,7 +922,7 @@ test("the bridge answers both SELECTs as the chip does: the whole AID 03 00, the
   const info = await sim.getInfo()
   assert.equal(info.version, "3.0")
   assert.equal(info.keysPerLoad, true, "GET_INFO P1 4 byte 56 bit 1")
-  assert.equal(info.profilesRaw, 0xff03)
+  assert.equal(info.profilesRaw, 0xf703, "every profile but the wait on every payment (D228)")
   await sim.apdu(encode.select(constants.PACKAGE_AID))
   assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
 })

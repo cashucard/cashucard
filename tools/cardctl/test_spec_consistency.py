@@ -440,9 +440,9 @@ def test_get_info_response_table_matches_the_decoder():
     assert "p1 == (byte) 2 ? (short) 43 : (short) 42" in src and "apdu.setOutgoingAndSend((short) 0, (short) 30);" in src
     assert "apdu.setOutgoingAndSend((short) 0, (short) 51);" in src, "P1 = 3's 51 bytes (D184)"
     assert "apdu.setOutgoingAndSend((short) 0, (short) 59);" in src, "P1 = 4's 59 bytes (D186, D195)"
-    assert ("buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x7F : (byte) 0xFF;" in src
-            and "buf[56] = (byte) 0x03;" in src and "answers `FF 03`" in _section("GET_INFO")
-            and "`7F 03`" in _section("GET_INFO")), "the profile bits, and the paid list's (D210)"
+    assert ("buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x77 : (byte) 0xF7;" in src
+            and "buf[56] = (byte) 0x03;" in src and "answers `F7 03`" in _section("GET_INFO")
+            and "`77 03`" in _section("GET_INFO")), "the profile bits, the paid list's (D210), and bit 3 clear (D228)"
 
 
 def test_get_card_table_matches_the_decoder_and_the_applets_rollover_bytes():

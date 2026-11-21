@@ -198,7 +198,7 @@ class CardSimHttpTest {
         assertEquals(100, s.get("allowance").getAsLong());
         assertEquals(5, s.get("rollBudget").getAsInt());
         assertEquals(1, s.get("noPinWindow").getAsInt(), "SET_LIMIT's eighteenth byte, GET_CARD byte 87");
-        assertEquals("ff03", s.get("profiles").getAsString());
+        assertEquals("f703", s.get("profiles").getAsString(), "every profile of 3.0 but the wait on every payment (D228)");
         assertTrue(s.get("testOwner").getAsBoolean());
         assertEquals("http://127.0.0.1:3338", s.get("mint").getAsString());
         assertEquals("01".repeat(32), s.getAsJsonArray("slots").get(0).getAsJsonObject().getAsJsonObject("dleq").get("e").getAsString());

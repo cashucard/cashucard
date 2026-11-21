@@ -200,7 +200,7 @@ neither; an app that has given the PIN in its tap sees them.
 | `format`, `unit` | `GET_INFO` byte 8 (`4`, or `5` with keysets of both units); the record's unit, `0` sat, `1` usd |
 | `changeOwed` | `GET_INFO` byte 29: an opening of the card's own change is owed (`GET_CHANGE`) |
 | `noPinWindow` | `GET_CARD` byte 87: `0` the no-PIN window of 24 hours, `1` none |
-| `profiles` | `GET_INFO` bytes 55 and 56, hex: `ff03`, every profile of 3.0 |
+| `profiles` | `GET_INFO` bytes 55 and 56, hex: `f703`, every profile of 3.0 but bit 3, the wait on every payment (D228) |
 | `now`, `windowStart`, `spentToday` | the card's clock (the newest header's time, 0 before any); the day's window start; what has left the card in it (history) |
 | `dailyLimit`, `allowance`, `nopinSpent` | the day's limit and the no-PIN allowance (0 is none); what the no-PIN window that runs has counted |
 | `rolls`, `rollBudget`, `allowanceArmed` | D20: rolls since the owner's last `REFRESH` (history); the budget (7 when the card holds 0); whether the next payment with no PIN may begin a new no-PIN window (history) |

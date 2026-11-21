@@ -271,8 +271,9 @@ a J3R180 whose configuration lacks either cannot run the card.
   bytes (amount, the mint's key K, the keyset); `GET_CHANGE` rows are 83 bytes and
   carry no blinding factor; `SET_LIMIT` and `SET_LIMIT_PIN` take 4, 8, 12, 13, 17 or
   18 bytes (budget, then rate, then the window switch); `GET_INFO` P1 = 3 answers 51
-  bytes and P1 = 4 59 bytes (profiles `FF 03`, or `7F 03` on a card refused its paid
-  list, then the loads left today); new
+  bytes and P1 = 4 59 bytes (profiles `F7 03`, or `77 03` on a card refused its paid
+  list, then the loads left today; byte 55 bit 3, the wait on every payment, is clear,
+  [D228](DECISIONS.md#d228)); new
   `GET_CARD` P1 = 2 and 3, `GET_BALANCE` P1 = 1, `GET_LOG` P1 = 2 and 3,
   `RESET_CARD` P1 = 1, `REFRESH` P1 = 1, `SPEND_ALL_AGAIN` by hash for the last 16
   payments; `RESET_CARD` P1 = 0 takes an anchor header, and a hand-over's anchor sets
