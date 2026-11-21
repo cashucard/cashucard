@@ -328,9 +328,9 @@ class SchnorrHWMathTest {
         // the applet instantiated first, so that the chip takes the card's own (CASHU-CARD-HARDWARE.md): it allocates nothing at all
         { "Opener.java",
           "public static void install(", "private Opener()" },
-        // the NFC tag: it allocates one transient byte, in its constructor, and nothing else (and its interface nothing at all)
+        // the NFC tag: it allocates one transient byte and the address the install gives, in its constructor, and nothing else (and its interface nothing at all)
         { "Tag.java",
-          "public static void install(", "private Tag()" },
+          "public static void install(", "private Tag(" },
         { "TagSwitch.java" },
     };
 

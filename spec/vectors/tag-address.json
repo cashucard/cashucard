@@ -1,0 +1,139 @@
+{
+  "about": "The NFC tag's address, given in the tag applet's install parameters (GlobalPlatform C9): the whole address in ASCII, 9 to 127 bytes, beginning https://, the byte after it a letter or a digit, every byte 21 to 7E but none of \" # < > \\ ^ ` { | }. `hex` is the install parameters' bytes exactly. For a valid address, `cc` is the capability container (file E103), `ndefNew` the NDEF file (E104) of a card with no owner or no holder's record, and `ndefCodedSize` the size of the NDEF file of a set-up card. Every invalid address is refused at install and no tag is made. spec/APDU.md, The NFC tag.",
+  "valid": [
+    {
+      "why": "the address the tests use",
+      "address": "https://example.com/card",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f63617264",
+      "cc": "000f20003b00340406e104004800ff",
+      "ndefNew": "0019d1011555046578616d706c652e636f6d2f63617264236e6577",
+      "ndefCodedSize": 72
+    },
+    {
+      "why": "the shortest: one byte after https://",
+      "address": "https://a",
+      "hex": "68747470733a2f2f61",
+      "cc": "000f20003b00340406e104003900ff",
+      "ndefNew": "000ad10106550461236e6577",
+      "ndefCodedSize": 57
+    },
+    {
+      "why": "a port, a path, a query, a percent escape, capitals and the unreserved marks",
+      "address": "https://EXAMPLE.org:8443/c/d?x=1&y=%20~_-.",
+      "hex": "68747470733a2f2f4558414d504c452e6f72673a383434332f632f643f783d3126793d2532307e5f2d2e",
+      "cc": "000f20003b00340406e104005a00ff",
+      "ndefNew": "002bd1012755044558414d504c452e6f72673a383434332f632f643f783d3126793d2532307e5f2d2e236e6577",
+      "ndefCodedSize": 90
+    },
+    {
+      "why": "the sub-delimiters and the other reserved marks but #",
+      "address": "https://9.example/!$&'()*+,;=:@[]",
+      "hex": "68747470733a2f2f392e6578616d706c652f2124262728292a2b2c3b3d3a405b5d",
+      "cc": "000f20003b00340406e104005100ff",
+      "ndefNew": "0022d1011e5504392e6578616d706c652f2124262728292a2b2c3b3d3a405b5d236e6577",
+      "ndefCodedSize": 81
+    },
+    {
+      "why": "the longest: 127 bytes in all",
+      "address": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hex": "68747470733a2f2f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "cc": "000f20003b00340406e10400af00ff",
+      "ndefNew": "0080d1017c55046161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161236e6577",
+      "ndefCodedSize": 175
+    }
+  ],
+  "invalid": [
+    {
+      "why": "no address (an install with C9 00)",
+      "hex": ""
+    },
+    {
+      "why": "nothing after https://",
+      "hex": "68747470733a2f2f"
+    },
+    {
+      "why": "not https",
+      "hex": "687474703a2f2f6578616d706c652e636f6d2f63617264"
+    },
+    {
+      "why": "https:// in capitals: prefix code 04 is the lowercase form",
+      "hex": "48545450533a2f2f6578616d706c652e636f6d2f63617264"
+    },
+    {
+      "why": "no scheme",
+      "hex": "6578616d706c652e636f6d2f63617264"
+    },
+    {
+      "why": "a fragment: the card's own",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f636172642378"
+    },
+    {
+      "why": "a slash first, so no host",
+      "hex": "68747470733a2f2f2f63617264"
+    },
+    {
+      "why": "a mark first, not a letter or a digit",
+      "hex": "68747470733a2f2f2d6578616d706c652e636f6d"
+    },
+    {
+      "why": "a dot first",
+      "hex": "68747470733a2f2f2e6578616d706c652e636f6d"
+    },
+    {
+      "why": "a space",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f612062"
+    },
+    {
+      "why": "DEL",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f7f"
+    },
+    {
+      "why": "a tab",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f09"
+    },
+    {
+      "why": "a byte past ASCII",
+      "hex": "68747470733a2f2f6578c3a46d706c652e636f6d"
+    },
+    {
+      "why": "128 bytes: one too many",
+      "hex": "68747470733a2f2f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+    },
+    {
+      "why": "the barred character \"",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f22"
+    },
+    {
+      "why": "the barred character <",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f3c"
+    },
+    {
+      "why": "the barred character >",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f3e"
+    },
+    {
+      "why": "the barred character \\",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f5c"
+    },
+    {
+      "why": "the barred character ^",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f5e"
+    },
+    {
+      "why": "the barred character `",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f60"
+    },
+    {
+      "why": "the barred character {",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f7b"
+    },
+    {
+      "why": "the barred character |",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f7c"
+    },
+    {
+      "why": "the barred character }",
+      "hex": "68747470733a2f2f6578616d706c652e636f6d2f7d"
+    }
+  ]
+}

@@ -144,8 +144,10 @@ PUK's custody) end with the 0.x wire.
 From software 1.19 the card also answers as an NFC Forum Type 4 Tag carrying one web
 address, so that a phone with its screen on offers to open it (`CASHU-CARD-SPEC.md` 5.8).
 
-**Public tag contents.** The capability container is the same on every card; since
-[D222](DECISIONS.md#d222) the message is `https://getfoxy.io/card#new` on a card with no
+**Public tag contents.** The capability container is the same on every card of one
+maker; since [D227](DECISIONS.md#d227) the address is the card maker's, given in the
+tag's install parameters (the package names none, and an install without one is
+refused). Since [D222](DECISIONS.md#d222) the message is that address and `#new` on a card with no
 owner or no record, and on a set-up card the same address with a code that is new at
 every read (16 random bytes and an 8-byte MAC under a key from the card's c), so that
 two reads of one card cannot be tied together by anyone without c. The paragraph
@@ -163,11 +165,14 @@ becoming an identifier that anyone with a phone could read with no PIN; that is 
 not, and a change that made it so would be a regression of this property.
 
 What a reader does learn is that the card has a tag application and that its address is
-Foxy's page: it is a card made for Foxy. Its other name, the card applet's, can be selected
-by anyone as well and answers its version, so this adds little.
+its maker's page: it is a card made by that maker. Its other name, the card applet's, can be selected
+by anyone as well and answers its version, so this adds little. The address is written once,
+at install, by whoever holds the card manager's keys; a card installed with another address
+than its maker's tells a phone to open that page, which is why provisioning reads the tag
+back after the install and stops on any other address (`tools/cardkit/gp/provision.ts`).
 
 **Who holds the switch.** The owner, by the owner's proof under its own label
-(`FoxyCard/tag`), with no PIN. A terminal that has been handed the PIN cannot turn the tag
+(`CashuCard/tag`), with no PIN. A terminal that has been handed the PIN cannot turn the tag
 off or on, and a wrong proof costs no PIN try. A locked card refuses the command, so a
 locked card's tag stays as it was. `RESET_CARD` puts the tag back on. The switch is not a
 security control for the money: it exists so that a card kept in a phone's wallet case does

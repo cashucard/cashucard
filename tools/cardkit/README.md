@@ -36,7 +36,8 @@ Build before installing either repository consumer:
 The app/ops use explicit `file:` dependencies. Yarn classic copies these packages;
 a cardkit source edit requires rebuilding and refreshing the consumer install
 (`yarn install --force --frozen-lockfile` if its cached copy is unchanged).
-Metro needs no sibling-source watch folder or private import alias. External
+Metro needs no sibling-source watch folder or private import alias for cardkit
+(the provisioner watches `maker/` alone, for the card maker's settings). External
 consumers can install the packed GitHub release artifact; npm publication remains
 disabled (`private: true`).
 
@@ -59,6 +60,28 @@ The package test packs the actual distributable, loads it in ordinary Node,
 checks supported exports/private-path rejection, and scans app/ops imports.
 GP tests use fake cards and do not authorize a real reader or phone action.
 See [component releases](../../docs/COMPONENT-RELEASES.md).
+
+## 0.4.0: the tag's address is the card maker's
+
+The card's package names no address any more: the NFC tag takes its address from
+its install parameters and refuses an install without one
+([D227](../../docs/DECISIONS.md#d227), `spec/APDU.md`, "The NFC tag application").
+Migration:
+
+- **`cashuPlan(loadFile, {tagAddress})`.** The second argument is required. The
+  address is the card maker's (`maker/maker.json`'s `tagAddress`; `parseMaker`
+  reads that file's JSON); a missing or invalid one throws a `RangeError` before
+  any card is touched. The tag's `InstallStep` carries `parameters` (`C9`, the
+  length, the address), and the plan's checks read the tag's NDEF file back
+  (`SELECT` `E104`, `READ BINARY`) and stop at `verify` on any other address. The
+  opener's and the card applet's `INSTALL` still send `C9 00`.
+- **New:** `tagAddressProblem`, `tagAddressBytes`, `tagInstallParameters`,
+  `tagNdefNew`, `TAG_ADDRESS_MAX` (`gp/tag.ts`); `parseMaker`, `MakerError`,
+  `MakerSettings` (`gp/maker.ts`). `spec/vectors/tag-address.json` holds the
+  tag-address rules' vectors, which the applet's suite runs as well.
+- **`FakeCard`** takes the tag's address from the install parameters, refuses
+  (`6A80`) an install of the tag without a valid one, and answers the tag's
+  `SELECT` of a file and `READ BINARY`.
 
 ## 0.3.0: protocol 3.0, and change owed
 

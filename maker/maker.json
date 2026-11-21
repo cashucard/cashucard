@@ -1,0 +1,8 @@
+{
+  "$schema": "./maker.schema.json",
+  "example": true,
+  "name": "Example card maker",
+  "tagAddress": "https://example.com/card",
+  "securityDomain": null,
+  "designCodes": []
+}

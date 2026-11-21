@@ -7,7 +7,7 @@ import {FACTORY_KEYS, FACTORY_KVN, SHIPPED_KVN, SPIKE_KEYS} from '../scp02';
 import {ISD_AID} from '../aids';
 import {fromHex, toHex} from '../bytes';
 import {CPLC_09336120, FakeCard, pullAt} from '../../testing/fake-card';
-import {CASHU_LOAD_FILE} from './assets';
+import {CASHU_LOAD_FILE, TEST_TAG_ADDRESS} from './assets';
 
 const authority = {
   chipId: 'cplc-v1:4790d3213041093361205547',
@@ -32,10 +32,14 @@ async function installed(scp: 2 | 3 = 2) {
   const card = new FakeCard({cplc: CPLC_09336120, scp});
   assert.equal(
     (
-      await provision(card.transceive, cashuPlan(CASHU_LOAD_FILE), {
-        ...options(),
-        keys: FACTORY_KEYS,
-      })
+      await provision(
+        card.transceive,
+        cashuPlan(CASHU_LOAD_FILE, {tagAddress: TEST_TAG_ADDRESS}),
+        {
+          ...options(),
+          keys: FACTORY_KEYS,
+        },
+      )
     ).ok,
     true,
   );
@@ -166,10 +170,14 @@ test('a reset stops guarded at key version FF, as at 00, with no login, DELETE o
 test('first contact, then an owned-card reset: a J3R452 that shipped at FF ends on the public default at 01, and installs and rotates again as a J3R180 does', async () => {
   const card = new FakeCard({cplc: CPLC_09336120, scp: 3, kvn: SHIPPED_KVN});
   const install = () =>
-    provision(card.transceive, cashuPlan(CASHU_LOAD_FILE), {
-      ...options(),
-      keys: FACTORY_KEYS,
-    });
+    provision(
+      card.transceive,
+      cashuPlan(CASHU_LOAD_FILE, {tagAddress: TEST_TAG_ADDRESS}),
+      {
+        ...options(),
+        keys: FACTORY_KEYS,
+      },
+    );
   assert.equal((await install()).ok, true);
   const first = await rotateKeys(
     card.transceive,

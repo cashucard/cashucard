@@ -8,12 +8,12 @@ the merged pull requests besides.
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
-`bc3d47bacbb66aa33667fd37bc35120cf873cc2f8afc3fd18339c245e3cd2948`. Its load file,
-the bytes a card is LOADed with, is 41,973 bytes by `tools/refcheck.py`'s measure,
-sha256 `2b9c6b02ed1574013e2320076f08a3b90d52ec1bda544a4bfcaf7467ef82fcab`. `SELECT`
+`0e3f6d804c0b63dafc9c0a13c9decb62044f715a99b8db633d011854b54d8a90`. Its load file,
+the bytes a card is LOADed with, is 42,485 bytes by `tools/refcheck.py`'s measure,
+sha256 `18389a1e65e5352d723eda68eab99f7371566f8c5a2500a7161cc388c19aac66`. `SELECT`
 and `GET_INFO` answer `03 00`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D226](DECISIONS.md#d226) (numbered 3.0 by
+[D183](DECISIONS.md#d183) to [D227](DECISIONS.md#d227) (numbered 3.0 by
 [D205](DECISIONS.md#d205); the decisions this repo's 2.3 files carried as D205 to D215 are D211 to D221
 since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
@@ -25,7 +25,9 @@ moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206]
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
 path; the no-PIN allowance armed by the owner's proof or a held tap and not by the PIN alone; `GET_INFO`'s paid-list
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
-settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)). The run is to be
+settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), and the tag's address given by
+whoever installs the card ([D227](DECISIONS.md#d227)): an install of the tag must now carry the card maker's address
+in its install parameters, and one without is refused. The run is to be
 repeated on it, its size first
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)).
 

@@ -40,16 +40,17 @@ import java.util.function.Function;
 
 /**
  * The tag's address that changes at every read (D222). A card with no owner or no holder's record says
- * `https://getfoxy.io/card#new`; a set-up card says `https://getfoxy.io/card#` and 48 lowercase hex characters, R (16 bytes of
+ * `<address>#new`; a set-up card says `<address>#` and 48 lowercase hex characters, R (16 bytes of
  * the chip's random, new at each selection) and M = HMAC-SHA256(K, R)[0..8), K = SHA-256("CashuCard/tag-address" || c). The
  * owner's phone, which has c, knows its card by M; anyone else sees a new address at every read. Simulator only.
  */
 class TagAddressTest {
 
     static final String TAG_HEX = TagTest.TAG_HEX;
-    static final String FIXED = "https://getfoxy.io/card";
-    static final String NEW = "https://getfoxy.io/card#new";
-    static final String PREFIX = "https://getfoxy.io/card#";
+    /** The address the tests' tag is installed with (TagTest.BASE): in a real install, the card maker's. */
+    static final String FIXED = TagTest.BASE;
+    static final String NEW = FIXED + "#new";
+    static final String PREFIX = FIXED + "#";
 
     // ---- the phone's side, as the wallet works it -------------------------------------------------------------------
 
@@ -83,10 +84,13 @@ class TagAddressTest {
         final CashuAppletTest.ExposedRuntime runtime = new CashuAppletTest.ExposedRuntime();
         final CardSimulator sim = new CardSimulator(runtime);
 
-        Card() {
+        Card() { this(TagTest.TAG_INSTALL); }
+
+        /** The same card, its tag installed with these install bytes (TagTest.tagInstall). */
+        Card(byte[] tagInstall) {
             sim.installApplet(AIDUtil.create(TagTest.OPENER_HEX), Opener.class);
             sim.installApplet(AIDUtil.create(TagTest.CARD_HEX), CashuApplet.class);
-            sim.installApplet(AIDUtil.create(TAG_HEX), Tag.class, TagTest.TAG_INSTALL, (short) 0, (byte) TagTest.TAG_INSTALL.length);
+            sim.installApplet(AIDUtil.create(TAG_HEX), Tag.class, tagInstall, (short) 0, (byte) tagInstall.length);
             selectCard();
         }
 
@@ -145,8 +149,10 @@ class TagAddressTest {
         }
     }
 
-    static Card setUp() {
-        Card k = new Card();
+    static Card setUp() { return setUp(TagTest.TAG_INSTALL); }
+
+    static Card setUp(byte[] tagInstall) {
+        Card k = new Card(tagInstall);
         readyOn(k.sim, 0);
         return k;
     }
@@ -173,13 +179,13 @@ class TagAddressTest {
     }
 
     @Test
-    @DisplayName("A set-up card no longer says the fixed address: it says #, 32 hex of R and 16 of M, 71 bytes in its NDEF file")
+    @DisplayName("A set-up card no longer says the fixed address: it says #, 32 hex of R and 16 of M, 72 bytes in its NDEF file")
     void theFixedAddressIsGone() {
         Card k = setUp();
         String a = k.address();
         assertNotEquals(FIXED, a, "not the address every card said");
         assertTrue(a.matches(TagTest.CODED), a);
-        assertEquals(71, k.readFile().length, "the NDEF file with a code");
+        assertEquals(72, k.readFile().length, "the NDEF file with a code");
         k.selectCard();
     }
 
@@ -224,11 +230,11 @@ class TagAddressTest {
         assertEquals(SW_OK, k.selectTag());
         k.selectFile(0xE104);
         byte[] whole = k.read(0, 256);
-        assertEquals(71, whole.length);
+        assertEquals(72, whole.length);
         for (int size = 1; size <= 59; size += 7) {
-            byte[] again = new byte[71];
-            for (int at = 0; at < 71; at += size) {
-                byte[] part = k.read(at, Math.min(size, 71 - at));
+            byte[] again = new byte[72];
+            for (int at = 0; at < 72; at += size) {
+                byte[] part = k.read(at, Math.min(size, 72 - at));
                 System.arraycopy(part, 0, again, at, part.length);
             }
             assertArrayEquals(whole, again, "read in pieces of " + size);
@@ -247,7 +253,7 @@ class TagAddressTest {
     void newBeforeSetUpAndAfterReset() {
         Card k = new Card();
         assertEquals(NEW, k.address(), "a new card");
-        assertEquals(26, k.readFile().length, "26 bytes");
+        assertEquals(27, k.readFile().length, "27 bytes");
         k.selectCard();
         // a holder's record and no owner: UnitsTest's card, with the tag installed beside it
         UnitsTest.Card noOwner = new UnitsTest.Card();
@@ -336,7 +342,7 @@ class TagAddressTest {
         k.sim.deleteApplet(AIDUtil.create(TagTest.CARD_HEX));
         assertEquals(SW_OK, k.selectTag());
         k.selectFile(0xE104);
-        assertEquals(NEW, TagTest.decodeUriRecord(Arrays.copyOfRange(k.read(0, 256), 2, 26)), "the card's applet gone: #new, no key anywhere");
+        assertEquals(NEW, TagTest.decodeUriRecord(Arrays.copyOfRange(k.read(0, 256), 2, 27)), "the card's applet gone: #new, no key anywhere");
     }
 
     @Test

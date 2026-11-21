@@ -22,7 +22,7 @@ import java.util.function.Supplier;
  * cardsim: the real CashuApplet, protocol 3.0, in jCardSim, served over loopback HTTP.
  *
  * <pre>
- *   java -jar tools/cardsim/target/cardsim.jar [--port 9876]
+ *   java -jar tools/cardsim/target/cardsim.jar [--port 9876] [--tag-address https://example.com/card]
  *   tools/cardsim/cardsim.sh [--port 9876]            # from source, via Maven
  * </pre>
  *
@@ -119,10 +119,10 @@ import java.util.function.Supplier;
  *
  * <h2>The other bridge</h2>
  *
- * Foxy's fork also has {@code tools/cardsim/run.sh}: the same applet behind a
+ * There is also {@code tools/cardsim/run.sh}: the same applet behind a
  * line protocol on port 47431 ({@code applet/src/test/java/.../CardServer.java}),
- * for Foxy's iOS Simulator build, with {@code ctl.sh} to take the card off the
- * reader. That is Foxy's wallet's transport, kept as it is; this HTTP bridge is
+ * for a reader app's iOS Simulator build (Foxy's uses it), with {@code ctl.sh} to take the card off the
+ * reader. That transport is kept as it is; this HTTP bridge is
  * the one the Flash apps and the CI pin.
  *
  * <h2>Threads</h2>
@@ -303,8 +303,12 @@ public final class CardSim {
                     System.err.println("cardsim: --port needs a number, got " + args[i]);
                     System.exit(1);
                 }
+            } else if ("--tag-address".equals(args[i]) && i + 1 < args.length) {
+                // the tag's install parameters; the applet refuses an address that breaks spec/APDU.md's rules, at the first /reset
+                SimCard.tagAddress = args[++i];
             } else if ("--help".equals(args[i]) || "-h".equals(args[i])) {
-                System.out.println("usage: cardsim [--port N]   (default " + DEFAULT_PORT + ", loopback only)");
+                System.out.println("usage: cardsim [--port N] [--tag-address URL]   (port default " + DEFAULT_PORT
+                    + ", loopback only; the tag's address default " + SimCard.DEFAULT_TAG_ADDRESS + ")");
                 return;
             } else {
                 System.err.println("cardsim: unknown argument " + args[i]);

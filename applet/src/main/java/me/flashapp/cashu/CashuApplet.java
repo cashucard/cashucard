@@ -7384,8 +7384,11 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.0: fifteen writes here, 86 bytes, so the load file is 41,973 bytes, 245 past a multiple of 256, where 190c5ab's 41,205 created at
-         * the first try every time on J3R180 58206920; 41,903 (175 past) was refused once (6F00) and created on the retry; unpadded, 41,887. The last 2.3
+        /* 3.0 with the tag's address given at install (D227): thirty-three writes here, 191 bytes, so the load file is 42,485 bytes, 245
+         * past a multiple of 256, the place of the 3.0 file before it (41,973 bytes, fifteen writes, 86 bytes), which installed on J3R180
+         * 58206920 30 times of 30 at the first try, and of 190c5ab's 41,205, which created at the first try every time there; D227's tag
+         * added 407 bytes, which came to 42,380 (140 past, near the refused 135) with the fifteen writes. Before them, 41,903 (175 past) was
+         * refused once (6F00) and created on the retry; unpadded, 41,887. The last 2.3
          * file (D221, 40,412 bytes, 220 past) ran on a J3R180 on 2026-11-15, and the file with D217 to D220 (40,365, 173 past) the day
          * before; the file with D213 to D216 (39,343, 175 past) installed on 2026-11-14, where a study build of its source was refused
          * (6F00) at 38,791 and 38,809 bytes (135 and 153 past) and installed at 38,893 (237 past); the files with D212 (37,269, 149
@@ -7400,6 +7403,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[1] = 11;
         a[2] = 12;
         a[3] = 13;
+        a[4] = 14;
+        a[5] = 15;
         a[10] = 20;
         a[11] = 21;
         a[12] = 22;
@@ -7411,5 +7416,21 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[18] = 28;
         a[19] = 29;
         a[20] = 30;
+        a[21] = 31;
+        a[22] = 32;
+        a[23] = 33;
+        a[24] = 34;
+        a[25] = 35;
+        a[26] = 36;
+        a[27] = 37;
+        a[28] = 38;
+        a[29] = 39;
+        a[30] = 40;
+        a[31] = 41;
+        a[32] = 42;
+        a[33] = 43;
+        a[34] = 44;
+        a[35] = 45;
+        a[36] = 5;
     }
 }

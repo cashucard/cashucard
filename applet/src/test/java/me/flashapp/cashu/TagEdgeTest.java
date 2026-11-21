@@ -47,22 +47,22 @@ class TagEdgeTest {
     // ---- the file's edges --------------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("READ BINARY at the edges of a set-up card's 71-byte file: every offset and length inside it is the one address of the selection, an offset at or past the end and an offset with its top bit set are refused (6B00), a READ with no file chosen 6986")
+    @DisplayName("READ BINARY at the edges of a set-up card's 72-byte file: every offset and length inside it is the one address of the selection, an offset at or past the end and an offset with its top bit set are refused (6B00), a READ with no file chosen 6986")
     void readBinaryBounds() {
         TagAddressTest.Card k = TagAddressTest.setUp();
         assertEquals(SW_OK, k.selectTag());
         assertEquals(0x6986, readAt(k, 0, 0, 16).getSW(), "no file chosen");
         k.selectFile(0xE104);
         byte[] whole = k.read(0, 256);
-        assertEquals(71, whole.length);
-        int[] lengths = { 1, 2, 3, 16, 58, 59, 60, 70, 71, 72, 255, 256 };
-        for (int at = 0; at < 71; at++) {
+        assertEquals(72, whole.length);
+        int[] lengths = { 1, 2, 3, 16, 58, 59, 60, 71, 72, 73, 255, 256 };
+        for (int at = 0; at < 72; at++) {
             for (int le : lengths) {
                 byte[] part = k.read(at, le);
-                assertArrayEquals(Arrays.copyOfRange(whole, at, Math.min(71, at + le)), part, "offset " + at + ", Le " + le);
+                assertArrayEquals(Arrays.copyOfRange(whole, at, Math.min(72, at + le)), part, "offset " + at + ", Le " + le);
             }
         }
-        for (int at : new int[] { 71, 72, 100, 0xFF, 0x100, 0x7FFF }) {
+        for (int at : new int[] { 72, 73, 100, 0xFF, 0x100, 0x7FFF }) {
             assertEquals(0x6B00, readAt(k, at >> 8, at & 0xFF, 1).getSW(), "offset " + at);
         }
         for (int p1 : new int[] { 0x80, 0xFF }) assertEquals(0x6B00, readAt(k, p1, 0, 1).getSW(), "P1 " + p1);
@@ -72,7 +72,7 @@ class TagEdgeTest {
     }
 
     @Test
-    @DisplayName("The capability container is the same 15 bytes on a new card and a set-up card; the NDEF file is 26 or 71 bytes and nothing else")
+    @DisplayName("The capability container is the same 15 bytes on a new card and a set-up card; the NDEF file is 27 or 72 bytes and nothing else")
     void theContainerSaysNothingOfTheState() {
         List<byte[]> containers = new ArrayList<>();
         List<Integer> sizes = new ArrayList<>();
@@ -85,8 +85,8 @@ class TagEdgeTest {
         sizes.add(k.readFile().length);
         k.selectCard();
         for (byte[] c : containers) assertArrayEquals(containers.get(0), c);
-        assertEquals("000f20003b00340406e104004700ff", CashuAppletTest.toHex(containers.get(0)).toLowerCase());
-        assertEquals(List.of(26, 71), sizes);
+        assertEquals("000f20003b00340406e104004800ff", CashuAppletTest.toHex(containers.get(0)).toLowerCase());
+        assertEquals(List.of(27, 72), sizes);
     }
 
     private static byte[] cc(TagAddressTest.Card k) {

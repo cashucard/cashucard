@@ -1,3 +1,4 @@
+const path = require('path');
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 
 /**
@@ -16,6 +17,8 @@ defaults.transformer.getTransformOptions = async () => ({
 });
 
 const config = {
+  // maker/maker.json at the repository's root, the card maker's settings (src/maker.ts), and nothing else outside the app
+  watchFolders: [path.resolve(__dirname, '../../maker')],
   transformer: {
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
   },

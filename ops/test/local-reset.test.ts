@@ -116,7 +116,13 @@ async function fixture() {
   const card = new FakeCard();
   const run = {random: (n: number) => randomBytes(n), now: () => 0};
   assert.equal(
-    (await provision(card.transceive, cashuPlan(CASHU_LOAD_FILE), run)).ok,
+    (
+      await provision(
+        card.transceive,
+        cashuPlan(CASHU_LOAD_FILE, {tagAddress: 'https://example.com/card'}),
+        run,
+      )
+    ).ok,
     true,
   );
   assert.equal(

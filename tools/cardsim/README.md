@@ -22,8 +22,8 @@ a reason to pick another port: a test that reached a stale bridge would be talki
 to a card that holds an earlier run's state. Android reaches it through
 `adb reverse tcp:9876 tcp:9876`.
 
-`tools/cardsim/run.sh` and `ctl.sh` are Foxy's line-protocol bridge on port 47431,
-for their iOS Simulator build. They are kept as they are. The HTTP bridge below is
+`tools/cardsim/run.sh` and `ctl.sh` are a line-protocol bridge on port 47431, for a
+reader app's iOS Simulator build (Foxy's uses it). They are kept as they are. The HTTP bridge below is
 the one the Flash apps and CI use.
 
 ## Routes
@@ -281,7 +281,8 @@ taught and loaded back with `LOAD_CHANGE`, its "card's own change on the bridge"
 
 **SELECT the applet's whole AID** (`F0 CASHUCARD 01`, [D25](../../docs/DECISIONS.md#d25)).
 The bridge installs the opener first, then the card's applet, then the tag, as a
-chip has them, and answers a SELECT by a partial name the way the J3R180 does: it
+chip has them (the tag with the address `--tag-address` gives, `https://example.com/card`
+unless said: a card maker gives its own at install, [`maker/`](../../maker/README.md)), and answers a SELECT by a partial name the way the J3R180 does: it
 reaches the first instance made whose AID begins with the name. So the package AID
 `F0 CASHUCARD` alone reaches the opener, which answers `9000` with no version and
 `6D00` to every command after. jCardSim on its own gives a partial name to the

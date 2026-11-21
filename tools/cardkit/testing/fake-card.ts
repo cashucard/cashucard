@@ -45,6 +45,7 @@
  */
 import {nodeAesEcb, nodeCmac, nodeScp03Kdf} from './node-aes';
 import {nodeEcb, nodeFullMac, nodeRetailMac, nodeCbc} from './node-des';
+import {tagAddressProblem, tagNdefNew} from '../gp/tag';
 
 type Bytes = number[];
 
@@ -182,6 +183,9 @@ interface Instance {
   module: string;
   pkg: string;
   state: CardAppletState;
+  /** The tag's: the address its install parameters gave, and the file chosen. */
+  tagAddress?: string;
+  tagFile?: 'cc' | 'ndef';
 }
 
 interface PendingLoad {
@@ -361,6 +365,19 @@ export class FakeCard {
   }
 
   private select(apdu: Bytes): Bytes {
+    const tag = this.instances.get(this.selected);
+    if (apdu[2] === 0x00 && tag?.module === TAG_MODULE) {
+      // the tag's SELECT of a file: E103, the capability container, or E104, the NDEF file
+      const fid = hex(apdu.slice(5, 7));
+      if (apdu[3] !== 0x0c || apdu[4] !== 2) {
+        return sw(0x6b00);
+      }
+      if (fid !== 'E103' && fid !== 'E104') {
+        return sw(0x6a82);
+      }
+      tag.tagFile = fid === 'E103' ? 'cc' : 'ndef';
+      return sw(0x9000);
+    }
     if (apdu[2] !== 0x04) {
       return sw(0x6a86);
     }
@@ -431,6 +448,23 @@ export class FakeCard {
     }
     if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x10) {
       return sw(0x9000, [0x03, ...new Array(32).fill(0x5a)]);
+    }
+    if (inst.module === TAG_MODULE && cla === 0x00 && ins === 0xb0) {
+      // READ BINARY of the file chosen: a card with no owner, so the NDEF file ends #new
+      if (!inst.tagFile) {
+        return sw(0x6986);
+      }
+      const n = inst.tagAddress!.length - 8;
+      const file =
+        inst.tagFile === 'cc'
+          ? [...fromHex('000F20003B00340406E10400'), n + 56, 0x00, 0xff]
+          : tagNdefNew(inst.tagAddress!);
+      const offset = (apdu[2] << 8) | apdu[3];
+      if (offset >= file.length) {
+        return sw(0x6b00);
+      }
+      const le = apdu[4] === 0 ? 256 : apdu[4];
+      return sw(0x9000, file.slice(offset, offset + le));
     }
     if (inst.module === HELLO_MODULE && ins === 0x01) {
       return sw(0x9000, Array.from(Buffer.from('HELLO')));
@@ -802,13 +836,13 @@ export class FakeCard {
   }
 
   private install(data: Bytes): Bytes {
-    let pkg: Bytes, mod: Bytes, inst: Bytes, at: number;
+    let pkg: Bytes, mod: Bytes, inst: Bytes, params: Bytes, at: number;
     try {
       [pkg, at] = this.lv(data, 0);
       [mod, at] = this.lv(data, at);
       [inst, at] = this.lv(data, at);
       [, at] = this.lv(data, at);
-      [, at] = this.lv(data, at);
+      [params, at] = this.lv(data, at);
       [, at] = this.lv(data, at);
     } catch {
       return sw(0x6a80);
@@ -818,6 +852,18 @@ export class FakeCard {
     }
     const p = this.packages.get(hex(pkg));
     const module = hex(mod);
+    // the tag takes its address from the install parameters, C9 and the address, and refuses an install without one
+    let tagAddress: string | undefined;
+    if (module === TAG_MODULE && p) {
+      const value =
+        params[0] === 0xc9 && params[1] === params.length - 2
+          ? params.slice(2)
+          : null;
+      tagAddress = value ? String.fromCharCode(...value) : '';
+      if (tagAddressProblem(tagAddress)) {
+        return sw(0x6a80);
+      }
+    }
     const aid = hex(inst);
     if (!p || !p.modules.includes(module)) {
       return sw(0x6a88);
@@ -838,6 +884,7 @@ export class FakeCard {
       module,
       pkg: p.aid,
       state: {unspent: 0, spent: 0, pin: 0, record: 0, owner: 0},
+      ...(tagAddress === undefined ? {} : {tagAddress}),
     });
     this.free -= 2048;
     return sw(0x9000, [0x00]);

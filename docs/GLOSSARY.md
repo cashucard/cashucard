@@ -99,6 +99,15 @@ scratch buffers must live.
 **GlobalPlatform / `gp`**: the standard (and the tool) for loading applets. Installation requires
 the correct card-manager keys and a manager state that permits loading.
 
+**Card maker**: whoever installs the card's software on cards and gives them out.
+What is a maker's own (its name, the address the card's NFC tag carries, its
+security domain, its design codes) is in one file, [`maker/maker.json`](../maker/README.md),
+never in the load file, which is the same for every maker ([D227](DECISIONS.md#d227)).
+
+**Install parameters**: the bytes an `INSTALL` hands an applet's `install` method
+(GlobalPlatform's `C9`). The NFC tag's are its address; the opener's and the card
+applet's are empty (`C9 00`).
+
 **PC/SC**: the OS-level smartcard API. `cardctl` talks PC/SC, which is why the
 same code drives both contact and contactless readers.
 

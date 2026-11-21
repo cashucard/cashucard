@@ -88,8 +88,8 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 3.0 build is **41,973 bytes** by refcheck's measure (245 past a multiple of 256;
-the Method component 34,279), in 170 blocks of 247 bytes, the last 230: the load file
+The 3.0 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
+the Method component 34,790), in 173 blocks of 247 bytes, the last 1: the load file
 inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
 not the CAP's ([Install](#install) gives both). Padded by `sizeTheFile` (below), this
 exact file has run only in a simulator so far, and no card has installed it or a file of its size. Its source is
@@ -98,10 +98,11 @@ moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206]
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
 path; the no-PIN allowance armed by the owner's proof or a held tap and not by the PIN alone; `GET_INFO`'s paid-list
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
-settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)). Its own run, as the checklist below, is still to come, its size
+settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), and the tag's address taken from its install
+parameters ([D227](DECISIONS.md#d227): 407 bytes more, padded back to 245 past by eighteen more writes, 105 bytes). Its own run, as the checklist below, is still to come, its size
 first; if the chip refuses its size, it is moved with `sizeTheFile` (below). The other maintainer's 3.0 file before
-the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by fifteen writes, 86 bytes, from 41,887 (159 past, six bytes from
-153 past, where the chip refused a study build) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been
+the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by thirty-three writes, 191 bytes, from 42,294 (54 past; before D227 the file was 41,887, 159 past, six bytes from
+153 past, where the chip refused a study build, and fifteen writes took it to 41,973) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been
 created at the first try on J3R180 58206920; a padding to 175 past (41,903 bytes, e2aac64) had its create refused `6F00` once
 and taken on the same retry ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). refcheck now warns of a size at or near a refused place.
 
@@ -456,10 +457,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.0**, sha256
-`bc3d47bacbb66aa33667fd37bc35120cf873cc2f8afc3fd18339c245e3cd2948`
+`0e3f6d804c0b63dafc9c0a13c9decb62044f715a99b8db633d011854b54d8a90`
 (`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 41,973 bytes), has sha256
-`2b9c6b02ed1574013e2320076f08a3b90d52ec1bda544a4bfcaf7467ef82fcab`: the hash the
+is LOADed with (refcheck's measure, 42,485 bytes), has sha256
+`18389a1e65e5352d723eda68eab99f7371566f8c5a2500a7161cc388c19aac66`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -486,8 +487,14 @@ installing, `SELECT` must answer `03 00` for the card's applet's whole AID (belo
 gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
 # ...then create the card's applet from the loaded package
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
-# ...then the NFC tag, under the NFC Forum's own name as its instance AID
-gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
+# ...then the NFC tag, under the NFC Forum's own name as its instance AID, with the card maker's
+# address as its install parameters (maker/maker.json's tagAddress; the tag refuses an install without one)
+python3 ../tools/maker/maker.py check
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 \
+   --params "$(python3 ../tools/maker/maker.py tag-params)"
+# (python3 ../tools/maker/maker.py gp-tag prints this whole line, with --to <domain> where the maker
+#  installs into a security domain of its own; both refuse the shared example file, whose tag says
+#  example.com, unless --allow-example says the card is a spare one on a bench)
 
 # Verify installation
 gp --list
@@ -496,9 +503,13 @@ gp --list
 #   APP: F043415348554341524401 (SELECTABLE)   ← the card's applet
 #   APP: D2760000850101 (SELECTABLE)           ← the tag
 
-# The tag, read as a phone reads it: its name, the capability container (15 bytes), the NDEF file (2, then 20 bytes)
-gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000214
-# Expected: 9000 / 9000 / 000F20003B00340406E104001600FF 9000 / 9000 / 0014 9000 / D101105504 + "getfoxy.io/card" 9000
+# The tag, read as a phone reads it: its name, the capability container (15 bytes), the NDEF file (2, then the rest)
+gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000200
+# Expected, for an address of n bytes after https:// (spec/APDU.md, The NFC tag; n = 16 for https://example.com/card):
+#   9000 / 9000 / 000F20003B00340406E10400 <n+56> 00FF 9000 / 9000 / 00 <n+9> 9000 /
+#   D101 <n+5> 5504 + the address after https:// + "#new" 9000
+# For https://example.com/card: 000F20003B00340406E104004800FF, then 0019, then
+#   D101155504 6578616D706C652E636F6D2F63617264236E6577 ("example.com/card#new")
 ```
 
 ### Setting a card up
@@ -617,10 +628,11 @@ gp --delete F043415348554341524401   # the card's applet
 gp --delete F04341534855434152444D   # the opener
 gp --delete F0434153485543415244     # the package
 
-# Re-install: the opener first, the tag last
+# Re-install: the opener first, the tag last, with the maker's address
 gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
-gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 \
+   --params "$(python3 ../tools/maker/maker.py tag-params)"
 ```
 
 The chip refuses to delete an instance that something still refers to, which is why the
@@ -666,6 +678,29 @@ apps):**
 For production cards, use a secure messaging channel (SCP02/SCP03) and rotate the
 card manager keys: a card left on its factory keys can have the applet deleted,
 and the money with it, by anyone with a reader.
+
+### A card maker's own production pieces
+
+What a card maker adds for its cards in the field is its own, and none of it is
+in this repository's applet or tools: the values are in its
+[`maker/maker.json`](../maker/README.md), and the keys in its own keeping, never in
+a repository ([D227](DECISIONS.md#d227)).
+
+- **Its tag address.** The NFC tag's install parameters (above); `maker.json`'s
+  `tagAddress`.
+- **Its card manager keys.** Rotated from the factory set at install, per card or
+  per batch; a per-card set may be derived from a master key the maker keeps
+  offline. The derivation and the master are the maker's; cardkit's `rotateKeys`
+  takes whatever set it is given.
+- **Its security domain and release key.** A maker may install into a supplementary
+  security domain of its own (`securityDomain.aid`) whose privileges mandate a DAP
+  signature, so that every load into any domain on the card must carry the
+  signature of the maker's release key over the load file's hash. The public half
+  goes in `securityDomain.dapPublicKey`; the private half is made and kept under
+  the maker's own ceremony, and a card keyed to a test release key is a test card.
+  The load file signed is this repository's, byte for byte.
+- **Its design codes.** Registered in [`CARD-DESIGNS.md`](CARD-DESIGNS.md) under the
+  maker's name and listed in `maker.json`'s `designCodes`.
 
 ---
 
@@ -804,6 +839,15 @@ run's log.
 
 - Install the three applets in order, and add the load file's size to refcheck's
   SIZES only once the card's applet is selected and answers.
+- The tag's install parameters ([D227](DECISIONS.md#d227)): `gp -d` shows the tag's
+  `INSTALL` carrying `C9`, the address's length and the address (gp puts the `C9`
+  in front of `--params`); the tag's `READ BINARY`s answer the capability container
+  with the NDEF file's largest size n + 56 and the NDEF file of the address and
+  `#new`; then, once the card is set up, the address and `#` with a code, read whole
+  in one `READ BINARY` and in pieces of 59. An `INSTALL` of the tag with `C9 00` is
+  refused and leaves no tag (`gp --list` shows none at `D2760000850101`), and the
+  card's applet still answers; the tag installed again with an address works. A
+  phone reads the tag and offers the address.
 - Add the load file's sha256 to refcheck's PROVEN only once the chip run has had
   real signatures and real change verified on the chip (the two items below), and
   write "real signatures and real change verified on the chip" in its entry:
@@ -951,6 +995,7 @@ Protocol 2.0 ([D19](DECISIONS.md#d19)):
 | Card's applet | `F0 43 41 53 48 55 43 41 52 44 01` |
 | Tag, class (listed last in the file) | `F0 43 41 53 48 55 43 41 52 44 54` |
 | Tag, instance (the NFC Forum's NDEF Tag Application; what a phone selects) | `D2 76 00 00 85 01 01` |
+| Tag, install parameters (`C9`) | the card maker's address, ASCII ([D227](DECISIONS.md#d227)); required |
 | SELECT (the card's applet, whole: what a reader sends, [D25](DECISIONS.md#d25)) | `00 A4 04 00 0B F0 43 41 53 48 55 43 41 52 44 01` |
 | SELECT of the package AID alone (reaches the opener on the chip: `90 00`, no version) | `00 A4 04 00 0A F0 43 41 53 48 55 43 41 52 44` |
 

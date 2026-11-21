@@ -77,6 +77,7 @@ import {
   splitLoad,
   transmit,
 } from './scp02';
+import {tagInstallParameters, tagNdefNew} from './tag';
 
 export type Phase =
   | 'probe'
@@ -130,6 +131,8 @@ export interface InstallStep {
   phase: InstallPhase;
   module: Bytes;
   instance: Bytes;
+  /** The install parameters field (C9 and its value); C9 00 when absent. The tag's carries its address (tag.ts). */
+  parameters?: Bytes;
 }
 
 /** A plain command to an installed applet, and the answer it must get. */
@@ -168,8 +171,28 @@ const CASHU_OBJECTS: readonly Bytes[] = [
   CASHU_PACKAGE_AID,
 ];
 
-/** The card: the opener first, then the card's applet, then the tag under the NFC Forum's name (HARDWARE_DEPLOYMENT.md). */
-export function cashuPlan(loadFile: LoadFileAsset): Plan {
+/** What a Cashu card install needs besides its load file: the card maker's settings (maker/maker.json). */
+export interface CashuPlanOptions {
+  /**
+   * The address the NFC tag carries, given in its install parameters: the
+   * card maker's, https:// and at most 127 characters (tag.ts). Required: the
+   * card's package names none, and no default would be neutral.
+   */
+  tagAddress: string;
+}
+
+/**
+ * The card: the opener first, then the card's applet, then the tag under the
+ * NFC Forum's name with the maker's address (HARDWARE_DEPLOYMENT.md). Throws a
+ * RangeError, before any card is touched, when the address breaks a rule.
+ */
+export function cashuPlan(
+  loadFile: LoadFileAsset,
+  options: CashuPlanOptions,
+): Plan {
+  const tagAddress = options?.tagAddress;
+  const parameters = tagInstallParameters(tagAddress);
+  const ndef = tagNdefNew(tagAddress);
   return {
     name: 'Cashu card',
     loadFile,
@@ -177,7 +200,12 @@ export function cashuPlan(loadFile: LoadFileAsset): Plan {
     installs: [
       {phase: 'installOpener', module: OPENER_AID, instance: OPENER_AID},
       {phase: 'installCard', module: CARD_AID, instance: CARD_AID},
-      {phase: 'installTag', module: TAG_CLASS_AID, instance: TAG_AID},
+      {
+        phase: 'installTag',
+        module: TAG_CLASS_AID,
+        instance: TAG_AID,
+        parameters,
+      },
     ],
     sweep: [TAG_AID, CARD_AID, OPENER_AID, CASHU_PACKAGE_AID],
     guard: CARD_AID,
@@ -187,6 +215,9 @@ export function cashuPlan(loadFile: LoadFileAsset): Plan {
       {apdu: GET_INFO, length: 30},
       {apdu: GET_PUBKEY, length: 33},
       {apdu: selectAid(TAG_AID)},
+      // the tag says the address it was given: the NDEF file of a card with no owner yet, whole
+      {apdu: [0x00, 0xa4, 0x00, 0x0c, 0x02, 0xe1, 0x04]},
+      {apdu: [0x00, 0xb0, 0x00, 0x00, ndef.length], data: ndef},
     ],
   };
 }
@@ -573,7 +604,12 @@ export async function provision(
     expectOk(
       await open().send(
         run.timed,
-        installAndSelectable(plan.packageAid, step.module, step.instance),
+        installAndSelectable(
+          plan.packageAid,
+          step.module,
+          step.instance,
+          step.parameters ? {parameters: step.parameters} : {},
+        ),
       ),
       0xe6,
     );

@@ -1,4 +1,5 @@
 import {CASHU_LOAD_FILE} from './assets/cashu';
+import {MAKER} from './maker';
 
 /**
  * The card load files a chip has installed and the operator approved for
@@ -26,13 +27,21 @@ export function loadFileValidated(sha256: string): boolean {
 
 /**
  * Operator-approved installation for distributed internal testing (D74): this
- * build's load file is a validated one. It gates what LOADs that file (a batch
+ * build's load file is a validated one, and its maker file a maker's own. It gates what LOADs that file (a batch
  * and its installs), never an owned-card reset, which removes an installation
  * and restores the manager keys without loading anything.
  */
-export const CARD_INSTALLATION_VALIDATED = loadFileValidated(
-  CASHU_LOAD_FILE.sha256,
-);
+export const CARD_INSTALLATION_VALIDATED =
+  loadFileValidated(CASHU_LOAD_FILE.sha256) && makerGiven();
+
+/**
+ * Whether the maker file this build carries is a maker's own, not the shared
+ * repository's example (`"example": true`), whose tag would send every card's
+ * holder to example.com: installation wants a maker's own file too.
+ */
+export function makerGiven(maker: {example: boolean} = MAKER): boolean {
+  return !maker.example;
+}
 
 /** Local validation builds only (including owner-built iOS Release binaries).
  * Never enable in a production commit or distribute an enabled validation build.

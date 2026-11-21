@@ -8599,7 +8599,8 @@ commit after this one: a rebuild of the same source, byte for byte the load file
 ## <a id="d222"></a>D222: The tag's address changes at every read, and only the owner's phone can tell it is its card
 
 **Decided (protocol 3.0, 2026-11-15, the project owner; amends the tag of software 1.19, `CASHU-CARD-SPEC.md` 5.8
-and `SECURITY-MODEL.md` threat 15, whose address was the same on every card).** The card's NFC tag answers a phone's background read with one of two addresses:
+and `SECURITY-MODEL.md` threat 15, whose address was the same on every card; *amended by [D227](#d227): the address
+before the fragment is the card maker's, given at install, and no longer the one below*).** The card's NFC tag answers a phone's background read with one of two addresses:
 
     https://getfoxy.io/card#new                   a card with no owner or no holder's record (new, or just reset)
     https://getfoxy.io/card#<R><M>                a card with an owner and a holder's record
@@ -8950,3 +8951,51 @@ pieces, one that loads without teaching, a card with no owner's set-up; the hand
 
 **Built (applet).** `newState` (now told whether the entry is a piece's), `forgetOwed`, `ENTRY_SETUP`'s comment; the comment
 on `forgetOwed` no longer says every entry nothing names goes while set-up entries were kept (round two's R4b).
+
+## <a id="d227"></a>D227: The tag's address is the card maker's, given at install; a maker's settings are one file
+
+**Decided (protocol 3.0, 2026-11-20, the project owner; amends [D222](#d222) and the tag of software 1.19).** The shared
+repository is neutral: no reader, wallet or card maker is the protocol's default. Until now the NFC tag's address was written
+into the package (`https://getfoxy.io/card`, one implementation's site), so every card built from this repository sent a phone
+that read it to that site, whoever made the card.
+
+**The rule.** (1) The package names no address. The tag (`Tag`) takes its address A from its install parameters, the value of
+GlobalPlatform's `C9` that the runtime hands `install` as the applet's data: A in ASCII, 9 to 127 bytes, beginning `https://`,
+a letter or a digit after it, every byte `21` to `7E` but `"` `#` `<` `>` `\` `^` `` ` `` `{` `|` `}`. It is kept in persistent
+memory at install, and the tag's two files are worked out from it: the capability container gives the NDEF file's largest size
+as n + 56 (n the length after `https://`), and the NDEF file is A's record with `#new` or `#` and the code of D222, which is
+unchanged. (2) An install with no parameters (`C9 00`) or with an address that breaks a rule is refused: the tag throws `6A80`
+from `install` and no tag is made. (3) Everything else that is a card maker's own is in one file, `maker/maker.json` (its name,
+its tag address, its security domain and the public half of its release key, its design codes), checked by
+`tools/maker/maker.py` and `tools/cardkit/gp/maker.ts` against `maker/maker.schema.json`. The file in this repository is a
+neutral example (`"example": true`, `https://example.com/card`, a name kept for examples by RFC 2606) that the tools refuse to
+put on a card in the field. A maker's fork changes that file and nothing else.
+
+**Why refuse rather than default.** Any default address is somebody's site: a card installed without thought would send its
+holder's phone there, and nothing on the card would say so. A refusal is seen at the install, where the person installing can
+fix it; a maker that wants no tag leaves the tag out of the install, and a phone then finds no tag, as on a card whose owner
+switched it off. Rejected: an empty address (a phone would open nothing useful, and readers would see a tag that names no
+one); a default of example.com (a card in the field would carry it); a `SET_TAG_ADDRESS` command (an address that can change
+after install is one more thing the owner's proof must guard, and the maker's address is not the owner's to change).
+
+**Why https:// only, and 127 bytes.** Prefix code `04` keeps the record as it was, and every phone opens an https address;
+127 bytes keeps every length in the install command and the record one byte (the record stays short, a payload of at most
+169), so no chip is asked for a long-form length. The rules are the applet's, and the tools apply the same ones first, so a bad
+address stops before a card is touched: `spec/vectors/tag-address.json` holds valid and invalid addresses, and the applet's
+suite (`TagInstallTest`), cardkit's (`tag.test.ts`, `maker.test.ts`) and `tools/maker/test_maker.py` run every one.
+
+**What a reader must do.** Match the fragment, never the address before it: cards of different makers carry different
+addresses. A reader that recognised its card by the address alone now misses every other maker's.
+
+**What it costs.** The tag keeps A (at most 119 bytes of persistent memory, at install) and builds its files byte by byte; a
+`READ BINARY` of a coded file puts the code at the end of the APDU buffer, so the answer stops 24 bytes short of the buffer's
+length (237 on a 261-byte buffer, more than the largest file). No transient memory is added. The load file grew by 407 bytes,
+to 42,380 (140 past a multiple of 256, near the refused 135), and `sizeTheFile` pads it to 42,485, 245 past, the place of the 3.0
+file before it, which J3R180 58206920 created 30 times of 30 at the first try. The new file has run only in a simulator: its
+chip run is [the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)'s, the tag's install parameters among it.
+
+**Built.** `Tag` (install, the two files from the address); `TagTest`, `TagAddressTest`, `TagEdgeTest` (installed with
+`https://example.com/card`), `TagInstallTest` (new); `tools/cardsim` (`--tag-address`, default example.com's); cardkit 0.4.0
+(`cashuPlan(loadFile, {tagAddress})`, the tag's `C9`, a check that reads the tag back; `parseMaker`); the provisioner (the
+address from `maker/maker.json`, and no install with the example file); `tools/maker/`; `spec/APDU.md`'s tag section and the
+deployment guide's commands. Not built: the chip run.

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "maker.schema.json",
+  "title": "Card maker settings",
+  "description": "Everything about a card maker that the repository's tools need, in one file: maker/maker.json. The card's load file carries none of it. tools/maker/maker.py and tools/maker/maker.cjs check a file against these rules; maker/README.md explains each field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["example", "name", "tagAddress", "securityDomain", "designCodes"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "example": {
+      "type": "boolean",
+      "description": "true only in the shared repository's neutral file. Tools that would write it to a card in the field (a release build of the provisioner) refuse an example file; tests and benches use it."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "The card maker's name as tools show it, and as its rows in docs/CARD-DESIGNS.md name it."
+    },
+    "tagAddress": {
+      "type": "string",
+      "minLength": 9,
+      "maxLength": 127,
+      "pattern": "^https://[0-9A-Za-z][!$%&'()*+,\\-./0-9:;=?@A-Z\\[\\]_a-z~]*$",
+      "description": "The address the card's NFC tag carries, given in the tag's install parameters; the card adds #new or #<code>. The rules are spec/APDU.md's (The NFC tag) and spec/vectors/tag-address.json's."
+    },
+    "securityDomain": {
+      "description": "null to install into the card manager (the issuer security domain). Otherwise the maker's own supplementary security domain, which installs and loads are made into.",
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["aid"],
+          "properties": {
+            "aid": {"type": "string", "pattern": "^([0-9A-F]{2}){5,16}$", "description": "The domain's AID, upper-case hex, 5 to 16 bytes."},
+            "dapPublicKey": {"type": "string", "pattern": "^([0-9A-F]{2})+$", "description": "The public half of the maker's release key, upper-case hex, where the domain asks for a DAP signature on every load. Never the private key."}
+          }
+        }
+      ]
+    },
+    "designCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[0-9A-Z]{3}$"},
+      "description": "The card-face design codes this maker registered in docs/CARD-DESIGNS.md (each a row whose 'whose' is this maker's name). Empty for none."
+    }
+  }
+}

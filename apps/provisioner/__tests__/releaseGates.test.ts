@@ -6,12 +6,15 @@ import {
   VALIDATED_LOAD_FILE_SHA256S,
   benchActionAllowed,
   loadFileValidated,
+  makerGiven,
 } from '../src/releaseGates';
+import {MAKER} from '../src/maker';
 import {CASHU_LOAD_FILE} from '../src/assets/cashu';
 
 test('installation follows the load file this build carries, never a bare switch', () => {
   expect(CARD_INSTALLATION_VALIDATED).toBe(
-    VALIDATED_LOAD_FILE_SHA256S.includes(CASHU_LOAD_FILE.sha256),
+    VALIDATED_LOAD_FILE_SHA256S.includes(CASHU_LOAD_FILE.sha256) &&
+      !MAKER.example,
   );
   for (const sha of VALIDATED_LOAD_FILE_SHA256S) {
     expect(sha).toMatch(/^[0-9a-f]{64}$/);
@@ -23,9 +26,9 @@ test('installation follows the load file this build carries, never a bare switch
 });
 
 test('the 3.0 load file is not validated until the operator approves it', () => {
-  // 41,973 bytes, not yet tried on a chip, nor a file of its size (tools/refcheck.py). Its sha256 goes on the list with
+  // 42,485 bytes, not yet tried on a chip, nor a file of its size (tools/refcheck.py). Its sha256 goes on the list with
   // the operator's approval and the run's report, after its chip run.
-  expect(CASHU_LOAD_FILE.size).toBe(41973);
+  expect(CASHU_LOAD_FILE.size).toBe(42485);
   expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(false);
   expect(CARD_INSTALLATION_VALIDATED).toBe(false);
   // the 2.2 load file the chip took on 2026-11-06 stays validated
@@ -66,4 +69,12 @@ test('the bench screen asks the gate before every run and for every button', () 
     );
   }
   expect(screen).not.toMatch(/if \(!BENCH_RUNS_ENABLED \|\| running/);
+});
+
+test("installation wants a maker's own file: the shared repository's example installs nothing", () => {
+  expect(MAKER.example).toBe(true);
+  expect(MAKER.tagAddress).toBe('https://example.com/card');
+  expect(makerGiven()).toBe(false);
+  expect(makerGiven({example: false})).toBe(true);
+  expect(CARD_INSTALLATION_VALIDATED).toBe(false);
 });

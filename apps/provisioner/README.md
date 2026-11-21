@@ -39,10 +39,14 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 41,973-byte
-  load file in 152 blocks, the opener, the card's applet, then the tag under
-  `D2760000850101`. Then it checks the card's applet answers `03 00`, `GET_INFO`
-  (30 bytes), `GET_PUBKEY` (33 bytes) and the tag's SELECT.
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 42,485-byte
+  load file in 173 blocks, the opener, the card's applet, then the tag under
+  `D2760000850101` with the card maker's address (`tagAddress` in
+  [`maker/maker.json`](../../maker/README.md), read at build time by `src/maker.ts`).
+  Then it checks the card's applet answers `03 00`, `GET_INFO` (30 bytes),
+  `GET_PUBKEY` (33 bytes), the tag's SELECT, and that the tag's NDEF file is the
+  maker's address with `#new`. A build whose maker file is the shared example
+  (`"example": true`) installs nothing (`makerGiven` in `src/releaseGates.ts`).
 - **Rotate keys and back.** The card manager from its factory keys (`40` to `4F`)
   to the spike's public test set (ENC `10` to `1F`, MAC `20` to `2F`, DEK `30` to
   `3F`) and back, each proved by a fresh login.
@@ -187,8 +191,8 @@ cancellation during key prefetch prevents NFC from opening later.
 
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
-chip has installed and the operator approved. The 3.0 load file (41,973 bytes,
-sha256 `2b9c6b02…`) is not on it yet, so a build from this tree installs no card.
+chip has installed and the operator approved. The 3.0 load file (42,485 bytes,
+sha256 `18389a1e…`) is not on it yet, so a build from this tree installs no card.
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
 No chip has installed the 3.0 file, or a file of its size, yet. Earlier sources ran on

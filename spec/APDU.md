@@ -2395,14 +2395,29 @@ its address carries. The card's applet hands that interface only to the tag: the
 caller's AID must be `D2 76 00 00 85 01 01` or the tag's class AID
 `F0 43 41 53 48 55 43 41 52 44 54`, and any other applet gets nothing.
 
+**Whose address ([D227](../docs/DECISIONS.md#d227)).** The package names no address.
+Whoever installs the card gives the tag its address A in the tag's install
+parameters: GlobalPlatform's `C9`, whose value the runtime hands the applet's
+`install`, is A in ASCII and nothing else. A is 9 to 127 bytes; it begins with the
+eight bytes `https://`; the byte after them is a letter or a digit; and every byte is
+printable ASCII (`21` to `7E`) other than `"` `#` `<` `>` `\` `^` `` ` `` `{` `|` `}`.
+An install whose parameters are empty (`C9 00`) or break a rule is refused: the
+applet throws `6A80`, which the chip answers to the `INSTALL` (or reports as its own
+error), and no tag is made. There is no default address, since any address would be
+somebody's site; a card maker that wants no tag leaves the tag out of the install,
+and a phone then finds none. A is kept in persistent memory, written once at install.
+Let n be its length after `https://`. [`spec/vectors/tag-address.json`](vectors/tag-address.json)
+lists valid and invalid addresses with the files a valid one gives; the tables below
+take `https://example.com/card` (n = 16), the vectors' first.
+
 **The address ([D222](../docs/DECISIONS.md#d222)).** One URI record, prefix code `04`
-(`https://`):
+(`https://`), then A after `https://`, then `#` and a fragment:
 
 | Card | Address | NDEF file (`E104`) |
 |---|---|---|
 | Tag switched off (`SET_TAG` `01`) | none: the tag's name is refused (`6999` in the simulator; the J3R180 answers `6A82`) | |
-| No owner, or no holder's record (new, or reset) | `https://getfoxy.io/card#new` | 26 bytes: `00 18 D1 01 14 55 04` and `getfoxy.io/card#new` |
-| An owner and a holder's record | `https://getfoxy.io/card#` and 48 lowercase hex | 71 bytes: `00 45 D1 01 41 55 04`, `getfoxy.io/card#`, then hex(R ‖ M) |
+| No owner, or no holder's record (new, or reset) | A`#new` | n + 11 bytes: NLEN = n + 9, `D1 01`, the payload's length n + 5, `55 04`, A after `https://`, `#new`. For the example, 27 bytes: `00 19 D1 01 15 55 04` and `example.com/card#new` |
+| An owner and a holder's record | A`#` and 48 lowercase hex | n + 56 bytes: NLEN = n + 54, `D1 01`, n + 50, `55 04`, A after `https://`, `#`, then hex(R ‖ M). For the example, 72 bytes: `00 46 D1 01 42 55 04`, `example.com/card#`, then the hex |
 
     R = 16 bytes of the chip's secure random, new at every selection of the tag
     K = SHA-256("CashuCard/tag-address" ‖ c)          c: the card's 32 bytes of D202
@@ -2411,14 +2426,20 @@ caller's AID must be `D2 76 00 00 85 01 01` or the tag's class AID
 R and M are made at the `SELECT` by name and held for that selection: every
 `READ BINARY` of it, from any offset and in any pieces, reads the one address, and
 the next selection makes another. Nothing that lasts is written. The capability
-container (`E103`) is `00 0F 20 00 3B 00 34 04 06 E1 04 00 47 00 FF`: the NDEF file at
-most 71 bytes, MLe 59, so a phone reads a coded file in two `READ BINARY`s.
+container (`E103`) is `00 0F 20 00 3B 00 34 04 06 E1 04 00` (n + 56) `00 FF`: the NDEF
+file at most n + 56 bytes (at most 175), MLe 59, so a phone reads a coded file in two to
+three `READ BINARY`s; for the example, `00 0F 20 00 3B 00 34 04 06 E1 04 00 48 00 FF`. A
+`READ BINARY` answers as many bytes as asked for and the file holds, up to the APDU
+buffer's length less 24 (the card keeps the code at the buffer's end while it writes
+the answer): 237 on a 261-byte buffer, more than the largest file.
 
 A phone that holds c for a card checks a coded address by taking R (the first 32 hex)
 and M (the last 16), working K out and comparing M with HMAC-SHA256(K, R)'s first
 eight bytes in constant time. A match is that card; no match for any card it holds is
 someone else's card; `#new` is a card to set up; the address with no fragment is a card
-of earlier software. The c is the one the phone kept for the card (given at the claim or
+of earlier software. A reader matches the fragment, never the address before it: cards
+of different makers carry different addresses, and a reader that knows only one maker's
+would take every other maker's card for no card at all. The c is the one the phone kept for the card (given at the claim or
 the hand-over, or read with `GET_CARD` P1 = `03`): a phone restored from its words keeps
 none until it reads the card once, and until then sees its own card's tag as someone
 else's.

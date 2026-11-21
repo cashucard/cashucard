@@ -11,8 +11,9 @@ Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT
 1. Run the commands in this file one at a time, exactly as written, and compare each output with the expected output before you run the next one.
 2. Stop and ask the person when a login to the card is refused, when the CAP's sha256 differs from the one below, or when any output differs from what this file expects. A refused login counts towards a lock that is permanent, so a refused card is put aside and its login is never tried again.
 3. Use gp's factory keys only, which is what gp does when it is given no key options. Keep to the commands in this file, and ask the person before anything else that writes to a card.
-4. Work on one card at a time. Ask the person to put a card on the reader before step 3, and before each further card.
-5. When a card is done, report what the last section lists.
+4. Before step 4, ask the person for the web address the card's NFC tag is to carry: theirs, beginning `https://`, at most 127 characters, with no `#`. A phone that reads the tag opens it. There is no default; if they want no tag, leave out the tag's command and its check.
+5. Work on one card at a time. Ask the person to put a card on the reader before step 3, and before each further card.
+6. When a card is done, report what the last section lists.
 
 ## What the person needs
 
@@ -60,7 +61,7 @@ sha256sum target/cashu-javacard-3.0.0.cap
 On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.0.0.cap`. Expected:
 
 ```
-bc3d47bacbb66aa33667fd37bc35120cf873cc2f8afc3fd18339c245e3cd2948  target/cashu-javacard-3.0.0.cap
+0e3f6d804c0b63dafc9c0a13c9decb62044f715a99b8db633d011854b54d8a90  target/cashu-javacard-3.0.0.cap
 ```
 
 Stop if the hash differs.
@@ -96,12 +97,12 @@ If gp reports that the login failed, stop and tell the person to put that card a
 
 ## 4. Install the applet
 
-The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. From `cashucard/applet`:
+The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. The tag carries the address the person gave (rule 4), in hex as its install parameters; the tag refuses an install without one. From `cashucard/applet`, with that address in place of `https://example.com/card`:
 
 ```sh
 gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
-gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454
+gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 --params "$(printf '%s' 'https://example.com/card' | xxd -p | tr -d '\n')"
 ```
 
 List the card again:
@@ -156,13 +157,13 @@ Expected: a 33-byte compressed secp256k1 public key, then `9000`.
 Last, read the NFC tag the way a phone does: its name, the capability container and the NDEF file.
 
 ```sh
-gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000214
+gp -d -a 00A4040007D2760000850101 -a 00A4000C02E103 -a 00B000000F -a 00A4000C02E104 -a 00B0000002 -a 00B0000200
 ```
 
-Expected:
+Expected, for `https://example.com/card` (another address gives other lengths: the capability container's byte 13 is n + 56 and the NDEF file's length n + 9, n the address's length after `https://`):
 
 ```
-9000 / 9000 / 000F20003B00340406E104001600FF 9000 / 9000 / 0014 9000 / D101105504 + "getfoxy.io/card" 9000
+9000 / 9000 / 000F20003B00340406E104004800FF 9000 / 9000 / 0019 9000 / D101155504 + "example.com/card#new" 9000
 ```
 
 When every answer matches, the card is installed.

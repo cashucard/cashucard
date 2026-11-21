@@ -8,6 +8,7 @@ import me.flashapp.cashu.CashuApplet;
 import me.flashapp.cashu.Opener;
 import me.flashapp.cashu.Tag;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
@@ -66,8 +67,23 @@ final class SimCard {
     static final byte[] SELECT = Hex.parse("00A404000B" + AID_HEX);
     /** SELECT by the package AID alone: a partial name, which reaches the opener (9000, no version). */
     static final byte[] SELECT_PACKAGE = Hex.parse("00A404000A" + PACKAGE_HEX);
-    /** The tag's install parameters: its instance AID's length and the AID, then no privileges and no parameters. */
-    private static final byte[] TAG_INSTALL = Hex.parse("07" + TAG_HEX + "0000");
+    /**
+     * The address the simulated tag is installed with (`--tag-address`): a card maker gives its own at install, and the
+     * simulator's default is example.com's, a name kept for examples (RFC 2606) and nobody's site.
+     */
+    static final String DEFAULT_TAG_ADDRESS = "https://example.com/card";
+    static volatile String tagAddress = DEFAULT_TAG_ADDRESS;
+
+    /** The tag's install bytes: its instance AID's length and the AID, no control information, then the install parameters, the address. */
+    static byte[] tagInstall(String address) {
+        byte[] a = address.getBytes(StandardCharsets.US_ASCII);
+        byte[] head = Hex.parse("07" + TAG_HEX + "00");
+        byte[] out = new byte[head.length + 1 + a.length];
+        System.arraycopy(head, 0, out, 0, head.length);
+        out[head.length] = (byte) a.length;
+        System.arraycopy(a, 0, out, head.length + 1, a.length);
+        return out;
+    }
 
     static final int SW_OK = 0x9000;
     static final int SW_KEEP_HOLDING = 0x6A98;
@@ -120,7 +136,8 @@ final class SimCard {
         // INSTANCES' order: the opener first, as the chip needs it and as resolveSelect gives partial names out
         sim.installApplet(AIDUtil.create(INSTANCES[0]), Opener.class);
         sim.installApplet(AIDUtil.create(INSTANCES[1]), CashuApplet.class);
-        sim.installApplet(AIDUtil.create(INSTANCES[2]), Tag.class, TAG_INSTALL, (short) 0, (byte) TAG_INSTALL.length);
+        byte[] tag = tagInstall(tagAddress);
+        sim.installApplet(AIDUtil.create(INSTANCES[2]), Tag.class, tag, (short) 0, (byte) tag.length);
         byte[] resp = sim.transmitCommand(SELECT);
         if (sw(resp) != SW_OK || resp.length != 4 || resp[0] != 3) {
             throw new IllegalStateException("SELECT after install answered " + Hex.format(resp) + ", not a 3.x applet");
