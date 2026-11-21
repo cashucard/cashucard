@@ -1,6 +1,7 @@
-# Foxy card: one PIN, a daily limit, an owner key
+# Cashu Card 1.x: one PIN, a daily limit, an owner key (historical)
 
-> Historical Foxy design, recorded at software 1.20 and incorporated into
+> Historical design of the card's 1.x line, made in the Foxy wallet project
+> (where "Foxy" below names that wallet and its card of the time), recorded at software 1.20 and incorporated into
 > shared protocol 2.0 ([D18](DECISIONS.md#d18)). The current applet wire is
 > [protocol 3.0](../spec/APDU.md): readers SELECT the full applet AID
 > `F043415348554341524401`, which answers `03 00`. Owner labels use

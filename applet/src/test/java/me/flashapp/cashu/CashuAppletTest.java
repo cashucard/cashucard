@@ -17,7 +17,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * jCardSim tests for the Foxy fork of the applet (docs/CASHU-CARD-SPEC.md and
+ * jCardSim tests for the card's applet (spec/APDU.md; its 1.x design history in docs/CASHU-CARD-SPEC.md and
  * docs/CASHU-CARD-DAILY-LIMIT.md).
  *
  * Upstream's tests were of another wire format: a 78-byte slot, a SPEND_PROOF

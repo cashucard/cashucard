@@ -1,8 +1,8 @@
 #!/bin/sh
-# A card on this Mac for Foxy in the iOS Simulator: the applet, in the JavaCard
+# A card on this Mac for a reader app in the iOS Simulator: the applet, in the JavaCard
 # simulator, on a loopback port (applet/src/test/java/.../CardServer.java).
 #
-#   sh tools/cardsim/run.sh [port]        47431 unless said; Foxy tries 47431 to 47434
+#   sh tools/cardsim/run.sh [port]        47431 unless said; a reader may try 47431 to 47434
 #   sh tools/cardsim/run.sh [port] plain  the one key every jCardSim card has, and not a key of its own:
 #                                         for a card whose money was locked to that key before cards had their own
 #   sh tools/cardsim/ctl.sh [port] off    take the card off the reader (on, pull N, new, show)

@@ -33,8 +33,8 @@ import java.util.Arrays;
  *
  * It makes up an owner key of its own and uses it once; nothing is kept. It ends with the card blank and holding nothing, but it
  * refuses to begin on a card that is not blank (an owner, a record or any piece), so it cannot disturb a card in use. A run that
- * stops part way leaves test pieces on the card: install the software again (~/.foxycard/install-1.20.sh refuses a card that
- * holds money; the wipe in ~/.foxycard/chip-test.sh does not).
+ * stops part way leaves test pieces on the card: install the software again (docs/HARDWARE_DEPLOYMENT.md's sweep and
+ * reinstall, which refuses a card that holds money; a bench's own wipe may not).
  *
  *   sh tools/chip/proofstore.sh                 the card in the reader, by PC/SC
  *   sh tools/chip/proofstore.sh 127.0.0.1:47470 a card behind a bridge or the simulator's server (tools/chip/run.sh, tools/cardsim/run.sh)

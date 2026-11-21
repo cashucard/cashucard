@@ -35,5 +35,5 @@ This policy covers this repository: the applet in `applet/`, the host tools in
 and the documents. A flaw in the protocol itself is in scope too; the core is
 specified in [cashucard/nut](https://github.com/cashucard/nut), and a private
 report here reaches the same maintainers. Wallet and till apps that talk to the
-card have their own policies, such as the Foxy app's in
-[getfoxy/iOS](https://github.com/getfoxy/iOS) (`docs/SECURITY.md`).
+card have their own policies, in their own repositories (the README's
+[known implementations](README.md#known-implementations)).

@@ -10,8 +10,8 @@ payment offline and settle with the mint when online.
 > its testing so far is limited to the dated reports in this repository. Keep
 > only small amounts on a card.
 
-This is the **shared Cashu card protocol, version 3.0**: one wire for Flash and
-for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
+This is the **shared Cashu card protocol, version 3.0**: one wire for every
+reader and every card maker ([known implementations](#known-implementations)). Reference implementation
 of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
 
 The card is developed here. [cashucard/javacard](https://github.com/cashucard/javacard),
@@ -77,8 +77,8 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > first asking and signed a payment with change. The tracked file is the 3.0 file of the merge of 2026-11-19: that
 > source with the version moved to 3.0 ([D205](docs/DECISIONS.md#d205)), the other maintainer's
 > [D206](docs/DECISIONS.md#d206) to [D210](docs/DECISIONS.md#d210), the rotating tag
-> ([D222](docs/DECISIONS.md#d222)) and [D223](docs/DECISIONS.md#d223) to [D226](docs/DECISIONS.md#d226) added
-> (41,973 bytes, load file sha256 `2b9c6b02…`). This exact file has run only in a simulator so far,
+> ([D222](docs/DECISIONS.md#d222)), [D223](docs/DECISIONS.md#d223) to [D226](docs/DECISIONS.md#d226) and the tag's
+> address given at install ([D227](docs/DECISIONS.md#d227)) added (42,485 bytes, load file sha256 `18389a1e…`). This exact file has run only in a simulator so far,
 > and no card has installed it or a file of its size; the run is to be repeated on it, its size first. The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
@@ -128,7 +128,8 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
   card has been shown, with a rollover budget between the owner's refreshes
   ([D20](docs/DECISIONS.md#d20)).
 - **Keeps the mint's DLEQ proof** beside each piece, for a reader to check offline.
-- **Answers as an NFC tag** carrying one web address, which its owner can switch off.
+- **Answers as an NFC tag** carrying one web address, which its owner can switch off. The address is
+  the card maker's, given at install ([`maker/`](maker/README.md)); the card's software names none.
 
 The host handles mint communication, DLEQ verification and BDHKE operations
 beyond the card's own blinded change outputs. See [D3](docs/DECISIONS.md#d3).
@@ -170,7 +171,19 @@ ant -f applet/build.xml cap
 The build strips the Descriptor component and checks the load file's size against
 what the J3R180 has installed (`tools/stripcap.py`, `tools/refcheck.py`;
 [`docs/CASHU-CARD-HARDWARE.md`](docs/CASHU-CARD-HARDWARE.md)). Installing onto a
-card: [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).
+card: [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md), with the card maker's settings
+from [`maker/maker.json`](maker/README.md).
+
+## Card makers
+
+Everything that is a card maker's own (its name, the address the card's NFC tag
+carries, its security domain and its design codes) is in one file,
+[`maker/maker.json`](maker/maker.json); the load file is the same for every maker,
+byte for byte. The file here is a neutral example (`"example": true`, a tag at
+`https://example.com/card`) that the tools refuse to put on a card in the field. A
+card maker's fork changes that file and nothing else, so `git diff` against this
+repository shows exactly what the maker added:
+[Forks for a card maker](maker/README.md#forks-for-a-card-maker).
 
 ## Test
 
@@ -216,8 +229,8 @@ card key is the same after every `/reset`, so mint pieces per run. The header of
 `tools/cardsim/src/main/java/me/flashapp/cashu/cardsim/CardSim.java` is the
 contract that flash-pos and flash-mobile pin.
 
-Foxy's own simulator for its iOS build (`tools/cardsim/run.sh`, a line protocol on
-port 47431) is kept beside it.
+A line-protocol simulator for a reader app's iOS Simulator build
+(`tools/cardsim/run.sh`, port 47431; Foxy's app uses it) is kept beside it.
 
 ## Project layout
 
@@ -226,12 +239,14 @@ applet/src/main/java/   applet source (JavaCard 3.0.5+): CashuApplet, SchnorrHW,
 applet/src/test/java/   jCardSim test suite
 tools/cardctl/          PC/SC host driver (protocol 3.0) + its own tests
 tools/cardsim/          jCardSim card over localhost HTTP for app e2e, its client and e2e
-tools/chip/             Foxy's bench scripts for a card on a reader
+tools/chip/             bench scripts for a card on a reader
 tools/cardkit/          GlobalPlatform for the phone: SCP02 and SCP03, the install, a fake card (D27, D181)
 apps/provisioner/       the operator app: installs the card's applet from a phone over NFC
 spec/                   APDU.md (wire format and profiles), vectors/,
                         CARD-FILE.md (0.x host↔mint interchange format)
-docs/                   vision, architecture, decisions, security, glossary, Foxy's design
+tools/maker/            the card maker's settings, checked (maker.py) and turned into install commands
+maker/                  maker.json: the card maker's settings, the one file a maker's fork changes
+docs/                   vision, architecture, decisions, security, glossary, the card's design history
 ```
 
 ## Spec
@@ -242,9 +257,21 @@ change to the core starts there. [`spec/APDU.md`](spec/APDU.md) gives every
 command byte for byte, with the profiles NUT-CCP leaves to implementations: the
 owner, the clock and the limits, and the NFC tag.
 
+## Known implementations
+
+Readers and wallets that speak this protocol, and card makers' forks, as their
+maintainers have told us; none of them is the protocol's default. A new one is
+added by a pull request.
+
+| Kind | Implementation |
+|---|---|
+| Reader, wallet | [Flash Mobile](https://github.com/lnflash/flash-mobile) |
+| Reader, point of sale | [Flash POS](https://github.com/lnflash/flash-pos) |
+| Reader, wallet | [Foxy](https://github.com/getfoxy/iOS) |
+| Card maker's fork | [getfoxy/card](https://github.com/getfoxy/card): Foxy's, the base of 2.0 |
+
 ## Related
 
-- [getfoxy/card](https://github.com/getfoxy/card): Foxy's fork, the base of 2.0
 - [cashu-client](https://github.com/cashucard/client): mint protocol, BDHKE, witnesses, DLEQ
 - [flash-card-assets](https://github.com/lnflash/flash-card-assets): print-ready physical card design
 - [forge.flashapp.me](https://forge.flashapp.me): the Flash Cashu mint ([reserves](https://forge.flashapp.me/reserves))
@@ -254,7 +281,8 @@ owner, the clock and the limits, and the NFC tag.
 
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and
 [`docs/DECISIONS.md`](docs/DECISIONS.md) first for the design decisions and their
-reasoning. A change to the wire is a change to Foxy's too: agree it with them.
+reasoning. A change to the wire is a change to every reader: agree it with the
+other maintainers first.
 
 ## License
 

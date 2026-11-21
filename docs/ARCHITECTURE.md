@@ -20,8 +20,11 @@ version and deployment contracts.
 | Host tools and simulator | `tools/cardctl/`, `tools/cardsim/` | PC/SC reference driver and hardware-free protocol simulation. The simulator's external client/routes remain a contract with wallet and terminal repositories. |
 | Public site | `website/` | Protocol introduction, implementation links and installation guide. It is not the operator app or an ops-service deployment. |
 
-Flash Mobile, Foxy and Flash POS implement the protocol in their own
-repositories. Other wallets and terminals can integrate the same protocol.
+Readers implement the protocol in their own repositories (the README's
+[known implementations](../README.md#known-implementations)); any wallet or
+terminal can. What is a card maker's own (the NFC tag's address, its security
+domain, its design codes) is in [`maker/maker.json`](../maker/README.md), never
+in the applet or the tools.
 Mint interactions are implemented by wallets/terminals and
 [the separate client library](https://github.com/cashucard/client). A batch's
 mint reference is operator metadata; the provisioner does not set holder
