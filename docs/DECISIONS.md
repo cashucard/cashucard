@@ -6105,7 +6105,7 @@ holder's own set-up, writing a shorter `SET_LIMIT`, would keep.
 **Built (applet).** `HISTORY_ASKINGS = 7` (10 until [D211](#d211)). `requireHistory` reads the history: on an owned
 card as 2.2 had it (the grant for both, or the PIN for the log), on a card with no owner the
 PIN, no `TAP_PAID`, then the held count with `HELD_HISTORY` in its top bit, `TAP_READ` at the
-fifth; a `GET_LOG` with a P1 over 3 is refused before it and leaves the count alone. The
+seventh; a `GET_LOG` with a P1 over 3 is refused before it and leaves the count alone. The
 holder's say is `holderSays` (the grant, or the PIN in a held tap: `GET_INFO`'s limit on one
 payment and rate, a load's new keyset) and `requireSay` (`KEYSET_KEYS` with another key);
 the let-go and `REFRESH` P1 = 1 want `requireHeld` after the PIN (`6985` with `TAP_PAID`,
@@ -6712,7 +6712,7 @@ no owner and of a wait of two stretches pulled at every write.
   nothing unspent or owed (`6A8D`); then `RESET_ASKINGS` (17; 60 until [D211](#d211)) askings of the same command in a
   row, each a signature's work of the card's own answered `6A98` (about eight seconds on a
   J3R180, 0.50 s an asking, 8.26 s measured; about eleven with the history's seven before it, 11.3 s; D211 had them at 0.59 to 0.66 s, eleven and fifteen), counted in RAM as a claim's are (`nonceLive[1]` with both held marks, `HELD_RESET`);
-  any other command between, a `SELECT` among them, begins the count again. The fifteenth
+  any other command between, a `SELECT` among them, begins the count again. The seventeenth
   resets the card as the owner's reset does: no PIN, no owner, no record, no limits, no
   history, every opening and entry free, a new card key and an empty paid list, or, on a
   certified card, the same key and the list kept ([D191](#d191), [D192](#d192)). The holder then
@@ -8442,8 +8442,9 @@ Rx and whose y is even, Q the card's own point from its key object (or [d]G wher
 form), and for a date's key Q = W + t·G, which must be the point the caller named, x and parity. s is kept in the signer's
 scratch and written to the caller's buffer only once the check has passed (D207); the check zeroes d, k and e·d first.
 **On the chip path** (`chipMul`: e·d by the chip's RSA in two shares, [D216](#d216), [D217](#d217)), a signature the
-check refuses, or any exception out of the chip's product, gives the chip path up for good (`chipMul` false, until the next
-`SET_CARD` runs the known answers again) and the **whole signature is made again by the bytecode**, from step 1 with a
+check refuses, or any exception out of the chip's product, gives the chip path up for that signature only ([D228](#d228);
+until D228 for good, `chipMul` false until the next `SET_CARD` ran the known answers again, which let one induced fault turn
+D217's shares off for every later signature) and the **whole signature is made again by the bytecode**, from step 1 with a
 fresh nonce (the check wiped d; the refused signature never left the card, so the second nonce gives nothing away), then
 checked again. **On the bytecode path**, a signature that fails the check is `6F00`, with nothing written to the caller's
 buffer. A key object that names another key, or a date's point that is not P + t·G, is `6F00` at once on either path:
@@ -8461,11 +8462,15 @@ holds' seconds are to be measured again on the 3.0 file (its chip run).
 
 **What it trusts.** The chip's EC engine and the stored key object. The check is not independent of the EC engine that
 made R, but a fault in the RSA engine or in the bytecode product is caught by it, and a fault in the EC engine that gives a
-wrong R and a wrong check the same way is not.
+wrong R and a wrong check the same way is not. *Narrowed by [D228](#d228):* the check takes the challenge e as the signer
+stored it and does not hash R.x ‖ P.x ‖ msg again, so it covers s against that e, not e's hash: a fault in the challenge's
+hash, its reduction or the copies into it gives a signature the card passes and the mint refuses (the money stranded, no
+key given away, the nonce being fresh). The stuck generator's "two good signatures and no d" holds for a fault in a
+squaring, the case tested.
 
 **Built.** `SchnorrHW.sign` (the chip path, then the bytecode's, each `signOnce`), `verify` (D207's, answering whether R'
 is R); `holds` is gone. Tests: `SignHardeningTest` (a fault in each of the four squarings, input or output, at eight bit
-places each: the answer verifies and `chipMul` is cleared; the stuck generator with a fault gives two good signatures and no
+places each: the answer verifies, and since D228 `chipMul` stays true; the stuck generator with a fault gives two good signatures and no
 d; a private key that is not the public key's is `6F00` with the output untouched on both paths; the cost two agreements and
 one addition); `SignatureCheckTest` (D207's cases; the waits checked; on the chip path a refused signature made again with a
 second R); `PerPaymentKeyTest.whatItCosts` (a signature's engine runs counted).
@@ -8625,8 +8630,8 @@ recognises the card at the background read itself.
 
 - **The state.** `#new` (no owner, or no record) against a code: whether a card is set up. A set-up card's file is 71 bytes,
   a new card's 26, so the lengths say the same; nothing else is in either.
-- **The switch.** A card whose owner switched the tag off refuses the tag's name. The simulator answers `6999`; the J3R180
-  answered `6A82` (the chip run of 2026-11-19, check 4), the answer for a name the card does not hold. Either way a reader
+- **The switch.** A card whose owner switched the tag off refuses the tag's name. The simulator answers `6999`; the J3R310-355 sample
+  card 58206920 answered `6A82` (the chip run of 2026-11-19, check 4; not a J3R180, [D228](#d228)), the answer for a name the card does not hold. Either way a reader
   learns that this card's tag is off, one bit shared by every card so switched, and `GET_INFO` P1 = 2 byte 42 says it to
   any reader too: the switch is not a privacy setting, and the app does not offer it as one.
 - **Timing.** A set-up card's selection does the code's work (about 45 ms measured on a J3R180: a whole tag read takes about
@@ -8648,6 +8653,14 @@ recognises the card at the background read itself.
 
   The rotation stops a phone's ordinary tag read from being a tracker; it does not make the card untraceable to a reader
   built to follow it. Those are separate decisions.
+- **The address before the fragment (since [D227](#d227), said by [D228](#d228)).** It is the installer's choice for each
+  card, given in the tag's install parameters, and it survives `RESET_CARD`, which only turns the tag back on. An installer
+  that gave each card its own address (`https://maker.example/c/<serial>`) would make the tag a fixed tracker for the card's
+  whole life and across owners, and a phone without the app opens it, so the server behind it sees every such read. The
+  applet cannot see other cards and so cannot refuse it. The check that holds is the maker's published address
+  ([`CARD-DESIGNS.md`](CARD-DESIGNS.md)): a card whose address is not its maker's published one is suspect.
+  `tools/maker/maker.py` refuses an address that looks per card unless told otherwise; a `gp --params` written by hand is
+  not checked.
 - **A reader with c.** Whoever holds c (the owner's phone, and anyone the owner's words reach) recognises every read of
   that card; nobody else can. A hand-over or a reset draws or takes a new c, and the last owner's phone no longer
   recognises the card from that moment.
@@ -8666,10 +8679,11 @@ recognises the card at the background read itself.
 through the same unexported shareable interface as the switch (`TagSwitch.tagCode`), to make this selection's code. The
 card's applet, on a card with an owner and a record, draws R, works K out from c and M from K and R, and keeps R and M in
 24 bytes of its own working memory (`scratch`, CLEAR_ON_DESELECT; the card's applet also clears the 24 bytes at its own `select`, for a chip
-that does not clear that memory when the tag, an applet of the same package, is selected after it. The J3R180 does clear
-it: a tag read between `SPEND_ALL_BEGIN` and `SPEND_ALL_SIGN` ended the payment, and SIGN answered `6985` with nothing
-spent, in the chip run of 2026-11-19. The applet comment at `tagCode` still says the opposite and is to be corrected with
-the next change to the applet's code); the room
+that does not clear that memory when the tag, an applet of the same package, is selected after it. The J3R310-355 sample
+card 58206920 of the chip run of 2026-11-19 (not a J3R180, [D228](#d228)) does clear it: a tag read between
+`SPEND_ALL_BEGIN` and `SPEND_ALL_SIGN` ended the payment, and SIGN answered `6985` with nothing spent, an inference from
+the payment's end and not a read of the memory. The applet comment at `tagCode`, which said the opposite, is corrected by
+D228); the room
 for the HMAC is the APDU buffer, K is held there only as the pad block. The room is checked to lie inside the caller's
 array before anything is worked out, and all of it is cleared on every way out, a failure's included. The card's applet
 hands the interface only to the tag: the caller's AID must be the tag's (the NFC Forum's name it is installed under, or
@@ -8684,8 +8698,11 @@ readers do.
   touches its own memory is the chip's affair.
 - **No new transient memory.** The card's applet holds 941 bytes of deselect RAM, the figure of the build that installs on
   the chip, and a larger figure has been refused (1,030). The tag keeps its one byte (the file chosen, and now a bit for
-  whether the address carries a code), and the code lives in the card's applet's existing scratch, in bytes no command of
-  its own uses. So deselect RAM is unchanged: 941 + 1.
+  whether the address carries a code), and the code lives in the card's applet's existing scratch, scratch 164 to 187.
+  Those bytes are not free (corrected by [D228](#d228)): a payment's output hash (`X_OUT` + 10 to + 76, 130 to 196) and a
+  teaching's high nodes (`T_HIGH`, 130 to 193) use them too. They do not meet only because the tag and the card's applet
+  are never selected at once (no class is `MultiSelectable`) and the card's applet clears the 24 bytes at its `select`.
+  So deselect RAM is unchanged: 941 + 1.
 - **No stale key.** K is worked out from c at every selection and kept nowhere. A reset (which clears the owner: `#new`),
   a hand-over (a new c) or the next claim (the next owner's c) changes the answer at the next read.
 - **The switch** is as it was: off, the tag's name is refused before any code is made.
@@ -8902,7 +8919,8 @@ recordable after the wait (the second line, reached by setting the stage in the 
 
 ## <a id="d226"></a>D226: One set-up keyset of each unit waits; a hand-over lets it go
 
-**Decided (protocol 3.0, 2026-11-19; amends [D223](#d223)).** *D222 on `card23-fixes`; D226 since the 3.0 merge.*
+**Decided (protocol 3.0, 2026-11-19; amends [D223](#d223)).** *D222 on `card23-fixes`; D226 since the 3.0 merge; amended by
+[D228](#d228): one set-up bit a unit, loaded or not.*
 The red team of 2026-11-19, round two (R2, `RT23R2TableTest` at 6864627), found that nothing limited how many entries got
 D223's set-up bit. Whoever speaks in the card's first set-up selection (a relay in the holder's set-up tap, or a seller who sets
 the card up and hands it over) taught five made-up keysets beside the real one; every reclaim spared them for good, they did not
@@ -8924,14 +8942,15 @@ middle chooses; what the rule bounds is the reach: at most one made-up keyset a 
 units) is kept past the set-up tap, and the holder keeps four entries, its own keysets going in with the PIN alone. Where a
 relay took the bit, the phone's own set-up keyset is still kept through the set-up tap (D223's fresh bit) and let go after it
 if no piece came; the first deposit teaches it again where `GET_CARD` says the keys are not known, as Foxy does. The bit is
-for waiting entries only, so a set-up that loads its first keyset and then teaches the mint's next one gives the next the bit.
+for waiting entries only, so a set-up that loads its first keyset and then teaches the mint's next one gives the next the bit
+(*amended by [D228](#d228): one bit a unit in the set-up, loaded or not; that next keyset is an ordinary entry*).
 
 **Cases checked.** `SetUpEntriesTest`: the red team's first proof made a test that fails on 6864627 (six made-up keysets taught
 after the phone's in the set-up selection: two go in, none has the bit, all are let go after the set-up tap, and the mint's
 next keyset goes in with the PIN alone); a relay that teaches first (its one kept; the phone's let go after the tap; the
 holder teaches its keysets again with the PIN alone); the honest set-up of one keyset a unit, owned, and with no owner both
 units under a held tap (each keeps the bit and survives taps and reclaims; a second sat keyset does not); a set-up keyset loaded
-in the set-up leaves the bit to the next; a hand-over lets the set-up keyset go; a reset empties the table and the next set-up's
+in the set-up leaves the bit to the next (since D228 it keeps the bit, `aLoadedSetUpEntryKeepsTheBit`); a hand-over lets the set-up keyset go; a reset empties the table and the next set-up's
 one keyset has the bit again. The red team's second proof (made-up pieces loaded under made-up keysets) is [D223](#d223)'s
 limit, below.
 
@@ -8991,8 +9010,9 @@ addresses. A reader that recognised its card by the address alone now misses eve
 `READ BINARY` of a coded file puts the code at the end of the APDU buffer, so the answer stops 24 bytes short of the buffer's
 length (237 on a 261-byte buffer, more than the largest file). No transient memory is added. The load file grew by 455 bytes,
 to 42,428 (188 past a multiple of 256), and `sizeTheFile` pads it to 42,485, 245 past, the place of the 3.0
-file before it, which J3R180 58206920 created 30 times of 30 at the first try. The new file (9ac55c1's, 42,485 bytes) installed 13
-times of 13 at the first try on J3R180 58206920 on 2026-11-21, with the tag's install parameters, its refusals and a
+file before it, which the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03; not a J3R180, [D228](#d228)) created 30
+times of 30 at the first try. The new file (9ac55c1's, load file `d69742d0…`) installed 13 times of 13 at the first try on
+that J3R310-355 on 2026-11-21, with the tag's install parameters, its refusals and a
 127-byte address checked, and the same day paid from at testnut with real signatures and real change verified on the chip
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)); the rest of
 [the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist) is still to come.
@@ -9002,3 +9022,74 @@ times of 13 at the first try on J3R180 58206920 on 2026-11-21, with the tag's in
 (`cashuPlan(loadFile, {tagAddress})`, the tag's `C9`, a check that reads the tag back; `parseMaker`); the provisioner (the
 address from `maker/maker.json`, and no install with the example file); `tools/maker/`; `spec/APDU.md`'s tag section and the
 deployment guide's commands. Run on a chip: the install and a payment run at testnut (the report above).
+
+## <a id="d228"></a>D228: The security review's fixes on 3.0: one set-up bit a unit, the chip's path given up for one signature, no wait bit
+
+**Decided (protocol 3.0, 2026-11-21, the project owner; amends [D218](#d218), [D222](#d222), [D226](#d226) and
+[D227](#d227)'s words, and closes M1).** The security review of 2026-11-21 of the 3.0 merge (a2da664) found, among others,
+applet-money-1, applet-crypto-1, applet-tag-maker-1 and the chip of the 2026-11-19 and 2026-11-21 runs misnamed. The owner
+decided each the same day.
+
+**(1) One set-up bit a unit, loaded or not (applet-money-1; amends D226).** Under D226 a keyset taught in the first set-up
+got the bit where no entry of its unit was a set-up's *still waiting* for its first piece. A load under the set-up's keyset
+made it no longer waiting, so a relay in the set-up selection taught a made-up keyset, loaded a made-up piece under it, and
+taught the next: each got the bit, none counted toward the two without the mark, and the holder's next keyset was `6A9C`
+even with the owner's grant (the review's `VerifyF1Test`; `VerifyF1bTest` in Foxy's flow, where the phone only teaches and
+the relay loads under the phone's real keyset). Now `newState` gives the bit only where no entry of the unit has it at all,
+loaded or not: one a unit in the set-up. The made-up keysets are ordinary entries, the third is `6A9C`, and the owner's
+grant still finds room. Rejected: taking the bit off at the first load. It breaks the teach-then-load set-up that D226
+round three keeps (Foxy's first keyset would count toward the two without the mark for life). The cost: a set-up that loads
+its keyset and then teaches the mint's next one (the mint rotating inside the set-up tap) leaves the next one ordinary; it is
+kept through the set-up tap, as every keyset taught in a tap is, and let go after it if no piece came.
+`SetUpEntriesTest.aLoadedSetUpEntryKeepsTheBit` is the amended case; `theOtherUnitsBitIsItsOwn` keeps usd's bit apart
+from sat's.
+
+**(2) The chip's path given up for one signature (applet-crypto-1; amends D217 and D218).** A signature whose chip product
+failed the check, or a chip that refused the product once, set `chipMul` false until the next `SET_CARD`, which needs the
+PIN or the owner. One induced fault in one `AUTH` (no PIN, as often as asked) turned D217's shares off for every later
+signature, and the bytecode's e·d of the known e by the fixed d is the first-order setting D217 removes. Now the bytecode
+remakes that one signature and `chipMul` stays as `SET_CARD`'s known answers left it; its only writer is `chipMulInit`.
+A truly broken engine costs a chip attempt and a bytecode retry on every signature, about 0.4 s. Not built, and left open
+(M2): a count of chip failures with `6F00` after some number, and a `GET_INFO` bit that says the chip's path is off.
+`SignHardeningTest.oneFaultDoesNotTurnTheChipPathOff` and the four amended cases.
+
+**(3) No payment floor, and byte 55 bit 3 says so (closes M1).** [D211](#d211) stands: 3.0 keeps no wait on a payment
+within its limit, and M1 (the other maintainer's floor of four) is closed by the owner. `GET_INFO` P1 = 4 byte 55 bit 3,
+the wait on every payment, is cleared: a 3.0 card answers `F7 03`, or `77 03` where its paid list's room was refused
+([D210](#d210)). A file that set the bit answered `FF 03`; a reader that matched `FF 03` exactly misreads the new value,
+and `cardctl` still names every bit by `PROFILE_NAMES` for older cards. The owner tells the other maintainer. The review's
+findings pr-spec-design-2 and -4 and applet-money-4 are accepted with D211.
+
+**(4) D218's check, narrowed (applet-crypto-2, its words).** The check covers s with the e the signer stored, not e's hash
+(D218, What it trusts). Recomputing e in `verify` and a second comparison before s is released are follow-ups.
+
+**(5) The tag's address is the installer's choice (applet-tag-maker-1; D222's tracker list, D227).** Since D227 the
+address before the fragment comes from the tag's install parameters, so whoever installs a card chooses it, card by card,
+and it survives `RESET_CARD`. The applet cannot see other cards. The guard is the maker's published address
+([`CARD-DESIGNS.md`](CARD-DESIGNS.md)) and, at the maker's own tool, `tools/maker/maker.py`, which refuses an address that
+looks per card (a run of six digits or more, of eight hex digits or more, a UUID, `serial` or `uid` in the path or the
+query) unless `--allow-per-card` is given. A `gp --params` written by hand is not checked. Whether wallets flag a card
+whose address is not its maker's is a follow-up.
+
+**(6) The chip of the 2026-11-19 and 2026-11-21 runs (pr-tooling-release-1).** Card 58206920 is a J3R310-355 sample card
+(ATR; ICType D321, SCP03), not a J3R180: the reports say so, and the guides and refcheck's comments called it a J3R180.
+They now name it as it is; the J3R180s 09301220, 09312320 and 09336320 stay J3R180s. No J3R180 has been given a 3.0 file,
+and a J3R180 run comes before any release wording. refcheck's SIZES entries 41,205, 41,973 and 42,485 are that
+J3R310-355's.
+
+**(7) Smaller corrections.** D222's "bytes no command of its own uses" and the applet's comment at `tagCode`, which said
+the chip does not clear the scratch at the tag's selection, are corrected (applet-tag-maker-6, pr-spec-design-7). The
+cardctl mock's held askings are the applet's `HISTORY_ASKINGS` (7) and `RESET_ASKINGS` (17), read from the source by a
+test (pr-tooling-release-4); [D189](#d189)'s "the fifth" and [D196](#d196)'s "the fifteenth", left from before D211, are
+the seventh and the seventeenth. SECURITY-MODEL row 13 says what the reference readers check today.
+
+**The file.** The tracked CAP is rebuilt with (1) to (3): 42,485 bytes again (it came to 42,482, 242 past, and two of
+`sizeTheFile`'s writes take a longer form), load file `99a66ba7…`, 245 past a multiple of 256. It has run only in a
+simulator so far: its hash is on neither of refcheck's PROVEN and INSTALLED, and the provisioner's validated list is
+unchanged. 9ac55c1's file (load file `d69742d0…`) stays on PROVEN as that file's.
+
+**Built.** `CashuApplet.newState`, `ENTRY_SETUP`'s comment, `processGetInfo`'s byte 55, `sizeTheFile`, the M1 notes and
+`tagCode`'s comment; `SchnorrHW.sign`. Tests: `VerifyF1Test`, `VerifyF1bTest` (new, each failing on a2da664),
+`SetUpEntriesTest`, `SignHardeningTest`, `SignatureCheckTest`, `CashuAppletTest`, `TagTest`, cardsim's byte 55;
+`tools/cardctl/test_apdu.py` (the mock's counts against the applet's); `tools/maker/test_maker.py`;
+`tools/ci/refcheck.test.cjs`.

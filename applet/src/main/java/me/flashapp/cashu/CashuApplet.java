@@ -6360,8 +6360,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The tag's code for this selection of it (D222, `TagSwitch.tagCode`): on a card with an owner and a holder's record,
      * R, sixteen bytes of the chip's secure random, and after it M, the first eight bytes of HMAC-SHA256(K, R) with
      * K = SHA-256("CashuCard/tag-address" || c); true. On any other card nothing, and false: the tag says `#new`. The code is
-     * kept in this applet's working memory (scratch[X_TAG], 24 bytes; on a chip that memory is not cleared when the tag, of
-     * this package, is selected after this applet, so it is cleared at this applet's own selection), so the tag asks for no transient memory of its own; `tagCodeCopy` gives it to the tag at each READ BINARY.
+     * kept in this applet's working memory (scratch[X_TAG], 24 bytes, CLEAR_ON_DESELECT; the J3R310-355 of the chip run of
+     * 2026-11-19 clears that memory when the tag, of this package, is selected after this applet, so that a tag read in the
+     * middle of a payment ends the payment, D222; it is cleared at this applet's own selection as well, for a chip that does
+     * not), so the tag asks for no transient memory of its own; `tagCodeCopy` gives it to the tag at each READ BINARY.
      * K is worked out from c at every selection and kept nowhere, so a new c (a hand-over, a reset, the next claim) is a new
      * key at once. The room w[at .. at + TAG_ROOM) is the tag's APDU buffer; K is held there only as the HMAC's pad block. The
      * room is checked before anything is worked out (a room that does not fit in w answers false and writes nothing), and all
