@@ -239,7 +239,7 @@ def test_the_applet_version_is_the_one_the_spec_the_guide_and_selftest_expect():
     """
     version = dict(re.findall(r"static final byte VERSION_(MAJOR|MINOR)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})", _applet_text()))
     major, minor = int(version["MAJOR"], 16), int(version["MINOR"], 16)
-    assert (major, minor) == (3, 0)
+    assert (major, minor) == (3, 1)
     assert f"`{major:02X} {minor:02X}`" in _heading_body("SELECT APPLICATION"), "the spec's SELECT response"
     guide = DEPLOYMENT_MD.read_text(encoding="utf-8")
     tracked = re.search(r"The CAP tracked in this repo is \*\*applet version (\d+)\.(\d+)\*\*", guide)
@@ -1076,7 +1076,7 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
     label = "On a card" if not untried else "On a card, not yet proven" if refcheck.installed(parts) else "Not yet on a card"
     guide_html_note = re.search(r'<p class="note"><b>' + re.escape(label) + r'\.</b>(.*?)</p>', guide_html, re.S)
     try:
-        deployment_size = deployment[deployment.index("The 3.0 build is"):deployment.index("On 2026-11-13 a J3R180")]
+        deployment_size = deployment[deployment.index("The 3.1 build is"):deployment.index("The 3.0 build was")]
     except ValueError:
         deployment_size = ""
     for name, text, is_html in (("guide.md", guide_md.split("## Rules")[0], False),
@@ -1095,7 +1095,7 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
     texts = (("guide.md", guide_md, False), ("guide.html", guide_html, True), ("HARDWARE_DEPLOYMENT.md", deployment, False),
              ("README.md", readme, False), ("RELEASE-NOTES.md", notes, False))
     if untried:
-        names = ("this exact file", "this exact", "3.0 file", "3.0 build", "3.0 cap", "3.0.0.cap", f"{size:,}", str(size),
+        names = ("this exact file", "this exact", "3.1 file", "3.1 build", "3.1 cap", "3.1.0.cap", f"{size:,}", str(size),
                  sha[:8], cap_sha[:8]) + UNTRIED_NAMES
         for name, text, is_html in texts:
             claims = file_claims(text, said, names, is_html)
@@ -1123,7 +1123,7 @@ def test_the_guides_say_what_refcheck_knows_of_the_tracked_file_and_where_the_fr
     tracked CAP; and the ECDH framing is checked at SET_CARD, not at install: the install's 6F00 points at the order and
     the size, the first SET_CARD's at the framing."""
     refcheck = _refcheck()
-    cap = ROOT / "applet" / "target" / "cashu-javacard-3.0.0.cap"
+    cap = ROOT / "applet" / "target" / "cashu-javacard-3.1.0.cap"
     guide_md = (ROOT / "website" / "dist" / "guide.md").read_text(encoding="utf-8")
     guide_html = GUIDE_HTML.read_text(encoding="utf-8")
     deployment = DEPLOYMENT_MD.read_text(encoding="utf-8")
@@ -1144,7 +1144,7 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
     them, in other words, as a flip, or hidden by entities, soft hyphens, zero-width characters, look-alike letters or
     full-width forms), finds it; and finds a checklist without refcheck's rule for PROVEN."""
     refcheck = _refcheck()
-    cap = (ROOT / "applet" / "target" / "cashu-javacard-3.0.0.cap").read_bytes()
+    cap = (ROOT / "applet" / "target" / "cashu-javacard-3.1.0.cap").read_bytes()
     md = (ROOT / "website" / "dist" / "guide.md").read_text(encoding="utf-8")
     html_ = GUIDE_HTML.read_text(encoding="utf-8")
     hd = DEPLOYMENT_MD.read_text(encoding="utf-8")
@@ -1204,8 +1204,8 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
         ("md", s, s + " It was \uff49nstalled."),
         ("hd", "adds its answer to\nrefcheck's table.", "adds its answer to\nrefcheck's table. On 2026-11-14 this exact "
                f"{size:,}-byte file installed on a J3R180 and passed its chip run."),
-        ("md", "## Rules", "## Rules\n\nThe 3.0 file installed and passed its chip run on a J3R180; it is safe to install.\n"),
-        ("html", "</body>", "<p>The 3.0 build has since been verified on the chip.</p></body>"),
+        ("md", "## Rules", "## Rules\n\nThe 3.1 file installed and passed its chip run on a J3R180; it is safe to install.\n"),
+        ("html", "</body>", "<p>The 3.1 build has since been verified on the chip.</p></body>"),
         ("hd", "## Install", "## Install\n\nThis exact file is ready for cards.\n"),
         # what the run of an earlier file did not cover, and the words a file tried somewhere is said in
         ("md", s, s + " The fix-15 file was tried on the bench J3R180 and every payment worked."),

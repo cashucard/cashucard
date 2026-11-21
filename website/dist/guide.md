@@ -2,7 +2,7 @@
 
 This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.0, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
-The 3.0 build: this exact file has run on a chip. It ran on the sample J3R180 of 2026-11-21, at a test mint. If the install in step 4 fails, stop and tell the person.
+The 3.1 build: this exact file has run only in a simulator so far, and no card has installed it. It is the 3.0 file with the waits made a second a limit and the held taps shortened (D229, D230). If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
@@ -50,18 +50,18 @@ chmod +x /usr/local/bin/gp
 
 ## 2. Get the applet
 
-The applet ships as one CAP file, `applet/target/cashu-javacard-3.0.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
+The applet ships as one CAP file, `applet/target/cashu-javacard-3.1.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
 
 ```sh
 git clone https://github.com/cashucard/cashucard
 cd cashucard/applet
-sha256sum target/cashu-javacard-3.0.0.cap
+sha256sum target/cashu-javacard-3.1.0.cap
 ```
 
-On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.0.0.cap`. Expected:
+On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.1.0.cap`. Expected:
 
 ```
-611b3478b82d4c1a3fb41878738087168b41a29c35343aafaa48fa8eeb297af4  target/cashu-javacard-3.0.0.cap
+5f0cb2a1d8cde67eb0d8f4c5663a239a95a2651541c2a157c6e569c52a857957  target/cashu-javacard-3.1.0.cap
 ```
 
 Stop if the hash differs.
@@ -100,7 +100,7 @@ If gp reports that the login failed, stop and tell the person to put that card a
 The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. The tag carries the address the person gave (rule 4), in hex as its install parameters; the tag refuses an install without one. From `cashucard/applet`, with that address in place of `https://example.com/card`:
 
 ```sh
-gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 --params "$(printf '%s' 'https://example.com/card' | xxd -p | tr -d '\n')"
 ```
@@ -174,7 +174,7 @@ A card fresh from the install is empty and unowned, and any reader in range can 
 
 ## Troubleshooting
 
-- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the chip next: this exact file has run on one J3R180, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and tell the person.
+- `gp --install` fails with `6F00`: check the order in step 4, since the chip takes the card's applet only after the opener. With the order right, suspect the chip next: the 3.0 file of the same size ran on one J3R180, and the chip refuses some sizes; an earlier source, numbered 2.3, ran on a J3R180 with both key agreements, and a chip in another configuration may refuse it. Stop and tell the person.
 - SELECT answers `6A82`: the requested applet was not found. An earlier 0.x or 1.x applet is one possible cause. Stop and ask the person.
 - SELECT answers `9000` with no version: that SELECT named the package AID alone, `F0434153485543415244`, which reaches the opener. Select the whole AID, `F043415348554341524401`, as in step 5.
 - The card refuses gp's keys: stop, as step 3 says.

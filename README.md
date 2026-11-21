@@ -78,8 +78,8 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > source with the version moved to 3.0 ([D205](docs/DECISIONS.md#d205)), the other maintainer's
 > [D206](docs/DECISIONS.md#d206) to [D210](docs/DECISIONS.md#d210), the rotating tag
 > ([D222](docs/DECISIONS.md#d222)), [D223](docs/DECISIONS.md#d223) to [D226](docs/DECISIONS.md#d226) and the tag's
-> address given at install ([D227](docs/DECISIONS.md#d227)) added (42,485 bytes, load file sha256 `d69742d0…`). This exact file has run on a chip:
-> J3R180 58206920 installed it 13 times of 13 at the first try, its tag took the address at install, and it paid from it at
+> address given at install ([D227](docs/DECISIONS.md#d227)) added (load file sha256 `d69742d0…`). That file ran on J3R180 58206920, which
+> installed it 13 times of 13 at the first try, its tag took the address at install, and it paid from it at
 > a test mint with real signatures and real change verified on the chip
 > ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)); the rest of the checklist is still to come. The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
@@ -167,7 +167,7 @@ The SDK is not downloaded for you:
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
-# → applet/target/cashu-javacard-3.0.0.cap   (three applets: the opener, the card's, then the NFC tag)
+# → applet/target/cashu-javacard-3.1.0.cap   (three applets: the opener, the card's, then the NFC tag)
 ```
 
 The build strips the Descriptor component and checks the load file's size against

@@ -8178,6 +8178,8 @@ its paid list (`7F 03`, and `6A84` at the load) and for both forms of a bad `ALL
 security. Those extra padding calculations should be removed." Then: "Reset pin should only be 15
 seconds", "History should take 4 seconds", "Owner claim should be brought down so it's 3 seconds."
 Supersedes [D188](#d188) and sets the counts of [D187](#d187), [D189](#d189) and [D196](#d196).
+*Amended by [D229](#d229) and [D230](#d230) (3.1, 2026-11-21): the over-limit wait it kept (10, then 4) becomes 2 a limit's worth
+past the first, the second payment's 10 becomes 2, the history's 7 becomes 3 and the reset's 17 becomes 4; the claim's 4 stays.*
 *At the merge of 2026-11-19: the other maintainer's 3.0 file before the merge kept D188's floor; this entry takes it
 away on the shared 3.0 wire too, which is open with him (M1). The shorter history's hold also shortens the held tap that
 arms a card with no owner under [D208](#d208) (about 3 s; M5).*
@@ -8531,6 +8533,9 @@ refused teaching leaves no entry; the planted entry plants nothing; the entry's 
 the entry D213 left behind is no longer left), `UnitsTest` (the state byte the tests read does not show the loaded bit).
 
 ## <a id="d221"></a>D221: A claim right after the set-up's record is one asking
+
+*Amended by [D231](#d231) and [D232](#d232) (3.1, 2026-11-21): `SET_CARD`'s self-tests run once in the card's life, so its
+seconds no longer stand for the hold; the one asking is kept for a card that had no PIN when the tap began.*
 
 **Decided (protocol 3.0, 2026-11-15, the project owner; amends [D187](#d187)).** A claim (`SET_OWNER` on a card with no
 owner) sets the owner at its first asking where, in this time in the field, the card's first set-up set its PIN (`SET_PIN`
@@ -9002,3 +9007,170 @@ times of 13 at the first try on J3R180 58206920 on 2026-11-21, with the tag's in
 (`cashuPlan(loadFile, {tagAddress})`, the tag's `C9`, a check that reads the tag back; `parseMaker`); the provisioner (the
 address from `maker/maker.json`, and no install with the example file); `tools/maker/`; `spec/APDU.md`'s tag section and the
 deployment guide's commands. Run on a chip: the install and a payment run at testnut (the report above).
+
+## <a id="d229"></a>D229: The limit on one payment is a rate: two askings a limit's worth past the first, with no larger first step
+
+**Decided (protocol 3.1, 2026-11-21, the project owner; moves the minor: `03 01`).** The owner's rule of 2026-11-03, "make the
+per second limit true", which became software 1.25 on the Foxy 1.x line (two askings a limit's worth), never reached the 2.x
+and 3.0 wires: 2.2's counts stayed, and [D211](#d211) kept them ("the over-limit wait, `WAIT_OVER_SIGNS` 10, `WAIT_MORE_SIGNS`
+4"). The phone that sets a card up asks its holder for a rate ("$10 a second") and writes it as the limit on one payment, as
+1.25 taught it to; on a 3.0 card that rate was not true. At the 473.6 ms an asking of J3R180 58206920 (2026-11-21, the
+hardware report's test 3) the first limit's worth past the limit cost 4.7 s and each after it 1.9 s: a holder told "$10 a
+second" held a $20 payment about 5.8 s where 2 s was promised. The owner: a payment within the limit holds about 1.1 to 1.5 s;
+"$10 a second" means $20 in about 2 s and $30 in about 3 s; "a 5 s wait where 2 s is promised is a disaster". And (2026-11-21)
+the payment's own signature, about 1.1 s, counts as the first second, so the limit is the rate times one second exactly.
+
+**The rule.** With N the limits' worth leaving the card, counted as before (1 within the limit or within a thirty-second over
+it, a part counting as one, 255 at the most, a sum that wrapped the most):
+
+    W = WAIT_MORE_SIGNS × (N − 1),   WAIT_MORE_SIGNS = 2
+
+0 at N = 1. No larger first step: the first limit's worth past the limit costs what every later one does. Two askings are about
+0.95 s on a J3R180 (k × t = 2 × 0.4736 s, the k nearest one second at that chip's asking). A second payment in the same time
+in the field keeps a wait of its own, at least `WAIT_SECOND_SIGNS` ([D230](#d230) sets it), whatever its size. The change
+outputs' credit is one wait for every two outputs, where 2.2 to 3.0 took two for every three: an output was two thirds of a
+signature when that was set, and is about half of one since [D217](#d217) and [D218](#d218) (0.23 s against 0.47 s, the
+report's test 3: five outputs took 1.1 s and were credited 1.4 s), so the old credit let a terminal buy the wait down below the
+rate with outputs. The day's limit, the no-PIN allowance and its window, the 255 cap and the carry rule are unchanged; there is
+still no floor on every payment ([D211](#d211)).
+
+**Predicted holds** at a limit of $10 (a "$10 a second" card), J3R180, 473.6 ms an asking, about 1.1 s from `SPEND_ALL_BEGIN`
+to a signature at the first `SIGN` (the report's 1,089 ms), no change outputs:
+
+| Payment | N | Waits | Hold, about | 3.0 |
+|---|---|---|---|---|
+| $10 | 1 | 0 | 1.1 s | 1.1 s |
+| $20 | 2 | 2 | 2.0 s | 5.8 s |
+| $30 | 3 | 4 | 3.0 s | 7.7 s |
+| $50 | 5 | 8 | 4.9 s | 11.5 s |
+
+**What it costs: the drain rate.** The number the holder is shown becomes the true rate, so at the same setting a card pays
+out faster than 3.0's: a reader that has the PIN and holds the card takes N limits' worth in 1.1 + 0.95 × (N − 1) seconds,
+where 3.0 took 1.1 + 4.7 + 1.9 × (N − 2); for a long hold about 1.9 times as fast as 3.0 at the same limit (the step 1.9 s
+against 0.95 s). And on the fastest chip known the step is 0.95 s, not 1 s: over a long hold the card pays about 5% faster
+than its limit a second. The owner accepted that (2026-11-21) rather than a k of three (1.4 s a step) or a limit written
+short. A slower chip (a J3R452, about 0.75 s an asking: 1.5 s a step) pays slower than its limit a second, never faster; a k
+chosen for it (one asking, 0.75 s) wants the card to know which chip it is on, which one load file for every chip does not,
+and is left open.
+
+**Rejected.** Keeping 2.2's counts (the owner's rule broken, the phone's rate untrue); a floor on every payment to make the
+first second ([D211](#d211) took it away; the signature is the first second); writing the limit as R × k × t at set-up (a
+payment of exactly the rate would wait one step, since R is 5.6% over R × 0.947, past the thirty-second).
+
+**Built (applet 3.1).** `WAIT_MORE_SIGNS = 2`, `WAIT_OVER_SIGNS` gone, `WAIT_SIGNS_MOST` = 2 × 254 = 508 (1,022 in 3.0),
+`waitsFor` returns `WAIT_MORE_SIGNS × (units − 1)` raised to `WAIT_SECOND_SIGNS` for a second payment, and `SPEND_ALL_SIGN`
+takes `outputs >> 1` off. `VERSION_MINOR` 1: a reader of 3.0 sends what it sent and is answered sooner, so the minor moves and
+not the major ([D205](#d205)). jCardSim: `testTheWaitIsTwoALimitsWorthWithNoFirstStep` (within the limit signs at the first
+`SIGN`; N limits' worth wait 2 × (N − 1); the credit; a second payment's least), and every test that pinned 10 and 4 moved to
+the rule. *Not yet agreed with the other maintainer, on the shared 3.x wire (as M1 and M3); not yet run on a chip.*
+
+## <a id="d230"></a>D230: No padding past the protection: the second payment two askings, the held history three, the reset by the PIN four
+
+**Decided (protocol 3.1, 2026-11-21, the project owner).** "Padding: a person must not hold a card longer than the protection
+needs." Three holds of 3.0 are set by that rule; the owner's claim (`CLAIM_ASKINGS`, 4, [D187](#d187)) and the PIN's wait
+after wrong tries (`PIN_STRETCH`, [D195](#d195)) are kept as they are.
+
+- **A second payment in the same time in the field: `WAIT_SECOND_SIGNS` = 2** (10 in 3.0, about 4.7 s), the least of 2 to 4
+  that holds a reader that has the PIN to the holder's rate. Its job is one payment a tap at full speed: a terminal must not
+  take a limit's worth, then another, as fast as it asks. Each payment already costs its own signature, about 1.1 s from its
+  beginning; with two askings more (0.95 s) a reader that has the PIN takes one limit's worth in about 2.0 s a payment, half
+  the rate the holder chose (L a second, [D229](#d229)), and a larger payment waits its own count, which is never less. With
+  no limit set, the second payment's two askings are the only pace there is; the day's limit and the no-PIN allowance hold.
+  The owner's grant in the tap still lifts it.
+- **The history of a card with no owner: `HISTORY_ASKINGS` = 3** (7 in 3.0; [D189](#d189)), about 1.5 s on a J3R180 (0.49 s
+  an asking). Its protection is that no brush of a tap opens a held tap, and that no held tap is had in a time in the field
+  that paid (`6985`), both kept. Every holder's act on a card with no owner pays it, since they all want a held tap: the
+  history itself (`GET_LOG`, the log and the receipts), the arming of the no-PIN allowance at its end ([D208](#d208)),
+  `REFRESH` under the PIN, a new PIN by `SET_PIN` on a set-up card, `LET_GO`, marking a keyset (`KEYSET_KEYS` under the
+  holder's say), `GET_OUTBOX` and the holder's fields of `GET_INFO`, and the reset by the PIN.
+- **The reset by the PIN of a card with no owner: `RESET_ASKINGS` = 4** (17 in 3.0; [D196](#d196)), about 2 s; with the
+  history's three before it, 7 askings and about 3.5 s in all (24 and about 11 s in 3.0). The card must be empty and owe
+  nothing (`6A8D`), so the reset moves no money.
+
+**What it gives up.** (1) A reader that has the PIN takes payments within the limit one after another at about one limit's
+worth every 2 s, where 3.0 made it about 5.8 s. (2) The no-PIN allowance of a card with no owner is armed by a held tap of
+about 1.5 s where it took about 3 s: a till handed the PIN can arm it in a tap of its own that pays nothing, a little more
+easily. (3) The accepted risk of [D196](#d196) (`SECURITY-MODEL.md` #20) is cheaper: anyone with the PIN who holds an empty
+card with no owner for about 3.5 s, in a tap that paid nothing, can reset it and set it up again with numbers, a refund key or
+an owner of its own; a till cannot do it in the tap that takes the payment, but can in a later tap of its own. The holder's
+phone still sees it (`GROUP_KEYS` before a top-up, [D197](#d197)); a guest wallet that never saw the card does not.
+
+**Built (applet 3.1).** `WAIT_SECOND_SIGNS = 2`, `HISTORY_ASKINGS = 3`, `RESET_ASKINGS = 4`; the held count's bits are as they
+were. jCardSim: the second payment's two in `testTheWaitIsTwoALimitsWorthWithNoFirstStep` and every test of the second payment,
+`HolderTest`, `SimpleCardTest` and `FarHeaderTest` at the new counts. *Not yet agreed with the other maintainer; not yet run on
+a chip.*
+
+## <a id="d231"></a>D231: The set-up's self-tests run once in the card's life
+
+**Decided (protocol 3.1, 2026-11-21, the project owner: "a person must not hold a card longer than the protection needs").**
+Every `SET_CARD` ran the chip's self-tests: the framing check's seventeen calls (`checkFraming`, before anything is written),
+the key agreement's seven points (`checksCurve`, D212, D219), the field's known answers (`fieldPInit`, D214) and the
+squaring's (`chipMulInit`, D216, D219). That is about 2.4 s of every record write on an iPhone 17 (2,033 ms of a first
+`SET_CARD` on a J3R180), and the chip is the same chip at every write.
+
+**The rule.** They run at the first `SET_CARD` in the card's life that gets that far, and their verdicts are kept, as they
+always were, in the applet's fields (`curveByAgreement`, `fieldP`, `SchnorrHW.chipMul`), with one more, `selfTested`, set
+once the framing check has passed and the three verdicts are worked out. A later `SET_CARD`, after a reset too (a reset keeps
+the card's software and its chip), writes the record alone. A failed self-test refuses exactly as before: the framing check
+throws `6F00` before anything is written and keeps no verdict, so a chip that fails it is asked again and refused at every
+`SET_CARD`; the other three choose the slow, checked paths where they fail, and a `false` is kept as a `false`.
+
+**Is any check needed at every write?** No, by the speed study's own reasoning ([D219](#d219), [D221](#d221)): each test is
+a known-answer test of the chip's engines, not of the data being written, and nothing a `SET_CARD` writes changes what the
+engines answer. The fault argument runs the other way: a check re-run at every write is one more chance for someone with a
+glitch rig to flip a verdict, and a verdict set once is set when the card is first set up (by its maker's factory record
+where bulk encoding writes one). What the verdicts guard is guarded again downstream: every signature is checked on the card
+before it leaves ([D218](#d218)), so a squaring engine wrongly trusted gives refused signatures, not a wrong one; a point off
+the curve taken through a wrongly trusted key agreement is worth nothing at a mint ([D212](#d212)). A chip whose engine fails
+after its first set-up (a fault that comes with age) is not found at a later `SET_CARD` any more; D218's check of every
+signature is what finds it then.
+
+**What it gives up.** [D221](#d221)'s one-asking claim rested on `SET_CARD`'s seconds ("if `SET_CARD` is ever made much
+faster ... the claim's hold must come back in some form"). It comes back as [D232](#d232).
+
+**Built (applet 3.1).** `selfTested`; `processSetCard` runs `checkFraming` and the three inits only while it is false.
+jCardSim: `HoldNoLongerThanNeededTest.theSelfTestsRunOnceInTheCardsLife`. *Not yet run on a chip; not yet agreed with the
+other maintainer.*
+
+## <a id="d232"></a>D232: The one-asking claim is a blank card's alone
+
+**Decided (protocol 3.1, 2026-11-21, the project owner).** Amends [D221](#d221). The claim right after the set-up's record is
+one asking only on a card that had **no PIN when this time in the field began**: a blank card (new, or reset in an earlier
+tap) set up in this tap. A card that had a PIN at the start of the tap (an ownerless "simple" card, reset by its PIN and set
+up again in the same tap) is claimed only after `CLAIM_ASKINGS` askings, whatever else happened in the tap.
+
+**Why.** With [D231](#d231) `SET_CARD` no longer holds the card for seconds, so its time can no longer stand for the claim's
+hold. A blank card holds no money, and whoever gives it its first PIN sets it up ([D196](#d196)); a card that had a PIN belongs
+to a holder, and a reader that knows the PIN must not make itself its owner in less than the full hold.
+
+**The rule, built.** Two bits of the CLEAR_ON_RESET `tapOpen[2]`: `TAP_BEGUN` (0x40), set at the first command of the time in
+the field, and with it `TAP_HADPIN` (0x80) where the card has a PIN then. `RESET_CARD` keeps both (it clears the PIN's own
+marks), so a reset inside the tap never makes the card a blank card's. `SET_OWNER` holds for one asking only with
+`TAP_SETUP` set and `TAP_HADPIN` clear. No order of commands gets under the full hold on a card that had a PIN: the bit is
+read once, before any command of the tap has run; a `SELECT` ends the first set-up ([D195](#d195)), so a record and a claim
+under a PIN given before it are refused.
+
+**What it gives up.** A blank card can be set up and claimed in one tap in about a second and a half of holding (`SET_PIN`,
+`SET_CARD`, the clock and one asking), where D221 made it about four. A stranger who reaches a blank card in someone's pocket
+for that long can make itself its owner, and the card is then the stranger's to reset; no money is at stake (a blank card
+takes none until it is set up). Rejected: keeping the claim's four askings on a blank card too (about 2.6 s more on every new
+card's set-up, for a card with nothing on it).
+
+**Built (applet 3.1).** jCardSim: `HoldNoLongerThanNeededTest.aBlankCardIsSetUpAndClaimedInOneTap` and
+`aCardThatHadAPinIsHeldForEveryAsking`; `ClaimAfterSetUpTest` and `HolderTest` as before. *Not yet run on a chip.*
+
+## <a id="d233"></a>D233: A card's first PIN stands as given for the selection that set it
+
+**Decided (protocol 3.1, 2026-11-21, the project owner).** The `SET_PIN` that gives a card that has no PIN (new, or reset) its
+first PIN also stands as that PIN given (`pinVerifiedFlag`) for the rest of the selection, so the reader that chose it sends
+no `VERIFY_PIN` after it (about 0.3 s of every set-up).
+
+**Why it is safe.** The PIN was chosen by the same reader in the same selection: nothing is learnt that it did not already
+have. Only `SET_PIN` on a card whose `pinState` is 0 (`first`) does it; a card that has a PIN is never given it by a
+`SET_PIN` (a forgotten PIN replaced with no PIN asked, [D196](#d196), stays not given, and needs `VERIFY_PIN`). The flag is
+CLEAR_ON_DESELECT, so a `SELECT` or the card leaving the field ends it, as it ends any PIN given. A card reset by its PIN in
+the tap had its PIN given already; its new first PIN is given by the same reader.
+
+**Built (applet 3.1).** `processSetPin`: `pinVerifiedFlag[0] = first ? 1 : 0` after the commit. jCardSim:
+`HoldNoLongerThanNeededTest.theFirstPinAsGivenEndsWithTheSelection`; `HolderTest.aClaimIsUnderThePin` asks its claim after a
+`SELECT`. *Not yet run on a chip.*

@@ -11,7 +11,7 @@ authorities. Do not generate replacement signing keys to make CI pass.
 
 | Component   | Current manifest identity                                        | New release tag              |
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
-| Firmware    | `applet/pom.xml`: 3.0.0; tracked CAP `cashu-javacard-3.0.0.cap`, APDU version 3.0 | `firmware-v3.0.0`            |
+| Firmware    | `applet/pom.xml`: 3.0.0; tracked CAP `cashu-javacard-3.1.0.cap`, APDU version 3.0 | `firmware-v3.0.0`            |
 | cardkit     | `tools/cardkit/package.json`: 0.4.0                              | `cardkit-v0.4.0`             |
 | Ops-service | `ops/package.json`: 0.2.0                                        | `ops-v0.2.0`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 15                  | `provisioner-v1.0.0-build.15` |
@@ -25,7 +25,7 @@ metadata does not alter the CAP.
 
 Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
 answer `03 00`, and the decisions are D183 to D227 (spec/APDU.md). The tracked
-`cashu-javacard-3.0.0.cap` has run on a chip: J3R180 58206920 installed it and paid from it at a test mint
+`cashu-javacard-3.1.0.cap` has run on a chip: J3R180 58206920 installed it and paid from it at a test mint
 on 2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md); no `firmware-v3.0.0` release is
 cut before the operator's approval. The firmware a chip ran before it
 was numbered 2.3 (`02 03`, `cashu-javacard-2.3.0.cap`, load file `05c9b847…`), never

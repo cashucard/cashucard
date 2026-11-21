@@ -5,9 +5,21 @@ One entry per component release, newest first, as
 in the reviewed pull request, and the tag follows the merge. A GitHub release lists
 the merged pull requests besides.
 
+## `firmware-v3.1.0`: Cashu Card protocol 3.1 (not yet tagged)
+
+The tracked CAP is `applet/target/cashu-javacard-3.1.0.cap`, sha256
+`5f0cb2a1d8cde67eb0d8f4c5663a239a95a2651541c2a157c6e569c52a857957`, its load file sha256
+`3953d506c8794b74271264e80457e6728de4fdc9047a9b1ad0250959ac31340c`. `SELECT` and `GET_INFO` answer `03 01`. It is
+the 3.0 file below with [D229](DECISIONS.md#d229) (the limit on one payment a rate: two askings for every limit's worth
+past the first, with no larger first step; the change's credit one for every two outputs) and [D230](DECISIONS.md#d230)
+(the second payment in a tap two askings, the held history three, the reset by the PIN four), [D231](DECISIONS.md#d231)
+(the set-up's self-tests once in the card's life), [D232](DECISIONS.md#d232) (the one-asking claim a blank card's alone) and
+[D233](DECISIONS.md#d233) (a card's first PIN stands as given for the selection that set it). This exact file has run
+only in a simulator so far, and no card has installed it.
+
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
-The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
+The CAP was `applet/target/cashu-javacard-3.0.0.cap`, sha256
 `611b3478b82d4c1a3fb41878738087168b41a29c35343aafaa48fa8eeb297af4`. Its load file,
 the bytes a card is LOADed with, is 42,485 bytes by `tools/refcheck.py`'s measure,
 sha256 `d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e`. `SELECT`
@@ -19,7 +31,7 @@ since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This exact file has run on a chip: J3R180 58206920 installed it 13 times of 13 at the first try on 2026-11-21, its tag
+That file (load file `d69742d0…`) ran on J3R180 58206920, which installed it 13 times of 13 at the first try on 2026-11-21, its tag
 taking the address at install, and paid from it at a test mint (testnut), with real signatures and real change verified
 on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version

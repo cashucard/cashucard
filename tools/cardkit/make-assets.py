@@ -6,7 +6,7 @@
 A load file is what gp sends after INSTALL [for load]: C4, its BER length, then
 the components refcheck counts, in refcheck's order (tools/refcheck.py, LOADED
 and components; GlobalPlatformPro's CAPFile.getCode sends the same). The card's
-comes from the tracked CAP, applet/target/cashu-javacard-3.0.0.cap (its sha256
+comes from the tracked CAP, applet/target/cashu-javacard-3.1.0.cap (its sha256
 is published in docs/HARDWARE_DEPLOYMENT.md, and pinned below as CAP_SHA256),
 and must be the 42,485 bytes refcheck measures, with the sha256 pinned below as
 LOAD_FILE_SHA256: the provisioner checks that hash again before it sends a
@@ -28,10 +28,10 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from refcheck import LOADED, components  # noqa: E402
 
-CAP = 'applet/target/cashu-javacard-3.0.0.cap'
+CAP = 'applet/target/cashu-javacard-3.1.0.cap'
 HELLO_CAP = 'applet/target/hello-1.0.cap'
-CAP_SHA256 = '611b3478b82d4c1a3fb41878738087168b41a29c35343aafaa48fa8eeb297af4'
-LOAD_FILE_SHA256 = 'd69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e'
+CAP_SHA256 = '5f0cb2a1d8cde67eb0d8f4c5663a239a95a2651541c2a157c6e569c52a857957'
+LOAD_FILE_SHA256 = '3953d506c8794b74271264e80457e6728de4fdc9047a9b1ad0250959ac31340c'
 LOAD_FILE_SIZE = 42485
 ASSETS = 'apps/provisioner/src/assets'
 
@@ -101,7 +101,7 @@ def main(argv):
     hello = load_file(args.hello_cap)
 
     out = {
-        'cashu.ts': render('CASHU_LOAD_FILE', 'cashu-javacard 3.0.0', CAP, CAP_SHA256, cashu),
+        'cashu.ts': render('CASHU_LOAD_FILE', 'cashu-javacard 3.1.0', CAP, CAP_SHA256, cashu),
         'hello.ts': render('HELLO_LOAD_FILE', 'hello 1.0', HELLO_CAP, None, hello),
     }
     failed = False
