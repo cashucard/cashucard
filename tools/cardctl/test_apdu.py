@@ -1508,8 +1508,12 @@ class FirstSetUpCard(Card23):
     """
     Card23, fresh from its install, as far as a first set-up goes (D196): SET_PIN begins the first set-up, which ends
     at the next selection; SET_CARD and the claim want it and the PIN given in this tap (6A91, 6982 otherwise); the
-    claim is held for (6A98 to the first three askings); the owner's SET_LIMIT is taken after a nonce.
+    claim is held for (6A98 to the first three askings); the owner's SET_LIMIT is taken after a nonce. GET_LOG and
+    RESET_CARD are held for as many askings as the applet holds them (test_the_mocks_held_askings_are_the_applets).
     """
+
+    HISTORY_ASKINGS = 7   # CashuApplet.HISTORY_ASKINGS (D211): GET_LOG answers at the seventh asking in a row
+    RESET_ASKINGS = 17    # CashuApplet.RESET_ASKINGS (D211): RESET_CARD resets at the seventeenth
 
     def __init__(self, factory=None, refuse=None, lift_at=None):
         super().__init__(has_owner=False, refund=False, pin_state=0)
@@ -1587,7 +1591,7 @@ class FirstSetUpCard(Card23):
             if not self.verified:
                 return b"", 0x6982
             self.log_askings += 1
-            if self.log_askings < 5:
+            if self.log_askings < self.HISTORY_ASKINGS:
                 return b"", 0x6A98
             self.held_tap = True
             return bytes(16), 0x9000
@@ -1604,7 +1608,7 @@ class FirstSetUpCard(Card23):
             if len(data) not in (0, 80):
                 return b"", 0x6700
             self.reset_askings += 1
-            if self.reset_askings < 15:
+            if self.reset_askings < self.RESET_ASKINGS:
                 return b"", 0x6A98
             self.pin_state, self.record, self.limits, self.first, self.verified = 0, None, None, False, False
             self.askings = 0
@@ -2050,7 +2054,44 @@ def test_setup_on_a_2_2_card_that_stops_names_the_claim_not_the_reset():
             raise AssertionError("a stopped setup was not reported")
 
 
-def test_reset_by_the_pin_holds_the_history_then_fifteen_askings_and_frees_the_card_for_setup():
+def _applet_asking(name):
+    """A count of askings as CashuApplet.java has it (`static final short NAME = (short) N;`)."""
+    import pathlib
+    import re
+    src = (pathlib.Path(__file__).resolve().parents[2] / "applet/src/main/java/me/flashapp/cashu/CashuApplet.java").read_text()
+    found = re.findall(r"static final short\s+" + name + r"\s*=\s*\(short\)\s*(\d+)\s*;", src)
+    assert len(found) == 1, (name, found)
+    return int(found[0])
+
+
+def test_the_mocks_held_askings_are_the_applets():
+    """The mock card holds GET_LOG and RESET_CARD for as many askings as the applet does (pr-tooling-release-4, D228):
+    HISTORY_ASKINGS and RESET_ASKINGS read from CashuApplet.java, and the askings the mock takes before its 9000 counted,
+    so that a test of cardctl's held askings tests the applet's counts and not the mock's own."""
+    history, reset = _applet_asking("HISTORY_ASKINGS"), _applet_asking("RESET_ASKINGS")
+    conn = FirstSetUpCard()
+    conn.pin_state, conn.verified = 1, True
+    n = 0
+    while True:
+        n += 1
+        assert n <= 100, "GET_LOG never answered"
+        _, sw1, sw2 = conn.transmit(bytes([cardctl.CLA, cardctl.INS_GET_LOG, 0, 0, 0]))
+        if (sw1, sw2) == (0x90, 0x00):
+            break
+        assert (sw1, sw2) == (0x6A, 0x98), hex(sw1 << 8 | sw2)
+    assert n == history, f"the mock answers GET_LOG at asking {n}, the applet at {history}"
+    n = 0
+    while True:
+        n += 1
+        assert n <= 100, "RESET_CARD never answered"
+        _, sw1, sw2 = conn.transmit(bytes([cardctl.CLA, cardctl.INS_RESET_CARD, 0, 0xAD]))
+        if (sw1, sw2) == (0x90, 0x00):
+            break
+        assert (sw1, sw2) == (0x6A, 0x98), hex(sw1 << 8 | sw2)
+    assert n == reset, f"the mock resets at asking {n}, the applet at {reset}"
+
+
+def test_reset_by_the_pin_holds_the_history_then_seventeen_askings_and_frees_the_card_for_setup():
     conn, card = _setup_card(refuse={cardctl.INS_SET_CARD: 0x6F00})
     try:
         _run(card, _setup_args())
@@ -2061,7 +2102,7 @@ def test_reset_by_the_pin_holds_the_history_then_fifteen_askings_and_frees_the_c
     code, out, err = _run(card, ["reset", "--pin", "1234", "--yes"])
     assert code == 0 and conn.pin_state == 0 and conn.record is None, (out, err)
     ins = [a[1] for a in conn.sent[-80:] if a[:2] != b"\x00\xA4"]
-    assert ins.count(cardctl.INS_GET_LOG) == 5 and ins.count(cardctl.INS_RESET_CARD) == 15, ins
+    assert ins.count(cardctl.INS_GET_LOG) == 7 and ins.count(cardctl.INS_RESET_CARD) == 17, ins
     assert all(a[2:4] == b"\x00\xAD" and len(a) == 4 for a in conn.sent if a[1] == cardctl.INS_RESET_CARD)
     conn.refuse = {}
     card.select()
@@ -2090,7 +2131,7 @@ def test_reset_by_the_pin_takes_an_anchor_in_every_asking_and_checks_its_work_fi
     code, out, err = _run(card, ["reset", "--pin", "1234", "--yes", "--anchor", _ANCHOR.hex()])
     assert code == 0 and conn.pin_state == 0 and getattr(conn, "anchored_at", None) == _ANCHOR, (out, err)
     resets = [a for a in conn.sent if a[1] == cardctl.INS_RESET_CARD]
-    assert len(resets) == 15 and all(a[2:5] == b"\x00\xAD\x50" and a[5:85] == _ANCHOR for a in resets), resets[:1]
+    assert len(resets) == 17 and all(a[2:5] == b"\x00\xAD\x50" and a[5:85] == _ANCHOR for a in resets), resets[:1]
     bad_work = bytearray(_ANCHOR)
     bad_work[76] ^= 0x01
     for anchor, hardest, word in ((bytes(bad_work), bytes(4), "work"), (_ANCHOR, bytes.fromhex("00010017"), "quarter")):
@@ -2229,7 +2270,7 @@ def test_the_holders_refresh_gives_the_pin_holds_the_history_and_sends_the_heade
     code, out, err = _run(card, ["refresh", "--pin", "1234", "--header", _ANCHOR.hex()])
     assert code == 0 and getattr(conn, "refreshed", None) == _ANCHOR, (out, err)
     ins = [a[1] for a in conn.sent if a[:2] != b"\x00\xA4"]
-    assert ins[0] == cardctl.INS_VERIFY_PIN and ins.count(cardctl.INS_GET_LOG) == 5 and ins[-1] == cardctl.INS_REFRESH, ins
+    assert ins[0] == cardctl.INS_VERIFY_PIN and ins.count(cardctl.INS_GET_LOG) == 7 and ins[-1] == cardctl.INS_REFRESH, ins
     refresh = [a for a in conn.sent if a[1] == cardctl.INS_REFRESH][0]
     assert refresh[2:5] == b"\x01\x00\x50" and refresh[5:85] == _ANCHOR, refresh.hex()
 
@@ -2300,7 +2341,7 @@ def test_setup_brings_back_a_far_clock_on_2_3_and_refuses_it_on_an_older_card():
 
 
 def test_a_fresh_card_is_reset_with_an_anchor_its_pin_set_for_the_reset_alone():
-    """reset --pin --anchor on a fresh card (D203): SET_PIN, VERIFY_PIN, the history held for and the reset's fifteen
+    """reset --pin --anchor on a fresh card (D203): SET_PIN, VERIFY_PIN, the history held for and the reset's seventeen
     askings with the anchor, in one selection, after which setup takes the card. Without --anchor a fresh card is not
     reset: nothing is sent, and setup is named."""
     conn, card = _setup_card()
@@ -2316,7 +2357,7 @@ def test_a_fresh_card_is_reset_with_an_anchor_its_pin_set_for_the_reset_alone():
     assert code == 0 and conn.pin_state == 0 and getattr(conn, "anchored_at", None) == _ANCHOR, (out, err)
     ins = [a[1] for a in conn.sent[sent:] if a[:2] != b"\x00\xA4"]
     assert ins.index(cardctl.INS_SET_PIN) < ins.index(cardctl.INS_VERIFY_PIN) < ins.index(cardctl.INS_GET_LOG), ins
-    assert ins.count(cardctl.INS_RESET_CARD) == 15, ins
+    assert ins.count(cardctl.INS_RESET_CARD) == 17, ins
     card.select()
     assert _run(card, _setup_args())[0] == 0 and conn.has_owner
 
