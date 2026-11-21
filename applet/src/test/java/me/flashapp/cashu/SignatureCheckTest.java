@@ -340,7 +340,7 @@ class SignatureCheckTest {
     }
 
     @Test
-    @DisplayName("D218 (the join, M2 open): on the chip's path a fault in e*d that makes a signature the check refuses never reaches out: the whole signature is made again by the bytecode, from step 1 with a fresh nonce (a second R), checked again, and verifies; the chip's path is given up (chipMul false); a key that does not agree is 6F00 even so, after the second try, out as it was and scratch and work zero")
+    @DisplayName("D218 (the join, M2 open): on the chip's path a fault in e*d that makes a signature the check refuses never reaches out: the whole signature is made again by the bytecode, from step 1 with a fresh nonce (a second R), checked again, and verifies; the chip's path is given up for that signature only (D228: chipMul stays true); a key that does not agree is 6F00 even so, after the second try, out as it was and scratch and work zero")
     void onTheChipsPathARefusedSignatureIsMadeAgain() throws Exception {
         java.math.BigInteger d = java.math.BigInteger.valueOf(0x5EED5L).shiftLeft(130).add(java.math.BigInteger.valueOf(77));
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
@@ -354,7 +354,7 @@ class SignatureCheckTest {
         byte[] out = untouched();
         assertEquals(64, s.sign(SignHardeningTest.ecPriv(ChipEnginesTest.be(d)), SignHardeningTest.ecPub(point65(pt)), m, (short) 0, out, (short) 8));
         assertTrue(schnorrVerify(ChipEnginesTest.be(pt[0]), m, Arrays.copyOfRange(out, 8, 72)), "the signature that leaves is the bytecode's, and verifies");
-        assertFalse(ChipEnginesTest.flag(s, SchnorrHW.class, "chipMul"), "the chip's path is given up");
+        assertTrue(ChipEnginesTest.flag(s, SchnorrHW.class, "chipMul"), "the chip's path is given up for that signature only (D228)");
         assertEquals(4, ecdh.answers.size(), "R and [e]Q of the refused try, then R and [e]Q again");
         assertFalse(Arrays.equals(xOf(ecdh.answers.get(0)), xOf(ecdh.answers.get(2))), "a fresh nonce: the second R is another");
         assertArrayEquals(xOf(ecdh.answers.get(2)), Arrays.copyOfRange(out, 8, 40), "and the signature is the second's");
@@ -366,7 +366,7 @@ class SignatureCheckTest {
         assertEquals(CashuApplet.SW_CRYPTO_ERROR & 0xFFFF,
             refusal(() -> t.sign(SignHardeningTest.ecPriv(ChipEnginesTest.be(d)), SignHardeningTest.ecPub(point65(other)), m, (short) 0, refused, (short) 0)));
         assertArrayEquals(untouched(), refused, "nothing written");
-        assertFalse(ChipEnginesTest.flag(t, SchnorrHW.class, "chipMul"));
+        assertTrue(ChipEnginesTest.flag(t, SchnorrHW.class, "chipMul"), "kept for the next signature (D228)");
         leftNothing(t, "after a refusal on the chip's path");
     }
 

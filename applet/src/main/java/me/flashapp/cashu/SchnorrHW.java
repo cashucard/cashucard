@@ -28,10 +28,10 @@ import javacardx.crypto.Cipher;
  *      mulModN where not; then addModN
  *   8. Verify: R' = s·G − e·Q, Q the even-Y point whose x went into e;
  *      R'.x must be R.x and R'.y even, or the card answers 6F00 and gives
- *      nothing (`verify`). On the chip's path a failed check turns the chip
- *      path off and the whole signature is made again by the bytecode, with
- *      a fresh nonce, and checked again; only that failing is 6F00 (D218,
- *      which amends D207)
+ *      nothing (`verify`). On the chip's path a failed check gives the chip
+ *      path up for this signature only (D228) and the whole signature is made
+ *      again by the bytecode, with a fresh nonce, and checked again; only that
+ *      failing is 6F00 (D218, which amends D207)
  *   9. sig = R.x ‖ s (64 bytes), written to the caller's buffer only now
  *
  *   Step 8 is BIP-340's own last step of default signing ("if Verify fails,
@@ -343,14 +343,15 @@ final class SchnorrHW {
                 short made = signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, true);
                 if (made != (short)0) return made;
                 // The chip's product did not give a signature that verifies (or the chip refused the work): the chip path
-                // is given up until the next SET_CARD's test, and the whole signature is made again by the bytecode, from
-                // step 1 with a fresh nonce: the check wiped d, and the failed signature never left the card (D218).
+                // is given up for this signature only (D228: chipMul stays as SET_CARD's test left it, so one induced fault
+                // does not turn the chip's path off for every later signature), and the whole signature is made again by
+                // the bytecode, from step 1 with a fresh nonce: the check wiped d, and the failed signature never left the
+                // card (D218).
                 // [M2: the plan's recommended join, not yet agreed by the other maintainer; to flip to his "6F00 at once",
                 // throw SW_CRYPTO_ERROR here instead of signing again.]
                 Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
                 Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
                 rest();
-                chipMul = false;
             }
             return signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, false);
         } finally {
