@@ -243,3 +243,151 @@ used.
 
 In the run's scratch folder (`chip-money`), not kept: `session-M.log` (every command, its status and time), `p19-M.log`,
 `state-M.json` (the play-money pieces and the payments), `bridge-M.log`, `guard.log`.
+
+## More play-money tests (the same night, the same card)
+
+On the keeper's yes, five more tests on the same card, the same file and the same mint (testnut, play money). Each
+began with a fresh set-up and ended with the card emptied at testnut and reset by its owner. The serial was read with
+`gp -i` before every step that changed the card and every endurance round (62 reads in all, every one 58206920), and
+from the CPLC at every tap.
+
+### Results
+
+| # | Test | Result |
+| --- | --- | --- |
+| 1 | A first load within 5 s | **pass at 9, 12, 20 and 30 pieces** (1.92, 2.26, 3.17 to 3.19, 4.33 s). The limit is about 35 pieces (below) |
+| 2 | A full card | **pass.** 128 places filled (30 in the first load, then 98), and the 129th piece refused with `6A84` and nothing stored. Then 86 rounds on the full card, every one right. Free memory the same throughout |
+| 3 | The wait over the limit | **pass.** Every wait was the spec's count to the answer (table below). A payment within the limit signed at its first `SIGN`, so there is no floor in this branch |
+| 4 | `SPEND_ALL_AGAIN` by digest after another payment | **pass**, in the money run above (item 7) |
+| 5 | A retired keyset | **not run.** It needs a mint whose keysets we can rotate. testnut's keysets cannot be rotated from here. A local nutshell needs Docker started and its image downloaded, and nothing on this machine had a download approved. Skipped |
+| 6 | Endurance | **pass: 226 pay-and-refill rounds** (86 on a full card, then 140 on a card of 20 pieces), every one right. The card's limit of 300 pieces a day ended each run, as designed. The `LOAD_PROOF` and `LOAD_CHANGE` times rise slowly with the day's loads (below) |
+
+### 1. A first load within 5 s
+
+**What counts as contact.** The tooling's `firstload.py` times one selection, from `SELECT`'s send to the last answer.
+The app sends the same commands in the same order:
+
+1. `SELECT`;
+2. `GET_INFO`;
+3. `AUTH`;
+4. the sealed PIN (`GET_NONCE` P1 1, then `VERIFY_PIN` P1 01);
+5. `GROUP_KEYS`;
+6. one `LOAD_PROOF` a piece, in the 04 form, with the mint's proof kept;
+7. `GET_INFO` and `GET_BALANCE`.
+
+Not counted: the minting at the mint (before the tap), the keyset's teaching (done at set-up), and the process start.
+
+| Pieces | The whole contact | One `LOAD_PROOF` (median) | Under 5 s |
+| ---: | ---: | ---: | --- |
+| 9 | 1,917 ms | 111.8 ms | yes |
+| 12 | 2,262 ms | 111.7 ms | yes |
+| 20 | 3,168 and 3,192 ms | 112.4 ms | yes |
+| 30 | 4,331 ms | 113.2 ms | yes |
+
+Everything but the loads takes about 0.92 s, of which `AUTH` is 0.48 to 0.49 s. Each piece adds about 0.113 s. So a first
+load of about 35 pieces is the most that fits in 5 s on this chip.
+
+### 2. A full card
+
+- **Filled.** 30 pieces of 8 sats in the first load, then 98 in one more tap under the PIN. Each was read back, and its
+  kept DLEQ checked under testnut's key. `GET_INFO`: 128 unspent, 0 empty.
+- **The 129th piece:** `LOAD_PROOF` `6A84` in 31 ms, nothing stored. Still 128 unspent and balance 1,024.
+- **A round**, three taps:
+  1. Under the PIN: pay two pieces (16 sats) for 7 to the till, a fee of 1 and 8 of change; `SPEND_ALL_SIGN`;
+     `CLEAR_SPENT`. Then testnut's swap.
+  2. No PIN: `LOAD_CHANGE` of the change into a freed place.
+  3. Under the PIN: one new piece from testnut, loaded with `LOAD_PROOF`.
+- **Every round, checked:**
+  - the signature good under BIP-340;
+  - no wait;
+  - two places freed;
+  - the change's DLEQ good under testnut's key;
+  - the two inputs `SPENT` and the change `UNSPENT` at testnut;
+  - after the round: 128 unspent and balance 1,024.
+- **No piece lost**, in 86 rounds on the full card.
+- **Free memory**, persistent / transient bytes:
+  - 72,620 / 2,084 at every reading: after the set-up, after the first load, full, after 5 rounds and after 86.
+  - The same after each owner's reset and the next set-up.
+  - Setting a card up again takes nothing more: the set-up's 27,484 bytes are kept through a reset and used again.
+
+### 3. The wait over the limit
+
+The set-up gave a limit on one payment of 200 sats (and a day of 100,000). The spec (`spec/APDU.md`, "The clock and the
+limits") counts the waits as `max(0, W − ⌊2 × change outputs / 3⌋)`:
+
+- W is 0 within the limit;
+- for N limits' worth leaving the card, W is `WAIT_OVER_SIGNS` + `WAIT_MORE_SIGNS` × (N − 2), that is 10 + 4 × (N − 2).
+
+| Payment (leaving the card, change) | N | Spec's waits | "Not yet" answers | Wait (ms) | From `BEGIN` to the signature |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 128 (127 + fee), no change | 1 | 0 | **0** | 0 | 1,089 ms |
+| 256, no change | 2 | 10 | **10** | 4,730 | 5,825 ms |
+| 768, no change | 4 | 18 | **18** | 8,520 | 9,730 ms |
+| 1,024, no change | 6 | 26 | **26** | 12,330 | 13,561 ms |
+| 301 (300 + fee), 5 change outputs | 2 | 10 − 3 = 7 | **7** | 3,320 | 5,555 ms |
+| 211 (the change spent), no change | 2 | 10 | **10** | 4,730 | 5,832 ms |
+
+- **Each "not yet" took 473.2 to 474.6 ms** (median 473.6). The chosen wait is that many answers of the card's own work.
+- **A payment over the limit costs:** about 4.7 s for the first 200 sats past the limit, then about 1.9 s for each further
+  200 sats.
+- **The first `SIGN`** of a payment that waits took 712 to 803 ms, and gives the first "not yet".
+- **No floor (M1):** the payment within the limit signed at its first `SIGN` (755 ms), as did every payment and round
+  of tests 2 and 6 (no limit set there).
+
+### 6. Endurance
+
+| Run | Rounds | Wall time | Failures | Ended by |
+| --- | ---: | --- | ---: | --- |
+| full card, 128 places | 86 (5 + 81) | 10 min | 0 | round 87's `SPEND_ALL_CHANGE` `6A8F` ("past the day's 300 pieces"): nothing signed, nothing owed |
+| 20 places | 140 | 16 min | 0 | the planned 140, ending at exactly 300 loads (`GET_INFO`: 0 left) |
+
+- **Why the runs stop:** each round loads two pieces (the change and the new piece), and the card takes at most 300 pieces
+  a day. So a card can make about 140 pay-and-refill rounds a day.
+  - The card's clock cannot be moved a day on with a real block header tonight.
+  - The owner's reset gives the count back: 300 again after each reset.
+  - So the 226 rounds are two runs of one "day" each, not one run of 45 minutes.
+
+Times per round, the full card's run (86 rounds; the median of the first ten, then of the last ten):
+
+| Step | min / median / max | First 10 → last 10 |
+| --- | --- | --- |
+| `SPEND_ALL_SIGN` (2 pieces, 1 output, 1 change) | 695 / 698 / 731 ms | 701 → 698 |
+| The paying tap (to `CLEAR_SPENT`) | 1,581 / 1,604 / 1,803 ms | 1,626 → 1,607 |
+| `LOAD_CHANGE` | 543 / 557 / 571 ms | **545 → 570** |
+| `LOAD_PROOF` | 125 / 136 / 159 ms | **126 → 146** |
+
+The 20-place run (140 rounds):
+
+| Step | min / median / max | First 10 → last 10 |
+| --- | --- | --- |
+| `SPEND_ALL_SIGN` | 684 / 687 / 706 ms | 690 → 687 |
+| `LOAD_CHANGE` | 513 / 534 / 555 ms | **516 → 549** |
+| `LOAD_PROOF` | 110 / 129 / 316 ms | **112 → 145** |
+
+- **The signature does not drift.** Its time is flat in both runs.
+- **The loads drift, with the day's loads.** Each load is about 0.12 ms slower than the one before, and the drift is
+  linear:
+  - `LOAD_PROOF` went from 126 to 146 ms in steps of about 2.7 ms every 10 rounds;
+  - the 98-piece fill showed the same slope (117 to 139 ms).
+- **It starts again after a reset.** The run after the reset began at 111 ms. So it follows the loads since the card was
+  set up or reset, not the place loaded into (both runs used places 0 and 1).
+- **How much it can cost:** the 300 loads of a day bound it at about +35 ms a load. Inference, not measured: the card
+  checks a new piece against a list that grows with the day's loads.
+- **Other failures:** none. One `LOAD_PROOF` of 316 ms, and one testnut mint of 12.8 s; neither recurred.
+
+### The card at the end
+
+- Reset by its owner after the last run: fresh, no PIN, no record, no owner, 0 pieces.
+- `selftest` 13 of 13.
+- The tag reads `https://getfoxy.io/card#new`.
+- `gp -l`: the opener, the card's applet and the tag, and the package.
+- Free memory 72,620 / 2,084 bytes. The set-up's storage is kept, as after the first set-up of this file.
+
+### Logs
+
+In the run's scratch folder (`chip-money`), not kept:
+
+- `session-F.log`, `session-W.log`, `session-E3.log`;
+- `rounds-F2.jsonl`, `rounds-F6.jsonl`, `rounds-E3.jsonl` (one line a round);
+- `p19-*.log`, `bridge-*.log`;
+- `guard.log`.
