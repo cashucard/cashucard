@@ -386,7 +386,7 @@ jobs:
       # 3.0.5 is the floor: SchnorrHW needs ALG_EC_SVDP_DH_PLAIN_XY, which does
       # not exist in 3.0.4. The target also runs tools/stripcap.py (the
       # Descriptor component out) and tools/refcheck.py, the size check against
-      # what the J3R180 has installed (docs/FOXY-CARD-HARDWARE.md), which fails
+      # what the J3R180 has installed (docs/CASHU-CARD-HARDWARE.md), which fails
       # the build for the opener not first or a size known to fail on the chip.
       - name: Convert CAP
         run: ant -f applet/build.xml cap -Djc.sdk="$GITHUB_WORKSPACE/.javacard-sdks/jc305u4_kit"

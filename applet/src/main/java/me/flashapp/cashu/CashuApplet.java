@@ -13,7 +13,7 @@ import javacardx.crypto.*;
  * conditions.
  *
  * This is the shared Cashu card protocol, version 2.1: the Foxy wallet
- * project's fork at software 1.20 (docs/FOXY-CARD-SPEC.md), merged back into
+ * project's fork at software 1.20 (docs/CASHU-CARD-SPEC.md), merged back into
  * cashu-javacard with a neutral identity and the fixes in docs/DECISIONS.md
  * D18 to D26. It is not compatible on the wire with cashu-javacard 0.x nor
  * with Foxy's 1.x, and has an AID of its own so that none of the three can be
@@ -63,7 +63,7 @@ import javacardx.crypto.*;
  *   0x53  REFRESH          — the owner's proof over a block header: the header is taken, and the rollover budget is full again (2.0); with P1 = 1 (3.0), on a card with no owner, the header alone, under the PIN in a held tap
  *   0x54  CERT_WRITE       — (3.0) the certificate written in pieces (P1 = 0) and sealed (P1 = 1), on a card that has never had a PIN, with no owner and nothing on it; the seal checks that it names the card key
  *
- * What the fork changes, and why (the spec's section 4, and docs/FOXY-CARD-DAILY-LIMIT.md):
+ * What the fork changes, and why (the spec's section 4, and docs/CASHU-CARD-DAILY-LIMIT.md):
  *   - SPEND_PROOF takes no message. Upstream signed 32 bytes the reader
  *     supplied, so a reader could have slot A burned for slot B's signature,
  *     and the SPENT flag bound nothing. The card now rebuilds the slot's own
@@ -116,7 +116,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // -------------------------------------------------------------------------
     //
     // 1.0 is the Foxy fork: another AID, another slot, another SPEND_PROOF.
-    // 1.1 is the daily limit, the owner key and the clock (docs/FOXY-CARD-DAILY-LIMIT.md).
+    // 1.1 is the daily limit, the owner key and the clock (docs/CASHU-CARD-DAILY-LIMIT.md).
     // FORMAT is what a reader checks before it reads a slot: 3 for this design
     // (2 was the allowance draft and the first limit).
     // 2.0 is the shared protocol (ENG-673, DECISIONS D18): Foxy's 1.20 under the neutral AID F0 CASHUCARD and the neutral
@@ -149,7 +149,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 1.6 is the same card made quicker to hold (see `slotHex`, GET_PIECES' two short forms, and several
     // pieces to one LOAD_PROOF): nothing it signs, refuses or stores for a piece is different.
     // 1.3 was a limit on one tap, a window of ten seconds that refused. 1.5 makes it the limit on one
-    // payment, which asks no clock and is waited for (docs/FOXY-CARD-DAILY-LIMIT.md, section 6a).
+    // payment, which asks no clock and is waited for (docs/CASHU-CARD-DAILY-LIMIT.md, section 6a).
     // 1.4 is one signature for a whole payment (NUT-11 SIG_ALL): format 4, in
     // which every piece's secret carries the flag and SPEND_PROOF is gone.
     // 1.12 makes a payment's change itself (SPEND_ALL_CHANGE): outputs locked to the card's own key,
@@ -180,7 +180,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // holder needs to check that the mint made the piece (NUT-12: e, s and the blinding factor r, 96 bytes), and GET_DLEQ (0x1A)
     // gives them back for an unspent place. The card does not check the proof and never uses it, and a payment is what it was: no
     // payment command writes them. The 12,288 bytes that hold them (`dleq`) are reserved by the first SET_CARD and NOT in the
-    // constructor, which the chip refuses to install with so much more in it (docs/FOXY-CARD-HARDWARE.md); the same bytes asked for
+    // constructor, which the chip refuses to install with so much more in it (docs/CASHU-CARD-HARDWARE.md); the same bytes asked for
     // after the install are given. Every use of `dleq` is safe while it is null (before the first SET_CARD, or after the card has
     // refused the room). GET_INFO is 1.19's to the byte but for the version; a phone tells a 1.20 card by that.
     // 3.0 (D183 to D193): the card finishes its own change (LOAD_CHANGE, 0x27), a PIN before any money, the owner claimed
@@ -1085,7 +1085,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * NOT allocated in the constructor, and null from install until the first SET_CARD, which reserves it (once, outside any
      * transaction; if the card refuses the room it stays null and the card works as a card with no room for proofs). The chip
      * refuses to install an applet whose constructor asks for this much more (+300 bytes installs, +12,288 does not:
-     * docs/FOXY-CARD-HARDWARE.md), and no simulator has that limit, so a test pins it. EVERY use of it is safe while it is null.
+     * docs/CASHU-CARD-HARDWARE.md), and no simulator has that limit, so a test pins it. EVERY use of it is safe while it is null.
      *
      * The rule that keeps it honest: a place that is UNSPENT holds in it its own proof or zeros, never another piece's. LOAD_PROOF
      * writes the record before the place's data and long before its status byte, the commit (`loadOne`), and nothing else writes
@@ -3500,7 +3500,7 @@ public class CashuApplet extends Applet implements TagSwitch {
              * copied, to be taken from; the limit's thirty-second is its four
              * bytes shifted down by five, written beside it. Both by hand: a
              * call is a place in the package the chip relocates at an install,
-             * and it takes only so many (docs/FOXY-CARD-HARDWARE.md). */
+             * and it takes only so many (docs/CASHU-CARD-HARDWARE.md). */
             short bits = 0;
             for (short i = 0; i < 4; i++) {
                 scratch[(short)(X_TAP + i)] = sum[(short)(sumOff + i)];
@@ -4642,7 +4642,7 @@ public class CashuApplet extends Applet implements TagSwitch {
          * (SET_HEADER), keeps its reading through a new record. */
         /* The room for the mint's proofs (1.20) is reserved here, the first time the card is set up, and not at install: the
          * chip refuses to install an applet whose constructor asks for this much more, and gives the same bytes asked for after
-         * it (docs/FOXY-CARD-HARDWARE.md). Once, and outside any transaction, so that nothing can undo it. If the
+         * it (docs/CASHU-CARD-HARDWARE.md). Once, and outside any transaction, so that nothing can undo it. If the
          * card refuses the room, `dleq` stays null, the record is written all the same, and the card works as one with no room for
          * proofs: every use of the store is safe while it is null. */
         /* The paid list (D191), 8,195 bytes, first: a card refused its room takes no piece. */
@@ -7378,7 +7378,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * Nothing is done here, and nothing calls it: this method is in the
      * package for its length alone. The chip the card runs on installs the
      * card's applet only when the load file's size falls in a window of each
-     * 256 bytes (docs/FOXY-CARD-HARDWARE.md), the same code failing a few
+     * 256 bytes (docs/CASHU-CARD-HARDWARE.md), the same code failing a few
      * dozen bytes to either side. Each write below is five to seven bytes of the file;
      * `tools/refcheck.py`, run after every build, says how many to add or to
      * take away.

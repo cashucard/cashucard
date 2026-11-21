@@ -25,7 +25,7 @@
  *
  * - the opener rule: the INSTALL that is a package's first instantiation and
  *   runs a heavy constructor goes mute (the reader gives up) or answers 6F00,
- *   and installs nothing (docs/FOXY-CARD-HARDWARE.md);
+ *   and installs nothing (docs/CASHU-CARD-HARDWARE.md);
  * - a LOAD torn by the card leaving the field either vanishes with the power
  *   (`partialLoad: 'discard'`) or stays as a partial package that blocks a new
  *   INSTALL [for load] until it is deleted (`'keep'`); which the chip does is

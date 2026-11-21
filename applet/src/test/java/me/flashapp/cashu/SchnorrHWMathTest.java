@@ -325,7 +325,7 @@ class SchnorrHWMathTest {
         { "CashuApplet.java",
           "public static void install(", "private CashuApplet()",
           "private void initCardKeypair()", "private void initPinKey()" },
-        // the applet instantiated first, so that the chip takes the card's own (FOXY-CARD-HARDWARE.md): it allocates nothing at all
+        // the applet instantiated first, so that the chip takes the card's own (CASHU-CARD-HARDWARE.md): it allocates nothing at all
         { "Opener.java",
           "public static void install(", "private Opener()" },
         // the NFC tag: it allocates one transient byte, in its constructor, and nothing else (and its interface nothing at all)
@@ -340,7 +340,7 @@ class SchnorrHWMathTest {
      * { file, the method's declaration, the statement }. There are seven: the room for the mint's proofs, the two arrays of
      * 2.2's assisted-settlement record (D176), which the chip refused in the constructor as well, and 3.0's openings' keys, keyset
      * table and paid list (D183, D184, D191) at SET_CARD and its certificate (D192) at the first CERT_WRITE. The chip will not install an
-     * applet whose constructor asks for that much more (+300 bytes installs, +12,288 does not: docs/FOXY-CARD-HARDWARE.md), and gives the
+     * applet whose constructor asks for that much more (+300 bytes installs, +12,288 does not: docs/CASHU-CARD-HARDWARE.md), and gives the
      * same bytes asked for after the install, so SET_CARD reserves them. What this test exists to catch, an allocation that repeats on
      * every command until the card's persistent memory is gone, cannot come of it: it is guarded so that it happens once in a card's
      * life (`if (dleq == null)`), and a request the card refuses allocates nothing and leaves the store null. The statement is found
@@ -596,7 +596,7 @@ class SchnorrHWMathTest {
 
     /**
      * The persistent arrays the constructors make, by their sizes: 29,806 bytes in 1.19, and the same in 1.20. The chip took +300 bytes
-     * more in a constructor and refused +12,288 (measured, docs/FOXY-CARD-HARDWARE.md), where the 12,288 bytes of the mint's proofs are
+     * more in a constructor and refused +12,288 (measured, docs/CASHU-CARD-HARDWARE.md), where the 12,288 bytes of the mint's proofs are
      * given when asked for after the install. A figure past this one has to be measured on a card first.
      *
      * 2.2 (ENG-819, D175) added the assisted-settlement record's four arrays, 4,321 bytes (outbox 3,692, outStage 593, outInstall 32,

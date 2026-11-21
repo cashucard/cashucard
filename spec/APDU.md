@@ -48,8 +48,8 @@ otherwise (a block header's own fields are little-endian, as the network carries
 them). `cardctl.py` (`tools/cardctl`) drives the commands it names below, and
 `test_spec_consistency.py` holds this file, `cardctl.py` and the applet to each
 other on every push. The design and the reasons for it are in
-[`docs/FOXY-CARD-SPEC.md`](../docs/FOXY-CARD-SPEC.md) section 5 and
-[`docs/FOXY-CARD-DAILY-LIMIT.md`](../docs/FOXY-CARD-DAILY-LIMIT.md); where they
+[`docs/CASHU-CARD-SPEC.md`](../docs/CASHU-CARD-SPEC.md) section 5 and
+[`docs/CASHU-CARD-DAILY-LIMIT.md`](../docs/CASHU-CARD-DAILY-LIMIT.md); where they
 and this file differ, this file is the protocol 3.0 command reference.
 
 **Two words.** *This tap* is from a `SELECT` of the card's applet until the next
@@ -206,7 +206,7 @@ The card hashes these tags too: `CashuCard/auth` ([AUTH](#auth-0x15)),
 [CERT_WRITE](#cert_write-0x54)).
 A phone derives a card's owner key as
 `HMAC-SHA256(seed, "CashuCard/owner" ‖ 0x00 ‖ card key (33))` mod n
-(`FOXY-CARD-SPEC.md` 5.6, with the 2.0 label), made again with a counter byte
+(`CASHU-CARD-SPEC.md` 5.6, with the 2.0 label), made again with a counter byte
 appended while the result is 0; the card never sees it. Restoring the seed
 restores ownership of every card. [`vectors/owner.json`](vectors/owner.json) has
 proofs for every label. The phone derives the owner's s for a card the same way, as
@@ -559,7 +559,7 @@ Spent and empty slots have no entry (`GET_INFO` counts them). A reader that gets
 `next` under 128 asks again with P1 = `next`, and has the whole card when `next`
 is 128. For example, slots 0, 1 and 2 holding 1, 8 and 3 of the keyset
 `00c94d2f98795f16`, undated, answer `80` ‖ `80 00c94d2f98795f16 00000000 00` ‖
-`01 03` ‖ `02 FF 00000003`. `FOXY-CARD-DAILY-LIMIT.md` 6d and 8.1 have the other
+`01 03` ‖ `02 FF 00000003`. `CASHU-CARD-DAILY-LIMIT.md` 6d and 8.1 have the other
 forms byte for byte. `6A83` for a P1 of 128 or more; `6A86` for another P2.
 
 ### GET_LOG (0x18)
@@ -1851,7 +1851,7 @@ the top.
 | INS | `40` |
 | P1 | `00`; `01` sealed |
 | P2 | `00` |
-| Data | the PIN, 4–8 bytes; with P1 = 1, the PIN sealed (`FOXY-CARD-DAILY-LIMIT.md` 6e, under `CashuCard/seal` and `CashuCard/pinkey`) |
+| Data | the PIN, 4–8 bytes; with P1 = 1, the PIN sealed (`CASHU-CARD-DAILY-LIMIT.md` 6e, under `CashuCard/seal` and `CashuCard/pinkey`) |
 
 Success opens the PIN's commands for this tap. It does not arm the no-PIN allowance
 and ends no no-PIN window ([D208](../docs/DECISIONS.md#d208)): a PIN typed at a
@@ -2387,7 +2387,7 @@ card key.
 
 A third applet of the package, instantiated under the NFC Forum's
 `D2 76 00 00 85 01 01`: a read-only NFC Forum Type 4 Tag carrying one web address
-(`FOXY-CARD-SPEC.md` 5.8 for the commands). It answers its own `SELECT`,
+(`CASHU-CARD-SPEC.md` 5.8 for the commands). It answers its own `SELECT`,
 `SELECT` of files `E103` and `E104` and `READ BINARY`, and nothing else. It finds
 the card's applet by the AID `F0 43 41 53 48 55 43 41 52 44 01` to ask whether the
 owner has switched it off and, since [D222](../docs/DECISIONS.md#d222), for the code

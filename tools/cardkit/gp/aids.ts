@@ -10,7 +10,7 @@ export const ISD_AID = fromHex('A000000151000000');
 
 /** The card's package: F0 then "CASHUCARD". */
 export const CASHU_PACKAGE_AID = fromHex('F0434153485543415244');
-/** The opener, instantiated first (docs/FOXY-CARD-HARDWARE.md). */
+/** The opener, instantiated first (docs/CASHU-CARD-HARDWARE.md). */
 export const OPENER_AID = fromHex('F04341534855434152444D');
 /** The card's applet, selected by its whole AID (D25). */
 export const CARD_AID = fromHex('F043415348554341524401');

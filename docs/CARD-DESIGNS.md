@@ -22,7 +22,7 @@ drawing itself in `build/markup.html` there (the card on the FLASHCARD screen).
 
 Since card software 1.10 the card's record carries the code: three bytes
 after the mint, written by `SET_CARD` when the phone gives them and read back
-by `GET_CARD` (FOXY-CARD-SPEC.md 5.1). A phone that sets a card up writes the
+by `GET_CARD` (CASHU-CARD-SPEC.md 5.1). A phone that sets a card up writes the
 design it chose for it (Foxy's own phone writes FX1), and every phone that
 reads the card draws it so. A card of 1.9 or earlier has no such field: the
 phone that set it up draws it as the design it wrote on its own file for it,

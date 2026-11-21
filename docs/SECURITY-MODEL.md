@@ -98,14 +98,14 @@ the reserve wallets would be the next step.
 
 ## The PIN, the owner, and the blocked PIN (#2, #14)
 
-**2.0's rule: the PIN spends, and the owner administers** (`FOXY-CARD-SPEC.md`
+**2.0's rule: the PIN spends, and the owner administers** (`CASHU-CARD-SPEC.md`
 5.3 rule 7, [D18](DECISIONS.md#d18)). A payment is asked its PIN at the
 signature (`SPEND_ALL_SIGN`), because what leaves the card
 is only known there. A card with a PIN signs without it only up to the no-PIN
 allowance the owner has set, and answers `6A94` over it, for the whole payment. A
 card with no PIN signs under its daily limit and its limit on one payment, and is
 cash to whoever holds it. The PIN is asked before the limits, so a reader with no
-PIN cannot fill the card's log. `FOXY-CARD-DAILY-LIMIT.md` 6f has the whole.
+PIN cannot fill the card's log. `CASHU-CARD-DAILY-LIMIT.md` 6f has the whole.
 
 Everything else is the owner's: changing the PIN, the limits, the record or the
 owner, adding funds with no PIN, refreshing the card, locking or resetting it. Each
@@ -124,7 +124,7 @@ the byte leaves the card blocked, and the owner sends it again
 ([D22](DECISIONS.md#d22)). A card whose owner has lost the seed cannot be
 unblocked, and its balance is stranded: nothing but the card key signs for its
 pieces, and their dated refund path is switched off in the apps for now
-(`FOXY-CARD-SPEC.md` 6).
+(`CASHU-CARD-SPEC.md` 6).
 
 **The ENG-615 lesson holds.** 0.x builds before 0.3 gated with `pinState == 1`, so
 a blocked PIN *removed* the gate; and a failed check left a verified session
@@ -142,7 +142,7 @@ PUK's custody) end with the 0.x wire.
 ## The NFC tag (#15, software 1.19)
 
 From software 1.19 the card also answers as an NFC Forum Type 4 Tag carrying one web
-address, so that a phone with its screen on offers to open it (`FOXY-CARD-SPEC.md` 5.8).
+address, so that a phone with its screen on offers to open it (`CASHU-CARD-SPEC.md` 5.8).
 
 **Public tag contents.** The capability container is the same on every card; since
 [D222](DECISIONS.md#d222) the message is `https://getfoxy.io/card#new` on a card with no
@@ -175,7 +175,7 @@ not raise the offer every time the screen wakes. Off, the tag application refuse
 name, and nothing else about the card changes.
 
 **A card left on factory keys.** Anyone with a reader and a card on factory keys can delete
-the card's applet and the money with it (`FOXY-CARD-SPEC.md` 5.4). They can equally delete
+the card's applet and the money with it (`CASHU-CARD-SPEC.md` 5.4). They can equally delete
 the tag's applet and install another in its place, under the same name, carrying another
 address, so that a phone that reads the card is sent somewhere else. Rotating the card
 manager keys (or locking the issuer domain) closes both, and it is part of set-up for the
@@ -185,7 +185,7 @@ cards that are given to people.
 
 From software 1.20 the card keeps, for a piece that is loaded with one, the mint's NUT-12
 proof: `e`, `s` and the blinding factor `r`, 96 bytes. `GET_DLEQ` gives it back, with no
-PIN, for an unspent piece (`FOXY-CARD-SPEC.md` 5.9, [D17](DECISIONS.md#d17)).
+PIN, for an unspent piece (`CASHU-CARD-SPEC.md` 5.9, [D17](DECISIONS.md#d17)).
 
 **What "real" rests on.** A phone that reads a piece and its proof can rebuild the piece's
 secret, work out `C'` and `B'`, and check the proof against the mint's public key for the
@@ -206,7 +206,7 @@ that card's key.
   is "not shown real", and the reader decides what that means to it.
 - Anything, to a reader that does not check. The card does not refuse a piece whose proof
   fails or is missing, and a terminal with the PIN can still write a piece the mint will
-  refuse (`FOXY-CARD-SPEC.md` 10). What changed is that a reader can now tell.
+  refuse (`CASHU-CARD-SPEC.md` 10). What changed is that a reader can now tell.
 
 **What it costs: `r`.** The proof carries the blinding factor. The mint made its signature for
 `B'`, and given `r`, whoever has the mint's record of that issue can recompute `B'` and `C'`
@@ -221,7 +221,7 @@ spent only with the card's signature, and nothing here gives that.
 
 **The store.** One persistent array of 12,288 bytes, reserved by the first `SET_CARD` and
 not at install, because the chip will not install an applet that asks for that much more in
-its constructor (`FOXY-CARD-HARDWARE.md`). A card that is refused it works without. A place
+its constructor (`CASHU-CARD-HARDWARE.md`). A card that is refused it works without. A place
 that is unspent holds its own proof or zeros and never another piece's: `LOAD_PROOF` writes
 the record before the place's data and the status byte last, `CLEAR_SPENT` and the payment
 commands write nothing to the store, and `RESET_CARD` zeros it. A card taken away in a load
@@ -385,7 +385,7 @@ a few hundred taps. Treat simulator results accordingly, see
    ([D14](DECISIONS.md#d14), [D23](DECISIONS.md#d23)); pulling a card mid-load,
    mid-clear, mid-payment and mid-`CHANGE_PIN` on hardware is still owed.
 3. **Recovery** (#3): the dated refund path is in the applet and switched off in
-   the apps; see [D5](DECISIONS.md#d5) and `FOXY-CARD-SPEC.md` 6. Since 3.0 a card
+   the apps; see [D5](DECISIONS.md#d5) and `CASHU-CARD-SPEC.md` 6. Since 3.0 a card
    can take its c from its owner's words ([D202](DECISIONS.md#d202)), so a phone
    restored from them works out the take-back key r + u of a lost card's dated pieces;
    it still needs the card's key P (to work out s, and so c) and the pieces themselves
@@ -488,7 +488,7 @@ a few hundred taps. Treat simulator results accordingly, see
    time) and turn the chip path back on where it holds.
 10. **A create that the chip refuses once** (3.0; the independent review after the chip run of 2026-11-19): the 3.0 file at
    175 past a multiple of 256 had its card applet's create answered `6F00` once and taken on an identical retry
-   ([`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md)). `tools/cardkit/gp/provision.ts` ends the run on any error, so a
+   ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). `tools/cardkit/gp/provision.ts` ends the run on any error, so a
    provisioning would have stopped there. Proposed for the other maintainer, not built: retry the create once on `6F00`,
    only after `GET STATUS` shows that no card applet was made, in a fresh secure session, logged, and once only.
 11. **A reader cannot tell when the card's ring of signatures has rolled past its payment** (3.0, a proposal; not built).

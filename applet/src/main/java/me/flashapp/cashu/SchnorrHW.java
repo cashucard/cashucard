@@ -291,7 +291,7 @@ final class SchnorrHW {
         // The three tags, hashed once. Written out here rather than kept as
         // constants of the class: each constant is one more entry in the
         // package's constant pool, and the chip takes only so many at an
-        // install (docs/FOXY-CARD-HARDWARE.md). A fresh digest is in its
+        // install (docs/CASHU-CARD-HARDWARE.md). A fresh digest is in its
         // initial state, and doFinal leaves it there for the next.
         byte[] tagAux = { 'B','I','P','0','3','4','0','/','a','u','x' };
         sha256.doFinal(tagAux, (short)0, (short)11, tagHashAux, (short)0);

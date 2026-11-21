@@ -146,7 +146,7 @@ constructor of the card's applet:
 
 The same 12,288 bytes, asked for by a command after the install (an array made in
 `SET_CARD`), were given. So the 12,288 bytes that hold the mint's proofs
-(software 1.20: [`FOXY-CARD-SPEC.md`](FOXY-CARD-SPEC.md) 5.9, [D17](DECISIONS.md#d17))
+(software 1.20: [`CASHU-CARD-SPEC.md`](CASHU-CARD-SPEC.md) 5.9, [D17](DECISIONS.md#d17))
 are not made in the constructor. The first `SET_CARD` that goes through makes them,
 once, outside any transaction. A card that is refused them carries on without, and
 every use of the store is safe while it does not exist.

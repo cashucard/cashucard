@@ -451,7 +451,7 @@ class PerPaymentKeyTest {
         CountingCipher rsa2 = (CountingCipher) wrap(d.applet(), CashuApplet.class, "rsa", o -> new CountingCipher((Cipher) o));
         assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, record(MINT, REFUND))));
         assertEquals(3, rsa2.powers, "SET_CARD: three powers of the chip's RSA, once");
-        // on a chip (docs/FOXY-CARD-HARDWARE.md, contact reader): a point addition 85-100 ms, a SHA-256 of under 100 bytes 4 ms,
+        // on a chip (docs/CASHU-CARD-HARDWARE.md, contact reader): a point addition 85-100 ms, a SHA-256 of under 100 bytes 4 ms,
         // a power of the RSA 70-80 ms and about 50 ms of reduction
         System.out.println("keys per load, counted: BEGIN +" + begun[0] + " SHA-256 +" + begun[3] + " point additions (about "
             + (begun[3] * 85 + begun[0] * 4) + "-" + (begun[3] * 100 + begun[0] * 4) + " ms on a chip); SIGN +0; GROUP_KEYS 2 + 2; SET_CARD +3 RSA powers (about 360-390 ms, once)");

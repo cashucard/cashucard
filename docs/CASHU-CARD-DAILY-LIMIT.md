@@ -9,7 +9,7 @@
 > implementing a reader.
 
 The second design of the card's limit, replacing the allowance of
-`FOXY-CARD-SPEC.md` 5.3 (rule 3), 5.6 and 5.7 as they stood in the working
+`CASHU-CARD-SPEC.md` 5.3 (rule 3), 5.6 and 5.7 as they stood in the working
 tree, and the `SET_ALLOWANCE` and owner-secret rows of its 5.2. Everything else
 in that specification stands: the slot, the secret text, `SPEND` from the slot,
 `AUTH`, the gate in every PIN state, D10 and D14, provisioning, the phone's
@@ -35,10 +35,10 @@ section 6f says what 1.16 does.
 
 From software 1.19 the card also answers as an NFC tag carrying one web address,
 which its owner switches off and on with one more owner's command, `SET_TAG`
-(`FOXY-CARD-SPEC.md` 5.8). It touches nothing of the limits, the day or the clock.
+(`CASHU-CARD-SPEC.md` 5.8). It touches nothing of the limits, the day or the clock.
 
 From software 1.20 the card also keeps the mint's NUT-12 proof with each piece that
-comes with one, for a phone to read (`GET_DLEQ`) and check (`FOXY-CARD-SPEC.md` 5.9).
+comes with one, for a phone to read (`GET_DLEQ`) and check (`CASHU-CARD-SPEC.md` 5.9).
 The card checks nothing and never uses it; a payment is what it was, and the limits,
 the day and the clock are untouched.
 
@@ -85,13 +85,13 @@ not a cheating one.
 4. A card with **no owner** is nobody's and is open while it is empty, because
    there is nothing on it to protect; it cannot be loaded. A card **with** an
    owner is its owner's, empty or not.
-5. The receiver's and holder's sides of `FOXY-CARD-SPEC.md` are unchanged in
+5. The receiver's and holder's sides of `CASHU-CARD-SPEC.md` are unchanged in
    what they promise: paid only when the mint has given the phone its pieces;
    nothing signed when a refusal can be known beforehand.
 
 Not goals: a limit that follows the price rather than the pieces signed
 (section 6); a check, by the card, of pieces a terminal writes onto it (DLEQ: since
-1.20 the card keeps the mint's proof for a phone to check, `FOXY-CARD-SPEC.md` 5.9); a balance the holder can read without a phone (a screen; a separate
+1.20 the card keeps the mint's proof for a phone to check, `CASHU-CARD-SPEC.md` 5.9); a balance the holder can read without a phone (a screen; a separate
 question); recovery of a lost card (no refund key for now); a clock that is
 exact (a block's time can lead the true time by up to two hours, 5.1).
 
@@ -186,7 +186,7 @@ a newer block can end is a bound it cannot walk round (5).
    SELECT or a reset ends it. It lets nothing else through: not `SPEND`, not
    anything the PIN opens. A till still writes change back under the verified
    PIN as before.
-10. The rest of `FOXY-CARD-SPEC.md` 5.3: no signature without a slot burned;
+10. The rest of `CASHU-CARD-SPEC.md` 5.3: no signature without a slot burned;
     the PIN gate first in every state (since 1.16, at the signature, with the
     no-PIN allowance beside it: 6f); nothing loaded without a PIN set or the
     owner's grant (a card with no PIN is loaded by whoever holds it: 6f); every
@@ -304,7 +304,7 @@ that is shown none keeps its clock where it is, and its day does not end.
 
 On the chip a header is two SHA-256 passes, one over 80 bytes and one over 32,
 and a few compares of 32 bytes: expected to be well under 20 ms. It has not been
-measured (`FOXY-CARD-HARDWARE.md`).
+measured (`CASHU-CARD-HARDWARE.md`).
 
 <a id="52-the-floor-and-the-quarter-and-why-those-numbers"></a>
 
@@ -452,7 +452,7 @@ piece of 1,000 and 700 of the card's own change costs the day 300. Change a
 terminal writes back by other means the card cannot check, as the draft's
 allowance could not, and it gives the day nothing back: before 1.12 that
 payment cost the day 1,000. A till picks pieces as near the price as it can
-(`FOXY-CARD-SPEC.md` 8.1), and the holder's phone loads a card in pieces
+(`CASHU-CARD-SPEC.md` 8.1), and the holder's phone loads a card in pieces
 small enough for the limit to be useful.
 
 **The edge of a window.** A window is a fixed day from its start, so a terminal
@@ -792,7 +792,7 @@ that binds its outputs is good only while the mint will still make that swap:
 if the mint retires the keyset the outputs are on, or raises its fee, between
 the signature and the swap, the pieces cannot be swapped by the card's
 signature at all (a card with a refund key: its owner's phone takes them back
-after their date, as section 6 of `FOXY-CARD-SPEC.md` has it).
+after their date, as section 6 of `CASHU-CARD-SPEC.md` has it).
 
 Measured on the chip, with 1.7: its transaction held the burn of eleven
 pieces and not of thirty-two (`SIGN` answered `6A96`, nothing burned, no
@@ -1198,7 +1198,7 @@ phone finishes it.
 ## 8. Commands
 
 Class `B0`. The instructions of this design, by byte; a row in **bold** is new
-or changed from `FOXY-CARD-SPEC.md` 5.2 and the allowance draft.
+or changed from `CASHU-CARD-SPEC.md` 5.2 and the allowance draft.
 
 | INS | Command | Needs | Data sent | Answers |
 |---|---|---|---|---|
@@ -1544,7 +1544,7 @@ phone says it belongs to another phone's words.
   meanwhile, the entry is marked taken back and the person is told. "Paid" is
   never said. A piece on a card of software before 1.20 carries no DLEQ proof, so
   offline the phone cannot check the mint's signature on it: that is the risk the
-  question names. From 1.20 a card can keep the proof (`FOXY-CARD-SPEC.md` 5.9), and a
+  question names. From 1.20 a card can keep the proof (`CASHU-CARD-SPEC.md` 5.9), and a
   phone that reads it and checks it can. A switch of its own turns this off; plain ecash between
   two offline phones has its own, as before.
 
@@ -1823,7 +1823,7 @@ seventy-seven; the flag for a clock moved twice in a tap is never set.
   empty, so the owner cannot replace its owner or record until it is spent. A fake
   piece looks unspent to a state check. From 1.20 the card can keep the mint's proof
   for a piece, and a phone that reads and checks it sees that a made-up piece is not
-  real (`FOXY-CARD-SPEC.md` 5.9); the card checks nothing, so a card loaded with no
+  real (`CASHU-CARD-SPEC.md` 5.9); the card checks nothing, so a card loaded with no
   proofs is as it was.
   Since 8.2, the reader that taps the card next after any payment can do the same
   once without the PIN: the nuisance is the same, and the reader is almost always

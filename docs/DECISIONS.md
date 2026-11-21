@@ -578,7 +578,7 @@ regenerating its key.
 
 **Decided:** from software 1.20 the card keeps, for each piece, the mint's NUT-12
 proof as a later holder needs it: `e`, `s` and the blinding factor `r`, 96 bytes
-(`GET_DLEQ`, `LOAD_PROOF` with `P1 = 1`: [`FOXY-CARD-SPEC.md`](FOXY-CARD-SPEC.md) 5.9).
+(`GET_DLEQ`, `LOAD_PROOF` with `P1 = 1`: [`CASHU-CARD-SPEC.md`](CASHU-CARD-SPEC.md) 5.9).
 The card does not check the proof and never uses it.
 
 **Why the card carries it.** Without it a phone that reads the card can ask the
@@ -598,7 +598,7 @@ stores the 96 bytes and gives them back, and a record of zeros means "no proof".
 **Why after install and not in the constructor** ([D10](#d10)). The chip refused to
 install a build whose constructor asked for 12,288 bytes more than 1.19's, and
 installed one that asked for 300 more
-([`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md)). The same bytes asked for by a
+([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). The same bytes asked for by a
 command after the install were given. No simulator has the limit, which is why it
 is pinned by tests that read the source and look at the card (null after install,
 reserved by the first `SET_CARD`). The reservation is guarded, so it happens once;
@@ -611,7 +611,7 @@ APDU carries 255. Two would not fit, and extended length is not something every
 reader and phone will carry (the same reason a plain batch stops at three pieces
 of 81 bytes). `LOAD_PROOF` with `P1 = 1` is one piece and its proof, and any
 other P1 is the plain form it always was. A command to each piece is slower than
-a batch of three (a batch took 0.19 s on the chip: [`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md));
+a batch of three (a batch took 0.19 s on the chip: [`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md));
 the one-piece form has not been timed there.
 
 **Why zeros are refused as a proof.** A record of zeros is how the card says "no
@@ -646,7 +646,7 @@ project's fork ([getfoxy/card](https://github.com/getfoxy/card) at `88840aa`,
 software 1.20), merged back with a real `git merge` so their history and
 authorship stay in `git log`. Flash and Foxy speak one wire from here, called
 **2.0**. The fork's applet, its tests, `spec/vectors/` and its documents
-(`docs/FOXY-CARD-*.md`, `docs/FOR-LNFLASH.md`, `FORK.md`) came in as they were;
+(`docs/CASHU-CARD-*.md`, `docs/FOR-LNFLASH.md`, `FORK.md`) came in as they were;
 our `tools/cardsim` bridge and `tools/cardctl` were kept and ported to 2.0.
 
 **Credit.** The fork's review of applet 0.4 (`docs/FOR-LNFLASH.md` section 3)
@@ -992,7 +992,7 @@ AIDs begin with it, the opener's (`…44 4D`), the card's applet's (`…44 01`) 
 tag's class (`…44 54`). The chip gives a partial name to the first instance it
 made whose AID begins with the name, and the opener is made first, because the
 J3R180 will not take the card's applet as the package's first instance
-([FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). So on a chip the package AID
+([CASHU-CARD-HARDWARE.md](CASHU-CARD-HARDWARE.md)). So on a chip the package AID
 reaches the opener, which answers its SELECT with `90 00` and nothing else, and
 `6D 00` to every command after. The suites run in jCardSim, where the package
 AID reached the card's applet: jCardSim keeps its applets sorted by AID and gives
@@ -5218,7 +5218,7 @@ owner chose to archive it rather than port 2.2 there. One repository, one spec,
 one applet.
 
 **What stays.** Historical links to `cashucard/javacard` in reports, decisions,
-`FORK.md`, `docs/FOR-LNFLASH.md`, `docs/FOXY-CARD-SPEC.md` and `docs/PROVENANCE.md`
+`FORK.md`, `docs/FOR-LNFLASH.md`, `docs/CASHU-CARD-SPEC.md` and `docs/PROVENANCE.md`
 are left as written: they describe what happened. The `cashu-javacard-*.cap` file
 name and package name are unchanged. An issue still open there at archiving
 (cashucard/javacard#27, CLEAR_SPENT in the 0.2 top-up flow) is read-only with the
@@ -8598,7 +8598,7 @@ commit after this one: a rebuild of the same source, byte for byte the load file
 
 ## <a id="d222"></a>D222: The tag's address changes at every read, and only the owner's phone can tell it is its card
 
-**Decided (protocol 3.0, 2026-11-15, the project owner; amends the tag of software 1.19, `FOXY-CARD-SPEC.md` 5.8
+**Decided (protocol 3.0, 2026-11-15, the project owner; amends the tag of software 1.19, `CASHU-CARD-SPEC.md` 5.8
 and `SECURITY-MODEL.md` threat 15, whose address was the same on every card).** The card's NFC tag answers a phone's background read with one of two addresses:
 
     https://getfoxy.io/card#new                   a card with no owner or no holder's record (new, or just reset)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """What the chip asks of the built card file, checked after every build.
 
-Two things, both found on the chip (docs/FOXY-CARD-HARDWARE.md):
+Two things, both found on the chip (docs/CASHU-CARD-HARDWARE.md):
 
 1. The J3R180 the card is built on fails the INSTALL that both instantiates a
    package for the first time and runs a heavy constructor (6F00, or no answer

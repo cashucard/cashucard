@@ -42,7 +42,7 @@ Dated reports, and the approved plans for named hardware runs, are in
 and [mobile reset report](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 for the tested card lifecycle.
 
-`FOXY-CARD-*` and `FOR-LNFLASH.md` retain the Foxy design history. The current
+`CASHU-CARD-*` and `FOR-LNFLASH.md` retain the Foxy design history. The current
 APDU reference and later design decisions govern the shared implementation.
 Hardware plans name their permitted devices and actions; repeating a run
 requires its own approval.

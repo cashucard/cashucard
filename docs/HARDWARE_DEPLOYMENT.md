@@ -60,7 +60,7 @@ ls -lh target/cashu-javacard-3.0.0.cap
 The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
 keeps nothing of it) and checks the load file's size against what the J3R180 has
 been seen to install (`tools/refcheck.py`, from
-[FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md)). The 2.2 build ([D175](DECISIONS.md#d175):
+[CASHU-CARD-HARDWARE.md](CASHU-CARD-HARDWARE.md)). The 2.2 build ([D175](DECISIONS.md#d175):
 `GET_OUTBOX`) was first **21,540 bytes** by refcheck's measure, and on 2026-11-06 a
 J3R180 (09336320) loaded it (88 blocks, 14.68 s, opener selectable), then refused
 to create the card's applet, `6F00` after 1.76 s. The cause is inferred, not shown:
@@ -103,7 +103,7 @@ first; if the chip refuses its size, it is moved with `sizeTheFile` (below). The
 the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by fifteen writes, 86 bytes, from 41,887 (159 past, six bytes from
 153 past, where the chip refused a study build) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been
 created at the first try on J3R180 58206920; a padding to 175 past (41,903 bytes, e2aac64) had its create refused `6F00` once
-and taken on the same retry ([`FOXY-CARD-HARDWARE.md`](FOXY-CARD-HARDWARE.md)). refcheck now warns of a size at or near a refused place.
+and taken on the same retry ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). refcheck now warns of a size at or near a refused place.
 
 On 2026-11-13 a J3R180 was given earlier source, numbered 2.3 then, padded to three
 sizes: it installed the files of 33,647 and 35,213 bytes and refused the card's applet in
@@ -414,7 +414,7 @@ installed it or a file of its size; the run is to be repeated on it.
 > and the install is three commands (below): the opener, the card's applet, and the
 > NFC tag, which is `Tag`, listed last and made under the NFC Forum's own name,
 > `D2760000850101`, given as the instance AID. Measurements and the rest of what
-> the chip has room for: [FOXY-CARD-HARDWARE.md](FOXY-CARD-HARDWARE.md).
+> the chip has room for: [CASHU-CARD-HARDWARE.md](CASHU-CARD-HARDWARE.md).
 
 > **The mint's proofs are reserved after install.** The 12,288 bytes that hold
 > them are not made at install: the chip would refuse the card's applet if its

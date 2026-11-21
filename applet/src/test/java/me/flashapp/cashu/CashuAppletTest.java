@@ -17,8 +17,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * jCardSim tests for the Foxy fork of the applet (docs/FOXY-CARD-SPEC.md and
- * docs/FOXY-CARD-DAILY-LIMIT.md).
+ * jCardSim tests for the Foxy fork of the applet (docs/CASHU-CARD-SPEC.md and
+ * docs/CASHU-CARD-DAILY-LIMIT.md).
  *
  * Upstream's tests were of another wire format: a 78-byte slot, a SPEND_PROOF
  * that signed the reader's bytes, SIGN_ARBITRARY, and cards loaded with no PIN.

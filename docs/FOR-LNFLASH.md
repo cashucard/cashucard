@@ -36,7 +36,7 @@ version 1.1, and most of its tables still say so (29 bytes of `GET_INFO`, 64
 slots, a `SPEND` of one slot). The clock has been brought up to software 1.15,
 and the PIN made optional in 1.16: the rows and sentences that name them say what
 the card does now. For the rest,
-`docs/FOXY-CARD-SPEC.md` and `docs/FOXY-CARD-DAILY-LIMIT.md` are what is built.
+`docs/CASHU-CARD-SPEC.md` and `docs/CASHU-CARD-DAILY-LIMIT.md` are what is built.
 
 <a id="1-what-we-would-like-you-to-look-at"></a>
 
@@ -381,7 +381,7 @@ visit, where the owner has set one.
 Two public repositories.
 
 - `getfoxy/card` (https://github.com/getfoxy/card): the applet. Start with
-  `FORK.md`, then `docs/FOXY-CARD-SPEC.md`, and `docs/FOXY-CARD-DAILY-LIMIT.md`
+  `FORK.md`, then `docs/CASHU-CARD-SPEC.md`, and `docs/CASHU-CARD-DAILY-LIMIT.md`
   for the daily limit, the clock and the owner key in full. `spec/vectors/` has
   the secrets and a full conversation with the card. Your own `spec/`, `README`
   and `tools/cardctl` are still in the tree and still describe your wire.

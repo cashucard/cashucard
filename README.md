@@ -97,7 +97,7 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 | **Curious what this is** | [`docs/VISION.md`](docs/VISION.md) |
 | **A developer joining the project** | [`VISION`](docs/VISION.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`CONTRIBUTING`](CONTRIBUTING.md) |
 | **Implementing a reader or wallet** | [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md) → [`spec/APDU.md`](spec/APDU.md) → [`spec/vectors/`](spec/vectors/) |
-| **Reading the design in full** | [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) |
+| **Reading the design in full** | [`docs/CASHU-CARD-SPEC.md`](docs/CASHU-CARD-SPEC.md) and [`docs/CASHU-CARD-DAILY-LIMIT.md`](docs/CASHU-CARD-DAILY-LIMIT.md) |
 | **An AI agent working in this repo** | [`AGENTS`](AGENTS.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`GLOSSARY`](docs/GLOSSARY.md). The decisions file exists so settled calls are not re-litigated. |
 | **Auditing security** | [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md); the ops service's is [`docs/OPS-THREAT-MODEL.md`](docs/OPS-THREAT-MODEL.md) |
 | **Holding a card and a reader** | [`tools/cardctl/README.md`](tools/cardctl/README.md), then [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) |
@@ -169,7 +169,7 @@ ant -f applet/build.xml cap
 
 The build strips the Descriptor component and checks the load file's size against
 what the J3R180 has installed (`tools/stripcap.py`, `tools/refcheck.py`;
-[`docs/FOXY-CARD-HARDWARE.md`](docs/FOXY-CARD-HARDWARE.md)). Installing onto a
+[`docs/CASHU-CARD-HARDWARE.md`](docs/CASHU-CARD-HARDWARE.md)). Installing onto a
 card: [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).
 
 ## Test
