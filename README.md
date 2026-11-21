@@ -78,8 +78,9 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > source with the version moved to 3.0 ([D205](docs/DECISIONS.md#d205)), the other maintainer's
 > [D206](docs/DECISIONS.md#d206) to [D210](docs/DECISIONS.md#d210), the rotating tag
 > ([D222](docs/DECISIONS.md#d222)), [D223](docs/DECISIONS.md#d223) to [D226](docs/DECISIONS.md#d226) and the tag's
-> address given at install ([D227](docs/DECISIONS.md#d227)) added (42,485 bytes, load file sha256 `d69742d0…`). This exact file has run only in a simulator so far,
-> and no card has installed it or a file of its size; the run is to be repeated on it, its size first. The
+> address given at install ([D227](docs/DECISIONS.md#d227)) added (42,485 bytes, load file sha256 `d69742d0…`). This exact file has been installed on a chip,
+> and has not yet been proven with a payment at a mint: J3R180 58206920 installed it 13 times of 13 at the first try, and
+> its tag took the address at install ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)); the payments of the checklist are still to come. The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The

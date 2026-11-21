@@ -29,7 +29,7 @@ that this file has run: whether this exact file has run on a chip is said by
 its load file's sha256 (`load_file`, the bytes gp LOADs), in PROVEN. A hash
 goes on PROVEN only once the chip run that installs that exact file has had
 real signatures and real change verified on the chip, and its entry says so in
-PROVEN_NEEDS's words; refcheck refuses to run while an entry does not (the two
+PROVEN_NEEDS's words (a file installed by a chip run but not yet paid with at a mint is on INSTALLED instead); refcheck refuses to run while an entry does not (the two
 entries made before the rule, EARLIER, excepted). The sentence the guides give
 of the file is said(), worked out from PROVEN and SIZES.
 
@@ -65,6 +65,7 @@ SIZES = {
     40412: True,   # 2.3 (CAP sha256 11104ceb..., load file 05c9b847...), unpadded, D200 to D204, D211 to D221 (the claim after the set-up's record is one asking), 2026-11-15, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 2 s; selftest 13/13, set-up claim at the first asking, 9-piece payment with change, installed three times
     41205: True,   # 2.3 with the rotating tag (190c5ab, load file 6f0e3a06..., never tracked), unpadded, 245 past a multiple of 256, J3R180 58206920: installed and left there, selftest 13 of 13 and the tag read (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920.md, its files table and the row Left); not on PROVEN
     41973: True,   # 3.0 of the merge, padded to 245 past a multiple of 256 (1ad208d, load file 2b9c6b02...), J3R180 58206920: created 30 times of 30 at the first try (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md, the install rate test); not on PROVEN
+    42485: True,   # neutral 3.0 with the tag's address at install (9ac55c1, load file d69742d0...), J3R180 58206920, 2026-11-21: 13 of 13 installs at the first try, ten create cycles (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md); on INSTALLED, not on PROVEN
     38791: False,  # 2.3 study build of D213 to D216 (ecdh study, never shipped), 2026-11-14, J3R180 09301220: loaded, opener made, card applet 6F00 at create (135 past a multiple of 256)
     38809: False,  # the same study source at this size, 2026-11-14, J3R180 09301220: card applet 6F00 at create (153 past a multiple of 256)
     38893: True,   # the same study source at this size (load file 92b67948..., never shipped), 2026-11-14, J3R180 09301220: installed at the first try (237 past a multiple of 256); passed the study's chip tests
@@ -99,6 +100,14 @@ PROVEN = {
         'testnut.cashu.space: real signatures and real change verified on the chip',
     '05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3': '2.3 with D200 to D204, D211 to D221 (D221 the claim after the set-up\'s record is one asking), 40,412 bytes, 2026-11-15, J3R180 09301220 at '
         'testnut.cashu.space: real signatures and real change verified on the chip',
+}
+# the load files a chip has installed, by the sha256 of the bytes gp LOADs, whose run has not yet had a payment at a mint: the
+# chip run that installs that exact file adds it here, with its size in SIZES; it moves to PROVEN once its run has had real
+# signatures and real change verified on the chip. A size in SIZES says what a chip did with some source of that size; an
+# entry here says this exact file installed.
+INSTALLED = {
+    'd69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3.0 (9ac55c1, the tag\'s address at install, '
+        'D227), 42,485 bytes, 2026-11-21, J3R180 58206920: 13 of 13 installs at the first try, the tag read; no payment at a mint',
 }
 # what every entry of PROVEN says of its chip run, word for word
 PROVEN_NEEDS = 'real signatures and real change verified on the chip'
@@ -175,10 +184,17 @@ def proven(parts):
     return sha in PROVEN and (sha in EARLIER or PROVEN_NEEDS in PROVEN[sha])
 
 
+def installed(parts):
+    """Whether this exact file has been installed by a chip run and is not yet proven: its sha256 is in INSTALLED."""
+    return not proven(parts) and hashlib.sha256(load_file(parts)).hexdigest() in INSTALLED
+
+
 def said(parts):
-    """The sentence the guides give of this exact file, worked out from PROVEN and SIZES."""
+    """The sentence the guides give of this exact file, worked out from PROVEN, INSTALLED and SIZES."""
     if proven(parts):
         return 'this exact file has run on a chip'
+    if installed(parts):
+        return 'this exact file has been installed on a chip, and has not yet been proven with a payment at a mint'
     if SIZES.get(load_file_size(parts)):
         return 'this exact file has run only in a simulator so far, and no card has installed it'
     return 'this exact file has run only in a simulator so far, and no card has installed it or a file of its size'

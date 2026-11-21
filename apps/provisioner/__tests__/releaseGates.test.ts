@@ -26,7 +26,7 @@ test('installation follows the load file this build carries, never a bare switch
 });
 
 test('the 3.0 load file is not validated until the operator approves it', () => {
-  // 42,485 bytes, not yet tried on a chip, nor a file of its size (tools/refcheck.py). Its sha256 goes on the list with
+  // 42,485 bytes, installed on a chip and not yet proven with a payment at a mint (tools/refcheck.py). Its sha256 goes on the list with
   // the operator's approval and the run's report, after its chip run.
   expect(CASHU_LOAD_FILE.size).toBe(42485);
   expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(false);

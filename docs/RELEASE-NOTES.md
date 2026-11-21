@@ -19,7 +19,9 @@ since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This exact file has run only in a simulator so far, and no card has installed it or a file of its size. Its source is
+This exact file has been installed on a chip, and has not yet been proven with a payment at a mint: J3R180 58206920
+installed it 13 times of 13 at the first try on 2026-11-21, its tag taking the address at install
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
@@ -27,8 +29,7 @@ path; the no-PIN allowance armed by the owner's proof or a held tap and not by t
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
 settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), and the tag's address given by
 whoever installs the card ([D227](DECISIONS.md#d227)): an install of the tag must now carry the card maker's address
-in its install parameters, and one without is refused. The run is to be
-repeated on it, its size first
+in its install parameters, and one without is refused. Its payments at a mint are still to come
 ([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)).
 
 The last 2.3 file (answering `02 03`, 40,412 bytes, load file `05c9b847…`) ran on a chip on 2026-11-15: it is the file below (40,365 bytes, `8aefa0db…`) with [D221](DECISIONS.md#d221) added (the

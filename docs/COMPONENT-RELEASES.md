@@ -24,9 +24,9 @@ valid historical records; do not move or retag them. Corrected firmware Maven
 metadata does not alter the CAP.
 
 Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
-answer `03 00`, and the decisions are D183 to D226 (spec/APDU.md). The tracked
-`cashu-javacard-3.0.0.cap` of that merge has run only in a simulator; no
-`firmware-v3.0.0` release is cut before its chip run. The last firmware a chip ran
+answer `03 00`, and the decisions are D183 to D227 (spec/APDU.md). The tracked
+`cashu-javacard-3.0.0.cap` has been installed on a chip and not yet proven with a payment at a mint; no
+`firmware-v3.0.0` release is cut before its payments are. The last firmware a chip ran
 was numbered 2.3 (`02 03`, `cashu-javacard-2.3.0.cap`, load file `05c9b847…`), never
 released under a tag.
 

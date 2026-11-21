@@ -92,7 +92,9 @@ The 3.0 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 
 the Method component 34,790), in 173 blocks of 247 bytes, the last 1: the load file
 inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
 not the CAP's ([Install](#install) gives both). Padded by `sizeTheFile` (below), this
-exact file has run only in a simulator so far, and no card has installed it or a file of its size. Its source is
+exact file has been installed on a chip, and has not yet been proven with a payment at a mint: J3R180 58206920 installed it
+13 times of 13 at the first try on 2026-11-21 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)),
+and the payments of the checklist below are still to come. Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
@@ -406,8 +408,8 @@ card), taking money back after D with the refund key, a header far ahead or a we
 clock (no real header makes either), tears, a phone and a production mint ([the
 hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
 file is that day's source with the version moved to 3.0 ([D205](DECISIONS.md#d205)) and
-D206 to D210 added. This exact file has run only in a simulator so far, and no card has
-installed it or a file of its size; the run is to be repeated on it.
+D206 to D210 added. The tracked file since is that source with D211 to D227 (above); its
+payments at a mint are still to come.
 
 > **Three applets, installed in order.** The chip refuses the card's applet as the
 > first instantiated from its package (no answer, or `6F00`); it takes it once a

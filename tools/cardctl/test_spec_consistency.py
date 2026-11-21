@@ -917,6 +917,9 @@ UNTRIED_REFUSES = ("installed", "installs", "install went", "chip run", "proven"
 UNTRIED_NEVER = ("safe to install", "ready for cards", "ready for a card", "cleared for cards", "pays real mints",
                  "now runs this file", "has run on a chip", "has run on a card", "has run on silicon",
                  "ready for production")
+#: Once refcheck says the file has been installed on a chip (INSTALLED), the words of its install are true of it and are
+#: taken out of UNTRIED_REFUSES; every other claim, of a pass, a proof, a payment or a run, is still refused.
+INSTALLED_ALLOWS = ("installed", "installs", "install went", "loaded it", "loads it", "loaded on", "tried on")
 #: The words that name the tracked file without its size or hash: a sentence with one is held to the untried rule.
 UNTRIED_NAMES = ("tracked file", "tracked cap", "current cap", "current file")
 #: The honest hedges, which say a claim's words with "not yet" or "to be" before them: taken out before a sentence is read.
@@ -977,13 +980,20 @@ def plain(text, html_text=False):
     return re.sub(r"\s+", " ", text)
 
 
+def refused_words(said):
+    """UNTRIED_REFUSES, less the words of an install (INSTALLED_ALLOWS) once refcheck says the file has been installed."""
+    if said.startswith("this exact file has been installed on a chip"):
+        return tuple(c for c in UNTRIED_REFUSES if c not in INSTALLED_ALLOWS)
+    return UNTRIED_REFUSES
+
+
 def untried_claims(text, said, html_text=False):
     """The claims a text makes of an install or a chip run (UNTRIED_REFUSES), read as plain() reads it, with refcheck's
     sentence for the file (`said`) and its negation ("no card has installed this exact file ...") taken out."""
     flat = plain(text, html_text)
     for quiet in (said, negated(said)) + UNTRIED_QUIET:
         flat = flat.replace(quiet, " ")
-    return [c for c in UNTRIED_REFUSES if re.search(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])", flat)]
+    return [c for c in refused_words(said) if re.search(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])", flat)]
 
 
 def negated(said):
@@ -1002,7 +1012,7 @@ def file_claims(text, said, names, html_text=False):
             sentence = sentence.replace(quiet, " ")
         never = [c for c in UNTRIED_NEVER if c in sentence]
         named = [n for n in names if n in sentence]
-        claims = [c for c in UNTRIED_REFUSES if re.search(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])", sentence)]
+        claims = [c for c in refused_words(said) if re.search(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])", sentence)]
         if never or (named and claims):
             out.append((sentence.strip()[:160], never + claims))
     return out
@@ -1055,12 +1065,15 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
     untried = not refcheck.proven(parts)
     said = refcheck.said(parts)
     found = []
-    if untried != said.startswith("this exact file has run only in a simulator"):
+    if untried != (said != "this exact file has run on a chip"):
         found.append(f"refcheck: proven {not untried} but says {said!r}")
+    if refcheck.installed(parts) != said.startswith("this exact file has been installed on a chip"):
+        found.append(f"refcheck: installed {refcheck.installed(parts)} but says {said!r}")
     if refcheck.unverified():
         found.append(f"refcheck's PROVEN has entries without {refcheck.PROVEN_NEEDS!r}: {refcheck.unverified()}")
-    # the note's label fits the file: "Not yet on a card." while it has run only in a simulator, "On a card." once proven
-    label = "Not yet on a card" if untried else "On a card"
+    # the note's label fits the file: "Not yet on a card." while it has run only in a simulator, "On a card, not yet
+    # proven." once a chip has installed it, "On a card." once proven
+    label = "On a card" if not untried else "On a card, not yet proven" if refcheck.installed(parts) else "Not yet on a card"
     guide_html_note = re.search(r'<p class="note"><b>' + re.escape(label) + r'\.</b>(.*?)</p>', guide_html, re.S)
     try:
         deployment_size = deployment[deployment.index("The 3.0 build is"):deployment.index("On 2026-11-13 a J3R180")]
@@ -1401,6 +1414,33 @@ def test_the_vectors_are_worked_out_again_from_the_text_alone():
     for label, lengths in want.items():
         assert lengths <= seen.get(label, set()), (label, sorted(seen.get(label, set())), "wanted", sorted(lengths))
     assert "CashuCard/set-card" in seen
+
+
+def test_an_installed_file_may_say_it_installed_and_nothing_more():
+    """Once refcheck says the tracked file has been installed on a chip (INSTALLED, not PROVEN), a sentence that names it
+    may say it installed, and is still refused for a pass, a proof, a payment or a run; while the file has run only in a
+    simulator, its install is refused too. refcheck says the installed sentence for an INSTALLED hash and the untried one
+    for a size in SIZES alone."""
+    import hashlib
+    refcheck = _refcheck()
+    installed = "this exact file has been installed on a chip, and has not yet been proven with a payment at a mint"
+    untried = "this exact file has run only in a simulator so far, and no card has installed it or a file of its size"
+    names = ("this exact file",)
+    ok = installed + ". J3R180 58206920 installed this exact file 13 times of 13."
+    assert file_claims(ok, installed, names) == [], file_claims(ok, installed, names)
+    assert file_claims(ok, untried, names), "an install claimed of an untried file"
+    for claim in ("This exact file passed.", "This exact file is proven.", "This exact file pays real mints.",
+                  "This exact file has run on a chip.", "This exact file was verified on the chip."):
+        assert file_claims(installed + ". " + claim, installed, names), claim
+    parts = {"Header": bytes(310)}
+    sha = hashlib.sha256(refcheck.load_file(parts)).hexdigest()
+    assert refcheck.said(parts).startswith("this exact file has run only in a simulator")
+    refcheck.INSTALLED[sha] = "a test entry"
+    try:
+        assert refcheck.installed(parts) and refcheck.said(parts) == installed
+    finally:
+        del refcheck.INSTALLED[sha]
+    assert not set(refcheck.INSTALLED) & set(refcheck.PROVEN), "a hash is on INSTALLED or PROVEN, never both"
 
 
 if __name__ == "__main__":

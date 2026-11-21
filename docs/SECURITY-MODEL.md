@@ -337,7 +337,8 @@ An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
   between two applets of one package
 - A blocked PIN on any build: neither ENG-615 nor its 0.3 fix (the
   blocked-state gate and the failed-check session rule) has run on a card
-- Anything on the tracked 3.0 file: no card has installed it ([D205](DECISIONS.md#d205));
+- Anything on the tracked 3.0 file beyond its install and its tag: a J3R180 has installed it
+  ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)) and no payment at a mint has been made from it;
   the runs above were of earlier sources numbered 2.3, without [D206](DECISIONS.md#d206)
   to [D210](DECISIONS.md#d210)
 - The commands and paths the runs above did not reach: the certificate
