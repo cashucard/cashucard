@@ -848,6 +848,10 @@ run's log.
   refused and leaves no tag (`gp --list` shows none at `D2760000850101`), and the
   card's applet still answers; the tag installed again with an address works. A
   phone reads the tag and offers the address.
+  - 2026-11-21, sample card 58206920 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
+    [x] `C9` and the address in `gp -d`; [x] n + 56 and `#new`; [x] the coded address whole and in pieces of 59, its M
+    under the owner's c; [x] `C9 00`, a short install and one with no length each `6A80`, no tag, the card's applet
+    answering; [x] 127 bytes, then `https://getfoxy.io/card`; [ ] a phone's read, left for the keeper.
 - Add the load file's sha256 to refcheck's PROVEN only once the chip run has had
   real signatures and real change verified on the chip (the two items below), and
   write "real signatures and real change verified on the chip" in its entry:
