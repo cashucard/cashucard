@@ -103,9 +103,13 @@ def test_design_codes_are_checked_against_the_registry():
 PER_CARD = ['https://cards.example.net/c/123456', 'https://cards.example.net/c/04A1B2C3D4E5F6',
             'https://cards.example.net/c/123e4567-e89b-12d3-a456-426614174000', 'https://cards.example.net/c?serial=7',
             'https://cards.example.net/SERIAL/7', 'https://cards.example.net/c?UID=x', 'https://cards.example.net/card_uid/x',
-            'https://Cards.Example.NET/c/0123456789', 'https://deadbeef01.example.net/c']
+            'https://Cards.Example.NET/c/0123456789', 'https://deadbeef01.example.net/c',
+            'https://cards.example.net/c?cardSerial=7', 'https://cards.example.net/c/cardserial/7',
+            'https://cards.example.net/c?cardUid=x', 'https://cards.example.net/c?cardUID=x',
+            'https://cards.example.net/c?uuid=42', 'https://cards.example.net/c?UUID=42', 'https://cards.example.net/c?uids=1']
 NOT_PER_CARD = [GOOD['tagAddress'], 'https://Cards.Example.NET/c', 'https://cards.example.net/guide',
-                'https://cards.example.net/c/12345', 'https://cards.example.net/c?v=2026']
+                'https://cards.example.net/c/12345', 'https://cards.example.net/c?v=2026',
+                'https://cards.example.net/liquid', 'https://cards.example.net/fluid']
 
 
 def test_the_per_card_heuristic():

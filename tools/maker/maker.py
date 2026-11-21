@@ -69,8 +69,9 @@ def tag_address_problem(address):
 
 def tag_address_warning(address):
     """Why `address` looks as if it names one card (D228), or None. A heuristic: a run of six digits or more, a run of
-    eight hex digits or more, or a UUID anywhere after https:// (the host compared in lowercase), or `serial` or `uid`
-    as a word in the path or the query, in any case. It refuses some innocent addresses (a long number in a path) and
+    eight hex digits or more, or a UUID anywhere after https:// (the host compared in lowercase), or `serial` (in any case,
+    as any part of a word) or `uid`, `uuid` or their plurals (as a word or a camelCase part: cardUid, cardUID) in the path
+    or the query. It refuses some innocent addresses (a long number in a path) and
     misses a per-card address that looks innocent; tag_address_problem's rules are the applet's and are separate."""
     if not isinstance(address, str) or not address.startswith(HTTPS):
         return None
@@ -84,7 +85,10 @@ def tag_address_warning(address):
         return 'it holds a run of six digits or more'
     if re.search(r'[0-9a-fA-F]{8,}', text):
         return 'it holds a run of eight hex digits or more'
-    if re.search(r'(?<![a-z])(?:serial|uid(?![a-z]))', tail, re.IGNORECASE):
+    # `serial` anywhere, in any case (no innocent word holds it); `uid` (or `uuid`, or a plural) standing alone or as a
+    # camelCase part (cardUid, cardUID), case-sensitive so that guide, fluid and liquid do not match.
+    if re.search(r'serial', tail, re.IGNORECASE) or re.search(
+            r'(?:(?<![A-Za-z])[Uu][Uu]?[Ii][Dd]|(?<=[a-z])U(?:u?id|U?ID))s?(?![a-z])', tail):
         return 'its path or query names a serial or a uid'
     return None
 

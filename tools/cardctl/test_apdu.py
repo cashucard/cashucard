@@ -71,9 +71,9 @@ assert len(INFO_43) == 43
 
 # A GET_INFO answer of 3.0 (P1 = 4, 59 bytes): INFO_43's bytes as a 3.0 card says them, then the keyset table kept,
 # a rate of 95000, 3 entries in use, 1 of them unmarked, the last payment in the card's unit (80), the no-PIN window
-# begun at 1791700000, the profiles FF 03 and 298 loads left today.
+# begun at 1791700000, the profiles F7 03 (bit 3 clear, D228) and 298 loads left today.
 INFO_59 = (b"\x03\x00" + INFO_43[2:] + b"\x01" + (95000).to_bytes(4, "big") + bytes([3, 1, 0x80])
-           + (1791700000).to_bytes(4, "big") + bytes([0xFF, 0x03]) + (298).to_bytes(2, "big"))
+           + (1791700000).to_bytes(4, "big") + bytes([0xF7, 0x03]) + (298).to_bytes(2, "big"))
 assert len(INFO_59) == 59
 
 # A GET_CARD answer: format 4, record set, sat, limit 5000, no refund key, the
@@ -2736,7 +2736,15 @@ def test_get_info_decodes_the_59_and_51_byte_answers():
     assert i["version_tuple"] == (3, 0) and i["tag_off"] is False and i["allowance"] == 250
     assert i["keyset_table"] is True and i["rate"] == 95000 and i["entries"] == 3 and i["unmarked"] == 1
     assert i["last_unit"] == "the card's" and i["nopin_window_start"] == 1791700000
-    assert i["profiles_raw"] == b"\xff\x03" and i["loads_left"] == 298
+    assert i["profiles_raw"] == b"\xf7\x03" and i["loads_left"] == 298
+    assert i["profiles"] == ["PIN before money", "the no-PIN window", "the owner claimed slowly",
+                             "two units on one card", "a holder with no phone",
+                             "keyset keys", "the paid list", "the certificate", "keys per load"], i["profiles"]
+    # a file before D228: byte 55 bit 3 set, the wait on every payment
+    body = bytearray(INFO_59)
+    body[55] = 0xFF
+    i = cardctl.decode_info(bytes(body))
+    assert "the wait on every payment" in i["profiles"], i["profiles"]
     assert i["profiles"] == ["PIN before money", "the no-PIN window", "the owner claimed slowly",
                              "the wait on every payment", "two units on one card", "a holder with no phone",
                              "keyset keys", "the paid list", "the certificate", "keys per load"], i["profiles"]
@@ -2759,7 +2767,8 @@ def test_cmd_info_prints_the_2_3_fields():
     card = _change_card(has_owner=True)
     code, out, _ = _run(card, ["info"])
     assert code == 0, out
-    assert "profiles         : FF03 (PIN before money," in out and "keys per load)" in out, out
+    assert "profiles         : F703 (PIN before money," in out and "keys per load)" in out, out
+    assert "the wait on every payment" not in out, "a 3.0 card after D228 says bit 3 clear"
     assert "loads left today : 298 of 300" in out and "rate             : 95000" in out, out
     assert "keyset table     : kept, 3 entries in use, 1 without the holder's mark" in out, out
     assert "no-PIN window    : from 1791700000" in out, out
@@ -2769,7 +2778,7 @@ def test_cmd_info_prints_the_2_3_fields():
 def test_selftest_on_a_2_3_card_checks_keys_per_load_and_prints_the_profiles():
     rc, out = run_selftest(FakeApplet(version=(3, 0)))
     assert rc == 0, out
-    assert "PASS  keys per load (GET_INFO byte 56 bit 1)  — profiles FF03" in out, out
+    assert "PASS  keys per load (GET_INFO byte 56 bit 1)  — profiles F703" in out, out
     assert "note  loads left today : 298 of 300" in out and "All 13 checks passed" in out, out
     applet = FakeApplet(version=(3, 0))
     applet.info_59 = INFO_59[:55] + b"\xff\x01" + INFO_59[57:]

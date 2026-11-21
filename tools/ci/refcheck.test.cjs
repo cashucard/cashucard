@@ -222,6 +222,7 @@ test("the tracked 3.0 CAP's load file has run only in a simulator: its hash is o
   assert.match(r.stdout, /; this exact file has run only in a simulator so far, and no card has installed it\.\n/, "the tracked file says it has run only in a simulator");
   assert.doesNotMatch(r.stdout, /this exact file has run on a chip/);
   assert.match(r.stdout, /a size known to install/);
+  assert.match(r.stdout, /known to install on the J3R310-355 sample card 58206920; no J3R180/, "the size is said to be the sample card's, not a J3R180's");
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));
   const installed = source.slice(source.indexOf("\nINSTALLED = {"), source.indexOf("\n}", source.indexOf("\nINSTALLED = {")));

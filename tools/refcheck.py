@@ -74,6 +74,13 @@ SIZES = {
     35509: True,   # the 2.3 chip run's test-only build (2.3 with one command added that says the signer's temporary key's kind; never shipped, load file sha256 1bf178bc...), 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s
     21540: False,  # 2.2 first build (sha256 51ddeee4...), ENG-823, 2026-11-06: loaded (88 blocks), card applet 6F00 at create; cause not isolated: the size window or the constructor's +4,321 B persistent (D176, docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
 }
+# the sizes in SIZES that only a chip other than a J3R180 has installed, by the chip that did: a file of one of these sizes
+# is not said to be known to install on a J3R180.
+OTHER_CHIP = {
+    41205: 'the J3R310-355 sample card 58206920',
+    41973: 'the J3R310-355 sample card 58206920',
+    42485: 'the J3R310-355 sample card 58206920',
+}
 NEAR = 8  # bytes: a size this close to one that failed is treated as that one
 # load-file sizes a build is kept out of (first, last), whatever SIZES says: around 32,777, which failed in 2.3
 AVOID = [(32700, 32850)]
@@ -232,7 +239,10 @@ def main(argv):
                   'install on a chip. Move CashuApplet.sizeTheFile out of it.' % (size, first, last))
             return 1
     if size in SIZES and SIZES[size]:
-        print('a size known to install on the chip.')
+        if size in OTHER_CHIP:
+            print('a size known to install on %s; no J3R180 has been given a file of this size.' % OTHER_CHIP[size])
+        else:
+            print('a size known to install on the chip.')
         return 0
     close = [s for s in bad if abs(s - size) <= NEAR]
     if close:
