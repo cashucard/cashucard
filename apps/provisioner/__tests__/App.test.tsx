@@ -180,7 +180,7 @@ test('settings shows the public dashboard and confirms sign-out while a saved ba
       .find(node => node.props.accessibilityRole === 'button')!
       .props.onPress();
   });
-  expect(JSON.stringify(tree.toJSON())).toContain('CAP: 611b3478');
+  expect(JSON.stringify(tree.toJSON())).toContain('CAP: 0b17e232');
   tree.unmount();
 });
 

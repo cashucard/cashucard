@@ -205,26 +205,32 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
   assert.match(source, /40412: True/);
 });
 
-// The tracked CAP is the 3.0 file of the merge of 2026-11-19: the last 2.3 file (40,412 bytes, D221) with the version moved
-// to 3.0 (D205), D206 to D210, the rotating tag (D222), D223 to D226 and the tag's address at install (D227) added: a load file
-// of 42,485 bytes. J3R180 58206920 installed it 13 times of 13 on 2026-11-21, and its payment run at testnut on the same card
-// that day had real signatures and real change verified on the chip, so its hash moved from INSTALLED to PROVEN and its size
-// is in SIZES. The 2.3 file's hash stays on PROVEN as that file's.
-test("the tracked 3.0 CAP's load file has run on a chip: its hash is on PROVEN and not on INSTALLED", () => {
+// The tracked CAP is the 3.0 file of the merge of 2026-11-19 with the review fixes of D228 (one set-up bit a unit, the
+// chip's path given up for one signature only, GET_INFO byte 55 bit 3 clear): a load file of 42,485 bytes again, padded by
+// sizeTheFile, that no chip has been given. The file before it (9ac55c1, load file d69742d0...), of the same size, was
+// installed 13 times of 13 on 2026-11-21 by the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), and its payment
+// run at testnut on that card had real signatures and real change verified on the chip: its hash stays on PROVEN as that
+// file's, and its size in SIZES says what that chip did with source of this size, not that the tracked file has run.
+test("the tracked 3.0 CAP's load file has run only in a simulator: its hash is on neither PROVEN nor INSTALLED, and d69742d0 stays on PROVEN as the file before it", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.0.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /load file: 42485 bytes/);
-  assert.match(r.stdout, /load file sha256: d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e; this exact file has run on a chip\.\n/);
-  assert.doesNotMatch(r.stdout, /not yet been proven/);
+  const sha = r.stdout.match(/load file sha256: ([0-9a-f]{64});/);
+  assert.ok(sha, r.stdout);
+  assert.notEqual(sha[1], "d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e", "the tracked file is not 9ac55c1's");
+  assert.match(r.stdout, /; this exact file has run only in a simulator so far, and no card has installed it\.\n/, "the tracked file says it has run only in a simulator");
+  assert.doesNotMatch(r.stdout, /this exact file has run on a chip/);
   assert.match(r.stdout, /a size known to install/);
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));
   const installed = source.slice(source.indexOf("\nINSTALLED = {"), source.indexOf("\n}", source.indexOf("\nINSTALLED = {")));
   assert.ok(proven.length > 1000, "PROVEN is read");
-  assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the tracked file's hash is on PROVEN, with PROVEN_NEEDS's words");
+  assert.ok(!proven.includes(sha[1]), "the tracked file's hash is not on PROVEN");
+  assert.ok(!installed.includes(sha[1]), "nor on INSTALLED");
+  assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the file before it stays on PROVEN as its own, with PROVEN_NEEDS's words");
   assert.doesNotMatch(installed, /d69742d0/, "and not on INSTALLED");
-  assert.match(source, /^ {4}42485: True,/m, "the tracked file's size is in SIZES");
+  assert.match(source, /^ {4}42485: True,/m, "the size is in SIZES");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes, 2026-11-14, J3R180 '\n +'09312320 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
 });
 

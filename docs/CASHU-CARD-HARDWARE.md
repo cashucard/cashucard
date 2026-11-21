@@ -114,19 +114,22 @@ first on 2026-10-14, and `cardctl selftest` passed 12 of 12
 ([report](reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)).
 
 The 3.0 file of the merge (e2aac64), padded to 41,903 bytes by refcheck's measure
-(175 past a multiple of 256), was given to J3R180 58206920 on 2026-11-19: the card
+(175 past a multiple of 256), was given to the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-19: the card
 applet's create answered `6F00` once, and the same create, sent again with nothing
 changed, was taken. The install path is the same, line for line, as that of the
 tag's 2.3 file 190c5ab, 41,205 bytes (245 past), which the same card has created
 at the first try every time. So the place again looks like the cause: 175 past
 rested on one earlier install (39,343 bytes on 2026-11-14) and sits near 153 and
 164, where the chip refused. The file is now padded to 245 past instead, 41,973
-bytes, which J3R180 58206920 then created 30 times of 30 at the first try
+bytes, which the J3R310-355 sample card 58206920 then created 30 times of 30 at the first try
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md)). With the
 tag's address given at install ([D227](DECISIONS.md#d227)) the file came to 42,428
 bytes (188 past) and is padded to 245 past again: 42,485
-bytes, which J3R180 58206920 installed 13 times of 13 at the first try on 2026-11-21 and then paid from at a
-test mint ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
+bytes, which the J3R310-355 sample card 58206920 installed 13 times of 13 at the first try on 2026-11-21 and then paid
+from at a test mint ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). With the security
+review's fixes ([D228](DECISIONS.md#d228)) the file came to 42,482 bytes (242 past), and two writes in a longer form
+pad it back to 42,485, 245 past: a file no chip has been given. No J3R180 has been given a 3.0 file; every place above
+past 41,205 bytes was measured on that J3R310-355, not on a J3R180.
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build

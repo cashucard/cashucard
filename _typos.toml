@@ -12,6 +12,10 @@ encrypter = "encrypter"
 unparseable = "unparseable"
 # HashiCorp, the company
 hashi = "hashi"
+# word pieces the untried rule's tests plant and look for (tools/cardctl/test_spec_consistency.py): "fram" of framing,
+# "nstalled" of a hidden "installed"
+fram = "fram"
+nstalled = "nstalled"
 
 [default.extend-identifiers]
 # a plural of the SELECT command, in the applet's tests
@@ -22,6 +26,10 @@ PNGs = "PNGs"
 "52307ba" = "52307ba"
 "5472ba9" = "5472ba9"
 "123ba99" = "123ba99"
+# the tracked 3.0 load file's short sha256 (D228)
+"99a66ba7" = "99a66ba7"
+# a command's name made a verb, as the deployment guide and the release notes write it
+LOADed = "LOADed"
 
 [files]
 # gp's APDU logs (H0 captures), the provisioner's load files and Xcode's object

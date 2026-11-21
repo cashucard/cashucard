@@ -89,24 +89,29 @@ v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
 The 3.0 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
-the Method component 34,790), in 173 blocks of 247 bytes, the last 1: the load file
+the Method component 34,791), in 173 blocks of 247 bytes, the last 1: the load file
 inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
 not the CAP's ([Install](#install) gives both). Padded by `sizeTheFile` (below), this
-exact file has run on a chip: J3R180 58206920 installed it 13 times of 13 at the first try on 2026-11-21, and then paid
-from it at a test mint, testnut, with real signatures and real change verified on the chip
-([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)); the rest of the checklist below is
-still to come. Its source is
+exact file has run only in a simulator so far, and no card has installed it. Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
 path; the no-PIN allowance armed by the owner's proof or a held tap and not by the PIN alone; `GET_INFO`'s paid-list
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
-settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), and the tag's address taken from its install
-parameters ([D227](DECISIONS.md#d227): 455 bytes more, padded back to 245 past by ten more writes, 57 bytes). Its own run, as the checklist below, is still to come, its size
-first; if the chip refuses its size, it is moved with `sizeTheFile` (below). The other maintainer's 3.0 file before
-the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by twenty-five writes, 143 bytes, from 42,342 (102 past; before D227 the file was 41,887, 159 past, six bytes from
-153 past, where the chip refused a study build, and fifteen writes took it to 41,973) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been
-created at the first try on J3R180 58206920; a padding to 175 past (41,903 bytes, e2aac64) had its create refused `6F00` once
+settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), the tag's address taken from its install
+parameters ([D227](DECISIONS.md#d227): 455 bytes more, padded back to 245 past by ten more writes, 57 bytes), and the
+security review's fixes of 2026-11-21 ([D228](DECISIONS.md#d228): one set-up bit a unit, the chip's path given up for
+one signature only, `GET_INFO` byte 55 bit 3 clear; three bytes fewer, padded back by two writes in a longer form). Its
+own run, as the checklist below, is still to come, its size first; if the chip refuses its size, it is moved with
+`sizeTheFile` (below). No J3R180 has been given a 3.0 file, and a J3R180 run comes before any release wording
+([D228](DECISIONS.md#d228)). The file before it, 9ac55c1's (load file `d69742d0…`, the same size), went to the
+J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21: what that card did with it is that file's
+history, in [Install](#install) and the checklist below, and says nothing of this one. The other maintainer's 3.0 file before
+the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by twenty-five writes, two of
+them in a longer form, 146 bytes, from 42,339 (99 past; 9ac55c1's file was 42,342 unpadded, 102 past, and before D227 the
+file was 41,887, 159 past, six bytes from 153 past, where the chip refused a study build, and fifteen writes took it to
+41,973) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been created at the first try on the
+J3R310-355 sample card 58206920; a padding to 175 past (41,903 bytes, e2aac64) had its create refused `6F00` once there
 and taken on the same retry ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). refcheck now warns of a size at or near a refused place.
 
 On 2026-11-13 a J3R180 was given earlier source, numbered 2.3 then, padded to three
@@ -409,8 +414,9 @@ card), taking money back after D with the refund key, a header far ahead or a we
 clock (no real header makes either), tears, a phone and a production mint ([the
 hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
 file is that day's source with the version moved to 3.0 ([D205](DECISIONS.md#d205)) and
-D206 to D210 added. The tracked file since is that source with D211 to D227 (above); it has run on
-J3R180 58206920 at testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
+D206 to D210 added. The tracked file since is that source with D211 to D228 (above); no chip has been given
+it. 9ac55c1's file before it (D211 to D227, load file `d69742d0…`) went to the J3R310-355 sample card 58206920 at
+testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
 
 > **Three applets, installed in order.** The chip refuses the card's applet as the
 > first instantiated from its package (no answer, or `6F00`); it takes it once a
@@ -460,10 +466,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.0**, sha256
-`611b3478b82d4c1a3fb41878738087168b41a29c35343aafaa48fa8eeb297af4`
+`0b17e232d394a7ce1885dcc395e38d6830cd4abf5097056052174a3f76b4f4a6`
 (`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
 is LOADed with (refcheck's measure, 42,485 bytes), has sha256
-`d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e`: the hash the
+`99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -851,7 +857,7 @@ run's log.
   refused and leaves no tag (`gp --list` shows none at `D2760000850101`), and the
   card's applet still answers; the tag installed again with an address works. A
   phone reads the tag and offers the address.
-  - 2026-11-21, sample card 58206920 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
+  - 2026-11-21, 9ac55c1's file (load file `d69742d0…`, not the tracked one), J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
     [x] `C9` and the address in `gp -d`; [x] n + 56 and `#new`; [x] the coded address whole and in pieces of 59, its M
     under the owner's c; [x] `C9 00`, a short install and one with no length each `6A80`, no tag, the card's applet
     answering; [x] 127 bytes, then `https://getfoxy.io/card`; [ ] a phone's read, left for the keeper.
@@ -868,11 +874,12 @@ run's log.
 - Real change: take a payment's change back with `LOAD_CHANGE` and see the mint
   take the piece in a later swap; and a date's keys from `GROUP_KEYS` against the
   owner's own derivation from c.
-  - 2026-11-21, sample card 58206920, at testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
+  - 2026-11-21, 9ac55c1's file (load file `d69742d0…`), J3R310-355 sample card 58206920, at testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
     [x] four payments signed at the first `SPEND_ALL_SIGN`, each good under P + t·G and not under P, every swap taken
     and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 14 of 14); [x] five change outputs back by
     `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in a later swap;
-    [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c. The hash is on PROVEN.
+    [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c. That file's hash is on PROVEN; the
+    tracked file's is not, and its own run is still to come.
 - `INBOX` for last week and this week, a real header of each given first
   (`SET_HEADER`), against the owner's derivation from c for each week.
 - `cardctl --timing selftest` (`AUTH`) and a sealed `VERIFY_PIN`, before and

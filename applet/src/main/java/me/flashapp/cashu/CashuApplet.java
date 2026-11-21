@@ -7391,11 +7391,16 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.0 with the tag's address given at install (D227): twenty-five writes here, 143 bytes, so the load file is 42,485 bytes, 245
-         * past a multiple of 256, the place of the 3.0 file before it (41,973 bytes, fifteen writes, 86 bytes), which installed on J3R180
-         * 58206920 30 times of 30 at the first try, and of 190c5ab's 41,205, which created at the first try every time there; D227's tag
-         * added 455 bytes with its install's checks, which came to 42,428 (188 past) with the fifteen writes. Before them, 41,903 (175 past) was
-         * refused once (6F00) and created on the retry; unpadded, 41,887. The last 2.3
+        /* 3.0 with D228's review fixes (one set-up bit a unit, the chip's path given up for one signature only, byte 55 bit 3
+         * clear): twenty-five writes here, two of them moved to a longer form (an index over 127, an index past sconst's), 146
+         * bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256; with the writes as 9ac55c1 had them it came to
+         * 42,482 (242 past), three bytes under 9ac55c1's. That is the size and the place of 9ac55c1's file (load file d69742d0..., D227's tag address at
+         * install, twenty-five writes, 143 bytes), which installed on J3R310-355 sample card 58206920 13 times of 13 at the first
+         * try, and of the 3.0 file before it (41,973 bytes, fifteen writes, 86 bytes), which installed there 30 times of 30 at
+         * the first try, and of 190c5ab's 41,205, which created at the first try every time there: what a J3R310-355 did with
+         * other source of this size, not this file, which no chip has been given, and no J3R180 has been given any 3.0 file.
+         * D227's tag added 455 bytes with its install's checks, which came to 42,428 (188 past) with the fifteen writes. Before
+         * them, 41,903 (175 past) was refused once (6F00) on that J3R310-355 and created on the retry; unpadded, 41,887. The last 2.3
          * file (D221, 40,412 bytes, 220 past) ran on a J3R180 on 2026-11-15, and the file with D217 to D220 (40,365, 173 past) the day
          * before; the file with D213 to D216 (39,343, 175 past) installed on 2026-11-14, where a study build of its source was refused
          * (6F00) at 38,791 and 38,809 bytes (135 and 153 past) and installed at 38,893 (237 past); the files with D212 (37,269, 149
@@ -7406,7 +7411,7 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the sizes not to be shipped untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
-        a[0] = 10;
+        a[6] = 16;
         a[1] = 11;
         a[2] = 12;
         a[3] = 13;
@@ -7430,6 +7435,6 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[25] = 35;
         a[26] = 36;
         a[27] = 37;
-        a[36] = 5;
+        a[136] = 50;
     }
 }
