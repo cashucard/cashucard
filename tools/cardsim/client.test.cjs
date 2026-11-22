@@ -367,7 +367,7 @@ const u32be = n => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b }
 const INFO_43 = Buffer.concat([Buffer.from([2, 0, 128, 3, 1, 124, 0xff, 1, 4, 3, 0, 1]), u32be(5000), Buffer.from([1]),
   u32be(1791814824), u32be(1791800000), u32be(100), Buffer.from([0]), u32be(0), u32be(250), u32be(50), Buffer.from([0])])
 const INFO_59 = Buffer.concat([Buffer.from([3, 0]), INFO_43.subarray(2), Buffer.from([1]), u32be(95000), Buffer.from([3, 1, 0x80]),
-  u32be(1791700000), Buffer.from([0xff, 0x03]), Buffer.from([298 >> 8, 298 & 0xff])])
+  u32be(1791700000), Buffer.from([0xf7, 0x03]), Buffer.from([298 >> 8, 298 & 0xff])])  // the profiles F7 03 (bit 3 clear, D228)
 
 test("parseInfo reads 30, 42, 43, 51 and 59 bytes (test_apdu.py's INFO_43 and INFO_59)", () => {
   assert.equal(INFO_43.length, 43)
@@ -396,9 +396,11 @@ test("parseInfo reads 30, 42, 43, 51 and 59 bytes (test_apdu.py's INFO_43 and IN
   assert.equal(j.unmarked, 1)
   assert.equal(j.lastUnit, "the card's")
   assert.equal(j.noPinWindowStart, 1791700000)
-  assert.equal(j.profilesRaw, 0xff03)
-  assert.deepEqual(j.profiles, ["PIN before money", "the no-PIN window", "the owner claimed slowly", "the wait on every payment",
+  assert.equal(j.profilesRaw, 0xf703)
+  assert.deepEqual(j.profiles, ["PIN before money", "the no-PIN window", "the owner claimed slowly",
     "two units on one card", "a holder with no phone", "keyset keys", "the paid list", "the certificate", "keys per load"])
+  const beforeD228 = Buffer.from(INFO_59); beforeD228[55] = 0xff  // a file before D228: bit 3 set
+  assert.ok(parseInfo(beforeD228).profiles.includes("the wait on every payment"), "a file before D228")
   assert.equal(j.keysPerLoad, true)
   assert.equal(j.loadsLeft, 298)
   const k = parseInfo(INFO_59.subarray(0, 51))
@@ -922,7 +924,7 @@ test("the bridge answers both SELECTs as the chip does: the whole AID 03 00, the
   const info = await sim.getInfo()
   assert.equal(info.version, "3.0")
   assert.equal(info.keysPerLoad, true, "GET_INFO P1 4 byte 56 bit 1")
-  assert.equal(info.profilesRaw, 0xff03)
+  assert.equal(info.profilesRaw, 0xf703, "every profile but the wait on every payment (D228)")
   await sim.apdu(encode.select(constants.PACKAGE_AID))
   assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
 })

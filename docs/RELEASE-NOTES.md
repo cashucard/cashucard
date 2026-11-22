@@ -8,20 +8,18 @@ the merged pull requests besides.
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
-`611b3478b82d4c1a3fb41878738087168b41a29c35343aafaa48fa8eeb297af4`. Its load file,
+`0b17e232d394a7ce1885dcc395e38d6830cd4abf5097056052174a3f76b4f4a6`. Its load file,
 the bytes a card is LOADed with, is 42,485 bytes by `tools/refcheck.py`'s measure,
-sha256 `d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e`. `SELECT`
+sha256 `99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536`. `SELECT`
 and `GET_INFO` answer `03 00`. The core is revision `03` of
 [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md). The decisions are
-[D183](DECISIONS.md#d183) to [D227](DECISIONS.md#d227) (numbered 3.0 by
+[D183](DECISIONS.md#d183) to [D228](DECISIONS.md#d228) (numbered 3.0 by
 [D205](DECISIONS.md#d205); the decisions this repo's 2.3 files carried as D205 to D215 are D211 to D221
 since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This exact file has run on a chip: J3R180 58206920 installed it 13 times of 13 at the first try on 2026-11-21, its tag
-taking the address at install, and paid from it at a test mint (testnut), with real signatures and real change verified
-on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). Its source is
+This exact file has run only in a simulator so far, and no card has installed it. Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
@@ -29,8 +27,15 @@ path; the no-PIN allowance armed by the owner's proof or a held tap and not by t
 bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md#d222)) and the till keysets and
 settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), and the tag's address given by
 whoever installs the card ([D227](DECISIONS.md#d227)): an install of the tag must now carry the card maker's address
-in its install parameters, and one without is refused. The rest of
-[the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist) is still to come.
+in its install parameters, and one without is refused; and the security review's fixes of 2026-11-21
+([D228](DECISIONS.md#d228)): one set-up bit a unit, the chip's path given up for one signature only, and `GET_INFO`
+byte 55 bit 3 clear. Its run is to come, on a J3R180, its size first
+([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)); no J3R180 has been given a 3.0 file.
+
+The file before it (9ac55c1, load file `d69742d0…`, the tag's address at install and nothing of D228) went to the
+J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21: 13 installs of 13 at the first try, its tag
+taking the address at install, and a payment at a test mint (testnut) with real signatures and real change verified on
+the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
 
 The last 2.3 file (answering `02 03`, 40,412 bytes, load file `05c9b847…`) ran on a chip on 2026-11-15: it is the file below (40,365 bytes, `8aefa0db…`) with [D221](DECISIONS.md#d221) added (the
 claim right after the set-up's record is one asking; 47 bytes more, 220 past a multiple of 256). The bench J3R180 09301220
@@ -271,8 +276,9 @@ a J3R180 whose configuration lacks either cannot run the card.
   bytes (amount, the mint's key K, the keyset); `GET_CHANGE` rows are 83 bytes and
   carry no blinding factor; `SET_LIMIT` and `SET_LIMIT_PIN` take 4, 8, 12, 13, 17 or
   18 bytes (budget, then rate, then the window switch); `GET_INFO` P1 = 3 answers 51
-  bytes and P1 = 4 59 bytes (profiles `FF 03`, or `7F 03` on a card refused its paid
-  list, then the loads left today); new
+  bytes and P1 = 4 59 bytes (profiles `F7 03`, or `77 03` on a card refused its paid
+  list, then the loads left today; byte 55 bit 3, the wait on every payment, is clear,
+  [D228](DECISIONS.md#d228)); new
   `GET_CARD` P1 = 2 and 3, `GET_BALANCE` P1 = 1, `GET_LOG` P1 = 2 and 3,
   `RESET_CARD` P1 = 1, `REFRESH` P1 = 1, `SPEND_ALL_AGAIN` by hash for the last 16
   payments; `RESET_CARD` P1 = 0 takes an anchor header, and a hand-over's anchor sets

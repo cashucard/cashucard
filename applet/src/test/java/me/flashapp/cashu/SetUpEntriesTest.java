@@ -16,7 +16,9 @@ import org.junit.jupiter.api.Test;
  * holder's set-up tap, or a seller who sets the card up and hands it over) taught five made-up keysets that every reclaim
  * spared for good, and the mint's next keyset was 6A9C even with the owner's grant. Now a keyset taught in the set-up gets the
  * bit only where no entry of its unit is a set-up's still waiting for its first piece (one a unit, the first), and a
- * hand-over takes the bit off every entry so that its reclaim frees them.
+ * hand-over takes the bit off every entry so that its reclaim frees them. D228 (the security review of 2026-11-21,
+ * applet-money-1) narrows it again: the bit goes only where no entry of the unit has it at all, loaded or not, so a load
+ * under the set-up's keyset no longer frees the bit for a made-up one (VerifyF1Test, VerifyF1bTest).
  */
 class SetUpEntriesTest {
 
@@ -112,13 +114,45 @@ class SetUpEntriesTest {
     }
 
     @Test
-    @DisplayName("D226: a set-up keyset loaded in the set-up frees the unit's one waiting bit for the next keyset taught there (the bit is for waiting entries only)")
-    void aLoadedSetUpEntryLeavesTheBitFree() throws Exception {
-        UnitsTest.Card c = setUpSelection();
-        taught(c, A);
-        assertEquals(SW_OK, c.load(c.piece(A.id8(), 32)).getSW());
-        taught(c, B);
-        assertTrue(setUpBit(c, B), "A is loaded: B is the unit's waiting set-up entry");
+    @DisplayName("D228 (amends D226): a set-up keyset loaded in the set-up keeps the unit's one bit: the next keyset taught there gets none, is kept through the set-up tap (it was taught in it), is let go after it when no piece came, and is kept when one did")
+    void aLoadedSetUpEntryKeepsTheBit() throws Exception {
+        for (boolean loadB : new boolean[] { false, true }) {
+            UnitsTest.Card c = setUpSelection();
+            taught(c, A);
+            assertEquals(SW_OK, c.load(c.piece(A.id8(), 32)).getSW());
+            taught(c, B);
+            assertTrue(setUpBit(c, A), "A, loaded, keeps the unit's one set-up bit");
+            assertFalse(setUpBit(c, B), "B gets none: one a unit in the set-up, loaded or not (D226 gave it to B)");
+            assertEquals(SW_OK, c.clearSpent());
+            assertTrue(c.entryOf(B.id8()) >= 0, "a reclaim in the set-up tap keeps B: taught in this time in the field");
+            if (loadB) assertEquals(SW_OK, c.load(c.piece(B.id8(), 32)).getSW());
+            c.tap();
+            assertEquals(SW_OK, c.clearSpent());
+            if (loadB) assertTrue(c.entryOf(B.id8()) >= 0, "B loaded: kept by its piece");
+            else assertEquals(-1, c.entryOf(B.id8()), "B never loaded and not this tap's: let go");
+            assertTrue(c.entryOf(A.id8()) >= 0, "A kept by its piece");
+        }
+    }
+
+    @Test
+    @DisplayName("D228: the set-up bit is one a unit: the sat keyset taught and loaded in the set-up does not take the usd keyset's, which a card with no owner teaches under the held tap, and the usd one keeps it across taps while it waits")
+    void theOtherUnitsBitIsItsOwn() throws Exception {
+        UnitsTest.Card d = new UnitsTest.Card();
+        assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
+        d.pin();
+        assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, UnitsTest.recordIn(SAT))));
+        assertEquals(SW_OK, d.sw(setTimeCommand(T0)));
+        HolderTest.hold(d);
+        taught(d, A);
+        assertEquals(SW_OK, d.load(d.piece(A.id8(), 32)).getSW());
+        taught(d, USD_KS);
+        assertTrue(setUpBit(d, A), "sat's bit, on its loaded keyset");
+        assertTrue(setUpBit(d, USD_KS), "usd's own bit: the sat entry's does not count for it");
+        assertEquals(SW_OK, teach(d, junk(1)).getSW());
+        assertFalse(setUpBit(d, junk(1)), "a second sat keyset gets none");
+        for (int i = 0; i < 3; i++) { d.tap(); assertEquals(SW_OK, d.clearSpent()); }
+        assertTrue(d.entryOf(USD_KS.id8()) >= 0 && setUpBit(d, USD_KS), "the usd keyset kept while it waits");
+        assertEquals(-1, d.entryOf(junk(1).id8()), "the second sat keyset let go");
     }
 
     @Test

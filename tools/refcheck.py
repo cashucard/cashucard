@@ -43,7 +43,9 @@ OPENER = bytes.fromhex('F04341534855434152444D')
 LOADED = ['Header', 'Directory', 'Import', 'Applet', 'Class', 'Method',
           'StaticField', 'Export', 'ConstantPool', 'RefLocation']
 # what the chip has answered, by the load file's size (refcheck's measure, the stored components): True installed,
-# False went 6F00 or mute at INSTALL. Measured on a J3R180 with the opener first.
+# False went 6F00 or mute at INSTALL. Measured with the opener first, per entry, on the chip the entry names (a J3R180
+# where it names none; 41205, 41973 and 42485 on the J3R310-355 sample card 58206920, ATR; ICType D321, SCP03). No
+# J3R180 has been given a 3.0 file.
 SIZES = {
     17344: False, 17438: False, 17479: False, 17480: False, 17538: True, 17552: True, 17560: True, 17562: True,
     17564: True, 17575: True, 17582: True, 17589: True, 17677: False, 17694: False, 17726: False,
@@ -63,14 +65,21 @@ SIZES = {
     39343: True,   # 2.3 (CAP sha256 b304d938..., load file c79b30a7...), unpadded, D200 to D204, D211 to D216 (D213 keyset taught at set-up, D214 the field on p padded, D215 LOAD_CHANGE's points by the key agreement, D216 e*d on the chip's RSA), 2026-11-14, J3R180 09301220: three steps, opener first, load 17 s, card applet 2 s at the first create, installed three times; SELECT 0203, selftest 20/20
     40365: True,   # 2.3 (CAP sha256 20b6d726..., load file 8aefa0db...), unpadded, D200 to D204, D211 to D220 (D217 the product in two shares, D218 every signature checked on the card, D219 wider known answers, D220 a taught keyset kept), 2026-11-14, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 1 to 3 s at the first create, four installs (173 past a multiple of 256; 135 and 153 past failed and 175 and 237 past installed); SELECT 0203, selftest 13/13, real signatures and real change verified on the chip
     40412: True,   # 2.3 (CAP sha256 11104ceb..., load file 05c9b847...), unpadded, D200 to D204, D211 to D221 (the claim after the set-up's record is one asking), 2026-11-15, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 2 s; selftest 13/13, set-up claim at the first asking, 9-piece payment with change, installed three times
-    41205: True,   # 2.3 with the rotating tag (190c5ab, load file 6f0e3a06..., never tracked), unpadded, 245 past a multiple of 256, J3R180 58206920: installed and left there, selftest 13 of 13 and the tag read (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920.md, its files table and the row Left); not on PROVEN
-    41973: True,   # 3.0 of the merge, padded to 245 past a multiple of 256 (1ad208d, load file 2b9c6b02...), J3R180 58206920: created 30 times of 30 at the first try (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md, the install rate test); not on PROVEN
-    42485: True,   # neutral 3.0 with the tag's address at install (9ac55c1, load file d69742d0...), J3R180 58206920, 2026-11-21: 13 of 13 installs at the first try, ten create cycles (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md), then a payment run at testnut on the same card (the same report); on PROVEN
+    41205: True,   # 2.3 with the rotating tag (190c5ab, load file 6f0e3a06..., never tracked), unpadded, 245 past a multiple of 256, J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03): installed and left there, selftest 13 of 13 and the tag read (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920.md, its files table and the row Left); not on PROVEN
+    41973: True,   # 3.0 of the merge, padded to 245 past a multiple of 256 (1ad208d, load file 2b9c6b02...), J3R310-355 sample card 58206920: created 30 times of 30 at the first try (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md, the install rate test); not on PROVEN
+    42485: True,   # neutral 3.0 with the tag's address at install (9ac55c1, load file d69742d0...), J3R310-355 sample card 58206920, 2026-11-21: 13 of 13 installs at the first try, ten create cycles (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md), then a payment run at testnut on the same card (the same report); on PROVEN
     38791: False,  # 2.3 study build of D213 to D216 (ecdh study, never shipped), 2026-11-14, J3R180 09301220: loaded, opener made, card applet 6F00 at create (135 past a multiple of 256)
     38809: False,  # the same study source at this size, 2026-11-14, J3R180 09301220: card applet 6F00 at create (153 past a multiple of 256)
     38893: True,   # the same study source at this size (load file 92b67948..., never shipped), 2026-11-14, J3R180 09301220: installed at the first try (237 past a multiple of 256); passed the study's chip tests
     35509: True,   # the 2.3 chip run's test-only build (2.3 with one command added that says the signer's temporary key's kind; never shipped, load file sha256 1bf178bc...), 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s
     21540: False,  # 2.2 first build (sha256 51ddeee4...), ENG-823, 2026-11-06: loaded (88 blocks), card applet 6F00 at create; cause not isolated: the size window or the constructor's +4,321 B persistent (D176, docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
+}
+# the sizes in SIZES that only a chip other than a J3R180 has installed, by the chip that did: a file of one of these sizes
+# is not said to be known to install on a J3R180.
+OTHER_CHIP = {
+    41205: 'the J3R310-355 sample card 58206920',
+    41973: 'the J3R310-355 sample card 58206920',
+    42485: 'the J3R310-355 sample card 58206920',
 }
 NEAR = 8  # bytes: a size this close to one that failed is treated as that one
 # load-file sizes a build is kept out of (first, last), whatever SIZES says: around 32,777, which failed in 2.3
@@ -101,7 +110,7 @@ PROVEN = {
     '05c9b8476313d18e453ebdfb04672296f7d64d825c6e34aff22ef43a3b8d6bc3': '2.3 with D200 to D204, D211 to D221 (D221 the claim after the set-up\'s record is one asking), 40,412 bytes, 2026-11-15, J3R180 09301220 at '
         'testnut.cashu.space: real signatures and real change verified on the chip',
     'd69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3.0 (9ac55c1, the tag\'s address at install, D227), 42,485 bytes, '
-        '2026-11-21, J3R180 58206920 at testnut.cashu.space: 13 of 13 installs at the first try, then a payment with five change outputs, '
+        '2026-11-21, J3R310-355 sample card 58206920 (ATR, ICType D321, SCP03) at testnut.cashu.space: 13 of 13 installs at the first try, then a payment with five change outputs, '
         'the change loaded back and taken by testnut in a later swap, AUTH verified: real signatures and real change verified on the chip',
 }
 # the load files a chip has installed, by the sha256 of the bytes gp LOADs, whose run has not yet had a payment at a mint: the
@@ -230,7 +239,10 @@ def main(argv):
                   'install on a chip. Move CashuApplet.sizeTheFile out of it.' % (size, first, last))
             return 1
     if size in SIZES and SIZES[size]:
-        print('a size known to install on the chip.')
+        if size in OTHER_CHIP:
+            print('a size known to install on %s; no J3R180 has been given a file of this size.' % OTHER_CHIP[size])
+        else:
+            print('a size known to install on the chip.')
         return 0
     close = [s for s in bad if abs(s - size) <= NEAR]
     if close:

@@ -192,10 +192,12 @@ cancellation during key prefetch prevents NFC from opening later.
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
 chip has installed and the operator approved. The 3.0 load file (42,485 bytes,
-sha256 `d69742d0…`) is not on it yet, so a build from this tree installs no card.
+sha256 `99a66ba7…`) is not on it yet, so a build from this tree installs no card.
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
-No chip has installed the 3.0 file, or a file of its size, yet. Earlier sources ran on
+No chip has installed this 3.0 file (D228's review fixes), and no J3R180 any 3.0 file; the 3.0 file before it,
+of the same size (load file `d69742d0…`), went to the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on
+2026-11-21. Earlier sources ran on
 a J3R180 while they were numbered 2.3, answering `02 03`: the file before D200
 (35,466 bytes, `48b8597c…`) on 2026-11-13, and the file with D200 to D204
 (36,953 bytes, `f216644a…`) on 2026-11-14; `tools/refcheck.py` keeps their sizes and

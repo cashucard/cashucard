@@ -24,7 +24,8 @@ import org.junit.jupiter.api.Test;
  * RSA as a function of d alone (a fresh random split of d, four squarings); D218 every signature is checked on the card against
  * the key before it leaves (a failing chip path is given up and redone by the bytecode, and a signature that fails then is not
  * released); D219 the set-up's known answers ask the engines for distinct operands at full width; and a sign-time engine failure
- * falls back and clears chipMul. Each test failed on the 7d760e5 file first (see the fix-24 report).
+ * falls back for that signature alone (D228: chipMul stays as SET_CARD's test left it). Each test failed on the 7d760e5 file
+ * first (see the fix-24 report); the D228 ones on a2da664.
  */
 class SignHardeningTest {
     @BeforeEach void floor() { useTheTestFloor(); }
@@ -133,7 +134,7 @@ class SignHardeningTest {
     // ---- MEDIUM-2 and -3: every signature is checked, none unchecked leaves ----
 
     @Test
-    @DisplayName("D218: a fault in any one of the four squarings, in its input or its output, in 8 bit places each, never lets a bad signature leave: the card withholds it and signs again by the bytecode, the answer verifies, and chipMul is cleared")
+    @DisplayName("D218: a fault in any one of the four squarings, in its input or its output, in 8 bit places each, never lets a bad signature leave: the card withholds it and signs again by the bytecode, the answer verifies, and the chip's path is given up for that signature only (D228: chipMul stays true)")
     void aFaultedSquaringReleasesNoBadSignature() throws Exception {
         BigInteger d = new BigInteger("123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 16);
         BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
@@ -147,7 +148,7 @@ class SignHardeningTest {
             byte[] sig = new byte[64];
             assertEquals(64, s.sign(ecPriv(be(d)), ecPub(point65(pt)), msg, (short) 0, sig, (short) 0));
             assertTrue(schnorrVerify(be(pt[0]), msg, sig), "squaring " + at + (input ? " input" : " output") + " bit " + bit);
-            assertFalse(flag(s, SchnorrHW.class, "chipMul"), "the chip's path is given up");
+            assertTrue(flag(s, SchnorrHW.class, "chipMul"), "the chip's path is given up for that signature only (D228)");
         }
     }
 
@@ -182,7 +183,7 @@ class SignHardeningTest {
     }
 
     @Test
-    @DisplayName("D218: a signature that cannot be shown to be the key's is not released, on either path: a private key whose public key is another's gives 6F00 with the output as it was, not a byte written (bytecode path, D207), and the chip path is given up first, the signature made again by the bytecode, and ends the same way")
+    @DisplayName("D218: a signature that cannot be shown to be the key's is not released, on either path: a private key whose public key is another's gives 6F00 with the output as it was, not a byte written (bytecode path, D207), and the chip path is given up first, for that signature only (D228: chipMul stays true), the signature made again by the bytecode, and ends the same way")
     void aSignatureNotTheKeysIsWithheld() throws Exception {
         BigInteger d = BigInteger.valueOf(0xCAFEBABEL), other = BigInteger.valueOf(0xDEADBEEFL);
         BigInteger[] wrong = ecMulTest(other, SECP_GX, SECP_GY);
@@ -199,7 +200,7 @@ class SignHardeningTest {
             byte[] was = new byte[64];
             Arrays.fill(was, (byte) 0x55);
             assertArrayEquals(was, sig, "nothing of a signature is written to the output (D207: s is kept in the scratch until the check passes)");
-            assertFalse(flag(s, SchnorrHW.class, "chipMul"));
+            assertEquals(chip, flag(s, SchnorrHW.class, "chipMul"), "the chip's path as SET_CARD's test left it (D228)");
             assertTrue(isZero(get(s, SchnorrHW.class, "work"), 0));
             assertTrue(isZero(get(s, SchnorrHW.class, "sc"), 0));
         }
@@ -283,7 +284,7 @@ class SignHardeningTest {
     // ---- LOW-6: a sign-time failure falls back ----
 
     @Test
-    @DisplayName("D217/D218: an engine that refuses after the set-up (chipMul true) does not stop signing: the signature is made by the bytecode, verifies, chipMul is cleared, and the next signature is the bytecode's with no asking of the engine")
+    @DisplayName("D217/D218: an engine that refuses after the set-up (chipMul true) does not stop signing: the signature is made by the bytecode and verifies, chipMul stays true (D228: the fallback is for that signature only), and the next signature asks the engine again")
     void aSignTimeEngineFailureFallsBack() throws Exception {
         Rec eng = new Rec();
         SchnorrHW s = chipSigner(eng);
@@ -293,13 +294,39 @@ class SignHardeningTest {
         byte[] msg = new byte[32], sig = new byte[64];
         assertEquals(64, s.sign(ecPriv(be(d)), ecPub(point65(pt)), msg, (short) 0, sig, (short) 0));
         assertTrue(schnorrVerify(be(pt[0]), msg, sig));
-        assertFalse(flag(s, SchnorrHW.class, "chipMul"));
+        assertTrue(flag(s, SchnorrHW.class, "chipMul"), "given up for that signature only");
         eng.refuse = false;
         eng.powers = 0;
         assertEquals(64, s.sign(ecPriv(be(d)), ecPub(point65(pt)), msg, (short) 0, sig, (short) 0));
         assertTrue(schnorrVerify(be(pt[0]), msg, sig));
-        assertEquals(0, eng.powers);
+        assertTrue(eng.powers > 0, "the next signature asks the engine (the bytecode's at a2da664)");
         assertTrue(isZero(get(s, SchnorrHW.class, "work"), 0));
         assertTrue(isZero(get(s, SchnorrHW.class, "sc"), 0));
+    }
+
+    @Test
+    @DisplayName("D228 (applet-crypto-1): one faulted squaring does not turn the chip's path off for later signatures: after it, three more signatures each verify, each asks the engine for its four squarings, chipMul stays true, and sc and work are zero after each")
+    void oneFaultDoesNotTurnTheChipPathOff() throws Exception {
+        BigInteger d = new BigInteger("0fedcba9876543210fedcba9876543210fedcba9876543210fedcba98765432", 16);
+        BigInteger[] pt = ecMulTest(d, SECP_GX, SECP_GY);
+        byte[] msg = new byte[32]; Arrays.fill(msg, (byte) 3);
+        Rec eng = new Rec();
+        SchnorrHW s = chipSigner(eng);
+        eng.faultAt = 1; eng.flipOutBit = 100;
+        byte[] sig = new byte[64];
+        assertEquals(64, s.sign(ecPriv(be(d)), ecPub(point65(pt)), msg, (short) 0, sig, (short) 0));
+        assertTrue(schnorrVerify(be(pt[0]), msg, sig), "the faulted signature is made again and verifies");
+        assertTrue(flag(s, SchnorrHW.class, "chipMul"), "kept after the fault");
+        eng.faultAt = -1; eng.flipOutBit = -1;
+        for (int i = 0; i < 3; i++) {
+            eng.powers = 0;
+            msg[0] = (byte) i;
+            assertEquals(64, s.sign(ecPriv(be(d)), ecPub(point65(pt)), msg, (short) 0, sig, (short) 0), "signature " + i);
+            assertTrue(schnorrVerify(be(pt[0]), msg, sig), "signature " + i + " verifies");
+            assertEquals(4, eng.powers, "signature " + i + " asks the engine for its four squarings (none at a2da664)");
+            assertTrue(flag(s, SchnorrHW.class, "chipMul"));
+            assertTrue(isZero(get(s, SchnorrHW.class, "work"), 0), "work after signature " + i);
+            assertTrue(isZero(get(s, SchnorrHW.class, "sc"), 0), "sc after signature " + i);
+        }
     }
 }

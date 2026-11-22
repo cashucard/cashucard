@@ -324,8 +324,10 @@ payment ([The clock and the limits](#the-clock-and-the-limits)), bit 4
 [a holder with no phone](#a-holder-with-no-phone), bit 6
 [keyset keys](#keyset-keys), bit 7 [the paid list](#the-paid-list). Byte 56: bit 0
 [the certificate](#the-certificate), bit 1 [keys per load](#keys-per-load); bits 2
-to 7 are `0`. A 3.0 card from this repository answers `FF 03`; byte 55
-bit 7 is `0` (`7F 03`) on a card whose record is set (byte 11 = `01`) and whose first
+to 7 are `0`. Byte 55 bit 3 is `0` on every 3.0 card: 3.0 keeps no wait on a
+payment within its limit (D211, D228), and a file that set it answered `FF 03`. A 3.0
+card from this repository answers `F7 03`; byte 55
+bit 7 is `0` as well (`77 03`) on a card whose record is set (byte 11 = `01`) and whose first
 `SET_CARD` could not reserve the paid list: such a card refuses every `LOAD_PROOF`
 (`6A84`), and a loader reads the bit before it swaps ([Keys per load](#keys-per-load)). A card that answers less than 57 bytes to P1 = 4 keeps
 none of them.
@@ -2665,7 +2667,8 @@ mint, told apart by keyset.
   bit 1 the keys known (a top kept). The keyset's 8 bytes are written, then the
   state byte, the entry's commit. The card also keeps bit 2, loaded, set at the first piece
   loaded under the keyset ([D220](../docs/DECISIONS.md#d220)); bit 3, entered in the card's
-  first set-up (only a keyset taught and not loaded, the first of its unit while it waits; never an entry a load makes,
+  first set-up (only a keyset taught and not loaded, the first of its unit in the set-up, whether that one has since
+  been loaded or not, [D228](../docs/DECISIONS.md#d228); never an entry a load makes,
   [D226](../docs/DECISIONS.md#d226); taken off every entry at a hand-over); and bit 4, taught in the last time in the field that taught
   ([D223](../docs/DECISIONS.md#d223)). `GET_CARD` shows none of the three.
 - **Every piece is of one unit.** `LOAD_PROOF` P2 = 1 names the pieces' unit; P2 = 0

@@ -634,7 +634,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * Entered in the card's first set-up (D223: `PM_FIRST`, whoever set the card's first PIN in this selection, the holder): the
      * reclaim spares such an entry taught and never loaded across taps, and it does not count toward UNMARKED_MOST. A keyset
-     * taught there gets it only as the first of its unit still waiting (D226, `newState`); a hand-over takes it off every entry.
+     * taught there gets it only as the first of its unit in the set-up, loaded or not (D228, which narrows D226: `newState`); a
+     * hand-over takes it off every entry.
      */
     static final byte  ENTRY_SETUP    = (byte) 0x08;
     /**
@@ -1045,9 +1046,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     // for the first limit's worth over the limit, and for every further limit's worth. Each change output
     // made (about 0.23 s) counts as one of them done. Within the limit there is no wait.
     static final short WAIT_OVER_SIGNS   = (short) 10;
-    /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14). [M1: the other
-     * maintainer has not yet agreed to take the floor away on the shared 3.0 wire; his pr254 kept WAIT_FLOOR_SIGNS = 4 here
-     * and in SPEND_ALL_SIGN's wait.] */
+    /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14), and GET_INFO's
+     * byte 55 bit 3 says so (D228). [M1, the other maintainer's floor of WAIT_FLOOR_SIGNS = 4, is closed by D228: D211 stands.] */
     static final short WAIT_MORE_SIGNS   = (short) 4;
     /** The most limits' worth a payment is counted as: past this it waits as 255 do (about twelve minutes). */
     static final short WAIT_UNITS_MOST = (short) 255;
@@ -1769,10 +1769,12 @@ public class CashuApplet extends Applet implements TagSwitch {
                 if (p1 == (byte) 4) {
                     Util.arrayCopyNonAtomic(cardRecord, CARD_NOPIN_START_OFFSET, buf, (short) 51, (short) 4);
                     if (!told || isZero(cardRecord, CARD_NOPIN_SPENT_OFFSET, (short) 4)) Util.arrayFillNonAtomic(buf, (short) 51, (short) 4, (byte) 0);
-                    /* every profile of byte 55, but bit 7, the paid list (D191), on a card set up whose chip refused its room
-                     * (SET_CARD reserves it, and writes the record all the same): such a card takes no piece (LOAD_PROOF 6A84), and
-                     * a loader reads this before it swaps at the mint. A card not yet set up has had no room asked for: FF. */
-                    buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x7F : (byte) 0xFF;
+                    /* every profile of byte 55 but bit 3, the wait on every payment, which 3.0 does not keep (D211: no floor, so
+                     * a payment within its limit waits for nothing; D228 clears the bit), and but bit 7, the paid list (D191), on a
+                     * card set up whose chip refused its room (SET_CARD reserves it, and writes the record all the same): such a
+                     * card takes no piece (LOAD_PROOF 6A84), and a loader reads this before it swaps at the mint. A card not yet set
+                     * up has had no room asked for: F7. */
+                    buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x77 : (byte) 0xF7;
                     // the certificate (bit 0) and keys per load (bit 1, D197)
                     buf[56] = (byte) 0x03;
                     short left = dayEnded(pinMarks, PM_LOAD_DAY) ? LOADS_A_DAY : (short)(LOADS_A_DAY - Util.getShort(pinMarks, PM_LOADS));
@@ -3131,7 +3133,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             /* No floor (D211, the project owner's choice of 2026-11-14: D188's floor is gone): a payment within its limit, the
              * first of its time in the field, is signed at its first SPEND_ALL_SIGN. 2.2's wait stays as it was, less what
              * the change outputs took, two waits for every three, and never below 0: waits = max(0, W - 2 * outputs / 3).
-             * [M1: not yet agreed by the other maintainer; his pr254 adds WAIT_FLOOR_SIGNS - 1 here.] */
+             * [M1 closed by D228: D211 stands, no WAIT_FLOOR_SIGNS - 1 here.] */
             waits -= (short)((short)((allState[6] & 0xFF) * 2) / 3);
             if (waits < 0) waits = 0;
             Util.setShort(allState, (short) 2, waits);
@@ -6358,8 +6360,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The tag's code for this selection of it (D222, `TagSwitch.tagCode`): on a card with an owner and a holder's record,
      * R, sixteen bytes of the chip's secure random, and after it M, the first eight bytes of HMAC-SHA256(K, R) with
      * K = SHA-256("CashuCard/tag-address" || c); true. On any other card nothing, and false: the tag says `#new`. The code is
-     * kept in this applet's working memory (scratch[X_TAG], 24 bytes; on a chip that memory is not cleared when the tag, of
-     * this package, is selected after this applet, so it is cleared at this applet's own selection), so the tag asks for no transient memory of its own; `tagCodeCopy` gives it to the tag at each READ BINARY.
+     * kept in this applet's working memory (scratch[X_TAG], 24 bytes, CLEAR_ON_DESELECT; the J3R310-355 of the chip run of
+     * 2026-11-19 clears that memory when the tag, of this package, is selected after this applet, so that a tag read in the
+     * middle of a payment ends the payment, D222; it is cleared at this applet's own selection as well, for a chip that does
+     * not), so the tag asks for no transient memory of its own; `tagCodeCopy` gives it to the tag at each READ BINARY.
      * K is worked out from c at every selection and kept nowhere, so a new c (a hand-over, a reset, the next claim) is a new
      * key at once. The room w[at .. at + TAG_ROOM) is the tag's APDU buffer; K is held there only as the HMAC's pad block. The
      * room is checked before anything is worked out (a room that does not fit in w answers false and writes nothing), and all
@@ -7139,16 +7143,19 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * A new entry's state byte: in use, of `unit`, marked where the holder has the say in this tap, ENTRY_LOADED for a piece's
      * (`loaded`), and ENTRY_SETUP only for a keyset taught in the card's first set-up and not loaded (D223), and only where no
-     * entry of `unit` is a set-up's still waiting for its first piece (D226): one such a unit, the first, which is the honest
-     * set-up's one teaching of the unit. An entry a load makes never has it (D226, round three): on a loaded entry the bit only
-     * kept it out of the two without the mark, so whoever spoke in the set-up selection could fill the table with loads.
+     * entry of `unit` has ENTRY_SETUP at all, loaded or not (D228, which narrows D226's "still waiting for its first piece"): one
+     * a unit in the set-up, the first, which is the honest set-up's one teaching of the unit. Under D226 a load under the set-up's
+     * keyset freed the bit for the next one, so a relay in the set-up selection that taught and loaded made-up keysets one at a
+     * time filled the table with entries no reclaim lets go (applet-money-1). An entry a load makes never has it (D226, round
+     * three): on a loaded entry the bit only kept it out of the two without the mark, so whoever spoke in the set-up selection
+     * could fill the table with loads.
      */
     private byte newState(short unit, boolean loaded) {
         byte st = (byte)(ENTRY_USED | unit | (holderSays() ? ENTRY_MARK : 0) | (loaded ? ENTRY_LOADED : 0));
         if (loaded || pinMarks[PM_FIRST] != (byte) 1) return st;
         for (short e = 0; e < BOOK_ENTRIES; e++) {
             byte o = book[(short)(e * ENTRY_LEN + ENTRY_STATE)];
-            if ((byte)(o & (byte)(ENTRY_USED | ENTRY_SETUP | ENTRY_LOADED)) == (byte)(ENTRY_USED | ENTRY_SETUP)
+            if ((byte)(o & (byte)(ENTRY_USED | ENTRY_SETUP)) == (byte)(ENTRY_USED | ENTRY_SETUP)
                 && (short)(o & 1) == unit) return st;
         }
         return (byte)(st | ENTRY_SETUP);
@@ -7384,11 +7391,16 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.0 with the tag's address given at install (D227): twenty-five writes here, 143 bytes, so the load file is 42,485 bytes, 245
-         * past a multiple of 256, the place of the 3.0 file before it (41,973 bytes, fifteen writes, 86 bytes), which installed on J3R180
-         * 58206920 30 times of 30 at the first try, and of 190c5ab's 41,205, which created at the first try every time there; D227's tag
-         * added 455 bytes with its install's checks, which came to 42,428 (188 past) with the fifteen writes. Before them, 41,903 (175 past) was
-         * refused once (6F00) and created on the retry; unpadded, 41,887. The last 2.3
+        /* 3.0 with D228's review fixes (one set-up bit a unit, the chip's path given up for one signature only, byte 55 bit 3
+         * clear): twenty-five writes here, two of them moved to a longer form (an index over 127, an index past sconst's), 146
+         * bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256; with the writes as 9ac55c1 had them it came to
+         * 42,482 (242 past), three bytes under 9ac55c1's. That is the size and the place of 9ac55c1's file (load file d69742d0..., D227's tag address at
+         * install, twenty-five writes, 143 bytes), which installed on J3R310-355 sample card 58206920 13 times of 13 at the first
+         * try, and of the 3.0 file before it (41,973 bytes, fifteen writes, 86 bytes), which installed there 30 times of 30 at
+         * the first try, and of 190c5ab's 41,205, which created at the first try every time there: what a J3R310-355 did with
+         * other source of this size, not this file, which no chip has been given, and no J3R180 has been given any 3.0 file.
+         * D227's tag added 455 bytes with its install's checks, which came to 42,428 (188 past) with the fifteen writes. Before
+         * them, 41,903 (175 past) was refused once (6F00) on that J3R310-355 and created on the retry; unpadded, 41,887. The last 2.3
          * file (D221, 40,412 bytes, 220 past) ran on a J3R180 on 2026-11-15, and the file with D217 to D220 (40,365, 173 past) the day
          * before; the file with D213 to D216 (39,343, 175 past) installed on 2026-11-14, where a study build of its source was refused
          * (6F00) at 38,791 and 38,809 bytes (135 and 153 past) and installed at 38,893 (237 past); the files with D212 (37,269, 149
@@ -7399,7 +7411,7 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the sizes not to be shipped untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
-        a[0] = 10;
+        a[6] = 16;
         a[1] = 11;
         a[2] = 12;
         a[3] = 13;
@@ -7423,6 +7435,6 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[25] = 35;
         a[26] = 36;
         a[27] = 37;
-        a[36] = 5;
+        a[136] = 50;
     }
 }

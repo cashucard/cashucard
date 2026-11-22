@@ -609,11 +609,11 @@ class TagTest {
         ResponseAPDU three = send(new CommandAPDU(CLA, INS_GET_INFO, 3, 0, 256));
         assertEquals(51, three.getData().length);
         assertArrayEquals(tagOff, Arrays.copyOf(three.getData(), 43), "P1 = 3 begins with the 43 of P1 = 2");
-        // P1 = 4 (D186) is the 51 and eight more: the no-PIN window's start, the profiles, FF 03, and the loads left today
+        // P1 = 4 (D186) is the 51 and eight more: the no-PIN window's start, the profiles, F7 03, and the loads left today
         ResponseAPDU four = send(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256));
         assertEquals(59, four.getData().length);
         assertArrayEquals(three.getData(), Arrays.copyOf(four.getData(), 51), "P1 = 4 begins with the 51 of P1 = 3");
-        assertEquals(0xFF, four.getData()[55] & 0xFF, "every profile of byte 55");
+        assertEquals(0xF7, four.getData()[55] & 0xFF, "every profile of byte 55 but bit 3, the wait on every payment (D211, D228)");
         assertEquals(0x03, four.getData()[56], "and the certificate's (bit 0) and keys per load (bit 1, D197)");
         for (int p1 : new int[] { 5, 0x10, 0x7F, 0x80, 0xFF }) {
             ResponseAPDU other = send(new CommandAPDU(CLA, INS_GET_INFO, p1, 0, 256));

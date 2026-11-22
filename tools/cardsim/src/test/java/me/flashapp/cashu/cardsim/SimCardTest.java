@@ -94,7 +94,7 @@ class SimCardTest {
         assertEquals("03009000", Hex.format(card.transmit(SimCard.SELECT)));
         assertEquals("00A404000BF043415348554341524401", Hex.format(SimCard.SELECT));
         assertEquals("3.0", card.state().get("version").getAsString());
-        assertEquals("ff03", card.state().get("profiles").getAsString(), "every profile of 3.0, keys per load among them");
+        assertEquals("f703", card.state().get("profiles").getAsString(), "every profile of 3.0 but the wait on every payment (bit 3, D228), keys per load among them");
     }
 
     @Test

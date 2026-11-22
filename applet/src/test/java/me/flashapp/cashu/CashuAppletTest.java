@@ -5603,20 +5603,20 @@ class CashuAppletTest {
     }
 
     @Test
-    @DisplayName("A card refused the room for its paid list (D191) takes no piece: LOAD_PROOF is 6A84 and writes nothing, so that every piece the card signs for is on the list; and it says so before a loader swaps: GET_INFO P1 = 4's byte 55 has bit 7 (the paid list) off, 7F 03 where a card set up with its room answers FF 03, and a card not yet set up, which has asked for no room, FF 03 too")
+    @DisplayName("A card refused the room for its paid list (D191) takes no piece: LOAD_PROOF is 6A84 and writes nothing, so that every piece the card signs for is on the list; and it says so before a loader swaps: GET_INFO P1 = 4's byte 55 has bit 7 (the paid list) off, 77 03 where a card set up with its room answers F7 03, and a card not yet set up, which has asked for no room, F7 03 too; bit 3, the wait on every payment, is clear on every 3.0 card (D211, D228)")
     void testNoPaidListNoPiece() throws Exception {
-        assertArrayEquals(new byte[] { (byte) 0xFF, 0x03 }, Arrays.copyOfRange(transmit(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256)).getData(), 55, 57),
-            "a card not set up: no room asked for yet, every profile");
+        assertArrayEquals(new byte[] { (byte) 0xF7, 0x03 }, Arrays.copyOfRange(transmit(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256)).getData(), 55, 57),
+            "a card not set up: no room asked for yet, every profile but the wait on every payment (D228)");
         assertNull(field("paid"), "(no room yet)");
         ready();
-        assertArrayEquals(new byte[] { (byte) 0xFF, 0x03 }, Arrays.copyOfRange(transmit(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256)).getData(), 55, 57),
+        assertArrayEquals(new byte[] { (byte) 0xF7, 0x03 }, Arrays.copyOfRange(transmit(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256)).getData(), 55, 57),
             "a card set up with its room");
         java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("paid");
         f.setAccessible(true);
         f.set(runtime.appletAt(AIDUtil.create(AID_HEX)), null);
         byte[] four = transmit(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256)).getData();
         assertEquals(59, four.length, "the answer's length as ever");
-        assertArrayEquals(new byte[] { 0x7F, 0x03 }, Arrays.copyOfRange(four, 55, 57), "set up, the room refused: bit 7 of byte 55 off, and every other bit as it was");
+        assertArrayEquals(new byte[] { 0x77, 0x03 }, Arrays.copyOfRange(four, 55, 57), "set up, the room refused: bit 7 of byte 55 off, and every other bit as it was");
         assertEquals(SW_NO_SPACE, load(PROOF_1).getSW());
         assertEquals(SW_NO_SPACE, loadBatch(numbered(1), numbered(2)).getSW());
         assertEquals(0, balance());
@@ -5669,7 +5669,7 @@ class CashuAppletTest {
         assertTrue(owed.indexOf("if ((owed & FORGET_PLACES) != 0) {") < r0 && r0 < n0 && n0 < owed.indexOf("forget();"), "the list emptied with the places, before the history and the mark");
         // and GET_INFO P1 = 4, which says whether the room for it was refused (byte 55 bit 7): it only asks whether it is null
         String info = body(code, "private void processGetInfo(", "\n    private ");
-        assertTrue(info.contains("buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x7F : (byte) 0xFF;"), "GET_INFO's byte 55");
+        assertTrue(info.contains("buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x77 : (byte) 0xF7;"), "GET_INFO's byte 55");
         assertEquals(1, info.split("\\bpaid\\b", -1).length - 1, "and names it nowhere else");
         String rest = code.replace(setCard, "").replace(load, "").replace(sign, "").replace(finish, "").replace(reset, "").replace(again, "").replace(forget, "").replace(owed, "").replace(info, "");
         java.util.regex.Matcher named = java.util.regex.Pattern.compile("\\bpaid\\b").matcher(rest);
@@ -12185,7 +12185,7 @@ class CashuAppletTest {
          * t and the keys come of the card's key and its c, another card's to differ in), the certificate's state on a card
          * that has none, and KEYSET_KEYS' refusals (teaching wants a keyset the mint's keys hash to: KeysetKeysTest). */
         say(out, "the info, P1 = 3: the keyset table kept, the rate, its entries, the last unit", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_INFO, 3, 0, 256));
-        say(out, "the info, P1 = 4: the no-PIN window, the profiles (FF 03) and the loads left today", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256));
+        say(out, "the info, P1 = 4: the no-PIN window, the profiles (F7 03) and the loads left today", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256));
         say(out, "the keyset table (GET_CARD P1 = 2): the count, then each entry and its state", "exact", SW_OK, new CommandAPDU(CLA, INS_GET_CARD, 2, 0, 256));
         say(out, "GROUP_KEYS of the date 0, under the PIN: t, P + t*G, and 33 zeros (an undated piece names no refund key)", "key", SW_OK,
             new CommandAPDU(CLA, CashuApplet.INS_GROUP_KEYS, 0, 0, u32(0), 0x62));
