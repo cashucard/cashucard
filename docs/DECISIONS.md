@@ -9187,10 +9187,17 @@ card with no owner for about 3.5 s, in a tap that paid nothing, can reset it and
 an owner of its own; a till cannot do it in the tap that takes the payment, but can in a later tap of its own. The holder's
 phone still sees it (`GROUP_KEYS` before a top-up, [D197](#d197)); a guest wallet that never saw the card does not.
 
+**Amended (2026-11-22, the keeper): the second payment's least is counted after the change's credit.** `SPEND_ALL_SIGN`
+took the outputs' credit (`outputs >> 1`, [D229](#d229)) off a wait that `waitsFor` had already raised to
+`WAIT_SECOND_SIGNS`, so a second payment in the tap with four change outputs or more waited nothing (the 3.1 chip run
+found it, its "Surprises"): a reader that has the PIN bought back one payment a tap at full speed by asking for change. Now
+the least is applied last, after the credit: a second payment waits `max(WAIT_SECOND_SIGNS, W − outputs / 2)`, whatever its
+change. A first payment is as before. jCardSim: `CashuAppletTest.aSecondPaymentsLeastIsAfterTheChangesCredit`.
+
 **Built (applet 3.1).** `WAIT_SECOND_SIGNS = 2`, `HISTORY_ASKINGS = 3`, `RESET_ASKINGS = 4`; the held count's bits are as they
 were. jCardSim: the second payment's two in `testTheWaitIsTwoALimitsWorthWithNoFirstStep` and every test of the second payment,
 `HolderTest`, `SimpleCardTest` and `FarHeaderTest` at the new counts. *Not yet agreed with the other maintainer. Run on a chip
-as 330ffa1's file (below).*
+as 330ffa1's file (below), before the amendment.*
 
 ## <a id="d231"></a>D231: The set-up's self-tests run once a set-up life
 
@@ -9285,5 +9292,5 @@ the tap had its PIN given already; its new first PIN is given by the same reader
 on the J3R310-355 sample card 58206920 (CPLC ICType D321) on 2026-11-21, 3 loads and 15 creates at the first try, and paid
 from at testnut with real signatures and real change verified on the chip
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)); its hash is on refcheck's PROVEN as that file's.
-The file of the merge onto [D228](#d228) (2026-11-22) is a new file: it has run only in a simulator,
+The file of the merge onto [D228](#d228) (2026-11-22, with D230's amendment) is a new file: it has run only in a simulator,
 and its hash is on neither PROVEN nor INSTALLED until a chip run.

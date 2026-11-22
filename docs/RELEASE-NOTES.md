@@ -8,13 +8,13 @@ the merged pull requests besides.
 ## `firmware-v3.1.0`: Cashu Card protocol 3.1 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-3.1.0.cap`, sha256
-`540ce0a4c6a8d06977bf44f76a57192681fb9d07d18869eeb0fd5f94f3cc4b2b`, its load file sha256
-`debc0de28ac1ce35c245504c46b6ff0d9df4cc330b9b4af213e8d8eb22e8b818`. `SELECT` and `GET_INFO` answer `03 01`, and
+`7a070ada1f2f50d2ee78f9393d48c7f99e3b31ed5807f21b3c5481d673127d0d`, its load file sha256
+`9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b`. `SELECT` and `GET_INFO` answer `03 01`, and
 `GET_INFO` P1 = 4 bytes 55 and 56 `F7 03` as 3.0's ([D228](DECISIONS.md#d228)). It is
 the 3.0 file below, with the security review's fixes of [D228](DECISIONS.md#d228), and with [D229](DECISIONS.md#d229)
 (the limit on one payment a rate: two askings for every limit's worth past the first, with no larger first step; the
 change's credit one for every two outputs) and [D230](DECISIONS.md#d230) (the second payment in a tap two askings at the
-least; the held history three, the reset by the PIN four), [D231](DECISIONS.md#d231)
+least, counted after the change's credit; the held history three, the reset by the PIN four), [D231](DECISIONS.md#d231)
 (the set-up's self-tests once a set-up life (until a reset); with D228, `chipMulInit` there is the one writer of the chip
 path's verdict), [D232](DECISIONS.md#d232) (the one-asking claim a blank card's alone) and
 [D233](DECISIONS.md#d233) (a card's first PIN stands as given for the selection that set it). This exact file has run

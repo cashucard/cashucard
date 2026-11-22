@@ -147,9 +147,11 @@ class CashuAppletTest {
     static int waitsRule(long limit, long net, int made) { return waitsRule(limit, net, made, false); }
     /** What `made` change outputs count for against the wait (D229): an output is about half a signature's work. */
     static int changeCredit(int made) { return made / 2; }
-    /** The same, for a payment that is the `second` (or later) signed in its tap without the owner's grant: at least one over the limit, limit or no limit. */
+    /** The same, for a payment that is the `second` (or later) signed in its tap without the owner's grant: WAIT_SECOND_SIGNS at the
+     *  least, limit or no limit, and that least is counted after the change's credit (D230, amended 2026-11-22). */
     static int waitsRule(long limit, long net, int made, boolean second) {
-        return Math.max(0, waitBeforeCredit(limit, net, second) - changeCredit(made));
+        int w = Math.max(0, waitBeforeCredit(limit, net, second) - changeCredit(made));
+        return second ? Math.max(w, WAIT_SECOND_SIGNS) : w;
     }
     /** W, before the change outputs' credit (D211 took away 2.3's floor, D188; D229 the shape): 0 within the limit,
      *  WAIT_MORE_SIGNS x (N - 1) for N limits' worth, and WAIT_SECOND_SIGNS at the least for a second payment; none for a first
@@ -8020,6 +8022,65 @@ class CashuAppletTest {
         assertEquals(4, waitsTaken(), "300 is three limits' worth, the tap's third: its own four, more than two");
         assertEquals(SW_OK, spend(3).getSW());
         assertEquals(18, waitsTaken(), "1000 is ten limits' worth: its own eighteen");
+    }
+
+    /**
+     * A payment of the piece in `place` in the tap that is open: a terminal's output of `toTill`, and the card's own change in
+     * outputs of `changes`. The signature, after as many waits as the card asks for (waitsTaken()).
+     */
+    private ResponseAPDU payTillAndChange(int place, long toTill, long... changes) {
+        waitAnswers.clear();
+        assertEquals(SW_OK, sw(beginCommand(place)));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, output(toTill, blinded(100 + place)))));
+        for (long c : changes) assertEquals(SW_OK, change(c).getSW(), "a change output of " + c);
+        return signAll();
+    }
+
+    @Test
+    @DisplayName("D230, amended (the keeper, 2026-11-22): a second payment in the same tap waits WAIT_SECOND_SIGNS at the least after the change's credit: four or six change outputs take nothing off that least (they took it to 0), and a larger second payment's own count is still bought down by its outputs to no less than the least")
+    void aSecondPaymentsLeastIsAfterTheChangesCredit() throws Exception {
+        // a limit of 100 on one payment: the tap's first within it, then a second within it with four change outputs
+        simulator = freshCard();
+        readyWithLimit(0);
+        assertEquals(SW_OK, setLimits(0, 100));
+        long[] amounts = { 50, 100 };
+        for (int i = 0; i < amounts.length; i++) assertEquals(SW_OK, load(buildProof(KEYSET, amounts[i], i + 1)).getSW());
+        newTap();
+        assertEquals(SW_OK, spend(0).getSW());
+        assertEquals(0, waitsTaken(), "the tap's first, within the limit: no wait");
+        ResponseAPDU second = payTillAndChange(1, 60, 10, 10, 10, 10);
+        assertEquals(SW_OK, second.getSW());
+        assertEquals(64, second.getData().length, "signed");
+        assertEquals(WAIT_SECOND_SIGNS, waitsTaken(), "the tap's second, within the limit, with four change outputs: still two (before the amendment, 2 - 4/2 = 0)");
+        assertEquals(WAIT_SECOND_SIGNS, waitsRule(100, 60, 4, true), "and the rule says so");
+        // no limit on one payment: a second payment with six change outputs waits the least
+        simulator = freshCard();
+        readyWithLimit(0);
+        for (int i = 0; i < amounts.length; i++) assertEquals(SW_OK, load(buildProof(KEYSET, amounts[i], i + 1)).getSW());
+        newTap();
+        assertEquals(SW_OK, spend(0).getSW());
+        assertEquals(0, waitsTaken(), "no limit, the tap's first: no wait");
+        assertEquals(SW_OK, payTillAndChange(1, 40, 10, 10, 10, 10, 10, 10).getSW());
+        assertEquals(WAIT_SECOND_SIGNS, waitsTaken(), "no limit, the tap's second with six change outputs: two");
+        // a second payment over the limit: its own count less the credit, held to the least
+        simulator = freshCard();
+        readyWithLimit(0);
+        assertEquals(SW_OK, setLimits(0, 100));
+        long[] big = { 50, 500 };
+        for (int i = 0; i < big.length; i++) assertEquals(SW_OK, load(buildProof(KEYSET, big[i], i + 1)).getSW());
+        newTap();
+        assertEquals(SW_OK, spend(0).getSW());
+        assertEquals(SW_OK, payTillAndChange(1, 460, 10, 10, 10, 10).getSW());
+        assertEquals(waitsRule(100, 460, 4, true), waitsTaken(), "460 is five limits' worth: eight, less two for four outputs, six");
+        assertEquals(6, waitsTaken());
+        // and a first payment is as before: the credit can take its wait to none
+        simulator = freshCard();
+        readyWithLimit(0);
+        assertEquals(SW_OK, setLimits(0, 100));
+        assertEquals(SW_OK, load(buildProof(KEYSET, 300, 1)).getSW());
+        newTap();
+        assertEquals(SW_OK, payTillAndChange(0, 200, 25, 25, 25, 25).getSW());
+        assertEquals(0, waitsTaken(), "the tap's first, two limits' worth with four change outputs: 2 - 2 = 0, as D229 has it");
     }
 
     /**

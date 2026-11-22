@@ -89,12 +89,13 @@ v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
 The 3.1 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256), in 173 blocks of 247 bytes, the
-last 1: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `debc0de2…`),
+last 1: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `9ed12359…`),
 whose own sha256 is not the CAP's ([Install](#install) gives both). It is the 3.0 file below, with the security review's
 fixes of [D228](DECISIONS.md#d228), and with [D229](DECISIONS.md#d229) (the wait over the limit a rate: two askings a
-limit's worth past the first), [D230](DECISIONS.md#d230) (the second payment's wait 2; the held history 3, the reset by the PIN 4), [D231](DECISIONS.md#d231) to
+limit's worth past the first), [D230](DECISIONS.md#d230) (the second payment's wait 2, counted after the change's credit
+since its amendment of 2026-11-22; the held history 3, the reset by the PIN 4), [D231](DECISIONS.md#d231) to
 [D233](DECISIONS.md#d233) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's
-alone, a first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` at sixteen writes, so
+alone, a first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` at thirteen writes, so
 that it is 245 past again, the place and the size of the 3.0 file. Padded by `sizeTheFile` (below), this exact file has run
 only in a simulator so far, and no card has installed it.
 
@@ -482,10 +483,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.1**, sha256
-`540ce0a4c6a8d06977bf44f76a57192681fb9d07d18869eeb0fd5f94f3cc4b2b`
+`7a070ada1f2f50d2ee78f9393d48c7f99e3b31ed5807f21b3c5481d673127d0d`
 (`applet/target/cashu-javacard-3.1.0.cap`). The load file in it, the bytes a card
 is LOADed with (refcheck's measure, 42,485 bytes), has sha256
-`debc0de28ac1ce35c245504c46b6ff0d9df4cc330b9b4af213e8d8eb22e8b818`: the hash the
+`9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation

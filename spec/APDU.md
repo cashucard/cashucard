@@ -2591,12 +2591,13 @@ bit 3 says so.)
 most, with the payment's own signature (about 1.1 s from `SPEND_ALL_BEGIN` on the
 J3R310-355 sample card 58206920) as the first second: every limit's worth past the
 first costs `WAIT_MORE_SIGNS` (2) signatures of work, about 0.95 s on that chip, with no
-larger first step. A second payment in the same time in the field waits
-`WAIT_SECOND_SIGNS` (2) at the least, and the card's change outputs take off one wait
-for every two:
+larger first step. The card's change outputs take off one wait for every two, and a
+second payment in the same time in the field waits `WAIT_SECOND_SIGNS` (2) at the least
+after that credit (D230, amended 2026-11-22: its change takes nothing off the least):
 
-    waits = max(0, W − ⌊outputs / 2⌋)
-    W = WAIT_MORE_SIGNS × (N − 1), at least WAIT_SECOND_SIGNS for a second payment
+    W = WAIT_MORE_SIGNS × (N − 1)
+    waits = max(0, W − ⌊outputs / 2⌋)                     a first payment
+    waits = max(WAIT_SECOND_SIGNS, W − ⌊outputs / 2⌋)      a second payment
 
 with N the limits' worth leaving the card (1 within the limit, or within a thirty-second
 over it; a part counting as one; 255 at the most; a sum that wrapped waits the most),

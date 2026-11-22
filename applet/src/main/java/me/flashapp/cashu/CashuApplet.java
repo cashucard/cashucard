@@ -1059,7 +1059,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     // is no wait. Each two change outputs made (about 0.23 s each) count as one of them done.
     /** The least a second payment signed in the same time in the field waits (without the owner's grant), limit or no limit (D230,
      *  the project owner's "a person must not hold a card longer than the protection needs"): two signatures of work, about 0.95 s on
-     *  that chip, where 3.0 waited ten (about 4.7 s). With the payment's own signature (about 1.1 s from its beginning), a reader that has the PIN takes one
+     *  that chip, where 3.0 waited ten (about 4.7 s). It is counted after the change's credit (D230, amended): the change outputs
+     *  take nothing off it. With the payment's own signature (about 1.1 s from its beginning), a reader that has the PIN takes one
      *  limit's worth in about two seconds a payment: half the holder's rate, never faster. */
     static final short WAIT_SECOND_SIGNS = (short) 2;
     /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14), and GET_INFO's
@@ -3157,8 +3158,8 @@ public class CashuApplet extends Applet implements TagSwitch {
                 allState[0] = (byte) 0;
                 throw e;
             }
-            waits = waitsFor(scratch, (short)(X_CONV + 4), allState[7] != (byte) 0,
-                             tapOpen[1] == (byte) 1 && loadGrant[0] != (byte) 1);
+            boolean second = tapOpen[1] == (byte) 1 && loadGrant[0] != (byte) 1;
+            waits = waitsFor(scratch, (short)(X_CONV + 4), allState[7] != (byte) 0, second);
             // waited past the floor (the log's bit 1): over the limit on one payment, or a second payment in the time in the field
             allState[4] = (byte)(waits > 0 ? 1 : 0);
             /* No floor (D211, the project owner's choice of 2026-11-14: D188's floor is gone): a payment within its limit, the
@@ -3168,6 +3169,10 @@ public class CashuApplet extends Applet implements TagSwitch {
              * [M1 closed by D228: D211 stands, no WAIT_FLOOR_SIGNS - 1 here.] */
             waits -= (short)((allState[6] & 0xFF) >> 1);
             if (waits < 0) waits = 0;
+            /* and a second payment in the same time in the field waits WAIT_SECOND_SIGNS at the least after the change's credit
+             * (D230, amended, the project owner's choice of 2026-11-22): its own outputs take nothing off that least, so a reader
+             * that has the PIN gains no second payment at full speed by asking for change (four outputs or more took it to 0). */
+            if (second && waits < WAIT_SECOND_SIGNS) waits = WAIT_SECOND_SIGNS;
             Util.setShort(allState, (short) 2, waits);
         }
         if (waits > 0) {
@@ -7442,10 +7447,11 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.1 (D229 to D233, on 3.0 with D228's review fixes): sixteen writes, 81 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the size and the
+        /* 3.1 (D229 to D233, on 3.0 with D228's review fixes, and D230 amended: a second payment's least after the change's
+         * credit): thirteen writes, 66 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the size and the
          * place of 330ffa1's 3.1 file (load file 4014e7f1..., fifteen writes, 78 bytes, from 42,407 unpadded), which the J3R310-355
          * sample card 58206920 installed at the first try (3 loads, 15 creates) on 2026-11-21: what that chip did with other
-         * source of this size, not this file. This source came to 42,404 unpadded (164 past, a place a chip refused before).
+         * source of this size, not this file. This source came to 42,419 unpadded (179 past, a place not tried).
          * 3.0 with D228's review fixes (one set-up bit a unit, the chip's path given up for one signature only, byte 55 bit 3
          * clear): twenty-five writes here, two of them moved to a longer form (an index over 127, an index past sconst's), 146
          * bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256; with the writes as 9ac55c1 had them it came to
@@ -7479,8 +7485,5 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[27] = 37;
         a[3] = 41;
         a[5] = 5;
-        a[28] = 38;
-        a[0] = 10;
-        a[0] = 0;
     }
 }
