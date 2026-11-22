@@ -1,8 +1,8 @@
-# The merged 3.1 file (bab8c5a) on the J3R310-355 sample card 58206920: the install, the waits, the second payment's least after the change's credit, D228's fixes, and payments at a test mint (2026-11-21)
+# The merged 3.1 file (bab8c5a) on card 58206920 (a J3R180 keyed for SCP03): the install, the waits, the second payment's least after the change's credit, D228's fixes, and payments at a test mint (2026-11-21)
 
 The tracked 3.1 file of branch `card-3.1-on-ib` at bab8c5a (3.1 on Island Bitcoin's merged #256: D228 theirs, D230 to D234
-ours, D231 amended so that a second payment in a tap waits `max(2, W − ⌊outputs / 2⌋)`) was put on the J3R310-355 sample
-card 58206920 in place of 330ffa1's 3.1 file, timed, paid from at a test mint, and left there fresh, with the tag at
+ours, D231 amended so that a second payment in a tap waits `max(2, W − ⌊outputs / 2⌋)`) was put on card 58206920 (ATR J3R310-355; a J3R180 keyed for SCP03 according to the card's
+supplier, D229) in place of 330ffa1's 3.1 file, timed, paid from at a test mint, and left there fresh, with the tag at
 `https://getfoxy.io/card`.
 
 - **Every install was taken at the first try:** the load 2 times of 2, the card's applet 14 times of 14, the tag 14 times
@@ -241,7 +241,7 @@ payments' signatures and the 8 of the made-up pieces, `AUTH` in each `selftest`,
 ## Not run
 
 - A phone's read of the tag or a set-up by the phone (left for the keeper).
-- A J3R180: no J3R180 has been given a 3.x file.
+- A J3R180 keyed for SCP02: none has been given a 3.x file, and none will be (D229).
 - A fault that would make the chip's product fail (the `chipMul` path), a dollar card, the clock and the day's window,
   `LOCK_CARD`, tears, the certificate, `INBOX`.
 

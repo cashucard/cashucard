@@ -24,14 +24,16 @@ valid historical records; do not move or retag them. Corrected firmware Maven
 metadata does not alter the CAP.
 
 Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
-answer `03 00`, and the decisions are D183 to D228 (spec/APDU.md). Firmware 3.1.0 is 3.0's wire answered sooner
+answer `03 00`, and the decisions are D183 to D229 (spec/APDU.md). Firmware 3.1.0 is 3.0's wire answered sooner
 (`03 01`, D230 to D234). The tracked `cashu-javacard-3.1.0.cap` (load file `9ed12359…`, 3.1 on D228's review fixes) was
-installed and paid from at a test mint on the J3R310-355 sample card 58206920 on 2026-11-21
-(docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md); no `firmware-v3.0.0` or `firmware-v3.1.0` release is cut before a chip run on a J3R180 and the
-operator's approval. 330ffa1's file before it, load file `4014e7f1…`, and the 3.0 file `d69742d0…` (9ac55c1) were
-installed and paid from at a test mint on the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21
-(docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md, docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md).
-The firmware a J3R180 ran before it
+installed and paid from at a test mint on card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, on
+2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md); no `firmware-v3.0.0` or
+`firmware-v3.1.0` release is cut before the operator's approval. No J3R180 keyed for SCP02 will be given a 3.x file:
+according to the card's supplier the chip's manufacturer has retired that keying (D229). 330ffa1's file before it, load
+file `4014e7f1…`, and the 3.0 file `d69742d0…` (9ac55c1) were installed and paid from at a test mint on the same card on
+2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md,
+docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md). The firmware a J3R180
+keyed for SCP02 last ran
 was numbered 2.3 (`02 03`, `cashu-javacard-2.3.0.cap`, load file `05c9b847…`), never
 released under a tag.
 

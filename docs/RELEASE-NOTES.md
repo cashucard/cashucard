@@ -18,9 +18,9 @@ least, counted after the change's credit; the held history three, the reset by t
 (the set-up's self-tests once a set-up life (until a reset); with D228, `chipMulInit` there is the one writer of the chip
 path's verdict), [D233](DECISIONS.md#d233) (the one-asking claim a blank card's alone) and
 [D234](DECISIONS.md#d234) (a card's first PIN stands as given for the selection that set it). This exact file has run
-on a chip: the J3R310-355 sample card 58206920 installed it and was paid from at a test mint, testnut, on 2026-11-21
+on a chip: card 58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), installed it and was paid from at a test mint, testnut, on 2026-11-21
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)). 330ffa1's file, from before the merge onto D228 (load file
-`4014e7f1…`), was installed on the J3R310-355 sample card 58206920 and paid from at a test mint, testnut, on 2026-11-21
+`4014e7f1…`), was installed on the same card and paid from at a test mint, testnut, on 2026-11-21
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)).
 
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
@@ -47,11 +47,14 @@ settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226))
 whoever installs the card ([D227](DECISIONS.md#d227)): an install of the tag must now carry the card maker's address
 in its install parameters, and one without is refused; and the security review's fixes of 2026-11-21
 ([D228](DECISIONS.md#d228)): one set-up bit a unit, the chip's path given up for one signature only, and `GET_INFO`
-byte 55 bit 3 clear. Its run is to come, on a J3R180, its size first
-([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)); no J3R180 has been given a 3.0 file.
+byte 55 bit 3 clear. Its run is to come, on a J3R180 keyed for SCP03, its size first
+([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)). No J3R180 keyed for SCP02 has been given a 3.0
+file, and none will be: according to the card's supplier the chip's manufacturer has retired that keying
+([D229](DECISIONS.md#d229)).
 
 The file before it (9ac55c1, load file `d69742d0…`, the tag's address at install and nothing of D228) went to the
-J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21: 13 installs of 13 at the first try, its tag
+J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's supplier,
+on 2026-11-21: 13 installs of 13 at the first try, its tag
 taking the address at install, and a payment at a test mint (testnut) with real signatures and real change verified on
 the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
 

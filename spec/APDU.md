@@ -2588,8 +2588,8 @@ bit 3 says so.)
 
 **The limit on one payment is a rate (3.1, [D230](../docs/DECISIONS.md#d230) and
 [D231](../docs/DECISIONS.md#d231)).** A limit of L on one payment is L a second at the
-most, with the payment's own signature (about 1.1 s from `SPEND_ALL_BEGIN` on the
-J3R310-355 sample card 58206920) as the first second: every limit's worth past the
+most, with the payment's own signature (about 1.1 s from `SPEND_ALL_BEGIN` on card
+58206920, a J3R180 keyed for SCP03, D229) as the first second: every limit's worth past the
 first costs `WAIT_MORE_SIGNS` (2) signatures of work, about 0.95 s on that chip, with no
 larger first step. The card's change outputs take off one wait for every two, and a
 second payment in the same time in the field waits `WAIT_SECOND_SIGNS` (2) at the least

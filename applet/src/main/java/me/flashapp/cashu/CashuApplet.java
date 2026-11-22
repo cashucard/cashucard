@@ -187,11 +187,11 @@ public class CashuApplet extends Applet implements TagSwitch {
     // slowly, two units on one card, a holder with no phone, keyset keys (KEYSET_KEYS, 0x38), the paid list and the
     // certificate (CERT_WRITE 0x54, CERT_READ 0x1C). spec/APDU.md, "Profiles of 3.0", lists them. It breaks a 2.2
     // reader, so it is a new major and not 2.3: the minor counts from 0 again.
-    // 3.1 (D230): the wait over the limit on one payment is WAIT_MORE_SIGNS (two signatures of work, about a second on the J3R310-355 sample card) for
+    // 3.1 (D230): the wait over the limit on one payment is WAIT_MORE_SIGNS (two signatures of work, about a second on a J3R180 keyed for SCP03) for
     // every limit's worth past the first, with no larger first step, where 3.0 waited ten and then four; a second payment in the same
     // time in the field waits WAIT_SECOND_SIGNS (two, where 3.0 had ten: D231) at the least; two change outputs take one wait off, where
     // three took two. And the held taps of a card with no owner are shorter (D231): its history 3 askings (7 in 3.0), its reset by the
-    // PIN 4 (17 in 3.0), about 1.5 s and 3.5 s in all with the history's on the J3R310-355 sample card; the owner's claim is as it was.
+    // PIN 4 (17 in 3.0), about 1.5 s and 3.5 s in all with the history's on that card; the owner's claim is as it was.
     // SET_CARD's self-tests run once a set-up life (until a reset) (D232); the one-asking claim is a blank card's alone (D233); a card's first
     // PIN stands as given for the selection that set it (D234).
     // A reader of 3.0 meets nothing new: it asks SPEND_ALL_SIGN until it signs, and is answered sooner. So the minor moves.
@@ -1052,7 +1052,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     /** The keys' tree (D190): a leaf is SHA-256(00 || amount || K), a node SHA-256(01 || left || right), a missing leaf SHA-256(02). */
     private static final byte[] TREE = { (byte) 0x00, (byte) 0x01, (byte) 0x02 };
 
-    // The wait (6a), in signatures of the card's own work (473.6 ms each on the J3R310-355 sample card 58206920 on the reader,
+    // The wait (6a), in signatures of the card's own work (473.6 ms each on card 58206920, a J3R180 keyed for SCP03 (D229), on the reader,
     // 2026-11-21; D218 checks every signature). 3.1 (D230, the project owner's rule of 2026-11-03, "make the per second limit
     // true"): every limit's worth past the first costs WAIT_MORE_SIGNS, about a second on that chip, with no larger first step, so
     // that a limit of L is about L a second (the payment's own signature, about 1.1 s, is the first second). Within the limit there
@@ -3165,7 +3165,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             /* No floor (D211, the project owner's choice of 2026-11-14: D188's floor is gone): a payment within its limit, the
              * first of its time in the field, is signed at its first SPEND_ALL_SIGN. 2.2's wait stays as it was, less what
              * the change outputs took (D230: one wait for every two; an output is about half a signature's work, 0.23 s against 0.47 s on a
-             * J3R310-355, where 2.2 to 3.0 took two for every three), and never below 0: waits = max(0, W - outputs / 2).
+             * J3R180 keyed for SCP03, where 2.2 to 3.0 took two for every three), and never below 0: waits = max(0, W - outputs / 2).
              * [M1 closed by D228: D211 stands, no WAIT_FLOOR_SIGNS - 1 here.] */
             waits -= (short)((allState[6] & 0xFF) >> 1);
             if (waits < 0) waits = 0;
@@ -3510,7 +3510,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * over it, see below), nothing, change or no change — that change is
      * coming is the phone's to say, not the card's; over L, WAIT_MORE_SIGNS
      * for every limit's worth past the first, whole or in part (about a
-     * second each on the J3R310-355 sample card), with no larger first step: N limits' worth
+     * second each on a J3R180 keyed for SCP03), with no larger first step: N limits' worth
      * wait WAIT_MORE_SIGNS x (N - 1). (3.0 waited ten for the first limit's
      * worth over and four for each after, about 4.7 s and then 1.9 s: D230.)
      *
@@ -7449,8 +7449,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     private static void sizeTheFile(byte[] a) {
         /* 3.1 (D230 to D234, on 3.0 with D228's review fixes, and D231 amended: a second payment's least after the change's
          * credit): thirteen writes, 66 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the size and the
-         * place of 330ffa1's 3.1 file (load file 4014e7f1..., fifteen writes, 78 bytes, from 42,407 unpadded), which the J3R310-355
-         * sample card 58206920 installed at the first try (3 loads, 15 creates) on 2026-11-21: what that chip did with other
+         * place of 330ffa1's 3.1 file (load file 4014e7f1..., fifteen writes, 78 bytes, from 42,407 unpadded), which card 58206920
+         * (a J3R180 keyed for SCP03, D229) installed at the first try (3 loads, 15 creates) on 2026-11-21: what that chip did with other
          * source of this size, not this file. This source came to 42,419 unpadded (179 past, a place not tried).
          * 3.0 with D228's review fixes (one set-up bit a unit, the chip's path given up for one signature only, byte 55 bit 3
          * clear): twenty-five writes here, two of them moved to a longer form (an index over 127, an index past sconst's), 146

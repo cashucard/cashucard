@@ -21,7 +21,7 @@ boundaries.
 | # | Threat | Protected? | Notes |
 |---|---|---|---|
 | 1 | Passive read of card memory | **Partially** | An attacker gets keyset id, amount, nonce and `C`; the secret string is never stored on the card, but it is reconstructible from the nonce plus the card's key for the piece's date (`SPEND_ALL_BEGIN` answers any reader the t of a date with a piece on the card, before any PIN, 3.0), so treat it as leaked too. What does not leak is the private key, so the proofs stay unspendable. The balance leaks; since 3.0 the spent pieces, the clock's last header, the rolls and the last payment's scope are said only to a reader with the PIN or the owner's grant ([D198](DECISIONS.md#d198)), and how many places are spent still leaks. From software 1.20 a reader also gets the mint's proof for each unspent piece that has one, and so its blinding factor (#16). |
-| 2 | Hostile reader spends the card | **Up to the owner's limits** (2.0) | A payment (`SPEND_ALL_SIGN`) needs the PIN given in this tap, or fits the no-PIN allowance; a card with no PIN pays nothing (`6A97`, #22, since 3.0); a failed PIN check ends the session. A blocked card has no allowance, by its state byte or by its counter ([D22](DECISIONS.md#d22)). What leaves the card is held to the daily limit, counted against a clock of Bitcoin block headers, and the window rolls at most the rollover budget's times between the owner's refreshes (#17, [D20](DECISIONS.md#d20)). Within the day, the limit on one payment L is a pace, not a cap: since 3.1 ([D230](DECISIONS.md#d230), [D231](DECISIONS.md#d231)) a reader that has the PIN and holds the card takes N limits' worth in one payment in about 1.1 + 0.95 × (N − 1) seconds on the J3R310-355 sample card 58206920 (0.92 s a step at the 462 ms an asking of its 3.1 run: about 5 to 8% faster than L a second over a long hold, which the keeper accepted), and about 1.9 times as fast as 3.0 at the same L (4.7 s and then 1.9 s a limit's worth); payments one after another in one tap at about one limit's worth every 2 s, whatever their change (the second payment's least is counted after the change's credit, D231 amended). A slower chip pays slower. Until 3.0 a card with no PIN was cash to whoever held it, under the same limits. |
+| 2 | Hostile reader spends the card | **Up to the owner's limits** (2.0) | A payment (`SPEND_ALL_SIGN`) needs the PIN given in this tap, or fits the no-PIN allowance; a card with no PIN pays nothing (`6A97`, #22, since 3.0); a failed PIN check ends the session. A blocked card has no allowance, by its state byte or by its counter ([D22](DECISIONS.md#d22)). What leaves the card is held to the daily limit, counted against a clock of Bitcoin block headers, and the window rolls at most the rollover budget's times between the owner's refreshes (#17, [D20](DECISIONS.md#d20)). Within the day, the limit on one payment L is a pace, not a cap: since 3.1 ([D230](DECISIONS.md#d230), [D231](DECISIONS.md#d231)) a reader that has the PIN and holds the card takes N limits' worth in one payment in about 1.1 + 0.95 × (N − 1) seconds on card 58206920, a J3R180 keyed for SCP03 ([D229](DECISIONS.md#d229)) (0.92 s a step at the 462 ms an asking of its 3.1 run: about 5 to 8% faster than L a second over a long hold, which the keeper accepted), and about 1.9 times as fast as 3.0 at the same L (4.7 s and then 1.9 s a limit's worth); payments one after another in one tap at about one limit's worth every 2 s, whatever their change (the second payment's least is counted after the change's credit, D231 amended). A slower chip pays slower. Until 3.0 a card with no PIN was cash to whoever held it, under the same limits. |
 | 3 | Card lost or destroyed | ❌ **By design** | The spending key remains on the lost or destroyed chip. See [D5](DECISIONS.md#d5). |
 | 4 | Cloning the chip | **Yes** | Cloning EEPROM copies the proofs but not the key; a clone cannot sign. Cards should be CC EAL 5+ to resist invasive extraction. |
 | 5 | Offline double-spend from copied data | ❌ **No** | Offline proof validation leaves its current redemption state unknown to the merchant. See below. |
@@ -333,10 +333,12 @@ a phone.
 The tracked file is built from that file's source with the version moved to 3.0
 ([D205](DECISIONS.md#d205)) and [D206](DECISIONS.md#d206) to [D228](DECISIONS.md#d228)
 added (42,485 bytes, load file `99a66ba7…`). It has run only in a simulator so far, and
-no card has installed it; its run is to come on a J3R180, and no J3R180 has been given a
-3.0 file. The file before it, 9ac55c1's (load file `d69742d0…`, without D228), went to the
-J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21: 13 installs at the
-first try and one payment run at a test mint
+no card has installed it; its run is to come on a J3R180 keyed for SCP03. No J3R180 keyed
+for SCP02 has been given a 3.0 file, and none will be: according to the card's supplier the
+chip's manufacturer has retired that keying ([D229](DECISIONS.md#d229)). The file before it,
+9ac55c1's (load file `d69742d0…`, without D228), went to the J3R310-355 sample card 58206920
+(ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's supplier, on
+2026-11-21: 13 installs at the first try and one payment run at a test mint
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
 
 An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
@@ -347,9 +349,11 @@ An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
   between two applets of one package
 - A blocked PIN on any build: neither ENG-615 nor its 0.3 fix (the
   blocked-state gate and the failed-check session rule) has run on a card
-- Anything on the tracked 3.0 file, which no card has installed; and anything on any 3.0 file on a J3R180. 9ac55c1's
+- Anything on the tracked 3.0 file, which no card has installed; and anything on any 3.0 file on a J3R180 keyed for
+  SCP02, which none will be given ([D229](DECISIONS.md#d229)). 9ac55c1's
   file before it had its install, its tag and one payment run at a test mint (a payment with change, the change loaded
-  back and spent, `SPEND_ALL_AGAIN` by the message's hash) on the J3R310-355 sample card 58206920
+  back and spent, `SPEND_ALL_AGAIN` by the message's hash) on the J3R310-355 sample card 58206920, a J3R180 keyed for
+  SCP03 according to the card's supplier
   ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md));
   the runs above were of earlier sources numbered 2.3, without [D206](DECISIONS.md#d206)
   to [D210](DECISIONS.md#d210)
@@ -400,8 +404,9 @@ a few hundred taps. Treat simulator results accordingly, see
    the install of the source numbered 2.3 then (the first run's before
    [D200](DECISIONS.md#d200), the second's with D200 to D204) and payments with real
    signatures and real change; the tracked 3.0 file is not yet tried on a chip, and no
-   J3R180 has been given a 3.0 file (9ac55c1's, before [D228](DECISIONS.md#d228), went to the
-   J3R310-355 sample card 58206920 on 2026-11-21). The
+   J3R180 keyed for SCP02 has been given a 3.0 file (9ac55c1's, before [D228](DECISIONS.md#d228), went to the
+   J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-21;
+   [D229](DECISIONS.md#d229)). The
    [October 23 payment](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) and
    [mobile reset](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md) reports
    record the tested lifecycle. Future releases require evidence for changed
