@@ -215,7 +215,7 @@ test("the tracked 3.1 CAP is the 3.0 file's size and place and has run on no chi
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /load file: 42485 bytes/);
-  assert.match(r.stdout, /load file sha256: 3953d506c8794b74271264e80457e6728de4fdc9047a9b1ad0250959ac31340c; this exact file has run only in a simulator so far, and no card has installed it\./);
+  assert.match(r.stdout, /load file sha256: 4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19; this exact file has run only in a simulator so far, and no card has installed it\./);
   assert.match(r.stdout, /a size known to install/);
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));

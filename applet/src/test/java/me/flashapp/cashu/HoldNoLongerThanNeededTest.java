@@ -104,4 +104,36 @@ class HoldNoLongerThanNeededTest {
         assertEquals(field, flag(c, "fieldP"));
         f.setBoolean(c.applet(), curve);
     }
+
+    @Test
+    @DisplayName("D231, amended: a RESET_CARD clears the verdicts' mark, and the next SET_CARD runs the self-tests again: a planted verdict, and a chip product given up after one failed signature, do not outlive a reset")
+    void aResetRunsTheSelfTestsAgain() throws Exception {
+        UnitsTest.Card c = SimpleCardTest.setUpWith(concat(u32(1000), u32(500), u32(0)));
+        assertTrue(flag(c, "selfTested"));
+        boolean curve = flag(c, "curveByAgreement");
+        java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("curveByAgreement");
+        f.setAccessible(true);
+        f.setBoolean(c.applet(), !curve);
+        java.lang.reflect.Field hw = CashuApplet.class.getDeclaredField("schnorrHW");
+        hw.setAccessible(true);
+        Object signer = hw.get(c.applet());
+        java.lang.reflect.Field mul = signer.getClass().getDeclaredField("chipMul");
+        mul.setAccessible(true);
+        UnitsTest.Card fresh = new UnitsTest.Card();
+        assertEquals(SW_OK, ClaimAfterSetUpTest.setPin(fresh, TEST_PIN));
+        assertEquals(SW_OK, ClaimAfterSetUpTest.setCard(fresh));
+        boolean chipMulTested = mul.getBoolean(hw.get(fresh.applet()));
+        mul.setBoolean(signer, !chipMulTested);     // as a failed chip product leaves it
+        c.tap();
+        c.pin();
+        HolderTest.hold(c);
+        assertEquals(SW_OK, SimpleCardTest.resetByPin(c)[1], "reset by its PIN");
+        assertFalse(flag(c, "selfTested"), "the reset clears the mark");
+        c.power();
+        assertEquals(SW_OK, ClaimAfterSetUpTest.setPin(c, NEW_PIN));
+        assertEquals(SW_OK, ClaimAfterSetUpTest.setCard(c), "set up again");
+        assertTrue(flag(c, "selfTested"), "and the tests ran again");
+        assertEquals(curve, flag(c, "curveByAgreement"), "the planted verdict is worked out again");
+        assertEquals(chipMulTested, mul.getBoolean(signer), "and the chip product is tested again, as on a fresh card");
+    }
 }

@@ -8,12 +8,12 @@ the merged pull requests besides.
 ## `firmware-v3.1.0`: Cashu Card protocol 3.1 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-3.1.0.cap`, sha256
-`5f0cb2a1d8cde67eb0d8f4c5663a239a95a2651541c2a157c6e569c52a857957`, its load file sha256
-`3953d506c8794b74271264e80457e6728de4fdc9047a9b1ad0250959ac31340c`. `SELECT` and `GET_INFO` answer `03 01`. It is
+`297e646c7af3745d877bbef01719411625bffbd4ea87e0238c2b7850b54d0d37`, its load file sha256
+`4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19`. `SELECT` and `GET_INFO` answer `03 01`. It is
 the 3.0 file below with [D229](DECISIONS.md#d229) (the limit on one payment a rate: two askings for every limit's worth
 past the first, with no larger first step; the change's credit one for every two outputs) and [D230](DECISIONS.md#d230)
 (the second payment in a tap two askings, the held history three, the reset by the PIN four), [D231](DECISIONS.md#d231)
-(the set-up's self-tests once in the card's life), [D232](DECISIONS.md#d232) (the one-asking claim a blank card's alone) and
+(the set-up's self-tests once a set-up life (until a reset)), [D232](DECISIONS.md#d232) (the one-asking claim a blank card's alone) and
 [D233](DECISIONS.md#d233) (a card's first PIN stands as given for the selection that set it). This exact file has run
 only in a simulator so far, and no card has installed it.
 

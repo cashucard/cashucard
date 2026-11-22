@@ -343,7 +343,8 @@ final class SchnorrHW {
                 short made = signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, true);
                 if (made != (short)0) return made;
                 // The chip's product did not give a signature that verifies (or the chip refused the work): the chip path
-                // is given up until the next SET_CARD's test, and the whole signature is made again by the bytecode, from
+                // is given up until the self-tests run again, at the first SET_CARD after a RESET_CARD (D231: they run once a
+                // set-up life, not at every SET_CARD), and the whole signature is made again by the bytecode, from
                 // step 1 with a fresh nonce: the check wiped d, and the failed signature never left the card (D218).
                 // [M2: the plan's recommended join, not yet agreed by the other maintainer; to flip to his "6F00 at once",
                 // throw SW_CRYPTO_ERROR here instead of signing again.]

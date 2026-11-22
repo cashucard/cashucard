@@ -8534,7 +8534,7 @@ the entry D213 left behind is no longer left), `UnitsTest` (the state byte the t
 
 ## <a id="d221"></a>D221: A claim right after the set-up's record is one asking
 
-*Amended by [D231](#d231) and [D232](#d232) (3.1, 2026-11-21): `SET_CARD`'s self-tests run once in the card's life, so its
+*Amended by [D231](#d231) and [D232](#d232) (3.1, 2026-11-21): `SET_CARD`'s self-tests run once a set-up life, so its
 seconds no longer stand for the hold; the one asking is kept for a card that had no PIN when the tap began.*
 
 **Decided (protocol 3.0, 2026-11-15, the project owner; amends [D187](#d187)).** A claim (`SET_OWNER` on a card with no
@@ -9100,7 +9100,14 @@ were. jCardSim: the second payment's two in `testTheWaitIsTwoALimitsWorthWithNoF
 `HolderTest`, `SimpleCardTest` and `FarHeaderTest` at the new counts. *Not yet agreed with the other maintainer; not yet run on
 a chip.*
 
-## <a id="d231"></a>D231: The set-up's self-tests run once in the card's life
+## <a id="d231"></a>D231: The set-up's self-tests run once a set-up life
+
+*Amended the same day (the review of e8ff075): once a **set-up life**, not once in the card's life. `RESET_CARD`, by the owner's
+proof or by the PIN, clears `selfTested`, so the first `SET_CARD` after a reset runs the tests again. Two lows of once-for-good: a
+single failed chip product sets `SchnorrHW.chipMul` false "until the next test", which once-for-good made forever (every later
+signature and wait on the slower bytecode path), and a false `checksCurve` refused the 04 form of `LOAD_PROOF` for the card's
+life; and a verdict planted by a glitch at the first `SET_CARD` outlived a reset and a hand-over to the next holder. A reset is
+rare and its set-up pays the tests' seconds once more.*
 
 **Decided (protocol 3.1, 2026-11-21, the project owner: "a person must not hold a card longer than the protection needs").**
 Every `SET_CARD` ran the chip's self-tests: the framing check's seventeen calls (`checkFraming`, before anything is written),
@@ -9108,10 +9115,10 @@ the key agreement's seven points (`checksCurve`, D212, D219), the field's known 
 squaring's (`chipMulInit`, D216, D219). That is about 2.4 s of every record write on an iPhone 17 (2,033 ms of a first
 `SET_CARD` on a J3R180), and the chip is the same chip at every write.
 
-**The rule.** They run at the first `SET_CARD` in the card's life that gets that far, and their verdicts are kept, as they
-always were, in the applet's fields (`curveByAgreement`, `fieldP`, `SchnorrHW.chipMul`), with one more, `selfTested`, set
-once the framing check has passed and the three verdicts are worked out. A later `SET_CARD`, after a reset too (a reset keeps
-the card's software and its chip), writes the record alone. A failed self-test refuses exactly as before: the framing check
+**The rule.** They run at the first `SET_CARD` after the install, or after a `RESET_CARD`, that gets that far, and their verdicts
+are kept, as they always were, in the applet's fields (`curveByAgreement`, `fieldP`, `SchnorrHW.chipMul`), with one more,
+`selfTested`, set once the framing check has passed and the three verdicts are worked out, and cleared by `RESET_CARD`. A later
+`SET_CARD` in the same set-up life writes the record alone. A failed self-test refuses exactly as before: the framing check
 throws `6F00` before anything is written and keeps no verdict, so a chip that fails it is asked again and refused at every
 `SET_CARD`; the other three choose the slow, checked paths where they fail, and a `false` is kept as a `false`.
 
@@ -9122,7 +9129,7 @@ glitch rig to flip a verdict, and a verdict set once is set when the card is fir
 where bulk encoding writes one). What the verdicts guard is guarded again downstream: every signature is checked on the card
 before it leaves ([D218](#d218)), so a squaring engine wrongly trusted gives refused signatures, not a wrong one; a point off
 the curve taken through a wrongly trusted key agreement is worth nothing at a mint ([D212](#d212)). A chip whose engine fails
-after its first set-up (a fault that comes with age) is not found at a later `SET_CARD` any more; D218's check of every
+after its set-up (a fault that comes with age) is not found at a later `SET_CARD` until a reset; D218's check of every
 signature is what finds it then.
 
 **What it gives up.** [D221](#d221)'s one-asking claim rested on `SET_CARD`'s seconds ("if `SET_CARD` is ever made much

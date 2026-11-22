@@ -192,7 +192,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // time in the field waits WAIT_SECOND_SIGNS (two, where 3.0 had ten: D230) at the least; two change outputs take one wait off, where
     // three took two. And the held taps of a card with no owner are shorter (D230): its history 3 askings (7 in 3.0), its reset by the
     // PIN 4 (17 in 3.0), about 1.5 s and 3.5 s in all with the history's on a J3R180; the owner's claim is as it was.
-    // SET_CARD's self-tests run once in the card's life (D231); the one-asking claim is a blank card's alone (D232); a card's first
+    // SET_CARD's self-tests run once a set-up life (until a reset) (D231); the one-asking claim is a blank card's alone (D232); a card's first
     // PIN stands as given for the selection that set it (D233).
     // A reader of 3.0 meets nothing new: it asks SPEND_ALL_SIGN until it signs, and is answered sooner. So the minor moves.
     static final byte VERSION_MINOR = (byte) 0x01;
@@ -1172,7 +1172,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     private SchnorrHW schnorrHW;
     /** Whether the chip's key agreement held to the curve at the last SET_CARD (D212, `SchnorrHW.checksCurve`), worked out there and nowhere else: false until the first. */
     private boolean curveByAgreement;
-    /** The set-up's self-tests have run on this chip and the framing check passed (D231): SET_CARD runs them once in the card's life. */
+    /** The set-up's self-tests have run on this chip and the framing check passed (D231): SET_CARD runs them once a set-up life, at the
+     *  first SET_CARD after the install or after a RESET_CARD, which clears it. */
     private boolean selfTested;
 
     // -------------------------------------------------------------------------
@@ -4619,8 +4620,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         // the chip's key agreement and point addition answer the check's seventeen points, X and Y, as the signer reads them (6F00
         // otherwise), before anything is written: a card whose chip answers otherwise is never set up, and so never takes a piece.
-        // Once in the card's life (D231): a chip that passed has its verdict kept (`selfTested`); one that fails is asked again, and
-        // refused, at every SET_CARD, as before
+        // Once a set-up life (D231): a chip that passed has its verdict kept (`selfTested`) until a RESET_CARD; one that fails is asked
+        // again, and refused, at every SET_CARD, as before
         if (!selfTested) schnorrHW.checkFraming(scratch, X_PT);
         short dataLen = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
@@ -4771,9 +4772,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* and, the record written, whether the chip's key agreement holds a point to the curve (D212): LOAD_PROOF's 04 form is
          * taken only where it does. Last, so that a SET_CARD refused writes nothing of it. */
         /* and whether the chip's RSA holds to the padded moduli (D214: the field's powers over p, D216: the signature's squaring over
-         * n): each is leaned on only where its known answers held, here, and not otherwise. Also after the record. Once in the
-         * card's life, at its first SET_CARD that gets this far (D231): the verdicts are fields, kept, and a SET_CARD after it
-         * writes the record alone. The keys they made stay made (persistent RSA keys). */
+         * n): each is leaned on only where its known answers held, here, and not otherwise. Also after the record. Once a set-up
+         * life, at the first SET_CARD after the install or a reset that gets this far (D231): the verdicts are fields, kept, and a
+         * SET_CARD after it writes the record alone. The keys they made stay made (persistent RSA keys). */
         if (!selfTested) {
             curveByAgreement = schnorrHW.checksCurve();
             fieldP = fieldPInit();
@@ -6289,6 +6290,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         // and the hold and the set-up's record (D221) with the PIN that gave them (the arming it gave went with the record, D208): a new PIN in this selection has no hold it did not ask for
         // (and whether the card had a PIN when the tap began, D232: a reset in the tap never makes it a blank card's)
         tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED | TAP_BEGUN | TAP_HADPIN);
+        /* and the set-up's self-tests are asked again at the next SET_CARD (D231, amended): a verdict a fault planted, or a chip product given
+         * up after one failed signature (SchnorrHW.chipMul), does not outlive a reset and a hand-over to the next holder */
+        selfTested = false;
     }
 
     /**
@@ -7429,9 +7433,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.1 (D229 to D233): fifteen writes, 82 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the 3.0
-         * file's size and place: the 3.1 source came to 42,403 unpadded (D231 to D233 added 72 bytes to D229 and D230's 42,331), and
-         * twelve writes of 3.0's (a[10] to a[21]) were taken out and two (a[28], a[3]) put in.
+        /* 3.1 (D229 to D233): fifteen writes, 78 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the 3.0
+         * file's size and place: the 3.1 source came to 42,407 unpadded (D231 to D233 added 72 bytes to D229 and D230's 42,331, and the
+         * reset's clearing of the self-tests' mark 4 more), and twelve writes of 3.0's (a[10] to a[21]) were taken out, two (a[28],
+         * a[3]) put in, and two of six bytes (a[22], a[23]) made two of four (a[1], a[2]).
          * 3.0 with the tag's address given at install (D227): twenty-five writes here, 143 bytes, so the load file is 42,485 bytes, 245
          * past a multiple of 256, the place of the 3.0 file before it (41,973 bytes, fifteen writes, 86 bytes), which installed on J3R180
          * 58206920 30 times of 30 at the first try, and of 190c5ab's 41,205, which created at the first try every time there; D227's tag
@@ -7453,8 +7458,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[3] = 13;
         a[4] = 14;
         a[5] = 15;
-        a[22] = 32;
-        a[23] = 33;
+        a[1] = 1;
+        a[2] = 2;
         a[24] = 34;
         a[25] = 35;
         a[26] = 36;

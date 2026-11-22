@@ -1513,8 +1513,9 @@ change-recovery records have their own retention requirements. See the shared
 ### SET_CARD (0x32)
 
 *3.1 ([D231](../docs/DECISIONS.md#d231)): the chip's self-tests (the framing check's seventeen calls, the key
-agreement's seven points, the field's and the squaring's known answers) run at the first `SET_CARD` in the card's life
-that gets that far, and their verdicts are kept; a later `SET_CARD`, after a reset too, writes the record alone. A chip that
+agreement's seven points, the field's and the squaring's known answers) run at the first `SET_CARD` after the install or
+after a `RESET_CARD` that gets that far, and their verdicts are kept until the next reset; a later `SET_CARD` writes the
+record alone. A chip that
 fails the framing check is refused `6F00` at every `SET_CARD`, as before, since a failed check keeps no verdict.*
 
 | Field | Value |
@@ -2670,7 +2671,7 @@ Right after the set-up's record, written under its PIN in the same time in the f
 the claim is one asking ([D221](../docs/DECISIONS.md#d221)), on a blank card alone: one
 that had no PIN when this time in the field began ([D232](../docs/DECISIONS.md#d232)). (Until
 3.1 `SET_CARD` held the card for about two seconds of its self-tests, which stood for the
-hold; since [D231](../docs/DECISIONS.md#d231) they run once in the card's life.) After a claim, no payment command
+hold; since [D231](../docs/DECISIONS.md#d231) they run once a set-up life (until a reset).) After a claim, no payment command
 is taken for the rest of that time in the field (`6985`). A phone sends
 `SET_OWNER` again for as long as the card answers `6A98`, and tells the holder to
 keep holding the card; a phone that asks once never takes `6A98` for done. A claim
