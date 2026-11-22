@@ -154,7 +154,7 @@ chmod +x /usr/local/bin/gp</code></pre>
           <section id="applet" aria-labelledby="applet-title">
             <h2 id="applet-title"><span class="step-no" aria-hidden="true">02</span>Get the applet</h2>
             <p>The applet ships as one CAP file, applet version 3.0, at <code>applet/target/cashu-javacard-3.1.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
-            <p class="note"><b>Not yet on a card.</b> The 3.1 build: this exact file has run only in a simulator so far, and no card has installed it. It is the 3.0 file with the waits made a second a limit and the held taps shortened (D229, D230). If the install in step 4 fails, stop.</p>
+            <p class="note"><b>On a card.</b> The 3.1 build: this exact file has run on a chip. It ran on the sample J3R180 of 2026-11-21, at a test mint. It is the 3.0 file with the waits made a second a limit and the held taps shortened (D229, D230). If the install in step 4 fails, stop.</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>git clone https://github.com/cashucard/cashucard

@@ -15,7 +15,8 @@ past the first, with no larger first step; the change's credit one for every two
 (the second payment in a tap two askings, the held history three, the reset by the PIN four), [D231](DECISIONS.md#d231)
 (the set-up's self-tests once a set-up life (until a reset)), [D232](DECISIONS.md#d232) (the one-asking claim a blank card's alone) and
 [D233](DECISIONS.md#d233) (a card's first PIN stands as given for the selection that set it). This exact file has run
-only in a simulator so far, and no card has installed it.
+on a chip: J3R180 58206920 installed it and was paid from at a test mint, testnut, on 2026-11-21
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)).
 
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 

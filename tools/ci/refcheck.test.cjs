@@ -205,24 +205,27 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
   assert.match(source, /40412: True/);
 });
 
-// (3.1, D229 and D230, is tracked since 2026-11-21 and has run on no chip: its own test is below.) The 3.0 CAP was the file of the merge of 2026-11-19: the last 2.3 file (40,412 bytes, D221) with the version moved
+// (3.1, D229 to D233, is tracked since 2026-11-21; J3R180 58206920 installed it and paid from it at testnut the same day: its own
+// test is below.) The 3.0 CAP was the file of the merge of 2026-11-19: the last 2.3 file (40,412 bytes, D221) with the version moved
 // to 3.0 (D205), D206 to D210, the rotating tag (D222), D223 to D226 and the tag's address at install (D227) added: a load file
 // of 42,485 bytes. J3R180 58206920 installed it 13 times of 13 on 2026-11-21, and its payment run at testnut on the same card
 // that day had real signatures and real change verified on the chip, so its hash moved from INSTALLED to PROVEN and its size
 // is in SIZES. The 2.3 file's hash stays on PROVEN as that file's.
-test("the tracked 3.1 CAP is the 3.0 file's size and place and has run on no chip yet; the 3.0 file's hash stays on PROVEN", () => {
+test("the tracked 3.1 CAP is the 3.0 file's size and place and has run on a chip; the 3.0 file's hash stays on PROVEN", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.1.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /load file: 42485 bytes/);
-  assert.match(r.stdout, /load file sha256: 4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19; this exact file has run only in a simulator so far, and no card has installed it\./);
+  assert.match(r.stdout, /load file sha256: 4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19; this exact file has run on a chip\./);
   assert.match(r.stdout, /a size known to install/);
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));
   const installed = source.slice(source.indexOf("\nINSTALLED = {"), source.indexOf("\n}", source.indexOf("\nINSTALLED = {")));
   assert.ok(proven.length > 1000, "PROVEN is read");
-  assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the tracked file's hash is on PROVEN, with PROVEN_NEEDS's words");
-  assert.doesNotMatch(installed, /d69742d0/, "and not on INSTALLED");
+  assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the 3.0 file's hash is on PROVEN, with PROVEN_NEEDS's words");
+  assert.doesNotMatch(installed, /d69742d0/, "and not on INSTALLED")
+  assert.match(proven, /'4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19': '3\.1[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the 3.1 file's hash is on PROVEN, with PROVEN_NEEDS's words")
+  assert.doesNotMatch(installed, /4014e7f1/, "and not on INSTALLED");
   assert.match(source, /^ {4}42485: True,/m, "the tracked file's size is in SIZES");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes, 2026-11-14, J3R180 '\n +'09312320 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
 });

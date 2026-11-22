@@ -95,8 +95,9 @@ whose own sha256 is not the CAP's ([Install](#install) gives both). It is the 3.
 [D230](DECISIONS.md#d230) (the second payment's wait 2, the held history 3, the reset by the PIN 4), [D231](DECISIONS.md#d231)
 to [D233](DECISIONS.md#d233) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's alone, a
 first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` cut to fifteen writes (78
-bytes) from 42,407 unpadded, so that it is 245 past again, the place and the size of the 3.0 file. This exact file has run only in a simulator so far, and no card has installed it. It is not yet tried on a
-chip: the install, then the waits and the held taps timed on a J3R180, are the operator's, and add its hash to refcheck's table.
+bytes) from 42,407 unpadded, so that it is 245 past again, the place and the size of the 3.0 file. This exact file has run on a chip: J3R180 58206920 installed it at the first try (3 loads, 15 creates) on 2026-11-21,
+the waits and the held taps were timed on it, and it was paid from at a test mint, testnut, with real signatures and real
+change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)).
 
 The 3.0 build was **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
 the Method component 34,790), in 173 blocks of 247 bytes, the last 1: the load file

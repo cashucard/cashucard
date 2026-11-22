@@ -2,7 +2,7 @@
 
 This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.0, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
-The 3.1 build: this exact file has run only in a simulator so far, and no card has installed it. It is the 3.0 file with the waits made a second a limit and the held taps shortened (D229, D230). If the install in step 4 fails, stop and tell the person.
+The 3.1 build: this exact file has run on a chip. It ran on the sample J3R180 of 2026-11-21, at a test mint. It is the 3.0 file with the waits made a second a limit and the held taps shortened (D229, D230). If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
