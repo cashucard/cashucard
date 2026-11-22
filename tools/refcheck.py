@@ -68,7 +68,7 @@ SIZES = {
     40412: True,   # 2.3 (CAP sha256 11104ceb..., load file 05c9b847...), unpadded, D200 to D204, D211 to D221 (the claim after the set-up's record is one asking), 2026-11-15, J3R180 09301220: three steps, opener first, load 17 to 18 s, card applet 2 s; selftest 13/13, set-up claim at the first asking, 9-piece payment with change, installed three times
     41205: True,   # 2.3 with the rotating tag (190c5ab, load file 6f0e3a06..., never tracked), unpadded, 245 past a multiple of 256, J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03): installed and left there, selftest 13 of 13 and the tag read (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920.md, its files table and the row Left); not on PROVEN
     41973: True,   # 3.0 of the merge, padded to 245 past a multiple of 256 (1ad208d, load file 2b9c6b02...), J3R310-355 sample card 58206920: created 30 times of 30 at the first try (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md, the install rate test); not on PROVEN
-    42485: True,   # neutral 3.0 with the tag's address at install (9ac55c1, load file d69742d0...), J3R310-355 sample card 58206920, 2026-11-21: 13 of 13 installs at the first try, ten create cycles (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md), then a payment run at testnut on the same card (the same report); on PROVEN
+    42485: True,   # neutral 3.0 with the tag's address at install (9ac55c1, load file d69742d0...), J3R310-355 sample card 58206920, 2026-11-21: 13 of 13 installs at the first try, ten create cycles (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md), then a payment run at testnut on the same card (the same report); on PROVEN; 3.0 with D228's review fixes (541aaef, load file 99a66ba7...) at the same size and place, the same card, 2026-11-22: 1 load and 13 creates at the first try, then paid from at testnut (docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md); on PROVEN
     38791: False,  # 2.3 study build of D213 to D216 (ecdh study, never shipped), 2026-11-14, J3R180 09301220: loaded, opener made, card applet 6F00 at create (135 past a multiple of 256)
     38809: False,  # the same study source at this size, 2026-11-14, J3R180 09301220: card applet 6F00 at create (153 past a multiple of 256)
     38893: True,   # the same study source at this size (load file 92b67948..., never shipped), 2026-11-14, J3R180 09301220: installed at the first try (237 past a multiple of 256); passed the study's chip tests
@@ -113,6 +113,11 @@ PROVEN = {
     'd69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3.0 (9ac55c1, the tag\'s address at install, D227), 42,485 bytes, '
         '2026-11-21, J3R310-355 sample card 58206920 (ATR, ICType D321, SCP03) at testnut.cashu.space: 13 of 13 installs at the first try, then a payment with five change outputs, '
         'the change loaded back and taken by testnut in a later swap, AUTH verified: real signatures and real change verified on the chip',
+    '99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536': '3.0 with the review fixes of D228 (541aaef), 42,485 bytes, '
+        '2026-11-22, J3R310-355 sample card 58206920 (ATR, ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card\'s supplier, '
+        'at testnut.cashu.space: 1 load and 13 creates at the first try, the set-up bit one a unit, the waits over the limit 10 + 4 x (N - 2), '
+        'payments with change, the change loaded back with no PIN and taken by testnut in later swaps: '
+        'real signatures and real change verified on the chip',
 }
 # the load files a chip has installed, by the sha256 of the bytes gp LOADs, whose run has not yet had a payment at a mint: the
 # chip run that installs that exact file adds it here, with its size in SIZES; it moves to PROVEN once its run has had real
