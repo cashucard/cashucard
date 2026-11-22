@@ -18,7 +18,8 @@ least, counted after the change's credit; the held history three, the reset by t
 (the set-up's self-tests once a set-up life (until a reset); with D228, `chipMulInit` there is the one writer of the chip
 path's verdict), [D232](DECISIONS.md#d232) (the one-asking claim a blank card's alone) and
 [D233](DECISIONS.md#d233) (a card's first PIN stands as given for the selection that set it). This exact file has run
-only in a simulator so far, and no card has installed it. 330ffa1's file, from before the merge onto D228 (load file
+on a chip: the J3R310-355 sample card 58206920 installed it and was paid from at a test mint, testnut, on 2026-11-21
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)). 330ffa1's file, from before the merge onto D228 (load file
 `4014e7f1…`), was installed on the J3R310-355 sample card 58206920 and paid from at a test mint, testnut, on 2026-11-21
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)).
 

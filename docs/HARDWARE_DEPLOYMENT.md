@@ -97,7 +97,9 @@ since its amendment of 2026-11-22; the held history 3, the reset by the PIN 4), 
 [D233](DECISIONS.md#d233) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's
 alone, a first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` at thirteen writes, so
 that it is 245 past again, the place and the size of the 3.0 file. Padded by `sizeTheFile` (below), this exact file has run
-only in a simulator so far, and no card has installed it.
+on a chip: the J3R310-355 sample card 58206920 (CPLC ICType D321) installed it at the first try (2 loads, 14 creates) on
+2026-11-21, the waits and the held taps were timed on it, and it was paid from at a test mint, testnut, with real signatures
+and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)).
 
 The 3.0 build was **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
 the Method component 34,791), in 173 blocks of 247 bytes, the last 1: the load file
@@ -112,8 +114,8 @@ settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226))
 parameters ([D227](DECISIONS.md#d227): 455 bytes more, padded back to 245 past by ten more writes, 57 bytes), and the
 security review's fixes of 2026-11-21 ([D228](DECISIONS.md#d228): one set-up bit a unit, the chip's path given up for
 one signature only, `GET_INFO` byte 55 bit 3 clear; three bytes fewer, padded back by two writes in a longer form). It was
-given to no chip; the 3.1 file above takes its place, and that file's run, as the checklist below, is still to come, its size
-first; if the chip refuses its size, it is moved with `sizeTheFile` (below). No J3R180 has been given a 3.0 file, and a J3R180 run comes before any release wording
+given to no chip; the 3.1 file above takes its place, and that file's run, as the checklist below, was made on the J3R310-355
+sample card 58206920 on 2026-11-21 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)). No J3R180 has been given a 3.0 file, and a J3R180 run comes before any release wording
 ([D228](DECISIONS.md#d228)). The file before it, 9ac55c1's (load file `d69742d0…`, the same size), went to the
 J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21: what that card did with it is that file's
 history, in [Install](#install) and the checklist below, and says nothing of this one. The other maintainer's 3.0 file before
@@ -895,8 +897,13 @@ run's log.
     [x] four payments signed at the first `SPEND_ALL_SIGN`, each good under P + t·G and not under P, every swap taken
     and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 14 of 14); [x] five change outputs back by
     `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in a later swap;
-    [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c. That file's hash is on PROVEN; the
-    tracked file's is not, and its own run is still to come.
+    [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c. That file's hash is on PROVEN.
+  - 2026-11-21, bab8c5a's file (load file `9ed12359…`, the tracked file), the same card, at testnut
+    ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)): [x] 19 payments signed, each good under P + t·G and not
+    under P, every swap taken and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 13 of 13); [x] 24 change
+    outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in later swaps;
+    [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c (the first load's 36 pieces, minted to it, read
+    back and rebuilt). Its hash is on PROVEN.
 - `INBOX` for last week and this week, a real header of each given first
   (`SET_HEADER`), against the owner's derivation from c for each week.
 - `cardctl --timing selftest` (`AUTH`) and a sealed `VERIFY_PIN`, before and

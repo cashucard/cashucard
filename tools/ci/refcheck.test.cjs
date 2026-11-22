@@ -207,12 +207,12 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
 
 // The tracked CAP is 3.1 (D229 to D233, with D230's amendment of 2026-11-22) on the 3.0 file of the merge of 2026-11-19 with
 // the review fixes of D228 (one set-up bit a unit, the chip's path given up for one signature only, GET_INFO byte 55 bit 3
-// clear): a load file of 42,485 bytes again, padded by sizeTheFile, that no chip has been given. Two files before it, of the
-// same size, ran on the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21 and paid at testnut with real
-// signatures and real change verified on the chip: 9ac55c1's 3.0 (load file d69742d0...) and 330ffa1's 3.1 (load file
-// 4014e7f1..., without D228). Their hashes stay on PROVEN as those files', and the size in SIZES says what that chip did with
-// source of this size, not that the tracked file has run.
-test("the tracked 3.1 CAP's load file has run only in a simulator: its hash is on neither PROVEN nor INSTALLED, and d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
+// clear): a load file of 42,485 bytes again, padded by sizeTheFile. The J3R310-355 sample card 58206920 (ATR; ICType D321,
+// SCP03) installed it at the first try on 2026-11-21 and paid from it at testnut with real signatures and real change verified
+// on the chip (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md), so its hash is on PROVEN. Two files before
+// it, of the same size, ran on the same card the same day: 9ac55c1's 3.0 (load file d69742d0...) and 330ffa1's 3.1 (load file
+// 4014e7f1..., without D228). Their hashes stay on PROVEN as those files'.
+test("the tracked 3.1 CAP's load file has run on a chip: its hash is on PROVEN and not on INSTALLED, and d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.1.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -221,16 +221,16 @@ test("the tracked 3.1 CAP's load file has run only in a simulator: its hash is o
   assert.ok(sha, r.stdout);
   assert.notEqual(sha[1], "d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e", "the tracked file is not 9ac55c1's");
   assert.notEqual(sha[1], "4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19", "nor 330ffa1's");
-  assert.match(r.stdout, /; this exact file has run only in a simulator so far, and no card has installed it\.\n/, "the tracked file says it has run only in a simulator");
-  assert.doesNotMatch(r.stdout, /this exact file has run on a chip/);
+  assert.equal(sha[1], "9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b", "the tracked file is bab8c5a's");
+  assert.match(r.stdout, /; this exact file has run on a chip\.\n/, "the tracked file says it has run on a chip");
   assert.match(r.stdout, /a size known to install/);
   assert.match(r.stdout, /known to install on the J3R310-355 sample card 58206920; no J3R180/, "the size is said to be the sample card's, not a J3R180's");
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));
   const installed = source.slice(source.indexOf("\nINSTALLED = {"), source.indexOf("\n}", source.indexOf("\nINSTALLED = {")));
   assert.ok(proven.length > 1000, "PROVEN is read");
-  assert.ok(!proven.includes(sha[1]), "the tracked file's hash is not on PROVEN");
-  assert.ok(!installed.includes(sha[1]), "nor on INSTALLED");
+  assert.match(proven, /'9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "the tracked file's hash is on PROVEN, the chip named as it is, with PROVEN_NEEDS's words");
+  assert.ok(!installed.includes(sha[1]), "and not on INSTALLED");
   assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the 3.0 file before it stays on PROVEN as its own, with PROVEN_NEEDS's words");
   assert.doesNotMatch(installed, /d69742d0/, "and not on INSTALLED");
   assert.match(proven, /'4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "330ffa1's 3.1 file stays on PROVEN as its own, the chip named as it is, with PROVEN_NEEDS's words");
