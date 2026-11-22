@@ -286,7 +286,8 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   `ant cap` run rewrites it, so restore it from git first. A new CAP moves the
   pins, every one of them listed under shipping the CAP, above.
 - **[D27](docs/DECISIONS.md#d27) covers SCP02 and the vendored DES** (`gp/des.ts`),
-  not a package's or a native cipher; SCP02 is all the J3R180 offers.
+  not a package's or a native cipher; SCP02 is all a J3R180 keyed for SCP02 offers (card 58206920, a J3R180 keyed for
+  SCP03 according to the card's supplier, opens SCP03: [D229](docs/DECISIONS.md#d229)).
   **[D181](docs/DECISIONS.md#d181) covers SCP03** (`gp/scp03.ts`), the J3R452's:
   AES from `@noble/ciphers`, pinned exact, with CMAC and the KDF written here.
   `openSession` picks the protocol from INITIALIZE UPDATE's reply, so a caller

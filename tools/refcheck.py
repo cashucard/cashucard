@@ -44,8 +44,9 @@ LOADED = ['Header', 'Directory', 'Import', 'Applet', 'Class', 'Method',
           'StaticField', 'Export', 'ConstantPool', 'RefLocation']
 # what the chip has answered, by the load file's size (refcheck's measure, the stored components): True installed,
 # False went 6F00 or mute at INSTALL. Measured with the opener first, per entry, on the chip the entry names (a J3R180
-# where it names none; 41205, 41973 and 42485 on the J3R310-355 sample card 58206920, ATR; ICType D321, SCP03). No
-# J3R180 has been given a 3.0 file.
+# keyed for SCP02 where it names none; 41205, 41973 and 42485 on the J3R310-355 sample card 58206920, ATR; ICType D321,
+# SCP03, a J3R180 keyed for SCP03 according to the card's supplier, D229). No J3R180 keyed for SCP02 has been given a 3.0
+# file.
 SIZES = {
     17344: False, 17438: False, 17479: False, 17480: False, 17538: True, 17552: True, 17560: True, 17562: True,
     17564: True, 17575: True, 17582: True, 17589: True, 17677: False, 17694: False, 17726: False,
@@ -74,12 +75,12 @@ SIZES = {
     35509: True,   # the 2.3 chip run's test-only build (2.3 with one command added that says the signer's temporary key's kind; never shipped, load file sha256 1bf178bc...), 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s
     21540: False,  # 2.2 first build (sha256 51ddeee4...), ENG-823, 2026-11-06: loaded (88 blocks), card applet 6F00 at create; cause not isolated: the size window or the constructor's +4,321 B persistent (D176, docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
 }
-# the sizes in SIZES that only a chip other than a J3R180 has installed, by the chip that did: a file of one of these sizes
-# is not said to be known to install on a J3R180.
-OTHER_CHIP = {
-    41205: 'the J3R310-355 sample card 58206920',
-    41973: 'the J3R310-355 sample card 58206920',
-    42485: 'the J3R310-355 sample card 58206920',
+# the sizes in SIZES that only a J3R180 keyed for SCP03 has installed, by the card that did (D229): the install sizes were
+# measured on the two keyings apart, so a file of one of these sizes is said to install on that keying only.
+SCP03_ONLY = {
+    41205: 'a J3R180 keyed for SCP03 (card 58206920)',
+    41973: 'a J3R180 keyed for SCP03 (card 58206920)',
+    42485: 'a J3R180 keyed for SCP03 (card 58206920)',
 }
 NEAR = 8  # bytes: a size this close to one that failed is treated as that one
 # load-file sizes a build is kept out of (first, last), whatever SIZES says: around 32,777, which failed in 2.3
@@ -239,8 +240,9 @@ def main(argv):
                   'install on a chip. Move CashuApplet.sizeTheFile out of it.' % (size, first, last))
             return 1
     if size in SIZES and SIZES[size]:
-        if size in OTHER_CHIP:
-            print('a size known to install on %s; no J3R180 has been given a file of this size.' % OTHER_CHIP[size])
+        if size in SCP03_ONLY:
+            print('a size known to install on %s; no J3R180 keyed for SCP02 has been given a file of this size.'
+                  % SCP03_ONLY[size])
         else:
             print('a size known to install on the chip.')
         return 0

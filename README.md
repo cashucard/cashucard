@@ -79,12 +79,15 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > [D206](docs/DECISIONS.md#d206) to [D210](docs/DECISIONS.md#d210), the rotating tag
 > ([D222](docs/DECISIONS.md#d222)), [D223](docs/DECISIONS.md#d223) to [D226](docs/DECISIONS.md#d226) and the tag's
 > address given at install ([D227](docs/DECISIONS.md#d227)) added (load file sha256 `d69742d0…`): on 2026-11-21 the
-> J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) took that file 13 times of 13 at the first try, its tag took the
+> J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's supplier,
+> took that file 13 times of 13 at the first try, its tag took the
 > address at install, and the card paid from it at a test mint with real signatures and real change verified on the chip
 > ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). The tracked file adds the security
 > review's fixes of [D228](docs/DECISIONS.md#d228) (one set-up bit a unit, the chip's path given up for one signature only,
 > `GET_INFO` byte 55 bit 3 clear; 42,485 bytes, load file sha256 `99a66ba7…`). This exact file has run only in a simulator
-> so far, and no card has installed it; no J3R180 has been given a 3.0 file, and a J3R180 run comes before any release. The
+> so far, and no card has installed it; its run on a J3R180 keyed for SCP03 comes before any release. No J3R180 keyed for
+> SCP02 has been given a 3.0 file, and none will be: according to the card's supplier the chip's manufacturer has retired
+> that keying ([D229](docs/DECISIONS.md#d229)). The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The
