@@ -91,7 +91,7 @@ const TRACKED_VERSION: readonly [number, number] = [3, 1];
 function versionOf(s: CardAppletState): readonly [number, number] {
   return s.version ?? TRACKED_VERSION;
 }
-// (3.1 is 3.0's wire: D229 and D230 move waits and held counts, nothing this fake card answers)
+// (3.1 is 3.0's wire: D230 and D231 move waits and held counts, nothing this fake card answers)
 function isThreeZero(v: readonly [number, number]): boolean {
   return v[0] === 3;
 }

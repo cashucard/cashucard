@@ -38,7 +38,7 @@ export async function readChangeOwed(
     throw new CardError(0x9000, 0x01, 'GET_INFO was too short for a card');
   }
   const [major, minor] = [info[0]!, info[1]!];
-  // (3.1, D229 and D230: 3.0's wire, its waits and held counts shorter)
+  // (3.1, D230 and D231: 3.0's wire, its waits and held counts shorter)
   if (major === 3 && (minor === 0 || minor === 1)) {
     return changeOwedByte(info);
   }

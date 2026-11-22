@@ -91,10 +91,10 @@ size that installs ([D25](DECISIONS.md#d25)).
 The 3.1 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256), in 173 blocks of 247 bytes, the
 last 1: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `9ed12359…`),
 whose own sha256 is not the CAP's ([Install](#install) gives both). It is the 3.0 file below, with the security review's
-fixes of [D228](DECISIONS.md#d228), and with [D229](DECISIONS.md#d229) (the wait over the limit a rate: two askings a
-limit's worth past the first), [D230](DECISIONS.md#d230) (the second payment's wait 2, counted after the change's credit
-since its amendment of 2026-11-22; the held history 3, the reset by the PIN 4), [D231](DECISIONS.md#d231) to
-[D233](DECISIONS.md#d233) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's
+fixes of [D228](DECISIONS.md#d228), and with [D230](DECISIONS.md#d230) (the wait over the limit a rate: two askings a
+limit's worth past the first), [D231](DECISIONS.md#d231) (the second payment's wait 2, counted after the change's credit
+since its amendment of 2026-11-22; the held history 3, the reset by the PIN 4), [D232](DECISIONS.md#d232) to
+[D234](DECISIONS.md#d234) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's
 alone, a first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` at thirteen writes, so
 that it is 245 past again, the place and the size of the 3.0 file. Padded by `sizeTheFile` (below), this exact file has run
 on a chip: the J3R310-355 sample card 58206920 (CPLC ICType D321) installed it at the first try (2 loads, 14 creates) on

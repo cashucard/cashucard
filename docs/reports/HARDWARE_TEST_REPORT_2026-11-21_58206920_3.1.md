@@ -1,16 +1,16 @@
 # The 3.1 file (330ffa1) on the reader's sample card 58206920: the install, the waits made a rate, the shorter held taps, and payments at a test mint (2026-11-21)
 
-The 3.1 file of branch `wait-per-second` at 330ffa1 (D229 to D233) was put on the reader's sample card in place of the
+The 3.1 file of branch `wait-per-second` at 330ffa1 (D230 to D234) was put on the reader's sample card in place of the
 neutral 3.0 file, timed, paid from at a test mint, and left there fresh, with the tag at `https://getfoxy.io/card`.
 
 - **Every install was taken at the first try:** the load 3 times of 3, the card's applet 15 times of 15, the tag 15 times
   of 15. No `6F00`, no retry. Free memory the same at every reading.
-- **D229, the wait a rate:** every payment waited exactly `2 × (N − 1)` "not yet" answers, less one for every two change
+- **D230, the wait a rate:** every payment waited exactly `2 × (N − 1)` "not yet" answers, less one for every two change
   outputs, for N = 1, 2, 3, 4, 6, 13. Each "not yet" took 462 ms (the first of a payment 470 to 484 ms). A payment of two
   limits' worth now signs in 2.0 s from `BEGIN`, where 3.0 took 5.8 s.
-- **D230:** a second payment in the same tap waited 2; the history answered at the third asking, the reset by the PIN at
+- **D231:** a second payment in the same tap waited 2; the history answered at the third asking, the reset by the PIN at
   the fourth after it; a claim on a card that had a PIN when the tap began took four askings.
-- **D231 to D233:** the first `SET_CARD` of a set-up life took 1.5 to 1.8 s, a second in the same selection 49 ms; the
+- **D232 to D234:** the first `SET_CARD` of a set-up life took 1.5 to 1.8 s, a second in the same selection 49 ms; the
   self-tests ran again after both resets. A blank card set up in one tap was claimed at the first asking. A first
   `SET_PIN` stood as the PIN given until a `SELECT`.
 - **Money:** 36 pieces loaded in one selection with their DLEQ kept; 17 payments signed, every signature good under
@@ -88,7 +88,7 @@ Free memory (persistent / transient), the same at every reading:
   larger in persistent memory than 3.0's (134,656 against 134,648).
 - The 129 transient bytes the 3.0 run saw go are still gone (3,789 with everything deleted).
 
-## 2. D229: the wait over the limit
+## 2. D230: the wait over the limit
 
 Set up with a limit on one payment of **100 sats** (and a day of 100,000). Expected waits:
 `max(0, 2 × (N − 1) − ⌊change outputs / 2⌋)`, N the limits' worth leaving the card (within a thirty-second over the limit
@@ -116,7 +116,7 @@ counts as one; a part counts as one). Each payment was the first in its tap.
 - **Change credit, one wait for every two outputs:** C1's six outputs took 3 off, C2's four took 2 (to 0). Each change
   output was 0.20 to 0.33 s of `SPEND_ALL_CHANGE`.
 
-## 3. D230: the second payment, the held history, the reset by the PIN
+## 3. D231: the second payment, the held history, the reset by the PIN
 
 **A second payment in one tap** (one tap under the PIN, four payments, the limit of 100):
 
@@ -141,23 +141,23 @@ The whole tap, four payments: 8,168 ms. All four swaps taken by testnut, their i
 
 The history's hold and the reset together: 7 askings, **2.6 s**, where 3.0 asked 24 (about 11 s).
 
-**A claim on a card that had a PIN at the tap's first command** (D232): in the same tap, after the reset, `SET_PIN`,
+**A claim on a card that had a PIN at the tap's first command** (D233): in the same tap, after the reset, `SET_PIN`,
 `SET_CARD` and the claim with the owner's c: `SET_OWNER` answered `6A98` three times and set the owner at the
 **fourth** (539.8, 543.2, 542.8, 835.3 ms: 2,461 ms).
 
-## 4. D231 to D233: the set-up
+## 4. D232 to D234: the set-up
 
 | Item | Result |
 | --- | --- |
-| D231: the first `SET_CARD` after the install | `9000` in **1,831 ms** (the self-tests) |
-| D231: a second `SET_CARD` in the same selection | `9000` in **48.6 ms** (self-tests skipped) |
-| D231: the first `SET_CARD` after the owner's reset | `9000` in **1,493 ms** (self-tests again) |
-| D231: the first `SET_CARD` after a `RESET_CARD` by the PIN | `9000` in **1,494 ms** (self-tests again) |
-| D232: a blank card set up and claimed in one tap | `SET_OWNER` `9000` at the **first** asking (826 ms). The money session's `cardctl setup` did the same: no "keep holding" note |
-| D233: `SET_CARD` after a first `SET_PIN`, no `VERIFY_PIN` | `9000` |
-| D233: `GROUP_KEYS` after the first `SET_PIN`, no `VERIFY_PIN` | `9000` (76.5 ms) |
-| D233: `GROUP_KEYS` after a `SELECT` in the same power-up | **`6982`** |
-| D233: `GROUP_KEYS` in a new tap / after `VERIFY_PIN` | `6982` / `9000` |
+| D232: the first `SET_CARD` after the install | `9000` in **1,831 ms** (the self-tests) |
+| D232: a second `SET_CARD` in the same selection | `9000` in **48.6 ms** (self-tests skipped) |
+| D232: the first `SET_CARD` after the owner's reset | `9000` in **1,493 ms** (self-tests again) |
+| D232: the first `SET_CARD` after a `RESET_CARD` by the PIN | `9000` in **1,494 ms** (self-tests again) |
+| D233: a blank card set up and claimed in one tap | `SET_OWNER` `9000` at the **first** asking (826 ms). The money session's `cardctl setup` did the same: no "keep holding" note |
+| D234: `SET_CARD` after a first `SET_PIN`, no `VERIFY_PIN` | `9000` |
+| D234: `GROUP_KEYS` after the first `SET_PIN`, no `VERIFY_PIN` | `9000` (76.5 ms) |
+| D234: `GROUP_KEYS` after a `SELECT` in the same power-up | **`6982`** |
+| D234: `GROUP_KEYS` in a new tap / after `VERIFY_PIN` | `6982` / `9000` |
 
 - `SET_PIN` 24 ms. The owner's reset 337 to 342 ms.
 - The first `SET_CARD` after the install is 0.34 s slower than after a reset. Not measured why; the chip may make its

@@ -1513,8 +1513,8 @@ class FirstSetUpCard(Card23):
     RESET_CARD are held for as many askings as the applet holds them (test_the_mocks_held_askings_are_the_applets).
     """
 
-    HISTORY_ASKINGS = 3   # CashuApplet.HISTORY_ASKINGS (D230; 7 in 3.0, D211): GET_LOG answers at the third asking in a row
-    RESET_ASKINGS = 4     # CashuApplet.RESET_ASKINGS (D230; 17 in 3.0, D211): RESET_CARD resets at the fourth
+    HISTORY_ASKINGS = 3   # CashuApplet.HISTORY_ASKINGS (D231; 7 in 3.0, D211): GET_LOG answers at the third asking in a row
+    RESET_ASKINGS = 4     # CashuApplet.RESET_ASKINGS (D231; 17 in 3.0, D211): RESET_CARD resets at the fourth
 
     def __init__(self, factory=None, refuse=None, lift_at=None):
         super().__init__(has_owner=False, refund=False, pin_state=0)

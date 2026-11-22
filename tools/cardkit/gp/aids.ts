@@ -16,8 +16,8 @@ export const OPENER_AID = fromHex('F04341534855434152444D');
 export const CARD_AID = fromHex('F043415348554341524401');
 /**
  * The card applet's versions this kit reads, as SELECT and GET_INFO's first two bytes answer them: 2.1 (D26), 2.2
- * (D175), which adds the public GET_OUTBOX and changes nothing a 2.1 card does, 3.0 (D183 to D198), and 3.1 (D229,
- * D230: the wait over the limit a rate and the held taps shorter; nothing a reader sends moves), which the tracked CAP
+ * (D175), which adds the public GET_OUTBOX and changes nothing a 2.1 card does, 3.0 (D183 to D198), and 3.1 (D230,
+ * D231: the wait over the limit a rate and the held taps shorter; nothing a reader sends moves), which the tracked CAP
  * installs.
  */
 export const CARD_VERSIONS: readonly (readonly [number, number])[] = [

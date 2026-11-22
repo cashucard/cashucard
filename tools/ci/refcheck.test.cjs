@@ -205,7 +205,7 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
   assert.match(source, /40412: True/);
 });
 
-// The tracked CAP is 3.1 (D229 to D233, with D230's amendment of 2026-11-22) on the 3.0 file of the merge of 2026-11-19 with
+// The tracked CAP is 3.1 (D230 to D234, with D231's amendment of 2026-11-22) on the 3.0 file of the merge of 2026-11-19 with
 // the review fixes of D228 (one set-up bit a unit, the chip's path given up for one signature only, GET_INFO byte 55 bit 3
 // clear): a load file of 42,485 bytes again, padded by sizeTheFile. The J3R310-355 sample card 58206920 (ATR; ICType D321,
 // SCP03) installed it at the first try on 2026-11-21 and paid from it at testnut with real signatures and real change verified

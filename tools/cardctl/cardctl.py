@@ -279,7 +279,7 @@ FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
 # the seventeenth asking after the history's seven (24 askings, about 11 s in all), D211: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D211 measured it).
-# 3.1 (D230) answers the history at the third asking and resets at the fourth (7 askings, about 3.5 s in all): these bounds are
+# 3.1 (D231) answers the history at the third asking and resets at the fourth (7 askings, about 3.5 s in all): these bounds are
 # 3.0's, the most any card asks for, and a 3.1 card answers before them.
 LOG_HOLD_MOST = 7
 RESET_MOST = 17

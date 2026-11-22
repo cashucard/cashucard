@@ -112,12 +112,12 @@ PROVEN = {
     'd69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3.0 (9ac55c1, the tag\'s address at install, D227), 42,485 bytes, '
         '2026-11-21, J3R310-355 sample card 58206920 (ATR, ICType D321, SCP03) at testnut.cashu.space: 13 of 13 installs at the first try, then a payment with five change outputs, '
         'the change loaded back and taken by testnut in a later swap, AUTH verified: real signatures and real change verified on the chip',
-    '4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19': '3.1 (330ffa1, D229 to D233), 42,485 bytes, 2026-11-21, J3R310-355 '
+    '4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19': '3.1 (330ffa1, D230 to D234), 42,485 bytes, 2026-11-21, J3R310-355 '
         'sample card 58206920 (ATR, ICType D321, SCP03) at testnut.cashu.space: 3 loads and 15 creates at the first try, the waits over the limit 2 x (N - 1) for N = 2 to '
         '13, payments with change, the change loaded back with no PIN and taken by testnut in later swaps: '
         'real signatures and real change verified on the chip',
-    '9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b': '3.1 on the review fixes of D228 (bab8c5a, D228, D229 to D233, '
-        'D230 amended), 42,485 bytes, 2026-11-21, J3R310-355 sample card 58206920 (ATR, ICType D321, SCP03) at testnut.cashu.space: 2 loads '
+    '9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b': '3.1 on the review fixes of D228 (bab8c5a, D228, D230 to D234, '
+        'D231 amended), 42,485 bytes, 2026-11-21, J3R310-355 sample card 58206920 (ATR, ICType D321, SCP03) at testnut.cashu.space: 2 loads '
         'and 14 creates at the first try, the waits over the limit 2 x (N - 1) for N = 1 to 10, a second payment max(2, W - outputs / 2), '
         'the set-up bit one a unit, payments with change, the change loaded back with no PIN and taken by testnut in later swaps: '
         'real signatures and real change verified on the chip',
