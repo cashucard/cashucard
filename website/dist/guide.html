@@ -54,7 +54,7 @@
 <span class="out">APP: F043415348554341524401 (SELECTABLE)</span>
 <span class="out">APP: D2760000850101 (SELECTABLE)</span>
 <span class="prompt">$</span> gp --apdu 00A404000BF043415348554341524401
-<span class="out">0300 9000</span></code></pre>
+<span class="out">0301 9000</span></code></pre>
           </figure>
           </div>
           <ol class="guide-steps" aria-label="The six steps">
@@ -153,8 +153,8 @@ chmod +x /usr/local/bin/gp</code></pre>
 
           <section id="applet" aria-labelledby="applet-title">
             <h2 id="applet-title"><span class="step-no" aria-hidden="true">02</span>Get the applet</h2>
-            <p>The applet ships as one CAP file, applet version 3.0, at <code>applet/target/cashu-javacard-3.0.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
-            <p class="note"><b>Not yet on a card.</b> The 3.0 build: this exact file has run only in a simulator so far, and no card has installed it. If the install in step 4 fails, stop.</p>
+            <p>The applet ships as one CAP file, applet version 3.1, at <code>applet/target/cashu-javacard-3.1.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
+            <p class="note"><b>Not yet on a card.</b> The 3.1 build: this exact file has run only in a simulator so far, and no card has installed it. If the install in step 4 fails, stop.</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>git clone https://github.com/cashucard/cashucard
@@ -163,8 +163,8 @@ cd cashucard/applet</code></pre>
             <p>Check that the file is the published one before you install it:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-              <pre><code>sha256sum target/cashu-javacard-3.0.0.cap</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0b17e232d394a7ce1885dcc395e38d6830cd4abf5097056052174a3f76b4f4a6  target/cashu-javacard-3.0.0.cap</code></pre></div>
+              <pre><code>sha256sum target/cashu-javacard-3.1.0.cap</code></pre>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>540ce0a4c6a8d06977bf44f76a57192681fb9d07d18869eeb0fd5f94f3cc4b2b  target/cashu-javacard-3.1.0.cap</code></pre></div>
             </figure>
             <p>On a macOS release without <code>sha256sum</code>, <code>shasum -a 256</code> prints the same line.</p>
             <details class="more">
@@ -184,10 +184,10 @@ ant cap -Djc.sdk=/path/to/jc305u4_kit</code></pre>
                 <p>A CAP you build hashes differently from the published one, even from the same source, because the converter writes a timestamp into <code>META-INF/MANIFEST.MF</code>. Compare every other entry with the published file:</p>
                 <figure class="cmd">
                   <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-                  <pre><code>git show HEAD:applet/target/cashu-javacard-3.0.0.cap &gt; /tmp/tracked.cap
+                  <pre><code>git show HEAD:applet/target/cashu-javacard-3.1.0.cap &gt; /tmp/tracked.cap
 rm -rf /tmp/cap-tracked /tmp/cap-built
 unzip -q /tmp/tracked.cap -d /tmp/cap-tracked
-unzip -q target/cashu-javacard-3.0.0.cap -d /tmp/cap-built
+unzip -q target/cashu-javacard-3.1.0.cap -d /tmp/cap-built
 diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built &amp;&amp; echo "same CAP as the tracked one"</code></pre>
                   <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>same CAP as the tracked one</code></pre></div>
                 </figure>
@@ -225,7 +225,7 @@ GP SCP02 (i=55)</code></pre><p>It also lists key set version 01, with three DES3
             </ol>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-              <pre><code>gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+              <pre><code>gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 \
    --params "$(printf '%s' 'https://example.com/card' | xxd -p | tr -d '\n')"</code></pre>
@@ -246,14 +246,14 @@ APP: D2760000850101 (SELECTABLE)           ← the tag</code></pre></div>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>gp --apdu 00A404000BF043415348554341524401</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0300 9000</code></pre></div>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>0301 9000</code></pre></div>
             </figure>
             <p>Read its state with <code>GET_INFO</code>. A new card shows 128 empty slots, with its PIN, owner and record still unset:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>gp --apdu B0010000</code></pre>
               <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-SW: 9000</code></pre><p>Read in order: version 3.0, 128 slots, 0 unspent, 0 spent, 128 empty, capabilities FF, no PIN, card file format 4, 3 PIN tries, unlocked, and no record, limit, owner, clock, window or change owed.</p></div>
+SW: 9000</code></pre><p>Read in order: version 3.1, 128 slots, 0 unspent, 0 spent, 128 empty, capabilities FF, no PIN, card file format 4, 3 PIN tries, unlocked, and no record, limit, owner, clock, window or change owed.</p></div>
             </figure>
             <p>Read the card's public key with <code>GET_PUBKEY</code>:</p>
             <figure class="cmd">
@@ -312,7 +312,7 @@ gp --delete F0434153485543415244     # the package</code></pre>
             <p>Then install again, the opener first and the tag last:</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
-              <pre><code>gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+              <pre><code>gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 \
    --params "$(printf '%s' 'https://example.com/card' | xxd -p | tr -d '\n')"</code></pre>

@@ -11,7 +11,7 @@ authorities. Do not generate replacement signing keys to make CI pass.
 
 | Component   | Current manifest identity                                        | New release tag              |
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
-| Firmware    | `applet/pom.xml`: 3.0.0; tracked CAP `cashu-javacard-3.0.0.cap`, APDU version 3.0 | `firmware-v3.0.0`            |
+| Firmware    | `applet/pom.xml`: 3.0.0; tracked CAP `cashu-javacard-3.1.0.cap`, APDU version 3.0 | `firmware-v3.0.0`            |
 | cardkit     | `tools/cardkit/package.json`: 0.4.0                              | `cardkit-v0.4.0`             |
 | Ops-service | `ops/package.json`: 0.2.0                                        | `ops-v0.2.0`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 15                  | `provisioner-v1.0.0-build.15` |
@@ -24,12 +24,13 @@ valid historical records; do not move or retag them. Corrected firmware Maven
 metadata does not alter the CAP.
 
 Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
-answer `03 00`, and the decisions are D183 to D228 (spec/APDU.md). The tracked
-`cashu-javacard-3.0.0.cap` (load file `99a66ba7…`, with D228's review fixes) has run only in a simulator; no
-`firmware-v3.0.0` release is cut before its chip run on a J3R180 and the operator's approval. The file before it, load
-file `d69742d0…` (9ac55c1), was installed and paid from at a test mint on the J3R310-355 sample card 58206920 (ATR;
-ICType D321, SCP03) on 2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md). The firmware a
-J3R180 ran before it
+answer `03 00`, and the decisions are D183 to D228 (spec/APDU.md). Firmware 3.1.0 is 3.0's wire answered sooner
+(`03 01`, D229 to D233). The tracked `cashu-javacard-3.1.0.cap` (load file `debc0de2…`, 3.1 on D228's review fixes) has run
+only in a simulator; no `firmware-v3.0.0` or `firmware-v3.1.0` release is cut before its chip run on a J3R180 and the
+operator's approval. 330ffa1's file before it, load file `4014e7f1…`, and the 3.0 file `d69742d0…` (9ac55c1) were
+installed and paid from at a test mint on the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21
+(docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md, docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md).
+The firmware a J3R180 ran before it
 was numbered 2.3 (`02 03`, `cashu-javacard-2.3.0.cap`, load file `05c9b847…`), never
 released under a tag.
 

@@ -53,8 +53,8 @@ cd cashucard/applet
 ant cap
 ant cap -Djc.sdk=/path/to/jc305u4_kit   # explicit form
 
-# Output: target/cashu-javacard-3.0.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
-ls -lh target/cashu-javacard-3.0.0.cap
+# Output: target/cashu-javacard-3.1.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
+ls -lh target/cashu-javacard-3.1.0.cap
 ```
 
 The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
@@ -88,11 +88,20 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 3.0 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
+The 3.1 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256), in 173 blocks of 247 bytes, the
+last 1: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `debc0de2…`),
+whose own sha256 is not the CAP's ([Install](#install) gives both). It is the 3.0 file below, with the security review's
+fixes of [D228](DECISIONS.md#d228), and with [D229](DECISIONS.md#d229) (the wait over the limit a rate: two askings a
+limit's worth past the first), [D230](DECISIONS.md#d230) (the second payment's wait 2; the held history 3, the reset by the PIN 4), [D231](DECISIONS.md#d231) to
+[D233](DECISIONS.md#d233) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's
+alone, a first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` at sixteen writes, so
+that it is 245 past again, the place and the size of the 3.0 file. Padded by `sizeTheFile` (below), this exact file has run
+only in a simulator so far, and no card has installed it.
+
+The 3.0 build was **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
 the Method component 34,791), in 173 blocks of 247 bytes, the last 1: the load file
-inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
-not the CAP's ([Install](#install) gives both). Padded by `sizeTheFile` (below), this
-exact file has run only in a simulator so far, and no card has installed it. Its source is
+inside the CAP tracked then (`applet/target/cashu-javacard-3.0.0.cap`, load file `99a66ba7…`). Padded by `sizeTheFile`
+(below), that file ran only in a simulator. Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
@@ -101,9 +110,9 @@ bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md
 settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), the tag's address taken from its install
 parameters ([D227](DECISIONS.md#d227): 455 bytes more, padded back to 245 past by ten more writes, 57 bytes), and the
 security review's fixes of 2026-11-21 ([D228](DECISIONS.md#d228): one set-up bit a unit, the chip's path given up for
-one signature only, `GET_INFO` byte 55 bit 3 clear; three bytes fewer, padded back by two writes in a longer form). Its
-own run, as the checklist below, is still to come, its size first; if the chip refuses its size, it is moved with
-`sizeTheFile` (below). No J3R180 has been given a 3.0 file, and a J3R180 run comes before any release wording
+one signature only, `GET_INFO` byte 55 bit 3 clear; three bytes fewer, padded back by two writes in a longer form). It was
+given to no chip; the 3.1 file above takes its place, and that file's run, as the checklist below, is still to come, its size
+first; if the chip refuses its size, it is moved with `sizeTheFile` (below). No J3R180 has been given a 3.0 file, and a J3R180 run comes before any release wording
 ([D228](DECISIONS.md#d228)). The file before it, 9ac55c1's (load file `d69742d0…`, the same size), went to the
 J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21: what that card did with it is that file's
 history, in [Install](#install) and the checklist below, and says nothing of this one. The other maintainer's 3.0 file before
@@ -113,6 +122,13 @@ file was 41,887, 159 past, six bytes from 153 past, where the chip refused a stu
 41,973) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been created at the first try on the
 J3R310-355 sample card 58206920; a padding to 175 past (41,903 bytes, e2aac64) had its create refused `6F00` once there
 and taken on the same retry ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). refcheck now warns of a size at or near a refused place.
+
+330ffa1's file, from before the merge onto D228 (load file
+`4014e7f1…`, the same size), was installed on the J3R310-355 sample card 58206920 (CPLC ICType D321) at the first try (3 loads,
+15 creates) on 2026-11-21, the waits and the held taps were timed on it, and it was paid from at a test mint, testnut, with
+real signatures and real change verified on the chip
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)): that is that file's history, and says nothing of
+this one.
 
 On 2026-11-13 a J3R180 was given earlier source, numbered 2.3 then, padded to three
 sizes: it installed the files of 33,647 and 35,213 bytes and refused the card's applet in
@@ -465,11 +481,11 @@ gp --list
 
 ## Install
 
-The CAP tracked in this repo is **applet version 3.0**, sha256
-`0b17e232d394a7ce1885dcc395e38d6830cd4abf5097056052174a3f76b4f4a6`
-(`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
+The CAP tracked in this repo is **applet version 3.1**, sha256
+`540ce0a4c6a8d06977bf44f76a57192681fb9d07d18869eeb0fd5f94f3cc4b2b`
+(`applet/target/cashu-javacard-3.1.0.cap`). The load file in it, the bytes a card
 is LOADed with (refcheck's measure, 42,485 bytes), has sha256
-`99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536`: the hash the
+`debc0de28ac1ce35c245504c46b6ff0d9df4cc330b9b4af213e8d8eb22e8b818`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -480,20 +496,20 @@ installing your own build, compare every entry except `META-INF/MANIFEST.MF`
 against the tracked CAP:
 
 ```bash
-# From applet/, after `ant cap` has overwritten target/cashu-javacard-3.0.0.cap
-git show HEAD:applet/target/cashu-javacard-3.0.0.cap > /tmp/tracked.cap
+# From applet/, after `ant cap` has overwritten target/cashu-javacard-3.1.0.cap
+git show HEAD:applet/target/cashu-javacard-3.1.0.cap > /tmp/tracked.cap
 rm -rf /tmp/cap-tracked /tmp/cap-built
 unzip -q /tmp/tracked.cap -d /tmp/cap-tracked
-unzip -q target/cashu-javacard-3.0.0.cap -d /tmp/cap-built
+unzip -q target/cashu-javacard-3.1.0.cap -d /tmp/cap-built
 diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built && echo "same CAP as the tracked one"
 ```
 
 Any output from `diff` means the two CAPs differ; do not install. After
-installing, `SELECT` must answer `03 00` for the card's applet's whole AID (below).
+installing, `SELECT` must answer `03 01` for the card's applet's whole AID (below).
 
 ```bash
 # Load the file and instantiate the opener (gp installs one applet of a file at a time)...
-gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 # ...then create the card's applet from the loaded package
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 # ...then the NFC tag, under the NFC Forum's own name as its instance AID, with the card maker's
@@ -582,7 +598,7 @@ python3 cardctl.py selftest --pin 1234
 # SELECT the card's applet by its whole AID, F0 CASHUCARD 01
 gp --apdu 00A404000BF043415348554341524401
 
-# Response: 0300 9000  (applet version 3.0 + SW_OK = applet responding)
+# Response: 0301 9000  (applet version 3.1 + SW_OK = applet responding)
 # A card that answers 6A82 has no 2.x applet: it is a 0.x or Foxy 1.x card and needs an update.
 # Do not SELECT the package AID alone (00A404000AF0434153485543415244): on the chip that
 # partial name reaches the opener, instantiated first, which answers 9000 with no version
@@ -591,8 +607,8 @@ gp --apdu 00A404000BF043415348554341524401
 # GET_INFO (INS 0x01)
 gp --apdu B0010000
 
-# Response: 03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-#   v3.0 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change owed
+# Response: 03 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+#   v3.1 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change owed
 # SW: 9000
 
 # GET_PUBKEY (INS 0x10)
@@ -638,7 +654,7 @@ gp --delete F04341534855434152444D   # the opener
 gp --delete F0434153485543415244     # the package
 
 # Re-install: the opener first, the tag last, with the maker's address
-gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 \
    --params "$(python3 ../tools/maker/maker.py tag-params)"

@@ -69,7 +69,7 @@ test("select uses the applet's 11-byte AID, F0 CASHUCARD 01, with the 10-byte pa
   assert.deepEqual(constants.APPLET_AID, Buffer.concat([constants.PACKAGE_AID, Buffer.from([0x01])]))
   assert.deepEqual(constants.OLD_AIDS.upstream0x, hex("D2760000850102"))
   assert.deepEqual(constants.OLD_AIDS.foxy1x, hex("F0464F585943415244"))
-  assert.deepEqual(constants.VERSION, { major: 3, minor: 0 }, "SELECT answers 03 00")
+  assert.deepEqual(constants.VERSION, { major: 3, minor: 1 }, "SELECT answers 03 01")
 })
 
 test("the INS of 3.0 (spec/APDU.md, Commands, by INS)", () => {
@@ -790,11 +790,11 @@ test("select tries the applet's whole AID first, falls back to the package AID a
   const sent = []
   const fetch = async (url, init) => {
     sent.push(JSON.parse(init.body).hex)
-    const answer = sent.length === 1 ? { hex: "6A82", sw: "6A82" } : { hex: "03009000", sw: "9000" }
+    const answer = sent.length === 1 ? { hex: "6A82", sw: "6A82" } : { hex: "03019000", sw: "9000" }
     return { ok: true, status: 200, text: async () => JSON.stringify(answer) }
   }
   const sim = new CardSim("http://127.0.0.1:9", { fetch })
-  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
   assert.deepEqual(sent, ["00a404000bf043415348554341524401", "00a404000af0434153485543415244"])
 
   const dead = new CardSim("http://127.0.0.1:9", { fetch: async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ hex: "6A82", sw: "6A82" }) }) })
@@ -805,7 +805,7 @@ test("select tries the applet's whole AID first, falls back to the package AID a
 const chipFetch = sent => async (url, init) => {
   const h = JSON.parse(init.body).hex.toUpperCase()
   sent.push(h)
-  const answer = h === "00A404000BF043415348554341524401" ? { hex: "03009000", sw: "9000" }
+  const answer = h === "00A404000BF043415348554341524401" ? { hex: "03019000", sw: "9000" }
     : h === "00A404000AF0434153485543415244" ? { hex: "9000", sw: "9000" }
     : { hex: "6D00", sw: "6D00" }
   return { ok: true, status: 200, text: async () => JSON.stringify(answer) }
@@ -814,7 +814,7 @@ const chipFetch = sent => async (url, init) => {
 test("on a chip's answers, select reaches the card's applet with its first SELECT, never the opener", async () => {
   const sent = []
   const sim = new CardSim("http://127.0.0.1:9", { fetch: chipFetch(sent) })
-  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
   assert.deepEqual(sent, ["00A404000BF043415348554341524401"])
 })
 
@@ -830,10 +830,10 @@ test("a 9000 with no version falls through to the next AID, and is no answer whe
   const empty = new CardSim("http://127.0.0.1:9", {
     fetch: async (url, init) => {
       sent.push(JSON.parse(init.body).hex)
-      return { ok: true, status: 200, text: async () => JSON.stringify(sent.length === 1 ? { hex: "9000", sw: "9000" } : { hex: "03009000", sw: "9000" }) }
+      return { ok: true, status: 200, text: async () => JSON.stringify(sent.length === 1 ? { hex: "9000", sw: "9000" } : { hex: "03019000", sw: "9000" }) }
     },
   })
-  assert.deepEqual(await empty.select(), { major: 3, minor: 0 })
+  assert.deepEqual(await empty.select(), { major: 3, minor: 1 })
   assert.deepEqual(sent, ["00a404000bf043415348554341524401", "00a404000af0434153485543415244"])
 })
 
@@ -910,7 +910,7 @@ async function setUp(sim, extra = {}) {
   return { P: fresh.pubkey, ...keys }
 }
 
-test("the bridge answers both SELECTs as the chip does: the whole AID 03 00, the package AID the opener's bare 9000", integration, async () => {
+test("the bridge answers both SELECTs as the chip does: the whole AID 03 01, the package AID the opener's bare 9000", integration, async () => {
   const sim = new CardSim(URL)
   await sim.waitReady()
   await sim.reset()
@@ -920,13 +920,13 @@ test("the bridge answers both SELECTs as the chip does: the whole AID 03 00, the
   assert.equal((await sim.apdu(encode.getInfo())).sw, constants.SW.INS_NOT_SUPPORTED, "and refuses the next command")
   const whole = await sim.apdu(encode.select(constants.APPLET_AID))
   assert.equal(whole.sw, constants.SW.OK)
-  assert.deepEqual(whole.data, Buffer.from([3, 0]))
+  assert.deepEqual(whole.data, Buffer.from([3, 1]))
   const info = await sim.getInfo()
-  assert.equal(info.version, "3.0")
+  assert.equal(info.version, "3.1")
   assert.equal(info.keysPerLoad, true, "GET_INFO P1 4 byte 56 bit 1")
   assert.equal(info.profilesRaw, 0xf703, "every profile but the wait on every payment (D228)")
   await sim.apdu(encode.select(constants.PACKAGE_AID))
-  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
 })
 
 test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the owner's changePin → verifyPin; a card with no PIN takes nothing (6A97)", integration, async () => {
@@ -935,8 +935,8 @@ test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the ow
   const fresh = await sim.reset()
   assert.equal(fresh.pubkey.length, 66)
   assert.equal(fresh.slots.length, 128)
-  assert.equal(fresh.version, "3.0")
-  assert.deepEqual(await sim.select(), { major: 3, minor: 0 })
+  assert.equal(fresh.version, "3.1")
+  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
   await assert.rejects(sim.loadProof("0059534ce0bfa19a", 8, "11".repeat(32), pointHex(5)), e => e instanceof CardError && e.sw === constants.SW.NO_PIN)
   await assert.rejects(sim.spendAllBegin([0]), e => e.sw === constants.SW.NO_PIN)
   const state = await sim.fixture({ pin: "1234", mint: "http://m", owner: true, blockedPin: true })

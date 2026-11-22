@@ -5,9 +5,26 @@ One entry per component release, newest first, as
 in the reviewed pull request, and the tag follows the merge. A GitHub release lists
 the merged pull requests besides.
 
+## `firmware-v3.1.0`: Cashu Card protocol 3.1 (not yet tagged)
+
+The tracked CAP is `applet/target/cashu-javacard-3.1.0.cap`, sha256
+`540ce0a4c6a8d06977bf44f76a57192681fb9d07d18869eeb0fd5f94f3cc4b2b`, its load file sha256
+`debc0de28ac1ce35c245504c46b6ff0d9df4cc330b9b4af213e8d8eb22e8b818`. `SELECT` and `GET_INFO` answer `03 01`, and
+`GET_INFO` P1 = 4 bytes 55 and 56 `F7 03` as 3.0's ([D228](DECISIONS.md#d228)). It is
+the 3.0 file below, with the security review's fixes of [D228](DECISIONS.md#d228), and with [D229](DECISIONS.md#d229)
+(the limit on one payment a rate: two askings for every limit's worth past the first, with no larger first step; the
+change's credit one for every two outputs) and [D230](DECISIONS.md#d230) (the second payment in a tap two askings at the
+least; the held history three, the reset by the PIN four), [D231](DECISIONS.md#d231)
+(the set-up's self-tests once a set-up life (until a reset); with D228, `chipMulInit` there is the one writer of the chip
+path's verdict), [D232](DECISIONS.md#d232) (the one-asking claim a blank card's alone) and
+[D233](DECISIONS.md#d233) (a card's first PIN stands as given for the selection that set it). This exact file has run
+only in a simulator so far, and no card has installed it. 330ffa1's file, from before the merge onto D228 (load file
+`4014e7f1…`), was installed on the J3R310-355 sample card 58206920 and paid from at a test mint, testnut, on 2026-11-21
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)).
+
 ## `firmware-v3.0.0`: Cashu Card protocol 3.0 (not yet tagged)
 
-The tracked CAP is `applet/target/cashu-javacard-3.0.0.cap`, sha256
+The CAP was `applet/target/cashu-javacard-3.0.0.cap`, sha256
 `0b17e232d394a7ce1885dcc395e38d6830cd4abf5097056052174a3f76b4f4a6`. Its load file,
 the bytes a card is LOADed with, is 42,485 bytes by `tools/refcheck.py`'s measure,
 sha256 `99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536`. `SELECT`
@@ -19,7 +36,7 @@ since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-This exact file has run only in a simulator so far, and no card has installed it. Its source is
+That file has run only in a simulator, and no card has installed it. Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip

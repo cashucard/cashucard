@@ -160,7 +160,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // within it (change or no change: the phone says change is coming, the card does not), about five
     // seconds over it, and two more for every further limit's worth (`waitsFor`). The work of making the
     // change counts toward it. And one payment a tap at full speed: a second one in the same time in the
-    // field is slowed as one over the limit, unless the owner's grant is in the tap.
+    // field is slowed as one over the limit, unless the owner's grant is in the tap. (3.1 reshapes it: D229, below.)
     // 1.16 makes the PIN optional. A card may have none, and then it pays without one (its limits still hold). A card
     // with a PIN has a third limit, the NO-PIN ALLOWANCE: what it signs for in a day without the PIN, counted in the day's
     // window beside the daily limit; over it the signature is refused with 6A94 and the PIN is asked for the whole payment.
@@ -187,7 +187,15 @@ public class CashuApplet extends Applet implements TagSwitch {
     // slowly, two units on one card, a holder with no phone, keyset keys (KEYSET_KEYS, 0x38), the paid list and the
     // certificate (CERT_WRITE 0x54, CERT_READ 0x1C). spec/APDU.md, "Profiles of 3.0", lists them. It breaks a 2.2
     // reader, so it is a new major and not 2.3: the minor counts from 0 again.
-    static final byte VERSION_MINOR = (byte) 0x00;
+    // 3.1 (D229): the wait over the limit on one payment is WAIT_MORE_SIGNS (two signatures of work, about a second on the J3R310-355 sample card) for
+    // every limit's worth past the first, with no larger first step, where 3.0 waited ten and then four; a second payment in the same
+    // time in the field waits WAIT_SECOND_SIGNS (two, where 3.0 had ten: D230) at the least; two change outputs take one wait off, where
+    // three took two. And the held taps of a card with no owner are shorter (D230): its history 3 askings (7 in 3.0), its reset by the
+    // PIN 4 (17 in 3.0), about 1.5 s and 3.5 s in all with the history's on the J3R310-355 sample card; the owner's claim is as it was.
+    // SET_CARD's self-tests run once a set-up life (until a reset) (D231); the one-asking claim is a blank card's alone (D232); a card's first
+    // PIN stands as given for the selection that set it (D233).
+    // A reader of 3.0 meets nothing new: it asks SPEND_ALL_SIGN until it signs, and is answered sooner. So the minor moves.
+    static final byte VERSION_MINOR = (byte) 0x01;
     static final byte FORMAT        = (byte) 0x04;
     /** GET_INFO byte 8 and GET_CARD byte 0 on a card whose keyset table holds a keyset of the other unit than its own (D184): the secret is format 4's. */
     static final byte FORMAT_UNITS  = (byte) 0x05;
@@ -737,15 +745,18 @@ public class CashuApplet extends Applet implements TagSwitch {
      *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fourth asking, about 2.6 seconds; at the
      *                    first where this first set-up's PIN was set and then its record written in this time in the field
      *                    (TAP_SETUP, D221): SET_CARD's own seconds on the chip are the hold then.
-     *   HISTORY_ASKINGS  GET_LOG, the log or the receipts, under the PIN on a card with no owner: answered at the seventh,
-     *                    about three seconds (2.95 s measured); then open for the rest of the time in the field (TAP_READ).
-     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the seventeenth asking, about eight seconds
-     *                    (8.3 s measured; about eleven in all with the history's seven before it: 24 askings).
+     *   HISTORY_ASKINGS  GET_LOG, the log or the receipts, under the PIN on a card with no owner: answered at the third,
+     *                    about 1.5 seconds (3.1, D230; seven, 2.95 s measured, in 3.0); then open for the rest of the time in the
+     *                    field (TAP_READ): the holder's say for REFRESH, SET_PIN, LET_GO, KEYSET_KEYS, GET_OUTBOX and the reset,
+     *                    and the arming of the no-PIN allowance (D208).
+     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the fourth asking, about two seconds (3.1, D230;
+     *                    seventeen in 3.0); about 3.5 seconds in all with the history's three before it: 7 askings (24 in 3.0).
      *
      * The counts are the project owner's choice of 2026-11-14 (D211), each from the 0.59 to 0.66 s an asking
      * measured on the J3R180 on 2026-11-14 (0.75 s was the first guess, and came out short). An asking is 0.49 to 0.58 s now (D216 made it
      * 0.23 to 0.31 s, and D217 and D218, the split of the product and the check of every signature, added 0.27 s): 4 askings about 2.6 s (the
-     * claim), 7 about 3.0 s (the history), 24 about 11 s (the reset by the PIN: the history's 7 and its own 17). The counts are not changed.
+     * claim), 7 about 3.0 s (the history), 24 about 11 s (the reset by the PIN: the history's 7 and its own 17). 3.1 (D230, the project owner,
+     * 2026-11-21: "a person must not hold a card longer than the protection needs") makes the history 3 and the reset 4; the claim stays 4.
      *
      *   the PIN's wait  VERIFY_PIN on a card with no owner after a wrong try (D195): the askings owed (pinMarks), served
      *                    PIN_STRETCH at a time, each stretch written down as it ends.
@@ -755,12 +766,12 @@ public class CashuApplet extends Applet implements TagSwitch {
      * (`process`).
      */
     static final short CLAIM_ASKINGS   = (short) 4;
-    static final short HISTORY_ASKINGS = (short) 7;
+    static final short HISTORY_ASKINGS = (short) 3;
     static final byte  HELD_HISTORY    = (byte) 0x80;
     static final byte  HELD_PIN        = (byte) 0x40;
     /** A reset of a card with no owner, by its PIN (D196): both marks; its count in the low six bits. */
     static final byte  HELD_RESET      = (byte) 0xC0;
-    static final short RESET_ASKINGS   = (short) 17;
+    static final short RESET_ASKINGS   = (short) 4;
     /** The PIN's wait (D195): the askings of one stretch, the wait that one tap is asked to hold for (about ten seconds). */
     static final short PIN_STRETCH     = (short) 16;
     /** The most askings owed before one try (16,384, about three hours): the wait after the fifteenth wrong try and every later one. */
@@ -1041,18 +1052,25 @@ public class CashuApplet extends Applet implements TagSwitch {
     /** The keys' tree (D190): a leaf is SHA-256(00 || amount || K), a node SHA-256(01 || left || right), a missing leaf SHA-256(02). */
     private static final byte[] TREE = { (byte) 0x00, (byte) 0x01, (byte) 0x02 };
 
-    /** What one limit's worth past the first costs a payment: this many signatures of work, about two seconds on the chip. */
-    // The wait (6a), in signatures of the card's own work (about 0.5 s each on a J3R180 on the reader, 0.6 over NFC: D218 checks every signature):
-    // for the first limit's worth over the limit, and for every further limit's worth. Each change output
-    // made (about 0.23 s) counts as one of them done. Within the limit there is no wait.
-    static final short WAIT_OVER_SIGNS   = (short) 10;
+    // The wait (6a), in signatures of the card's own work (473.6 ms each on the J3R310-355 sample card 58206920 on the reader,
+    // 2026-11-21; D218 checks every signature). 3.1 (D229, the project owner's rule of 2026-11-03, "make the per second limit
+    // true"): every limit's worth past the first costs WAIT_MORE_SIGNS, about a second on that chip, with no larger first step, so
+    // that a limit of L is about L a second (the payment's own signature, about 1.1 s, is the first second). Within the limit there
+    // is no wait. Each two change outputs made (about 0.23 s each) count as one of them done.
+    /** The least a second payment signed in the same time in the field waits (without the owner's grant), limit or no limit (D230,
+     *  the project owner's "a person must not hold a card longer than the protection needs"): two signatures of work, about 0.95 s on
+     *  that chip, where 3.0 waited ten (about 4.7 s). With the payment's own signature (about 1.1 s from its beginning), a reader that has the PIN takes one
+     *  limit's worth in about two seconds a payment: half the holder's rate, never faster. */
+    static final short WAIT_SECOND_SIGNS = (short) 2;
     /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14), and GET_INFO's
-     * byte 55 bit 3 says so (D228). [M1, the other maintainer's floor of WAIT_FLOOR_SIGNS = 4, is closed by D228: D211 stands.] */
-    static final short WAIT_MORE_SIGNS   = (short) 4;
-    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about twelve minutes). */
+     * byte 55 bit 3 says so (D228). [M1, the other maintainer's floor of WAIT_FLOOR_SIGNS = 4, is closed by D228: D211 stands.]
+     * WAIT_SECOND_SIGNS is not that floor: it holds only a second payment in the same time in the field. */
+    /** What each limit's worth past the first costs a payment: this many signatures of work, about 0.95 s on that chip. */
+    static final short WAIT_MORE_SIGNS   = (short) 2;
+    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about four minutes). */
     static final short WAIT_UNITS_MOST = (short) 255;
     /** What 255 limits' worth waits: the most any payment does. */
-    static final short WAIT_SIGNS_MOST = (short)(WAIT_OVER_SIGNS + WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 2));
+    static final short WAIT_SIGNS_MOST = (short)(WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 1));
     /** 10 seconds, big-endian: how close together refusals are one run of them, in the card's own log (6b). */
     private static final byte[] TAP_SECONDS = { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x0A };
 
@@ -1155,6 +1173,9 @@ public class CashuApplet extends Applet implements TagSwitch {
     private SchnorrHW schnorrHW;
     /** Whether the chip's key agreement held to the curve at the last SET_CARD (D212, `SchnorrHW.checksCurve`), worked out there and nowhere else: false until the first. */
     private boolean curveByAgreement;
+    /** The set-up's self-tests have run on this chip and the framing check passed (D231): SET_CARD runs them once a set-up life, at the
+     *  first SET_CARD after the install or after a RESET_CARD, which clears it. */
+    private boolean selfTested;
 
     // -------------------------------------------------------------------------
     // Transient state (RAM, cleared on deselect)
@@ -1263,6 +1284,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte TAP_SETUP   = (byte) 0x10;
     /** A teaching ended in this time in the field (D223): the entries marked ENTRY_FRESH are this time in the field's. */
     static final byte TAP_TAUGHT  = (byte) 0x20;
+    /** This time in the field has had its first command (D232): TAP_HADPIN below is set then, once, and never after. */
+    static final byte TAP_BEGUN   = (byte) 0x40;
+    /** The card had a PIN when this time in the field began (D232): a claim in it is never one asking, whatever came after. */
+    static final byte TAP_HADPIN  = (byte) 0x80;
     private MessageDigest sha;
     /** The hash of the message a payment's one signature is over, kept from SPEND_ALL_BEGIN to SPEND_ALL_SIGN. */
     private MessageDigest shaAll;
@@ -1546,6 +1571,12 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* A PIN whose tries are all gone is blocked, whatever its state byte says: a last wrong try torn after the chip took the
          * try and before failPinCheck wrote 2 is finished here, before anything reads the byte. One byte, written once. */
         if (pinState[0] == (byte) 1 && pin.getTriesRemaining() == 0) pinState[0] = (byte) 2;
+        /* D232: whether the card had a PIN when this time in the field began, read at its first command (a SELECT, on the chip) and
+         * kept for the rest of it: the one-asking claim of a first set-up is a blank card's alone. RAM, gone with the power. */
+        if ((tapOpen[2] & TAP_BEGUN) == 0) {
+            tapOpen[2] |= TAP_BEGUN;
+            if (pinState[0] != (byte) 0) tapOpen[2] |= TAP_HADPIN;
+        }
 
         /* A held tap is the same command asked again and again (`holdOn`: an owner's claim, D187; the history of a card with
          * no owner, D189): anything else, a SELECT among it, begins the count again, and an asking of the one begins the
@@ -3132,9 +3163,10 @@ public class CashuApplet extends Applet implements TagSwitch {
             allState[4] = (byte)(waits > 0 ? 1 : 0);
             /* No floor (D211, the project owner's choice of 2026-11-14: D188's floor is gone): a payment within its limit, the
              * first of its time in the field, is signed at its first SPEND_ALL_SIGN. 2.2's wait stays as it was, less what
-             * the change outputs took, two waits for every three, and never below 0: waits = max(0, W - 2 * outputs / 3).
+             * the change outputs took (D229: one wait for every two; an output is about half a signature's work, 0.23 s against 0.47 s on a
+             * J3R310-355, where 2.2 to 3.0 took two for every three), and never below 0: waits = max(0, W - outputs / 2).
              * [M1 closed by D228: D211 stands, no WAIT_FLOOR_SIGNS - 1 here.] */
-            waits -= (short)((short)((allState[6] & 0xFF) * 2) / 3);
+            waits -= (short)((allState[6] & 0xFF) >> 1);
             if (waits < 0) waits = 0;
             Util.setShort(allState, (short) 2, waits);
         }
@@ -3463,36 +3495,38 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * What the payment costs in time (W; D188's floor is gone, D211): the
      * signatures of work to be done at SPEND_ALL_SIGN before it is signed
-     * (6a), shaped so that a payer can feel that a payment was over the
-     * limit. SPEND_ALL_SIGN takes off what the change
-     * outputs took, two waits for every three: an output is about two thirds
+     * (6a), so that a limit of L on one payment is about L a second (D229).
+     * SPEND_ALL_SIGN takes off what the change
+     * outputs took, one wait for every two: an output is about half
      * of a signature's work, so outputs buy a terminal no wait.
      *
      * With a limit on one payment of L and S leaving the card (`sum`: the
      * pieces less the card's own change): within L (or within a thirty-second
      * over it, see below), nothing, change or no change — that change is
-     * coming is the phone's to say, not the card's; over L, WAIT_OVER_SIGNS
-     * for the first limit's worth over (about five seconds) and
-     * WAIT_MORE_SIGNS for every further one, whole or in part (two seconds
-     * each).
+     * coming is the phone's to say, not the card's; over L, WAIT_MORE_SIGNS
+     * for every limit's worth past the first, whole or in part (about a
+     * second each on the J3R310-355 sample card), with no larger first step: N limits' worth
+     * wait WAIT_MORE_SIGNS x (N - 1). (3.0 waited ten for the first limit's
+     * worth over and four for each after, about 4.7 s and then 1.9 s: D229.)
      *
      * One payment a tap at full speed: a second payment signed in the same
      * time in the field (`second`: one was, and the owner's grant is not in
-     * this tap) is slowed as one over the limit is, limit or no limit. A
+     * this tap) waits at least WAIT_SECOND_SIGNS, limit or no limit. A
      * terminal that has the PIN could otherwise take a limit's worth a second
-     * for as long as the card is held; now each costs it about seven seconds,
-     * or a fresh tap, which asks the PIN again. The owner's phone, which takes
+     * for as long as the card is held; now each costs it at least about two
+     * seconds with its own signature (D230), or a fresh tap, which asks the
+     * PIN again. The owner's phone, which takes
      * a whole card off in more than one signature where its pieces have more
      * than one date, gives its grant first and is not slowed.
      *
      * Nothing is remembered from one payment to the next but that, and no
      * clock is asked, so there is nothing a terminal can replay or reset to
-     * make it less. No limit: 0, or WAIT_OVER_SIGNS for a second payment in
+     * make it less. No limit: 0, or WAIT_SECOND_SIGNS for a second payment in
      * the tap. A sum that wrapped (`carry`) waits the most.
      */
     private short waitsFor(byte[] sum, short sumOff, boolean carry, boolean second) {
         if (isZero(cardRecord, CARD_TAP_LIMIT_OFFSET, (short) 4)) {
-            return second ? WAIT_OVER_SIGNS : (short) 0;
+            return second ? WAIT_SECOND_SIGNS : (short) 0;
         } else {
             if (carry) return WAIT_SIGNS_MOST;
             /* Within the limit, or within a thirty-second over it: a limit set in
@@ -3523,10 +3557,10 @@ public class CashuApplet extends Applet implements TagSwitch {
                 }
                 if (units < WAIT_UNITS_MOST) units++;
             }
-            // a second payment in the tap is at least one over the limit
-            if (second && units <= 1) units = 2;
-            if (units <= 1) return (short) 0;
-            return (short)(WAIT_OVER_SIGNS + WAIT_MORE_SIGNS * (units - 2));
+            // D229: each limit's worth past the first; a second payment in the tap waits WAIT_SECOND_SIGNS at the least
+            short w = (short)(WAIT_MORE_SIGNS * (short)(units - 1));
+            if (second && w < WAIT_SECOND_SIGNS) w = WAIT_SECOND_SIGNS;
+            return w;
         }
     }
     /** a -= b, four bytes each, big-endian; a is not less than b. */
@@ -4588,8 +4622,10 @@ public class CashuApplet extends Applet implements TagSwitch {
             if (pinState[0] != (byte) 0 && pinMarks[PM_FIRST] != (byte) 1) ISOException.throwIt(SW_OWNER_PROOF);
         }
         // the chip's key agreement and point addition answer the check's seventeen points, X and Y, as the signer reads them (6F00
-        // otherwise), before anything is written: a card whose chip answers otherwise is never set up, and so never takes a piece
-        schnorrHW.checkFraming(scratch, X_PT);
+        // otherwise), before anything is written: a card whose chip answers otherwise is never set up, and so never takes a piece.
+        // Once a set-up life (D231): a chip that passed has its verdict kept (`selfTested`) until a RESET_CARD; one that fails is asked
+        // again, and refused, at every SET_CARD, as before
+        if (!selfTested) schnorrHW.checkFraming(scratch, X_PT);
         short dataLen = apdu.setIncomingAndReceive();
         byte[] buf = apdu.getBuffer();
         short at = ISO7816.OFFSET_CDATA;
@@ -4738,11 +4774,16 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         /* and, the record written, whether the chip's key agreement holds a point to the curve (D212): LOAD_PROOF's 04 form is
          * taken only where it does. Last, so that a SET_CARD refused writes nothing of it. */
-        curveByAgreement = schnorrHW.checksCurve();
         /* and whether the chip's RSA holds to the padded moduli (D214: the field's powers over p, D216: the signature's squaring over
-         * n): each is leaned on only where its known answers held, here, and not otherwise. Also after the record. */
-        fieldP = fieldPInit();
-        schnorrHW.chipMul = schnorrHW.chipMulInit();
+         * n): each is leaned on only where its known answers held, here, and not otherwise. Also after the record. Once a set-up
+         * life, at the first SET_CARD after the install or a reset that gets this far (D231): the verdicts are fields, kept, and a
+         * SET_CARD after it writes the record alone. The keys they made stay made (persistent RSA keys). */
+        if (!selfTested) {
+            curveByAgreement = schnorrHW.checksCurve();
+            fieldP = fieldPInit();
+            schnorrHW.chipMul = schnorrHW.chipMulInit();
+            selfTested = true;
+        }
         /* and, last of all, the claim of this first set-up is one asking (D221): its PIN was set in this selection (a PIN on a
          * card with no owner passes the check at the top only in the first set-up) and the record is written now, after the
          * self-tests' seconds of steady contact. A SET_CARD refused, or cut, sets nothing; one before the PIN sets nothing. */
@@ -5343,8 +5384,10 @@ public class CashuApplet extends Applet implements TagSwitch {
              * before the commit, the old PIN and all of the history; after it, the new PIN and none */
             if (spent) pinMarks[PM_FORGET] = (byte) 1;
             JCSystem.commitTransaction();
-            // a new PIN has not been typed yet: any session that had verified the old one is over
-            pinVerifiedFlag[0] = (byte) 0;
+            /* a new PIN has not been typed yet: any session that had verified the old one is over; but a card's first PIN, on a card
+             * that had none (new or reset), was chosen by this reader in this selection, and stands as given for the rest of it (D233:
+             * CLEAR_ON_DESELECT, so a SELECT ends it; a PIN replaced on a card that had one is never given by its SET_PIN) */
+            pinVerifiedFlag[0] = first ? (byte) 1 : (byte) 0;
             // and a set-up it begins has no record written under it yet (D221): its claim is held until its SET_CARD
             if (first) tapOpen[2] &= (byte) ~TAP_SETUP;
             forgetOwed();
@@ -5582,7 +5625,9 @@ public class CashuApplet extends Applet implements TagSwitch {
                 asked = 0;
             }
             // one asking after this set-up's record written under its PIN in this time in the field (D221), CLAIM_ASKINGS otherwise
-            holdOn(buf, (short)(asked + 1), (tapOpen[2] & TAP_SETUP) != 0 ? (short) 1 : CLAIM_ASKINGS, (byte) 0);
+            /* (D232: and only on a card that had no PIN when this time in the field began, a blank card set up in it; a card that had one,
+             * reset in this tap and set up again, holds for every asking) */
+            holdOn(buf, (short)(asked + 1), ((tapOpen[2] & TAP_SETUP) != 0 && (tapOpen[2] & TAP_HADPIN) == 0) ? (short) 1 : CLAIM_ASKINGS, (byte) 0);
         }
         requireOwnerPoint(buf, at);
         if (given) {
@@ -5639,7 +5684,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         // a replacement: nothing the last owner's PIN or grant gave in this tap stands, and its history goes now
         pinVerifiedFlag[0] = (byte) 0;
         loadGrant[0] = (byte) 0;
-        tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED);
+        // (and whether the card had a PIN when the tap began, D232: a reset in the tap never makes it a blank card's)
+        tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED | TAP_BEGUN | TAP_HADPIN);
         forgetOwed();
     }
 
@@ -6245,7 +6291,12 @@ public class CashuApplet extends Applet implements TagSwitch {
         tapOpen[0] = (byte) 0;
         tapOpen[1] = (byte) 0;
         // and the hold and the set-up's record (D221) with the PIN that gave them (the arming it gave went with the record, D208): a new PIN in this selection has no hold it did not ask for
-        tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED);
+        // (and whether the card had a PIN when the tap began, D232: a reset in the tap never makes it a blank card's)
+        tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED | TAP_BEGUN | TAP_HADPIN);
+        /* and the set-up's self-tests are asked again at the next SET_CARD (D231, amended): a verdict a fault planted at the set-up
+         * life's first SET_CARD (SchnorrHW.chipMul or curveByAgreement false, or either true where the chip had failed) does not
+         * outlive a reset and a hand-over to the next holder. A signature never writes chipMul (D228): chipMulInit is its one writer. */
+        selfTested = false;
     }
 
     /**
@@ -7391,7 +7442,11 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.0 with D228's review fixes (one set-up bit a unit, the chip's path given up for one signature only, byte 55 bit 3
+        /* 3.1 (D229 to D233, on 3.0 with D228's review fixes): sixteen writes, 81 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the size and the
+         * place of 330ffa1's 3.1 file (load file 4014e7f1..., fifteen writes, 78 bytes, from 42,407 unpadded), which the J3R310-355
+         * sample card 58206920 installed at the first try (3 loads, 15 creates) on 2026-11-21: what that chip did with other
+         * source of this size, not this file. This source came to 42,404 unpadded (164 past, a place a chip refused before).
+         * 3.0 with D228's review fixes (one set-up bit a unit, the chip's path given up for one signature only, byte 55 bit 3
          * clear): twenty-five writes here, two of them moved to a longer form (an index over 127, an index past sconst's), 146
          * bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256; with the writes as 9ac55c1 had them it came to
          * 42,482 (242 past), three bytes under 9ac55c1's. That is the size and the place of 9ac55c1's file (load file d69742d0..., D227's tag address at
@@ -7411,30 +7466,21 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the sizes not to be shipped untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
-        a[6] = 16;
         a[1] = 11;
         a[2] = 12;
         a[3] = 13;
         a[4] = 14;
         a[5] = 15;
-        a[10] = 20;
-        a[11] = 21;
-        a[12] = 22;
-        a[13] = 23;
-        a[14] = 24;
-        a[15] = 25;
-        a[16] = 26;
-        a[17] = 27;
-        a[18] = 28;
-        a[19] = 29;
-        a[20] = 30;
-        a[21] = 31;
-        a[22] = 32;
-        a[23] = 33;
+        a[1] = 1;
+        a[2] = 2;
         a[24] = 34;
         a[25] = 35;
         a[26] = 36;
         a[27] = 37;
-        a[136] = 50;
+        a[3] = 41;
+        a[5] = 5;
+        a[28] = 38;
+        a[0] = 10;
+        a[0] = 0;
     }
 }

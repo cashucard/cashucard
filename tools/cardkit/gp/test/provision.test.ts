@@ -570,12 +570,12 @@ describe('provision: the Cashu card', () => {
     assertInstalled(card);
   });
 
-  it('leaves alone a card applet of a version this kit does not know (2.0, 2.3, 2.4, 3.1, 4.0), even empty and with replace on', async () => {
+  it('leaves alone a card applet of a version this kit does not know (2.0, 2.3, 2.4, 3.2, 4.0), even empty and with replace on', async () => {
     for (const version of [
       [2, 0],
       [2, 3],
       [2, 4],
-      [3, 1],
+      [3, 2],
       [4, 0],
     ] as const) {
       const card = new FakeCard();

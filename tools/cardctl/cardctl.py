@@ -145,7 +145,7 @@ PIN_STATE_NAMES = {0: "none", 1: "set", 2: "blocked"}
 SELFTEST_MIN_VERSION = (2, 1)
 # The versions selftest knows, and so passes: a later minor of a major it knows,
 # or a later major, is not passed on trust.
-SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0))
+SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0), (3, 1))
 # The majors cardctl speaks outside the card file tools: those of SELFTEST_VERSIONS.
 PROTOCOL_MAJORS = tuple(sorted({v[0] for v in SELFTEST_VERSIONS}))
 # The versions cardctl drives a card as (`driven_as`, `connect`): those selftest knows, and 2.0, the release D26
@@ -279,6 +279,8 @@ FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
 # the seventeenth asking after the history's seven (24 askings, about 11 s in all), D211: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D211 measured it).
+# 3.1 (D230) answers the history at the third asking and resets at the fourth (7 askings, about 3.5 s in all): these bounds are
+# 3.0's, the most any card asks for, and a 3.1 card answers before them.
 LOG_HOLD_MOST = 7
 RESET_MOST = 17
 RESET_CONFIRM_BYTE = 0xAD
@@ -616,7 +618,7 @@ class Card:
             f"SELECT failed: {last}\n"
             "No 2.0 applet answers on this card. A card on the 0.x or Foxy 1.x applet needs an\n"
             "update (sweep it first, then reinstall: docs/HARDWARE_DEPLOYMENT.md):\n"
-            "  applet/target/cashu-javacard-3.0.0.cap"
+            "  applet/target/cashu-javacard-3.1.0.cap"
         )
 
     # ── read commands ─────────────────────────────────────────────────────────

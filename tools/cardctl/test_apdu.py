@@ -1055,7 +1055,7 @@ def test_selftest_fails_a_blocked_pin_and_names_the_owners_change_pin():
 
 
 def test_selftest_fails_a_card_of_a_version_it_does_not_know():
-    for version in ((1, 20), (0, 6), (2, 0), (2, 3), (3, 1), (4, 0)):
+    for version in ((1, 20), (0, 6), (2, 0), (2, 3), (3, 2), (4, 0)):
         rc, out = run_selftest(FakeApplet(version=version, pin_state=0))
         assert rc == 1, (version, out)
         assert "FAIL  SELECT applet" in out, out
@@ -1071,12 +1071,13 @@ def test_select_verdict_passes_only_2_1_2_2_and_3_0():
     assert cardctl._select_verdict(bytes([2, 1])) == (True, "version 2.1")
     assert cardctl._select_verdict(bytes([2, 2]))[0] is True
     assert cardctl._select_verdict(bytes([3, 0])) == (True, "version 3.0")
+    assert cardctl._select_verdict(bytes([3, 1])) == (True, "version 3.1")
     # 2.0 is the v2.0.0 release, whose day a payment of nothing rolled (D26): swept and reinstalled
     for version in (bytes([2, 0]), bytes([1, 20]), bytes([0, 6])):
         ok, detail = cardctl._select_verdict(version)
         assert ok is False and "not protocol 2.1, 2.2 or 3.0" in detail and "reinstall the tracked CAP" in detail, detail
     # a later minor of a major this tool knows, or a later major, is a version it does not know: refused, not passed
-    for version in (bytes([3, 1]), bytes([4, 0])):
+    for version in (bytes([3, 2]), bytes([4, 0])):
         ok, detail = cardctl._select_verdict(version)
         assert ok is False and "a version this cardctl does not know" in detail, detail
     # a 2.x above 2.2 is no release: 02 03 is 3.0's wire before its renumbering (D205), said as such
@@ -1512,8 +1513,8 @@ class FirstSetUpCard(Card23):
     RESET_CARD are held for as many askings as the applet holds them (test_the_mocks_held_askings_are_the_applets).
     """
 
-    HISTORY_ASKINGS = 7   # CashuApplet.HISTORY_ASKINGS (D211): GET_LOG answers at the seventh asking in a row
-    RESET_ASKINGS = 17    # CashuApplet.RESET_ASKINGS (D211): RESET_CARD resets at the seventeenth
+    HISTORY_ASKINGS = 3   # CashuApplet.HISTORY_ASKINGS (D230; 7 in 3.0, D211): GET_LOG answers at the third asking in a row
+    RESET_ASKINGS = 4     # CashuApplet.RESET_ASKINGS (D230; 17 in 3.0, D211): RESET_CARD resets at the fourth
 
     def __init__(self, factory=None, refuse=None, lift_at=None):
         super().__init__(has_owner=False, refund=False, pin_state=0)
@@ -2102,7 +2103,7 @@ def test_reset_by_the_pin_holds_the_history_then_seventeen_askings_and_frees_the
     code, out, err = _run(card, ["reset", "--pin", "1234", "--yes"])
     assert code == 0 and conn.pin_state == 0 and conn.record is None, (out, err)
     ins = [a[1] for a in conn.sent[-80:] if a[:2] != b"\x00\xA4"]
-    assert ins.count(cardctl.INS_GET_LOG) == 7 and ins.count(cardctl.INS_RESET_CARD) == 17, ins
+    assert ins.count(cardctl.INS_GET_LOG) == FirstSetUpCard.HISTORY_ASKINGS and ins.count(cardctl.INS_RESET_CARD) == FirstSetUpCard.RESET_ASKINGS, ins
     assert all(a[2:4] == b"\x00\xAD" and len(a) == 4 for a in conn.sent if a[1] == cardctl.INS_RESET_CARD)
     conn.refuse = {}
     card.select()
@@ -2131,7 +2132,7 @@ def test_reset_by_the_pin_takes_an_anchor_in_every_asking_and_checks_its_work_fi
     code, out, err = _run(card, ["reset", "--pin", "1234", "--yes", "--anchor", _ANCHOR.hex()])
     assert code == 0 and conn.pin_state == 0 and getattr(conn, "anchored_at", None) == _ANCHOR, (out, err)
     resets = [a for a in conn.sent if a[1] == cardctl.INS_RESET_CARD]
-    assert len(resets) == 17 and all(a[2:5] == b"\x00\xAD\x50" and a[5:85] == _ANCHOR for a in resets), resets[:1]
+    assert len(resets) == FirstSetUpCard.RESET_ASKINGS and all(a[2:5] == b"\x00\xAD\x50" and a[5:85] == _ANCHOR for a in resets), resets[:1]
     bad_work = bytearray(_ANCHOR)
     bad_work[76] ^= 0x01
     for anchor, hardest, word in ((bytes(bad_work), bytes(4), "work"), (_ANCHOR, bytes.fromhex("00010017"), "quarter")):
@@ -2270,7 +2271,7 @@ def test_the_holders_refresh_gives_the_pin_holds_the_history_and_sends_the_heade
     code, out, err = _run(card, ["refresh", "--pin", "1234", "--header", _ANCHOR.hex()])
     assert code == 0 and getattr(conn, "refreshed", None) == _ANCHOR, (out, err)
     ins = [a[1] for a in conn.sent if a[:2] != b"\x00\xA4"]
-    assert ins[0] == cardctl.INS_VERIFY_PIN and ins.count(cardctl.INS_GET_LOG) == 7 and ins[-1] == cardctl.INS_REFRESH, ins
+    assert ins[0] == cardctl.INS_VERIFY_PIN and ins.count(cardctl.INS_GET_LOG) == FirstSetUpCard.HISTORY_ASKINGS and ins[-1] == cardctl.INS_REFRESH, ins
     refresh = [a for a in conn.sent if a[1] == cardctl.INS_REFRESH][0]
     assert refresh[2:5] == b"\x01\x00\x50" and refresh[5:85] == _ANCHOR, refresh.hex()
 
@@ -2357,7 +2358,7 @@ def test_a_fresh_card_is_reset_with_an_anchor_its_pin_set_for_the_reset_alone():
     assert code == 0 and conn.pin_state == 0 and getattr(conn, "anchored_at", None) == _ANCHOR, (out, err)
     ins = [a[1] for a in conn.sent[sent:] if a[:2] != b"\x00\xA4"]
     assert ins.index(cardctl.INS_SET_PIN) < ins.index(cardctl.INS_VERIFY_PIN) < ins.index(cardctl.INS_GET_LOG), ins
-    assert ins.count(cardctl.INS_RESET_CARD) == 17, ins
+    assert ins.count(cardctl.INS_RESET_CARD) == FirstSetUpCard.RESET_ASKINGS, ins
     card.select()
     assert _run(card, _setup_args())[0] == 0 and conn.has_owner
 
@@ -3678,7 +3679,7 @@ def test_connect_takes_every_minor_of_3_as_3_0_and_the_known_versions_as_before(
             assert err == "", err
             assert got.at_least(3, 0) == (answer[0] == 3)
     assert cardctl.driven_as(b"\x03\x01") == (3, 1) and cardctl.driven_as(b"\x02\x03") is None
-    assert cardctl._select_verdict(b"\x03\x01")[0] is False
+    assert cardctl._select_verdict(b"\x03\x01")[0] is True and cardctl._select_verdict(b"\x03\x02")[0] is False
     for answer in (b"\x04\x00", b"\x01\x14"):
         for command in ("load", "info"):
             got, _, _ = _connect_with(answer, command)

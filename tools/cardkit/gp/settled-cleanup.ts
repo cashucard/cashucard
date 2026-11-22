@@ -77,7 +77,7 @@ const send = async (tx: Transceiver, a: number[]) => {
  * 04, or on a 3.0 card 05 when it holds keysets of both units; a 3.0 card's byte 29, the change owed, is 00 or 01.
  */
 function info(data: number[], selected: readonly number[]) {
-  const v30 = selected[0] === 3 && selected[1] === 0;
+  const v30 = selected[0] === 3 && (selected[1] === 0 || selected[1] === 1);
   if (
     data.length !== 30 ||
     !equal(data.slice(0, 2), selected) ||

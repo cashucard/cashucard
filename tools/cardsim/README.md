@@ -4,7 +4,7 @@
 # cardsim: the 3.0 card over loopback HTTP
 
 The real `CashuApplet` (protocol 3.0, AID `F0 43 41 53 48 55 43 41 52 44 01`,
-`SELECT` answers `03 00`) in jCardSim, behind a small HTTP API. flash-pos and
+`SELECT` answers `03 01`) in jCardSim, behind a small HTTP API. flash-pos and
 flash-mobile run it in their e2e jobs, pinned by `CASHU_JAVACARD_REF`. **This file
 is that contract**: the four routes, the `/fixture` schema, the `/state` fields and
 the Node client. A change to any of them is a change for both apps, so it is made
@@ -191,7 +191,7 @@ neither; an app that has given the PIN in its tap sees them.
 |---|---|
 | `generation` | goes up on every reset and fixture, so a test can tell its card from one another run left |
 | `deterministicKey` | always `true`: the card key P, never the keys per date |
-| `version` | `"3.0"` |
+| `version` | `"3.1"` |
 | `pubkey` | the card key P, 33 bytes compressed: for `AUTH` and a certificate, never to lock ecash to |
 | `balance` | the card's unit in unspent pieces |
 | `pinState`, `tries`, `locked` | `0` no PIN, `1` set, `2` blocked; tries left (on a card with no owner the chip's counter); the owner's lock |
@@ -223,7 +223,7 @@ the same bytes on the wire as `tools/cardctl/cardctl.py`.
 
 | Method | Command | 3.0 |
 |---|---|---|
-| `select()` | `SELECT` | answers `{major: 3, minor: 0}` |
+| `select()` | `SELECT` | answers `{major: 3, minor: 1}` |
 | `getInfo(p1 = 4)` | `GET_INFO` | P1 4 by default: 59 bytes, parsed with `keysetTable`, `rate`, `entries`, `unmarked`, `lastUnit`, `noPinWindowStart`, `profiles`, `keysPerLoad`, `loadsLeft`; byte 29 is `changeOwed` |
 | `getCard()` | `GET_CARD` | 109 bytes and the mint, with `noPinWindowStart` and `noPinWindow` |
 | `getCardSecret(E?)` | `GET_CARD` P1 3 | c, sealed (the raw answer), after `getNonce(1)` |
@@ -265,7 +265,7 @@ curl -s -X POST localhost:9876/reset | jq -r .pubkey      # P: for AUTH, never t
 curl -s -X POST localhost:9876/fixture -d '{"pin": "1234", "mint": "http://127.0.0.1:3338", "owner": true,
   "anchor": "<the tip header, 80 bytes>"}' | jq '{hasOwner, pinState}'
 # the card's key for the date 0: SELECT, VERIFY_PIN, GROUP_KEYS (t, P + t*G, R + u*G)
-curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"03009000",…}
+curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"03019000",…}
 curl -s -X POST localhost:9876/apdu -d '{"hex":"B04000000431323334"}'
 curl -s -X POST localhost:9876/apdu -d '{"hex":"B01D0000040000000062"}'               # bytes 32 to 64: P + t*G
 # mint pieces to that key at your mint (format-4 SIG_ALL secrets, NUT-CCP's card proofs), then:
@@ -321,7 +321,7 @@ shape (an 8-byte id, no fee) and against a fresh v2 keyset (a 33-byte id, a fee 
 For flash-pos and flash-mobile, before either moves its `CASHU_JAVACARD_REF` pin
 past this change (both pins move together, with the app changes below):
 
-- **`SELECT` answers `03 00`**, `/state.version` is `"3.0"`. The major moves
+- **`SELECT` answers `03 01`**, `/state.version` is `"3.1"` (3.1, D229 and D230: the waits; `03 00` before). The major moves
   ([D205](../../docs/DECISIONS.md#d205)): an app that takes only major 2 answers this
   card with "needs an update" until it takes major 3.
 - **Lock pieces to the card's key for their date, never to `/state.pubkey`.** Read
