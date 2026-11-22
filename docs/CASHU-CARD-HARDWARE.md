@@ -114,7 +114,10 @@ first on 2026-10-14, and `cardctl selftest` passed 12 of 12
 ([report](reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)).
 
 The 3.0 file of the merge (e2aac64), padded to 41,903 bytes by refcheck's measure
-(175 past a multiple of 256), was given to the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-19: the card
+(175 past a multiple of 256), was given to the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-19, a
+J3R180 keyed for SCP03 according to the card's supplier: its ATR's historical bytes read J3R310-355 and it is keyed for
+SCP03 (AES), where the earlier J3R180 cards 09312320, 09301220 and 09336320 are keyed for SCP02. No datasheet says so; the
+evidence this repository holds is the chip type both kinds report, ICType D321 ([D229](DECISIONS.md#d229)). The card
 applet's create answered `6F00` once, and the same create, sent again with nothing
 changed, was taken. The install path is the same, line for line, as that of the
 tag's 2.3 file 190c5ab, 41,205 bytes (245 past), which the same card has created
@@ -128,8 +131,10 @@ bytes (188 past) and is padded to 245 past again: 42,485
 bytes, which the J3R310-355 sample card 58206920 installed 13 times of 13 at the first try on 2026-11-21 and then paid
 from at a test mint ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). With the security
 review's fixes ([D228](DECISIONS.md#d228)) the file came to 42,482 bytes (242 past), and two writes in a longer form
-pad it back to 42,485, 245 past: a file no chip has been given. No J3R180 has been given a 3.0 file; every place above
-past 41,205 bytes was measured on that J3R310-355, not on a J3R180.
+pad it back to 42,485, 245 past: a file no chip has been given. Every place above past 41,205 bytes was measured on that
+card, a J3R180 keyed for SCP03, and not on a J3R180 keyed for SCP02. No J3R180 keyed for SCP02 has been given a 3.0 file,
+and none will be: according to the supplier the chip's manufacturer has retired that keying, and new J3R180 stock is
+keyed for SCP03. The run owed before any release wording is this file (load file `99a66ba7…`) on a J3R180 keyed for SCP03.
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build

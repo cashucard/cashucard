@@ -8631,7 +8631,7 @@ recognises the card at the background read itself.
 - **The state.** `#new` (no owner, or no record) against a code: whether a card is set up. A set-up card's file is 71 bytes,
   a new card's 26, so the lengths say the same; nothing else is in either.
 - **The switch.** A card whose owner switched the tag off refuses the tag's name. The simulator answers `6999`; the J3R310-355 sample
-  card 58206920 answered `6A82` (the chip run of 2026-11-19, check 4; not a J3R180, [D228](#d228)), the answer for a name the card does not hold. Either way a reader
+  card 58206920 answered `6A82` (the chip run of 2026-11-19, check 4; a J3R180 keyed for SCP03 according to the card's supplier, [D229](#d229)), the answer for a name the card does not hold. Either way a reader
   learns that this card's tag is off, one bit shared by every card so switched, and `GET_INFO` P1 = 2 byte 42 says it to
   any reader too: the switch is not a privacy setting, and the app does not offer it as one.
 - **Timing.** A set-up card's selection does the code's work (about 45 ms measured on a J3R180: a whole tag read takes about
@@ -8680,7 +8680,7 @@ through the same unexported shareable interface as the switch (`TagSwitch.tagCod
 card's applet, on a card with an owner and a record, draws R, works K out from c and M from K and R, and keeps R and M in
 24 bytes of its own working memory (`scratch`, CLEAR_ON_DESELECT; the card's applet also clears the 24 bytes at its own `select`, for a chip
 that does not clear that memory when the tag, an applet of the same package, is selected after it. The J3R310-355 sample
-card 58206920 of the chip run of 2026-11-19 (not a J3R180, [D228](#d228)) does clear it: a tag read between
+card 58206920 of the chip run of 2026-11-19 (a J3R180 keyed for SCP03 according to the card's supplier, [D229](#d229)) does clear it: a tag read between
 `SPEND_ALL_BEGIN` and `SPEND_ALL_SIGN` ended the payment, and SIGN answered `6985` with nothing spent, an inference from
 the payment's end and not a read of the memory. The applet comment at `tagCode`, which said the opposite, is corrected by
 D228); the room
@@ -9010,7 +9010,7 @@ addresses. A reader that recognised its card by the address alone now misses eve
 `READ BINARY` of a coded file puts the code at the end of the APDU buffer, so the answer stops 24 bytes short of the buffer's
 length (237 on a 261-byte buffer, more than the largest file). No transient memory is added. The load file grew by 455 bytes,
 to 42,428 (188 past a multiple of 256), and `sizeTheFile` pads it to 42,485, 245 past, the place of the 3.0
-file before it, which the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03; not a J3R180, [D228](#d228)) created 30
+file before it, which the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03; a J3R180 keyed for SCP03 according to the card's supplier, [D229](#d229)) created 30
 times of 30 at the first try. The new file (9ac55c1's, load file `d69742d0…`) installed 13 times of 13 at the first try on
 that J3R310-355 on 2026-11-21, with the tag's install parameters, its refusals and a
 127-byte address checked, and the same day paid from at testnut with real signatures and real change verified on the chip
@@ -9077,6 +9077,8 @@ They now name it as it is; the J3R180s 09301220, 09312320 and 09336320 stay J3R1
 and a J3R180 run comes before any release wording. refcheck's SIZES entries 41,205, 41,973 and 42,485 are that
 J3R310-355's.
 
+*Corrected by [D229](#d229): card 58206920 is a J3R180 keyed for SCP03, according to the card's supplier.*
+
 **(7) Smaller corrections.** D222's "bytes no command of its own uses" and the applet's comment at `tagCode`, which said
 the chip does not clear the scratch at the tag's selection, are corrected (applet-tag-maker-6, pr-spec-design-7). The
 cardctl mock's held askings are the applet's `HISTORY_ASKINGS` (7) and `RESET_ASKINGS` (17), read from the source by a
@@ -9093,3 +9095,42 @@ unchanged. 9ac55c1's file (load file `d69742d0…`) stays on PROVEN as that file
 `SetUpEntriesTest`, `SignHardeningTest`, `SignatureCheckTest`, `CashuAppletTest`, `TagTest`, cardsim's byte 55;
 `tools/cardctl/test_apdu.py` (the mock's counts against the applet's); `tools/maker/test_maker.py`;
 `tools/ci/refcheck.test.cjs`.
+
+## <a id="d229"></a>D229: Card 58206920 is a J3R180 keyed for SCP03; no 3.0 file goes to a J3R180 keyed for SCP02
+
+**Decided (protocol 3.0, 2026-11-21, the project owner; corrects [D228](#d228) (6)).** D228 (6) said that card 58206920,
+labelled the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), is not a J3R180; that no J3R180 had been given a
+3.0 file; that a J3R180 run came before any release wording, meaning a run on the bench cards keyed for SCP02; and that
+refcheck's SIZES entries 41,205, 41,973 and 42,485 were another chip's. The guides, the notes on that card in
+[D222](#d222) and [D227](#d227), and refcheck's `OTHER_CHIP` table said the same. Before D228 the guides had called the
+card a J3R180.
+
+**What the supplier says.** According to the card's supplier, as the other maintainer passed it on, card 58206920 is a
+J3R180. Its ATR's historical bytes read J3R310-355, and it is keyed for SCP03 (AES), where the earlier J3R180 cards
+09312320, 09301220 and 09336320 are keyed for SCP02. The chip's manufacturer has retired the SCP02 keying, and new J3R180
+stock is keyed for SCP03. No datasheet seen here says so. The one piece of evidence this repository holds is the chip type:
+both kinds of card report ICType D321.
+
+**The decisions.**
+
+1. Card 58206920 is a J3R180 keyed for SCP03. Its runs of 2026-11-19 and 2026-11-21 are J3R180 evidence, of the SCP03
+   kind. Its label stays as the reports give it, and the docs say beside it: a J3R180 keyed for SCP03 according to the
+   card's supplier.
+2. No 3.0 file will be tried on a J3R180 keyed for SCP02. None has been given one, and none is planned: the keying is
+   retired, so the cards a 3.0 release meets are keyed for SCP03.
+3. The run still owed before any release wording is the tracked file (load file `99a66ba7…`, 42,485 bytes, built on
+   2026-11-21 and run only in a simulator) on a J3R180 keyed for SCP03.
+
+**refcheck.** `OTHER_CHIP` is now `SCP03_ONLY`. For a file of 41,205, 41,973 or 42,485 bytes refcheck prints "a size
+known to install on a J3R180 keyed for SCP03 (card 58206920); no J3R180 keyed for SCP02 has been given a file of this
+size." The two keyings stay apart: each size was measured on one kind, never on both. PROVEN, INSTALLED and SIZES are
+unchanged, and the tracked file stays untried.
+
+**Still unproven.** That the two kinds are one chip with two keyings rests on the supplier's word and the shared ICType,
+not on a datasheet. That a size measured on one keying installs on the other. Anything at all on the tracked file, on any
+card.
+
+**Changed.** The README, `CASHU-CARD-HARDWARE.md`, `HARDWARE_DEPLOYMENT.md`, `COMPONENT-RELEASES.md`,
+`RELEASE-NOTES.md`, `SECURITY-MODEL.md`, the provisioner's README, `AGENTS.md`, `tools/refcheck.py` and
+`tools/ci/refcheck.test.cjs`. The applet's comments that repeat D228 (6)'s words are left as they are, for a later
+change to the applet's source.

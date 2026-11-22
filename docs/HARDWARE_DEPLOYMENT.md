@@ -103,9 +103,11 @@ parameters ([D227](DECISIONS.md#d227): 455 bytes more, padded back to 245 past b
 security review's fixes of 2026-11-21 ([D228](DECISIONS.md#d228): one set-up bit a unit, the chip's path given up for
 one signature only, `GET_INFO` byte 55 bit 3 clear; three bytes fewer, padded back by two writes in a longer form). Its
 own run, as the checklist below, is still to come, its size first; if the chip refuses its size, it is moved with
-`sizeTheFile` (below). No J3R180 has been given a 3.0 file, and a J3R180 run comes before any release wording
-([D228](DECISIONS.md#d228)). The file before it, 9ac55c1's (load file `d69742d0…`, the same size), went to the
-J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-21: what that card did with it is that file's
+`sizeTheFile` (below). That run, on a J3R180 keyed for SCP03, is owed before any release wording
+([D229](DECISIONS.md#d229)). No J3R180 keyed for SCP02 has been given a 3.0 file, and none will be: according to the
+card's supplier the chip's manufacturer has retired that keying, and new J3R180 stock is keyed for SCP03. The file before
+it, 9ac55c1's (load file `d69742d0…`, the same size), went to the J3R310-355 sample card 58206920 (ATR; ICType D321,
+SCP03), a J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-21: what that card did with it is that file's
 history, in [Install](#install) and the checklist below, and says nothing of this one. The other maintainer's 3.0 file before
 the merge (37,413 bytes, 37 past) was never given to a chip either. `sizeTheFile` pads it by twenty-five writes, two of
 them in a longer form, 146 bytes, from 42,339 (99 past; 9ac55c1's file was 42,342 unpadded, 102 past, and before D227 the
@@ -415,8 +417,8 @@ clock (no real header makes either), tears, a phone and a production mint ([the
 hardware report](reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The tracked
 file is that day's source with the version moved to 3.0 ([D205](DECISIONS.md#d205)) and
 D206 to D210 added. The tracked file since is that source with D211 to D228 (above); no chip has been given
-it. 9ac55c1's file before it (D211 to D227, load file `d69742d0…`) went to the J3R310-355 sample card 58206920 at
-testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
+it. 9ac55c1's file before it (D211 to D227, load file `d69742d0…`) went to the J3R310-355 sample card 58206920, a
+J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), at testnut ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
 
 > **Three applets, installed in order.** The chip refuses the card's applet as the
 > first instantiated from its package (no answer, or `6F00`); it takes it once a
@@ -842,7 +844,7 @@ in that week, as no reader's header moves the clock back; and the sealed `VERIFY
 ran once, after the run, while `selftest` ran before and after. The run of 2026-11-14
 (above) did them all for the file before D211, numbered 2.3 then (`f216644a…`), but the owner's
 reset of a locked card, which would lock the bench card for good; `INBOX` for last week
-was read after a reset by the PIN anchored in that week. The run on the 3.0 file of the merge
+was read after a reset by the PIN anchored in that week. The run on the 3.0 file of the merge, on a J3R180 keyed for SCP03 ([D229](DECISIONS.md#d229)),
 is to do them all again, and the size first. Write the sha256 of every file sent to the chip in the
 run's log.
 
@@ -857,7 +859,7 @@ run's log.
   refused and leaves no tag (`gp --list` shows none at `D2760000850101`), and the
   card's applet still answers; the tag installed again with an address works. A
   phone reads the tag and offers the address.
-  - 2026-11-21, 9ac55c1's file (load file `d69742d0…`, not the tracked one), J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
+  - 2026-11-21, 9ac55c1's file (load file `d69742d0…`, not the tracked one), J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's supplier ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)):
     [x] `C9` and the address in `gp -d`; [x] n + 56 and `#new`; [x] the coded address whole and in pieces of 59, its M
     under the owner's c; [x] `C9 00`, a short install and one with no length each `6A80`, no tag, the card's applet
     answering; [x] 127 bytes, then `https://getfoxy.io/card`; [ ] a phone's read, left for the keeper.
