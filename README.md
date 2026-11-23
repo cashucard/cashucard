@@ -98,10 +98,10 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > ([D229](docs/DECISIONS.md#d229)). The tracked file adds [D236](docs/DECISIONS.md#d236)'s review fixes (42,741 bytes,
 > load file sha256 `b2afa9a8…`): on 2026-11-23 the same card installed it at the first try and paid from it at a test mint
 > with real signatures and real change verified on the chip
-> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same report gives the
-> contributor's account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220); their
-> logs were added after the review ([the logs](docs/reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and until the owner has read them those two runs
-> are not counted ([D237](docs/DECISIONS.md#d237)). 3.0 is not
+> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same day the same file
+> installed and was paid from at a test mint on card 36813121, a J3R452, and on card 09334220, a J3R180 keyed for SCP02;
+> the owner counts those two runs on the contributor's logs, whose gaps [D238](docs/DECISIONS.md#d238) lists
+> ([the logs](docs/reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)). 3.0 is not
 > released: the first released card version is 3.1 ([D237](docs/DECISIONS.md#d237)). The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
