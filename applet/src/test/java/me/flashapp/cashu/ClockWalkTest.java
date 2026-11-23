@@ -32,8 +32,9 @@ import java.util.regex.Pattern;
  * header begins a new day and a new daily limit. Real headers come once a day for free (the network makes them), so a
  * till kept the card's PIN and a phone's worth of headers takes a limit a day for as long as it holds the card, and a
  * no-PIN reader takes the no-PIN allowance a day. 2.0 bounds both: the window rolls at most `rollBudget` times between
- * the owner's REFRESHes (default 7), the allowance begins again only once per arming (a PIN or an owner's proof), and a
- * card whose owner was set with a header never runs at now = 0.
+ * the owner's REFRESHes (default 7), and a card whose owner was set with a header never runs at now = 0. 3.0 (D186) gives
+ * the allowance a window of its own, which begins again only once per arming (an owner's proof, or on a card with no
+ * owner a held tap; the PIN alone arms nothing).
  *
  * Every header here is a real mainnet header (spec/vectors/headers.json), held to the floor built into the applet:
  * nothing a test mines is accepted, which is the point.
@@ -42,6 +43,7 @@ class ClockWalkTest {
 
     static final byte CLA = CashuAppletTest.CLA;
     static final int SW_OK = CashuAppletTest.SW_OK;
+    static final int SW_GRANT = CashuAppletTest.SW_GRANT;
     static final byte INS_REFRESH = 0x53;
 
     /** The mainnet headers, oldest first, and their times. */
@@ -70,11 +72,13 @@ class ClockWalkTest {
     }
 
     private CardSimulator sim;
+    private CashuAppletTest.ExposedRuntime runtime;
 
     @BeforeEach
     void install() {
         CashuAppletTest.useTheRealFloor();
-        sim = new CardSimulator(new CashuAppletTest.ExposedRuntime());
+        runtime = new CashuAppletTest.ExposedRuntime();
+        sim = new CardSimulator(runtime);
         sim.installApplet(AIDUtil.create(CashuAppletTest.AID_HEX), CashuApplet.class);
         assertEquals(SW_OK, select());
     }
@@ -86,7 +90,7 @@ class ClockWalkTest {
 
     // ---- what a terminal and a phone send ----------------------------------------------------------------------------
 
-    private ResponseAPDU send(CommandAPDU c) { return sim.transmitCommand(c); }
+    private ResponseAPDU send(CommandAPDU c) { return CashuAppletTest.held(sim::transmitCommand, c); }
     private int sw(CommandAPDU c) { return send(c).getSW(); }
     private int select() { return sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, CashuAppletTest.hexToBytes(CashuAppletTest.AID_STR))); }
     /** A new tap: out of the field and back, selected, nothing verified. */
@@ -101,10 +105,10 @@ class ClockWalkTest {
     private byte[] info() { return send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_INFO, 0, 0, 256)).getData(); }
     private long now() { return CashuAppletTest.readUint32(info(), 17); }
     private byte[] card() { return send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_CARD, 0, 0, 256)).getData(); }
-    /** GET_CARD's bytes 76, 77, 78 (2.0): rolls since the owner's REFRESH, the budget (0: 7), armed. */
-    private int rolls() { return card()[76] & 0xFF; }
+    /** GET_CARD's bytes 76, 77, 78 (2.0), the rolls and the arming as the card keeps them (GET_CARD says them to a reader told only: HistoryPrivacyTest): rolls since the owner's REFRESH, the budget (0: 7), armed. */
+    private int rolls() { return kept()[CashuApplet.CARD_ROLLS_OFFSET] & 0xFF; }
     private int budget() { return card()[77] & 0xFF; }
-    private int armed() { return card()[78] & 0xFF; }
+    private int armed() { return kept()[CashuApplet.CARD_ARMED_OFFSET] & 0xFF; }
 
     /** SET_LIMIT, the owner's form, thirteen bytes: the day's limit, the limit on one payment, the no-PIN allowance, the rollover budget. */
     private int setLimits(long day, long allowance, int budget) {
@@ -127,7 +131,7 @@ class ClockWalkTest {
 
     /** A payment of the piece in `slot` and no outputs, waited out if the card makes it wait. The status that ended it. */
     private int pay(int slot) {
-        ResponseAPDU r = send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { (byte) slot }, 4));
+        ResponseAPDU r = send(CashuAppletTest.spendBegin(new byte[] { (byte) slot }));
         if (r.getSW() != SW_OK) return r.getSW();
         for (int i = 0; i <= CashuAppletTest.WAITS_MOST; i++) {
             r = send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64));
@@ -142,9 +146,9 @@ class ClockWalkTest {
      * the terminal's. What leaves the card for good is 0. The status that ended it.
      */
     private int payNothing(int slot, long amount) {
-        ResponseAPDU r = send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { (byte) slot }, 4));
+        ResponseAPDU r = send(CashuAppletTest.spendBegin(new byte[] { (byte) slot }));
         if (r.getSW() != SW_OK) return r.getSW();
-        r = send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_CHANGE, 0, 0, CashuAppletTest.u32(amount), 33));
+        r = send(CashuAppletTest.changeCommand(amount, CashuAppletTest.mintKey()));
         if (r.getSW() != SW_OK) return r.getSW();
         for (int i = 0; i <= CashuAppletTest.WAITS_MOST; i++) {
             r = send(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64));
@@ -154,8 +158,23 @@ class ClockWalkTest {
         return -1;
     }
 
-    /** GET_INFO's bytes 21..24: when the day's window began. */
-    private long windowStart() { return CashuAppletTest.readUint32(info(), 21); }
+    /** When the day's window began, as the card keeps it (GET_INFO's bytes 21..24 say it to a reader that has given the PIN or the grant). */
+    private long windowStart() { return CashuAppletTest.readUint32(kept(), CashuApplet.CARD_WINDOW_OFFSET); }
+    /** GET_INFO P1 = 4 (D186): the no-PIN window's count (38..41); its start as the card keeps it (GET_INFO's 51..54 to a reader told). */
+    private long noPinSpent() { return CashuAppletTest.readUint32(send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_INFO, 4, 0, 256)).getData(), 38); }
+    private long noPinStart() {
+        byte[] r = kept();
+        return CashuAppletTest.readUint32(r, CashuApplet.CARD_NOPIN_SPENT_OFFSET) == 0 ? 0 : CashuAppletTest.readUint32(r, CashuApplet.CARD_NOPIN_START_OFFSET);
+    }
+    private byte[] kept() {
+        try {
+            java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("cardRecord");
+            f.setAccessible(true);
+            return (byte[]) f.get(runtime.appletAt(com.licel.jcardsim.utils.AIDUtil.create(CashuAppletTest.AID_HEX)));
+        } catch (ReflectiveOperationException x) {
+            throw new AssertionError(x);
+        }
+    }
 
     /**
      * A card set up as flash-mobile sets one up in 2.0: a PIN, the record, then the owner with the tip header it has seen (the
@@ -170,7 +189,7 @@ class ClockWalkTest {
         assertEquals(T.get(anchorAt).longValue(), now(), "the clock at the anchor");
         assertEquals(SW_OK, setLimits(day, allowance, budget));
         for (int i = 0; i < pieces; i++) {
-            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, amount, 100 + i), 1)), "piece " + i);
+            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, amount, 100 + i), 1)), "piece " + i);
         }
     }
 
@@ -299,7 +318,7 @@ class ClockWalkTest {
             CashuAppletTest.ownerData(CashuAppletTest.ownerProof(CashuAppletTest.L_LIMIT, CashuAppletTest.OWNER, nonce(), four), four))));
         assertEquals(0, budget(), "never given: 0, which the card reads as 7");
         for (int i = 0; i < 12; i++) {
-            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 100 + i), 1)));
+            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 100 + i), 1)));
         }
         int[] next = { 0 };
         int got = 0;
@@ -351,7 +370,7 @@ class ClockWalkTest {
         // spend the budget: three days at headers 5, 6, 7 (no pieces: the window turns at a payment only, so load some)
         newTap();
         assertEquals(SW_OK, verify());
-        for (int i = 0; i < 4; i++) assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 200 + i), 1)));
+        for (int i = 0; i < 4; i++) assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 200 + i), 1)));
         int got = 0;
         for (int i = 5; i <= 8; i++) got += pinScriptAt(H.get(i), next);
         assertEquals(3, got);
@@ -371,7 +390,7 @@ class ClockWalkTest {
         for (int i = 0; i <= 3; i++) pinScriptAt(H.get(i), next);
         assertEquals(2, rolls());
         newTap();
-        byte[] before = card();
+        byte[] before = kept().clone();
         long clock = now();
         assertEquals(CashuAppletTest.SW_OWNER_PROOF, refresh(CashuAppletTest.OTHER_OWNER, H.get(10), H.get(10)), "another key");
         assertEquals(CashuAppletTest.SW_OWNER_PROOF, refresh(CashuAppletTest.OWNER, H.get(9), H.get(10)), "a proof over another header");
@@ -385,7 +404,7 @@ class ClockWalkTest {
         assertEquals(CashuAppletTest.SW_OWNER_PROOF, sw(new CommandAPDU(CLA, INS_REFRESH, 0, 0,
             CashuAppletTest.ownerData(CashuAppletTest.ownerProof("CashuCard/refresh", CashuAppletTest.OWNER, new byte[16], H.get(10)), H.get(10)), 4)),
             "no nonce given in this tap");
-        assertArrayEquals(before, card(), "the record, the clock's proof, the rolls and the budget are as they were");
+        assertArrayEquals(before, kept(), "the record, the clock's proof, the rolls and the budget are as they were");
         assertEquals(clock, now());
         assertEquals(2, rolls());
         newTap();
@@ -406,43 +425,43 @@ class ClockWalkTest {
     // ---- the armed allowance --------------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("a no-PIN reader gets one allowance per re-arm: the allowance begins again at a roll only after a PIN or an owner's proof, and the arming is spent by the roll")
+    @DisplayName("D186: a no-PIN reader gets one allowance per arming: the payment that begins a no-PIN window spends the arming, a day on by the clock renews nothing, and the PIN arms nothing, typed alone or to pay: the window begins again only after an owner's proof")
     void aNoPinReaderGetsOneAllowancePerArming() {
         setUp(0, 0, 100, 30, 12, 100);
-        assertEquals(1, armed(), "armed by the PIN typed at set-up and the owner's proof");
+        assertEquals(1, armed(), "armed by the owner's proof at set-up");
         int slot = 0;
         newTap();
         assertEquals(SW_OK, pay(slot++), "no PIN, within the allowance: the first window begins");
+        assertEquals(0, armed(), "and the beginning spent the arming");
         newTap();
-        assertEquals(CashuAppletTest.SW_PIN_NEEDED, pay(slot), "the allowance spent");
-        // day 1: the window rolls, armed: the allowance begins again, and the arming is spent
-        newTap();
-        assertEquals(SW_OK, setHeader(H.get(1)));
-        assertEquals(SW_OK, pay(slot++), "a new day, armed: a new allowance");
-        assertEquals(0, armed(), "the roll spent the arming");
-        // days 2 and 3: the window rolls, not armed: what was counted stays counted
-        for (int d = 2; d <= 3; d++) {
+        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "the allowance spent");
+        // days 1 to 3: real headers, a day apart, not armed: what was counted stays counted
+        for (int d = 1; d <= 3; d++) {
             newTap();
             assertEquals(SW_OK, setHeader(H.get(d)));
-            assertEquals(CashuAppletTest.SW_PIN_NEEDED, pay(slot), "day " + d + ": not armed, no new allowance");
+            assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day " + d + ": not armed, no new allowance");
         }
-        // the holder types the PIN once (nothing paid): armed
+        // the holder types the PIN once (nothing paid): nothing armed (D186: the PIN alone arms nothing, a reader has it too)
         newTap();
         assertEquals(SW_OK, verify());
-        assertEquals(1, armed(), "a PIN arms it");
+        assertEquals(0, armed(), "a PIN arms nothing");
         newTap();
         assertEquals(SW_OK, setHeader(H.get(4)));
-        assertEquals(SW_OK, pay(slot++), "day 4: armed by the PIN, a new allowance");
+        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day 4: no new allowance");
+        // a PIN typed to pay, in the same time in the field, arms nothing either
+        newTap();
+        assertEquals(SW_OK, verify());
+        assertEquals(SW_OK, pay(slot++), "with the PIN");
+        assertEquals(0, armed(), "the PIN typed for a payment opens no allowance for the next reader");
         newTap();
         assertEquals(SW_OK, setHeader(H.get(5)));
-        assertEquals(CashuAppletTest.SW_PIN_NEEDED, pay(slot), "day 5: spent again");
-        // the owner's phone (any owner's proof) arms it as well
+        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(slot), "day 5: still spent");
+        // the owner's phone (any owner's proof) ends the window: a new allowance at once
         newTap();
-        assertEquals(SW_OK, allowLoad());
+        assertEquals(SW_GRANT, allowLoad());
         assertEquals(1, armed(), "an owner's proof arms it");
         newTap();
-        assertEquals(SW_OK, setHeader(H.get(6)));
-        assertEquals(SW_OK, pay(slot++), "day 6: armed by the owner");
+        assertEquals(SW_OK, pay(slot++), "day 5: the owner's proof ended the window");
     }
 
     @Test
@@ -450,10 +469,7 @@ class ClockWalkTest {
     void failuresArmNothing() {
         setUp(0, 0, 100, 30, 4, 100);
         newTap();
-        assertEquals(SW_OK, pay(0));
-        newTap();
-        assertEquals(SW_OK, setHeader(H.get(1)));
-        assertEquals(SW_OK, pay(1), "the arming from set-up, spent");
+        assertEquals(SW_OK, pay(0), "the arming from set-up, spent by the window's beginning");
         assertEquals(0, armed());
         newTap();
         assertEquals(0x63C2, sw(new CommandAPDU(CLA, CashuAppletTest.INS_VERIFY_PIN, 0, 0, CashuAppletTest.WRONG_PIN)));
@@ -461,7 +477,7 @@ class ClockWalkTest {
         assertEquals(0, armed(), "neither armed it");
         newTap();
         assertEquals(SW_OK, setHeader(H.get(2)));
-        assertEquals(CashuAppletTest.SW_PIN_NEEDED, pay(2));
+        assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(1));
     }
 
     // ---- what spends a roll (D26) ------------------------------------------------------------------------------------------
@@ -469,9 +485,10 @@ class ClockWalkTest {
     @Test
     @DisplayName("D26: a reader with no PIN that pays nothing away (the piece all back as the card's change) a day apart, seven times, rolls nothing: the owner's next days still roll")
     void aPaymentThatMovesNoValueRollsNothing() {
-        setUp(0, 100, 50, 7, 7, 10);
+        // an allowance of 100: seven payments of nothing count their whole pieces against it (D186), 70 in all
+        setUp(0, 100, 100, 7, 7, 10);
         for (int i = 0; i < 4; i++) {
-            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 200 + i), 1)), "100, piece " + (7 + i));
+            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 200 + i), 1)), "100, piece " + (7 + i));
         }
         long began = windowStart();
         assertEquals(T.get(0).longValue(), began, "the window began at the owner's SET_LIMIT, at the anchor");
@@ -504,43 +521,35 @@ class ClockWalkTest {
     }
 
     @Test
-    @DisplayName("D26: on a card with no PIN, a payment that moves no value rolls nothing either")
+    @DisplayName("D26, D185: a card with no PIN pays nothing at all, of value or of none: 6A97, and it rolls nothing")
     void onACardWithNoPinAPaymentOfNothingRollsNothing() {
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_CARD, 0, 0, CashuAppletTest.record(CashuAppletTest.MINT, CashuAppletTest.REFUND))));
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_OWNER, 0, 0, CashuAppletTest.concat(CashuAppletTest.OWNER.pub, H.get(0)))));
-        assertEquals(SW_OK, setLimits(100, 0, 2));
-        for (int i = 0; i < 6; i++) {
-            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 300 + i), 1)), "piece " + i);
-        }
+        assertEquals(SW_OK, setHeader(H.get(0)));
+        byte[] before = kept().clone();
         for (int d = 1; d <= 3; d++) {
             newTap();
-            assertEquals(SW_OK, setHeader(H.get(d)));
-            assertEquals(SW_OK, payNothing(d - 1, 100), "day " + d);
+            assertEquals(CashuAppletTest.SW_NO_PIN, payNothing(d - 1, 100), "day " + d + ": a payment of nothing");
+            assertEquals(CashuAppletTest.SW_NO_PIN, pay(d - 1), "day " + d + ": a payment");
         }
-        assertEquals(0, rolls(), "three payments of nothing past a budget of 2: no roll");
-        newTap();
-        assertEquals(SW_OK, setHeader(H.get(4)));
-        assertEquals(SW_OK, pay(3), "a payment of 100 on day 4: a roll");
-        assertEquals(1, rolls());
-        newTap();
-        assertEquals(SW_OK, setHeader(H.get(5)));
-        assertEquals(SW_OK, pay(4), "and day 5: the second roll of the owner's two");
-        assertEquals(2, rolls());
+        assertEquals(0, rolls(), "no roll");
+        assertArrayEquals(before, kept(), "and the record as it was");
     }
 
     @Test
-    @DisplayName("D26: a payment that moves no value begins no first window: the first payment that moves value does")
+    @DisplayName("D26, D186: a payment that moves no value begins no day; the day's window is the daily limit's alone, and the no-PIN window counts the whole pieces of every payment with no PIN, one of nothing too")
     void aPaymentOfNothingBeginsNoWindow() {
-        // an allowance alone (no day's limit) begins no window at SET_LIMIT, and no header has come since: the first payment begins it
         setUp(0, 0, 50, 7, 4, 10);
-        assertEquals(0, windowStart(), "no window yet");
+        assertEquals(0, windowStart(), "no day's limit: no day's window");
         newTap();
         assertEquals(SW_OK, payNothing(0, 10));
         assertEquals(0, windowStart(), "a payment of nothing begins none");
+        assertEquals(10, noPinSpent(), "but its whole piece counts against the allowance (D186)");
+        assertEquals(T.get(0).longValue(), noPinStart(), "and begins the no-PIN window at the clock");
         assertEquals(0, rolls());
         newTap();
         assertEquals(SW_OK, pay(1), "a payment of 10 with no PIN");
-        assertEquals(T.get(0).longValue(), windowStart(), "begins the window at the clock");
+        assertEquals(0, windowStart(), "no day's window still: there is no day's limit");
+        assertEquals(20, noPinSpent());
         assertEquals(0, rolls(), "a beginning, not a roll");
     }
 
@@ -559,11 +568,11 @@ class ClockWalkTest {
             info();
             card();
             send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_INFO, 1, 0, 256));
-            assertEquals(SW_OK, allowLoad(), "an owner's grant arms, and rolls nothing");
-            assertEquals(CashuAppletTest.SW_PIN_NEEDED, pay(1), "no PIN, 60 over the allowance of 50: refused");
+            assertEquals(SW_GRANT, allowLoad(), "an owner's grant arms, and rolls nothing");
+            assertEquals(CashuAppletTest.SW_ENTER_PIN, pay(1), "no PIN, 60 over the allowance of 50: refused, a refusal over a limit");
             assertEquals(0x6985, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_SIGN, 0, 0, 64)), "a SIGN with nothing begun: refused");
             assertEquals(SW_OK, verify());
-            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 1, 2 }, 4)));
+            assertEquals(SW_OK, sw(CashuAppletTest.spendBegin(new byte[] { 1, 2 })));
             assertEquals(CashuAppletTest.SW_OVER_LIMIT, signUntilDone(), "with the PIN, 120 in the old window's 60: over the day's 100, refused");
             assertEquals(0, rolls(), "day " + d + ": no roll");
             assertEquals(began, windowStart(), "day " + d + ": the window as it was");
@@ -592,7 +601,7 @@ class ClockWalkTest {
         newTap();
         assertEquals(SW_OK, verify());
         for (int i = 0; i < 8; i++) {
-            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 1, 400 + i), 1)), "1 sat, piece " + i);
+            assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 1, 400 + i), 1)), "1 sat, piece " + i);
         }
         for (int d = 1; d <= 8; d++) {
             newTap();
@@ -601,7 +610,7 @@ class ClockWalkTest {
         }
         assertEquals(7, rolls(), "seven rolls for seven sats: the budget, and no more (the eighth day does not roll)");
         assertEquals(8, CashuAppletTest.readUint32(send(new CommandAPDU(CLA, CashuAppletTest.INS_GET_INFO, 1, 0, 256)).getData(), 38),
-            "each sat counted against the allowance, which did not begin again: the first roll spent the arming");
+            "each sat counted against the allowance in one no-PIN window: its first payment spent the arming, and the clock renews nothing (D186)");
         newTap();
         assertEquals(SW_OK, refresh(H.get(9)), "the owner's phone, online");
         assertEquals(0, rolls());
@@ -610,7 +619,7 @@ class ClockWalkTest {
     // ---- the anchor ---------------------------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("an anchored owner: the clock is the header's from SET_OWNER on, never 0; older headers move nothing; a header without the work refuses the owner too")
+    @DisplayName("an anchored owner: the clock is the header's from SET_OWNER on, never 0; older headers move nothing after the first set-up; a header without the work refuses the owner too")
     void theAnchor() {
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_PIN, 0, 0, CashuAppletTest.TEST_PIN)));
         assertEquals(SW_OK, verify());
@@ -627,7 +636,9 @@ class ClockWalkTest {
         assertEquals(1, info()[16], "owned");
         assertEquals(T.get(5).longValue(), now(), "the clock is the anchor's");
         assertNotEquals(0, now(), "an owned card set up so never runs at now = 0");
-        assertEquals(CashuAppletTest.blockHash(H.get(5)), CashuAppletTest.toHex(Arrays.copyOfRange(card(), 44, 76)), "and the anchor is the last header taken");
+        assertEquals(CashuAppletTest.blockHash(H.get(5)), CashuAppletTest.toHex(Arrays.copyOfRange(kept(), CashuApplet.CARD_HEADER_OFFSET, CashuApplet.CARD_HEADER_OFFSET + 32)), "and the anchor is the last header taken");
+        // past the first set-up (D204: in it, an empty card's SET_HEADER is an anchor too, FirstAnchorTest)
+        newTap();
         for (int i = 0; i < 5; i++) {
             assertEquals(SW_OK, setHeader(H.get(i)), "header " + i + ", older: answered, as SET_HEADER answers an old header");
             assertEquals(T.get(5).longValue(), now(), "and the clock does not go back");
@@ -660,7 +671,10 @@ class ClockWalkTest {
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_SET_OWNER, 0, 0, CashuAppletTest.OWNER.pub)));
         assertEquals(0, now());
         assertEquals(SW_OK, setLimits(100, 0, 7));
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 0, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 1), 1)));
+        // a time in the field of its own to pay in: one that claimed an owner pays nothing (D187)
+        newTap();
+        assertEquals(SW_OK, verify());
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, CashuAppletTest.INS_LOAD_PROOF, 0, 2, CashuAppletTest.buildProof(CashuAppletTest.KEYSET, 100, 1), 1)));
         assertEquals(SW_OK, pay(0), "a first day on trust, as 1.20 had it");
     }
 }

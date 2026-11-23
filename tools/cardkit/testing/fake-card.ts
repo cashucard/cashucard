@@ -25,7 +25,7 @@
  *
  * - the opener rule: the INSTALL that is a package's first instantiation and
  *   runs a heavy constructor goes mute (the reader gives up) or answers 6F00,
- *   and installs nothing (docs/FOXY-CARD-HARDWARE.md);
+ *   and installs nothing (docs/CASHU-CARD-HARDWARE.md);
  * - a LOAD torn by the card leaving the field either vanishes with the power
  *   (`partialLoad: 'discard'`) or stays as a partial package that blocks a new
  *   INSTALL [for load] until it is deleted (`'keep'`); which the chip does is
@@ -45,6 +45,7 @@
  */
 import {nodeAesEcb, nodeCmac, nodeScp03Kdf} from './node-aes';
 import {nodeEcb, nodeFullMac, nodeRetailMac, nodeCbc} from './node-des';
+import {tagAddressProblem, tagNdefNew} from '../gp/tag';
 
 type Bytes = number[];
 
@@ -73,6 +74,25 @@ export interface CardAppletState {
   pin: number;
   record: number;
   owner: number;
+  /**
+   * Openings of change owed (0 by default): GET_CHANGE's count, and on a 3.0
+   * card GET_INFO byte 29 = 1 while any is owed.
+   */
+  change?: number;
+  /**
+   * The version SELECT and GET_INFO answer, major and minor: [3, 0] (the
+   * tracked CAP's) by default, [2, 1] or [2, 2] for an older card.
+   */
+  version?: readonly [number, number];
+}
+
+/** The tracked CAP's version, 3.0: what a card applet answers unless its state names another. */
+const TRACKED_VERSION: readonly [number, number] = [3, 0];
+function versionOf(s: CardAppletState): readonly [number, number] {
+  return s.version ?? TRACKED_VERSION;
+}
+function isThreeZero(v: readonly [number, number]): boolean {
+  return v[0] === 3 && v[1] === 0;
 }
 
 export interface FakeCardOptions {
@@ -163,6 +183,9 @@ interface Instance {
   module: string;
   pkg: string;
   state: CardAppletState;
+  /** The tag's: the address its install parameters gave, and the file chosen. */
+  tagAddress?: string;
+  tagFile?: 'cc' | 'ndef';
 }
 
 interface PendingLoad {
@@ -342,6 +365,19 @@ export class FakeCard {
   }
 
   private select(apdu: Bytes): Bytes {
+    const tag = this.instances.get(this.selected);
+    if (apdu[2] === 0x00 && tag?.module === TAG_MODULE) {
+      // the tag's SELECT of a file: E103, the capability container, or E104, the NDEF file
+      const fid = hex(apdu.slice(5, 7));
+      if (apdu[3] !== 0x0c || apdu[4] !== 2) {
+        return sw(0x6b00);
+      }
+      if (fid !== 'E103' && fid !== 'E104') {
+        return sw(0x6a82);
+      }
+      tag.tagFile = fid === 'E103' ? 'cc' : 'ndef';
+      return sw(0x9000);
+    }
     if (apdu[2] !== 0x04) {
       return sw(0x6a86);
     }
@@ -375,8 +411,8 @@ export class FakeCard {
     }
     const inst = this.instances.get(target)!;
     if (inst.module === CARD_MODULE) {
-      // the tracked CAP's version (CARD_VERSION): 2.2
-      return sw(0x9000, [0x02, 0x02]);
+      // the tracked CAP's version (CARD_VERSION), 3.0, unless the state names another
+      return sw(0x9000, [...versionOf(inst.state)]);
     }
     return sw(0x9000);
   }
@@ -385,9 +421,9 @@ export class FakeCard {
     const [cla, ins] = apdu;
     if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x01) {
       const s = inst.state;
+      const version = versionOf(s);
       const info = [
-        0x02,
-        0x02,
+        ...version,
         0x80,
         s.unspent,
         s.spent,
@@ -399,11 +435,36 @@ export class FakeCard {
         0x00,
         s.record,
       ];
-      info.push(0, 0, 0, 0, s.owner, ...new Array(13).fill(0));
+      info.push(0, 0, 0, 0, s.owner, ...new Array(12).fill(0));
+      // byte 29: on 3.0, change owed; 2.1 and 2.2 say something else there, 0 outside a tap that loads change
+      info.push(isThreeZero(version) && (s.change ?? 0) > 0 ? 1 : 0);
       return sw(0x9000, info);
+    }
+    if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x19) {
+      // GET_CHANGE page 0: a count, then 83-byte openings on 3.0, 80-byte ones on 2.1 and 2.2
+      const owed = Math.min(inst.state.change ?? 0, 3);
+      const size = isThreeZero(versionOf(inst.state)) ? 83 : 80;
+      return sw(0x9000, [owed, ...new Array(owed * size).fill(0x0c)]);
     }
     if (inst.module === CARD_MODULE && cla === 0xb0 && ins === 0x10) {
       return sw(0x9000, [0x03, ...new Array(32).fill(0x5a)]);
+    }
+    if (inst.module === TAG_MODULE && cla === 0x00 && ins === 0xb0) {
+      // READ BINARY of the file chosen: a card with no owner, so the NDEF file ends #new
+      if (!inst.tagFile) {
+        return sw(0x6986);
+      }
+      const n = inst.tagAddress!.length - 8;
+      const file =
+        inst.tagFile === 'cc'
+          ? [...fromHex('000F20003B00340406E10400'), n + 56, 0x00, 0xff]
+          : tagNdefNew(inst.tagAddress!);
+      const offset = (apdu[2] << 8) | apdu[3];
+      if (offset >= file.length) {
+        return sw(0x6b00);
+      }
+      const le = apdu[4] === 0 ? 256 : apdu[4];
+      return sw(0x9000, file.slice(offset, offset + le));
     }
     if (inst.module === HELLO_MODULE && ins === 0x01) {
       return sw(0x9000, Array.from(Buffer.from('HELLO')));
@@ -775,13 +836,13 @@ export class FakeCard {
   }
 
   private install(data: Bytes): Bytes {
-    let pkg: Bytes, mod: Bytes, inst: Bytes, at: number;
+    let pkg: Bytes, mod: Bytes, inst: Bytes, params: Bytes, at: number;
     try {
       [pkg, at] = this.lv(data, 0);
       [mod, at] = this.lv(data, at);
       [inst, at] = this.lv(data, at);
       [, at] = this.lv(data, at);
-      [, at] = this.lv(data, at);
+      [params, at] = this.lv(data, at);
       [, at] = this.lv(data, at);
     } catch {
       return sw(0x6a80);
@@ -791,6 +852,18 @@ export class FakeCard {
     }
     const p = this.packages.get(hex(pkg));
     const module = hex(mod);
+    // the tag takes its address from the install parameters, C9 and the address, and refuses an install without one
+    let tagAddress: string | undefined;
+    if (module === TAG_MODULE && p) {
+      const value =
+        params[0] === 0xc9 && params[1] === params.length - 2
+          ? params.slice(2)
+          : null;
+      tagAddress = value ? String.fromCharCode(...value) : '';
+      if (tagAddressProblem(tagAddress)) {
+        return sw(0x6a80);
+      }
+    }
     const aid = hex(inst);
     if (!p || !p.modules.includes(module)) {
       return sw(0x6a88);
@@ -811,6 +884,7 @@ export class FakeCard {
       module,
       pkg: p.aid,
       state: {unspent: 0, spent: 0, pin: 0, record: 0, owner: 0},
+      ...(tagAddress === undefined ? {} : {tagAddress}),
     });
     this.free -= 2048;
     return sw(0x9000, [0x00]);

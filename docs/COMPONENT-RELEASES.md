@@ -11,8 +11,8 @@ authorities. Do not generate replacement signing keys to make CI pass.
 
 | Component   | Current manifest identity                                        | New release tag              |
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
-| Firmware    | `applet/pom.xml`: 2.1.0; tracked CAP and APDU version remain 2.1 | `firmware-v2.1.0`            |
-| cardkit     | `tools/cardkit/package.json`: 0.2.0                              | `cardkit-v0.2.0`             |
+| Firmware    | `applet/pom.xml`: 3.0.0; tracked CAP `cashu-javacard-3.0.0.cap`, APDU version 3.0 | `firmware-v3.0.0`            |
+| cardkit     | `tools/cardkit/package.json`: 0.4.0                              | `cardkit-v0.4.0`             |
 | Ops-service | `ops/package.json`: 0.2.0                                        | `ops-v0.2.0`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 15                  | `provisioner-v1.0.0-build.15` |
 
@@ -23,6 +23,19 @@ Info.plist. Historical `v2.1.0` and `provisioner-v1.0.0-beta.1` releases remain
 valid historical records; do not move or retag them. Corrected firmware Maven
 metadata does not alter the CAP.
 
+Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
+answer `03 00`, and the decisions are D183 to D228 (spec/APDU.md). The tracked
+`cashu-javacard-3.0.0.cap` (load file `99a66ba7…`, with D228's review fixes) was installed and paid from at a test mint
+on the J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-22
+(docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md; see D230 for what that run covered); no `firmware-v3.0.0` release is cut before the operator's approval. No
+J3R180 keyed for SCP02 will be given a 3.0 file: according to the card's supplier the chip's manufacturer has retired
+that keying (D229). The file before it, load file `d69742d0…` (9ac55c1), was installed and paid from at a test mint on
+the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's
+supplier, on 2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md). The firmware a J3R180
+keyed for SCP02 last ran
+was numbered 2.3 (`02 03`, `cashu-javacard-2.3.0.cap`, load file `05c9b847…`), never
+released under a tag.
+
 Firmware's protocol major/minor follows SELECT/GET_INFO. An applet behavior change
 ships its rebuilt CAP, hash and generated load-file pins together, with hardware
 evidence as required by AGENTS. A host API change uses cardkit's independent
@@ -31,7 +44,7 @@ and fences; redeploying old code is not a database rollback.
 
 ## Verification and tags
 
-Update the component's manifest and changelog/release notes in a reviewed PR.
+Update the component's manifest and its entry in [the release notes](RELEASE-NOTES.md) in a reviewed PR.
 After merge, tag that exact main commit with its component tag. The release
 identity guard is loaded from main, verifies tag ancestry before checking out
 the requested commit, and validates its manifest/native versions and tag target; branches, mismatched versions and legacy tag shapes are rejected.

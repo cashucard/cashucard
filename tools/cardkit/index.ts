@@ -18,8 +18,11 @@ export {
 export * from './gp/scp02';
 export * from './gp/scp03';
 export * from './gp/provision';
+export * from './gp/tag';
+export * from './gp/maker';
 export * from './gp/identity';
 
+export * from './gp/change-owed';
 export * from './gp/inspect';
 export * from './gp/reset-preflight';
 export * from './gp/registry';

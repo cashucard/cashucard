@@ -7,7 +7,6 @@ import static me.flashapp.cashu.CashuAppletTest.INS_LOAD_PROOF;
 import static me.flashapp.cashu.CashuAppletTest.INS_LOCK_CARD;
 import static me.flashapp.cashu.CashuAppletTest.INS_RESET_CARD;
 import static me.flashapp.cashu.CashuAppletTest.INS_SET_TAG;
-import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_BEGIN;
 import static me.flashapp.cashu.CashuAppletTest.INS_SPEND_ALL_SIGN;
 import static me.flashapp.cashu.CashuAppletTest.KEYSET;
 import static me.flashapp.cashu.CashuAppletTest.L_LOCK;
@@ -63,15 +62,24 @@ class TagTest {
     static final String OPENER_HEX = "F04341534855434152444D";
     static final String CARD_HEX = "F043415348554341524401";
     static final String TAG_HEX = "D2760000850101";
-    /** What the install command carries for the tag: the instance AID's length and the AID, then no privileges and no parameters. */
-    static final byte[] TAG_INSTALL = hexToBytes("07" + TAG_HEX + "0000");
+    /** The address the tests' tag is installed with: the card maker's, in a real install (example.com is reserved for examples, RFC 2606). */
+    static final String BASE = "https://example.com/card";
+    /** What the install command carries for a tag of this address: the instance AID's length and the AID, no control information, then the install parameters, the address. */
+    static byte[] tagInstall(String address) {
+        byte[] a = address.getBytes(StandardCharsets.US_ASCII);
+        return concat(hexToBytes("07" + TAG_HEX + "00"), new byte[] { (byte) a.length }, a);
+    }
+    static final byte[] TAG_INSTALL = tagInstall(BASE);
 
-    /** The capability container (file E103), as the card's specification lists it. */
-    static final byte[] CC = hexToBytes("000f20003b00340406e104001600ff");
-    /** The NDEF file (E104): NLEN, then one well-known URI record with prefix code 04 and "getfoxy.io/card". */
-    static final byte[] NDEF = hexToBytes("0014d101105504" + "676574666f78792e696f2f63617264");
-    static final String ADDRESS = "https://getfoxy.io/card";
-    static { if (!toHex("getfoxy.io/card".getBytes(StandardCharsets.US_ASCII)).equals("676574666f78792e696f2f63617264")) throw new IllegalStateException("the address's hex"); }
+    /** The capability container (file E103), as the card's specification lists it: the NDEF file at most 72 bytes, the address's 16 and 56 (D222). */
+    static final byte[] CC = hexToBytes("000f20003b00340406e104004800ff");
+    /** The NDEF file (E104) of a card with no owner or no record: NLEN, then one well-known URI record with prefix code 04 and "example.com/card#new". */
+    static final byte[] NDEF = hexToBytes("0019d101155504" + "6578616d706c652e636f6d2f63617264236e6577");
+    static final String ADDRESS = BASE + "#new";
+    /** A set-up card's address (D222): 32 hex of R and 16 of M, lowercase. */
+    static final String CODED = "https://example\\.com/card#[0-9a-f]{48}";
+    static { if (!toHex("example.com/card#new".getBytes(StandardCharsets.US_ASCII)).equals("6578616d706c652e636f6d2f63617264236e6577")) throw new IllegalStateException("the address's hex"); }
+    static { if (!toHex(NDEF).equals("0019d1011555046578616d706c652e636f6d2f63617264236e6577")) throw new IllegalStateException("the NDEF file's hex"); }
 
     private CashuAppletTest.ExposedRuntime runtime;
     private CardSimulator sim;
@@ -95,7 +103,7 @@ class TagTest {
 
     // ---- what a phone sends ---------------------------------------------------------------------------------------------
 
-    private ResponseAPDU send(CommandAPDU c) { return sim.transmitCommand(c); }
+    private ResponseAPDU send(CommandAPDU c) { return CashuAppletTest.held(sim::transmitCommand, c); }
     private int sw(CommandAPDU c) { return send(c).getSW(); }
     /** SELECT by name, as a phone sends it to the tag application: case 4, the name and a zero Le. */
     private ResponseAPDU selectTag() { return send(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(TAG_HEX), 256)); }
@@ -152,7 +160,7 @@ class TagTest {
     // =========================================================================
 
     @Test
-    @DisplayName("The tag: the whole sequence a phone runs, byte for byte: select the name, select E103, read 15, select E104, read 2, read 20")
+    @DisplayName("The tag: the whole sequence a phone runs, byte for byte, on a new card: select the name, select E103, read 15, select E104, read 2, read 25")
     void testThePhonesSequence() {
         ResponseAPDU name = selectTag();
         assertEquals(SW_OK, name.getSW(), "SELECT by name");
@@ -160,14 +168,14 @@ class TagTest {
         assertEquals(SW_OK, send(new CommandAPDU(hexToBytes("00A4000C02E103"))).getSW(), "SELECT E103, the capability container");
         ResponseAPDU cc = send(new CommandAPDU(hexToBytes("00B000000F")));
         assertEquals(SW_OK, cc.getSW());
-        assertEquals("000f20003b00340406e104001600ff", toHex(cc.getData()), "READ BINARY, 15 bytes of the capability container");
+        assertEquals("000f20003b00340406e104004800ff", toHex(cc.getData()), "READ BINARY, 15 bytes of the capability container");
         assertEquals(SW_OK, send(new CommandAPDU(hexToBytes("00A4000C02E104"))).getSW(), "SELECT E104, the NDEF file");
         ResponseAPDU nlen = send(new CommandAPDU(hexToBytes("00B0000002")));
         assertEquals(SW_OK, nlen.getSW());
-        assertEquals("0014", toHex(nlen.getData()), "READ BINARY, 2 bytes: the message is 20 bytes");
-        ResponseAPDU message = send(new CommandAPDU(hexToBytes("00B0000214")));
+        assertEquals("0019", toHex(nlen.getData()), "READ BINARY, 2 bytes: the message is 25 bytes");
+        ResponseAPDU message = send(new CommandAPDU(hexToBytes("00B0000219")));
         assertEquals(SW_OK, message.getSW());
-        assertEquals("d101105504" + "676574666f78792e696f2f63617264", toHex(message.getData()), "READ BINARY from offset 2, 20 bytes: the message");
+        assertEquals("d101155504" + "6578616d706c652e636f6d2f63617264236e6577", toHex(message.getData()), "READ BINARY from offset 2, 25 bytes: the message");
         assertEquals(ADDRESS, decodeUriRecord(message.getData()), "which is one URI record, and the address it carries is the card's address");
     }
 
@@ -192,7 +200,7 @@ class TagTest {
     }
 
     @Test
-    @DisplayName("The tag's two files are exactly the bytes the specification lists: 15 and 22, the capability container and the NDEF file, and the NLEN of the second is the record's length")
+    @DisplayName("The tag's two files are exactly the bytes the specification lists: 15 and 27 on a new card, the capability container and the NDEF file, and the NLEN of the second is the record's length")
     void testTheTwoFiles() {
         byte[][] read = aPhoneReadsTheTag();
         assertArrayEquals(CC, read[0], "the capability container");
@@ -201,12 +209,12 @@ class TagTest {
         assertEquals(0x20, CC[2] & 0xFF, "mapping version 2.0");
         assertEquals(59, ((CC[3] & 0xFF) << 8) | (CC[4] & 0xFF), "MLe");
         assertEquals(52, ((CC[5] & 0xFF) << 8) | (CC[6] & 0xFF), "MLc");
-        assertArrayEquals(hexToBytes("0406e1040016"), Arrays.copyOfRange(CC, 7, 13), "the NDEF file control TLV: file E104, at most 22 bytes");
+        assertArrayEquals(hexToBytes("0406e1040048"), Arrays.copyOfRange(CC, 7, 13), "the NDEF file control TLV: file E104, at most 72 bytes");
         assertEquals(0x00, CC[13], "read access: free");
         assertEquals((byte) 0xFF, CC[14], "write access: never");
         assertArrayEquals(Arrays.copyOf(NDEF, 2), read[1]);
         assertArrayEquals(Arrays.copyOfRange(NDEF, 2, NDEF.length), read[2]);
-        assertEquals(22, NDEF.length, "and the NDEF file is the 22 bytes the capability container says it may be");
+        assertEquals(27, NDEF.length, "and the NDEF file is 27 bytes, within the 72 the capability container says it may be");
         assertEquals(NDEF.length - 2, ((NDEF[0] & 0xFF) << 8) | (NDEF[1] & 0xFF), "its NLEN is the message's length");
         assertEquals(ADDRESS, decodeUriRecord(read[2]));
         // each file whole, in one READ BINARY
@@ -239,10 +247,10 @@ class TagTest {
         }
         // a short read, and the one after it, are the file from where each says
         assertEquals(SW_OK, selectFile(0xE104).getSW());
-        assertEquals("0014", toHex(read(0, 2).getData()));
+        assertEquals("0019", toHex(read(0, 2).getData()));
         assertEquals("d1", toHex(read(2, 1).getData()));
-        assertEquals("64", toHex(read(21, 1).getData()), "the last byte, the d of card");
-        assertEquals(1, read(21, 59).getData().length, "an Le of the most the capability container allows, past the end: what there is");
+        assertEquals("77", toHex(read(26, 1).getData()), "the last byte, the w of new");
+        assertEquals(1, read(26, 59).getData().length, "an Le of the most the capability container allows, past the end: what there is");
     }
 
     @Test
@@ -315,38 +323,40 @@ class TagTest {
     }
 
     @Test
-    @DisplayName("There is nothing per card in the tag: two cards, one set up with an owner and money and one new, answer the phone's whole sequence in the same bytes")
+    @DisplayName("Nothing fixed per card is in the tag (D222): two new cards answer the same bytes, #new; a set-up card answers a fresh address that carries neither the card's key nor the owner's")
     void testTheSameOnEveryCard() {
+        byte[][] fresh = aPhoneReadsTheTag();
+        sim = freshCardWithTheTag();
+        byte[][] another = aPhoneReadsTheTag();
+        for (int i = 0; i < 3; i++) assertArrayEquals(fresh[i], another[i], "part " + i);
+        selectCard();
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)));
         byte[][] mine = aPhoneReadsTheTag();
+        assertTrue(decodeUriRecord(mine[2]).matches(CODED), "a set-up card's address carries a code");
         selectCard();
         byte[] myKey = send(new CommandAPDU(CLA, 0x10, 0, 0, 256)).getData();
         assertEquals(33, myKey.length);
-        sim = freshCardWithTheTag();
-        byte[][] theirs = aPhoneReadsTheTag();
-        for (int i = 0; i < 3; i++) assertArrayEquals(mine[i], theirs[i], "part " + i);
-        // (jCardSim draws the same card key every time; the point is that nothing the card holds is in what the tag says)
         String said = toHex(concat(mine[0], mine[1], mine[2]));
-        assertFalse(said.contains(toHex(myKey).substring(2)), "the card's key is not in it");
-        assertFalse(said.contains(toHex(OWNER.pub).substring(2, 40)), "nor the owner's");
+        assertFalse(said.contains(toHex(myKey).substring(2, 18)), "the card's key is not in it");
+        assertFalse(said.contains(toHex(OWNER.pub).substring(2, 18)), "nor the owner's");
     }
 
     @Test
-    @DisplayName("The tag keeps no state but the file chosen: one byte of transient memory cleared on deselect, and nothing is static but constants")
+    @DisplayName("The tag keeps no state but its address and this selection's: one byte of transient memory cleared on deselect, and nothing is static but constants")
     void testTheTagKeepsNothing() throws Exception {
         SimulatorRuntime fresh = new CashuAppletTest.ExposedRuntime();
         long[] before = transientHeldOnDeselect(fresh);
         CardSimulator s = new CardSimulator(fresh);
         s.installApplet(AIDUtil.create(TAG_HEX), Tag.class, TAG_INSTALL, (short) 0, (byte) TAG_INSTALL.length);
         long[] after = transientHeldOnDeselect(fresh);
-        assertEquals(1, after[0] - before[0], "one byte of transient memory that is cleared on deselect");
+        assertEquals(1, after[0] - before[0], "one byte of transient memory that is cleared on deselect (the file chosen and whether there is a code; the code is the card's applet's, D222)");
         assertEquals(1, after[1] - before[1], "in one array");
         for (java.lang.reflect.Field f : Tag.class.getDeclaredFields()) {
             if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
             assertEquals(byte[].class, f.getType(), "an instance field of the tag is an array of bytes and holds no applet, no interface, no AID: " + f.getName());
         }
-        assertEquals(1, Arrays.stream(Tag.class.getDeclaredFields()).filter(f -> !java.lang.reflect.Modifier.isStatic(f.getModifiers())).count(), "and there is the one");
+        assertEquals(2, Arrays.stream(Tag.class.getDeclaredFields()).filter(f -> !java.lang.reflect.Modifier.isStatic(f.getModifiers())).count(), "and there are the two: the selection's byte and the address the install gave");
     }
 
     /** { bytes, arrays } this runtime holds as transient arrays cleared on deselect. */
@@ -481,7 +491,7 @@ class TagTest {
         assertTrue(tagIsSelectable(), "and its tag is on");
         sim = freshCardWithTheTag();
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)), "money on the card");
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)), "money on the card");
         assertEquals(SW_OK, switchTag(true), "the owner's proof, with money on the card");
         assertEquals(SW_OK, switchTag(false), "and again");
         assertEquals(SW_OK, switchTag(true));
@@ -503,14 +513,14 @@ class TagTest {
         assertEquals(0x6999, selectTag().getSW(), "the tag application refuses its name");
         ResponseAPDU card = selectCard();
         assertEquals(SW_OK, card.getSW(), "the card's own name is selected");
-        assertArrayEquals(new byte[] { 0x02, 0x02 }, card.getData(), "and answers its version, 2.2");
+        assertArrayEquals(new byte[] { 0x03, 0x00 }, card.getData(), "and answers its version, 3.0");
         assertEquals(1, infoTag().getData()[42], "and says the tag is off");
         assertEquals(0x6999, selectTag().getSW(), "the tag asks at each selection, and it is still off");
         selectCard();
         assertEquals(SW_OK, switchTag(false));
         assertEquals(SW_OK, selectTag().getSW(), "on again, the name is taken");
         assertEquals(SW_OK, selectFile(0xE104).getSW());
-        assertEquals(ADDRESS, decodeUriRecord(read(2, 20).getData()), "and it answers as it did");
+        assertTrue(decodeUriRecord(read(2, 70).getData()).matches(CODED), "and it answers a set-up card's address");
         selectCard();
         assertEquals(SW_OK, selectCard().getSW(), "the card's own name, even when it is selected already");
         assertEquals(SW_OK, switchTag(true));
@@ -570,7 +580,7 @@ class TagTest {
         // a reset that is refused leaves the tag as it was: money on the card
         sim = freshCardWithTheTag();
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)));
         assertEquals(SW_OK, switchTag(true));
         assertEquals(0x6A8D, sw(new CommandAPDU(CLA, INS_RESET_CARD, 0, RESET_CONFIRM, ownerData(ownerProof(L_RESET, OWNER, nonce(), new byte[0]), new byte[0]))), "a piece unspent: refused");
         assertEquals(1, tagOffInTheCard(), "and the tag is as it was");
@@ -595,7 +605,17 @@ class TagTest {
         assertArrayEquals(longOff, Arrays.copyOf(tagOff, 42), "P1 = 2 begins with them");
         assertEquals(1, tagOff[42], "and the tag is off");
         assertArrayEquals(thirtyOn, Arrays.copyOf(tagOff, 30), "the 30 are the first of the 43");
-        for (int p1 : new int[] { 3, 4, 0x10, 0x7F, 0x80, 0xFF }) {
+        // P1 = 3 (D184) is the 43 and eight more, the tag's byte as P1 = 2 says it
+        ResponseAPDU three = send(new CommandAPDU(CLA, INS_GET_INFO, 3, 0, 256));
+        assertEquals(51, three.getData().length);
+        assertArrayEquals(tagOff, Arrays.copyOf(three.getData(), 43), "P1 = 3 begins with the 43 of P1 = 2");
+        // P1 = 4 (D186) is the 51 and eight more: the no-PIN window's start, the profiles, F7 03, and the loads left today
+        ResponseAPDU four = send(new CommandAPDU(CLA, INS_GET_INFO, 4, 0, 256));
+        assertEquals(59, four.getData().length);
+        assertArrayEquals(three.getData(), Arrays.copyOf(four.getData(), 51), "P1 = 4 begins with the 51 of P1 = 3");
+        assertEquals(0xF7, four.getData()[55] & 0xFF, "every profile of byte 55 but bit 3, the wait on every payment (D211, D228)");
+        assertEquals(0x03, four.getData()[56], "and the certificate's (bit 0) and keys per load (bit 1, D197)");
+        for (int p1 : new int[] { 5, 0x10, 0x7F, 0x80, 0xFF }) {
             ResponseAPDU other = send(new CommandAPDU(CLA, INS_GET_INFO, p1, 0, 256));
             assertEquals(SW_OK, other.getSW(), "P1 = " + p1);
             assertArrayEquals(thirtyOff, other.getData(), "any other P1 is answered as it was: the thirty bytes (P1 = " + p1 + ")");
@@ -618,7 +638,7 @@ class TagTest {
         owned();
         byte[] limits = concat(CashuAppletTest.u32(1000), CashuAppletTest.u32(100), CashuAppletTest.u32(50));
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x34, 0, 0, ownerData(ownerProof("CashuCard/set-limit", OWNER, nonce(), limits), limits))), "the owner sets all three limits");
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x45, 0, 0, ownerData(ownerProof("CashuCard/load", OWNER, nonce(), new byte[0]), new byte[0]))), "and gives the grant, so that the limit on one payment is said");
+        assertEquals(CashuAppletTest.SW_GRANT, sw(new CommandAPDU(CLA, 0x45, 0, 0, ownerData(ownerProof("CashuCard/load", OWNER, nonce(), new byte[0]), new byte[0]))), "and gives the grant (6200, a warning: given, and no load opened by it), so that the limit on one payment is said");
         long[] on = readAsAWalletOf118Does(info().getData(), infoTap().getData());
         assertNotNull(on, "with the tag on, the long form is taken");
         assertArrayEquals(new long[] { 100, 50, 0 }, on, "the limit on one payment, the allowance, and nothing counted against it");
@@ -634,13 +654,13 @@ class TagTest {
     @DisplayName("A payment works with the tag off, and with money on the card the switch works")
     void testAPaymentWorksWithTheTagOff() {
         owned();
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 0, buildProof(KEYSET, 16, 1), 1)));
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, buildProof(KEYSET, 16, 1), 1)));
         assertEquals(SW_OK, switchTag(true));
         // the PIN again (switching the tag is not a payment, and SELECTs end the tap), then one signature for the one piece
         selectCard();
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, 0x40, 0, 0, TEST_PIN)));
-        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_SPEND_ALL_BEGIN, 0, 0, new byte[] { 0 }, 4)), "a payment begun");
-        ResponseAPDU signed = send(new CommandAPDU(CLA, INS_SPEND_ALL_SIGN, 0, 0, 64));
+        assertEquals(SW_OK, sw(CashuAppletTest.spendBegin(new byte[] { 0 })), "a payment begun");
+        ResponseAPDU signed = CashuAppletTest.signThrough(this::send);
         assertEquals(SW_OK, signed.getSW(), "signed, with the tag off");
         assertEquals(64, signed.getData().length, "one signature");
         assertEquals(1, tagOffInTheCard(), "and the tag is as it was");
@@ -689,17 +709,18 @@ class TagTest {
                 assertTrue(f.getType().isPrimitive() || f.getType() == byte[].class, c.getSimpleName() + "." + f.getName() + " is " + f.getType().getSimpleName());
             }
         }
-        // and the tag's source: the card's applet is looked up once, in select, into locals, and nothing of it is kept
+        // and the tag's source: the card's applet is looked up in one place, into locals, at select and at the SELECT's process, and nothing of it is kept
         String code = tagSource();
-        assertEquals(1, count(code, "JCSystem.lookupAID("), "the card's applet is looked up once");
-        assertEquals(1, count(code, "JCSystem.getAppletShareableInterfaceObject("), "and its interface asked for once");
-        String select = code.substring(code.indexOf("public boolean select()"), code.indexOf("public void process("));
-        assertTrue(select.contains("AID card = JCSystem.lookupAID(") && select.contains("Shareable s = JCSystem.getAppletShareableInterfaceObject("), "both in select, into locals");
+        assertEquals(1, count(code, "JCSystem.lookupAID("), "the card's applet is looked up in one place");
+        assertEquals(1, count(code, "JCSystem.getAppletShareableInterfaceObject("), "and its interface asked for in one place");
+        String helper = code.substring(code.indexOf("private static TagSwitch card()"), code.indexOf("public boolean select()"));
+        assertTrue(helper.contains("AID card = JCSystem.lookupAID(") && helper.contains("Shareable s = JCSystem.getAppletShareableInterfaceObject("), "both into locals");
+        assertEquals(3, count(code, "TagSwitch c = card();"), "asked for at select, at the SELECT's process and at a READ BINARY of a code, into a local each time");
         assertFalse(code.contains("this.card") || code.contains("private AID") || code.contains("private Shareable") || code.contains("private TagSwitch"), "and it keeps neither");
     }
 
     @Test
-    @DisplayName("The source of the switch: SET_TAG writes the byte only when it would change, in no transaction, after the proof; RESET_CARD writes it in its own; the interface answers any caller, for the one parameter 0")
+    @DisplayName("The source of the switch: SET_TAG writes the byte only when it would change, in no transaction, after the proof; RESET_CARD writes it in its own; the interface answers only the tag, for the one parameter 0")
     void testSwitchSource() throws Exception {
         String code = new String(java.nio.file.Files.readAllBytes(SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), StandardCharsets.UTF_8);
         int from = code.indexOf("private void processSetTag("), to = code.indexOf("public boolean tagIsOn()");
@@ -716,8 +737,8 @@ class TagTest {
         assertFalse(body.contains("pinVerifiedFlag") || body.contains("pinState") || body.contains("pin."), "it asks no PIN");
         assertTrue(code.contains("case INS_SET_TAG:          processSetTag(apdu);         break;"), "it is dispatched");
         String shared = code.substring(code.indexOf("public Shareable getShareableInterfaceObject("), code.indexOf("// Guard helpers"));
-        assertTrue(shared.contains("parameter == (byte) 0 ? this : null"), "any caller, the one parameter");
-        assertFalse(shared.contains("clientAID."), "the caller is not looked at");
+        assertTrue(shared.contains("parameter != (byte) 0 || clientAID == null) return null;"), "the one parameter, and a caller with a name");
+        assertTrue(shared.contains("clientAID.equals(TAG_AID,") && shared.contains("clientAID.equals(TAG_CLASS_AID,"), "the caller must be the tag (TagCallerTest runs it)");
         java.util.regex.Matcher writes = java.util.regex.Pattern.compile("tagOff\\[0\\] =(?!=)").matcher(code);
         int assigned = 0;
         while (writes.find()) assigned++;

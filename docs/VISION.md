@@ -6,7 +6,9 @@
 Cashu Card puts Bitcoin-denominated ecash on a physical NFC card. A holder
 loads the card through a compatible wallet, taps to pay, and the merchant
 settles with the mint when online. The protocol is open to wallets, terminals
-and card vendors. Flash and Foxy are reference integrations.
+and card vendors, and none of them is its default: the README lists the
+[known implementations](../README.md#known-implementations), and a card maker's
+own settings are one file ([`maker/`](../maker/README.md)).
 
 This document explains the product goals. [Architecture](ARCHITECTURE.md)
 describes the components, [design decisions](DECISIONS.md) record their

@@ -10,8 +10,8 @@ payment offline and settle with the mint when online.
 > its testing so far is limited to the dated reports in this repository. Keep
 > only small amounts on a card.
 
-This is the **shared Cashu card protocol, version 2.1**: one wire for Flash and
-for the [Foxy](https://github.com/getfoxy/iOS) wallet. Reference implementation
+This is the **shared Cashu card protocol, version 3.0**: one wire for every
+reader and every card maker ([known implementations](#known-implementations)). Reference implementation
 of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
 
 The card is developed here. [cashucard/javacard](https://github.com/cashucard/javacard),
@@ -30,11 +30,68 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > 2.0 has a neutral identity ([D19](docs/DECISIONS.md#d19)) and our fixes
 > ([D20](docs/DECISIONS.md#d20) to [D24](docs/DECISIONS.md#d24)).
 
-> ### Status: protocol 2.1 tested on J3R180 and real phones
+> ### Status: protocol 3.0 not yet run on a chip; an earlier source, numbered 2.3, run on a J3R180 at a test mint; 2.1 tested with real phones
 >
-> The [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
-> records installation, holder setup, funding, online/offline payments, change and
-> eventual mint settlement on the named card/phones. The
+> On 2026-11-13 a J3R180 installed the applet in this
+> tree as it was before [D200](docs/DECISIONS.md#d200), numbered 2.3 then and answering
+> `02 03` (a 35,466-byte load file, sha256 `48b8597c…`) and, at a FakeWallet test mint (fake sats), paid with real signatures, finished its own change
+> with `LOAD_CHANGE` and paid that change again, each swap taken by the mint (the run
+> is in [the deployment guide](docs/HARDWARE_DEPLOYMENT.md) and
+> [its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-13_J3R180_2.3.md)). With a
+> refund key it loaded dated pieces, paid under their date's key, took its dated
+> change back, and gave c sealed to the refund key. It has not yet run with a phone,
+> at a production mint, or torn on purpose, and no dated piece has yet been taken
+> back after its date by the refund key. The file before D211 (36,953 bytes, load file
+> sha256 `f216644a…`) added D200 (a payment's
+> change counted when it is made, and the owner's anchor bringing back a clock moved
+> far ahead) and [D201](docs/DECISIONS.md#d201) (a header at the floor's work begins
+> and ends no day, and `REFRESH` brings the clock back), [D202](docs/DECISIONS.md#d202)
+> (the card's secret c made from its owner's words at the claim or the hand-over) and
+> [D203](docs/DECISIONS.md#d203) (a fresh or newly set-up card held to the same bar, and
+> the owner's back form bringing back the day of loads) and [D204](docs/DECISIONS.md#d204)
+> (the tip a card is set up with is its clock and its hardest); on 2026-11-14 the same
+> J3R180 installed it and, at the same test mint, had real signatures and real change
+> verified on the chip, with the clock brought back by the set-up, the resets, the
+> hand-over and the owner's back form, and the owner's c read back
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14_J3R180_2.3.md)). The file
+> after it adds [D211](docs/DECISIONS.md#d211) (no payment floor, shorter holds; 36,950 bytes, load file
+> sha256 `075448e4…`); on 2026-11-14 a second bench J3R180 installed it at the first try and, at the same test mint, had real
+> signatures and real change verified on the chip, with the shorter holds timed
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14b_J3R180_2.3.md)). The file tracked now adds
+> [D212](docs/DECISIONS.md#d212) (`LOAD_PROOF`'s 04 form, C held to the curve by the chip's key agreement; 37,269 bytes, load
+> file sha256 `fe156f4f…`); the same day the second J3R180 installed it five times at the first try and, at the same test
+> mint, had real signatures and real change verified on the chip, and took a first load of 45 pieces in 8.2 s where the
+> 33-byte form took 11.8 ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md)). The file after it adds
+> [D213](docs/DECISIONS.md#d213) to [D216](docs/DECISIONS.md#d216) (a keyset taught at set-up; the field's arithmetic, the change's
+> point checks and the signature's e·d on the chip's own engines; 39,343 bytes, load file sha256 `c79b30a7…`); the same day the
+> J3R180 installed it at the first try and, at the same test mint, had real signatures and real change verified on the chip, and
+> took a first load of 45 pieces in 7.8 s and a payment with change in 2.2 s where it took 4.0
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14d_J3R180_2.3.md)). The file after it adds
+> [D217](docs/DECISIONS.md#d217) to [D220](docs/DECISIONS.md#d220) (the signature's product in two shares, every signature checked on the
+> card before it leaves, wider known answers at set-up, a taught keyset kept until its first piece; 40,365 bytes, load file sha256
+> `8aefa0db…`); the same day the J3R180 installed it at the first try and, at the same test mint, had real signatures and real change
+> verified on the chip, and took a first load of 45 pieces in 8.0 s, every signature 0.27 s longer than before
+> ([its report](docs/reports/HARDWARE_TEST_REPORT_2026-11-14e_J3R180_2.3.md)). The file tracked now adds
+> [D221](docs/DECISIONS.md#d221) (the claim right after the set-up's record is one asking; 40,412 bytes, load file sha256
+> `05c9b847…`); on 2026-11-15 the J3R180 installed it three times and, at the same test mint, claimed the card at the set-up's
+> first asking and signed a payment with change. The tracked file is the 3.0 file of the merge of 2026-11-19: that
+> source with the version moved to 3.0 ([D205](docs/DECISIONS.md#d205)), the other maintainer's
+> [D206](docs/DECISIONS.md#d206) to [D210](docs/DECISIONS.md#d210), the rotating tag
+> ([D222](docs/DECISIONS.md#d222)), [D223](docs/DECISIONS.md#d223) to [D226](docs/DECISIONS.md#d226) and the tag's
+> address given at install ([D227](docs/DECISIONS.md#d227)) added (load file sha256 `d69742d0…`): on 2026-11-21 the
+> J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's supplier,
+> took that file 13 times of 13 at the first try, its tag took the
+> address at install, and the card paid from it at a test mint with real signatures and real change verified on the chip
+> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). The tracked file adds the security
+> review's fixes of [D228](docs/DECISIONS.md#d228) (one set-up bit a unit, the chip's path given up for one signature only,
+> `GET_INFO` byte 55 bit 3 clear; 42,485 bytes, load file sha256 `99a66ba7…`). This exact file has run on a chip: the
+> same sample card installed it and paid from it at a test mint on 2026-11-22, the run on a J3R180 keyed for SCP03 that
+> [D229](docs/DECISIONS.md#d229) owed ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). No J3R180 keyed for
+> SCP02 has been given a 3.0 file, and none will be: according to the card's supplier the chip's manufacturer has retired
+> that keying ([D229](docs/DECISIONS.md#d229)). The
+> [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
+> records protocol 2.1's installation, holder setup, funding, online/offline payments,
+> change and eventual mint settlement on the named card/phones. The
 > [mobile reset report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 > records reset and reinstall. These bounded tests do not establish compatibility
 > with every device or failure mode. The repository also includes the operator
@@ -49,7 +106,7 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 | **Curious what this is** | [`docs/VISION.md`](docs/VISION.md) |
 | **A developer joining the project** | [`VISION`](docs/VISION.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`CONTRIBUTING`](CONTRIBUTING.md) |
 | **Implementing a reader or wallet** | [NUT-CCP](https://github.com/cashucard/nut/blob/main/CCP.md) → [`spec/APDU.md`](spec/APDU.md) → [`spec/vectors/`](spec/vectors/) |
-| **Reading the design in full** | [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md) and [`docs/FOXY-CARD-DAILY-LIMIT.md`](docs/FOXY-CARD-DAILY-LIMIT.md) |
+| **Reading the design in full** | [`docs/CASHU-CARD-SPEC.md`](docs/CASHU-CARD-SPEC.md) and [`docs/CASHU-CARD-DAILY-LIMIT.md`](docs/CASHU-CARD-DAILY-LIMIT.md) |
 | **An AI agent working in this repo** | [`AGENTS`](AGENTS.md) → [`ARCHITECTURE`](docs/ARCHITECTURE.md) → [`DECISIONS`](docs/DECISIONS.md) → [`GLOSSARY`](docs/GLOSSARY.md). The decisions file exists so settled calls are not re-litigated. |
 | **Auditing security** | [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md); the ops service's is [`docs/OPS-THREAT-MODEL.md`](docs/OPS-THREAT-MODEL.md) |
 | **Holding a card and a reader** | [`tools/cardctl/README.md`](tools/cardctl/README.md), then [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md) |
@@ -60,31 +117,35 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 ## Card capabilities
 
 - **Holds pieces**: up to 128 slots of 82 bytes: keyset, amount, the P2PK nonce,
-  `C`, and a date. Every piece is a format-4 secret locked to the card's key with
-  `SIG_ALL` (NUT-11). The card rebuilds each secret and signs the payment
+  `C`, and a date. Every piece is a format-4 secret locked with `SIG_ALL` (NUT-11)
+  to the card's key for its date, P + t·G, worked out from a secret c the card keeps
+  ([Keys per load](spec/APDU.md#keys-per-load)); never to the card key P itself,
+  which the card does not pay from. The card rebuilds each secret and signs the payment
   transcript, including the reader's outputs.
 - **Holds a secp256k1 key** generated on-card at install, never exported.
 - **Pays with one signature**: `SPEND_ALL_*`: the places, a till's outputs, the
-  card's own change (locked to its own key), then one BIP-340 signature over the
+  card's own change (locked to the payment's date key), then one BIP-340 signature over the
   NUT-11 `SIG_ALL` message, with every place burned in the commit that releases it.
 - **Proves itself**: `AUTH` signs a tagged hash of the reader's and the card's
   random bytes; it cannot be a spend.
 - **Has an owner**: a P-256 key on the holder's phone, whose ECDSA proofs (labels
-  `CashuCard/…`) change the PIN, the limits, the record and the owner, add funds
-  with no PIN, and refresh the card. A blocked PIN is unblocked by the owner.
+  `CashuCard/…`) change the PIN, the limits, the record and the owner, read the
+  card's secret c, and refresh the card; loads want the PIN. A blocked PIN is
+  unblocked by the owner. A card with no owner is set up once under its PIN.
 - **Bounds a terminal**: a daily limit, a limit on one payment and a no-PIN
   allowance, counted against a clock that is the newest Bitcoin block header the
   card has been shown, with a rollover budget between the owner's refreshes
   ([D20](docs/DECISIONS.md#d20)).
 - **Keeps the mint's DLEQ proof** beside each piece, for a reader to check offline.
-- **Answers as an NFC tag** carrying one web address, which its owner can switch off.
+- **Answers as an NFC tag** carrying one web address, which its owner can switch off. The address is
+  the card maker's, given at install ([`maker/`](maker/README.md)); the card's software names none.
 
 The host handles mint communication, DLEQ verification and BDHKE operations
 beyond the card's own blinded change outputs. See [D3](docs/DECISIONS.md#d3).
 
 **AID:** package `F0 43 41 53 48 55 43 41 52 44` ("CASHUCARD"), applet `…44 01`.
 A reader selects the applet's whole AID, `F0 43 41 53 48 55 43 41 52 44 01`, and
-`SELECT` answers `02 01`; the package AID alone reaches the opener on a chip
+`SELECT` answers `03 00` (protocol 3.0); the package AID alone reaches the opener on a chip
 ([D25](docs/DECISIONS.md#d25)). A card on the 0.x AID (`D2 76 00 00 85 01 02`) or Foxy's
 1.x AID answers nothing to it: it needs an update.
 
@@ -92,11 +153,15 @@ A reader selects the applet's whole AID, `F0 43 41 53 48 55 43 41 52 44 01`, and
 
 | Chip | Status | Notes |
 |---|---|---|
-| NXP JCOP4 (SmartMX3, J3R180) | ✅ Target | JavaCard 3.0.5, CC EAL 5+ |
+| NXP JCOP4 (SmartMX3, J3R180) | ✅ Target | JavaCard 3.0.5, CC EAL 5+; its configuration must have `ALG_EC_SVDP_DH_PLAIN_XY` and `ALG_EC_PACE_GM` |
 | Feitian / JCOP3 JavaCard 3.0.4 | ❌ | No `ALG_EC_SVDP_DH_PLAIN_XY`: 3.0.5+ only |
 | NXP NTAG 424 DNA | ❌ | No EC crypto; this is the BoltCard chip |
 
-**JavaCard 3.0.5 or later is a hard requirement** ([D6](docs/DECISIONS.md#d6)).
+**JavaCard 3.0.5 or later is a hard requirement** ([D6](docs/DECISIONS.md#d6)),
+and so are two key agreements: `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY` and
+`KeyAgreement.ALG_EC_PACE_GM`. JCOP4 cards are sold in more than one
+configuration: a J3R180 whose configuration lacks either cannot run the card (its
+applet is refused at install).
 The card must also be supplied **unlocked** (known GlobalPlatform keys), and its
 manager keys rotated before it is handed to a person.
 
@@ -109,13 +174,25 @@ The SDK is not downloaded for you:
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
-# → applet/target/cashu-javacard-2.1.0.cap   (three applets: the opener, the card's, then the NFC tag)
+# → applet/target/cashu-javacard-3.0.0.cap   (three applets: the opener, the card's, then the NFC tag)
 ```
 
 The build strips the Descriptor component and checks the load file's size against
 what the J3R180 has installed (`tools/stripcap.py`, `tools/refcheck.py`;
-[`docs/FOXY-CARD-HARDWARE.md`](docs/FOXY-CARD-HARDWARE.md)). Installing onto a
-card: [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md).
+[`docs/CASHU-CARD-HARDWARE.md`](docs/CASHU-CARD-HARDWARE.md)). Installing onto a
+card: [`docs/HARDWARE_DEPLOYMENT.md`](docs/HARDWARE_DEPLOYMENT.md), with the card maker's settings
+from [`maker/maker.json`](maker/README.md).
+
+## Card makers
+
+Everything that is a card maker's own (its name, the address the card's NFC tag
+carries, its security domain and its design codes) is in one file,
+[`maker/maker.json`](maker/maker.json); the load file is the same for every maker,
+byte for byte. The file here is a neutral example (`"example": true`, a tag at
+`https://example.com/card`) that the tools refuse to put on a card in the field. A
+card maker's fork changes that file and nothing else, so `git diff` against this
+repository shows exactly what the maker added:
+[Forks for a card maker](maker/README.md#forks-for-a-card-maker).
 
 ## Test
 
@@ -147,36 +224,38 @@ on a simulator or emulator without a reader:
 ```bash
 tools/cardsim/cardsim.sh                               # from source, via Maven
 mvn -B -f tools/cardsim/pom.xml package && java -jar tools/cardsim/target/cardsim.jar
-curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"02019000","sw":"9000"}
+curl -s -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}'   # {"hex":"03009000","sw":"9000"}
 ```
 
 Endpoints: `POST /apdu` (raw bytes in, data‖SW out, never retried), `POST /reset`
 (a brand-new card), `POST /fixture` (PIN, record, the deterministic test owner,
 anchor and headers, format-4 pieces with dates and DLEQ, spent slots, limits with
 the rollover budget, a blocked PIN), `GET /state`. `tools/cardsim/client.cjs` is a
-zero-dependency Node client with the 2.0 command set and the owner's proofs, and
+zero-dependency Node client with the 3.0 command set and the owner's proofs, and
 `tools/cardsim/cashu-crypto.cjs` the Cashu arithmetic a test needs. Two things a
 loader has to know: SELECT starts a session, as a tap does; and the simulator's
 card key is the same after every `/reset`, so mint pieces per run. The header of
 `tools/cardsim/src/main/java/me/flashapp/cashu/cardsim/CardSim.java` is the
 contract that flash-pos and flash-mobile pin.
 
-Foxy's own simulator for its iOS build (`tools/cardsim/run.sh`, a line protocol on
-port 47431) is kept beside it.
+A line-protocol simulator for a reader app's iOS Simulator build
+(`tools/cardsim/run.sh`, port 47431; Foxy's app uses it) is kept beside it.
 
 ## Project layout
 
 ```
 applet/src/main/java/   applet source (JavaCard 3.0.5+): CashuApplet, SchnorrHW, Opener, Tag
 applet/src/test/java/   jCardSim test suite
-tools/cardctl/          PC/SC host driver (protocol 2.1) + its own tests
+tools/cardctl/          PC/SC host driver (protocol 3.0) + its own tests
 tools/cardsim/          jCardSim card over localhost HTTP for app e2e, its client and e2e
-tools/chip/             Foxy's bench scripts for a card on a reader
+tools/chip/             bench scripts for a card on a reader
 tools/cardkit/          GlobalPlatform for the phone: SCP02 and SCP03, the install, a fake card (D27, D181)
 apps/provisioner/       the operator app: installs the card's applet from a phone over NFC
 spec/                   APDU.md (wire format and profiles), vectors/,
                         CARD-FILE.md (0.x host↔mint interchange format)
-docs/                   vision, architecture, decisions, security, glossary, Foxy's design
+tools/maker/            the card maker's settings, checked (maker.py) and turned into install commands
+maker/                  maker.json: the card maker's settings, the one file a maker's fork changes
+docs/                   vision, architecture, decisions, security, glossary, the card's design history
 ```
 
 ## Spec
@@ -187,9 +266,21 @@ change to the core starts there. [`spec/APDU.md`](spec/APDU.md) gives every
 command byte for byte, with the profiles NUT-CCP leaves to implementations: the
 owner, the clock and the limits, and the NFC tag.
 
+## Known implementations
+
+Readers and wallets that speak this protocol, and card makers' forks, as their
+maintainers have told us; none of them is the protocol's default. A new one is
+added by a pull request.
+
+| Kind | Implementation |
+|---|---|
+| Reader, wallet | [Flash Mobile](https://github.com/lnflash/flash-mobile) |
+| Reader, point of sale | [Flash POS](https://github.com/lnflash/flash-pos) |
+| Reader, wallet | [Foxy](https://github.com/getfoxy/iOS) |
+| Card maker's fork | [getfoxy/card](https://github.com/getfoxy/card): Foxy's, the base of 2.0 |
+
 ## Related
 
-- [getfoxy/card](https://github.com/getfoxy/card): Foxy's fork, the base of 2.0
 - [cashu-client](https://github.com/cashucard/client): mint protocol, BDHKE, witnesses, DLEQ
 - [flash-card-assets](https://github.com/lnflash/flash-card-assets): print-ready physical card design
 - [forge.flashapp.me](https://forge.flashapp.me): the Flash Cashu mint ([reserves](https://forge.flashapp.me/reserves))
@@ -199,7 +290,8 @@ owner, the clock and the limits, and the NFC tag.
 
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and
 [`docs/DECISIONS.md`](docs/DECISIONS.md) first for the design decisions and their
-reasoning. A change to the wire is a change to Foxy's too: agree it with them.
+reasoning. A change to the wire is a change to every reader: agree it with the
+other maintainers first.
 
 ## License
 

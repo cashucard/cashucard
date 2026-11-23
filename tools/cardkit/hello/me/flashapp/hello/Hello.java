@@ -14,7 +14,7 @@ import javacard.framework.Util;
  *
  * Package F0 "CASHHELLO" (F04341534848454C4C4F), applet ...01. INS 01 answers
  * the five bytes HELLO; every other command 6D00. It is small, so it installs
- * as its package's first instance on the J3R180 (docs/FOXY-CARD-HARDWARE.md),
+ * as its package's first instance on the J3R180 (docs/CASHU-CARD-HARDWARE.md),
  * and it is deleted again at the end of every smoke run. It holds nothing.
  */
 public final class Hello extends Applet {

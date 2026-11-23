@@ -1,12 +1,13 @@
 <a id="what-the-chip-has-room-for"></a>
 
-# Foxy card hardware constraints
+# Cashu Card hardware constraints
 
-These observations cover the Foxy 1.x and shared 2.x applets identified in
-each section. Use the [deployment guide](HARDWARE_DEPLOYMENT.md) for the
-current package, AIDs and pinned artifact.
+These observations cover the 1.x applets (the Foxy wallet project's card, which
+2.0 grew out of) and the shared 2.x and 3.0 applets, each identified in its
+section. Use the [deployment guide](HARDWARE_DEPLOYMENT.md) for the current
+package, AIDs and pinned artifact.
 
-Foxy's card runs on an NXP J3R180 (JCOP 4, Java Card 3.0.5, 180 KB of
+The card runs on an NXP J3R180 (JCOP 4, Java Card 3.0.5, 180 KB of
 storage). The simulator the tests run in (jCardSim) has none of the limits
 below, so each was found on the chip, usually the hard way. Each is given
 with what was measured and what the card's software does about it.
@@ -112,13 +113,39 @@ multiple of 256), eight more than 2.0. It installed on a J3R180 with the opener
 first on 2026-10-14, and `cardctl selftest` passed 12 of 12
 ([report](reports/HARDWARE_TEST_REPORT_2026-10-14.j3r180-2.1.md)).
 
+The 3.0 file of the merge (e2aac64), padded to 41,903 bytes by refcheck's measure
+(175 past a multiple of 256), was given to the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03) on 2026-11-19, a
+J3R180 keyed for SCP03 according to the card's supplier: its ATR's historical bytes read J3R310-355 and it is keyed for
+SCP03 (AES), where the earlier J3R180 cards 09312320, 09301220 and 09336320 are keyed for SCP02. No datasheet says so; the
+evidence this repository holds is the chip type both kinds report, ICType D321 ([D229](DECISIONS.md#d229)). The card
+applet's create answered `6F00` once, and the same create, sent again with nothing
+changed, was taken. The install path is the same, line for line, as that of the
+tag's 2.3 file 190c5ab, 41,205 bytes (245 past), which the same card has created
+at the first try every time. So the place again looks like the cause: 175 past
+rested on one earlier install (39,343 bytes on 2026-11-14) and sits near 153 and
+164, where the chip refused. The file is now padded to 245 past instead, 41,973
+bytes, which the J3R310-355 sample card 58206920 then created 30 times of 30 at the first try
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md)). With the
+tag's address given at install ([D227](DECISIONS.md#d227)) the file came to 42,428
+bytes (188 past) and is padded to 245 past again: 42,485
+bytes, which the J3R310-355 sample card 58206920 installed 13 times of 13 at the first try on 2026-11-21 and then paid
+from at a test mint ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). With the security
+review's fixes ([D228](DECISIONS.md#d228)) the file came to 42,482 bytes (242 past), and two writes in a longer form
+pad it back to 42,485, 245 past: the same card installed that file (load file `99a66ba7…`) at the first try on
+2026-11-22, 13 creates of 13, and paid from it at a test mint
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). Every place above past 41,205 bytes was measured on that
+card, a J3R180 keyed for SCP03, and not on a J3R180 keyed for SCP02. No J3R180 keyed for SCP02 has been given a 3.0 file,
+and none will be: according to the supplier the chip's manufacturer has retired that keying, and new J3R180 stock is
+keyed for SCP03. The run owed before any release wording, this file (load file `99a66ba7…`) on a J3R180 keyed for SCP03,
+is that run of 2026-11-22 (see [D230](DECISIONS.md#d230) for what that run covered).
+
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build
 can be moved to a size that is known to install; `tools/refcheck.py`, after
 every `ant cap`, keeps every size the chip has answered (`SIZES`) and says
 whether this build's size is one that installed, one that failed, or one not
-tried yet. A size not tried yet is tried on the chip with
-`~/.foxycard/install-try.sh`, and the answer is added to the table. A
+tried yet. A size not tried yet is tried on the chip (the deployment guide's
+install, on a spare card), and the answer is added to the table. A
 version is shipped at a size that installed.
 
 <a id="a-constructor-may-ask-for-little-more-the-rest-is-asked-for-after-the-install"></a>
@@ -136,7 +163,7 @@ constructor of the card's applet:
 
 The same 12,288 bytes, asked for by a command after the install (an array made in
 `SET_CARD`), were given. So the 12,288 bytes that hold the mint's proofs
-(software 1.20: [`FOXY-CARD-SPEC.md`](FOXY-CARD-SPEC.md) 5.9, [D17](DECISIONS.md#d17))
+(software 1.20: [`CASHU-CARD-SPEC.md`](CASHU-CARD-SPEC.md) 5.9, [D17](DECISIONS.md#d17))
 are not made in the constructor. The first `SET_CARD` that goes through makes them,
 once, outside any transaction. A card that is refused them carries on without, and
 every use of the store is safe while it does not exist.

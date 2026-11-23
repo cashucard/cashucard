@@ -1,6 +1,10 @@
 <a id="flashcard-the-screens-as-they-are-built"></a>
 
-# Foxy Flashcard screens (historical)
+# Card screens of one reader app (historical)
+
+> Historical: the card screens of one reader, the Foxy wallet, as its 1.x card
+> line built them. They are that app's design, not the protocol's: a reader
+> chooses its own screens. The protocol is [`spec/APDU.md`](../spec/APDU.md).
 
 What each screen is for, what is on it, and its states, in the wallet as it
 stands (the wallet repository, getfoxy/iOS, https://github.com/getfoxy/iOS:

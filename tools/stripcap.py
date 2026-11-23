@@ -7,7 +7,7 @@ virtual machine specification says neither need be loaded onto a card, and the
 loader GlobalPlatformPro sends the Descriptor all the same. The chip the card
 runs on keeps nothing of it: the same file installs with it and without it, and
 it has no part in the size the chip is particular about
-(docs/FOXY-CARD-HARDWARE.md). So the build takes it out, which shortens the
+(docs/CASHU-CARD-HARDWARE.md). So the build takes it out, which shortens the
 load by about three kilobytes, and writes 0 for it in the Directory component's
 table of sizes, as the specification has it for a component that is not there.
 

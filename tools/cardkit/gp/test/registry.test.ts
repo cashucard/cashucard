@@ -21,7 +21,7 @@ import {TAG_AID} from '../aids';
 import {fromHex, toHex} from '../bytes';
 import {cashuPlan, provision} from '../provision';
 import {FakeCard} from '../../testing/fake-card';
-import {CASHU_LOAD_FILE} from './assets';
+import {CASHU_LOAD_FILE, TEST_TAG_ADDRESS} from './assets';
 import {parseGpLog, replay} from './transcript';
 
 const fixture = join(__dirname, 'fixtures/gp-list.txt');
@@ -294,7 +294,7 @@ test('readForeignTag finds none on a blank card, nor on a J3R452 the Cashu card 
   const card = new FakeCard({scp: 3});
   const installed = await provision(
     card.transceive,
-    cashuPlan(CASHU_LOAD_FILE),
+    cashuPlan(CASHU_LOAD_FILE, {tagAddress: TEST_TAG_ADDRESS}),
     {
       random: n => randomBytes(n),
       now: () => 0,

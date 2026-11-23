@@ -188,8 +188,8 @@ def test_set_owner_url_fetches_then_anchors():
     saved_fetch, saved_connect = cardctl.fetch_tip, cardctl.connect
 
     class FakeCard:
-        def set_owner(self, pub, anchor, old):
-            assert anchor == HEADER_80
+        def set_owner(self, pub, anchor, old, s=None):
+            assert anchor == HEADER_80 and s is None
             self.anchored = True
 
         def get_info(self):
@@ -198,7 +198,7 @@ def test_set_owner_url_fetches_then_anchors():
     cardctl.fetch_tip = fake
     cardctl.connect = lambda args: FakeCard()
     try:
-        code, out, _ = run_main(["set-owner-url", "--url", "http://ops.test"])
+        code, out, _ = run_main(["set-owner-url", "--url", "http://ops.test", "--owner-key", "22" * 32])
     finally:
         cardctl.fetch_tip, cardctl.connect = saved_fetch, saved_connect
     assert code == 0

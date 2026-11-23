@@ -5,8 +5,8 @@
 > **Historical design record.** Foxy's software 1.20 was merged as protocol 2.0
 > (ENG-673, [D18](docs/DECISIONS.md#d18)). The body below preserves that fork
 > at the time, including its version numbers, paths and CI state. For the current
-> protocol 2.1 wire, use [`spec/APDU.md`](spec/APDU.md); readers select the whole
-> applet AID `F043415348554341524401`, which answers `02 01`. See
+> protocol 3.0 wire, use [`spec/APDU.md`](spec/APDU.md); readers select the whole
+> applet AID `F043415348554341524401`, which answers `03 00`. See
 > [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the current repository layout.
 
 `getfoxy/card` is a fork of `cashucard/javacard` (applet 0.4, `c1f4580`,
@@ -14,7 +14,7 @@ MIT). The applet here is **not compatible on the wire** with
 upstream's, and has an AID of its own (`F0 46 4F 58 59 43 41 52 44`) so that
 neither can be mistaken for the other.
 
-What changed and why is in [`docs/FOXY-CARD-SPEC.md`](docs/FOXY-CARD-SPEC.md),
+What changed and why is in [`docs/CASHU-CARD-SPEC.md`](docs/CASHU-CARD-SPEC.md),
 section 4:
 
 - `SPEND_PROOF` takes no message. The card rebuilds the slot's own secret and
@@ -64,7 +64,7 @@ section 4:
 
 The instructions and what each carries are in the spec's section 5.2, the owner
 and its proofs in 5.6, and the daily limit and the clock in 5.7; the whole text
-of those three is `docs/FOXY-CARD-DAILY-LIMIT.md`. The applet's version is 1.1
+of those three is `docs/CASHU-CARD-DAILY-LIMIT.md`. The applet's version is 1.1
 (`SELECT` answers `01 01`) and the format byte is 3: `GET_INFO` is 29 bytes (the
 first 16 did not move), `CHANGE_PIN` and `LOCK_CARD` carry an owner's proof, and
 `33`, `34`, `36`, `37`, `41`, `42`, `43`, `44` and `45` are the instructions of the
@@ -78,9 +78,9 @@ only test cards, so none is expected in the field with an older shape.
 | Part | State |
 |---|---|
 | `applet/` and its tests | the fork. `mvn -f applet/pom.xml test`, and `ant -f applet/build.xml cap -Djc.sdk=…/jc305u4_kit` |
-| `docs/FOXY-CARD-SPEC.md` | the fork |
-| `docs/FOXY-CARD-DAILY-LIMIT.md` | the daily limit, the clock and the owner key, in full; where it and the spec differ, this is what is built |
-| `docs/FOXY-CARD-SCREENS.md` | the wallet's card screens, as built |
+| `docs/CASHU-CARD-SPEC.md` | the fork |
+| `docs/CASHU-CARD-DAILY-LIMIT.md` | the daily limit, the clock and the owner key, in full; where it and the spec differ, this is what is built |
+| `docs/CASHU-CARD-SCREENS.md` | the wallet's card screens, as built |
 | `docs/CARD-DESIGNS.md` | the codes of the designs a card's face can have, and how one is added |
 | `docs/FOR-LNFLASH.md` | the note to upstream: what changed, what was found, what has and has not been tested |
 | `spec/`, `README.md`, the other `docs/` | upstream's, describing upstream's wire. Not yet rewritten |

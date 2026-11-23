@@ -45,7 +45,7 @@ The 256-byte refusal supplies no allocation-capacity measurement. The earlier
 successful constructor control had a 19,635-byte load file; both the 256-byte
 and 16 KiB single-pool profiles had 19,751-byte load files. Their comparison
 changed both allocation and image layout. The documented
-[load-file-size sensitivity and constructor budget](../FOXY-CARD-HARDWARE.md)
+[load-file-size sensitivity and constructor budget](../CASHU-CARD-HARDWARE.md)
 remain confounders. The generic status cannot identify the failing operation.
 
 A next diagnostic should use one identical CAP for its baseline and reservation
