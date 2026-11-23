@@ -1,0 +1,13 @@
+  > 00a404000bf043415348554341524401
+  ⏱ SELECT               17.9 ms
+  < 0301 9000
+  > b001040000
+  ⏱ GET_INFO             29.3 ms
+  < 030180000080ff010403000100000000016b047a9e00000000000000000000000000000000000000000000010000000000000000000000f7030000 9000
+
+apdu timing (reader round trip):
+command     n       min    median       max      total
+SELECT      1      17.9      17.9      17.9       17.9
+GET_INFO    1      29.3      29.3      29.3       29.3
+2 APDU(s), 47.3 ms on the wire (all figures ms)
+this card has an owner: it is reset by its owner's proof (--owner-key, and --pin where it is locked; or the provisioner's reset, or ops local-reset), not by the PIN; nothing was sent
