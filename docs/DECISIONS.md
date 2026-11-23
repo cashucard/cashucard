@@ -9456,11 +9456,9 @@ them, and corrects [D236](#d236) where it said more than its run showed.
    askings and then four a limit's worth, a second payment's ten, the history at the seventh asking and the reset by the
    PIN at the seventeenth. A 3.0 card needs `VERIFY_PIN` after its first `SET_PIN`. A reader of 3.1 reads them as 3.x
    ([D205](#d205)) and asks until `9000`; once one holds nothing it may be given the 3.1 file.
-3. **The owner agreed on 2026-11-23**, as the other maintainer D231 to D233 name, to the three shorter protections of
-   3.1: the limit as a rate ([D231](#d231)); the second payment's wait of two askings and the history's hold of three
-   ([D232](#d232)); and, explicitly, the reset by the PIN of an empty card with no owner at four askings (about 2.6 s with the history's three),
-   with what it allows as `SECURITY-MODEL.md` #20 says it. The owner agreed to [D233](#d233) to [D235](#d235) too.
-   D231 to D235 stay decided; the applet is unchanged.
+3. **The owner agreed on 2026-11-23** to [D231](#d231) to [D235](#d235), as the other maintainer D231 to D233 name: to
+   the reset by the PIN of an empty card with no owner at four askings ([D232](#d232)) explicitly, with what it allows as
+   `SECURITY-MODEL.md` #20 says it. D231 to D235 stay decided; the applet is unchanged.
 4. **The runs of 2026-11-23, and what each rests on.** The
    [report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md) gives the tracked file (load file
    `b2afa9a8…`, 42,741 bytes) on three chips:
@@ -9494,3 +9492,43 @@ it prints.
 `COMPONENT-RELEASES.md`, `RELEASE-NOTES.md`, `CASHU-CARD-HARDWARE.md`, `HARDWARE_DEPLOYMENT.md`, the README and the site's
 guides say that 3.0 is not released and that 3.1 is the first release, and name the runs of 2026-11-23 as above. refcheck's
 `PROVEN` entry for `b2afa9a8…` says (1) and (4) behaved as before; its hashes and sizes are unchanged. No report is edited.
+
+*Amended by [D238](#d238) (2026-11-23): the owner counts the runs on card 36813121 and card 09334220 on the
+contributor's logs; item 4's "not counted" no longer holds for them.*
+
+## <a id="d238"></a>D238: The 3.1 runs on a J3R452 and on a J3R180 keyed for SCP02 are counted, on the contributor's logs
+
+**Decided (protocol 3.1, 2026-11-23, the project owner; amends [D237](#d237) (4)).** D237 left the runs of 2026-11-23 on
+card 36813121, a J3R452, and card 09334220, a J3R180 keyed for SCP02, uncounted until the owner had read their logs. The
+contributor added the logs of all three cards in commit `de39f68` ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and the reviewer read all 38 files
+against [the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). They are per-card records of one
+reader and three sessions, one after another, with each card's own keys and timings. Every wait over the limit matches
+3.1's rule ([D231](#d231)), each card answers `03 01`, and each shows [D236](#d236) (2), the claim after a reset held for
+four askings.
+
+**The decisions.**
+
+1. The owner counts the runs of 2026-11-23 on card 36813121 (a J3R452) and on card 09334220 (a J3R180 keyed for SCP02)
+   as runs of a 3.1 file with D236, on the strength of the contributor's logs. This replaces D237 (4)'s "not counted"
+   for those two runs.
+2. What the logs lack, said plainly:
+   - no log gives the sha256 of the file sent to the chip: `install.log` names the CAP by its path only, with no block
+     count or load size, where the deployment guide's checklist asks the run's log for every file's sha256;
+   - there are no logs of the create cycles, of `cardctl selftest`, or of the free memory read;
+   - the J3R452's `install.log` logs no deletes of its earlier install;
+   - the folder of card 09334220 holds no `select-zero.log`, although the report claims D236 (4) on that card and the
+     logs' README says every folder has one. The report's claim of D236 (4) on card 09334220 is unsupported by its logs.
+     The report is not edited.
+3. [D229](#d229)'s sentence still holds for 3.0: no 3.0 file was ever given to a J3R180 keyed for SCP02, and none will be.
+   A 3.1 file has now been run on one, card 09334220.
+4. `PROVEN`'s entry for `b2afa9a8…` still rests on the run on card 58206920 and is unchanged. No hash or size is added,
+   and `SCP03_ONLY` is unchanged: refcheck prints the general line for 42,741 bytes, "a size known to install on the
+   chip.", and that line now agrees with the records, since the size has installed on a J3R180 keyed for SCP03
+   (58206920), on one keyed for SCP02 (09334220) and on a J3R452 (36813121). Only the `SIZES` comment for 42,741 now names
+   the three chips.
+5. Asked of the contributor: the sha256 of the load file in each run's log, the `selftest` and create-cycle logs, and the
+   missing `select-zero.log` for card 09334220.
+
+**Changed.** The README, `COMPONENT-RELEASES.md`, `RELEASE-NOTES.md`, `HARDWARE_DEPLOYMENT.md`, `CASHU-CARD-HARDWARE.md`,
+`SECURITY-MODEL.md` and the provisioner's README name the two runs as counted and point here;
+`tools/refcheck.py`'s `SIZES` comment for 42,741. Nothing about a J3R180 keyed for SCP02 and 3.0 changes.
