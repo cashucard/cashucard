@@ -1102,9 +1102,9 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
             if claims:
                 found.append(f"{name}: claims of a file that has run only in a simulator: {claims}")
     for name, text, is_html in texts:
-        # the two speak of other versions' runs too, with phones: held to the sentences of 3.0 and of its source's
-        # runs, made when it was numbered 2.3 (D205)
-        claims = proven_overclaims(text, is_html, ("3.0", "2.3") if name in ("README.md", "RELEASE-NOTES.md") else None)
+        # the two speak of other versions' runs too, with phones: held to the sentences of 3.1 (the tracked file), of
+        # 3.0 and of its source's runs, made when it was numbered 2.3 (D205)
+        claims = proven_overclaims(text, is_html, ("3.1", "3.0", "2.3") if name in ("README.md", "RELEASE-NOTES.md") else None)
         if claims:
             found.append(f"{name}: claims beyond what the chip run proved: {claims}")
     head = "### The 3.0 chip run's checklist"
@@ -1178,6 +1178,20 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
             assert old in texts[where], (where, old)
             texts[where] = texts[where].replace(old, new, 1)
             assert guide_findings(refcheck, cap, texts["md"], texts["html"], texts["hd"]), (where, new)
+        # README and the release notes, held to the sentences of 3.1, 3.0 and 2.3: a claim of what the run did not cover,
+        # in a sentence of 3.1 alone (naming neither 3.0 nor 2.3) as in one of 3.0
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        notes = (ROOT / "docs" / "RELEASE-NOTES.md").read_text(encoding="utf-8")
+        assert guide_findings(refcheck, cap, md, html_, hd, readme, notes) == []
+        for where, old, new in (
+            ("readme", "## ", "## Status\n\nThe 3.1 file paid a production mint with a phone.\n\n## "),
+            ("notes", "## ", "## Run\n\nProtocol 3.1 was tested with phones and torn on purpose.\n\n## "),
+            ("notes", "## ", "## Run\n\nThe earlier 3.0 file paid a production mint with a phone.\n\n## "),
+        ):
+            texts = {"readme": readme, "notes": notes}
+            assert old in texts[where], (where, old)
+            texts[where] = texts[where].replace(old, new, 1)
+            assert guide_findings(refcheck, cap, md, html_, hd, texts["readme"], texts["notes"]), (where, new)
         for fine in ("Not covered: a phone, a production mint, or a card torn on purpose.",
                      "It has not yet paid a production mint or run with a phone.",
                      "Read the NFC tag the way a phone does."):

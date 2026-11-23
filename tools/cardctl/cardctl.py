@@ -3583,15 +3583,21 @@ def cmd_selftest(args) -> int:
     return rc if all_sigs_ok else 1
 
 
+def _versions_said(versions, last: str) -> str:
+    """The versions as a sentence says them: "2.1, 2.2, 3.0 or 3.1"."""
+    names = [f"{a}.{b}" for a, b in versions]
+    return ", ".join(names[:-1]) + f" {last} " + names[-1] if len(names) > 1 else "".join(names)
+
+
 def _select_verdict(version: bytes) -> Tuple[bool, str]:
     """
     Whether the applet version SELECT answered is a build selftest can pass:
-    protocol 2.1, 2.2 or 3.0 (SELFTEST_VERSIONS). The shared AID (D19) answers
-    nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26 replaced:
-    it is reinstalled. A later minor of a major this tool knows (2.3, 3.1), or a
-    later major (4.0), is one it does not know, and is refused. That is a
-    statement about the test, not the wire: a 3.1 is still driven as 3.0 by the
-    other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
+    protocol 2.1, 2.2, 3.0 or 3.1 (SELFTEST_VERSIONS). The shared AID (D19)
+    answers nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26
+    replaced: it is reinstalled. A later minor of a major this tool knows (2.3,
+    3.2), or a later major (4.0), is one it does not know, and is refused. That
+    is a statement about the test, not the wire: a 3.2 is still driven as 3.x by
+    the other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
     before the renumbering, is not, and is said so here.
     """
     if len(version) < 2:
@@ -3603,10 +3609,11 @@ def _select_verdict(version: bytes) -> Tuple[bool, str]:
         return False, (f"applet {ver[0]}.{ver[1]} is no released version, and the commands that move money or set a "
                        f"card up refuse it: {PRE_RENUMBERING}")
     if ver > SELFTEST_VERSIONS[-1] or (newest_of_major is not None and ver > newest_of_major):
-        return False, (f"applet {ver[0]}.{ver[1]} is a version this cardctl does not know (it knows 2.1, 2.2 and "
-                       f"3.0): use a cardctl of that version")
+        return False, (f"applet {ver[0]}.{ver[1]} is a version this cardctl does not know (it knows "
+                       f"{_versions_said(SELFTEST_VERSIONS, 'and')}): use a cardctl of that version")
     if ver not in SELFTEST_VERSIONS:
-        return False, (f"applet {ver[0]}.{ver[1]} is not protocol 2.1, 2.2 or 3.0: sweep the balance, then "
+        return False, (f"applet {ver[0]}.{ver[1]} is not protocol {_versions_said(SELFTEST_VERSIONS, 'or')}: "
+                       f"sweep the balance, then "
                        f"reinstall the tracked CAP (docs/HARDWARE_DEPLOYMENT.md)")
     return True, f"version {ver[0]}.{ver[1]}"
 

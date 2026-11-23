@@ -135,7 +135,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // payment leaves the one before it as it was. Nothing else on the wire moves.
     // 2.0 to 2.2 are major 2. 3.0 is the wire of D183 and after (the comment above VERSION_MINOR has it): a 2.2 reader
     // cannot read it, and readers take the major as the line they can read, so the major moves to 3 and the minor counts
-    // from 0 again. Cards in the field stay 2.1 and 2.2, and answer as they did. [M3: the merge's D211 to D226 ride in 03 00; 3.1 is open with the other maintainer.]
+    // from 0 again. Cards in the field stay 2.1 and 2.2, and answer as they did. [M3: the merge's D211 to D226 ride in 03 00; 3.1 is agreed by both maintainers, D237.]
     static final byte VERSION_MAJOR = (byte) 0x03;
     // 1.9 takes its PIN sealed: enciphered to a key the card keeps for that and nothing else, under
     // sixteen bytes of its own that are good once (see `unseal`). Capability bit 7 says so.
@@ -7472,8 +7472,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* 3.1 with the review's fixes (D236): forty writes, the thirteen below and twenty-seven more, 228 bytes, so the load file
          * is 42,741 bytes, 245 past a multiple of 256, the place (not the size) of every 3.x file card 58206920 (a J3R180 keyed
          * for SCP03, D229) has installed. D236's code took the thirteen writes' file to 42,579 (83 past; 42,513 unpadded, 17 past,
-         * places not tried); 42,485 again would mean 28 bytes less code than D236 needs. No chip has been given a file of 42,741
-         * bytes: the chip run of D236 is to try it.
+         * places not tried); 42,485 again would mean 28 bytes less code than D236 needs. Card 58206920 installed this file of
+         * 42,741 bytes at the first try on 2026-11-23 (D237).
          * 3.1 (D231 to D235, on 3.0 with D228's review fixes, and D232 amended: a second payment's least after the change's
          * credit): thirteen writes, 66 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the size and the
          * place of 330ffa1's 3.1 file (load file 4014e7f1..., fifteen writes, 78 bytes, from 42,407 unpadded), which card 58206920

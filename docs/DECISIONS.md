@@ -9240,8 +9240,8 @@ payment of exactly the rate would wait one step, since R is 5.6% over R × 0.947
 takes `outputs >> 1` off. `VERSION_MINOR` 1: a reader of 3.0 sends what it sent and is answered sooner, so the minor moves and
 not the major ([D205](#d205)). jCardSim: `testTheWaitIsTwoALimitsWorthWithNoFirstStep` (within the limit signs at the first
 `SIGN`; N limits' worth wait 2 × (N − 1); the credit; a second payment's least), and every test that pinned 10 and 4 moved to
-the rule. *Not yet agreed with the other maintainer, on the shared 3.x wire (as M3; M1 is closed by [D228](#d228)). Run on a
-chip as 330ffa1's file (below).*
+the rule. *Agreed with the other maintainer on 2026-11-23, on the shared 3.x wire (M3; M1 is closed by [D228](#d228);
+[D237](#d237)). Run on a chip as 330ffa1's file (below).*
 
 ## <a id="d232"></a>D232: No padding past the protection: the second payment two askings, the held history three, the reset by the PIN four
 
@@ -9284,8 +9284,10 @@ change. A first payment is as before. jCardSim: `CashuAppletTest.aSecondPayments
 
 **Built (applet 3.1).** `WAIT_SECOND_SIGNS = 2`, `HISTORY_ASKINGS = 3`, `RESET_ASKINGS = 4`; the held count's bits are as they
 were. jCardSim: the second payment's two in `testTheWaitIsTwoALimitsWorthWithNoFirstStep` and every test of the second payment,
-`HolderTest`, `SimpleCardTest` and `FarHeaderTest` at the new counts. *Not yet agreed with the other maintainer. Run on a chip
-as 330ffa1's file (below), before the amendment.*
+`HolderTest`, `SimpleCardTest` and `FarHeaderTest` at the new counts. *Agreed with the other maintainer on 2026-11-23
+([D237](#d237)): the second payment's two askings, the history's three, and, explicitly, the reset by the PIN's four, the
+shorter hold and what it allows (`SECURITY-MODEL.md` #20 as it stands). Run on a chip as 330ffa1's file (below), before the
+amendment.*
 
 ## <a id="d233"></a>D233: The set-up's self-tests run once a set-up life
 
@@ -9329,8 +9331,8 @@ signature is what finds it then, and since [D228](#d228) each such signature is 
 faster ... the claim's hold must come back in some form"). It comes back as [D234](#d234).
 
 **Built (applet 3.1).** `selfTested`; `processSetCard` runs `checkFraming` and the three inits only while it is false.
-jCardSim: `HoldNoLongerThanNeededTest.theSelfTestsRunOnceInTheCardsLife`, `aResetRunsTheSelfTestsAgain`. *Not yet agreed with
-the other maintainer. Run on a chip as 330ffa1's file (below).*
+jCardSim: `HoldNoLongerThanNeededTest.theSelfTestsRunOnceInTheCardsLife`, `aResetRunsTheSelfTestsAgain`. *Agreed with
+the other maintainer on 2026-11-23 ([D237](#d237)). Run on a chip as 330ffa1's file (below).*
 
 ## <a id="d234"></a>D234: The one-asking claim is a blank card's alone
 
@@ -9428,3 +9430,110 @@ alone, so every 3.1 card was refused (`Saved reset requires reconciliation`). It
 has both hashes): D236's code took 94 bytes, so `sizeTheFile` now holds forty writes and the file sits at 245 past a multiple
 of 256 again, the place where card 58206920 has installed every 3.x file, one page (256 bytes) above their size. No chip has
 been given a file of this size. jCardSim 963 (959 and these four). Run on three chips on 2026-11-23 (sample card 58206920, a J3R452 and a J3R180 keyed for SCP02): installed at the first try, (1), (2) and (4) seen on the chip, and paid from at testnut with change (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md).
+
+*Amended by [D237](#d237) (2026-11-23): "No chip has been given a file of this size" was true when written; card 58206920
+installed this file on 2026-11-23. Of (1), (2) and (4), only (2) was shown to differ on the chip: (1) and (4) behaved there
+as the file before D236 does, and their fixes are covered in jCardSim only. Of the three chips, the run counted is card
+58206920's; the J3R452's and the J3R180 keyed for SCP02's are the contributor's report, not counted until the owner has
+read their logs.*
+
+*Amended by [D238](#d238) (2026-11-23): the owner counts the runs on card 36813121 and card 09334220, on the
+contributor's statement for the file and on the contributor's logs for the rest.*
+
+## <a id="d237"></a>D237: 3.0 is not released; 3.1 is the first released card version, and its shorter holds are agreed
+
+**Decided (protocol 3.1, 2026-11-23, the project owner; after the review of 3.1 at the head of `card-3.1-pr`).** The
+review asked three things of the owner: whether 3.0 is released before 3.1; whether the owner, the other maintainer that
+[D231](#d231) to [D233](#d233) wait on, agrees to D231 to [D235](#d235); and what the runs of 2026-11-23 count for. This decision answers
+them, and corrects [D236](#d236) where it said more than its run showed.
+
+**The decisions.**
+
+1. **3.0 is never released.** The first released card version is 3.1. 3.0 becomes a development step, as 2.3 was before it
+   ([D205](#d205)). Its branch is merged to main for its history, with no firmware tag: no `firmware-v3.0.0` tag will be
+   cut, and `firmware-v3.1.0` is the first firmware tag of the 3.x line. The tracked CAP is `cashu-javacard-3.1.0.cap`;
+   the 3.0 file (load file `99a66ba7…`) stays on refcheck's `PROVEN` and in the history, with
+   [its report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md) and [D230](#d230).
+   [D228](#d228) to [D230](#d230) stand as written.
+2. **The few test cards that carry a 3.0 file** answer `03 00` and keep 3.0's waits and holds: the over-limit wait of ten
+   askings and then four a limit's worth, a second payment's ten, the history at the seventh asking and the reset by the
+   PIN at the seventeenth. A 3.0 card needs `VERIFY_PIN` after its first `SET_PIN`. A reader of 3.1 reads them as 3.x
+   ([D205](#d205)) and asks until `9000`; once one holds nothing it may be given the 3.1 file.
+3. **The owner agreed on 2026-11-23** to [D231](#d231) to [D235](#d235), as the other maintainer D231 to D233 name: to
+   the reset by the PIN of an empty card with no owner at four askings ([D232](#d232)) explicitly, with what it allows as
+   `SECURITY-MODEL.md` #20 says it. D231 to D235 stay decided; the applet is unchanged.
+4. **The runs of 2026-11-23, and what each rests on.** The
+   [report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md) gives the tracked file (load file
+   `b2afa9a8…`, 42,741 bytes) on three chips:
+   - card 58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](#d229)): the install, the D236 checks
+     and the money run at testnut. `PROVEN`'s entry for `b2afa9a8…` and `SIZES`' 42,741 stand on this report, as
+     [D230](#d230) (2) says the entries for `99a66ba7…` and `d69742d0…` stand on theirs;
+   - card 36813121, a J3R452, and card 09334220, a J3R180 keyed for SCP02: the contributor's report. Neither run is
+     counted until the owner has read its logs: no text relies on them for a general claim, and nothing says on their
+     strength that a file of 42,741 bytes installs on a J3R180 keyed for SCP02. [D229](#d229)'s sentence stands as far as
+     this repository's evidence goes: no run on a J3R180 keyed for SCP02 with a 3.x file is counted.
+
+   The review found no logs of these runs in the repository, and they were asked for. The contributor added the logs of
+   all three cards after the review ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/), commit `de39f68`; the report's last section points to them). They
+   name the CAP by its path; none gives the sha256 of the file sent to the chip, which the deployment guide's checklist
+   asks the run's log to hold. Reading them against the report, and counting the two runs or not, is the owner's.
+5. **What D236's run showed.** (2), the one-asking claim, is the one fix shown to differ on the chip: after a reset by the
+   owner the claim was held for four askings where the earlier file took one. (1) and (4) behaved on the chip as the file
+   before D236 does: an untorn reset ran the self-tests again under both files, and the chips we know clear what a tap
+   gave at a `SELECT` of the tag ([D222](#d222)). Their fixes are covered in jCardSim only (`ReviewFixesTest`), as is
+   (3). The report says (1) and (4) were checked on the chip; it is not edited.
+
+**For the owner: refcheck's line for 42,741 bytes.** `SCP03_ONLY` lists 41,205, 41,973 and 42,485, so for a file of those
+sizes refcheck prints that the size is known to install on a J3R180 keyed for SCP03 and that no J3R180 keyed for SCP02 has
+been given a file of that size. 42,741 was added to `SIZES` and not to `SCP03_ONLY`, so for the tracked file refcheck
+prints the general line, "a size known to install on the chip.", with no word of the keying. Its `SIZES` comment and its
+`PROVEN` entry name card 58206920 alone. Whether 42,741 goes on `SCP03_ONLY`, or the SCP02 run is counted on its log,
+is left to the owner; refcheck's behaviour is unchanged here, and `tools/ci/refcheck.test.cjs` asserts the line
+it prints.
+
+**Changed.** D231 to D233's notes say, in their own words, that the other maintainer agreed; a note after D236.
+`COMPONENT-RELEASES.md`, `RELEASE-NOTES.md`, `CASHU-CARD-HARDWARE.md`, `HARDWARE_DEPLOYMENT.md`, the README and the site's
+guides say that 3.0 is not released and that 3.1 is the first release, and name the runs of 2026-11-23 as above. refcheck's
+`PROVEN` entry for `b2afa9a8…` says (1) and (4) behaved as before; its hashes and sizes are unchanged. No report is edited.
+
+*Amended by [D238](#d238) (2026-11-23): the owner counts the runs on card 36813121 and card 09334220 on the
+contributor's logs; item 4's "not counted" no longer holds for them.*
+
+## <a id="d238"></a>D238: The 3.1 runs on a J3R452 and on a J3R180 keyed for SCP02 are counted, on the contributor's logs
+
+**Decided (protocol 3.1, 2026-11-23, the project owner; amends [D237](#d237) (4)).** D237 left the runs of 2026-11-23 on
+card 36813121, a J3R452, and card 09334220, a J3R180 keyed for SCP02, uncounted until the owner had read their logs. The
+contributor added the logs of all three cards in commit `de39f68` ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and the reviewer read the logs
+against [the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). They are per-card records of one
+reader and three sessions, one after another, with each card's own keys and timings. Every wait over the limit matches
+3.1's rule ([D231](#d231)), each card answers `03 01`, and each shows [D236](#d236) (2), the claim after a reset held for
+four askings.
+
+**The decisions.**
+
+1. The owner counts the runs of 2026-11-23 on card 36813121 (a J3R452) and on card 09334220 (a J3R180 keyed for SCP02)
+   as runs of the tracked 3.1 file, on the contributor's statement: for those two cards the file's sha256 and load size
+   are unlogged (item 2's first gap). The rest of each run rests on the contributor's logs. This replaces D237 (4)'s
+   "not counted" for those two runs.
+2. What the logs lack, said plainly:
+   - no log gives the sha256 of the file sent to the chip: `install.log` names the CAP by its path only, with no block
+     count or load size, where the deployment guide's checklist asks the run's log for every file's sha256;
+   - there are no logs of the create cycles, of `cardctl selftest`, or of the free memory read;
+   - the J3R452's `install.log` logs no deletes of its earlier install;
+   - the folder of card 09334220 holds no `select-zero.log`, although the report claims D236 (4) on that card and the
+     logs' README says every folder has one. The report's claim of D236 (4) on card 09334220 is unsupported by its logs.
+     The report is not edited.
+3. [D229](#d229)'s sentence still holds for 3.0: no 3.0 file has been given to a J3R180 keyed for SCP02, as far as this
+   repository records, and none will be.
+   A 3.1 file has now been run on one, card 09334220.
+4. `PROVEN`'s entry for `b2afa9a8…` still rests on the run on card 58206920 and is unchanged. No hash or size is added,
+   and `SCP03_ONLY` is unchanged: refcheck prints the general line for 42,741 bytes, "a size known to install on the
+   chip.", and that line now agrees with the records, since the size has installed on a J3R180 keyed for SCP03
+   (58206920), on one keyed for SCP02 (09334220) and on a J3R452 (36813121). Only the `SIZES` comment for 42,741 now names
+   the three chips.
+5. Asked of the contributor: the sha256 of the load file in each run's log, the `selftest` and create-cycle logs, and the
+   missing `select-zero.log` for card 09334220.
+
+**Changed.** The README, `COMPONENT-RELEASES.md`, `RELEASE-NOTES.md`, `HARDWARE_DEPLOYMENT.md`, `CASHU-CARD-HARDWARE.md`,
+`SECURITY-MODEL.md` and the provisioner's README name the two runs as counted and point here;
+`tools/refcheck.py`'s `SIZES` comment for 42,741. Nothing about a J3R180 keyed for SCP02 and 3.0 changes.

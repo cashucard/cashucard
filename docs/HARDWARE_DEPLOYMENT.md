@@ -97,6 +97,9 @@ that has never had a PIN, the shared hash emptied before each first update, a `S
 size no chip had been given before. Padded by `sizeTheFile` (below), this exact file has run on a chip: card 58206920
 installed it at the first try (1 load, 6 creates) on 2026-11-23, and it was paid from at a test mint, testnut, with real
 signatures and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)).
+The same day this file installed and was paid from at a test mint on card 36813121, a J3R452, and on card 09334220, a
+J3R180 keyed for SCP02: runs the owner counts on the contributor's logs ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), whose gaps
+[D238](DECISIONS.md#d238) lists, among them that no log gives the sha256 of the file sent. 3.1 is the first released card version; 3.0 is not released ([D237](DECISIONS.md#d237)).
 
 The 3.1 file before it (bab8c5a, load file `9ed12359…`) was **42,485 bytes**, in 173 blocks of 247 bytes, the last 1. It
 is the 3.0 file below, with the security review's
@@ -875,7 +878,7 @@ ran once, after the run, while `selftest` ran before and after. The run of 2026-
 (above) did them all for the file before D211, numbered 2.3 then (`f216644a…`), but the owner's
 reset of a locked card, which would lock the bench card for good; `INBOX` for last week
 was read after a reset by the PIN anchored in that week. The run on the 3.0 file of the merge, on a J3R180 keyed for SCP03 ([D229](DECISIONS.md#d229)),
-is to do them all again, and the size first; the run of 2026-11-22 on the tracked file did the items ticked below for it. Write the sha256 of every file sent to the chip in the
+is to do them all again, and the size first; the run of 2026-11-22 on the 3.0 file, tracked then, did the items ticked below for it. Write the sha256 of every file sent to the chip in the
 run's log.
 
 - Install the three applets in order, and add the load file's size to refcheck's
@@ -893,7 +896,7 @@ run's log.
     [x] `C9` and the address in `gp -d`; [x] n + 56 and `#new`; [x] the coded address whole and in pieces of 59, its M
     under the owner's c; [x] `C9 00`, a short install and one with no length each `6A80`, no tag, the card's applet
     answering; [x] 127 bytes, then `https://getfoxy.io/card`; [ ] a phone's read, left for the keeper.
-  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked file), the same card ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)):
+  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked file until 3.1), the same card ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)):
     [x] the three applets in order, 1 load and 13 creates of the card's applet and of the tag at the first try, `SELECT`
     `03 00`; [x] n + 56 and `#new` at `https://getfoxy.io/card`; [ ] the refusals and the coded address, not repeated
     (D228 did not touch the tag); [ ] a phone's read, left for the keeper.
@@ -921,7 +924,7 @@ run's log.
     outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in later swaps;
     [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c (the first load's 36 pieces, minted to it, read
     back and rebuilt). Its hash is on PROVEN.
-  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked 3.0 file), the same card, at testnut
+  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the 3.0 file, tracked until 3.1), the same card, at testnut
     ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)): [x] 19 payments signed, each good under P + t·G and not
     under P, every swap taken and the inputs `SPENT`, each wait the spec's count; [x] `AUTH` under the card's key
     (`selftest`, 13 of 13); [x] 24 change outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof,

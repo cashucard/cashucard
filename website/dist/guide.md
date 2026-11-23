@@ -121,7 +121,7 @@ APP: D2760000850101 (SELECTABLE)
 
 ## 5. Check the install
 
-Select the card's applet by its whole AID. It answers with its version, 3.0, and `9000` for success:
+Select the card's applet by its whole AID. It answers with its version, 3.1, and `9000` for success:
 
 ```sh
 gp --apdu 00A404000BF043415348554341524401
@@ -142,7 +142,7 @@ gp --apdu B0010000
 Expected on a new card, with 128 empty slots and its PIN, owner and record still unset:
 
 ```
-03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+03 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 SW: 9000
 ```
 
