@@ -279,7 +279,7 @@ FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
 # the seventeenth asking after the history's seven (24 askings, about 11 s in all), D211: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D211 measured it).
-# 3.1 (D231) answers the history at the third asking and resets at the fourth (7 askings, about 3.5 s in all): these bounds are
+# 3.1 (D231) answers the history at the third asking and resets at the fourth (7 askings, about 2.6 s in all, D235): these bounds are
 # 3.0's, the most any card asks for, and a 3.1 card answers before them.
 LOG_HOLD_MOST = 7
 RESET_MOST = 17
@@ -3776,7 +3776,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_setup)
 
     s = sub.add_parser("reset", help="3.0: the reset of an empty card: by the PIN on a card with no owner (a held tap, "
-                                     "then seventeen askings, about 11 seconds in all), by the owner's proof (--owner-key) on one "
+                                     "then four askings after the history's three, about 2.6 seconds in all on 3.1; seventeen after seven, about 11 "
+                                     "seconds, on 3.0), by the owner's proof (--owner-key) on one "
                                      "with an owner: no PIN, no record, a new card key, for setup")
     s.add_argument("--pin", help="the card's PIN: a card with no owner (on a fresh card reset with --anchor, set here "
                                  "for the reset alone), or a locked card with an owner")

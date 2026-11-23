@@ -9460,7 +9460,7 @@ class CashuAppletTest {
         // and KEYSET_KEYS (D190: the grant teaches a keyset's keys, and is the holder's say to bind an opening to another key);
         // and nowhere else: since 3.0 (D185) it opens no load, no CLEAR_SPENT and no SET_PIN. 3.0 (D189): the holder's say (GET_INFO, a load's
         // keyset table, KEYSET_KEYS' other key) is read in holderSays and requireSay, the history's in requireHistory
-        assertEquals(9, uses, "loadGrant is set by ALLOW_LOAD and read by SPEND_ALL_SIGN, KEYSET_KEYS' teaching, holderSays (GET_INFO, a load's keyset table), requireSay (KEYSET_KEYS' other key), requireHistory (GET_LOG and its receipts) and GET_CARD P1 = 3 (c, D197), and let go by RESET_CARD (1.17) and by an owner replaced (SET_OWNER, D197): " + uses);
+        assertEquals(10, uses, "loadGrant is set by ALLOW_LOAD and read by SPEND_ALL_SIGN, KEYSET_KEYS' teaching, holderSays (GET_INFO, a load's keyset table), requireSay (KEYSET_KEYS' other key), requireHistory (GET_LOG and its receipts) and GET_CARD P1 = 3 (c, D197), and let go by RESET_CARD (1.17), by an owner replaced (SET_OWNER, D197) and by every selection (select(), D235): " + uses);
         assertEquals(1, count(body(code, "private boolean holderSays(", "private void requireSay("), "loadGrant[0]"), "the holder's say is the grant on an owned card");
         for (String[] m : new String[][] { { "private void requireLoadAuthority(", "private void requireNothingUnspent(" },
                                            { "private void processClearSpent(", "private short freeSpent(" },

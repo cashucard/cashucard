@@ -205,38 +205,33 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
   assert.match(source, /40412: True/);
 });
 
-// The tracked CAP is 3.1 (D230 to D234, with D231's amendment of 2026-11-22) on the 3.0 file of the merge of 2026-11-19 with
-// the review fixes of D228 (one set-up bit a unit, the chip's path given up for one signature only, GET_INFO byte 55 bit 3
-// clear): a load file of 42,485 bytes again, padded by sizeTheFile. Card 58206920 (ATR J3R310-355; ICType D321, SCP03), a
-// J3R180 keyed for SCP03 according to the card's supplier (D229), installed it at the first try on 2026-11-21 and paid from
-// it at testnut with real signatures and real change verified on the chip
-// (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md), so its hash is on PROVEN. Two files before it, of
-// the same size, ran on the same card the same day: 9ac55c1's 3.0 (load file d69742d0...) and 330ffa1's 3.1 (load file
-// 4014e7f1..., without D228). Their hashes stay on PROVEN as those files'.
-test("the tracked 3.1 CAP's load file has run on a chip: its hash is on PROVEN and not on INSTALLED, and d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
+// The tracked CAP is 3.1 with D235's review fixes on top of bab8c5a's 3.1 file: a load file of 42,741 bytes, padded by
+// sizeTheFile to 245 past a multiple of 256, the place of every 3.x file card 58206920 (a J3R180 keyed for SCP03, D229)
+// installed, at a size no chip has been given. It has run only in a simulator: its hash is on neither PROVEN nor INSTALLED
+// until its chip run. bab8c5a's file (load file 9ed12359..., 42,485 bytes), which card 58206920 installed and paid from at
+// testnut on 2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md), stays on PROVEN as that
+// file's, with 9ac55c1's 3.0 (d69742d0...) and 330ffa1's 3.1 (4014e7f1...) before it.
+test("the tracked 3.1 CAP's load file (D235) has run only in a simulator, and 9ed12359, d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.1.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 42485 bytes/);
+  assert.match(r.stdout, /load file: 42741 bytes \(245 past a multiple of 256\)/);
   const sha = r.stdout.match(/load file sha256: ([0-9a-f]{64});/);
   assert.ok(sha, r.stdout);
-  assert.notEqual(sha[1], "d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e", "the tracked file is not 9ac55c1's");
-  assert.notEqual(sha[1], "4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19", "nor 330ffa1's");
-  assert.equal(sha[1], "9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b", "the tracked file is bab8c5a's");
-  assert.match(r.stdout, /; this exact file has run on a chip\.\n/, "the tracked file says it has run on a chip");
-  assert.match(r.stdout, /a size known to install/);
-  assert.match(r.stdout, /known to install on a J3R180 keyed for SCP03 \(card 58206920\); no J3R180 keyed for SCP02 has been given a file of this size\./, "the size is said to be the SCP03 card's, not the SCP02 cards'");
+  assert.equal(sha[1], "b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da", "the tracked file is D235's");
+  assert.match(r.stdout, /this exact file has run only in a simulator so far/, "the tracked file says it has not run on a chip");
+  assert.match(r.stdout, /not yet tried on a chip/, "nor has a file of its size");
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));
   const installed = source.slice(source.indexOf("\nINSTALLED = {"), source.indexOf("\n}", source.indexOf("\nINSTALLED = {")));
   assert.ok(proven.length > 1000, "PROVEN is read");
-  assert.match(proven, /'9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "the tracked file's hash is on PROVEN, the chip named as it is, with PROVEN_NEEDS's words");
-  assert.ok(!installed.includes(sha[1]), "and not on INSTALLED");
+  assert.ok(!proven.includes(sha[1]) && !installed.includes(sha[1]), "on neither PROVEN nor INSTALLED");
+  assert.doesNotMatch(source, /^ {4}42741:/m, "and its size not in SIZES");
+  assert.match(proven, /'9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "bab8c5a's 3.1 file stays on PROVEN as its own");
   assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the 3.0 file before it stays on PROVEN as its own, with PROVEN_NEEDS's words");
-  assert.doesNotMatch(installed, /d69742d0/, "and not on INSTALLED");
-  assert.match(proven, /'4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "330ffa1's 3.1 file stays on PROVEN as its own, the chip named as it is, with PROVEN_NEEDS's words");
-  assert.doesNotMatch(installed, /4014e7f1/, "and not on INSTALLED");
-  assert.match(source, /^ {4}42485: True,/m, "the size is in SIZES");
+  assert.doesNotMatch(installed, /d69742d0|4014e7f1|9ed12359/, "and none is on INSTALLED");
+  assert.match(proven, /'4014e7f17c65bd2a420157852c5a262ba68062ed4ff3ff7122ac21f34d4a1a19': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "330ffa1's 3.1 file stays on PROVEN as its own");
+  assert.match(source, /^ {4}42485: True,/m, "the size those files had is in SIZES");
   assert.match(source, /'f216644a316e4c9de0f8bed2a4f32e90b48fa18624ed95a8f8950503f9464440': '2\.3 with D200 to D204, 36,953 bytes, 2026-11-14, J3R180 '\n +'09312320 at testnut\.cashu\.space: real signatures and real change verified on the chip'/);
 });
 

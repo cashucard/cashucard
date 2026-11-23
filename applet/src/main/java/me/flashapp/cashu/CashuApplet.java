@@ -191,9 +191,10 @@ public class CashuApplet extends Applet implements TagSwitch {
     // every limit's worth past the first, with no larger first step, where 3.0 waited ten and then four; a second payment in the same
     // time in the field waits WAIT_SECOND_SIGNS (two, where 3.0 had ten: D231) at the least; two change outputs take one wait off, where
     // three took two. And the held taps of a card with no owner are shorter (D231): its history 3 askings (7 in 3.0), its reset by the
-    // PIN 4 (17 in 3.0), about 1.5 s and 3.5 s in all with the history's on that card; the owner's claim is as it was.
-    // SET_CARD's self-tests run once a set-up life (until a reset) (D232); the one-asking claim is a blank card's alone (D233); a card's first
-    // PIN stands as given for the selection that set it (D234).
+    // PIN 4 (17 in 3.0): an N-asking hold does the work of N - 1 signatures, so 0.94 s for the history and 1.66 s for the reset
+    // measured on a J3R180 keyed for SCP03, 2.6 s in all (D235 corrects D231's 1.5 s and 3.5 s); the owner's claim is as it was.
+    // SET_CARD's self-tests run once a set-up life (until a reset) (D232); the one-asking claim is a blank card's alone (D233), one that never
+    // had a PIN (D235); a card's first PIN stands as given for the selection that set it (D234).
     // A reader of 3.0 meets nothing new: it asks SPEND_ALL_SIGN until it signs, and is answered sooner. So the minor moves.
     static final byte VERSION_MINOR = (byte) 0x01;
     static final byte FORMAT        = (byte) 0x04;
@@ -740,17 +741,19 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * The held taps (D187, D189): how many times in a row a command is asked for before the card does it. Each asking but
      * the last is answered 6A98, keep holding, after a signature's work of the card's own, thrown away (`holdOn`), as a
-     * payment's wait does it: about half a second an asking on a slower chip, so the hold is seconds the holder sees.
+     * payment's wait does it: about half a second an asking on a slower chip, so the hold is seconds the holder sees. The
+     * last asking does no work, so a hold of N askings is N - 1 signatures' work (D235).
      *
      *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fourth asking, about 2.6 seconds; at the
      *                    first where this first set-up's PIN was set and then its record written in this time in the field
      *                    (TAP_SETUP, D221): SET_CARD's own seconds on the chip are the hold then.
      *   HISTORY_ASKINGS  GET_LOG, the log or the receipts, under the PIN on a card with no owner: answered at the third,
-     *                    about 1.5 seconds (3.1, D231; seven, 2.95 s measured, in 3.0); then open for the rest of the time in the
+     *                    two signatures' work, 0.94 s measured on the chip (3.1, D231, D235; seven, 2.95 s measured, in 3.0); then open for the rest of the time in the
      *                    field (TAP_READ): the holder's say for REFRESH, SET_PIN, LET_GO, KEYSET_KEYS, GET_OUTBOX and the reset,
      *                    and the arming of the no-PIN allowance (D208).
-     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the fourth asking, about two seconds (3.1, D231;
-     *                    seventeen in 3.0); about 3.5 seconds in all with the history's three before it: 7 askings (24 in 3.0).
+     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the fourth asking, three signatures' work, 1.66 s
+     *                    measured on the chip (3.1, D231, D235; seventeen in 3.0); about 2.6 seconds in all with the history's three
+     *                    before it: 7 askings, five signatures' work (24 in 3.0).
      *
      * The counts are the project owner's choice of 2026-11-14 (D211), each from the 0.59 to 0.66 s an asking
      * measured on the J3R180 on 2026-11-14 (0.75 s was the first guess, and came out short). An asking is 0.49 to 0.58 s now (D216 made it
@@ -1287,7 +1290,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     static final byte TAP_TAUGHT  = (byte) 0x20;
     /** This time in the field has had its first command (D233): TAP_HADPIN below is set then, once, and never after. */
     static final byte TAP_BEGUN   = (byte) 0x40;
-    /** The card had a PIN when this time in the field began (D233): a claim in it is never one asking, whatever came after. */
+    /** The card had a PIN when this time in the field began (D233), or had one before a reset (`hadPin`, D235): a claim in it is never one asking, whatever came after. */
     static final byte TAP_HADPIN  = (byte) 0x80;
     private MessageDigest sha;
     /** The hash of the message a payment's one signature is over, kept from SPEND_ALL_BEGIN to SPEND_ALL_SIGN. */
@@ -1551,9 +1554,20 @@ public class CashuApplet extends Applet implements TagSwitch {
     // APDU dispatch
     // -------------------------------------------------------------------------
 
-    /** Every selection, made by a SELECT or by the chip at power-up, ends a first set-up (D195). One byte, written once. */
+    /**
+     * Every selection, made by a SELECT or by the chip at power-up, ends a first set-up (D195). One byte, written once.
+     * And it begins with nothing given (D235): the PIN, the owner's grant and nonce, a held count, a payment or a teaching
+     * begun, and the owner's s, all CLEAR_ON_DESELECT, are zeroed here as well, for a chip that keeps a same-package
+     * applet's transient memory across a SELECT of the tag and back (JCRE 3.0.5, 5.1.1).
+     */
     public boolean select() {
         if (pinMarks[PM_FIRST] != (byte) 0) pinMarks[PM_FIRST] = (byte) 0;
+        pinVerifiedFlag[0] = (byte) 0;
+        loadGrant[0] = (byte) 0;
+        Util.arrayFillNonAtomic(nonceLive, (short) 0, (short) 2, (byte) 0);
+        Util.arrayFillNonAtomic(ownerNonce, (short) 0, OWNER_NONCE_LEN, (byte) 0);
+        Util.arrayFillNonAtomic(allState, (short) 0, (short) 8, (byte) 0);
+        Util.arrayFillNonAtomic(allOut, (short) 0, (short) 33, (byte) 0);
         // the tag's code of its last selection (D222), in this applet's working memory: not left for this one to find
         Util.arrayFillNonAtomic(scratch, X_TAG, (short)(TAG_R_LEN + TAG_MAC_LEN), (byte) 0);
         return true;
@@ -1576,7 +1590,9 @@ public class CashuApplet extends Applet implements TagSwitch {
          * kept for the rest of it: the one-asking claim of a first set-up is a blank card's alone. RAM, gone with the power. */
         if ((tapOpen[2] & TAP_BEGUN) == 0) {
             tapOpen[2] |= TAP_BEGUN;
-            if (pinState[0] != (byte) 0) tapOpen[2] |= TAP_HADPIN;
+            /* (D235: or had one before a reset: `hadPin` is persistent and never cleared, so the card leaving the field after its
+             * reset, or a reader cutting the field, does not make a card that had a PIN a blank card's) */
+            if (pinState[0] != (byte) 0 || hadPin[0] != (byte) 0) tapOpen[2] |= TAP_HADPIN;
         }
 
         /* A held tap is the same command asked again and again (`holdOn`: an owner's claim, D187; the history of a card with
@@ -3916,7 +3932,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         try {
             checkedC = unblind(buf, in, k);
         } catch (RuntimeException e) {
-            // a point the chip will not take, or a proof that does not hold: whatever the platform throws, it is the data's
+            /* a point the chip will not take, or a proof that does not hold: whatever the platform throws, it is the data's;
+             * and the hash it may have left half fed (D235) is emptied, so no later command's hash begins with its bytes */
+            sha.reset();
             ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         }
         // the piece, as LOAD_PROOF takes one, over the data that is done with: keyset, amount, nonce, C, date
@@ -4110,7 +4128,8 @@ public class CashuApplet extends Applet implements TagSwitch {
                     if (Util.arrayCompare(buf, at, allOut, (short) 0, (short) 8) != 0) dropTeaching(ISO7816.SW_WRONG_DATA);
                 }
                 Util.arrayCopyNonAtomic(buf, at, allOut, (short) 0, (short) 8);
-                // the leaf, folded into the tree
+                // the leaf, folded into the tree, from an empty hash (D235: nothing another command left in it)
+                sha.reset();
                 sha.update(TREE, (short) 0, (short) 1);
                 sha.doFinal(buf, at, KEY_WIRE, scratch, (short) 0);
                 push(n, (short) 0);
@@ -4138,6 +4157,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         short at = (short)((short)(allState[1] & 0xFF) * ENTRY_LEN);
         if (!sameBytes(book, at, buf, (short) 0, (short) 8)) ISOException.throwIt(ISO7816.SW_WRONG_DATA);
         // the leaves padded to a power of two: a missing subtree of height h is SHA-256(02) folded h times, in the tail's room
+        sha.reset();
         sha.doFinal(TREE, (short) 2, (short) 1, scratch, T_TAIL);
         for (short h = 0; (short)(n & (short)(n - 1)) != (short) 0; h++) {
             if ((short)((short)(n >> h) & 1) != (short) 0) {
@@ -4268,6 +4288,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         Util.arrayCopyNonAtomic(changeOpen, (short)(k * OPEN_LEN + OPEN_AMOUNT), scratch, (short) 4, (short) 4);
         if (other) Util.arrayCopyNonAtomic(buf, given, scratch, (short) 8, (short) 33);
         else Util.arrayCopyNonAtomic(openKeys, (short)(row + OPEN_KEYS_K), scratch, (short) 8, (short) 33);
+        sha.reset();
         sha.update(TREE, (short) 0, (short) 1);
         sha.doFinal(scratch, (short) 0, KEY_WIRE, scratch, (short) 0);
         // folded up the path
@@ -6285,6 +6306,11 @@ public class CashuApplet extends Applet implements TagSwitch {
             Util.setShort(paid, PAID_NEXT, (short) 0);
             paid[PAID_ROUND] = (byte) 0;
         }
+        /* and the set-up's self-tests are asked again at the next SET_CARD (D232, amended): a verdict a fault planted at the set-up
+         * life's first SET_CARD (SchnorrHW.chipMul or curveByAgreement false, or either true where the chip had failed) does not
+         * outlive a reset and a hand-over to the next holder. A signature never writes chipMul (D228): chipMulInit is its one writer.
+         * In this transaction (D235): a card torn after it is a new card, and a new card has run no self-test. */
+        selfTested = false;
         JCSystem.commitTransaction();
 
         // the old owner's key and PIN overwritten (nothing reads them now), and the PIN's tries back
@@ -6298,10 +6324,6 @@ public class CashuApplet extends Applet implements TagSwitch {
         // and the hold and the set-up's record (D221) with the PIN that gave them (the arming it gave went with the record, D208): a new PIN in this selection has no hold it did not ask for
         // (and whether the card had a PIN when the tap began, D233: a reset in the tap never makes it a blank card's)
         tapOpen[2] &= (byte)(TAP_PAID | TAP_CLAIMED | TAP_BEGUN | TAP_HADPIN);
-        /* and the set-up's self-tests are asked again at the next SET_CARD (D232, amended): a verdict a fault planted at the set-up
-         * life's first SET_CARD (SchnorrHW.chipMul or curveByAgreement false, or either true where the chip had failed) does not
-         * outlive a reset and a hand-over to the next holder. A signature never writes chipMul (D228): chipMulInit is its one writer. */
-        selfTested = false;
     }
 
     /**
@@ -7447,7 +7469,12 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.1 (D230 to D234, on 3.0 with D228's review fixes, and D231 amended: a second payment's least after the change's
+        /* 3.1 with the review's fixes (D235): forty writes, the thirteen below and twenty-seven more, 228 bytes, so the load file
+         * is 42,741 bytes, 245 past a multiple of 256, the place (not the size) of every 3.x file card 58206920 (a J3R180 keyed
+         * for SCP03, D229) has installed. D235's code took the thirteen writes' file to 42,579 (83 past; 42,513 unpadded, 17 past,
+         * places not tried); 42,485 again would mean 28 bytes less code than D235 needs. No chip has been given a file of 42,741
+         * bytes: the chip run of D235 is to try it.
+         * 3.1 (D230 to D234, on 3.0 with D228's review fixes, and D231 amended: a second payment's least after the change's
          * credit): thirteen writes, 66 bytes, so the load file is 42,485 bytes again, 245 past a multiple of 256, the size and the
          * place of 330ffa1's 3.1 file (load file 4014e7f1..., fifteen writes, 78 bytes, from 42,407 unpadded), which card 58206920
          * (a J3R180 keyed for SCP03, D229) installed at the first try (3 loads, 15 creates) on 2026-11-21: what that chip did with other
@@ -7485,5 +7512,32 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[27] = 37;
         a[3] = 41;
         a[5] = 5;
+        a[30] = 40;
+        a[31] = 41;
+        a[32] = 42;
+        a[33] = 43;
+        a[34] = 44;
+        a[35] = 45;
+        a[36] = 46;
+        a[37] = 47;
+        a[38] = 48;
+        a[39] = 49;
+        a[40] = 50;
+        a[41] = 51;
+        a[42] = 52;
+        a[43] = 53;
+        a[44] = 54;
+        a[45] = 55;
+        a[46] = 56;
+        a[47] = 57;
+        a[48] = 58;
+        a[49] = 59;
+        a[50] = 60;
+        a[51] = 61;
+        a[52] = 62;
+        a[53] = 63;
+        a[54] = 64;
+        a[55] = 65;
+        a[56] = 66;
     }
 }

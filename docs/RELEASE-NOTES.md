@@ -8,8 +8,8 @@ the merged pull requests besides.
 ## `firmware-v3.1.0`: Cashu Card protocol 3.1 (not yet tagged)
 
 The tracked CAP is `applet/target/cashu-javacard-3.1.0.cap`, sha256
-`7a070ada1f2f50d2ee78f9393d48c7f99e3b31ed5807f21b3c5481d673127d0d`, its load file sha256
-`9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b`. `SELECT` and `GET_INFO` answer `03 01`, and
+`4ff8d8a20bf1106a3a31db5824a80d8626838d237c974157197d3fac1104845a`, its load file sha256
+`b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da` (42,741 bytes). `SELECT` and `GET_INFO` answer `03 01`, and
 `GET_INFO` P1 = 4 bytes 55 and 56 `F7 03` as 3.0's ([D228](DECISIONS.md#d228)). It is
 the 3.0 file below, with the security review's fixes of [D228](DECISIONS.md#d228), and with [D230](DECISIONS.md#d230)
 (the limit on one payment a rate: two askings for every limit's worth past the first, with no larger first step; the
@@ -17,8 +17,10 @@ change's credit one for every two outputs) and [D231](DECISIONS.md#d231) (the se
 least, counted after the change's credit; the held history three, the reset by the PIN four), [D232](DECISIONS.md#d232)
 (the set-up's self-tests once a set-up life (until a reset); with D228, `chipMulInit` there is the one writer of the chip
 path's verdict), [D233](DECISIONS.md#d233) (the one-asking claim a blank card's alone) and
-[D234](DECISIONS.md#d234) (a card's first PIN stands as given for the selection that set it). This exact file has run
-on a chip: card 58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), installed it and was paid from at a test mint, testnut, on 2026-11-21
+[D234](DECISIONS.md#d234) (a card's first PIN stands as given for the selection that set it), and the review fixes of
+[D235](DECISIONS.md#d235) (a torn reset, a claim after a cut field, the shared hash, a `SELECT` that clears; the holds'
+seconds corrected). This file has run only in a simulator; its chip run is owed. The file before D235 (bab8c5a, load file
+`9ed12359…`, 42,485 bytes) has run on a chip: card 58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), installed it and was paid from at a test mint, testnut, on 2026-11-21
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)). 330ffa1's file, from before the merge onto D228 (load file
 `4014e7f1…`), was installed on the same card and paid from at a test mint, testnut, on 2026-11-21
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)).

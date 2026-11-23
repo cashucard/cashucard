@@ -88,15 +88,22 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 3.1 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256), in 173 blocks of 247 bytes, the
-last 1: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `9ed12359…`),
-whose own sha256 is not the CAP's ([Install](#install) gives both). It is the 3.0 file below, with the security review's
+The 3.1 build is **42,741 bytes** by refcheck's measure (245 past a multiple of 256), in 174 blocks of 247 bytes, the
+last 10: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `b2afa9a8…`),
+whose own sha256 is not the CAP's ([Install](#install) gives both). It is the file of the next paragraph with the review's
+fixes of [D235](DECISIONS.md#d235) (a reset's `selfTested` cleared in its last transaction, the one-asking claim for a card
+that has never had a PIN, the shared hash emptied before each first update, a `SELECT` that zeroes what the tap gave), and
+`sizeTheFile` at forty writes, so that it is 245 past again: the place of every 3.x file card 58206920 has installed, at a
+size no chip has been given yet. **This file has run only in a simulator.** Its chip run is owed.
+
+The 3.1 file before it (bab8c5a, load file `9ed12359…`) was **42,485 bytes**, in 173 blocks of 247 bytes, the last 1. It
+is the 3.0 file below, with the security review's
 fixes of [D228](DECISIONS.md#d228), and with [D230](DECISIONS.md#d230) (the wait over the limit a rate: two askings a
 limit's worth past the first), [D231](DECISIONS.md#d231) (the second payment's wait 2, counted after the change's credit
 since its amendment of 2026-11-22; the held history 3, the reset by the PIN 4), [D232](DECISIONS.md#d232) to
 [D234](DECISIONS.md#d234) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's
 alone, a first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` at thirteen writes, so
-that it is 245 past again, the place and the size of the 3.0 file. Padded by `sizeTheFile` (below), this exact file has run
+that it is 245 past again, the place and the size of the 3.0 file. Padded by `sizeTheFile` (below), that exact file has run
 on a chip: card 58206920 (CPLC ICType D321), a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), installed it at the first try (2 loads, 14 creates) on
 2026-11-21, the waits and the held taps were timed on it, and it was paid from at a test mint, testnut, with real signatures
 and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)).
@@ -488,10 +495,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.1**, sha256
-`7a070ada1f2f50d2ee78f9393d48c7f99e3b31ed5807f21b3c5481d673127d0d`
+`4ff8d8a20bf1106a3a31db5824a80d8626838d237c974157197d3fac1104845a`
 (`applet/target/cashu-javacard-3.1.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 42,485 bytes), has sha256
-`9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b`: the hash the
+is LOADed with (refcheck's measure, 42,741 bytes), has sha256
+`b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -901,7 +908,7 @@ run's log.
     and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 14 of 14); [x] five change outputs back by
     `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in a later swap;
     [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c. That file's hash is on PROVEN.
-  - 2026-11-21, bab8c5a's file (load file `9ed12359…`, the tracked file), the same card, at testnut
+  - 2026-11-21, bab8c5a's file (load file `9ed12359…`, the tracked file until D235), the same card, at testnut
     ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)): [x] 19 payments signed, each good under P + t·G and not
     under P, every swap taken and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 13 of 13); [x] 24 change
     outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in later swaps;
