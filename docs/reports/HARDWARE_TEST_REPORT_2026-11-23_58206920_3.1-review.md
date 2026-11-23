@@ -75,3 +75,23 @@ The load file's sha256 is on refcheck's PROVEN.
 Logs are kept in the run's scratch folder, not in the repository: the payment session (`session-M.log`,
 `p31-results.jsonl`, `p19-M.log`, `bridge-M.log`), `guard.log` (every serial read), `install.log`, `setup1.log`,
 `setup2.log`, `reset-owner.log` and `select-zero.log`.
+
+## The same file on a J3R452 (ICType D600, serial 36813121), 2026-11-23
+
+The same CAP was put on a second chip, a J3R452 (NXP P71D600, SCP03 i=10 with its supplier's AES keys), in place of an older
+1.x install that held nothing of value.
+
+- **Install:** the load (about 18 s), the card's applet and the tag (`https://getfoxy.io/card`) all `9000` at the first try;
+  `selftest` 13 of 13; 5 create cycles of the card's applet and the tag, 5 of 5 at the first try (the tag 260 ms).
+- **D235:** the first set-up's claim at the first asking (960 ms); after a reset by the owner, `6A98` three times (609 to
+  613 ms) and `9000` at the fourth; the first `SET_CARD` after the reset 1,650 ms (the self-tests ran); a SELECT after
+  VERIFY_PIN leaves `GET_LOG` answering `6982`.
+- **Money at testnut, the same plan:** the first load of 36 read back unspent; every payment taken by testnut; the waits
+  over the limit exactly 2 × (N − 1), less one for every two change outputs, as on the J3R180. Each "not yet" took about
+  572 ms here against 462 ms on the J3R180: the holds are counted in askings, so their seconds depend on the chip.
+  Every change piece loaded back with no PIN, with the mint's DLEQ, and read `UNSPENT`; C2's change was spent in X1; the
+  withdrawal of all took 21 pieces.
+- **One break, not the card's:** testnut timed out once while SA2's change was being loaded, after 2 of its 4 pieces. The
+  card listed exactly the 2 still owed (`GET_CHANGE`: #2 and #3); the run went on from there and loaded them.
+- Every one of 27 serial reads was 36813121. Left reset by the owner, this file and the tag installed. Free memory, empty:
+  persistent 190,700, transient 2,718.
