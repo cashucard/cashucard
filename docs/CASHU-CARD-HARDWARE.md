@@ -137,7 +137,7 @@ pad it back to 42,485, 245 past: the same card installed that file (load file `9
 card, a J3R180 keyed for SCP03, and not on a J3R180 keyed for SCP02. No J3R180 keyed for SCP02 has been given a 3.0 file,
 and none will be: according to the supplier the chip's manufacturer has retired that keying, and new J3R180 stock is
 keyed for SCP03. The run owed before any release wording, this file (load file `99a66ba7…`) on a J3R180 keyed for SCP03,
-is that run of 2026-11-22.
+is that run of 2026-11-22 (see [D230](DECISIONS.md#d230) for what that run covered).
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build

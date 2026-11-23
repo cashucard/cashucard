@@ -27,7 +27,7 @@ Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_
 answer `03 00`, and the decisions are D183 to D228 (spec/APDU.md). The tracked
 `cashu-javacard-3.0.0.cap` (load file `99a66ba7…`, with D228's review fixes) was installed and paid from at a test mint
 on the J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-22
-(docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md); no `firmware-v3.0.0` release is cut before the operator's approval. No
+(docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md; see D230 for what that run covered); no `firmware-v3.0.0` release is cut before the operator's approval. No
 J3R180 keyed for SCP02 will be given a 3.0 file: according to the card's supplier the chip's manufacturer has retired
 that keying (D229). The file before it, load file `d69742d0…` (9ac55c1), was installed and paid from at a test mint on
 the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's
