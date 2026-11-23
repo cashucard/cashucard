@@ -87,7 +87,7 @@ test('a blank card needs only identity and applet selection; unknown versions st
     [2, 0, 0x90, 0],
     [2, 3, 0x90, 0],
     [2, 4, 0x90, 0],
-    [3, 1, 0x90, 0],
+    [3, 2, 0x90, 0],
     [4, 0, 0x90, 0],
   ]) {
     const commands: number[][] = [];
@@ -103,7 +103,7 @@ test('a blank card needs only identity and applet selection; unknown versions st
     expect(commands.map(a => a[1])).toEqual([0xa4, 0xca, 0xa4]);
   }
 });
-test('a 2.1 card, a 2.2 card (D175: GET_OUTBOX added) and a 3.0 card are all read past the version', async () => {
+test('a 2.1 card, a 2.2 card (D175: GET_OUTBOX added), a 3.0 card and a 3.1 card are all read past the version', async () => {
   const cplc = fromHex(
     '9f7f2a4790d32147000000000030410933632055470000000000000000048c2337323937360000000000000000',
   );
@@ -111,6 +111,7 @@ test('a 2.1 card, a 2.2 card (D175: GET_OUTBOX added) and a 3.0 card are all rea
     [2, 1],
     [2, 2],
     [3, 0],
+    [3, 1],
   ]) {
     const commands: number[][] = [];
     await readCardStatus(async a => {
@@ -147,8 +148,8 @@ test('a card owed change is told to bring it home through its holder wallet, bef
     expect(s.detail).toContain('Reset is unavailable');
   }
 });
-test("a 3.0 card's spent entries are its holder wallet's to free: no promise of this app's settlement check", () => {
-  const s = cardStatus(installed({spent: 2, version: '3.0'}));
+test.each(['3.0', '3.1'])("a %s card's spent entries are its holder wallet's to free: no promise of this app's settlement check", version => {
+  const s = cardStatus(installed({spent: 2, version}));
   expect(s.title).toBe('Check earlier payments');
   expect(s.detail).toContain('holder wallet frees spent entries');
   expect(s.detail).not.toContain('Reset will independently check settlement');
