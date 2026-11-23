@@ -9451,7 +9451,7 @@ them, and corrects [D236](#d236) where it said more than its run showed.
    cut, and `firmware-v3.1.0` is the first firmware tag of the 3.x line. The tracked CAP is `cashu-javacard-3.1.0.cap`;
    the 3.0 file (load file `99a66ba7…`) stays on refcheck's `PROVEN` and in the history, with
    [its report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md) and [D230](#d230).
-   [D228](#d228) to [D230](#d230) stand as written; where they speak of a 3.0 release, read 3.1.
+   [D228](#d228) to [D230](#d230) stand as written.
 2. **The few test cards that carry a 3.0 file** answer `03 00` and keep 3.0's waits and holds: the over-limit wait of ten
    askings and then four a limit's worth, a second payment's ten, the history at the seventh asking and the reset by the
    PIN at the seventeenth. A 3.0 card needs `VERIFY_PIN` after its first `SET_PIN`. A reader of 3.1 reads them as 3.x
