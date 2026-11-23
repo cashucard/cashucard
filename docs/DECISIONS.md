@@ -9434,8 +9434,8 @@ been given a file of this size. jCardSim 963 (959 and these four). Run on three 
 *Amended by [D237](#d237) (2026-11-23): "No chip has been given a file of this size" was true when written; card 58206920
 installed this file on 2026-11-23. Of (1), (2) and (4), only (2) was shown to differ on the chip: (1) and (4) behaved there
 as the file before D236 does, and their fixes are covered in jCardSim only. Of the three chips, the run counted is card
-58206920's; the J3R452's and the J3R180 keyed for SCP02's are reported by the contributor, their logs not in the
-repository.*
+58206920's; the J3R452's and the J3R180 keyed for SCP02's are the contributor's report, not counted until the owner has
+read their logs.*
 
 ## <a id="d237"></a>D237: 3.0 is not released; 3.1 is the first released card version, and its shorter holds are agreed
 
@@ -9465,14 +9465,17 @@ them, and corrects [D236](#d236) where it said more than its run showed.
    [report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md) gives the tracked file (load file
    `b2afa9a8…`, 42,741 bytes) on three chips:
    - card 58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](#d229)): the install, the D236 checks
-     and the money run at testnut. The report names its logs, kept in the run's scratch folder. They are not in the
-     repository and have been asked for. `PROVEN`'s entry for `b2afa9a8…` and `SIZES`' 42,741 stand on this report, as
+     and the money run at testnut. `PROVEN`'s entry for `b2afa9a8…` and `SIZES`' 42,741 stand on this report, as
      [D230](#d230) (2) says the entries for `99a66ba7…` and `d69742d0…` stand on theirs;
-   - card 36813121, a J3R452, and card 09334220, a J3R180 keyed for SCP02: reported by the contributor, with no logs
-     named in the report and none in the repository. Their logs have been asked for. Until they are in the repository,
-     neither run is counted: no text relies on them for a general claim, and nothing says on their strength that a file
-     of 42,741 bytes installs on a J3R180 keyed for SCP02. [D229](#d229)'s sentence stands as far as this repository's
-     evidence goes: no run on a J3R180 keyed for SCP02 with a 3.x file is counted.
+   - card 36813121, a J3R452, and card 09334220, a J3R180 keyed for SCP02: the contributor's report. Neither run is
+     counted until the owner has read its logs: no text relies on them for a general claim, and nothing says on their
+     strength that a file of 42,741 bytes installs on a J3R180 keyed for SCP02. [D229](#d229)'s sentence stands as far as
+     this repository's evidence goes: no run on a J3R180 keyed for SCP02 with a 3.x file is counted.
+
+   The review found no logs of these runs in the repository, and they were asked for. The contributor added the logs of
+   all three cards after the review ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/), commit `de39f68`; the report's last section points to them). They
+   name the CAP by its path; none gives the sha256 of the file sent to the chip, which the deployment guide's checklist
+   asks the run's log to hold. Reading them against the report, and counting the two runs or not, is the owner's.
 5. **What D236's run showed.** (2), the one-asking claim, is the one fix shown to differ on the chip: after a reset by the
    owner the claim was held for four askings where the earlier file took one. (1) and (4) behaved on the chip as the file
    before D236 does: an untorn reset ran the self-tests again under both files, and the chips we know clear what a tap
@@ -9483,8 +9486,8 @@ them, and corrects [D236](#d236) where it said more than its run showed.
 sizes refcheck prints that the size is known to install on a J3R180 keyed for SCP03 and that no J3R180 keyed for SCP02 has
 been given a file of that size. 42,741 was added to `SIZES` and not to `SCP03_ONLY`, so for the tracked file refcheck
 prints the general line, "a size known to install on the chip.", with no word of the keying. Its `SIZES` comment and its
-`PROVEN` entry name card 58206920 alone. Whether 42,741 goes on `SCP03_ONLY` until the SCP02 run's log is in the
-repository is left to the owner; refcheck's behaviour is unchanged here, and `tools/ci/refcheck.test.cjs` asserts the line
+`PROVEN` entry name card 58206920 alone. Whether 42,741 goes on `SCP03_ONLY`, or the SCP02 run is counted on its log,
+is left to the owner; refcheck's behaviour is unchanged here, and `tools/ci/refcheck.test.cjs` asserts the line
 it prints.
 
 **Changed.** D231 to D233's notes say, in their own words, that the other maintainer agreed; a note after D236.

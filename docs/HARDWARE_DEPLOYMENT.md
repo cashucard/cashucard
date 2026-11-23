@@ -98,7 +98,8 @@ size no chip had been given before. Padded by `sizeTheFile` (below), this exact 
 installed it at the first try (1 load, 6 creates) on 2026-11-23, and it was paid from at a test mint, testnut, with real
 signatures and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)).
 The same report gives the contributor's account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02
-(card 09334220); their logs are not in the repository, and those two runs are not counted
+(card 09334220); their logs were added after the review ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and until the owner has read
+them those two runs are not counted
 ([D237](DECISIONS.md#d237)). 3.1 is the first released card version; 3.0 is not released ([D237](DECISIONS.md#d237)).
 
 The 3.1 file before it (bab8c5a, load file `9ed12359…`) was **42,485 bytes**, in 173 blocks of 247 bytes, the last 1. It

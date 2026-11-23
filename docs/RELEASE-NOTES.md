@@ -26,7 +26,8 @@ seconds corrected). This exact file has run on a chip: card 58206920, a J3R180 k
 supplier, installed it and was paid from at a test mint, testnut, on 2026-11-23
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same report gives the contributor's
 account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220) the same day; their logs
-are not in the repository, and those two runs are not counted ([D237](DECISIONS.md#d237)). The file before D236 (bab8c5a, load file
+were added after the review ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and until the owner has read them those two runs are not
+counted ([D237](DECISIONS.md#d237)). The file before D236 (bab8c5a, load file
 `9ed12359…`, 42,485 bytes) has run on a chip: card 58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), installed it and was paid from at a test mint, testnut, on 2026-11-21
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)). 330ffa1's file, from before the merge onto D228 (load file
 `4014e7f1…`), was installed on the same card and paid from at a test mint, testnut, on 2026-11-21

@@ -142,8 +142,9 @@ released card version is 3.1 ([D237](DECISIONS.md#d237)). With 3.1 and the revie
 file came to 42,741 bytes, padded to 245 past again, one page above: the same card installed it at the first try on
 2026-11-23 and paid from it at a test mint
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same report gives the contributor's
-account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220); their logs are not in the
-repository, and those two runs are not counted, so this size too is known on a J3R180 keyed for SCP03 alone.
+account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220); their logs were added
+after the review ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and until the owner has read them those two runs are not counted, so this
+size too is known on a J3R180 keyed for SCP03 alone ([D237](DECISIONS.md#d237)).
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build

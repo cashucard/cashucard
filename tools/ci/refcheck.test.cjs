@@ -223,8 +223,8 @@ test("the tracked 3.1 CAP's load file (D236) has run on a chip: its hash is on P
   assert.match(r.stdout, /; this exact file has run on a chip\.\n/, "the tracked file says it has run on a chip");
   assert.doesNotMatch(r.stdout, /run only in a simulator/);
   // the line refcheck prints for 42,741 bytes, exactly: SCP03_ONLY does not list the size, so it is the general line, not
-  // the SCP03 card's (D237: the owner's decision; the SCP02 run of 2026-11-23 is the contributor's report, its log not in
-  // the repository)
+  // the SCP03 card's (D237: the owner's decision; the SCP02 run of 2026-11-23 is the contributor's report, its log added
+  // after the review and not yet counted)
   assert.match(r.stdout, /; this exact file has run on a chip\.\na size known to install on the chip\.\n$/, "the size is one known to install");
   assert.doesNotMatch(r.stdout, /not yet tried on a chip/, "and its size is known");
   const source = readFileSync(REFCHECK, "utf8");

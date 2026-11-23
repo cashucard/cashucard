@@ -30,7 +30,8 @@ answer `03 00`, and the decisions are D183 to D230 (spec/APDU.md); it is a devel
 D236's review fixes) was installed and paid from at a test mint on card 58206920, a J3R180 keyed for SCP03 according to
 the card's supplier, on 2026-11-23 (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). The same report
 gives the contributor's account of the file on a J3R452, card 36813121, and on a J3R180 keyed for SCP02, card 09334220;
-their logs are not in the repository, and those two runs are not counted (D237). The file before it (load file `9ed12359…`, 3.1
+their logs were added after the review (docs/reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/), and until the owner has read them those two runs are not
+counted (D237). The file before it (load file `9ed12359…`, 3.1
 on D228's review fixes) was installed and paid from at a test mint on card 58206920 on 2026-11-21
 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md); the 3.0 file it sits on (load file `99a66ba7…`,
 with D228's review fixes) was installed and paid from at a test mint on the same card on 2026-11-22

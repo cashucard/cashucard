@@ -347,8 +347,9 @@ chip's manufacturer has retired that keying ([D229](DECISIONS.md#d229)). The fil
 The tracked file is 3.1 with the review fixes of [D236](DECISIONS.md#d236) (42,741 bytes, load file `b2afa9a8…`). Card
 58206920 installed it at the first try on 2026-11-23 and paid from it at a test mint
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same report gives the contributor's
-account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220); their logs are not in
-the repository, and those two runs are not counted ([D237](DECISIONS.md#d237)).
+account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220); their logs were added
+after the review ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and until the owner has read them those two runs are not counted
+([D237](DECISIONS.md#d237)).
 
 An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
 2026-09-01 ([its report](reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md)).
@@ -359,8 +360,8 @@ An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
 - A blocked PIN on any build: neither ENG-615 nor its 0.3 fix (the
   blocked-state gate and the failed-check session rule) has run on a card
 - Anything on a J3R180 keyed for SCP02 with a 3.x file that this repository counts: none is given a 3.0 file
-  ([D229](DECISIONS.md#d229)), and the 3.1 run on one is the contributor's report, its log not in the repository
-  ([D237](DECISIONS.md#d237)). 9ac55c1's
+  ([D229](DECISIONS.md#d229)), and the 3.1 run on one is the contributor's report, not counted until the owner has read
+  its log ([D237](DECISIONS.md#d237)). 9ac55c1's
   file before it had its install, its tag and one payment run at a test mint (a payment with change, the change loaded
   back and spent, `SPEND_ALL_AGAIN` by the message's hash) on the J3R310-355 sample card 58206920, a J3R180 keyed for
   SCP03 according to the card's supplier

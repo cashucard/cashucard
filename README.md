@@ -100,7 +100,8 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > with real signatures and real change verified on the chip
 > ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same report gives the
 > contributor's account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220); their
-> logs are not in the repository, and those two runs are not counted ([D237](docs/DECISIONS.md#d237)). 3.0 is not
+> logs were added after the review ([the logs](docs/reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and until the owner has read them those two runs
+> are not counted ([D237](docs/DECISIONS.md#d237)). 3.0 is not
 > released: the first released card version is 3.1 ([D237](docs/DECISIONS.md#d237)). The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,

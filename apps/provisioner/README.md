@@ -197,7 +197,8 @@ The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
 The J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, installed the tracked
 3.1 file at the first try and paid from it at a test mint on 2026-11-23 (D237: the same file's runs on a J3R452 and on a
-J3R180 keyed for SCP02 are the contributor's report, their logs not in the repository, and are not counted). It installed
+J3R180 keyed for SCP02 are the contributor's report, their logs added after the review, and are not counted until the
+owner has read them). It installed
 the 3.0 file (D228's review fixes) and paid from it at a test mint on 2026-11-22 (its hash is on `tools/refcheck.py`'s PROVEN; the
 list here takes it only with the operator's approval), and no J3R180 keyed for SCP02 has been given any 3.0 file (none will
 be: according to the card's supplier the chip's manufacturer has retired that keying, D229); the 3.0 file before it,
