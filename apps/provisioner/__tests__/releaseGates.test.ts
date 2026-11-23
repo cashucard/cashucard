@@ -25,7 +25,7 @@ test('installation follows the load file this build carries, never a bare switch
   expect(loadFileValidated('')).toBe(false);
 });
 
-test('the 3.0 load file is not validated until the operator approves it', () => {
+test('the 3.1 load file is not validated until the operator approves it', () => {
   // 42,741 bytes, 3.1 with D236's review fixes, on tools/refcheck.py's PROVEN since its chip run of 2026-11-23 on the
   // J3R310-355 sample card 58206920 (the files before it, 9ed12359... and 99a66ba7..., are on PROVEN too). Its sha256
   // goes on the list only with the operator's approval, in a change of its own.

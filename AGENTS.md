@@ -11,7 +11,7 @@ how the card behaves.
 ## What this repo is, and what cashucard/javacard was
 
 `cashucard/cashucard` is the working repository of the shared Cashu card
-(protocol 3.0, one wire for every reader and card maker): the JavaCard applet,
+(protocol 3.1, one wire for every reader and card maker): the JavaCard applet,
 its host tools and simulator, the command reference in `spec/`, the TypeScript card
 library with the bench-spike app that installs the card from a phone, the provisioning app and its ops-service. It began as a copy of
 `cashucard/javacard` main with its whole history. `cashucard/javacard` is
@@ -207,7 +207,7 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
 ## Implementation conventions
 
 - **SELECT answers the applet's version, and a wire change moves it.** The
-  card's applet answers `SELECT` with `03 00 90 00` (3.0), and `GET_INFO`
+  card's applet answers `SELECT` with `03 01 90 00` (3.1), and `GET_INFO`
   begins with the same two bytes. `CashuApplet.VERSION_MAJOR` and
   `VERSION_MINOR` move with every wire-visible change of behaviour and every
   fix a card in the field has to be told apart by (the comment above them;

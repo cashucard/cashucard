@@ -130,8 +130,9 @@ PROVEN = {
         'real signatures and real change verified on the chip',
     'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da': '3.1 with D236, the 3.1 review fixes (63453f2), 42,741 bytes, '
         '2026-11-23, J3R310-355 sample card 58206920 (ATR, ICType D321, SCP03) at testnut.cashu.space: 1 load and 6 creates at the first '
-        'try, selftest 13 of 13, the claim after a reset held for four askings (D236 2), the self-tests run again after a reset (D236 1), '
-        'a SELECT clearing the PIN given (D236 4), a first load of 36, the waits over the limit 2 x (N - 1) for N = 2 to 10, payments with '
+        'try, selftest 13 of 13, the claim after a reset held for four askings (D236 2), the self-tests run again after a reset and '
+        'a SELECT clearing the PIN given as the file before it did (D236 1 and 4 are covered in jCardSim only, D237), a first load of 36, '
+        'the waits over the limit 2 x (N - 1) for N = 2 to 10, payments with '
         'change, the change loaded back with no PIN and taken by testnut in later swaps, SPEND_ALL_AGAIN, a withdrawal of all 21 pieces: '
         'real signatures and real change verified on the chip',
 }

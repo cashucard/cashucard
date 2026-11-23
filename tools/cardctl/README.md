@@ -199,7 +199,7 @@ outbox key, the old set-up clock check). Every command that moves money or sets 
 card up refuses such a card after its `SELECT`, saying what it answered and what
 cardctl knows; the reads (`info`, `balance`, `slots`, `proof`, `auth`, `change`,
 `cert`, `outbox`, `group-keys`, `card-secret`, `verify-pin`) and `apdu` go on, with a
-note. `selftest` passes only the versions it knows (2.1, 2.2, 3.0): a 3.1 fails its
+note. `selftest` passes only the versions it knows (2.1, 2.2, 3.0, 3.1): a 3.2 fails its
 `SELECT` check as a version that cardctl does not know, which says the test is not
 proven on it, not that the wire differs.
 

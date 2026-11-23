@@ -195,8 +195,10 @@ chip has installed and the operator approved. The tracked 3.1 load file (42,741 
 sha256 `b2afa9a8…`, D236) is not on it yet, so a build from this tree installs no card.
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
-The J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, installed this 3.0 file
-(D228's review fixes) and paid from it at a test mint on 2026-11-22 (its hash is on `tools/refcheck.py`'s PROVEN; the
+The J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, installed the tracked
+3.1 file at the first try and paid from it at a test mint on 2026-11-23 (D237: the same file's runs on a J3R452 and on a
+J3R180 keyed for SCP02 are the contributor's report, their logs not in the repository, and are not counted). It installed
+the 3.0 file (D228's review fixes) and paid from it at a test mint on 2026-11-22 (its hash is on `tools/refcheck.py`'s PROVEN; the
 list here takes it only with the operator's approval), and no J3R180 keyed for SCP02 has been given any 3.0 file (none will
 be: according to the card's supplier the chip's manufacturer has retired that keying, D229); the 3.0 file before it,
 of the same size (load file `d69742d0…`), went to the J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a
@@ -204,7 +206,8 @@ J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-21. Earlier 
 a J3R180 keyed for SCP02 while they were numbered 2.3, answering `02 03`: the file before D200
 (35,466 bytes, `48b8597c…`) on 2026-11-13, and the file with D200 to D204
 (36,953 bytes, `f216644a…`) on 2026-11-14; `tools/refcheck.py` keeps their sizes and
-hashes. The 3.0 file is that source renumbered (D205) with D206 to D210 added. The 3.0 file goes on `VALIDATED_LOAD_FILE_SHA256S` after its
+hashes. The 3.0 file is that source renumbered (D205) with D206 to D210 added; 3.0 is not released, and 3.1 is the
+first released card version (D237). The 3.1 file goes on `VALIDATED_LOAD_FILE_SHA256S` after its
 own chip run, once the operator approves it, with the run's hardware report, in a
 change that also updates
 `__tests__/releaseGates.test.ts`. Both batch creation

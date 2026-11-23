@@ -224,11 +224,17 @@ where its restore reaches them. [`vectors/owner-c.json`](vectors/owner-c.json) h
 and c, with BIP-39's test words.
 
 A card is set up in one tap, owner last ([Personalisation](#personalisation)):
-`SET_PIN` (a card's first PIN stands as given for the selection that set it, so no
-`VERIFY_PIN` follows it: [D235](../docs/DECISIONS.md#d235)), `SET_CARD` (the mint), then the owner's claim
-(`SET_OWNER` P1 = `01` with the owner's c, then `SET_OWNER`, one asking right after
-`SET_CARD` in the same tap ([D221](../docs/DECISIONS.md#d221)), carrying
-the tip block header as its anchor and the c's check). A card
+`SET_PIN`, `VERIFY_PIN`, `SET_CARD` (the mint), then the owner's claim
+(`SET_OWNER` P1 = `01` with the owner's c, then `SET_OWNER`, carrying
+the tip block header as its anchor and the c's check). On a 3.1 card the `VERIFY_PIN`
+may be left out: a card's first PIN stands as given for the selection that set it
+([D235](../docs/DECISIONS.md#d235), 3.1 only). A 3.0 card needs it, and answers `6982`
+at `SET_CARD` without it. A reader may always send it, to either version. The claim is
+one asking right after `SET_CARD` in the same tap ([D221](../docs/DECISIONS.md#d221)),
+and on 3.1 only on a card that has never had a PIN
+([D234](../docs/DECISIONS.md#d234), [D236](../docs/DECISIONS.md#d236)). A 3.1 card that
+has had a PIN is asked four times, `6A98` to the first three
+([SET_OWNER](#set_owner-0x43)), so a reader asks until `9000` on both. A card
 with no PIN takes nothing, and an owner is claimed only under the PIN.
 
 ---

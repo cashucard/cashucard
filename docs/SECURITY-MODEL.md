@@ -330,7 +330,7 @@ by the refund key, a header far ahead or a weak clock, tears, the certificate, t
 list full, the PIN's waits, a dollar card or a card of two units, a production mint, and
 a phone.
 
-The tracked file is built from that file's source with the version moved to 3.0
+The 3.0 file is built from that file's source with the version moved to 3.0
 ([D205](DECISIONS.md#d205)) and [D206](DECISIONS.md#d206) to [D228](DECISIONS.md#d228)
 added (42,485 bytes, load file `99a66ba7…`). It has run on a chip: the J3R310-355 sample card 58206920, a J3R180 keyed
 for SCP03 according to the card's supplier, installed it at the first try on 2026-11-22 and paid from it at a test mint
@@ -342,6 +342,13 @@ chip's manufacturer has retired that keying ([D229](DECISIONS.md#d229)). The fil
 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's supplier, on
 2026-11-21: 13 installs at the first try and one payment run at a test mint
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)).
+3.0 is not released: the first released card version is 3.1 ([D237](DECISIONS.md#d237)).
+
+The tracked file is 3.1 with the review fixes of [D236](DECISIONS.md#d236) (42,741 bytes, load file `b2afa9a8…`). Card
+58206920 installed it at the first try on 2026-11-23 and paid from it at a test mint
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same report gives the contributor's
+account of the file on a J3R452 (card 36813121) and on a J3R180 keyed for SCP02 (card 09334220); their logs are not in
+the repository, and those two runs are not counted ([D237](DECISIONS.md#d237)).
 
 An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
 2026-09-01 ([its report](reports/HARDWARE_TEST_REPORT_2026-09-01.j3r452.md)).
@@ -351,8 +358,9 @@ An earlier card, a J3R452 on applet 0.1, ran the read and sign path on
   between two applets of one package
 - A blocked PIN on any build: neither ENG-615 nor its 0.3 fix (the
   blocked-state gate and the failed-check session rule) has run on a card
-- Anything on the tracked 3.0 file, which no card has installed; and anything on any 3.0 file on a J3R180 keyed for
-  SCP02, which none will be given ([D229](DECISIONS.md#d229)). 9ac55c1's
+- Anything on a J3R180 keyed for SCP02 with a 3.x file that this repository counts: none is given a 3.0 file
+  ([D229](DECISIONS.md#d229)), and the 3.1 run on one is the contributor's report, its log not in the repository
+  ([D237](DECISIONS.md#d237)). 9ac55c1's
   file before it had its install, its tag and one payment run at a test mint (a payment with change, the change loaded
   back and spent, `SPEND_ALL_AGAIN` by the message's hash) on the J3R310-355 sample card 58206920, a J3R180 keyed for
   SCP03 according to the card's supplier
@@ -405,8 +413,8 @@ a few hundred taps. Treat simulator results accordingly, see
    chip runs of 2026-11-13 and 2026-11-14 ([`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md))
    the install of the source numbered 2.3 then (the first run's before
    [D200](DECISIONS.md#d200), the second's with D200 to D204) and payments with real
-   signatures and real change; the tracked 3.0 file is not yet tried on a chip, and no
-   J3R180 keyed for SCP02 has been given a 3.0 file (9ac55c1's, before [D228](DECISIONS.md#d228), went to the
+   signatures and real change; the tracked 3.1 file has run on one card, 58206920
+   ([D237](DECISIONS.md#d237)), and no J3R180 keyed for SCP02 has been given a 3.0 file (9ac55c1's, before [D228](DECISIONS.md#d228), went to the
    J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-21;
    [D229](DECISIONS.md#d229)). The
    [October 23 payment](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) and
