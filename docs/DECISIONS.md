@@ -9427,4 +9427,4 @@ alone, so every 3.1 card was refused (`Saved reset requires reconciliation`). It
 **Built (applet 3.1).** A new load file, 42,741 bytes (load file sha256 `b2afa9a8…`; [`HARDWARE_DEPLOYMENT.md`](HARDWARE_DEPLOYMENT.md)
 has both hashes): D236's code took 94 bytes, so `sizeTheFile` now holds forty writes and the file sits at 245 past a multiple
 of 256 again, the place where card 58206920 has installed every 3.x file, one page (256 bytes) above their size. No chip has
-been given a file of this size. jCardSim 963 (959 and these four). *Not yet run on a chip.*
+been given a file of this size. jCardSim 963 (959 and these four). Run on three chips on 2026-11-23 (sample card 58206920, a J3R452 and a J3R180 keyed for SCP02): installed at the first try, (1), (2) and (4) seen on the chip, and paid from at testnut with change (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md).
