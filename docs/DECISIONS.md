@@ -9437,6 +9437,9 @@ as the file before D236 does, and their fixes are covered in jCardSim only. Of t
 58206920's; the J3R452's and the J3R180 keyed for SCP02's are the contributor's report, not counted until the owner has
 read their logs.*
 
+*Amended by [D238](#d238) (2026-11-23): the owner counts the runs on card 36813121 and card 09334220, on the
+contributor's statement for the file and on the contributor's logs for the rest.*
+
 ## <a id="d237"></a>D237: 3.0 is not released; 3.1 is the first released card version, and its shorter holds are agreed
 
 **Decided (protocol 3.1, 2026-11-23, the project owner; after the review of 3.1 at the head of `card-3.1-pr`).** The
@@ -9500,7 +9503,7 @@ contributor's logs; item 4's "not counted" no longer holds for them.*
 
 **Decided (protocol 3.1, 2026-11-23, the project owner; amends [D237](#d237) (4)).** D237 left the runs of 2026-11-23 on
 card 36813121, a J3R452, and card 09334220, a J3R180 keyed for SCP02, uncounted until the owner had read their logs. The
-contributor added the logs of all three cards in commit `de39f68` ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and the reviewer read all 38 files
+contributor added the logs of all three cards in commit `de39f68` ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), and the reviewer read the logs
 against [the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). They are per-card records of one
 reader and three sessions, one after another, with each card's own keys and timings. Every wait over the limit matches
 3.1's rule ([D231](#d231)), each card answers `03 01`, and each shows [D236](#d236) (2), the claim after a reset held for
@@ -9509,8 +9512,9 @@ four askings.
 **The decisions.**
 
 1. The owner counts the runs of 2026-11-23 on card 36813121 (a J3R452) and on card 09334220 (a J3R180 keyed for SCP02)
-   as runs of a 3.1 file with D236, on the strength of the contributor's logs. This replaces D237 (4)'s "not counted"
-   for those two runs.
+   as runs of the tracked 3.1 file, on the contributor's statement: for those two cards the file's sha256 and load size
+   are unlogged (item 2's first gap). The rest of each run rests on the contributor's logs. This replaces D237 (4)'s
+   "not counted" for those two runs.
 2. What the logs lack, said plainly:
    - no log gives the sha256 of the file sent to the chip: `install.log` names the CAP by its path only, with no block
      count or load size, where the deployment guide's checklist asks the run's log for every file's sha256;
@@ -9519,7 +9523,8 @@ four askings.
    - the folder of card 09334220 holds no `select-zero.log`, although the report claims D236 (4) on that card and the
      logs' README says every folder has one. The report's claim of D236 (4) on card 09334220 is unsupported by its logs.
      The report is not edited.
-3. [D229](#d229)'s sentence still holds for 3.0: no 3.0 file was ever given to a J3R180 keyed for SCP02, and none will be.
+3. [D229](#d229)'s sentence still holds for 3.0: no 3.0 file has been given to a J3R180 keyed for SCP02, as far as this
+   repository records, and none will be.
    A 3.1 file has now been run on one, card 09334220.
 4. `PROVEN`'s entry for `b2afa9a8…` still rests on the run on card 58206920 and is unchanged. No hash or size is added,
    and `SCP03_ONLY` is unchanged: refcheck prints the general line for 42,741 bytes, "a size known to install on the
