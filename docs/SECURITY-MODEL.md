@@ -332,8 +332,10 @@ a phone.
 
 The tracked file is built from that file's source with the version moved to 3.0
 ([D205](DECISIONS.md#d205)) and [D206](DECISIONS.md#d206) to [D228](DECISIONS.md#d228)
-added (42,485 bytes, load file `99a66ba7…`). It has run only in a simulator so far, and
-no card has installed it; its run is to come on a J3R180 keyed for SCP03. No J3R180 keyed
+added (42,485 bytes, load file `99a66ba7…`). It has run on a chip: the J3R310-355 sample card 58206920, a J3R180 keyed
+for SCP03 according to the card's supplier, installed it at the first try on 2026-11-22 and paid from it at a test mint
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)); what that run covered and left out is in the
+report. No J3R180 keyed
 for SCP02 has been given a 3.0 file, and none will be: according to the card's supplier the
 chip's manufacturer has retired that keying ([D229](DECISIONS.md#d229)). The file before it,
 9ac55c1's (load file `d69742d0…`, without D228), went to the J3R310-355 sample card 58206920

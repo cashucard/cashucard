@@ -9088,7 +9088,8 @@ the seventh and the seventeenth. SECURITY-MODEL row 13 says what the reference r
 **The file.** The tracked CAP is rebuilt with (1) to (3): 42,485 bytes again (it came to 42,482, 242 past, and two of
 `sizeTheFile`'s writes take a longer form), load file `99a66ba7…`, 245 past a multiple of 256. It has run only in a
 simulator so far: its hash is on neither of refcheck's PROVEN and INSTALLED, and the provisioner's validated list is
-unchanged. 9ac55c1's file (load file `d69742d0…`) stays on PROVEN as that file's.
+unchanged. 9ac55c1's file (load file `d69742d0…`) stays on PROVEN as that file's. *Its chip run, on 2026-11-22, put it on PROVEN ([D229](#d229),
+[the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)).*
 
 **Built.** `CashuApplet.newState`, `ENTRY_SETUP`'s comment, `processGetInfo`'s byte 55, `sizeTheFile`, the M1 notes and
 `tagCode`'s comment; `SchnorrHW.sign`. Tests: `VerifyF1Test`, `VerifyF1bTest` (new, each failing on a2da664),
@@ -9134,3 +9135,7 @@ card.
 `RELEASE-NOTES.md`, `SECURITY-MODEL.md`, the provisioner's README, `AGENTS.md`, `tools/refcheck.py` and
 `tools/ci/refcheck.test.cjs`. The applet's comments that repeat D228 (6)'s words are left as they are, for a later
 change to the applet's source.
+
+*Item 3's run was made on 2026-11-22: card 58206920 installed the tracked file (load file `99a66ba7…`) at the first try
+and paid from it at testnut with real signatures and real change verified on the chip; its hash is on refcheck's PROVEN
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)).*

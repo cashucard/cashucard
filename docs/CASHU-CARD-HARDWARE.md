@@ -131,10 +131,13 @@ bytes (188 past) and is padded to 245 past again: 42,485
 bytes, which the J3R310-355 sample card 58206920 installed 13 times of 13 at the first try on 2026-11-21 and then paid
 from at a test mint ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). With the security
 review's fixes ([D228](DECISIONS.md#d228)) the file came to 42,482 bytes (242 past), and two writes in a longer form
-pad it back to 42,485, 245 past: a file no chip has been given. Every place above past 41,205 bytes was measured on that
+pad it back to 42,485, 245 past: the same card installed that file (load file `99a66ba7…`) at the first try on
+2026-11-22, 13 creates of 13, and paid from it at a test mint
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). Every place above past 41,205 bytes was measured on that
 card, a J3R180 keyed for SCP03, and not on a J3R180 keyed for SCP02. No J3R180 keyed for SCP02 has been given a 3.0 file,
 and none will be: according to the supplier the chip's manufacturer has retired that keying, and new J3R180 stock is
-keyed for SCP03. The run owed before any release wording is this file (load file `99a66ba7…`) on a J3R180 keyed for SCP03.
+keyed for SCP03. The run owed before any release wording, this file (load file `99a66ba7…`) on a J3R180 keyed for SCP03,
+is that run of 2026-11-22.
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build
