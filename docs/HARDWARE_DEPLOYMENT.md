@@ -94,7 +94,9 @@ whose own sha256 is not the CAP's ([Install](#install) gives both). It is the fi
 fixes of [D236](DECISIONS.md#d236) (a reset's `selfTested` cleared in its last transaction, the one-asking claim for a card
 that has never had a PIN, the shared hash emptied before each first update, a `SELECT` that zeroes what the tap gave), and
 `sizeTheFile` at forty writes, so that it is 245 past again: the place of every 3.x file card 58206920 has installed, at a
-size no chip has been given yet. **This file has run only in a simulator.** Its chip run is owed.
+size no chip had been given before. Padded by `sizeTheFile` (below), this exact file has run on a chip: card 58206920
+installed it at the first try (1 load, 6 creates) on 2026-11-23, and it was paid from at a test mint, testnut, with real
+signatures and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)).
 
 The 3.1 file before it (bab8c5a, load file `9ed12359…`) was **42,485 bytes**, in 173 blocks of 247 bytes, the last 1. It
 is the 3.0 file below, with the security review's
@@ -111,7 +113,10 @@ and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_
 The 3.0 build was **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
 the Method component 34,791), in 173 blocks of 247 bytes, the last 1: the load file
 inside the CAP tracked then (`applet/target/cashu-javacard-3.0.0.cap`, load file `99a66ba7…`). Padded by `sizeTheFile`
-(below), that file ran only in a simulator. Its source is
+(below), that exact file has run on a chip: the J3R310-355 sample card 58206920 (CPLC ICType D321), a J3R180 keyed for SCP03 according
+to the card's supplier, installed it at the first try (1 load, 13 creates) on 2026-11-22, the waits were timed on it, and
+it was paid from at a test mint, testnut, with real signatures and real change verified on the chip
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
@@ -120,12 +125,10 @@ bit; `ALLOW_LOAD`'s length checked first), the rotating tag ([D222](DECISIONS.md
 settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226)), the tag's address taken from its install
 parameters ([D227](DECISIONS.md#d227): 455 bytes more, padded back to 245 past by ten more writes, 57 bytes), and the
 security review's fixes of 2026-11-21 ([D228](DECISIONS.md#d228): one set-up bit a unit, the chip's path given up for
-one signature only, `GET_INFO` byte 55 bit 3 clear; three bytes fewer, padded back by two writes in a longer form). It was
-given to no chip; the 3.1 file above takes its place, and that file's run, as the checklist below, was made on card
-58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), on 2026-11-21
-([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)). No J3R180 keyed for SCP02 has been given a
-3.x file, and none will be: according to the card's supplier the chip's manufacturer has retired that keying, and new
-J3R180 stock is keyed for SCP03. The file before
+one signature only, `GET_INFO` byte 55 bit 3 clear; three bytes fewer, padded back by two writes in a longer form). Its
+own run, as the checklist below, is the run [D229](DECISIONS.md#d229) owed on a J3R180 keyed for SCP03, made on
+2026-11-22 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). No J3R180 keyed for SCP02 has been given a 3.0 file, and none will be: according to the
+card's supplier the chip's manufacturer has retired that keying, and new J3R180 stock is keyed for SCP03. The file before
 it, 9ac55c1's (load file `d69742d0…`, the same size), went to the J3R310-355 sample card 58206920 (ATR; ICType D321,
 SCP03), a J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-21: what that card did with it is that file's
 history, in [Install](#install) and the checklist below, and says nothing of this one. The other maintainer's 3.0 file before
@@ -872,7 +875,7 @@ ran once, after the run, while `selftest` ran before and after. The run of 2026-
 (above) did them all for the file before D211, numbered 2.3 then (`f216644a…`), but the owner's
 reset of a locked card, which would lock the bench card for good; `INBOX` for last week
 was read after a reset by the PIN anchored in that week. The run on the 3.0 file of the merge, on a J3R180 keyed for SCP03 ([D229](DECISIONS.md#d229)),
-is to do them all again, and the size first. Write the sha256 of every file sent to the chip in the
+is to do them all again, and the size first; the run of 2026-11-22 on the tracked file did the items ticked below for it. Write the sha256 of every file sent to the chip in the
 run's log.
 
 - Install the three applets in order, and add the load file's size to refcheck's
@@ -890,6 +893,10 @@ run's log.
     [x] `C9` and the address in `gp -d`; [x] n + 56 and `#new`; [x] the coded address whole and in pieces of 59, its M
     under the owner's c; [x] `C9 00`, a short install and one with no length each `6A80`, no tag, the card's applet
     answering; [x] 127 bytes, then `https://getfoxy.io/card`; [ ] a phone's read, left for the keeper.
+  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked file), the same card ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)):
+    [x] the three applets in order, 1 load and 13 creates of the card's applet and of the tag at the first try, `SELECT`
+    `03 00`; [x] n + 56 and `#new` at `https://getfoxy.io/card`; [ ] the refusals and the coded address, not repeated
+    (D228 did not touch the tag); [ ] a phone's read, left for the keeper.
 - Add the load file's sha256 to refcheck's PROVEN only once the chip run has had
   real signatures and real change verified on the chip (the two items below), and
   write "real signatures and real change verified on the chip" in its entry:
@@ -914,6 +921,12 @@ run's log.
     outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in later swaps;
     [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c (the first load's 36 pieces, minted to it, read
     back and rebuilt). Its hash is on PROVEN.
+  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked 3.0 file), the same card, at testnut
+    ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)): [x] 19 payments signed, each good under P + t·G and not
+    under P, every swap taken and the inputs `SPENT`, each wait the spec's count; [x] `AUTH` under the card's key
+    (`selftest`, 13 of 13); [x] 24 change outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof,
+    then taken by testnut in later swaps; [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c (the first
+    load's 36 pieces, minted to it, read back and rebuilt). Its hash is on PROVEN.
 - `INBOX` for last week and this week, a real header of each given first
   (`SET_HEADER`), against the owner's derivation from c for each week.
 - `cardctl --timing selftest` (`AUTH`) and a sealed `VERIFY_PIN`, before and

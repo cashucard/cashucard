@@ -9093,7 +9093,8 @@ the seventh and the seventeenth. SECURITY-MODEL row 13 says what the reference r
 **The file.** The tracked CAP is rebuilt with (1) to (3): 42,485 bytes again (it came to 42,482, 242 past, and two of
 `sizeTheFile`'s writes take a longer form), load file `99a66ba7…`, 245 past a multiple of 256. It has run only in a
 simulator so far: its hash is on neither of refcheck's PROVEN and INSTALLED, and the provisioner's validated list is
-unchanged. 9ac55c1's file (load file `d69742d0…`) stays on PROVEN as that file's.
+unchanged. 9ac55c1's file (load file `d69742d0…`) stays on PROVEN as that file's. *Its chip run, on 2026-11-22, put it on PROVEN ([D229](#d229),
+[the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)).*
 
 **Built.** `CashuApplet.newState`, `ENTRY_SETUP`'s comment, `processGetInfo`'s byte 55, `sizeTheFile`, the M1 notes and
 `tagCode`'s comment; `SchnorrHW.sign`. Tests: `VerifyF1Test`, `VerifyF1bTest` (new, each failing on a2da664),
@@ -9139,6 +9140,51 @@ card.
 `RELEASE-NOTES.md`, `SECURITY-MODEL.md`, the provisioner's README, `AGENTS.md`, `tools/refcheck.py` and
 `tools/ci/refcheck.test.cjs`. The applet's comments that repeat D228 (6)'s words are left as they are, for a later
 change to the applet's source.
+
+*Item 3's run was made on 2026-11-22: card 58206920 installed the tracked file (load file `99a66ba7…`) at the first try
+and paid from it at testnut with real signatures and real change verified on the chip; its hash is on refcheck's PROVEN
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)).*
+
+## <a id="d230"></a>D230: The run D229 (3) owed is the run of 2026-11-22; what it covered and what it did not
+
+**Decided (protocol 3.0, 2026-11-23, the project owner; says what [D229](#d229) (3) meant).** D229 (3) said that the run
+still owed before any release wording was the tracked file (load file `99a66ba7…`, 42,485 bytes) on a J3R180 keyed for
+SCP03. Since the run of 2026-11-22 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)),
+`COMPONENT-RELEASES.md` no longer makes the `firmware-v3.0.0` release wait for that run, and `CASHU-CARD-HARDWARE.md`
+says that run was the one owed. That reading is right. The report's "Not run" list is long, so this decision says what the
+run covered and what it did not.
+
+**The decisions.**
+
+1. The run D229 (3) asked for is the run reported on 2026-11-22: the tracked 3.0 file on sample card 58206920, a J3R180
+   keyed for SCP03 according to the card's supplier.
+2. The report rests on the account of the contributor who made the run: it states that its logs were not kept, so the
+   repository holds the report and nothing else of the run. `PROVEN`'s entry for `99a66ba7…` stands on it in the same way
+   as the entry for `d69742d0…` (9ac55c1's file) stands on the report of 2026-11-21, whose logs were not kept either.
+3. What the run covered: the install (one load, then the card's applet and the tag 13 times of 13 at the first try);
+   `GET_INFO` P1 = 4 bytes 55 and 56 `F7 03`; D228's set-up bit, one a unit, in both of its flows; the waits over the
+   limit, 17 payments each at the spec's count; a first load of 36 pieces in one selection (5.09 s); 19 payments at
+   testnut, every signature good under BIP-340; 24 change pieces loaded back with no PIN and spent at testnut;
+   `SPEND_ALL_AGAIN` by digest; two withdrawals of all; the held taps of a card with no owner; the owner's reset.
+4. What it did not cover, as the report's "Not run" list names it:
+   - a phone's read of the tag or a set-up by the phone;
+   - the tag's install refusals (`C9 00`, short, 128 bytes) and the coded address after a set-up (9ac55c1's run did
+     them, on the file before this one);
+   - a J3R180 keyed for SCP02 (none has been given a 3.0 file, and none will be);
+   - a fault that would make the chip's product fail (the `chipMul` path), a dollar card, the clock and the day's
+     window, `LOCK_CARD`, tears, the certificate, `INBOX`, the payment's largest transaction of eight change outputs,
+     the day's 300 loads.
+
+   None of these is claimed anywhere as tried on a chip with this file, and none is to be until a run does it.
+
+**A correction to the report.** Its "Surprising" section says the first load of 36 pieces took 5.09 s "as with the 3.0
+and 3.1 files before it", but the report of 2026-11-21 measured first loads of 9, 12, 20 and 30 pieces only and
+estimated from them that about 35 is the most that fits in 5 s; it did not measure a load of that size.
+
+**Changed.** `COMPONENT-RELEASES.md` and `CASHU-CARD-HARDWARE.md` point here where they state the release condition; the
+condition is unchanged. The site's install guide (`guide.html` and `guide.md`) names the card as a J3R180 keyed for SCP03
+(sample card 58206920). The report, `tools/refcheck.py` and the tests are unchanged.
+
 ## <a id="d231"></a>D231: The limit on one payment is a rate: two askings a limit's worth past the first, with no larger first step
 
 **Decided (protocol 3.1, 2026-11-21, the project owner; moves the minor: `03 01`).** The owner's rule of 2026-11-03, "make the

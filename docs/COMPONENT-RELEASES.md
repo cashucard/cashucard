@@ -25,15 +25,19 @@ metadata does not alter the CAP.
 
 Firmware 3.0.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
 answer `03 00`, and the decisions are D183 to D229 (spec/APDU.md). Firmware 3.1.0 is 3.0's wire answered sooner
-(`03 01`, D231 to D236). The tracked `cashu-javacard-3.1.0.cap` (load file `b2afa9a8…`, with D236's review fixes) has run
-only in a simulator. The file before it (load file `9ed12359…`, 3.1 on D228's review fixes) was
+(`03 01`, D231 to D236). The tracked `cashu-javacard-3.1.0.cap` (load file `b2afa9a8…`, with D236's review fixes) was
 installed and paid from at a test mint on card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, on
-2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md); no `firmware-v3.0.0` or
-`firmware-v3.1.0` release is cut before the operator's approval. No J3R180 keyed for SCP02 will be given a 3.x file:
-according to the card's supplier the chip's manufacturer has retired that keying (D229). 330ffa1's file before it, load
-file `4014e7f1…`, and the 3.0 file `d69742d0…` (9ac55c1) were installed and paid from at a test mint on the same card on
-2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md,
-docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md). The firmware a J3R180
+2026-11-23, and on the same day on a J3R452 and on a J3R180 keyed for SCP02, card 09334220
+(docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). The file before it (load file `9ed12359…`, 3.1
+on D228's review fixes) was installed and paid from at a test mint on card 58206920 on 2026-11-21
+(docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md); the 3.0 file it sits on (load file `99a66ba7…`,
+with D228's review fixes) was installed and paid from at a test mint on the same card on 2026-11-22
+(docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md; see D230 for what that run covered); no
+`firmware-v3.0.0` or `firmware-v3.1.0` release is cut before the operator's approval. No J3R180 keyed for SCP02 will be
+given a 3.0 file: according to the card's supplier the chip's manufacturer has retired that keying (D229). 330ffa1's
+file, load file `4014e7f1…`, and the 3.0 file `d69742d0…` (9ac55c1) were installed and paid from at a test mint on card
+58206920 on 2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md,
+docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md). Before 3.1, the firmware a J3R180
 keyed for SCP02 last ran
 was numbered 2.3 (`02 03`, `cashu-javacard-2.3.0.cap`, load file `05c9b847…`), never
 released under a tag.

@@ -19,7 +19,9 @@ least, counted after the change's credit; the held history three, the reset by t
 path's verdict), [D234](DECISIONS.md#d234) (the one-asking claim a blank card's alone) and
 [D235](DECISIONS.md#d235) (a card's first PIN stands as given for the selection that set it), and the review fixes of
 [D236](DECISIONS.md#d236) (a torn reset, a claim after a cut field, the shared hash, a `SELECT` that clears; the holds'
-seconds corrected). This file has run only in a simulator; its chip run is owed. The file before D236 (bab8c5a, load file
+seconds corrected). This exact file has run on a chip: card 58206920 installed it and was paid from at a test mint,
+testnut, on 2026-11-23, and so were a J3R452 and a J3R180 keyed for SCP02 the same day
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The file before D236 (bab8c5a, load file
 `9ed12359…`, 42,485 bytes) has run on a chip: card 58206920, a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), installed it and was paid from at a test mint, testnut, on 2026-11-21
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)). 330ffa1's file, from before the merge onto D228 (load file
 `4014e7f1…`), was installed on the same card and paid from at a test mint, testnut, on 2026-11-21
@@ -39,7 +41,9 @@ since the merge), and the wire is in [`spec/APDU.md`](../spec/APDU.md).
 
 ### On a chip
 
-That file has run only in a simulator, and no card has installed it. Its source is
+This exact file has run on a chip: the J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the
+card's supplier, installed it and was paid from at a test mint, testnut, on 2026-11-22
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). Its source is
 the merge of 2026-11-19: the 2.3 file of 2026-11-15 below (40,412 bytes, load file `05c9b847…`) with the version
 moved from 2.3 to 3.0 ([D205](DECISIONS.md#d205)), the other maintainer's [D206](DECISIONS.md#d206) to
 [D210](DECISIONS.md#d210) (each signature checked before it leaves, joined with [D218](DECISIONS.md#d218)'s chip
@@ -49,8 +53,8 @@ settlement record fixes ([D223](DECISIONS.md#d223) to [D226](DECISIONS.md#d226))
 whoever installs the card ([D227](DECISIONS.md#d227)): an install of the tag must now carry the card maker's address
 in its install parameters, and one without is refused; and the security review's fixes of 2026-11-21
 ([D228](DECISIONS.md#d228)): one set-up bit a unit, the chip's path given up for one signature only, and `GET_INFO`
-byte 55 bit 3 clear. Its run is to come, on a J3R180 keyed for SCP03, its size first
-([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist)). No J3R180 keyed for SCP02 has been given a 3.0
+byte 55 bit 3 clear. Its run on a J3R180 keyed for SCP03 ([the checklist](HARDWARE_DEPLOYMENT.md#the-30-chip-runs-checklist))
+was made on 2026-11-22. No J3R180 keyed for SCP02 has been given a 3.0
 file, and none will be: according to the card's supplier the chip's manufacturer has retired that keying
 ([D229](DECISIONS.md#d229)).
 
