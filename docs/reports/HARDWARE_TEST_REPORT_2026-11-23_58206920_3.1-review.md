@@ -72,7 +72,7 @@ Reset by the owner at the end of the session: no PIN, no record, no owner, a new
 
 The load file's sha256 is on refcheck's PROVEN.
 
-Logs are kept in the run's scratch folder, not in the repository: the payment session (`session-M.log`,
+The logs of all three cards are in `docs/reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/` (its README says what each file is; the run's state file and piece list are left out, as they hold the run's payment keys and proof secrets). On 58206920: the payment session (`session-M.log`,
 `p31-results.jsonl`, `p19-M.log`, `bridge-M.log`), `guard.log` (every serial read), `install.log`, `setup1.log`,
 `setup2.log`, `reset-owner.log` and `select-zero.log`.
 

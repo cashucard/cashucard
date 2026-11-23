@@ -1,0 +1,298 @@
+bridge: the card in 'ACS ACR39U ICC Reader' is on 127.0.0.1:47470
+  === change SA2, 2026-11-23T18:03:38.018Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.6 ms
+    GET_CHANGE         P1 00 P2 00 -> 9000  245.4 ms
+  GET_CHANGE (no PIN): #2 4, #3 2
+  change output 0: already on the card (resumed run)
+  change output 1: already on the card (resumed run)
+    KEYSET_KEYS        P1 03 P2 00 -> 9000  198.4 ms
+    LOAD_CHANGE        P1 02 P2 02 -> 9000  900.7 ms
+    GET_DLEQ           P1 30 P2 ff -> 9000  134.4 ms
+  LOAD_CHANGE #2 -> slot 48, 4, proof kept true, 901.6 ms; kept DLEQ by testnut's key true; at testnut UNSPENT
+    KEYSET_KEYS        P1 03 P2 00 -> 9000  198.8 ms
+    LOAD_CHANGE        P1 03 P2 02 -> 9000  906.7 ms
+    GET_DLEQ           P1 31 P2 ff -> 9000  134.2 ms
+  LOAD_CHANGE #3 -> slot 49, 2, proof kept true, 907.3 ms; kept DLEQ by testnut's key true; at testnut UNSPENT
+    GET_CHANGE         P1 00 P2 00 -> 9000  20.2 ms
+  openings left 0
+    GET_BALANCE        P1 00 P2 00 -> 9000  60.7 ms
+  balance 1520
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     35.6     35.6     35.6
+    GET_CHANGE 9000             2     20.2    245.4    245.4
+    KEYSET_KEYS 9000            2    198.4    198.8    198.8
+    LOAD_CHANGE 9000            2    900.7    906.7    906.7
+    GET_DLEQ 9000               2    134.2    134.4    134.4
+    GET_BALANCE 9000            1     60.7     60.7     60.7
+  node p31.cjs change SA2: rc 0, 4549 ms
+  === tap SB SB1=0,1=exact SB2=32,33=496, 2026-11-23T18:03:43.368Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.1 ms
+    VERIFY_PIN         P1 00 P2 00 -> 9000  31.4 ms
+    GET_PUBKEY         P1 00 P2 00 -> 9000  56.2 ms
+    GET_SLOT_STATUS    P1 00 P2 00 -> 9000  175.5 ms
+    GET_PROOF          P1 00 P2 00 -> 9000  106.8 ms
+    GET_PROOF          P1 01 P2 00 -> 9000  107.2 ms
+  SB1: slots 0,1 (3), till 2 as 1 outputs, fee 1, change 0 as 0 outputs; leaving the card 3
+    SPEND_ALL_BEGIN    P1 02 P2 00 -> 9000  208.3 ms
+    SPEND_ALL_OUTPUTS  P1 01 P2 00 -> 9000  81.4 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  903.2 ms
+  SB1: signed after 0 "not yet" ( ms), the signing SIGN 903.2 ms; 904 ms from the first SIGN, 1242 ms from BEGIN; BIP-340 under P+tG true, under P false
+    GET_SLOT_STATUS    P1 00 P2 00 -> 9000  175.6 ms
+    GET_PROOF          P1 20 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 21 P2 00 -> 9000  106.6 ms
+  SB2: slots 32,33 (512), till 496 as 5 outputs, fee 1, change 15 as 4 outputs; leaving the card 497
+    SPEND_ALL_BEGIN    P1 02 P2 00 -> 9000  208.3 ms
+    SPEND_ALL_OUTPUTS  P1 01 P2 00 -> 9000  301.1 ms
+    SPEND_ALL_CHANGE   P1 00 P2 00 -> 9000  322.6 ms
+    SPEND_ALL_CHANGE   P1 00 P2 00 -> 9000  438.7 ms
+    SPEND_ALL_CHANGE   P1 00 P2 00 -> 9000  355.1 ms
+    SPEND_ALL_CHANGE   P1 00 P2 00 -> 9000  357.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  594.0 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.0 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.2 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.1 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.0 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  988.7 ms
+  SB2: signed after 6 "not yet" (594, 569, 569.2, 569.1, 569, 568.9 ms), the signing SIGN 988.7 ms; 4430 ms from the first SIGN, 6464 ms from BEGIN; BIP-340 under P+tG true, under P false
+    GET_INFO           P1 04 P2 00 -> 9000  97.2 ms
+  SB1: testnut /v1/swap 200, 1 signatures; the inputs SPENT (2)
+  SB2: testnut /v1/swap 200, 9 signatures; the inputs SPENT (2)
+    GET_BALANCE        P1 00 P2 00 -> 9000  56.6 ms
+  tap SB: 9438 ms in contact (tap to the last signature); unspent now 21, balance 1005
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     35.1     35.1     35.1
+    VERIFY_PIN 9000             1     31.4     31.4     31.4
+    GET_PUBKEY 9000             1     56.2     56.2     56.2
+    GET_SLOT_STATUS 9000        2    175.5    175.6    175.6
+    GET_PROOF 9000              4    106.5    106.8    107.2
+    SPEND_ALL_BEGIN 9000        2    208.3    208.3    208.3
+    SPEND_ALL_OUTPUTS 9000      2     81.4    301.1    301.1
+    SPEND_ALL_SIGN 9000         8    568.9    569.2    988.7
+    SPEND_ALL_CHANGE 9000       4    322.6    357.9    438.7
+    GET_INFO 9000               1     97.2     97.2     97.2
+    GET_BALANCE 9000            1     56.6     56.6     56.6
+  node p31.cjs tap SB SB1=0,1=exact SB2=32,33=496: rc 0, 11755 ms
+  === change SB2, 2026-11-23T18:03:55.925Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.0 ms
+    GET_CHANGE         P1 00 P2 00 -> 9000  352.5 ms
+    GET_CHANGE         P1 01 P2 00 -> 9000  193.8 ms
+  GET_CHANGE (no PIN): #0 8, #1 4, #2 2, #3 1
+    KEYSET_KEYS        P1 03 P2 00 -> 9000  198.4 ms
+    LOAD_CHANGE        P1 00 P2 02 -> 9000  912.8 ms
+    GET_DLEQ           P1 32 P2 ff -> 9000  134.0 ms
+  LOAD_CHANGE #0 -> slot 50, 8, proof kept true, 913.6 ms; kept DLEQ by testnut's key true; at testnut UNSPENT
+    KEYSET_KEYS        P1 03 P2 00 -> 9000  198.6 ms
+    LOAD_CHANGE        P1 01 P2 02 -> 9000  908.5 ms
+    GET_DLEQ           P1 33 P2 ff -> 9000  133.8 ms
+  LOAD_CHANGE #1 -> slot 51, 4, proof kept true, 909.1 ms; kept DLEQ by testnut's key true; at testnut UNSPENT
+    KEYSET_KEYS        P1 03 P2 00 -> 9000  198.6 ms
+    LOAD_CHANGE        P1 02 P2 02 -> 9000  907.6 ms
+    GET_DLEQ           P1 34 P2 ff -> 9000  133.9 ms
+  LOAD_CHANGE #2 -> slot 52, 2, proof kept true, 908.2 ms; kept DLEQ by testnut's key true; at testnut UNSPENT
+    KEYSET_KEYS        P1 03 P2 00 -> 9000  198.5 ms
+    LOAD_CHANGE        P1 03 P2 02 -> 9000  909.0 ms
+    GET_DLEQ           P1 35 P2 ff -> 9000  134.0 ms
+  LOAD_CHANGE #3 -> slot 53, 1, proof kept true, 909.6 ms; kept DLEQ by testnut's key true; at testnut UNSPENT
+    GET_CHANGE         P1 00 P2 00 -> 9000  20.1 ms
+  openings left 0
+    GET_BALANCE        P1 00 P2 00 -> 9000  60.5 ms
+  balance 1020
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     35.0     35.0     35.0
+    GET_CHANGE 9000             3     20.1    193.8    352.5
+    KEYSET_KEYS 9000            4    198.4    198.6    198.6
+    LOAD_CHANGE 9000            4    907.6    909.0    912.8
+    GET_DLEQ 9000               4    133.8    134.0    134.0
+    GET_BALANCE 9000            1     60.5     60.5     60.5
+  node p31.cjs change SB2: rc 0, 8661 ms
+  === pay A 2,3 exact noswap, 2026-11-23T18:04:05.389Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.1 ms
+    VERIFY_PIN         P1 00 P2 00 -> 9000  31.3 ms
+    GET_PUBKEY         P1 00 P2 00 -> 9000  56.1 ms
+    GET_SLOT_STATUS    P1 00 P2 00 -> 9000  175.4 ms
+    GET_PROOF          P1 02 P2 00 -> 9000  106.6 ms
+    GET_PROOF          P1 03 P2 00 -> 9000  106.6 ms
+  paying slots 2,3 (12): till 11 as 3 outputs, fee 1, change 0 as 0 outputs
+    SPEND_ALL_BEGIN    P1 02 P2 00 -> 9000  208.2 ms
+    SPEND_ALL_OUTPUTS  P1 01 P2 00 -> 9000  196.3 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  912.8 ms
+  SPEND_ALL_SIGN: the signature after 0 "not yet", 913 ms from the first SIGN, 1367 ms from BEGIN
+  BIP-340 under P+tG: true; under P: false
+    GET_INFO           P1 04 P2 00 -> 9000  96.8 ms
+  GET_INFO after SIGN: unspent 23, spent 31, clock 1795223174, window 1795223174, signed 2829, change owed false, loads left 246
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     35.1     35.1     35.1
+    VERIFY_PIN 9000             1     31.3     31.3     31.3
+    GET_PUBKEY 9000             1     56.1     56.1     56.1
+    GET_SLOT_STATUS 9000        1    175.4    175.4    175.4
+    GET_PROOF 9000              2    106.6    106.6    106.6
+    SPEND_ALL_BEGIN 9000        1    208.2    208.2    208.2
+    SPEND_ALL_OUTPUTS 9000      1    196.3    196.3    196.3
+    SPEND_ALL_SIGN 9000         1    912.8    912.8    912.8
+    GET_INFO 9000               1     96.8     96.8     96.8
+  node p19.cjs pay A 2,3 exact noswap: rc 0, 3949 ms
+  === pay B 16,17 exact, 2026-11-23T18:04:10.141Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.2 ms
+    VERIFY_PIN         P1 00 P2 00 -> 9000  31.3 ms
+    GET_PUBKEY         P1 00 P2 00 -> 9000  56.2 ms
+    GET_SLOT_STATUS    P1 00 P2 00 -> 9000  175.4 ms
+    GET_PROOF          P1 10 P2 00 -> 9000  106.6 ms
+    GET_PROOF          P1 11 P2 00 -> 9000  106.5 ms
+  paying slots 16,17 (48): till 47 as 5 outputs, fee 1, change 0 as 0 outputs
+    SPEND_ALL_BEGIN    P1 02 P2 00 -> 9000  208.2 ms
+    SPEND_ALL_OUTPUTS  P1 01 P2 00 -> 9000  300.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  938.1 ms
+  SPEND_ALL_SIGN: the signature after 0 "not yet", 939 ms from the first SIGN, 1497 ms from BEGIN
+  BIP-340 under P+tG: true; under P: false
+    GET_INFO           P1 04 P2 00 -> 9000  97.0 ms
+  GET_INFO after SIGN: unspent 21, spent 33, clock 1795223174, window 1795223174, signed 2877, change owed false, loads left 246
+  testnut /v1/swap: 200, 5 signatures (the till's proofs kept in the state file)
+  the card's inputs at testnut: SPENT, SPENT
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     35.2     35.2     35.2
+    VERIFY_PIN 9000             1     31.3     31.3     31.3
+    GET_PUBKEY 9000             1     56.2     56.2     56.2
+    GET_SLOT_STATUS 9000        1    175.4    175.4    175.4
+    GET_PROOF 9000              2    106.5    106.6    106.6
+    SPEND_ALL_BEGIN 9000        1    208.2    208.2    208.2
+    SPEND_ALL_OUTPUTS 9000      1    300.9    300.9    300.9
+    SPEND_ALL_SIGN 9000         1    938.1    938.1    938.1
+    GET_INFO 9000               1     97.0     97.0     97.0
+  node p19.cjs pay B 16,17 exact: rc 0, 9046 ms
+  === again A B, 2026-11-23T18:04:20.003Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.0 ms
+    VERIFY_PIN         P1 00 P2 00 -> 9000  31.1 ms
+    SPEND_ALL_AGAIN    P1 01 P2 00 -> 9000  125.2 ms
+  AGAIN P1 1 with A's hash: A's signature, 125.6 ms
+    SPEND_ALL_AGAIN    P1 01 P2 00 -> 9000  125.1 ms
+  AGAIN P1 1 with B's hash: B's signature
+    SPEND_ALL_AGAIN    P1 00 P2 00 -> 9000  91.4 ms
+  AGAIN P1 0: B's signature (the last), not A's
+    SPEND_ALL_AGAIN    P1 01 P2 00 -> 6A88  52.9 ms
+  AGAIN P1 1 with zeros: refused 6A88
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.2 ms
+    SPEND_ALL_AGAIN    P1 01 P2 00 -> 6A88  52.7 ms
+  AGAIN P1 1 without the PIN, A's hash: refused 6A88
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 2     35.0     35.2     35.2
+    VERIFY_PIN 9000             1     31.1     31.1     31.1
+    SPEND_ALL_AGAIN 9000        3     91.4    125.1    125.2
+    SPEND_ALL_AGAIN 6A88        2     52.7     52.9     52.9
+  node p19.cjs again A B: rc 0, 2022 ms
+  === pay A - exact, 2026-11-23T18:04:22.826Z
+  testnut /v1/swap: 200, 3 signatures (the till's proofs kept in the state file)
+  the card's inputs at testnut: SPENT, SPENT
+  timing (ms): command sw  n  min  median  max
+  node p19.cjs pay A - exact: rc 0, 1701 ms
+  === tap WALL WALL=all=exact, 2026-11-23T18:04:25.336Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.0 ms
+    VERIFY_PIN         P1 00 P2 00 -> 9000  31.4 ms
+    GET_PUBKEY         P1 00 P2 00 -> 9000  56.3 ms
+    GET_SLOT_STATUS    P1 00 P2 00 -> 9000  175.4 ms
+    GET_PROOF          P1 0e P2 00 -> 9000  106.6 ms
+    GET_PROOF          P1 0f P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 17 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 1b P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 1c P2 00 -> 9000  106.7 ms
+    GET_PROOF          P1 22 P2 00 -> 9000  106.7 ms
+    GET_PROOF          P1 23 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 24 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 25 P2 00 -> 9000  106.6 ms
+    GET_PROOF          P1 26 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 27 P2 00 -> 9000  106.4 ms
+    GET_PROOF          P1 28 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 29 P2 00 -> 9000  106.4 ms
+    GET_PROOF          P1 2e P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 2f P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 30 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 31 P2 00 -> 9000  106.4 ms
+    GET_PROOF          P1 32 P2 00 -> 9000  106.7 ms
+    GET_PROOF          P1 33 P2 00 -> 9000  106.5 ms
+    GET_PROOF          P1 34 P2 00 -> 9000  106.4 ms
+    GET_PROOF          P1 35 P2 00 -> 9000  106.5 ms
+  WALL: slots 14,15,23,27,28,34,35,36,37,38,39,40,41,46,47,48,49,50,51,52,53 (960), till 957 as 8 outputs, fee 3, change 0 as 0 outputs; leaving the card 960
+    SPEND_ALL_BEGIN    P1 02 P2 00 -> 9000  438.6 ms
+    SPEND_ALL_OUTPUTS  P1 01 P2 00 -> 9000  355.3 ms
+    SPEND_ALL_OUTPUTS  P1 01 P2 00 -> 9000  133.4 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  599.2 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.8 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.7 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.8 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.0 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.7 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.8 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.0 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.1 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.7 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.0 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  569.1 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  568.9 ms
+    SPEND_ALL_SIGN     P1 00 P2 00 -> 9000  1539.7 ms
+  WALL: signed after 18 "not yet" (599.2, 568.8, 568.7, 568.8, 569, 568.9, 568.7, 568.8, 568.9, 568.9, 568.9, 569, 569.1, 568.7, 569, 569.1, 568.9, 568.9 ms), the signing SIGN 1539.7 ms; 11816 ms from the first SIGN, 12792
+    GET_INFO           P1 04 P2 00 -> 9000  97.0 ms
+  WALL: testnut /v1/swap 200, 8 signatures; the inputs SPENT (21)
+    GET_BALANCE        P1 00 P2 00 -> 9000  33.5 ms
+  tap WALL: 16064 ms in contact (tap to the last signature); unspent now 0, balance 0
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     35.0     35.0     35.0
+    VERIFY_PIN 9000             1     31.4     31.4     31.4
+    GET_PUBKEY 9000             1     56.3     56.3     56.3
+    GET_SLOT_STATUS 9000        1    175.4    175.4    175.4
+    GET_PROOF 9000             21    106.4    106.5    106.7
+    SPEND_ALL_BEGIN 9000        1    438.6    438.6    438.6
+    SPEND_ALL_OUTPUTS 9000      2    133.4    355.3    355.3
+    SPEND_ALL_SIGN 9000        19    568.7    568.9   1539.7
+    GET_INFO 9000               1     97.0     97.0     97.0
+    GET_BALANCE 9000            1     33.5     33.5     33.5
+  node p31.cjs tap WALL WALL=all=exact: rc 0, 18100 ms
+  === info , 2026-11-23T18:04:44.250Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  34.8 ms
+    VERIFY_PIN         P1 00 P2 00 -> 9000  31.0 ms
+    GET_INFO           P1 04 P2 00 -> 9000  96.7 ms
+  GET_INFO: unspent 0, spent 54, clock 1795223174, window 1795223174, signed 3837, change owed false, loads left 246
+    GET_BALANCE        P1 00 P2 00 -> 9000  33.2 ms
+  balance 0
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     34.8     34.8     34.8
+    VERIFY_PIN 9000             1     31.0     31.0     31.0
+    GET_INFO 9000               1     96.7     96.7     96.7
+    GET_BALANCE 9000            1     33.2     33.2     33.2
+  node p19.cjs info: rc 0, 1515 ms
+  free memory (empty, before the reset): apps 4, persistent 190700, transient 2718
+  | card reset by its owner: no PIN, no record, no owner, a new card key; set it up with setup
+  | note: signing with cardctl's TEST owner key — bench cards only; anyone with this repository can administer a card owned by it
+  | warning: a reset gives the card a new c, so new keys for every date. eCash already swapped to this card's keys and not yet loaded can never be loaded or paid after it: undated (the date 0), it is lost
+  cardctl reset: rc 0, 1084 ms (process start included)
+  | applet version   : 3.1 (format 4)
+  | slots            : 128 total — 0 unspent, 0 spent, 128 empty
+  | capabilities     : 0xFF (secp256k1 native=True, schnorr=True)
+  | PIN              : none (3 tries left)
+  | owner            : none — open to the first phone that sets it up
+  | record           : not set
+  | locked           : no
+  | clock            : 1795223174
+  | daily limit      : none (window from 0, 0 signed for in it)
+  | no-PIN allowance : none (0 signed for without the PIN)
+  | keyset table     : kept, 0 entries in use, 0 without the holder's mark; the last payment's unit: none
+  | rate             : none, or not said (sats to the dollar)
+  | no-PIN window    : none running, or not said
+  | profiles         : F703 (PIN before money, the no-PIN window, the owner claimed slowly, two units on one card, a holder with no phone, keyset keys, the paid list, the certificate, keys per load)
+  | loads left today : none, or not said (zeros to a reader not given the PIN or the grant)
+  | rollover budget  : 0 of 7 rolls since the owner's last refresh; allowance not armed
+  | balance          : 0
+  cardctl info: rc 0, 279 ms (process start included)
