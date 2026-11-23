@@ -75,7 +75,7 @@ class AidVersionTest {
         ResponseAPDU info = sim.transmitCommand(new CommandAPDU(CashuAppletTest.CLA, CashuAppletTest.INS_GET_INFO, 0, 0, 256));
         assertEquals(CashuAppletTest.SW_OK, info.getSW());
         assertEquals(3, info.getData()[0], "major 3: the card's own change finished on the card, two units, keyset keys, the paid list and the certificate (D183 to D193), which a 2.2 reader cannot read");
-        assertEquals(1, info.getData()[1], "minor 1: 3.0's wire with the wait made a second a limit and the held taps shorter (D230, D231), which a 3.0 reader meets as sooner answers");
+        assertEquals(1, info.getData()[1], "minor 1: 3.0's wire with the wait made a second a limit and the held taps shorter (D231, D232), which a 3.0 reader meets as sooner answers");
         assertEquals(3, CashuApplet.VERSION_MAJOR);
         assertEquals(1, CashuApplet.VERSION_MINOR);
     }

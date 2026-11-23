@@ -85,14 +85,14 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). The 3.0 file after it added the security
 > review's fixes of [D228](docs/DECISIONS.md#d228) (one set-up bit a unit, the chip's path given up for one signature only,
 > `GET_INFO` byte 55 bit 3 clear; load file sha256 `99a66ba7…`), and the tracked file is 3.1 on top of it:
-> [D230](docs/DECISIONS.md#d230) to [D234](docs/DECISIONS.md#d234) (the limit on one payment a rate, shorter held taps, the
+> [D231](docs/DECISIONS.md#d231) to [D235](docs/DECISIONS.md#d235) (the limit on one payment a rate, shorter held taps, the
 > set-up's self-tests once a set-up life; 42,485 bytes, load file sha256 `9ed12359…`). That file has run on a chip:
 > the same card installed it and paid from it at a test mint on 2026-11-21
 > ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)); 330ffa1's file, from before the merge onto D228 (load file `4014e7f1…`), ran on the
 > same card and paid from it at a test mint
 > ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)). No J3R180 keyed for SCP02 has been given a
 > 3.x file, and none will be: according to the card's supplier the chip's manufacturer has retired that keying
-> ([D229](docs/DECISIONS.md#d229)). The tracked file now adds [D235](docs/DECISIONS.md#d235)'s review fixes (42,741 bytes,
+> ([D229](docs/DECISIONS.md#d229)). The tracked file now adds [D236](docs/DECISIONS.md#d236)'s review fixes (42,741 bytes,
 > load file sha256 `b2afa9a8…`): it has run only in a simulator, and its chip run is owed. The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,

@@ -192,7 +192,7 @@ cancellation during key prefetch prevents NFC from opening later.
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
 chip has installed and the operator approved. The tracked 3.1 load file (42,741 bytes,
-sha256 `b2afa9a8…`, D235) is not on it yet, so a build from this tree installs no card.
+sha256 `b2afa9a8…`, D236) is not on it yet, so a build from this tree installs no card.
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
 No chip has installed this 3.0 file (D228's review fixes), and no J3R180 keyed for SCP02 any 3.0 file (none will

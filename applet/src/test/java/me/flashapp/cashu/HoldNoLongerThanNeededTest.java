@@ -12,10 +12,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 3.1 (the project owner, 2026-11-21: a person must not hold a card longer than the protection needs). D232: SET_CARD's
- * self-tests run once in the card's life, their verdicts kept. D233: the one-asking claim right after a set-up's record is a
+ * 3.1 (the project owner, 2026-11-21: a person must not hold a card longer than the protection needs). D233: SET_CARD's
+ * self-tests run once in the card's life, their verdicts kept. D234: the one-asking claim right after a set-up's record is a
  * blank card's alone, one that had no PIN when this time in the field began; a card that had one is held for CLAIM_ASKINGS
- * whatever came between. D234: a card's first PIN, set by SET_PIN on a card that had none, stands as given for the rest of
+ * whatever came between. D235: a card's first PIN, set by SET_PIN on a card that had none, stands as given for the rest of
  * that selection, so the reader sends no VERIFY_PIN after it; a SELECT ends it, and a PIN replaced is never given by its SET_PIN.
  */
 class HoldNoLongerThanNeededTest {
@@ -33,18 +33,18 @@ class HoldNoLongerThanNeededTest {
     }
 
     @Test
-    @DisplayName("D233 and D234: a blank card is set up and claimed in one tap: SET_PIN (no VERIFY_PIN after it), SET_CARD, and the owner set at the first asking")
+    @DisplayName("D234 and D235: a blank card is set up and claimed in one tap: SET_PIN (no VERIFY_PIN after it), SET_CARD, and the owner set at the first asking")
     void aBlankCardIsSetUpAndClaimedInOneTap() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         assertEquals(SW_OK, ClaimAfterSetUpTest.setPin(c, TEST_PIN), "the first PIN");
-        assertEquals(1, c.field("pinVerifiedFlag")[0], "chosen by this reader in this selection: it stands as given (D234)");
+        assertEquals(1, c.field("pinVerifiedFlag")[0], "chosen by this reader in this selection: it stands as given (D235)");
         assertEquals(SW_OK, ClaimAfterSetUpTest.setCard(c), "the record, with no VERIFY_PIN between");
         assertEquals(SW_OK, c.sw(setTimeCommand(T0)));
         ClaimAfterSetUpTest.quickClaim(c, "a blank card's first set-up");
     }
 
     @Test
-    @DisplayName("D234: the first PIN as given does not outlive a SELECT, and a PIN that replaces one (a forgotten PIN) is never given by its SET_PIN")
+    @DisplayName("D235: the first PIN as given does not outlive a SELECT, and a PIN that replaces one (a forgotten PIN) is never given by its SET_PIN")
     void theFirstPinAsGivenEndsWithTheSelection() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         assertEquals(SW_OK, ClaimAfterSetUpTest.setPin(c, TEST_PIN));
@@ -60,7 +60,7 @@ class HoldNoLongerThanNeededTest {
     }
 
     @Test
-    @DisplayName("D233: a card that had a PIN when the tap began (a simple card, reset by its PIN and set up again in the same tap) is claimed only after CLAIM_ASKINGS askings, and no order of commands makes it fewer")
+    @DisplayName("D234: a card that had a PIN when the tap began (a simple card, reset by its PIN and set up again in the same tap) is claimed only after CLAIM_ASKINGS askings, and no order of commands makes it fewer")
     void aCardThatHadAPinIsHeldForEveryAsking() throws Exception {
         UnitsTest.Card c = SimpleCardTest.setUpWith(concat(u32(1000), u32(500), u32(0)));
         c.tap();
@@ -81,13 +81,13 @@ class HoldNoLongerThanNeededTest {
         assertEquals(SW_OK, SimpleCardTest.resetByPin(d)[1]);
         assertEquals(SW_OK, ClaimAfterSetUpTest.setPin(d, NEW_PIN));
         d.select();
-        assertEquals(SW_SECURITY_NOT_SATIS, ClaimAfterSetUpTest.setCard(d), "after a SELECT the new PIN is not given (D234)");
+        assertEquals(SW_SECURITY_NOT_SATIS, ClaimAfterSetUpTest.setCard(d), "after a SELECT the new PIN is not given (D235)");
         assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, NEW_PIN)));
         assertEquals(SW_OWNER_PROOF, ClaimAfterSetUpTest.setCard(d), "and the SELECT ended the first set-up: no record, so no claim, in it");
     }
 
     @Test
-    @DisplayName("D232: the set-up's self-tests run at the first SET_CARD and are kept: a SET_CARD after it, on the same card after a reset, writes the record alone")
+    @DisplayName("D233: the set-up's self-tests run at the first SET_CARD and are kept: a SET_CARD after it, on the same card after a reset, writes the record alone")
     void theSelfTestsRunOnceInTheCardsLife() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         assertFalse(flag(c, "selfTested"), "a new card has run none");
@@ -106,7 +106,7 @@ class HoldNoLongerThanNeededTest {
     }
 
     @Test
-    @DisplayName("D232, amended: a RESET_CARD clears the verdicts' mark, and the next SET_CARD runs the self-tests again: a planted verdict, and a chip product given up after one failed signature, do not outlive a reset")
+    @DisplayName("D233, amended: a RESET_CARD clears the verdicts' mark, and the next SET_CARD runs the self-tests again: a planted verdict, and a chip product given up after one failed signature, do not outlive a reset")
     void aResetRunsTheSelfTestsAgain() throws Exception {
         UnitsTest.Card c = SimpleCardTest.setUpWith(concat(u32(1000), u32(500), u32(0)));
         assertTrue(flag(c, "selfTested"));

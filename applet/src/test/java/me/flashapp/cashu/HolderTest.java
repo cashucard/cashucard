@@ -210,7 +210,7 @@ class HolderTest {
         UnitsTest.Card bare = new UnitsTest.Card();
         assertEquals(SW_NO_PIN, raw(bare, setOwnerOpenCommand(OWNER)).getSW(), "no PIN");
         assertEquals(SW_OK, bare.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
-        // (D234: the first PIN stands as given for the selection it was set in; after a SELECT it is not given)
+        // (D235: the first PIN stands as given for the selection it was set in; after a SELECT it is not given)
         bare.select();
         assertEquals(SW_SECURITY_NOT_SATIS, raw(bare, setOwnerOpenCommand(OWNER)).getSW(), "the PIN not given");
         assertEquals(0, bare.field("nonceLive")[1], "nothing counted");
@@ -395,7 +395,7 @@ class HolderTest {
     // =========================================================================
 
     @Test
-    @DisplayName("The history of a card with a PIN and no owner is held for: the PIN given (6982), never in a time in the field that paid (6985), HISTORY_ASKINGS - 1 askings answered 6A98 (two since D231) and the next the log; then the log and the receipts are open to the PIN for the rest of the time in the field, through a SELECT, and no payment is taken in it; any other command begins the count again, and a P1 over 3 neither counts nor ends it")
+    @DisplayName("The history of a card with a PIN and no owner is held for: the PIN given (6982), never in a time in the field that paid (6985), HISTORY_ASKINGS - 1 askings answered 6A98 (two since D232) and the next the log; then the log and the receipts are open to the PIN for the rest of the time in the field, through a SELECT, and no payment is taken in it; any other command begins the count again, and a P1 over 3 neither counts nor ends it")
     void theHistoryIsHeldFor() throws Exception {
         UnitsTest.Card c = noOwner();
         int place = c.put(-1, A.id8(), 64);
@@ -641,7 +641,7 @@ class HolderTest {
         c.select();
         assertEquals(CashuApplet.TAP_READ, c.field("tapOpen")[2] & CashuApplet.TAP_READ, "kept through a SELECT");
         c.power();
-        // (D233: the bits of how the time in the field began, TAP_BEGUN and TAP_HADPIN, are set again at its first command)
+        // (D234: the bits of how the time in the field began, TAP_BEGUN and TAP_HADPIN, are set again at its first command)
         assertEquals(0, c.field("tapOpen")[2] & ~(CashuApplet.TAP_BEGUN | CashuApplet.TAP_HADPIN), "gone with the power");
         assertEquals(2, c.field("nonceLive").length, "the nonce's mark and the held count");
     }

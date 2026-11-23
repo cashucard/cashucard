@@ -84,7 +84,7 @@ class LoadWordTest {
     }
 
     @Test
-    @DisplayName("The pickup order (D231's companion in the phone): change written with LOAD_CHANGE and then a payment from it, BEGIN, OUTPUTS and SIGN, in the same time in the field: the card takes both, in that order")
+    @DisplayName("The pickup order (D232's companion in the phone): change written with LOAD_CHANGE and then a payment from it, BEGIN, OUTPUTS and SIGN, in the same time in the field: the card takes both, in that order")
     void changeWrittenThenPaidInOneTap() throws Exception {
         TearSweepTest.Card c = new TearSweepTest.Card();
         TearSweepTest.readyOwed(c);

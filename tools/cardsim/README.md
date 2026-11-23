@@ -321,7 +321,7 @@ shape (an 8-byte id, no fee) and against a fresh v2 keyset (a 33-byte id, a fee 
 For flash-pos and flash-mobile, before either moves its `CASHU_JAVACARD_REF` pin
 past this change (both pins move together, with the app changes below):
 
-- **`SELECT` answers `03 01`**, `/state.version` is `"3.1"` (3.1, D230 and D231: the waits; `03 00` before). The major moves
+- **`SELECT` answers `03 01`**, `/state.version` is `"3.1"` (3.1, D231 and D232: the waits; `03 00` before). The major moves
   ([D205](../../docs/DECISIONS.md#d205)): an app that takes only major 2 answers this
   card with "needs an update" until it takes major 3.
 - **Lock pieces to the card's key for their date, never to `/state.pubkey`.** Read

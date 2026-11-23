@@ -1,15 +1,15 @@
 # The merged 3.1 file (bab8c5a) on card 58206920 (a J3R180 keyed for SCP03): the install, the waits, the second payment's least after the change's credit, D228's fixes, and payments at a test mint (2026-11-21)
 
-The tracked 3.1 file of branch `card-3.1-on-ib` at bab8c5a (3.1 on Island Bitcoin's merged #256: D228 theirs, D230 to D234
-ours, D231 amended so that a second payment in a tap waits `max(2, W − ⌊outputs / 2⌋)`) was put on card 58206920 (ATR J3R310-355; a J3R180 keyed for SCP03 according to the card's
+The tracked 3.1 file of branch `card-3.1-on-ib` at bab8c5a (3.1 on Island Bitcoin's merged #256: D228 theirs, D231 to D235
+ours, D232 amended so that a second payment in a tap waits `max(2, W − ⌊outputs / 2⌋)`) was put on card 58206920 (ATR J3R310-355; a J3R180 keyed for SCP03 according to the card's
 supplier, D229) in place of 330ffa1's 3.1 file, timed, paid from at a test mint, and left there fresh, with the tag at
 `https://getfoxy.io/card`.
 
 - **Every install was taken at the first try:** the load 2 times of 2, the card's applet 14 times of 14, the tag 14 times
   of 14. No `6F00`, no retry. Free memory the same at every reading, and the same as 330ffa1's file.
-- **D230, the wait a rate:** every first payment of a tap waited exactly `2 × (N − 1)` "not yet" answers, less one for
+- **D231, the wait a rate:** every first payment of a tap waited exactly `2 × (N − 1)` "not yet" answers, less one for
   every two change outputs, for N = 1, 2, 3, 4, 5, 6, 10. Each "not yet" took 462 ms (the first of a payment 465 to 481 ms).
-- **D231 as amended, the second payment's least after the change's credit:** within the limit with 4 change outputs, **2**
+- **D232 as amended, the second payment's least after the change's credit:** within the limit with 4 change outputs, **2**
   (330ffa1's file waited 0 for such a payment); with no limit and 6 change outputs, **2**; five limits' worth with 4 change
   outputs, **6**. The held history answered at the third asking, the reset by the PIN at the fourth.
 - **D228 on the chip:** `GET_INFO` P1 = 4 bytes 55 and 56 read **`F7 03`** (330ffa1's file read `FF 03` before the wipe);
@@ -88,9 +88,9 @@ Free memory (persistent / transient), the same at every reading:
 | after the tag | 100,112 / 2,084 |
 | after a set-up life (the set-up's storage kept through a reset) | 72,628 / 2,084 |
 
-- **No drift.** The same figures as 330ffa1's file at every point: D228's fixes and D231's amendment cost no memory.
+- **No drift.** The same figures as 330ffa1's file at every point: D228's fixes and D232's amendment cost no memory.
 
-## 2. D230: the wait over the limit
+## 2. D231: the wait over the limit
 
 Set up with a limit on one payment of **100 sats** (and a day of 100,000). Expected for the first payment of a tap:
 `max(0, 2 × (N − 1) − ⌊change outputs / 2⌋)`, N the limits' worth leaving the card (within a thirty-second over the limit
@@ -114,7 +114,7 @@ counts as one; a part counts as one).
 - C2 was made after C1's six change pieces were loaded: no `6A84` this time (the earlier run's C2 came while C1's six
   openings were owed).
 
-## 3. D231 as amended: the second payment, the held history, the reset by the PIN
+## 3. D232 as amended: the second payment, the held history, the reset by the PIN
 
 **The new rule, a second payment in one tap waits `max(2, W − ⌊outputs / 2⌋)`**, W its own wait (at least 2):
 
@@ -141,23 +141,23 @@ counts as one; a part counts as one).
 | `RESET_CARD` P2 `AD`, held | `6A98` × 3, **`9000` at the fourth** | 473.1, 473.0, 473.2, 236.5 ms: **1,656 ms** |
 | `GET_INFO` | no PIN, no record, no owner | |
 
-**A claim on a card that had a PIN at the tap's first command** (D233): in the same tap, after the reset, `SET_PIN`,
+**A claim on a card that had a PIN at the tap's first command** (D234): in the same tap, after the reset, `SET_PIN`,
 `SET_CARD` and the claim: `SET_OWNER` answered `6A98` three times and set the owner at the **fourth** (528.5, 532.1, 532.1,
 837.0 ms: 2,430 ms).
 
-## 4. D232 to D234: the set-up
+## 4. D233 to D235: the set-up
 
 | Item | Result |
 | --- | --- |
-| D232: the first `SET_CARD` after the install | `9000` in **1,820 ms** (the self-tests) |
-| D232: a second `SET_CARD` in the same selection | `9000` in **48.4 ms** (self-tests skipped) |
-| D232: the first `SET_CARD` after the owner's reset | `9000` in **1,494 ms** (three times: 1,493.3 to 1,493.9) |
-| D232: the first `SET_CARD` after a `RESET_CARD` by the PIN | `9000` in **1,494 ms** (self-tests again) |
-| D233: a blank card set up and claimed in one tap | `SET_OWNER` `9000` at the **first** asking (828 to 834 ms) |
-| D234: `SET_CARD` after a first `SET_PIN`, no `VERIFY_PIN` | `9000` |
-| D234: `GROUP_KEYS` after the first `SET_PIN`, no `VERIFY_PIN` | `9000` (76.3 ms) |
-| D234: `GROUP_KEYS` after a `SELECT` in the same power-up | **`6982`** |
-| D234: `GROUP_KEYS` in a new tap / after `VERIFY_PIN` | `6982` / `9000` |
+| D233: the first `SET_CARD` after the install | `9000` in **1,820 ms** (the self-tests) |
+| D233: a second `SET_CARD` in the same selection | `9000` in **48.4 ms** (self-tests skipped) |
+| D233: the first `SET_CARD` after the owner's reset | `9000` in **1,494 ms** (three times: 1,493.3 to 1,493.9) |
+| D233: the first `SET_CARD` after a `RESET_CARD` by the PIN | `9000` in **1,494 ms** (self-tests again) |
+| D234: a blank card set up and claimed in one tap | `SET_OWNER` `9000` at the **first** asking (828 to 834 ms) |
+| D235: `SET_CARD` after a first `SET_PIN`, no `VERIFY_PIN` | `9000` |
+| D235: `GROUP_KEYS` after the first `SET_PIN`, no `VERIFY_PIN` | `9000` (76.3 ms) |
+| D235: `GROUP_KEYS` after a `SELECT` in the same power-up | **`6982`** |
+| D235: `GROUP_KEYS` in a new tap / after `VERIFY_PIN` | `6982` / `9000` |
 
 - `SET_PIN` 24 ms. The owner's reset 336 to 337 ms.
 

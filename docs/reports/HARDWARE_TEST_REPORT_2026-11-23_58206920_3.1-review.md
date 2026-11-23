@@ -1,6 +1,6 @@
-# Hardware test report: 3.1 with D235 on sample card 58206920 (2026-11-23)
+# Hardware test report: 3.1 with D236 on sample card 58206920 (2026-11-23)
 
-The 3.1 file with the review fixes of D235 (branch `card-3.1-pr`, 63453f2) was put on the reader's sample card, checked for
+The 3.1 file with the review fixes of D236 (branch `card-3.1-pr`, 63453f2) was put on the reader's sample card, checked for
 each fix a reader can see, paid from at a test mint, and left fresh.
 
 - **Card:** CPLC ICSerialNumber **58206920**, ICType D321 (ATR "J3R310-355", a J3R180 keyed for SCP03, D229), the public
@@ -39,7 +39,7 @@ balance 0, `cardctl change`: "no change owed"). Nothing of value; the keeper's a
 
 **42,741 bytes installs on this chip.** SIZES has it.
 
-## D235 on the chip
+## D236 on the chip
 
 | Fix | Check | Result |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ The same CAP was put on a second chip, a J3R452 (NXP P71D600, SCP03 i=10 with it
 
 - **Install:** the load (about 18 s), the card's applet and the tag (`https://getfoxy.io/card`) all `9000` at the first try;
   `selftest` 13 of 13; 5 create cycles of the card's applet and the tag, 5 of 5 at the first try (the tag 260 ms).
-- **D235:** the first set-up's claim at the first asking (960 ms); after a reset by the owner, `6A98` three times (609 to
+- **D236:** the first set-up's claim at the first asking (960 ms); after a reset by the owner, `6A98` three times (609 to
   613 ms) and `9000` at the fourth; the first `SET_CARD` after the reset 1,650 ms (the self-tests ran); a SELECT after
   VERIFY_PIN leaves `GET_LOG` answering `6982`.
 - **Money at testnut, the same plan:** the first load of 36 read back unspent; every payment taken by testnut; the waits
@@ -103,7 +103,7 @@ empty 1.21 install (balance 0, 128 places empty). It is the first J3R180 keyed f
 
 - **Install:** the load, the card's applet and the tag all `9000` at the first try; `selftest` 13 of 13; 5 create cycles
   at the first try.
-- **D235:** the first set-up's claim at the first asking (843 ms); after a reset by the owner, `6A98` three times and
+- **D236:** the first set-up's claim at the first asking (843 ms); after a reset by the owner, `6A98` three times and
   `9000` at the fourth; the first `SET_CARD` after the reset 1,529 ms; a SELECT after VERIFY_PIN leaves `GET_LOG`
   answering `6982`.
 - **Money at testnut, the same plan, with no break:** the first load of 36 read back unspent; every payment taken by

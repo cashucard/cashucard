@@ -205,20 +205,20 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
   assert.match(source, /40412: True/);
 });
 
-// The tracked CAP is 3.1 with D235's review fixes on top of bab8c5a's 3.1 file: a load file of 42,741 bytes, padded by
+// The tracked CAP is 3.1 with D236's review fixes on top of bab8c5a's 3.1 file: a load file of 42,741 bytes, padded by
 // sizeTheFile to 245 past a multiple of 256, the place of every 3.x file card 58206920 (a J3R180 keyed for SCP03, D229)
 // installed, at a size no chip has been given. It has run only in a simulator: its hash is on neither PROVEN nor INSTALLED
 // until its chip run. bab8c5a's file (load file 9ed12359..., 42,485 bytes), which card 58206920 installed and paid from at
 // testnut on 2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md), stays on PROVEN as that
 // file's, with 9ac55c1's 3.0 (d69742d0...) and 330ffa1's 3.1 (4014e7f1...) before it.
-test("the tracked 3.1 CAP's load file (D235) has run only in a simulator, and 9ed12359, d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
+test("the tracked 3.1 CAP's load file (D236) has run only in a simulator, and 9ed12359, d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
   const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.1.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /load file: 42741 bytes \(245 past a multiple of 256\)/);
   const sha = r.stdout.match(/load file sha256: ([0-9a-f]{64});/);
   assert.ok(sha, r.stdout);
-  assert.equal(sha[1], "b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da", "the tracked file is D235's");
+  assert.equal(sha[1], "b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da", "the tracked file is D236's");
   assert.match(r.stdout, /this exact file has run only in a simulator so far/, "the tracked file says it has not run on a chip");
   assert.match(r.stdout, /not yet tried on a chip/, "nor has a file of its size");
   const source = readFileSync(REFCHECK, "utf8");

@@ -18,7 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * D235: the fixes from the outside review of 3.1 at be8794e. A reset torn after its last commit has run no self-test; a card
+ * D236: the fixes from the outside review of 3.1 at be8794e. A reset torn after its last commit has run no self-test; a card
  * that has had a PIN is held for every asking of its next claim, even after the field is cut; a LOAD_CHANGE that throws
  * leaves nothing in the hash the next command uses; a SELECT zeroes what the tap gave.
  */
@@ -40,7 +40,7 @@ class ReviewFixesTest {
     }
 
     @Test
-    @DisplayName("D235 (1): a RESET_CARD torn right after the transaction that makes it a new card has run no self-test: the next SET_CARD runs them")
+    @DisplayName("D236 (1): a RESET_CARD torn right after the transaction that makes it a new card has run no self-test: the next SET_CARD runs them")
     void aResetTornRightAfterItsCommitHasRunNoSelfTest() throws Exception {
         TearSweepTest.Card t = new TearSweepTest.Card();
         assertEquals(SW_OK, t.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)), "the first PIN");
@@ -64,7 +64,7 @@ class ReviewFixesTest {
     }
 
     @Test
-    @DisplayName("D235 (2): a card reset by its PIN and taken out of the field (or the field cut by the reader) is still a card that had a PIN: its next claim is held for every asking")
+    @DisplayName("D236 (2): a card reset by its PIN and taken out of the field (or the field cut by the reader) is still a card that had a PIN: its next claim is held for every asking")
     void aResetCardIsHeldForEveryAskingAfterTheFieldIsCut() throws Exception {
         UnitsTest.Card c = SimpleCardTest.setUpWith(concat(u32(1000), u32(500), u32(0)));
         c.tap();
@@ -94,7 +94,7 @@ class ReviewFixesTest {
     }
 
     @Test
-    @DisplayName("D235 (3): a LOAD_CHANGE that throws half way (C_ = B_, e = s = 1: a point at infinity) leaves nothing in the hash: a keyset taught and a key shown after it in the same selection are right")
+    @DisplayName("D236 (3): a LOAD_CHANGE that throws half way (C_ = B_, e = s = 1: a point at infinity) leaves nothing in the hash: a keyset taught and a key shown after it in the same selection are right")
     void aLoadChangeThatThrowsLeavesNoBytesInTheNextHash() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         c.ready(UnitsTest.SAT, false);
@@ -121,7 +121,7 @@ class ReviewFixesTest {
     }
 
     @Test
-    @DisplayName("D235 (4): select() zeroes the PIN given, the owner's grant and nonce, the held count, a payment or teaching begun, and the owner's s, for a runtime that would keep them across a SELECT")
+    @DisplayName("D236 (4): select() zeroes the PIN given, the owner's grant and nonce, the held count, a payment or teaching begun, and the owner's s, for a runtime that would keep them across a SELECT")
     void aSelectZeroesWhatTheTapGave() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         c.ready(UnitsTest.SAT, false);
