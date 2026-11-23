@@ -53,13 +53,13 @@ class CardSimHttpTest {
     }
 
     @Test
-    @DisplayName("POST /apdu round-trips a SELECT by the card's applet's whole AID, F0 CASHUCARD 01: 03 00")
+    @DisplayName("POST /apdu round-trips a SELECT by the card's applet's whole AID, F0 CASHUCARD 01: 03 01")
     void apduRoundTrip() throws Exception {
         HttpResponse<String> r = post("/apdu", "{\"hex\":\"00A404000BF043415348554341524401\"}");
         assertEquals(200, r.statusCode());
         assertEquals("application/json", r.headers().firstValue("Content-Type").orElse(""));
         JsonObject o = json(r);
-        assertEquals("03009000", o.get("hex").getAsString());
+        assertEquals("03019000", o.get("hex").getAsString());
         assertEquals("9000", o.get("sw").getAsString());
     }
 
@@ -73,9 +73,9 @@ class CardSimHttpTest {
         // GET /state still reads the card, and leaves the opener selected for the app
         HttpResponse<String> state = get("/state");
         assertEquals(200, state.statusCode(), state.body());
-        assertEquals("3.0", json(state).get("version").getAsString());
+        assertEquals("3.1", json(state).get("version").getAsString());
         assertEquals("6D00", json(post("/apdu", "{\"hex\":\"B001020000\"}")).get("sw").getAsString());
-        assertEquals("03009000", json(post("/apdu", "{\"hex\":\"00A404000BF043415348554341524401\"}")).get("hex").getAsString());
+        assertEquals("03019000", json(post("/apdu", "{\"hex\":\"00A404000BF043415348554341524401\"}")).get("hex").getAsString());
         assertEquals("9000", json(post("/apdu", "{\"hex\":\"B001020000\"}")).get("sw").getAsString());
     }
 
@@ -134,7 +134,7 @@ class CardSimHttpTest {
     void stateAndReset() throws Exception {
         JsonObject s = json(get("/state"));
         assertEquals(0, s.get("generation").getAsLong());
-        assertEquals("3.0", s.get("version").getAsString());
+        assertEquals("3.1", s.get("version").getAsString());
         assertEquals(66, s.get("pubkey").getAsString().length());
         assertEquals(128, s.getAsJsonArray("slots").size());
         assertEquals(7, s.get("rollBudget").getAsInt());

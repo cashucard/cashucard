@@ -147,7 +147,7 @@ const SELECT_AIDS = Object.freeze([APPLET_AID, PACKAGE_AID])
 // Withdrawn: a card that answers these, or does not answer the shared AID (D19, since 2.0), needs an update.
 const OLD_AIDS = Object.freeze({ upstream0x: Buffer.from("D2760000850102", "hex"), foxy1x: Buffer.from("F0464F585943415244", "hex") })
 
-const VERSION = Object.freeze({ major: 3, minor: 0 })
+const VERSION = Object.freeze({ major: 3, minor: 1 })
 /** GET_OUTBOX (2.2): the scope's length, and the most bytes one page answers. */
 const OUTBOX_SCOPE_LEN = 45
 const OUTBOX_PAGE = 255

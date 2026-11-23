@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import {useProvisioning} from '../ProvisioningStore';
 import {useApp} from '../store';
-import {resetRecoveryDetails} from '../ownedResetWorkflow';
+import {resetRecoveryDetails, threeLine} from '../ownedResetWorkflow';
 
 import {CardFigure} from '../CardFigure';
 import {FONT, useTheme} from '../theme';
@@ -84,8 +84,8 @@ export function ResetCardScreen({
   };
   const card = pending ? visible.review : flow.resetReview?.card;
   const lookup = flow.resetReview?.source;
-  // a 3.0 card's spent entries are freed by its holder wallet, not by this app's settlement check
-  const cleanable = !!card && card.version !== '3.0';
+  // a 3.x card's spent entries are freed by its holder wallet, not by this app's settlement check
+  const cleanable = !!card && !threeLine(card.version);
   const allowed =
     !!card &&
     card.unspent === 0 &&

@@ -118,7 +118,9 @@ class StrangerHoldingTheCardTest {
         UnitsTest.Card n = new UnitsTest.Card();
         byte[] pinKey = LinkingTest.ownPinKey(n);
         assertEquals(SW_OK, n.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
-        // before the PIN is given in the first set-up: 6982
+        // (as a reader that has not given it: D235's first PIN as given, cleared by hand)
+        n.field("pinVerifiedFlag")[0] = 0;
+        // before the PIN is given: 6982
         n.send(new CommandAPDU(CLA, INS_GET_NONCE, 1, 0, 256));
         assertEquals(SW_SECURITY_NOT_SATIS, n.sw(new CommandAPDU(CLA, INS_GET_CARD, 3, 0, agreed(EPH[0], pinKey)[0], 256)), "SET_PIN alone");
         n.pin();

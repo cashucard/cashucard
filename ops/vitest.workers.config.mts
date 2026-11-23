@@ -13,6 +13,16 @@ export default defineConfig({
       main: './src/worker.ts',
       wrangler: {configPath: './wrangler.toml'},
       miniflare: {
+        // No test leaves the machine: miniflare hands every outbound fetch
+        // of the Worker under test (and of the tests, which run in it) to this
+        // handler, in this process, which answers 503 and names itself. So the
+        // anchor route's upstream (mempool.space) fails at once and for
+        // certain, as test/workers/offline.test.ts pins.
+        outboundService: () =>
+          new Response('no network in the Workers tests', {
+            status: 503,
+            headers: {'x-ops-test-offline': '1'},
+          }),
         r2Buckets: ['OPS_BACKUPS'],
         // OPS_MASTER_KEY: a TEST master, the same fixed value the node tests
         // use; never a real secret in the tree.

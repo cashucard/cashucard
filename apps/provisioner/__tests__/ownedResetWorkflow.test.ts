@@ -1,5 +1,6 @@
 import {
   OwnedResetWorkflow,
+  threeLine,
   type OwnedResetService,
 } from '../src/ownedResetWorkflow';
 import type {ResetReview} from '../src/cardkit';
@@ -114,13 +115,14 @@ test('wrong actor, retained value and unsupported provenance stop before intent,
     expect(f.service.keys).not.toHaveBeenCalled();
   }
 });
-test('a card owed change, a 3.0 card with spent entries, or a review without the change owed, is never begun', async () => {
+test('a card owed change, a 3.0 or 3.1 card with spent entries, or a review without the change owed, is never begun', async () => {
   const older: Partial<ResetReview> = {...review};
   delete older.changeOwed;
   delete older.version;
   for (const observed of [
     {...review, changeOwed: true},
     {...review, version: '3.0', spent: 2},
+    {...review, version: '3.1', spent: 2},
     older as ResetReview,
   ]) {
     const f = fixture();
@@ -134,17 +136,37 @@ test('a card owed change, a 3.0 card with spent entries, or a review without the
     expect(f.raw()).toBeNull();
     expect(f.service.lookup).not.toHaveBeenCalled();
   }
-  // a 3.0 card with no spent entries and nothing owed begins
-  const f = fixture();
-  const w = await OwnedResetWorkflow.open(f.storage);
-  await w.begin(
-    f.service,
-    uuid(1),
-    uuid(2),
-    {...review, version: '3.0'},
-    {erase: true, valueHandled: true},
-  );
-  expect(JSON.parse(f.raw()!).review.changeOwed).toBe(false);
+  // a 3.0 or 3.1 card with no spent entries and nothing owed begins
+  for (const version of ['3.0', '3.1']) {
+    const f = fixture();
+    const w = await OwnedResetWorkflow.open(f.storage);
+    await w.begin(
+      f.service,
+      uuid(1),
+      uuid(2),
+      {...review, version},
+      {erase: true, valueHandled: true},
+    );
+    expect(JSON.parse(f.raw()!).review.changeOwed).toBe(false);
+    expect(JSON.parse(f.raw()!).review.version).toBe(version);
+  }
+});
+test('only 3.0 and 3.1 are of the 3.x line, and a review of any other version is never begun', async () => {
+  expect(threeLine('3.0')).toBe(true);
+  expect(threeLine('3.1')).toBe(true);
+  for (const version of ['3.2', '3.10', '3.01', '3.1.0', '3', '4.0', '2.3', '']) {
+    expect(threeLine(version)).toBe(false);
+    const f = fixture();
+    const w = await OwnedResetWorkflow.open(f.storage);
+    await expect(
+      w.begin(f.service, uuid(1), uuid(2), {...review, version}, {
+        erase: true,
+        valueHandled: true,
+      }),
+    ).rejects.toThrow();
+    expect(f.raw()).toBeNull();
+    expect(f.service.lookup).not.toHaveBeenCalled();
+  }
 });
 test('a reset saved by an earlier build, whose review has no change owed or version, still opens', async () => {
   const f = fixture();

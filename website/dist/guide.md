@@ -1,8 +1,8 @@
 # Install the Cashu Card applet: the guide for AI agents
 
-This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.0, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
+This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.1, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
-The 3.0 build: this exact file has run on a chip. It ran on a J3R180 keyed for SCP03 (sample card 58206920) on 2026-11-22, at a test mint. If the install in step 4 fails, stop and tell the person.
+The 3.1 build: this exact file has run on a chip. It ran on a J3R180 keyed for SCP03 (sample card 58206920) on 2026-11-23, at a test mint. If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
@@ -50,18 +50,18 @@ chmod +x /usr/local/bin/gp
 
 ## 2. Get the applet
 
-The applet ships as one CAP file, `applet/target/cashu-javacard-3.0.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
+The applet ships as one CAP file, `applet/target/cashu-javacard-3.1.0.cap`, holding three applets: an opener, the card's applet and an NFC tag.
 
 ```sh
 git clone https://github.com/cashucard/cashucard
 cd cashucard/applet
-sha256sum target/cashu-javacard-3.0.0.cap
+sha256sum target/cashu-javacard-3.1.0.cap
 ```
 
-On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.0.0.cap`. Expected:
+On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.1.0.cap`. Expected:
 
 ```
-0b17e232d394a7ce1885dcc395e38d6830cd4abf5097056052174a3f76b4f4a6  target/cashu-javacard-3.0.0.cap
+4ff8d8a20bf1106a3a31db5824a80d8626838d237c974157197d3fac1104845a  target/cashu-javacard-3.1.0.cap
 ```
 
 Stop if the hash differs.
@@ -100,7 +100,7 @@ If gp reports that the login failed, stop and tell the person to put that card a
 The chip takes the card's applet only once another applet from the same package exists, so the install is three commands in this order: the opener, the card's applet, then the NFC tag. The tag carries the address the person gave (rule 4), in hex as its install parameters; the tag refuses an install without one. From `cashucard/applet`, with that address in place of `https://example.com/card`:
 
 ```sh
-gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 --params "$(printf '%s' 'https://example.com/card' | xxd -p | tr -d '\n')"
 ```
@@ -121,7 +121,7 @@ APP: D2760000850101 (SELECTABLE)
 
 ## 5. Check the install
 
-Select the card's applet by its whole AID. It answers with its version, 3.0, and `9000` for success:
+Select the card's applet by its whole AID. It answers with its version, 3.1, and `9000` for success:
 
 ```sh
 gp --apdu 00A404000BF043415348554341524401
@@ -130,7 +130,7 @@ gp --apdu 00A404000BF043415348554341524401
 Expected:
 
 ```
-0300 9000
+0301 9000
 ```
 
 Read its state with GET_INFO:
@@ -142,7 +142,7 @@ gp --apdu B0010000
 Expected on a new card, with 128 empty slots and its PIN, owner and record still unset:
 
 ```
-03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+03 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 SW: 9000
 ```
 

@@ -145,7 +145,7 @@ PIN_STATE_NAMES = {0: "none", 1: "set", 2: "blocked"}
 SELFTEST_MIN_VERSION = (2, 1)
 # The versions selftest knows, and so passes: a later minor of a major it knows,
 # or a later major, is not passed on trust.
-SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0))
+SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0), (3, 1))
 # The majors cardctl speaks outside the card file tools: those of SELFTEST_VERSIONS.
 PROTOCOL_MAJORS = tuple(sorted({v[0] for v in SELFTEST_VERSIONS}))
 # The versions cardctl drives a card as (`driven_as`, `connect`): those selftest knows, and 2.0, the release D26
@@ -279,6 +279,8 @@ FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
 # the seventeenth asking after the history's seven (24 askings, about 11 s in all), D211: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D211 measured it).
+# 3.1 (D232) answers the history at the third asking and resets at the fourth (7 askings, about 2.6 s in all, D236): these bounds are
+# 3.0's, the most any card asks for, and a 3.1 card answers before them.
 LOG_HOLD_MOST = 7
 RESET_MOST = 17
 RESET_CONFIRM_BYTE = 0xAD
@@ -616,7 +618,7 @@ class Card:
             f"SELECT failed: {last}\n"
             "No 2.0 applet answers on this card. A card on the 0.x or Foxy 1.x applet needs an\n"
             "update (sweep it first, then reinstall: docs/HARDWARE_DEPLOYMENT.md):\n"
-            "  applet/target/cashu-javacard-3.0.0.cap"
+            "  applet/target/cashu-javacard-3.1.0.cap"
         )
 
     # ── read commands ─────────────────────────────────────────────────────────
@@ -3581,15 +3583,21 @@ def cmd_selftest(args) -> int:
     return rc if all_sigs_ok else 1
 
 
+def _versions_said(versions, last: str) -> str:
+    """The versions as a sentence says them: "2.1, 2.2, 3.0 or 3.1"."""
+    names = [f"{a}.{b}" for a, b in versions]
+    return ", ".join(names[:-1]) + f" {last} " + names[-1] if len(names) > 1 else "".join(names)
+
+
 def _select_verdict(version: bytes) -> Tuple[bool, str]:
     """
     Whether the applet version SELECT answered is a build selftest can pass:
-    protocol 2.1, 2.2 or 3.0 (SELFTEST_VERSIONS). The shared AID (D19) answers
-    nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26 replaced:
-    it is reinstalled. A later minor of a major this tool knows (2.3, 3.1), or a
-    later major (4.0), is one it does not know, and is refused. That is a
-    statement about the test, not the wire: a 3.1 is still driven as 3.0 by the
-    other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
+    protocol 2.1, 2.2, 3.0 or 3.1 (SELFTEST_VERSIONS). The shared AID (D19)
+    answers nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26
+    replaced: it is reinstalled. A later minor of a major this tool knows (2.3,
+    3.2), or a later major (4.0), is one it does not know, and is refused. That
+    is a statement about the test, not the wire: a 3.2 is still driven as 3.x by
+    the other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
     before the renumbering, is not, and is said so here.
     """
     if len(version) < 2:
@@ -3601,10 +3609,11 @@ def _select_verdict(version: bytes) -> Tuple[bool, str]:
         return False, (f"applet {ver[0]}.{ver[1]} is no released version, and the commands that move money or set a "
                        f"card up refuse it: {PRE_RENUMBERING}")
     if ver > SELFTEST_VERSIONS[-1] or (newest_of_major is not None and ver > newest_of_major):
-        return False, (f"applet {ver[0]}.{ver[1]} is a version this cardctl does not know (it knows 2.1, 2.2 and "
-                       f"3.0): use a cardctl of that version")
+        return False, (f"applet {ver[0]}.{ver[1]} is a version this cardctl does not know (it knows "
+                       f"{_versions_said(SELFTEST_VERSIONS, 'and')}): use a cardctl of that version")
     if ver not in SELFTEST_VERSIONS:
-        return False, (f"applet {ver[0]}.{ver[1]} is not protocol 2.1, 2.2 or 3.0: sweep the balance, then "
+        return False, (f"applet {ver[0]}.{ver[1]} is not protocol {_versions_said(SELFTEST_VERSIONS, 'or')}: "
+                       f"sweep the balance, then "
                        f"reinstall the tracked CAP (docs/HARDWARE_DEPLOYMENT.md)")
     return True, f"version {ver[0]}.{ver[1]}"
 
@@ -3774,7 +3783,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_setup)
 
     s = sub.add_parser("reset", help="3.0: the reset of an empty card: by the PIN on a card with no owner (a held tap, "
-                                     "then seventeen askings, about 11 seconds in all), by the owner's proof (--owner-key) on one "
+                                     "then four askings after the history's three, about 2.6 seconds in all on 3.1; seventeen after seven, about 11 "
+                                     "seconds, on 3.0), by the owner's proof (--owner-key) on one "
                                      "with an owner: no PIN, no record, a new card key, for setup")
     s.add_argument("--pin", help="the card's PIN: a card with no owner (on a fresh card reset with --anchor, set here "
                                  "for the reset alone), or a locked card with an owner")

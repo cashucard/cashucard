@@ -168,6 +168,12 @@ const REVIEW = [
 ];
 // cardkit 0.3 adds these to the review; a reset saved by an earlier build has neither
 const REVIEW_03 = ['changeOwed', 'version'];
+// the 3.x versions this app knows, as cardkit's CARD_VERSIONS lists them: a later minor is not taken on trust
+const THREE_LINE = ['3.0', '3.1'];
+/** A card of the 3.x line this app knows (3.0 or 3.1, exactly): its holder wallet frees its spent entries, and this app's settlement cleanup is not its. */
+export function threeLine(version: string): boolean {
+  return THREE_LINE.includes(version);
+}
 function validateReview(r: ResetReview) {
   const saved02 =
     !!r &&
@@ -177,7 +183,7 @@ function validateReview(r: ResetReview) {
   check(
     saved02 ||
       (typeof r.changeOwed === 'boolean' &&
-        ['2.1', '2.2', '3.0'].includes(r.version)),
+        (['2.1', '2.2'].includes(r.version) || threeLine(r.version))),
   );
   check(
     /^cplc-v1:[0-9a-f]{24}$/.test(r.chipId) &&
@@ -359,9 +365,9 @@ export class OwnedResetWorkflow {
       consent.erase &&
         consent.valueHandled &&
         review.unspent === 0 &&
-        // change owed is lost with the applet; a 3.0 card's spent entries are its holder wallet's to free
+        // change owed is lost with the applet; a 3.x card's spent entries are its holder wallet's to free
         review.changeOwed === false &&
-        !(review.version === '3.0' && review.spent > 0) &&
+        !(threeLine(review.version) && review.spent > 0) &&
         !review.locked &&
         !review.pinBlocked &&
         review.tag,

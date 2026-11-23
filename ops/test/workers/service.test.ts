@@ -7,7 +7,8 @@
  * issue/escrow is one write, the tip route answers headerless, and the
  * escrow export round-trips through age.
  *
- * No network: the anchor routes answer 503 (no upstream in workerd tests).
+ * No network: the anchor routes answer 503 (no upstream in workerd tests:
+ * the config's outboundService answers every outbound fetch, offline.test.ts).
  */
 import {env} from 'cloudflare:workers';
 import {SELF} from 'cloudflare:test';

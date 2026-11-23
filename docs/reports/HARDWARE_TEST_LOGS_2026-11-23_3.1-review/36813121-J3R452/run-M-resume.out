@@ -1,0 +1,15 @@
+bridge: the card in 'ACS ACR39U ICC Reader' is on 127.0.0.1:47470
+  === change SA2, 2026-11-23T18:03:21.851Z
+  --- tap (card reset by the reader; CPLC serial 36813121)
+    SELECT             P1 04 P2 00 -> 9000  35.4 ms
+    GET_CHANGE         P1 00 P2 00 -> 9000  245.3 ms
+  GET_CHANGE (no PIN): #2 4, #3 2
+  timing (ms): command sw  n  min  median  max
+    SELECT 9000                 1     35.4     35.4     35.4
+    GET_CHANGE 9000             1    245.3    245.3    245.3
+  ERROR Error: no opening for change output 0
+      at loadChangeOf (<scratch>/chip452/h/js/p31.cjs:84:74)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async <scratch>/chip452/h/js/p31.cjs:118:23 
+  node p31.cjs change SA2: rc 1, 1115 ms
+node step failed

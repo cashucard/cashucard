@@ -10,7 +10,7 @@ payment offline and settle with the mint when online.
 > its testing so far is limited to the dated reports in this repository. Keep
 > only small amounts on a card.
 
-This is the **shared Cashu card protocol, version 3.0**: one wire for every
+This is the **shared Cashu card protocol, version 3.1**: one wire for every
 reader and every card maker ([known implementations](#known-implementations)). Reference implementation
 of **NUT-CCP: Cashu Card Protocol**, the draft NUT in [cashucard/nut](https://github.com/cashucard/nut).
 
@@ -30,7 +30,7 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > 2.0 has a neutral identity ([D19](docs/DECISIONS.md#d19)) and our fixes
 > ([D20](docs/DECISIONS.md#d20) to [D24](docs/DECISIONS.md#d24)).
 
-> ### Status: protocol 3.0 not yet run on a chip; an earlier source, numbered 2.3, run on a J3R180 at a test mint; 2.1 tested with real phones
+> ### Status: protocol 3.1 run on a J3R180 keyed for SCP03 at a test mint, not yet with a phone; 3.0 not released; an earlier source, numbered 2.3, run on a J3R180 at a test mint; 2.1 tested with real phones
 >
 > On 2026-11-13 a J3R180 installed the applet in this
 > tree as it was before [D200](docs/DECISIONS.md#d200), numbered 2.3 then and answering
@@ -82,13 +82,27 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > J3R310-355 sample card 58206920 (ATR; ICType D321, SCP03), a J3R180 keyed for SCP03 according to the card's supplier,
 > took that file 13 times of 13 at the first try, its tag took the
 > address at install, and the card paid from it at a test mint with real signatures and real change verified on the chip
-> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). The tracked file adds the security
+> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.0-neutral.md)). The 3.0 file after it added the security
 > review's fixes of [D228](docs/DECISIONS.md#d228) (one set-up bit a unit, the chip's path given up for one signature only,
-> `GET_INFO` byte 55 bit 3 clear; 42,485 bytes, load file sha256 `99a66ba7…`). This exact file has run on a chip: the
+> `GET_INFO` byte 55 bit 3 clear; 42,485 bytes, load file sha256 `99a66ba7…`). That exact file has run on a chip: the
 > same sample card installed it and paid from it at a test mint on 2026-11-22, the run on a J3R180 keyed for SCP03 that
-> [D229](docs/DECISIONS.md#d229) owed ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). No J3R180 keyed for
-> SCP02 has been given a 3.0 file, and none will be: according to the card's supplier the chip's manufacturer has retired
-> that keying ([D229](docs/DECISIONS.md#d229)). The
+> [D229](docs/DECISIONS.md#d229) owed ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md);
+> [D230](docs/DECISIONS.md#d230) says what it covered). 3.1 is on top of it:
+> [D231](docs/DECISIONS.md#d231) to [D235](docs/DECISIONS.md#d235) (the limit on one payment a rate, shorter held taps, the
+> set-up's self-tests once a set-up life; 42,485 bytes, load file sha256 `9ed12359…`). That file has run on a chip:
+> the same card installed it and paid from it at a test mint on 2026-11-21
+> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)); 330ffa1's file, from before the merge onto D228 (load file `4014e7f1…`), ran on the
+> same card and paid from it at a test mint
+> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)). No J3R180 keyed for SCP02 has been given a
+> 3.0 file, and none will be: according to the card's supplier the chip's manufacturer has retired that keying
+> ([D229](docs/DECISIONS.md#d229)). The tracked file adds [D236](docs/DECISIONS.md#d236)'s review fixes (42,741 bytes,
+> load file sha256 `b2afa9a8…`): on 2026-11-23 the same card installed it at the first try and paid from it at a test mint
+> with real signatures and real change verified on the chip
+> ([the report](docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same day the same file
+> installed and was paid from at a test mint on card 36813121, a J3R452, and on card 09334220, a J3R180 keyed for SCP02;
+> the owner counts those two runs on the contributor's logs, whose gaps [D238](docs/DECISIONS.md#d238) lists
+> ([the logs](docs/reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)). 3.0 is not
+> released: the first released card version is 3.1 ([D237](docs/DECISIONS.md#d237)). The
 > [23 October physical E2E report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md)
 > records protocol 2.1's installation, holder setup, funding, online/offline payments,
 > change and eventual mint settlement on the named card/phones. The
@@ -145,7 +159,7 @@ beyond the card's own blinded change outputs. See [D3](docs/DECISIONS.md#d3).
 
 **AID:** package `F0 43 41 53 48 55 43 41 52 44` ("CASHUCARD"), applet `…44 01`.
 A reader selects the applet's whole AID, `F0 43 41 53 48 55 43 41 52 44 01`, and
-`SELECT` answers `03 00` (protocol 3.0); the package AID alone reaches the opener on a chip
+`SELECT` answers `03 01` (protocol 3.1; a 3.0 card answers `03 00`); the package AID alone reaches the opener on a chip
 ([D25](docs/DECISIONS.md#d25)). A card on the 0.x AID (`D2 76 00 00 85 01 02`) or Foxy's
 1.x AID answers nothing to it: it needs an update.
 
@@ -174,7 +188,7 @@ The SDK is not downloaded for you:
 git clone https://github.com/martinpaljak/oracle_javacard_sdks ~/.javacard/sdks
 
 ant -f applet/build.xml cap
-# → applet/target/cashu-javacard-3.0.0.cap   (three applets: the opener, the card's, then the NFC tag)
+# → applet/target/cashu-javacard-3.1.0.cap   (three applets: the opener, the card's, then the NFC tag)
 ```
 
 The build strips the Descriptor component and checks the load file's size against

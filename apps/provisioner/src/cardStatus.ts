@@ -10,7 +10,7 @@ import {
   type ResetReview,
   type Transceiver,
 } from './cardkit';
-import type {ResetLookup} from './ownedResetWorkflow';
+import {threeLine, type ResetLookup} from './ownedResetWorkflow';
 export type CardReadout =
   | {state: 'blank'; chipId: string}
   | {state: 'unsupported'; chipId: string; version: string}
@@ -141,8 +141,8 @@ export function cardStatus(
     };
   }
   if (c.spent > 0) {
-    // the settlement cleanup is a 2.1 and 2.2 card's: a 3.0 card's holder wallet frees its spent places
-    return c.version === '3.0'
+    // the settlement cleanup is a 2.1 and 2.2 card's: a 3.x card's holder wallet frees its spent places
+    return threeLine(c.version)
       ? {
           title: 'Check earlier payments',
           detail: `${c.spent} spent entries remain. On this card the holder wallet frees spent entries once the mint has settled them; this app does not clear them. Reset is unavailable until they are freed.`,

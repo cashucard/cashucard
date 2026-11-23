@@ -1,0 +1,23 @@
+  > 00a404000bf043415348554341524401
+  ⏱ SELECT               18.1 ms
+  < 0301 9000
+  > b001040000
+  ⏱ GET_INFO             29.5 ms
+  < 030180000080ff010403000100000000016b047a9e00000000000000000000000000000000000000000000010000000000000000000000f7030000 9000
+note: signing with cardctl's TEST owner key — bench cards only; anyone with this repository can administer a card owned by it
+warning: a reset gives the card a new c, so new keys for every date. eCash already swapped to this card's keys and not yet loaded can never be loaded or paid after it: undated (the date 0), it is lost for good; dated, only the refund key takes it back, after its date, with r + u, where u comes from the c the card holds now. Load such eCash first, or read c and keep it with the refund key's r (card-secret) before the reset
+  > b044000010
+  ⏱ GET_NONCE             7.5 ms
+  < 891f6bcfca627d1b076410f7fa921871 9000
+  > b05100ad48473045022100f358a2e7c4a7ba42d1b25b86cf2698089a7859a118b6a6363f3720ee763ce35402203213d31d31b286ce2a17db9dda1ace357631ecb40c7faad0a36a2326e497808a
+  ⏱ RESET_CARD          275.7 ms
+  <  9000
+
+apdu timing (reader round trip):
+command       n       min    median       max      total
+SELECT        1      18.1      18.1      18.1       18.1
+GET_INFO      1      29.5      29.5      29.5       29.5
+GET_NONCE     1       7.5       7.5       7.5        7.5
+RESET_CARD    1     275.7     275.7     275.7      275.7
+4 APDU(s), 330.8 ms on the wire (all figures ms)
+card reset by its owner: no PIN, no record, no owner, a new card key; set it up with setup

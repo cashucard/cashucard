@@ -344,9 +344,10 @@ final class SchnorrHW {
                 if (made != (short)0) return made;
                 // The chip's product did not give a signature that verifies (or the chip refused the work): the chip path
                 // is given up for this signature only (D228: chipMul stays as SET_CARD's test left it, so one induced fault
-                // does not turn the chip's path off for every later signature), and the whole signature is made again by
-                // the bytecode, from step 1 with a fresh nonce: the check wiped d, and the failed signature never left the
-                // card (D218).
+                // does not turn the chip's path off for every later signature; its one writer is chipMulInit, run at the
+                // first SET_CARD of a set-up life, after the install or a RESET_CARD, D233), and the whole signature is made
+                // again by the bytecode, from step 1 with a fresh nonce: the check wiped d, and the failed signature never
+                // left the card (D218).
                 // [M2: the plan's recommended join, not yet agreed by the other maintainer; to flip to his "6F00 at once",
                 // throw SW_CRYPTO_ERROR here instead of signing again.]
                 Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
@@ -1310,8 +1311,9 @@ final class SchnorrHW {
     // ── e·d mod n on the chip's RSA engine (D216) ─────────────────────────
 
     /**
-     * Whether the chip's RSA held to the squaring's known answers at the last SET_CARD (`chipMulInit`): worked out there and
-     * nowhere else, false until the first. Where it is true the signature's e·d is made by `mulModNChip`, else by `mulModN`.
+     * Whether the chip's RSA held to the squaring's known answers at the set-up life's first SET_CARD (`chipMulInit`, run at
+     * the first SET_CARD after the install or after a RESET_CARD: D233): worked out there and nowhere else, false until the
+     * first. A signature never writes it (D228). Where it is true the signature's e·d is made by `mulModNChip`, else by `mulModN`.
      */
     boolean chipMul;
     /** The chip's RSA and its key for squaring mod n: made at the first SET_CARD (not in the constructor: the chip's first create is kept light), and never again. */
@@ -1327,7 +1329,7 @@ final class SchnorrHW {
     };
 
     /**
-     * The squaring key and its known answers, at every SET_CARD: modulus n padded to 64 bytes (32 zeros before it: the chip's
+     * The squaring key and its known answers, at the first SET_CARD of a set-up life (D233): modulus n padded to 64 bytes (32 zeros before it: the chip's
      * RSA is of its modulus' length and takes an input under it, and answers garbage, with no error, for one at or over it),
      * exponent 2; then 3^2 = 9, (n - 1)^2 = 1, and three products by `mulModNChip` whole (D219): G's x times G's y, G's y times n less
      * G's x (n less the first), and n - 1 times n - 2 (2), whose squarings are eight distinct numbers of the full width, each worked

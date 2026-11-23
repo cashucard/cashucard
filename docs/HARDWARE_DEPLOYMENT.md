@@ -53,8 +53,8 @@ cd cashucard/applet
 ant cap
 ant cap -Djc.sdk=/path/to/jc305u4_kit   # explicit form
 
-# Output: target/cashu-javacard-3.0.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
-ls -lh target/cashu-javacard-3.0.0.cap
+# Output: target/cashu-javacard-3.1.0.cap, one file with three applets in it: the opener, the card's, and the NFC tag
+ls -lh target/cashu-javacard-3.1.0.cap
 ```
 
 The build then takes the Descriptor component out (`tools/stripcap.py`: the chip
@@ -88,11 +88,35 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 3.0 build is **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
+The 3.1 build is **42,741 bytes** by refcheck's measure (245 past a multiple of 256), in 174 blocks of 247 bytes, the
+last 10: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `b2afa9a8…`),
+whose own sha256 is not the CAP's ([Install](#install) gives both). It is the file of the next paragraph with the review's
+fixes of [D236](DECISIONS.md#d236) (a reset's `selfTested` cleared in its last transaction, the one-asking claim for a card
+that has never had a PIN, the shared hash emptied before each first update, a `SELECT` that zeroes what the tap gave), and
+`sizeTheFile` at forty writes, so that it is 245 past again: the place of every 3.x file card 58206920 has installed, at a
+size no chip had been given before. Padded by `sizeTheFile` (below), this exact file has run on a chip: card 58206920
+installed it at the first try (1 load, 6 creates) on 2026-11-23, and it was paid from at a test mint, testnut, with real
+signatures and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)).
+The same day this file installed and was paid from at a test mint on card 36813121, a J3R452, and on card 09334220, a
+J3R180 keyed for SCP02: runs the owner counts on the contributor's logs ([the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)), whose gaps
+[D238](DECISIONS.md#d238) lists, among them that no log gives the sha256 of the file sent. 3.1 is the first released card version; 3.0 is not released ([D237](DECISIONS.md#d237)).
+
+The 3.1 file before it (bab8c5a, load file `9ed12359…`) was **42,485 bytes**, in 173 blocks of 247 bytes, the last 1. It
+is the 3.0 file below, with the security review's
+fixes of [D228](DECISIONS.md#d228), and with [D231](DECISIONS.md#d231) (the wait over the limit a rate: two askings a
+limit's worth past the first), [D232](DECISIONS.md#d232) (the second payment's wait 2, counted after the change's credit
+since its amendment of 2026-11-22; the held history 3, the reset by the PIN 4), [D233](DECISIONS.md#d233) to
+[D235](DECISIONS.md#d235) (the set-up's self-tests once a set-up life (until a reset), the one-asking claim a blank card's
+alone, a first PIN standing as given for its selection), the version moved to 3.1, and `sizeTheFile` at thirteen writes, so
+that it is 245 past again, the place and the size of the 3.0 file. Padded by `sizeTheFile` (below), that exact file has run
+on a chip: card 58206920 (CPLC ICType D321), a J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d229)), installed it at the first try (2 loads, 14 creates) on
+2026-11-21, the waits and the held taps were timed on it, and it was paid from at a test mint, testnut, with real signatures
+and real change verified on the chip ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)).
+
+The 3.0 build was **42,485 bytes** by refcheck's measure (245 past a multiple of 256;
 the Method component 34,791), in 173 blocks of 247 bytes, the last 1: the load file
-inside the tracked CAP (`applet/target/cashu-javacard-3.0.0.cap`), whose own sha256 is
-not the CAP's ([Install](#install) gives both). Padded by `sizeTheFile` (below), this
-exact file has run on a chip: the J3R310-355 sample card 58206920 (CPLC ICType D321), a J3R180 keyed for SCP03 according
+inside the CAP tracked then (`applet/target/cashu-javacard-3.0.0.cap`, load file `99a66ba7…`). Padded by `sizeTheFile`
+(below), that exact file has run on a chip: the J3R310-355 sample card 58206920 (CPLC ICType D321), a J3R180 keyed for SCP03 according
 to the card's supplier, installed it at the first try (1 load, 13 creates) on 2026-11-22, the waits were timed on it, and
 it was paid from at a test mint, testnut, with real signatures and real change verified on the chip
 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)). Its source is
@@ -117,6 +141,13 @@ file was 41,887, 159 past, six bytes from 153 past, where the chip refused a stu
 41,973) to 245 past, where the tag's 41,205-byte file (190c5ab) has always been created at the first try on the
 J3R310-355 sample card 58206920; a padding to 175 past (41,903 bytes, e2aac64) had its create refused `6F00` once there
 and taken on the same retry ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). refcheck now warns of a size at or near a refused place.
+
+330ffa1's file, from before the merge onto D228 (load file
+`4014e7f1…`, the same size), was installed on the same card at the first try (3 loads,
+15 creates) on 2026-11-21, the waits and the held taps were timed on it, and it was paid from at a test mint, testnut, with
+real signatures and real change verified on the chip
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md)): that is that file's history, and says nothing of
+this one.
 
 On 2026-11-13 a J3R180 was given earlier source, numbered 2.3 then, padded to three
 sizes: it installed the files of 33,647 and 35,213 bytes and refused the card's applet in
@@ -469,11 +500,11 @@ gp --list
 
 ## Install
 
-The CAP tracked in this repo is **applet version 3.0**, sha256
-`0b17e232d394a7ce1885dcc395e38d6830cd4abf5097056052174a3f76b4f4a6`
-(`applet/target/cashu-javacard-3.0.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 42,485 bytes), has sha256
-`99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536`: the hash the
+The CAP tracked in this repo is **applet version 3.1**, sha256
+`4ff8d8a20bf1106a3a31db5824a80d8626838d237c974157197d3fac1104845a`
+(`applet/target/cashu-javacard-3.1.0.cap`). The load file in it, the bytes a card
+is LOADed with (refcheck's measure, 42,741 bytes), has sha256
+`b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation
@@ -484,20 +515,20 @@ installing your own build, compare every entry except `META-INF/MANIFEST.MF`
 against the tracked CAP:
 
 ```bash
-# From applet/, after `ant cap` has overwritten target/cashu-javacard-3.0.0.cap
-git show HEAD:applet/target/cashu-javacard-3.0.0.cap > /tmp/tracked.cap
+# From applet/, after `ant cap` has overwritten target/cashu-javacard-3.1.0.cap
+git show HEAD:applet/target/cashu-javacard-3.1.0.cap > /tmp/tracked.cap
 rm -rf /tmp/cap-tracked /tmp/cap-built
 unzip -q /tmp/tracked.cap -d /tmp/cap-tracked
-unzip -q target/cashu-javacard-3.0.0.cap -d /tmp/cap-built
+unzip -q target/cashu-javacard-3.1.0.cap -d /tmp/cap-built
 diff -r -x MANIFEST.MF /tmp/cap-tracked /tmp/cap-built && echo "same CAP as the tracked one"
 ```
 
 Any output from `diff` means the two CAPs differ; do not install. After
-installing, `SELECT` must answer `03 00` for the card's applet's whole AID (below).
+installing, `SELECT` must answer `03 01` for the card's applet's whole AID (below).
 
 ```bash
 # Load the file and instantiate the opener (gp installs one applet of a file at a time)...
-gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 # ...then create the card's applet from the loaded package
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 # ...then the NFC tag, under the NFC Forum's own name as its instance AID, with the card maker's
@@ -586,7 +617,7 @@ python3 cardctl.py selftest --pin 1234
 # SELECT the card's applet by its whole AID, F0 CASHUCARD 01
 gp --apdu 00A404000BF043415348554341524401
 
-# Response: 0300 9000  (applet version 3.0 + SW_OK = applet responding)
+# Response: 0301 9000  (applet version 3.1 + SW_OK = applet responding)
 # A card that answers 6A82 has no 2.x applet: it is a 0.x or Foxy 1.x card and needs an update.
 # Do not SELECT the package AID alone (00A404000AF0434153485543415244): on the chip that
 # partial name reaches the opener, instantiated first, which answers 9000 with no version
@@ -595,8 +626,8 @@ gp --apdu 00A404000BF043415348554341524401
 # GET_INFO (INS 0x01)
 gp --apdu B0010000
 
-# Response: 03 00 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-#   v3.0 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change owed
+# Response: 03 01 80 00 00 80 FF 00 04 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+#   v3.1 | 128 slots | 0 unspent | 0 spent | 128 empty | caps=FF | PIN none | format 4 | 3 tries | not locked | no record | no limit | no owner | no clock | no window | 0 spent | no change owed
 # SW: 9000
 
 # GET_PUBKEY (INS 0x10)
@@ -642,7 +673,7 @@ gp --delete F04341534855434152444D   # the opener
 gp --delete F0434153485543415244     # the package
 
 # Re-install: the opener first, the tag last, with the maker's address
-gp --install target/cashu-javacard-3.0.0.cap --applet F04341534855434152444D
+gp --install target/cashu-javacard-3.1.0.cap --applet F04341534855434152444D
 gp --create F043415348554341524401 --package F0434153485543415244 --applet F043415348554341524401
 gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554341524454 \
    --params "$(python3 ../tools/maker/maker.py tag-params)"
@@ -847,7 +878,7 @@ ran once, after the run, while `selftest` ran before and after. The run of 2026-
 (above) did them all for the file before D211, numbered 2.3 then (`f216644a…`), but the owner's
 reset of a locked card, which would lock the bench card for good; `INBOX` for last week
 was read after a reset by the PIN anchored in that week. The run on the 3.0 file of the merge, on a J3R180 keyed for SCP03 ([D229](DECISIONS.md#d229)),
-is to do them all again, and the size first; the run of 2026-11-22 on the tracked file did the items ticked below for it. Write the sha256 of every file sent to the chip in the
+is to do them all again, and the size first; the run of 2026-11-22 on the 3.0 file, tracked then, did the items ticked below for it. Write the sha256 of every file sent to the chip in the
 run's log.
 
 - Install the three applets in order, and add the load file's size to refcheck's
@@ -865,7 +896,7 @@ run's log.
     [x] `C9` and the address in `gp -d`; [x] n + 56 and `#new`; [x] the coded address whole and in pieces of 59, its M
     under the owner's c; [x] `C9 00`, a short install and one with no length each `6A80`, no tag, the card's applet
     answering; [x] 127 bytes, then `https://getfoxy.io/card`; [ ] a phone's read, left for the keeper.
-  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked file), the same card ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)):
+  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked file until 3.1), the same card ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)):
     [x] the three applets in order, 1 load and 13 creates of the card's applet and of the tag at the first try, `SELECT`
     `03 00`; [x] n + 56 and `#new` at `https://getfoxy.io/card`; [ ] the refusals and the coded address, not repeated
     (D228 did not touch the tag); [ ] a phone's read, left for the keeper.
@@ -887,7 +918,13 @@ run's log.
     and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 14 of 14); [x] five change outputs back by
     `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in a later swap;
     [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c. That file's hash is on PROVEN.
-  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the tracked file), the same card, at testnut
+  - 2026-11-21, bab8c5a's file (load file `9ed12359…`, the tracked file until D236), the same card, at testnut
+    ([the report](reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md)): [x] 19 payments signed, each good under P + t·G and not
+    under P, every swap taken and the inputs `SPENT`; [x] `AUTH` under the card's key (`selftest`, 13 of 13); [x] 24 change
+    outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof, then taken by testnut in later swaps;
+    [x] `GROUP_KEYS` for the date 0 against the owner's derivation from c (the first load's 36 pieces, minted to it, read
+    back and rebuilt). Its hash is on PROVEN.
+  - 2026-11-22, 541aaef's file (load file `99a66ba7…`, the 3.0 file, tracked until 3.1), the same card, at testnut
     ([the report](reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md)): [x] 19 payments signed, each good under P + t·G and not
     under P, every swap taken and the inputs `SPENT`, each wait the spec's count; [x] `AUTH` under the card's key
     (`selftest`, 13 of 13); [x] 24 change outputs back by `LOAD_CHANGE` with no PIN, each `UNSPENT` with testnut's proof,

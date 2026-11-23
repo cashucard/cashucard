@@ -137,7 +137,14 @@ pad it back to 42,485, 245 past: the same card installed that file (load file `9
 card, a J3R180 keyed for SCP03, and not on a J3R180 keyed for SCP02. No J3R180 keyed for SCP02 has been given a 3.0 file,
 and none will be: according to the supplier the chip's manufacturer has retired that keying, and new J3R180 stock is
 keyed for SCP03. The run owed before any release wording, this file (load file `99a66ba7…`) on a J3R180 keyed for SCP03,
-is that run of 2026-11-22 (see [D230](DECISIONS.md#d230) for what that run covered).
+is that run of 2026-11-22 (see [D230](DECISIONS.md#d230) for what that run covered). 3.0 is not released: the first
+released card version is 3.1 ([D237](DECISIONS.md#d237)). With 3.1 and the review fixes of [D236](DECISIONS.md#d236) the
+file came to 42,741 bytes, padded to 245 past again, one page above: the same card installed it at the first try on
+2026-11-23 and paid from it at a test mint
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md)). The same day the same file installed on
+card 36813121, a J3R452, and on card 09334220, a J3R180 keyed for SCP02, runs the owner counts on the contributor's logs
+([D238](DECISIONS.md#d238), [the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)). So 42,741 bytes is a size known to install on a J3R180 keyed for
+SCP03 (58206920), on one keyed for SCP02 (09334220) and on a J3R452 (36813121), as refcheck's general line for it says.
 
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build

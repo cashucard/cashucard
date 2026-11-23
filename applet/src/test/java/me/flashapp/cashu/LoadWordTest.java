@@ -3,6 +3,7 @@ package me.flashapp.cashu;
 import static me.flashapp.cashu.CashuAppletTest.*;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 import javax.smartcardio.CommandAPDU;
@@ -80,5 +81,26 @@ class LoadWordTest {
         assertEquals(0, c.balance());
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_LOAD_CHANGE, 0, 2, answer, 256)), "P2 02");
         assertEquals(500, c.balance());
+    }
+
+    @Test
+    @DisplayName("The pickup order (D232's companion in the phone): change written with LOAD_CHANGE and then a payment from it, BEGIN, OUTPUTS and SIGN, in the same time in the field: the card takes both, in that order")
+    void changeWrittenThenPaidInOneTap() throws Exception {
+        TearSweepTest.Card c = new TearSweepTest.Card();
+        TearSweepTest.readyOwed(c);
+        byte[] answer = TearSweepTest.answerFor(c);
+        assertEquals(0, c.balance(), "the card holds nothing but the change it is owed");
+        assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_LOAD_CHANGE, 0, 2, answer, 256)), "the waiting change written first");
+        assertEquals(500, c.balance());
+        int place = -1;
+        for (int i = 0; i < 128 && place < 0; i++) if (c.status(i) == 1) place = i;
+        assertTrue(place >= 0, "the change is a piece on the card");
+        ResponseAPDU b = c.send(CashuAppletTest.spendBegin(new byte[] { (byte) place }));
+        assertEquals(SW_OK, b.getSW(), "BEGIN after LOAD_CHANGE in the same tap");
+        assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SPEND_ALL_OUTPUTS, 0, 0, concat(u32(500), mintKey()))));
+        ResponseAPDU sig = CashuAppletTest.signThrough(c::send);
+        assertEquals(SW_OK, sig.getSW());
+        assertEquals(64, sig.getData().length, "and signed: the payment from the change, in the tap that wrote it");
+        assertEquals(0, c.balance());
     }
 }

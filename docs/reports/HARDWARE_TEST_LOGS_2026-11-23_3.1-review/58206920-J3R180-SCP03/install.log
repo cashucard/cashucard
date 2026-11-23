@@ -1,0 +1,14 @@
+ICSerialNumber=58206920
+== delete D2760000850101
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+== delete F043415348554341524401
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+== delete F04341534855434152444D
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+== delete F0434153485543415244
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+applet/target/cashu-javacard-3.1.0.cap loaded: me.flashapp.cashu F0434153485543415244
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+# Warning: no keys given, defaulting to 404142434445464748494A4B4C4D4E4F
+[WARN] GPSession - Installation parameters did not parse as valid TLV, assuming simple app parameters!
