@@ -413,7 +413,8 @@ a few hundred taps. Treat simulator results accordingly, see
    the install of the source numbered 2.3 then (the first run's before
    [D200](DECISIONS.md#d200), the second's with D200 to D204) and payments with real
    signatures and real change; the tracked 3.1 file has run on cards 58206920, 36813121 (a J3R452) and 09334220 (a
-   J3R180 keyed for SCP02) ([D237](DECISIONS.md#d237), [D238](DECISIONS.md#d238)), and no J3R180 keyed for SCP02 has been given a 3.0 file (9ac55c1's, before [D228](DECISIONS.md#d228), went to the
+   J3R180 keyed for SCP02; on those two the file's hash is unlogged, [D238](DECISIONS.md#d238) (2))
+   ([D237](DECISIONS.md#d237), [D238](DECISIONS.md#d238)), and no J3R180 keyed for SCP02 has been given a 3.0 file (9ac55c1's, before [D228](DECISIONS.md#d228), went to the
    J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, on 2026-11-21;
    [D229](DECISIONS.md#d229)). The
    [October 23 payment](reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md) and
