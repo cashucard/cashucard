@@ -95,3 +95,18 @@ The same CAP was put on a second chip, a J3R452 (NXP P71D600, SCP03 i=10 with it
   card listed exactly the 2 still owed (`GET_CHANGE`: #2 and #3); the run went on from there and loaded them.
 - Every one of 27 serial reads was 36813121. Left reset by the owner, this file and the tag installed. Free memory, empty:
   persistent 190,700, transient 2,718.
+
+## The same file on a J3R180 keyed for SCP02 (ICType D321, serial 09334220), 2026-11-23
+
+A second J3R180, keyed for SCP02 with the public default key (the 2.3 cards' set-up, not 58206920's SCP03), held an
+empty 1.21 install (balance 0, 128 places empty). It is the first J3R180 keyed for SCP02 given a 3.x file.
+
+- **Install:** the load, the card's applet and the tag all `9000` at the first try; `selftest` 13 of 13; 5 create cycles
+  at the first try.
+- **D235:** the first set-up's claim at the first asking (843 ms); after a reset by the owner, `6A98` three times and
+  `9000` at the fourth; the first `SET_CARD` after the reset 1,529 ms; a SELECT after VERIFY_PIN leaves `GET_LOG`
+  answering `6982`.
+- **Money at testnut, the same plan, with no break:** the first load of 36 read back unspent; every payment taken by
+  testnut; the waits 2 × (N − 1) less the change credit; each "not yet" about 480 ms; every change piece loaded back with
+  the mint's DLEQ and read `UNSPENT`; the withdrawal of all.
+- All 25 serial reads were 09334220. Left reset by the owner, with this file and the tag.
