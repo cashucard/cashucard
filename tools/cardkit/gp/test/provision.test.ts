@@ -17,6 +17,7 @@ import {describe, it} from 'node:test';
 
 import {
   CARD_AID,
+  CARD_VERSION,
   CASHU_PACKAGE_AID,
   HELLO_PACKAGE_AID,
   OPENER_AID,
@@ -38,6 +39,7 @@ import {
 } from '../provision';
 import {
   FACTORY_KEYS,
+  FACTORY_KVN,
   SPIKE_KEYS,
   WrongKeys,
   getKeyInformation,
@@ -49,7 +51,13 @@ import {
   type Transceiver,
 } from '../scp02';
 import {CASHU_LOAD_FILE, HELLO_LOAD_FILE, TEST_TAG_ADDRESS} from './assets';
-import {FakeCard, ISD, SELLER_APPLETS, pullAt} from '../../testing/fake-card';
+import {
+  CPLC_09336320,
+  FakeCard,
+  ISD,
+  SELLER_APPLETS,
+  pullAt,
+} from '../../testing/fake-card';
 
 const CASHU = cashuPlan(CASHU_LOAD_FILE, {tagAddress: TEST_TAG_ADDRESS});
 const HELLO = helloPlan(HELLO_LOAD_FILE);
@@ -759,6 +767,75 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
       );
     }
     assert.deepEqual(r.blocks, {at: 174, of: 174});
+  });
+
+  it("installs the 3.1 file on a J3R180 keyed for SCP03 at key version 01, with no seller's tag, then rotates its keys and installs again over itself, as the app's tap does", async () => {
+    // Card 58206920's keying, in software: a J3R180 (ICType D321, GlobalPlatform 2.3) keyed for SCP03 with the
+    // public default key at key version 01 (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md). cardkit
+    // branches on INITIALIZE UPDATE's protocol byte and key version alone, never on the chip: SCP03 reads the registry
+    // before the sweep, version 01 is no first contact (that is FF, a J3R452 as it ships), and the seller's tag is
+    // deleted only when the registry shows one. Not known of the real card, so this test does not show them: whether
+    // its INITIALIZE UPDATE answers i=10 in 32 bytes (the fake does, as the J3R452 does; scp03.ts refuses any i
+    // without 10 before EXTERNAL AUTHENTICATE), whether its GET STATUS P2 02 answers in the J3R452's tag-list shape
+    // (scp03-07; anything else stops the sweep guarded, nothing deleted), and its CPLC (the fake's is J3R180
+    // 09336320's; provision reads none). A `gp -d -l` capture of the card settles the first two.
+    for (const replaceSellerTag of [false, true]) {
+      const card = new FakeCard({
+        scp: 3,
+        kvn: FACTORY_KVN,
+        cplc: CPLC_09336320,
+      });
+      const r = await provision(
+        card.transceive,
+        CASHU,
+        options({keys: FACTORY_KEYS, replaceSellerTag}),
+      );
+      assert.equal(r.ok, true, r.reason);
+      assert.equal(r.phase, 'done');
+      assertInstalled(card);
+      assert.equal(r.sellerTagRemoved, false);
+      // the registry read fires (protocol 03); with replaceSellerTag it first asks for the tag, finds none, deletes none
+      assert.deepEqual(
+        card.insLog(),
+        replaceSellerTag
+          ? [
+              ...INSTALL_ORDER_SCP03.slice(0, 5),
+              0xf2,
+              ...INSTALL_ORDER_SCP03.slice(5),
+            ]
+          : INSTALL_ORDER_SCP03,
+      );
+      assert.ok(!card.insLog().includes(0xd8), 'no PUT KEY in the install');
+      assert.equal(card.kvn, FACTORY_KVN);
+      // the verify step held SELECT to the tracked version, and the card answers it: 03 01
+      assert.deepEqual([...CARD_VERSION], [0x03, 0x01]);
+      const selected = await card.transceive(selectAid(CARD_AID));
+      assert.equal(toHex(selected.slice(-2)), '9000');
+      assert.equal(toHex(selected.slice(0, -2)), '0301');
+
+      // the tap's second half: the manager keys rotate in place at version 01, with no first contact
+      const rotated = await rotateKeys(
+        card.transceive,
+        FACTORY_KEYS,
+        SPIKE_KEYS,
+        options(),
+      );
+      assert.equal(rotated.ok, true, rotated.reason);
+      assert.equal(rotated.keyVersion, FACTORY_KVN);
+      assert.equal(rotated.firstContact, undefined);
+      assert.equal(card.failedAuths, 0);
+
+      // a card that already holds this install, empty (58206920 holds the 2026-11-23 one): the registry vouches for
+      // every Cashu object, the sweep deletes them, and the file goes on again
+      const again = await provision(
+        card.transceive,
+        CASHU,
+        options({keys: SPIKE_KEYS, replace: true, replaceSellerTag}),
+      );
+      assert.equal(again.ok, true, again.reason);
+      assert.equal(again.sellerTagRemoved, false);
+      assertInstalled(card);
+    }
   });
 
   it('comes back from a pull at any APDU, before or after the card acts, with a run that sweeps and installs', async () => {
