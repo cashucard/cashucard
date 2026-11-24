@@ -771,14 +771,16 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
 
   it("installs the 3.1 file on a J3R180 keyed for SCP03 at key version 01, with no seller's tag, then rotates its keys and installs again over itself, as the app's tap does", async () => {
     // Card 58206920's keying, in software: a J3R180 (ICType D321, GlobalPlatform 2.3) keyed for SCP03 with the
-    // public default key at key version 01 (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920_3.0.md). cardkit
+    // public default key at key version 01 (docs/reports/HARDWARE_TEST_REPORT_2026-11-19_58206920.md). cardkit
     // branches on INITIALIZE UPDATE's protocol byte and key version alone, never on the chip: SCP03 reads the registry
     // before the sweep, version 01 is no first contact (that is FF, a J3R452 as it ships), and the seller's tag is
     // deleted only when the registry shows one. Not known of the real card, so this test does not show them: whether
     // its INITIALIZE UPDATE answers i=10 in 32 bytes (the fake does, as the J3R452 does; scp03.ts refuses any i
     // without 10 before EXTERNAL AUTHENTICATE), whether its GET STATUS P2 02 answers in the J3R452's tag-list shape
     // (scp03-07; anything else stops the sweep guarded, nothing deleted), and its CPLC (the fake's is J3R180
-    // 09336320's; provision reads none). A `gp -d -l` capture of the card settles the first two.
+    // 09336320's; provision reads none), and whether its PUT KEY replaces the AES set in place at version 01 (no
+    // record shows this card's manager keys rotated; every run used the public default key). A `gp -d -l` capture of
+    // the card settles the first two.
     for (const replaceSellerTag of [false, true]) {
       const card = new FakeCard({
         scp: 3,

@@ -194,11 +194,13 @@ build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
 chip has installed and the operator approved, and only when its maker file is a maker's
 own (`makerGiven`). The tracked 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
 as `firmware-v3.1.0`, is on it since the owner's approval of 2026-11-24 for Setup build 16
-(ENG-870). The evidence is the desktop tools' runs of 2026-11-23 below: that exact file was
-installed and paid from at a test mint on three chips, with GlobalPlatformPro and
-`tools/cardctl`, per [the release notes](../../docs/RELEASE-NOTES.md) and
-[the hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md);
-two of the three runs are counted on the contributor's logs (D238). This app's own install
+(ENG-870). The evidence is the desktop tools' runs of 2026-11-23: that exact file (by sha256)
+was installed and paid from at a test mint on card 58206920, with GlobalPlatformPro,
+`tools/cardctl` and a payment harness, per
+[the hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md).
+The same day cards 36813121 and 09334220 took it, counted by the owner on the contributor's
+statement and logs, which do not give the file's sha256 (D238; see
+[the release notes](../../docs/RELEASE-NOTES.md)). This app's own install
 path has not yet run on a 3.1 card on a chip. The operator's own install of a card with this
 app is the check before the build 16 tag. The shared repository's maker file is the example,
 so a build from this tree, as it stands, still installs no card: the build carries a maker's
