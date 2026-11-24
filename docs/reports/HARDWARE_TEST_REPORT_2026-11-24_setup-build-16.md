@@ -21,12 +21,13 @@ The operator, who is the project owner, installed the released 3.1 card file on 
 CPLC IC type D321, chip serial 07297620. The contactless ATR historical bytes read `JTaxCoreV1`. Key information shows three
 DES keys at key version 01 (`C0 04 01 01 80 10` and so on). The card data gives SCP 02, option 55.
 
-It was installed twice: once alone, then again in a batch of two after the operator reset it with the app.
+The operator installed it once, alone in its batch, and then reset it. By the operator's account it was then one of the two
+cards of the batch below. No read was made after that second install.
 
 | Read | Result |
 | --- | --- |
 | After the first install | Cashu applet answers SELECT with `03 01`. The tag app answers. The NDEF file holds the address saved in the app with `#new`. The capability container gives the NDEF file's largest size as 72 (`0048`), which is 16 bytes of address after `https://` plus 56. |
-| After the operator's reset | The Cashu applet answers `6A82` and the tag app answers `6A82`: both absent. The manager (ISD) still answers `9000`. |
+| After the operator's reset (the operator did not say with which tool) | The Cashu applet answers `6A82` and the tag app answers `6A82`: both absent. The manager (ISD) still answers `9000`. |
 
 ## Card 2: a J3R452 keyed for SCP03
 
@@ -46,14 +47,15 @@ at key version 01 (`C0 04 01 01 88 10` and so on).
 
 ## The batch
 
-In the batch of two, both installs finished ("two of two").
+By the operator's account, in the batch of two both installs finished ("two of two"). The J3R452 was read afterwards (above).
+The other card of the batch was not read afterwards.
 
 ## What this shows
 
 - The build 16 app installs the released 3.1 file on a J3R180 keyed for SCP02 and on a J3R452 keyed for SCP03, from a phone,
   through the ops service, with a saved maker name and address.
 - After each install the applet answers `03 01` and the tag holds the saved address with `#new`.
-- On the J3R180 the app's reset takes the applet and the tag off, and a second install followed.
+- After the operator's reset of the J3R180 the applet and the tag read absent.
 - The app does not install over an existing applet.
 
 ## What this does not show
