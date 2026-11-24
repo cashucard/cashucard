@@ -95,7 +95,7 @@
             <figure class="ecosystem" aria-labelledby="ecosystem-caption">
               <picture>
                 <source media="(max-width:900px)" srcset="/assets/ecosystem-mobile.svg" />
-                <img src="/assets/ecosystem.svg" width="1000" height="824" alt="Wallet and till connect to the mint and tap the same physical card. Ops-service authorizes CCP to install the applet. Encrypted exports flow through a backup job to independent storage and alerts; the backup key has separate custody." decoding="async" />
+                <img src="/assets/ecosystem.svg" width="1000" height="824" alt="Wallet and till connect to the mint and tap the same physical card. Ops-service authorizes Cashu Card Setup to install the applet. Encrypted exports flow through a backup job to independent storage and alerts; the backup key has separate custody." decoding="async" />
               </picture>
               <figcaption id="ecosystem-caption">
                 <div class="ecosystem-legend" aria-label="Connection types"><span class="legend-nfc">NFC</span><span class="legend-online">Online API</span><span class="legend-recovery">Backup + alerts</span><a href="/assets/ecosystem.svg" download="cashu-card-ecosystem.svg">Download SVG ↗</a></div>
@@ -108,7 +108,7 @@
                 <div><dt>Holder wallet</dt><dd>The holder runs a compatible wallet to set ownership and a PIN, load ecash and manage their card.</dd></div>
                 <div><dt>Till app</dt><dd>The merchant runs a compatible till on an NFC device to accept payments and settle them with the card's mint.</dd></div>
                 <div><dt>Mint</dt><dd>The mint operator issues the ecash proofs and checks redemption. A card issuer can reference an existing compatible mint.</dd></div>
-                <div><dt>CCP and ops-service</dt><dd>The card issuer's operators use Cashu Card Provisioner (CCP). The issuer runs an ops-service or uses an existing service they trust. The service manages issuance; holder wallets and tills handle payments through the card and mint.</dd></div>
+                <div><dt>Cashu Card Setup and ops-service</dt><dd>The card issuer's operators use Cashu Card Setup. The issuer runs an ops-service or uses an existing service they trust. The service manages issuance; holder wallets and tills handle payments through the card and mint.</dd></div>
               </dl>
             </div></details>
             <details class="more"><summary>Optional backup storage and notifications</summary><div class="more-body">
@@ -129,7 +129,7 @@
 
           <section id="issuers" aria-labelledby="issuers-title">
             <h2 id="issuers-title">Issuing cards</h2>
-            <p>Use <a href="/#install">Cashu Card Provisioner</a> to install the applet from a phone. An ops-service supplies operator accounts, assigned manager keys and durable installation/reset records. Read <a href="/ops-service#why">why this service is needed</a>, then use your issuer's service or follow the <a href="/ops-service">Docker self-hosting guide</a>.</p>
+            <p>Use <a href="/#install">Cashu Card Setup</a> to install the applet from a phone. An ops-service supplies operator accounts, assigned manager keys and durable installation/reset records. Read <a href="/ops-service#why">why this service is needed</a>, then use your issuer's service or follow the <a href="/ops-service">Docker self-hosting guide</a>.</p>
             <p>For a computer with a USB reader, the <a href="/guide">manual install guide</a> covers the card commands and leaves manager-key custody with the operator. Holder-wallet setup follows either installation path.</p>
           </section>
 
@@ -157,7 +157,7 @@
               <li><b><a href="https://github.com/cashucard/client">cashucard/client</a></b><span>A TypeScript library with the Cashu primitives a reader needs and a client for the mint's HTTP API.</span></li>
               <li><b><a href="https://github.com/cashucard/cashucard/tree/main/tools/cardctl">cardctl</a></b><span>A Python command-line driver for the card over any PC/SC reader, contact or contactless.</span></li>
               <li><b><a href="https://github.com/cashucard/cashucard/tree/main/tools/cardkit">cardkit</a></b><span>A TypeScript API for installing the applet and resetting cards, over a transport you supply.</span></li>
-              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/apps/provisioner">Cashu Card Provisioner</a></b><span>The app card issuers use to install the applet from a phone.</span></li>
+              <li><b><a href="https://github.com/cashucard/cashucard/tree/main/apps/provisioner">Cashu Card Setup</a></b><span>The app card issuers use to install the applet from a phone.</span></li>
             </ul>
             <p>The repository's <a href="https://github.com/cashucard/cashucard/blob/main/docs/ARCHITECTURE.md">architecture</a> shows how the parts fit, and its <a href="https://github.com/cashucard/cashucard/blob/main/docs/DECISIONS.md">decisions</a> record why the card works as it does.</p>
           </section>
@@ -200,7 +200,7 @@
         <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an ops-service</a></div>
         <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Setup</a></div>
       </div>
       <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>

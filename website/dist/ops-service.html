@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Why Cashu Card Provisioner uses an ops-service, and how to run your own with Docker, HTTPS, operator accounts and encrypted backups." />
+    <meta name="description" content="Why Cashu Card Setup uses an ops-service, and how to run your own with Docker, HTTPS, operator accounts and encrypted backups." />
     <meta property="og:title" content="Host an ops-service | Cashu Card" />
     <meta property="og:description" content="Run the operator console and provisioning API on your own server. Understand its keys, records and recovery responsibilities." />
     <meta property="og:type" content="article" />
@@ -32,7 +32,7 @@
         <div class="guide-hero-inner">
           <div class="eyebrow"><span class="status-dot"></span> SELF-HOSTING <span class="eyebrow-divider">/</span> OPS-SERVICE 0.1.0</div>
           <h1 id="ops-title">Host an <em>ops-service</em></h1>
-          <p class="guide-lead">Run the operator console and provisioning API for your own cards. One Docker image provides the service and its SQLite storage tools. Your domain connects it to Cashu Card Provisioner.</p>
+          <p class="guide-lead">Run the operator console and provisioning API for your own cards. One Docker image provides the service and its SQLite storage tools. Your domain connects it to Cashu Card Setup.</p>
           <ul class="guide-facts" aria-label="At a glance"><li>Experimental</li><li>Linux AMD64 + ARM64</li><li>Docker Compose</li><li>Your HTTPS domain</li></ul>
           <p class="guide-back"><a href="/developers#overview">See how all the parts fit together ↗</a></p>
         </div>
@@ -46,7 +46,7 @@
             <li><a href="#install">Start the container</a></li>
             <li><a href="#custody">Save your credentials</a></li>
             <li><a href="#domain">Connect your domain</a></li>
-            <li><a href="#phone">Connect the CCP app</a></li>
+            <li><a href="#phone">Connect the Cashu Card Setup app</a></li>
             <li><a href="#backups">Backups and recovery</a></li>
             <li><a href="#maintain">Updates and configuration</a></li>
             <li><a href="#help">Troubleshooting</a></li>
@@ -54,19 +54,19 @@
         </nav>
         <article class="guide-doc">
           <details class="guide-toc"><summary>Contents</summary><ol>
-            <li><a href="#why">Why a service is needed</a></li><li><a href="#need">What you need</a></li><li><a href="#install">Start the container</a></li><li><a href="#custody">Save your credentials</a></li><li><a href="#domain">Connect your domain</a></li><li><a href="#phone">Connect the CCP app</a></li><li><a href="#backups">Backups and recovery</a></li><li><a href="#maintain">Updates and configuration</a></li><li><a href="#help">Troubleshooting</a></li>
+            <li><a href="#why">Why a service is needed</a></li><li><a href="#need">What you need</a></li><li><a href="#install">Start the container</a></li><li><a href="#custody">Save your credentials</a></li><li><a href="#domain">Connect your domain</a></li><li><a href="#phone">Connect the Cashu Card Setup app</a></li><li><a href="#backups">Backups and recovery</a></li><li><a href="#maintain">Updates and configuration</a></li><li><a href="#help">Troubleshooting</a></li>
           </ol></details>
 
           <section id="why" aria-labelledby="why-title">
             <h2 id="why-title">Why a service is needed</h2>
             <p><b>The phone installs the card software. The ops-service keeps the authority and records needed to manage that installation over time.</b></p>
-            <p>A blank card arrives with known factory manager keys. CCP replaces them with a set assigned to that card. The service retains those keys, binds the installation to the physical chip and records each attempt. After an interrupted tap or a lost phone, an authorized operator can retrieve the same assigned keys and reconcile the saved work.</p>
+            <p>A blank card arrives with known factory manager keys. Cashu Card Setup replaces them with a set assigned to that card. The service retains those keys, binds the installation to the physical chip and records each attempt. After an interrupted tap or a lost phone, an authorized operator can retrieve the same assigned keys and reconcile the saved work.</p>
             <ul>
               <li><b>Access:</b> named operator accounts and device-scoped reservations control who can install or reset a card.</li>
               <li><b>Continuity:</b> saved installation and reset records help distinguish completed work from an unresolved attempt.</li>
               <li><b>Reuse:</b> a reset can use the recorded manager keys after checking the card's identity, owner authorization and empty state.</li>
             </ul>
-            <p>The CCP app needs an ops-service for this issuance workflow. Wallets and tills use the card and mint for payments; an installed card can keep operating while its ops-service is down. You can use an issuer's existing service or host your own.</p>
+            <p>The Cashu Card Setup app needs an ops-service for this issuance workflow. Wallets and tills use the card and mint for payments; an installed card can keep operating while its ops-service is down. You can use an issuer's existing service or host your own.</p>
             <details class="more"><summary>The three kinds of card keys</summary><div class="more-body">
               <dl class="faults">
                 <div><dt>Manager keys: the ops-service</dt><dd>Authorize installing and removing the applet. The issuer keeps them in its operational database and encrypted backups.</dd></div>
@@ -129,9 +129,9 @@ docker compose run --rm --entrypoint node setup -e 'require("node:fs").unlinkSyn
           </section>
 
           <section id="phone" aria-labelledby="phone-title">
-            <h2 id="phone-title">Connect the CCP app</h2>
+            <h2 id="phone-title">Connect the Cashu Card Setup app</h2>
             <ol>
-              <li>Open <a href="/#install">Cashu Card Provisioner</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
+              <li>Open <a href="/#install">Cashu Card Setup</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
               <li>Add your HTTPS origin, for example <code>https://ops.example.com</code>, and confirm the service selection. Use the origin without <code>/ops/operators</code>.</li>
               <li>Sign in with an operator account created on this service. Confirm the displayed hostname before creating a batch.</li>
             </ol>
@@ -160,7 +160,7 @@ docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-e
           <section id="maintain" aria-labelledby="maintain-title">
             <h2 id="maintain-title">Updates and configuration</h2>
             <p>Keep the Compose file, issuer master and persistent volumes together. Before an update, verify a recent independent backup, read the new release notes, and change both services' image pin to that release's digest. Pull and recreate the service, then check readiness and sign-in. Starting with new empty volumes creates a different issuer.</p>
-            <p>The <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/docker/README.md#configuration">configuration reference</a> covers administrator names, mint references, mounted secrets, ports and storage. Offering a mint URL in CCP is installation metadata; the holder wallet later configures the card and funds it.</p>
+            <p>The <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/docker/README.md#configuration">configuration reference</a> covers administrator names, mint references, mounted secrets, ports and storage. Offering a mint URL in Cashu Card Setup is installation metadata; the holder wallet later configures the card and funds it.</p>
           </section>
 
           <section id="help" aria-labelledby="help-title">
@@ -180,7 +180,7 @@ docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-e
         <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
         <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">Ops-service release ↗</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Setup</a></div>
       </div>
       <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>

@@ -1,7 +1,7 @@
 # Security Policy
 
 This repository builds the Cashu Card: the JavaCard applet that holds ecash on
-a card, the host tools, the provisioner app, the ops service and cashucard.org.
+a card, the host tools, the Cashu Card Setup app, the ops service and cashucard.org.
 A bug here can lose the money on a card, so reports are welcome and taken
 seriously.
 

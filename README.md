@@ -109,7 +109,7 @@ reference, and its `spec/` stops at protocol 2.1 ([D177](docs/DECISIONS.md#d177)
 > [mobile reset report](docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md)
 > records reset and reinstall. These bounded tests do not establish compatibility
 > with every device or failure mode. The repository also includes the operator
-> provisioner and Cloudflare-capable ops-service. Read the
+> app, Cashu Card Setup, and Cloudflare-capable ops-service. Read the
 > [architecture](docs/ARCHITECTURE.md), [security model](docs/SECURITY-MODEL.md) and
 > [component release guide](docs/COMPONENT-RELEASES.md) before changing or shipping a component.
 
@@ -264,7 +264,7 @@ tools/cardctl/          PC/SC host driver (protocol 3.0) + its own tests
 tools/cardsim/          jCardSim card over localhost HTTP for app e2e, its client and e2e
 tools/chip/             bench scripts for a card on a reader
 tools/cardkit/          GlobalPlatform for the phone: SCP02 and SCP03, the install, a fake card (D27, D181)
-apps/provisioner/       the operator app: installs the card's applet from a phone over NFC
+apps/provisioner/       the operator app, Cashu Card Setup: installs the card's applet from a phone over NFC
 spec/                   APDU.md (wire format and profiles), vectors/,
                         CARD-FILE.md (0.x host↔mint interchange format)
 tools/maker/            the card maker's settings, checked (maker.py) and turned into install commands

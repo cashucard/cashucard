@@ -30,7 +30,7 @@ export async function readCardStatus(tx: Transceiver): Promise<CardReadout> {
   if (reply.sw !== 0x9000) {
     throw new CardError(reply.sw, 0xa4);
   }
-  // 2.1, 2.2 (D175), which only adds a public read, or 3.0: the cardkit's CARD_VERSIONS
+  // 2.1, 2.2 (D175), which only adds a public read, 3.0 or 3.1: the cardkit's CARD_VERSIONS
   if (!supportedCardVersion(reply.data)) {
     return {
       state: 'unsupported',
@@ -100,7 +100,7 @@ export function cardStatus(
     return {
       title: c.pinBlocked ? 'PIN recovery needed' : 'Card is locked',
       detail:
-        'Use the linked holder wallet to unlock or recover this card. The provisioner will not guess its PIN or erase it.',
+        'Use the linked holder wallet to unlock or recover this card. The Cashu Card Setup app will not guess its PIN or erase it.',
       action: 'holder',
       label: 'HOLDER WALLET INSTRUCTIONS',
     };

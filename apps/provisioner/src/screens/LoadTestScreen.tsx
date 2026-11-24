@@ -132,7 +132,7 @@ export function LoadTestScreen(): React.JSX.Element {
   return (
     <Screen title="Bench tools">
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Cashu card provisioner</Text>
+        <Text style={styles.title}>Cashu Card Setup</Text>
         <Text style={styles.note}>
           Bench tool for the spare J3R180. Factory keys; the rotation uses the
           spike's public test set.

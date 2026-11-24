@@ -1,4 +1,4 @@
-Cashu Provisioner is an operator tool for installing Cashu card software on compatible NXP J3R180 NFC cards. A supported NFC phone, internet access and an operator account from the connected provisioning service are required.
+Cashu Card Setup is an operator tool for installing Cashu card software on compatible NXP J3R180 NFC cards. A supported NFC phone, internet access and an operator account from the connected provisioning service are required.
 
 • Create and manage installation batches.
 • Install card software and rotate card-manager keys.

@@ -16,7 +16,7 @@ runs. Historical proposals retain the assumptions and gates of their date.
 - [Hardware deployment](HARDWARE_DEPLOYMENT.md): build, install and package details.
 - [Hardware loop](HARDWARE-LOOP.md): turning one silicon observation into a fixture fix, a regression and a green suite without a second human round.
 
-## Provisioner
+## Cashu Card Setup app
 
 - [Screens and operator flow](PROVISIONER-APP.md).
 - [Installation recovery](PROVISIONER-RECOVERY.md) and [safe exits](PROVISIONER-SAFE-EXITS.md).

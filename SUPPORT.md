@@ -7,7 +7,7 @@ maintainers and community, on a best-effort basis.
   on cashucard/cashucard. Questions about the protocol, the applet, the client
   library and the tools all go there.
 - **Bugs:** [open an issue](https://github.com/cashucard/cashucard/issues/new/choose).
-- **The Cashu Card Provisioner app or an ops.cashucard.org account:** email
+- **The Cashu Card Setup app or an ops.cashucard.org account:** email
   [support@cashucard.org](mailto:support@cashucard.org), or see
   [cashucard.org/support](https://cashucard.org/support).
 - **Vulnerabilities:** report them privately, as [SECURITY.md](SECURITY.md) describes.

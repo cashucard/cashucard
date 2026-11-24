@@ -43,7 +43,7 @@ its funds; a backup of the owner key does not recreate the spending key.
 The [security model](SECURITY-MODEL.md) explains PIN lockout, owner-key loss
 and the optional recovery mechanisms retained in historical designs.
 
-Provisioning is a separate administrative step. The provisioner installs the
+Provisioning is a separate administrative step. The Setup app installs the
 applet and rotates manager keys. The holder then establishes ownership and
 a PIN in a compatible wallet before funding the card. Manager-key custody
 can affect the applet and its funds, so reset requires explicit authorization
