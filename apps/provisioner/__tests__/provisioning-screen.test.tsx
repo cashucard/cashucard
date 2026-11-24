@@ -2059,3 +2059,110 @@ test('Settings and the maker form show the saved maker when the gate is closed f
   await openMakerForm(tree2, brokenOptions);
   expect(byId(tree2, 'maker-address').props.value).toBe(broken.tagAddress);
 });
+
+test('the card picture starts empty for the second card of a batch and fills again with its load', async () => {
+  const f = fixture();
+  const attempts = new Map<string, ReservedAttempt>();
+  (f.service.reserve as jest.Mock).mockImplementation(async request => {
+    const made: ReservedAttempt = {
+      ...request,
+      operator_id: 7,
+      revision: 0,
+      state: 'active',
+      chip_id: null,
+      completion_receipt: null,
+    };
+    attempts.set(request.attempt_id, made);
+    ((await f.service.batch({} as never)) as RemoteBatch).next_ordinal =
+      request.ordinal + 1;
+    return {...made};
+  });
+  (f.service.attempt as jest.Mock).mockImplementation(async (_d, id) => ({
+    ...attempts.get(id)!,
+  }));
+  (f.service.record as jest.Mock).mockImplementation(
+    async (_d, attempt_id, revision) => ({
+      attempt_id,
+      installation_id: `02${String(cards).repeat(64)}`,
+      revision,
+      recorded_at: 1,
+      verified_stage: 'rotated',
+      ready_for_holder: false,
+    }),
+  );
+  let hold!: () => void;
+  const held = new Promise<void>(resolve => {
+    hold = resolve;
+  });
+  let atBlock!: () => void;
+  const reached = new Promise<void>(resolve => {
+    atBlock = resolve;
+  });
+  let cards = 0;
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    w,
+    service,
+    options,
+  ) => {
+    const ordinal = cards++;
+    options.onEvent?.({type: 'block', index: 10, of: 20});
+    if (ordinal === 1) {
+      atBlock();
+      await held;
+    }
+    await w.withAttempt(service, async j => {
+      await j.bind(`cplc-v1:4790d32131800729762075${ordinal}1`);
+      Object.assign(attempts.get(j.snapshot().attempt_id)!, {chip_id: j.snapshot().chip_id, revision: 1});
+      await j.installIntent({installation_id: null, replacement_consent: false});
+      await j.installed(`02${String(ordinal + 1).repeat(64)}`, {complete: true});
+      await j.rotationIntent();
+      await j.rotated(1);
+      const at = j.snapshot();
+      await j.freezeRecord({
+        attempt_id: at.attempt_id,
+        batch_id: at.batch_id,
+        ordinal: at.ordinal,
+        load_sha256: at.load_sha256,
+        operator_id: at.operator_id,
+        device_id: at.device_id,
+        key_env: at.key_env,
+        chip_id: at.chip_id!,
+        installation_id: at.installation_id!,
+        display_id: at.installation_id!.slice(-4),
+        gp_key_version: 1,
+        configuration_revision: 1,
+        verified_stage: 'rotated',
+        verified_at: 1,
+      });
+    });
+    await w.postRecord(service);
+    return 'recorded' as never;
+  };
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makerStorageWith(),
+    serviceFor: () => f.service,
+    runCard,
+  });
+  await signIn();
+  await act(async () => {
+    await flow.create(config);
+    await flow.program();
+  });
+  expect(flow.snapshot!.history).toHaveLength(1);
+  expect(flow.snapshot!.active).toBeNull();
+  expect(tree.root.findByType(CardFigure).props.fill).toBe(1);
+  let second!: Promise<boolean>;
+  await act(async () => {
+    second = flow.program();
+    await reached;
+  });
+  // halfway through the second card the picture is half written, not full
+  expect(tree.root.findByType(CardFigure).props.fill).toBe(0.5);
+  await act(async () => {
+    hold();
+    await second;
+  });
+  expect(tree.root.findByType(CardFigure).props.fill).toBe(1);
+});
