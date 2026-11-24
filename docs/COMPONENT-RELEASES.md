@@ -35,7 +35,7 @@ on D228's review fixes) was installed and paid from at a test mint on card 58206
 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1-merged.md); the 3.0 file it sits on (load file `99a66ba7…`,
 with D228's review fixes) was installed and paid from at a test mint on the same card on 2026-11-22
 (docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md; see D230 for what that run covered), and stays on
-refcheck's PROVEN and in the history, with no tag. No `firmware-v3.1.0` release is cut before the operator's approval.
+refcheck's PROVEN and in the history, with no tag of its own. `firmware-v3.1.0` was tagged at b9a65fc and released on 2026-11-24, on the operator's approval.
 No J3R180 keyed for SCP02 will be given a 3.0 file: according to the card's supplier the chip's manufacturer has retired that keying (D229). 330ffa1's
 file, load file `4014e7f1…`, and the 3.0 file `d69742d0…` (9ac55c1) were installed and paid from at a test mint on card
 58206920 on 2026-11-21 (docs/reports/HARDWARE_TEST_REPORT_2026-11-21_58206920_3.1.md,
