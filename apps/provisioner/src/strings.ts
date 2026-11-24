@@ -138,4 +138,4 @@ export const PHYSICAL_READ_BANNER = 'PHYSICAL CARD — read-only';
 
 /** What the install step says when the saved maker's tag address is not the open batch's (D239). */
 export const batchMakerDiffers = (batch: {name: string; tagAddress: string}) =>
-  `This batch was opened with another tag address: ${batch.tagAddress} (${batch.name}). No card is installed. Close this batch, or set the card maker back to that address in Settings.`;
+  `This batch uses another tag address: ${batch.tagAddress} (${batch.name}). No card is installed. Close this batch, or set the card maker back to that address in Settings.`;
