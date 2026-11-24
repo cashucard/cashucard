@@ -100,7 +100,7 @@ export function cardStatus(
     return {
       title: c.pinBlocked ? 'PIN recovery needed' : 'Card is locked',
       detail:
-        'Use the linked holder wallet to unlock or recover this card. The provisioner will not guess its PIN or erase it.',
+        'Use the linked holder wallet to unlock or recover this card. The Setup app will not guess its PIN or erase it.',
       action: 'holder',
       label: 'HOLDER WALLET INSTRUCTIONS',
     };

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Why Cashu Card Provisioner uses an ops-service, and how to run your own with Docker, HTTPS, operator accounts and encrypted backups." />
+    <meta name="description" content="Why Cashu Card Setup uses an ops-service, and how to run your own with Docker, HTTPS, operator accounts and encrypted backups." />
     <meta property="og:title" content="Host an ops-service | Cashu Card" />
     <meta property="og:description" content="Run the operator console and provisioning API on your own server. Understand its keys, records and recovery responsibilities." />
     <meta property="og:type" content="article" />
@@ -32,7 +32,7 @@
         <div class="guide-hero-inner">
           <div class="eyebrow"><span class="status-dot"></span> SELF-HOSTING <span class="eyebrow-divider">/</span> OPS-SERVICE 0.1.0</div>
           <h1 id="ops-title">Host an <em>ops-service</em></h1>
-          <p class="guide-lead">Run the operator console and provisioning API for your own cards. One Docker image provides the service and its SQLite storage tools. Your domain connects it to Cashu Card Provisioner.</p>
+          <p class="guide-lead">Run the operator console and provisioning API for your own cards. One Docker image provides the service and its SQLite storage tools. Your domain connects it to Cashu Card Setup.</p>
           <ul class="guide-facts" aria-label="At a glance"><li>Experimental</li><li>Linux AMD64 + ARM64</li><li>Docker Compose</li><li>Your HTTPS domain</li></ul>
           <p class="guide-back"><a href="/developers#overview">See how all the parts fit together ↗</a></p>
         </div>
@@ -131,7 +131,7 @@ docker compose run --rm --entrypoint node setup -e 'require("node:fs").unlinkSyn
           <section id="phone" aria-labelledby="phone-title">
             <h2 id="phone-title">Connect the CCP app</h2>
             <ol>
-              <li>Open <a href="/#install">Cashu Card Provisioner</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
+              <li>Open <a href="/#install">Cashu Card Setup</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
               <li>Add your HTTPS origin, for example <code>https://ops.example.com</code>, and confirm the service selection. Use the origin without <code>/ops/operators</code>.</li>
               <li>Sign in with an operator account created on this service. Confirm the displayed hostname before creating a batch.</li>
             </ol>
@@ -180,7 +180,7 @@ docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-e
         <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
         <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">Ops-service release ↗</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Provisioner</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Setup</a></div>
       </div>
       <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>

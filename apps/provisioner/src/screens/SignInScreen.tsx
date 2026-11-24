@@ -225,7 +225,7 @@ export function SignInScreen({onServices}: {onServices?: () => void} = {}) {
             />
           </View>
           <View style={s.intro}>
-            <Text style={s.eyebrow}>Card provisioner</Text>
+            <Text style={s.eyebrow}>Cashu Card Setup</Text>
             <View style={s.headingRow}>
               <Text style={s.heading} accessibilityRole="header">
                 Sign in

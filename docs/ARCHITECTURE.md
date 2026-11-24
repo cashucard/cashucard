@@ -27,14 +27,14 @@ domain, its design codes) is in [`maker/maker.json`](../maker/README.md), never
 in the applet or the tools.
 Mint interactions are implemented by wallets/terminals and
 [the separate client library](https://github.com/cashucard/client). A batch's
-mint reference is operator metadata; the provisioner does not set holder
+mint reference is operator metadata; the Setup app does not set holder
 ownership, fund the card, or make it spend-ready.
 
 ## Trust and data flow
 
 ```mermaid
 flowchart LR
-  Operator[Operator] --> P[Provisioner]
+  Operator[Operator] --> P[Cashu Card Setup]
   P -->|sessions, scoped reservations and receipts| O[Ops-service]
   P --> K[cardkit public API]
   K -->|injected NFC transceiver| C[JavaCard]

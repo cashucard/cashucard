@@ -5,7 +5,7 @@
  * that order; the word "error" appears on no screen.
  */
 
-export const APP_NAME = 'Cashu card provisioner';
+export const APP_NAME = 'Cashu Card Setup';
 
 export const SIGNIN = {
   tagline: 'Programs blank cards into Cashu cards. Operators only.',

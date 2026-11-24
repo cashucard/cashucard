@@ -36,7 +36,7 @@ the APDU reference, the vectors and the code. Both use the install guide's
 layout and `guide.js`. When a doc they link moves, update its link here. There
 is no page for merchants yet, by choice: it waits for more wallets and tills.
 Footer links point to the draft NUT and the Cashu Card source, with the Cashu
-Card Provisioner under Apps. The install guide's Apps also link Flash and Foxy
+Card Setup under Apps. The install guide's Apps also link Flash and Foxy
 at their own sites, getflash.io and getfoxy.io, since its setup step sends a
 new holder to the wallets there (D118).
 The links do not claim completed integrations.
@@ -45,7 +45,7 @@ The links do not claim completed integrations.
 that narrow screens load, and its poster; `dist/assets/og.jpg` is the share
 image, from the film's end frame. The film section is black, and the film's
 scene fades to black at the frame's edge under its text layer, so the frame
-has no visible edge on the page. In the film's key chapter the provisioner
+has no visible edge on the page. In the film's key chapter the Setup
 app (apps/provisioner, its installation screen in the dark theme, with the
 Cashu Card's face in place of its branded card art) installs the applet on a
 blank card while the chip makes its key; its tap and settle chapters use the
@@ -90,7 +90,7 @@ anything yet. When a checkout goes live, `_headers`' content security policy
 needs the provider's origins (it allows no connections or form posts today).
 
 "Install the applet" (`#install`, the nav's "Install") gives the two ways to
-put the applet on a blank card. The first is the Cashu Card Provisioner
+put the applet on a blank card. The first is the Cashu Card Setup
 (`apps/provisioner`; see the linked release for the build identity), for card issuers with an operator
 account. It shows the app's icon (`dist/assets/provisioner-icon.png`, its
 180-pixel iOS icon) and links the TestFlight public beta, Google Play's

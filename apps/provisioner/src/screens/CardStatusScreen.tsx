@@ -101,7 +101,7 @@ export function CardStatusScreen({
                 Open Cards in a compatible Cashu wallet and read this same card.
                 Use that wallet for holder setup, balance, loading, PIN recovery
                 and pending change. Keep its recovery backup verified; never
-                enter the recovery phrase in this provisioner.
+                enter the recovery phrase in this Setup app.
               </Dim>
             ) : null}
             {card?.unspent === 0 &&

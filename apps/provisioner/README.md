@@ -1,4 +1,4 @@
-# Cashu Card Provisioner
+# Cashu Card Setup
 
 The shipping app signs operators into the ops-service, installs the shared Cashu
 card applet, records manager-key rotation, restores interrupted work and supports
@@ -43,7 +43,7 @@ workflow. The decision behind the GlobalPlatform implementation is
   load file in 174 blocks, the opener, the card's applet, then the tag under
   `D2760000850101` with the card maker's address (`tagAddress` in
   [`maker/maker.json`](../../maker/README.md), read at build time by `src/maker.ts`).
-  Then it checks the card's applet answers `03 00`, `GET_INFO` (30 bytes),
+  Then it checks the card's applet answers `03 01`, `GET_INFO` (30 bytes),
   `GET_PUBKEY` (33 bytes), the tag's SELECT, and that the tag's NDEF file is the
   maker's address with `#new`. A build whose maker file is the shared example
   (`"example": true`) installs nothing (`makerGiven` in `src/releaseGates.ts`).
@@ -52,8 +52,8 @@ workflow. The decision behind the GlobalPlatform implementation is
   `3F`) and back, each proved by a fresh login.
 - **Replace existing install (spare card only).** Off by default. With it on, an
   installed card applet is removed first, and only if it is a version the app
-  knows (2.1, 2.2 or 3.0), its `GET_INFO` is empty and it is owed no change
-  (`GET_INFO` byte 29 on 3.0, `GET_CHANGE` on 2.1 and 2.2).
+  knows (2.1, 2.2, 3.0 or 3.1), its `GET_INFO` is empty and it is owed no change
+  (`GET_INFO` byte 29 on 3.0 and 3.1, `GET_CHANGE` on 2.1 and 2.2).
 
 Every run starts from the card as it is: it checks for an installed applet, logs
 in, removes whatever a torn run left (newest instance first, then the package) and
@@ -240,7 +240,7 @@ perform mint/owner/PIN personalization or report holder readiness.
 The read-only cardkit inspector returns the full installation key, empty-state
 and tag evidence. A card owed change from a payment is never empty: the status
 and reset screens send the operator to the holder wallet to bring the change home,
-and the reset stops before anything is saved or deleted. A 3.0 card's spent entries
+and the reset stops before anything is saved or deleted. A 3.0 or 3.1 card's spent entries
 are freed by its holder wallet; this app's settlement check is a 2.1 and 2.2 card's. An interrupted complete new installation can be adopted;
 absent, partial or untouched old states quarantine without a recovery sweep.
 The saved intent names the verified pre-install inspection state separately

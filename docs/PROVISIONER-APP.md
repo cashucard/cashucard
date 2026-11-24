@@ -1,8 +1,8 @@
 <a id="the-provisioner-the-screens-as-designed"></a>
 
-# Provisioner screens and operator flow
+# Setup app screens and operator flow
 
-Cashu Provisioner installs card software and rotates manager keys on compatible
+Cashu Card Setup installs card software and rotates manager keys on compatible
 J3R180 cards. Operators sign in to the configured ops-service, create a batch,
 install each card and save the result. Holders complete ownership, PIN,
 configuration and funding in a compatible wallet.

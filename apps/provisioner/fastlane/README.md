@@ -1,4 +1,4 @@
-# Fastlane Setup for Cashu Card Provisioner
+# Fastlane Setup for Cashu Card Setup
 
 ## One-time Setup (run once)
 

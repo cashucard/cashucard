@@ -33,7 +33,7 @@ test('sign-in uses the shared forest Cashu Card identity and explicit field labe
   const text = tree.root.findAllByType(Text).map(node => node.props.children);
   expect(text).toEqual(
     expect.arrayContaining([
-      'Card provisioner',
+      'Cashu Card Setup',
       'Sign in',
       'Operator name',
       'Password',
