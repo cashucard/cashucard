@@ -65,7 +65,7 @@ and the badge's switch in `motion.js` use those bounds. Media names carry a
 version (`-2`) because `_headers` caches `/film/*` and `/seq/*` for a year:
 publish a new render under a new number.
 
-The film, the frames and `dist/assets/custom-cards-1.webp` are rendered with a
+The film and the frames are rendered with a
 private fork of the Daylight Fob film renderer (a WebGL2 scene driven by
 headless Chrome, with a synthesized score at -18 LUFS and a look-ahead limiter
 rather than clipping); the render source lives in the private `cashucard/cashucard-film` repository. What
@@ -83,11 +83,7 @@ and wallet names stay off them.
 default GlobalPlatform keys over SCP02. It links one Amazon listing that
 states those for testing, and for volume CardLogix and Feitian's J3R180 on
 Alibaba, with prices as listed on 23 October 2026; check them before relying
-on them. The third option, custom printed cards with the applet installed,
-shows three made-up designs under a "Coming soon" stamp. Its quantities and
-its Lightning and Stripe checkouts are placeholders that are not connected to
-anything yet. When a checkout goes live, `_headers`' content security policy
-needs the provider's origins (it allows no connections or form posts today).
+on them.
 
 "Install the applet" (`#install`, the nav's "Install") gives the two ways to
 put the applet on a blank card. The first is the Cashu Card Setup
