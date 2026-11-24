@@ -23,7 +23,9 @@ export const VALIDATED_LOAD_FILE_SHA256S: readonly string[] = [
   // mint on card 58206920 with desktop tools (GlobalPlatformPro, tools/cardctl and a payment harness), per
   // docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md. The same day cards 36813121 and 09334220
   // took it, counted by the owner on the contributor's statement and logs, which do not give the file's sha256
-  // (D238). This app's own install path has not yet run on a 3.1 card on a chip.
+  // (D238). On 2026-11-24 the operator installed it with a development-signed build of build 16 on a J3R180
+  // keyed for SCP02 and a J3R452 keyed for SCP03 (docs/reports/HARDWARE_TEST_REPORT_2026-11-24_setup-build-16.md).
+  // Not shown: a J3R180 keyed for SCP03, and an install by the released files.
   'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
 ];
 

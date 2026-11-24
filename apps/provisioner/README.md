@@ -200,9 +200,10 @@ was installed and paid from at a test mint on card 58206920, with GlobalPlatform
 [the hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md).
 The same day cards 36813121 and 09334220 took it, counted by the owner on the contributor's
 statement and logs, which do not give the file's sha256 (D238; see
-[the release notes](../../docs/RELEASE-NOTES.md)). This app's own install
-path has not yet run on a 3.1 card on a chip. The operator's own install of a card with this
-app is the check before the build 16 tag.
+[the release notes](../../docs/RELEASE-NOTES.md)). On 2026-11-24 the
+operator installed that file with a development-signed build of build 16 on a J3R180 keyed for SCP02 and on a J3R452 keyed for
+SCP03, per [the report](../../docs/reports/HARDWARE_TEST_REPORT_2026-11-24_setup-build-16.md). Not shown: an install on a J3R180 keyed for SCP03, and an install by the
+released files themselves (they differ from that build by one display fix, #269).
 
 **The card maker.** The build carries no maker ([D239](../../docs/DECISIONS.md#d239)). The
 person making cards sets the maker's name and tag address in the app (Settings, Card maker),
