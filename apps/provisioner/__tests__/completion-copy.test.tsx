@@ -1,3 +1,4 @@
+import {OPEN_GATE} from '../test-support/maker';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import {AppStore} from '../src/store';
@@ -12,7 +13,7 @@ test('a finished batch clearly separates installation from holder setup and can 
     status: 'ready',
     scopeMatches: true,
     busy: false,
-    hardwareValidated: true,
+    hardwareValidated: true, installGate: OPEN_GATE,
     resetState: null,
     snapshot: {
       batch: {next_ordinal: 1, request: {count: 1}},

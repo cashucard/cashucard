@@ -1,3 +1,4 @@
+import {OPEN_GATE} from '../test-support/maker';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import {Linking, Modal, StyleSheet, Text} from 'react-native';
@@ -30,7 +31,7 @@ beforeEach(() => {
     status: 'ready',
     scopeMatches: true,
     busy: false,
-    hardwareValidated: true,
+    hardwareValidated: true, installGate: OPEN_GATE,
     snapshot: {batch: null, active: null, history: []},
     resetState: null,
     resetReview: null,

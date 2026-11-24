@@ -8,13 +8,13 @@
  * store's reserved run replaces (replaceSellerTag, D182).
  */
 import {
-  CASHU_PLAN,
   FACTORY_KEYS,
   HELLO_PLAN,
   SPIKE_KEYS,
   provision,
   rotateKeys,
 } from '../src/cardkit';
+import {CASHU_PLAN} from '../test-support/maker';
 import {randomBytes} from '../src/random';
 import {FakeCard, SELLER_APPLETS} from '@cashu-card/cardkit/testing';
 

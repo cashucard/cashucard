@@ -1,7 +1,6 @@
 /** The words on the screen and in iOS's NFC sheet. */
 import {
-  CASHU_PLAN,
-  mayLeaveGuardedApplet,
+  cashuMayLeaveGuardedApplet,
   type RunEvent,
   type RunResult,
 } from './cardkit';
@@ -96,7 +95,7 @@ export function describeResult(
       const again =
         action === 'cashu' &&
         !replace &&
-        mayLeaveGuardedApplet(CASHU_PLAN, result.phase)
+        cashuMayLeaveGuardedApplet(result.phase)
           ? 'Turn on Replace (spare card only) and tap again'
           : 'Tap again';
       return `${how} during ${during}. ${again}; the partial install is removed first.`;

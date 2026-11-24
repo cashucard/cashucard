@@ -1,4 +1,5 @@
 import {RecoveryDrill} from '../src/recoveryDrills';
+import type {InstallMaker} from '../src/releaseGates';
 import {runProvisioningTap, runReservedAttempt} from '../src/provisioningTap';
 import {
   ProvisioningWorkflow,
@@ -7,7 +8,6 @@ import {
 } from '../src/provisioningWorkflow';
 import {ProvisioningJournal, type JournalStorage} from '../src/journal';
 import {
-  CASHU_PLAN,
   FACTORY_KEYS,
   SPIKE_KEYS,
   fromHex,
@@ -16,6 +16,7 @@ import {
   type RunEvent,
   type RunOptions,
 } from '../src/cardkit';
+import {CASHU_PLAN, gatedMaker} from '../test-support/maker';
 import {FakeCard, SELLER_APPLETS} from '@cashu-card/cardkit/testing';
 const key =
   '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
@@ -35,7 +36,11 @@ const identity = {
   ordinal: 0,
   load_sha256: CASHU_PLAN.loadFile.sha256,
 };
-const options: RunOptions = {random: n => Array(n).fill(0x55), now: () => 123};
+const options: RunOptions & {maker: InstallMaker} = {
+  random: n => Array(n).fill(0x55),
+  now: () => 123,
+  maker: gatedMaker(),
+};
 function fixture(card = new FakeCard()) {
   let saved: string | null = null;
   const flags = {failInstalled: false, losePut: false, failRecord: false};
@@ -575,3 +580,42 @@ test.each([
     }
   },
 );
+
+test('the install gives the tag exactly the gated maker\'s address, and a maker the gate did not pass touches no card', async () => {
+  const address = 'https://getfoxy.io/card';
+  const f = fixture();
+  const j = await f.open();
+  expect(
+    await runProvisioningTap(f.tx, j, SPIKE_KEYS, f.bind, {
+      ...options,
+      maker: gatedMaker({name: 'Foxy', tagAddress: address}),
+      verifiedAt: () => 1700000000,
+    }),
+  ).toBe('record_pending');
+  const bytes = [0xc9, address.length, ...Array.from(address, c => c.charCodeAt(0))];
+  const carries = (apdu: number[], part: number[]) =>
+    apdu.some((_, i) => part.every((b, k) => apdu[i + k] === b));
+  expect(f.log.filter(a => carries(a, bytes)).length).toBe(1);
+  const other = Array.from('https://cards.testworks.dev/card', c => c.charCodeAt(0));
+  expect(f.log.filter(a => carries(a, other)).length).toBe(0);
+
+  for (const maker of [
+    undefined,
+    {name: 'Example card maker', tagAddress: 'https://example.com/card'},
+    {name: 'Foxy', tagAddress: 'http://getfoxy.io/card'},
+    // a good name and address that the gate did not hand out
+    {name: 'Foxy', tagAddress: 'https://getfoxy.io/card'},
+  ]) {
+    const g = fixture();
+    const fresh = await g.open();
+    await expect(
+      runProvisioningTap(g.tx, fresh, SPIKE_KEYS, g.bind, {
+        ...options,
+        maker: maker as unknown as InstallMaker,
+        verifiedAt: () => 1700000000,
+      }),
+    ).rejects.toThrow();
+    expect(g.log).toEqual([]);
+    expect(fresh.snapshot().stage).toBe('reserved');
+  }
+});

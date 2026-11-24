@@ -24,13 +24,17 @@ The drawings are the wallets'; one wallet that draws all three is Foxy's
 ## The maker's tag address
 
 Each card maker publishes the one address its cards' NFC tag carries before the fragment
-(`tagAddress` in its `maker/maker.json`, [D227](DECISIONS.md#d227)), here or on its own
+(`tagAddress` in its `maker/maker.json` for the desktop tools, [D227](DECISIONS.md#d227); the
+card maker setting of the set-up app, [D239](DECISIONS.md#d239)), here or on its own
 site, so that anyone can check a card against it. The address is the installer's choice
 for each card and survives a reset, so nothing on the card stops an installer from giving
 each card its own, which would make the tag a tracker; a card whose address is not its
 maker's published one is suspect ([D228](DECISIONS.md#d228)). `python3 tools/maker/maker.py
 check` refuses an address that looks per card (a long run of digits or hex, a UUID, a
-serial or a uid in the path or the query) unless `--allow-per-card` is given.
+serial or a uid in the path or the query) unless `--allow-per-card` is given. The set-up
+app takes one address for each ops service, in its settings and never with a batch or a
+card, shows it on the batch screen before any card is installed, and says in its settings
+that the maker publishes it.
 
 ## How a card names its design
 

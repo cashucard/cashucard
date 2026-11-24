@@ -8,6 +8,7 @@ import {
 
 import {CardsHomeScreen} from './src/screens/CardsHomeScreen';
 import {LoadTestScreen} from './src/screens/LoadTestScreen';
+import {MakerScreen} from './src/screens/MakerScreen';
 import {SettingsScreen} from './src/screens/SettingsScreen';
 import {SignInScreen} from './src/screens/SignInScreen';
 import {ServiceSelectorScreen} from './src/screens/ServiceSelectorScreen';
@@ -27,6 +28,7 @@ type Route =
   | 'home'
   | 'setup'
   | 'settings'
+  | 'maker'
   | 'bench'
   | 'identity'
   | 'reset'
@@ -56,6 +58,15 @@ function Navigator(): React.JSX.Element {
   const [route, setRoute] = useState<Route>('home');
   const [choosingService, setChoosingService] = useState(false);
   const [origins, setOrigins] = useState(initialOrigins);
+  const [makerOrigin, setMakerOrigin] = useState<'settings' | 'setup'>(
+    'settings',
+  );
+  const openMaker = (origin: 'settings' | 'setup') => {
+    if (!recovery.busy) {
+      setMakerOrigin(origin);
+      setRoute('maker');
+    }
+  };
   const openTool = (tool: Tool, origin: ToolOrigin) => {
     if (recovery.busy) {
       return;
@@ -95,6 +106,7 @@ function Navigator(): React.JSX.Element {
       <ProvisioningScreen
         onHome={() => setRoute('home')}
         onSettings={() => setRoute('settings')}
+        onMaker={() => openMaker('setup')}
         onReset={() => openTool('reset', 'setup')}
         onCheck={() => openTool('status', 'setup')}
       />
@@ -119,6 +131,8 @@ function Navigator(): React.JSX.Element {
             }
           }}
           onIdentity={() => openTool('identity', 'settings')}
+          onMaker={() => openMaker('settings')}
+          maker={recovery.savedMaker}
           hardwareBusy={recovery.busy}
           hasSavedBatch={
             !!recovery.snapshot?.batch ||
@@ -127,6 +141,8 @@ function Navigator(): React.JSX.Element {
           }
         />
       );
+    case 'maker':
+      return <MakerScreen onBack={() => setRoute(makerOrigin)} />;
     case 'identity':
       return (
         <CardIdentityScreen
@@ -159,7 +175,11 @@ function Navigator(): React.JSX.Element {
             style={benchStyles.benchBack}>
             ‹ Back
           </Text>
-          <LoadTestScreen />
+          <LoadTestScreen
+            maker={
+              recovery.installGate.allowed ? recovery.installGate.maker : null
+            }
+          />
         </View>
       );
     default:
@@ -167,6 +187,7 @@ function Navigator(): React.JSX.Element {
         <ProvisioningScreen
           onHome={() => setRoute('home')}
           onSettings={() => setRoute('settings')}
+          onMaker={() => openMaker('setup')}
           onReset={() => openTool('reset', 'setup')}
           onCheck={() => openTool('status', 'setup')}
         />

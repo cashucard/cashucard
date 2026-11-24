@@ -2,7 +2,7 @@
  * Manager keys live only in this call; intent writes are awaited explicitly.
  */
 import {
-  CASHU_PLAN,
+  cashuPlanFor,
   FACTORY_KEYS,
   CardError,
   ChipIdentityMismatch,
@@ -21,6 +21,8 @@ import {
   type Transceiver,
   type InstallationInspection,
 } from './cardkit';
+import {CASHU_LOAD_FILE} from './assets/cashu';
+import type {InstallMaker} from './releaseGates';
 import type {RecoveryBoundary} from './recoveryDrills';
 import type {ProvisioningJournal} from './journal';
 import {
@@ -34,6 +36,11 @@ export type TapOutcome =
   | 'quarantined'
   | 'reset-required';
 export interface TapOptions extends RunOptions {
+  /**
+   * The maker whose tag address this install gives the card: one that passed
+   * the installation gate (releaseGates.ts). Without it nothing is installed.
+   */
+  maker: InstallMaker;
   /** Legacy callers cannot authorize factory-key replacement; ignored. */
   replacementInstallationId?: string;
   /**
@@ -89,9 +96,11 @@ export async function runProvisioningTap(
   if (j.stage === 'recorded') {
     throw new Error('attempt already recorded');
   }
-  if (j.load_sha256 !== CASHU_PLAN.loadFile.sha256) {
+  if (j.load_sha256 !== CASHU_LOAD_FILE.sha256) {
     throw new Error('load artifact does not match the reservation');
   }
+  // Built before the card is touched: a maker the gate did not pass stops here.
+  const plan = cashuPlanFor(options.maker);
   try {
     const chip = await readChipIdentity(tx, j.chip_id);
     let observed = await inspectInstallation(tx);
@@ -114,7 +123,7 @@ export async function runProvisioningTap(
         replacement_consent: false,
       });
       await options.checkpoint?.('install-intent-saved');
-      const installed = await provision(tx, CASHU_PLAN, {
+      const installed = await provision(tx, plan, {
         ...options,
         keys: FACTORY_KEYS,
         replace: false,

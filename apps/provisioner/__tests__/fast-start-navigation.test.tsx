@@ -1,3 +1,4 @@
+import {makerStorageWith} from '../test-support/maker';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import App from '../App';
@@ -71,7 +72,7 @@ test.each(['start-batch', 'create-batch-only'])(
             resetStorage: {read: async () => null, replace: async () => {}},
             uuid: () =>
               `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`,
-            hardwareValidated: true,
+            hardwareValidated: true, makerStorage: makerStorageWith(),
             serviceFor: () => service,
             runCard,
           }}

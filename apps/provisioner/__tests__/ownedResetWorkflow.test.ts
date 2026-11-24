@@ -4,12 +4,12 @@ import {
   type OwnedResetService,
 } from '../src/ownedResetWorkflow';
 import type {ResetReview} from '../src/cardkit';
+import {CASHU_PLAN} from '../test-support/maker';
 import type {JournalStorage} from '../src/journal';
 import {FakeCard} from '@cashu-card/cardkit/testing';
 import {
   FACTORY_KEYS,
   SPIKE_KEYS,
-  CASHU_PLAN,
   provision,
   rotateKeys,
   toHex,

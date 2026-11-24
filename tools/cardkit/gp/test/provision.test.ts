@@ -601,6 +601,11 @@ describe('provision: the Cashu card', () => {
       );
       assert.equal(r.kind, 'guarded');
       assert.match(r.reason ?? '', /version this kit knows/);
+      // the message names every version in CARD_VERSIONS, 3.1 among them
+      assert.match(
+        r.reason ?? '',
+        /version this kit knows \(2\.1, 2\.2, 3\.0, 3\.1\)/,
+      );
       assert.deepEqual(
         card.log.slice(before).map(a => a[1]),
         [0xa4],

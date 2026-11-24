@@ -4,16 +4,45 @@
  */
 import {CASHU_LOAD_FILE} from './assets/cashu';
 import {HELLO_LOAD_FILE} from './assets/hello';
-import {cashuPlan, helloPlan} from '@cashu-card/cardkit';
-import {MAKER} from './maker';
+import {
+  cashuPlan,
+  helloPlan,
+  mayLeaveGuardedApplet,
+  type Plan,
+} from '@cashu-card/cardkit';
+import {makerProblem} from './maker';
+import {passedInstallGate, type InstallMaker} from './releaseGates';
 
 export * from '@cashu-card/cardkit';
 // Holder PIN/settlement helpers are explicit: the ops reset runner does not
 // import or bundle this mobile-only crypto dependency through the GP barrel.
 export * from '@cashu-card/cardkit/cleanup';
 
-/** The card, its tag carrying the maker's address (maker/maker.json). */
-export const CASHU_PLAN = cashuPlan(CASHU_LOAD_FILE, {
-  tagAddress: MAKER.tagAddress,
-});
+/**
+ * The card plan, its tag carrying the maker's address. It takes only a maker
+ * that passed the installation gate (releaseGates.ts, installGate): the very
+ * object the gate handed out, not one that looks like it. It checks the rules
+ * once more, so no other address reaches a card (D239).
+ */
+export function cashuPlanFor(maker: InstallMaker): Plan {
+  if (!passedInstallGate(maker)) {
+    throw new RangeError('This card maker did not pass the installation gate.');
+  }
+  const problem = makerProblem(maker.name, maker.tagAddress);
+  if (problem) {
+    throw new RangeError(problem);
+  }
+  return cashuPlan(CASHU_LOAD_FILE, {tagAddress: maker.tagAddress});
+}
+/**
+ * Whether a run pulled at `phase` may have left the card applet behind. That
+ * follows the plan's order of installs, which no tag address changes: the
+ * plan built here never leaves this function.
+ */
+export function cashuMayLeaveGuardedApplet(phase: string): boolean {
+  return mayLeaveGuardedApplet(
+    cashuPlan(CASHU_LOAD_FILE, {tagAddress: 'https://order-only.invalid/'}),
+    phase,
+  );
+}
 export const HELLO_PLAN = helloPlan(HELLO_LOAD_FILE);

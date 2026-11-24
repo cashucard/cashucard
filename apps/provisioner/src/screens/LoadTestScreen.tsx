@@ -7,7 +7,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {ScrollView, Share, StyleSheet, Switch, Text, View} from 'react-native';
 
 import {
-  CASHU_PLAN,
+  cashuPlanFor,
   FACTORY_KEYS,
   HELLO_PLAN,
   SPIKE_KEYS,
@@ -29,15 +29,23 @@ import {
 import {randomBytes} from '../random';
 import {formatReadout, locksOut, makeReadout, type Readout} from '../readout';
 import {cancelCard, setCardMessage, withCard} from '../session';
-import {BENCH_RUNS_ENABLED, benchActionAllowed} from '../releaseGates';
+import {
+  BENCH_RUNS_ENABLED,
+  benchActionAllowed,
+  type InstallMaker,
+} from '../releaseGates';
 import {FONT, useTheme, type Theme} from '../theme';
 import {Screen, SecondaryButton} from '../ui';
+
+const NO_MAKER =
+  'Set the card maker in Settings before installing the Cashu card.';
 
 async function runAction(
   action: Action,
   tx: Transceiver,
   replace: boolean,
   onEvent: (e: RunEvent) => void,
+  maker: InstallMaker | null,
 ): Promise<RunResult<string>[]> {
   const options = {random: randomBytes, now: Date.now, onEvent};
   if (action === 'rotate') {
@@ -47,11 +55,19 @@ async function runAction(
     }
     return [there, await rotateKeys(tx, SPIKE_KEYS, FACTORY_KEYS, options)];
   }
-  const plan = action === 'hello' ? HELLO_PLAN : CASHU_PLAN;
+  if (action === 'cashu' && !maker) {
+    throw new Error('no card maker passed the installation gate');
+  }
+  const plan = action === 'hello' ? HELLO_PLAN : cashuPlanFor(maker!);
   return [await provision(tx, plan, {...options, replace})];
 }
 
-export function LoadTestScreen(): React.JSX.Element {
+export function LoadTestScreen({
+  maker = null,
+}: {
+  /** The maker that passed the installation gate, or null: the card is then not installed. */
+  maker?: InstallMaker | null;
+}): React.JSX.Element {
   const t = useTheme();
   const styles = local(t);
   const [running, setRunning] = useState<Action | null>(null);
@@ -79,6 +95,10 @@ export function LoadTestScreen(): React.JSX.Element {
       if (!benchActionAllowed(action) || running || stopped) {
         return;
       }
+      if (action === 'cashu' && !maker) {
+        setStatus(NO_MAKER);
+        return;
+      }
       setRunning(action);
       setReadout(null);
       setStatus(HOLD);
@@ -94,7 +114,7 @@ export function LoadTestScreen(): React.JSX.Element {
       };
       try {
         const {value, stamps, meta} = await withCard(HOLD, tx =>
-          runAction(action, tx, replace, onEvent),
+          runAction(action, tx, replace, onEvent, maker),
         );
         const last = value[value.length - 1];
         if (locksOut(last)) {
@@ -123,7 +143,7 @@ export function LoadTestScreen(): React.JSX.Element {
         setRunning(null);
       }
     },
-    [running, stopped, replace],
+    [running, stopped, replace, maker],
   );
 
   const idle = BENCH_RUNS_ENABLED && running === null && !stopped;

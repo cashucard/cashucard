@@ -100,4 +100,42 @@ export const SETTINGS = {
   signOutSub: 'Signs out without deleting saved batches or resets.',
 };
 
+/** The card maker setting (D239). */
+export const MAKER_SETTING = {
+  title: 'Card maker',
+  what: 'The card maker is whoever makes these cards and gives them out.',
+  tagWhat:
+    'The tag address is the web address a phone opens when it taps one of your cards.',
+  published:
+    'The card maker publishes this address. Anyone who taps a card can see it, and it is the same on every card you install.',
+  scope:
+    'Saved on this phone for this ops service. A card keeps the address it was installed with.',
+  name: 'Maker name',
+  namePlaceholder: 'Your name or company',
+  address: 'Tag address',
+  addressPlaceholder: 'https://',
+  save: 'SAVE CARD MAKER',
+  saving: 'SAVING…',
+  saved: 'Saved. New cards are installed with this tag address.',
+  set: 'SET CARD MAKER',
+  notSet: 'Not set',
+  fromFile:
+    'Filled in from the maker file in this build. No card is installed until you save it on this phone.',
+  batchNote:
+    'Every card in this batch is installed with this tag address. To change it, open Settings.',
+  openBatchNote:
+    'Every card in this batch is installed with this tag address. To change it, close this batch first.',
+  batchLocked:
+    'Close the open batch before you change the tag address. Every card in a batch gets the same tag address.',
+  changeTitle: 'Change the card maker?',
+  changeNote:
+    'Cards you already installed keep their tag address. Cards you install from now on get the new one.',
+  change: 'CHANGE CARD MAKER',
+  keep: 'KEEP CURRENT MAKER',
+};
+
 export const PHYSICAL_READ_BANNER = 'PHYSICAL CARD — read-only';
+
+/** What the install step says when the saved maker's tag address is not the open batch's (D239). */
+export const batchMakerDiffers = (batch: {name: string; tagAddress: string}) =>
+  `This batch was opened with another tag address: ${batch.tagAddress} (${batch.name}). No card is installed. Close this batch, or set the card maker back to that address in Settings.`;
