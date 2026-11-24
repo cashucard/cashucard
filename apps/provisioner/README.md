@@ -191,8 +191,20 @@ cancellation during key prefetch prevents NFC from opening later.
 
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
-chip has installed and the operator approved. The tracked 3.1 load file (42,741 bytes,
-sha256 `b2afa9a8…`, D236) is not on it yet, so a build from this tree installs no card.
+chip has installed and the operator approved, and only when its maker file is a maker's
+own (`makerGiven`). The tracked 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
+as `firmware-v3.1.0`, is on it since the owner's approval of 2026-11-24 for Setup build 16
+(ENG-870). The evidence is the desktop tools' runs of 2026-11-23: that exact file (by sha256)
+was installed and paid from at a test mint on card 58206920, with GlobalPlatformPro,
+`tools/cardctl` and a payment harness, per
+[the hardware report](../../docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md).
+The same day cards 36813121 and 09334220 took it, counted by the owner on the contributor's
+statement and logs, which do not give the file's sha256 (D238; see
+[the release notes](../../docs/RELEASE-NOTES.md)). This app's own install
+path has not yet run on a 3.1 card on a chip. The operator's own install of a card with this
+app is the check before the build 16 tag. The shared repository's maker file is the example,
+so a build from this tree, as it stands, still installs no card: the build carries a maker's
+own `maker/maker.json` ([`maker/README.md`](../../maker/README.md)).
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
 The J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, installed the tracked
@@ -207,10 +219,10 @@ a J3R180 keyed for SCP02 while they were numbered 2.3, answering `02 03`: the fi
 (35,466 bytes, `48b8597c…`) on 2026-11-13, and the file with D200 to D204
 (36,953 bytes, `f216644a…`) on 2026-11-14; `tools/refcheck.py` keeps their sizes and
 hashes. The 3.0 file is that source renumbered (D205) with D206 to D210 added; 3.0 is not released, and 3.1 is the
-first released card version (D237). The 3.1 file goes on `VALIDATED_LOAD_FILE_SHA256S` after its
+first released card version (D237). A later load file goes on `VALIDATED_LOAD_FILE_SHA256S` after its
 own chip run, once the operator approves it, with the run's hardware report, in a
 change that also updates
-`__tests__/releaseGates.test.ts`. Both batch creation
+`__tests__/releaseGates.test.ts`, as the 3.1 file did. Both batch creation
 and programming enforce the gate; software-only record recovery and explicit
 disposition remain usable. Reauthentication, foregrounding and a 30-second timer
 retry only frozen records, without keys or NFC. Summaries report acknowledged

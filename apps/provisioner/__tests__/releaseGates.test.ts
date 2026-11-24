@@ -25,12 +25,23 @@ test('installation follows the load file this build carries, never a bare switch
   expect(loadFileValidated('')).toBe(false);
 });
 
-test('the 3.1 load file is not validated until the operator approves it', () => {
-  // 42,741 bytes, 3.1 with D236's review fixes, on tools/refcheck.py's PROVEN since its chip run of 2026-11-23 on the
-  // J3R310-355 sample card 58206920 (the files before it, 9ed12359... and 99a66ba7..., are on PROVEN too). Its sha256
-  // goes on the list only with the operator's approval, in a change of its own.
+test('the released 3.1 load file is validated, with the owner approval of 2026-11-24', () => {
+  // 42,741 bytes, 3.1 with D236's review fixes, released as firmware-v3.1.0. Installed and paid from at a test mint on
+  // three chips on 2026-11-23 with GlobalPlatformPro and tools/cardctl, not this app; two of the runs are counted on the
+  // contributor's logs (D238). The owner approved it for build 16 (ENG-870). The files before it (9ed12359...,
+  // 99a66ba7..., d69742d0...) are on refcheck's PROVEN but were never approved here, and stay off the list.
   expect(CASHU_LOAD_FILE.size).toBe(42741);
-  expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(false);
+  expect(CASHU_LOAD_FILE.sha256).toBe(
+    'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
+  );
+  expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(true);
+  expect(VALIDATED_LOAD_FILE_SHA256S).toEqual([
+    'fe7d8ac31be1284f8a9a6d031cdee9b4690f8d02e0a9ab1fa3bac645f6bc13ee',
+    '28ddfb9d47af16e565f565149a91fddfa7af94ca4bed0ef686e7a6c2fe0285d3',
+    'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
+  ]);
+  // installation still wants a maker's own file: this repository's example keeps it off
+  expect(CARD_INSTALLATION_VALIDATED).toBe(!MAKER.example);
   expect(CARD_INSTALLATION_VALIDATED).toBe(false);
   // the 2.2 load file the chip took on 2026-11-06 stays validated
   expect(
@@ -49,7 +60,7 @@ test('the bench installs the Cashu card only where this build may install its lo
   for (const action of ['hello', 'cashu', 'rotate'] as const) {
     expect(benchActionAllowed(action, false, true)).toBe(false);
   }
-  // this build: the bench is off, and the 3.0 load file is not validated
+  // this build: the bench is off, and the example maker file keeps installation off
   expect(benchActionAllowed('cashu')).toBe(
     BENCH_RUNS_ENABLED && CARD_INSTALLATION_VALIDATED,
   );

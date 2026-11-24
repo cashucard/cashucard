@@ -18,6 +18,13 @@ export const VALIDATED_LOAD_FILE_SHA256S: readonly string[] = [
   'fe7d8ac31be1284f8a9a6d031cdee9b4690f8d02e0a9ab1fa3bac645f6bc13ee',
   // 2.2, 21,631 bytes: installed 2026-11-06 (ENG-823)
   '28ddfb9d47af16e565f565149a91fddfa7af94ca4bed0ef686e7a6c2fe0285d3',
+  // 3.1, 42,741 bytes, released as firmware-v3.1.0 (CAP sha256 4ff8d8a2...): approved by the owner on 2026-11-24
+  // for Setup build 16 (ENG-870). On 2026-11-23 that exact file (by sha256) was installed and paid from at a test
+  // mint on card 58206920 with desktop tools (GlobalPlatformPro, tools/cardctl and a payment harness), per
+  // docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md. The same day cards 36813121 and 09334220
+  // took it, counted by the owner on the contributor's statement and logs, which do not give the file's sha256
+  // (D238). This app's own install path has not yet run on a 3.1 card on a chip.
+  'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
 ];
 
 /** Whether `sha256` (hex, either case) is on VALIDATED_LOAD_FILE_SHA256S. */
