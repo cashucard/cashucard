@@ -124,7 +124,7 @@ async function main() {
       source: "window.__csp=[];document.addEventListener('securitypolicyviolation',e=>__csp.push(e.violatedDirective+' '+e.blockedURI))",
     });
     // the host must answer byte ranges (Safari plays the film only then) and apply dist/_headers
-    const media = await fetch(origin + "/film/cashu-card-film-3.mp4", { headers: { Range: "bytes=0-1" } });
+    const media = await fetch(origin + "/film/cashu-card-film-4.mp4", { headers: { Range: "bytes=0-1" } });
     assert.equal(media.status, 206, "Host answers byte-range requests for the film");
     await media.arrayBuffer();
     const home = await fetch(origin + "/");
@@ -163,12 +163,10 @@ async function main() {
     assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes('cashucard/cashucard'))"), "Linked source cashucard/cashucard");
     // the home page links no Flash or Foxy app, by repository or by site; the install guide's footer links their sites (D117, D118)
     assert.equal(await evaluate("[...document.querySelectorAll('a')].filter(a=>/lnflash\\/flash-mobile|getfoxy\\/iOS|lnflash\\/flash-pos|getflash\\.io|getfoxy\\.io/.test(a.href)).length"), 0, "The home page links no Flash, Flash POS or Foxy app");
-    // where to buy cards: two shops for blank cards, then custom printed cards whose checkout waits for launch
-    assert.equal(await evaluate("document.querySelectorAll('#buy .buy-option').length"), 3, "Three ways to get cards");
+    // where to buy cards: two shops for blank cards
+    assert.equal(await evaluate("document.querySelectorAll('#buy .buy-option').length"), 2, "Two ways to get cards");
     assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.amazon.com/dp/\"]')"), "Cards for testing link to an Amazon listing");
     assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.cardlogix.com/\"]')"), "Cards in bulk link to CardLogix");
-    assert.equal(await evaluate("document.querySelectorAll('#buy input[name=\"buy-qty\"]').length"), 4, "Custom cards come in four quantities");
-    assert.equal(await evaluate("[...document.querySelectorAll('#buy .pay')].map(b=>b.getAttribute('aria-disabled')).join()"), "true,true", "Lightning and Stripe checkouts wait for launch");
     // installing the applet: the provisioner's two betas, then the install guide
     assert.equal(await evaluate("document.querySelectorAll('#install .buy-option').length"), 2, "Two ways to install the applet");
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://testflight.apple.com/join/M3JucFNy\"]')"), "The provisioner links its TestFlight beta");
