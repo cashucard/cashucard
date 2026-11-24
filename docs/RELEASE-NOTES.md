@@ -5,7 +5,7 @@ One entry per component release, newest first, as
 in the reviewed pull request, and the tag follows the merge. A GitHub release lists
 the merged pull requests besides.
 
-## `firmware-v3.1.0`: Cashu Card protocol 3.1 (not yet tagged)
+## `firmware-v3.1.0`: Cashu Card protocol 3.1 (released 2026-11-24)
 
 The first released card version of the 3.x line. 3.0, below, is never released: it is a development step, as 2.3 was,
 and no `firmware-v3.0.0` tag will be cut ([D237](DECISIONS.md#d237)).
