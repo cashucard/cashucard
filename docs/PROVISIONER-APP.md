@@ -78,6 +78,12 @@ a card count. The count supports minus/plus buttons and replacement by typing;
 the installation batch range is 1 to 500. Invalid input shows the allowed
 range and prevents submission.
 
+Before the first batch the app asks for the card maker: the maker's name and its tag
+address, the web address a phone opens when it taps one of the maker's cards
+([D239](DECISIONS.md#d239)). Until both are saved the form is locked, no batch is created
+and no card is installed. The form and the review then show the maker's name and the tag
+address, with the note that every card in the batch is installed with that address.
+
 Cards → New batch opens the editable review. Start & Read First Card creates
 the shown batch and starts its first card run. Create Batch Only saves it for
 later. Either action takes two presses from Cards with the displayed defaults.
@@ -115,7 +121,8 @@ See [D124](DECISIONS.md#d124).
 ## Card installation
 
 Start & Read First Card starts the first session after batch confirmation.
-Install Next Card starts later sessions. The operator holds one card
+Install Next Card starts later sessions; the maker's name and the tag address are shown
+beside it, and the install gives the card's tag exactly that address. The operator holds one card
 still until the run ends. On iOS, the native NFC sheet displays the current
 phase; the screen behind it shows the same workflow progress.
 
@@ -183,6 +190,13 @@ installation creates a new spending key, followed by holder-wallet setup.
 Settings provides provisioning scope and its explanation, identity diagnostics,
 version, pinned load-file identity and the public ops dashboard URL. Signing out preserves work and asks for confirmation when
 durable work exists.
+
+Card maker opens the maker's name and tag address for the current ops service. The screen
+says what the tag address is and that the card maker publishes it. There is no default and
+no list; the example maker and example addresses are refused, with the same address rules
+as the card. Changing a saved maker takes a second step and is refused while a batch is
+open: cards already installed keep their address. A service saved by an earlier build has
+no maker until one is set here. A fork's own `maker/maker.json` pre-fills the setting.
 
 Change Ops Service signs out before opening the service selector and confirms
 when saved work exists. Each service uses its own operator accounts and records.

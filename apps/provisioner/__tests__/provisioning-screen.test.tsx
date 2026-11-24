@@ -1,3 +1,9 @@
+import {makerStorageWith, TEST_MAKER} from '../test-support/maker';
+import {MakerScreen} from '../src/screens/MakerScreen';
+import {SettingsScreen} from '../src/screens/SettingsScreen';
+import {encodeSavedMaker} from '../src/maker';
+import {GATE_WORDS} from '../src/releaseGates';
+import {MAKER_SETTING} from '../src/strings';
 import React from 'react';
 import {ScrollView, Share} from 'react-native';
 import {publicFailureContext, recoveryDetails} from '../src/recoveryExport';
@@ -142,7 +148,7 @@ test('distributed defaults allow authenticated installation without laboratory c
   const runCard = jest.fn(async () => 'interrupted' as const);
   // the build's own gate follows the load file it carries (releaseGates.ts, and releaseGates.test.ts for its value); this test is of
   // the flow once that file is validated: authenticated installation with no laboratory control
-  await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
+  await mount({...f, hardwareValidated: true, makerStorage: makerStorageWith(), runCard, serviceFor: () => f.service});
   await signIn();
   await act(async () => {
     expect(await flow.create(config)).toBe(true);
@@ -168,7 +174,7 @@ test("every reserved tap asks for replaceSellerTag, so a J3R452's seller tag is 
     tapOptions = options;
     return 'interrupted';
   };
-  await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
+  await mount({...f, hardwareValidated: true, makerStorage: makerStorageWith(), runCard, serviceFor: () => f.service});
   await signIn();
   await act(async () => {
     expect(await flow.create(config)).toBe(true);
@@ -216,7 +222,7 @@ test.each([
       };
     const tree = await mount({
       ...f,
-      hardwareValidated: true,
+      hardwareValidated: true, makerStorage: makerStorageWith(),
       serviceFor: () => f.service,
       runCard,
     });
@@ -272,7 +278,7 @@ test.each(['before', 'after'] as const)(
     };
     const tree = await mount({
       ...f,
-      hardwareValidated: true,
+      hardwareValidated: true, makerStorage: makerStorageWith(),
       serviceFor: () => f.service,
       runCard,
     });
@@ -358,7 +364,7 @@ test.each([
     };
     const tree = await mount({
       ...f,
-      hardwareValidated: true,
+      hardwareValidated: true, makerStorage: makerStorageWith(),
       serviceFor: () => f.service,
       runCard,
       withCard,
@@ -400,7 +406,7 @@ test('unfinished batch requires confirmation to end and retains server closure',
   const f = fixture();
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
   });
   await signIn();
@@ -424,7 +430,7 @@ test('sync saved work explains its service action and confirms a successful chec
   const f = fixture();
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
   });
   await signIn();
@@ -451,7 +457,7 @@ test('acknowledged stop remains identifiable with its reason in batch history', 
   );
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
     runCard: async (w, service) => {
       await w.withAttempt(service, async j => {
@@ -497,7 +503,7 @@ test('unreadable saved work blocks new requests; reload recovers without clearin
     .mockRejectedValueOnce(new Error('disk'));
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
   });
   await signIn();
@@ -518,7 +524,7 @@ test('restart retains the pending reservation; a different operator cannot repla
   const f = fixture();
   let tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
   });
   await signIn();
@@ -536,7 +542,7 @@ test('restart retains the pending reservation; a different operator cannot repla
   tree = await mount({
     ...f,
     storage: {...f.storage},
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
   });
   await signIn(8);
@@ -577,7 +583,7 @@ test('cancellation during key prefetch prevents a later native session from armi
   const cancelCard = jest.fn(async () => {});
   await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
     runCard,
     withCard,
@@ -611,7 +617,7 @@ test('cancel tap stays outside scrolling history while a card session is armed',
   });
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
     runCard: async () => {
       await pending;
@@ -654,7 +660,7 @@ test('sign-out while keys are pending cannot arm NFC under the old session', asy
   };
   await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
     runCard,
     withCard,
@@ -735,7 +741,7 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     const intervals = jest.spyOn(globalThis, 'setInterval');
     const tree = await mount({
       ...f,
-      hardwareValidated: true,
+      hardwareValidated: true, makerStorage: makerStorageWith(),
       serviceFor: () => f.service,
       withCard,
     });
@@ -755,7 +761,7 @@ test('the real screen installs and rotates, then a restart retries its frozen re
     await act(async () => {flow.cancel();});
     await act(async () => {
       for (const [callback, delay] of intervals.mock.calls) {
-        if (delay === 30_000 && typeof callback === 'function') callback();
+        if (delay === 30_000 && typeof callback === 'function') {callback();}
       }
     });
     intervals.mockRestore();
@@ -849,7 +855,7 @@ test('sign-out cancels an armed session and blocks its next command', async () =
     });
   await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
     runCard,
     withCard: run => run(tx),
@@ -882,7 +888,7 @@ test('real installation setup exposes no holder controls and submits inert legac
   const f = fixture();
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
   });
   await signIn();
@@ -965,7 +971,7 @@ test('real card artwork follows observed LOAD blocks and retains partial state a
     return 'interrupted';
   };
   const tree = await mount({
-    ...f, hardwareValidated: true, serviceFor: () => f.service, runCard,
+    ...f, hardwareValidated: true, makerStorage: makerStorageWith(), serviceFor: () => f.service, runCard,
   });
   await signIn();
   await act(async () => { await flow.create(config); });
@@ -990,7 +996,7 @@ test('validation pauses keep the operation busy; sign-out releases the waiter an
   };
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     recoveryDrillsEnabled: true,
     serviceFor: () => f.service,
     runCard,
@@ -1068,7 +1074,7 @@ test('an installed card closes the read session and directs the operator to rese
   };
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
     runCard,
     withCard: run => run(async () => [0x90, 0]),
@@ -1108,7 +1114,7 @@ test('native pause messages report saved state only inside an active card sessio
     return 'interrupted';
   };
   const options: ProvisioningProviderOptions & {cardMessage: typeof cardMessage} = {
-    ...f, hardwareValidated: true, recoveryDrillsEnabled: true,
+    ...f, hardwareValidated: true, makerStorage: makerStorageWith(), recoveryDrillsEnabled: true,
     serviceFor: () => f.service, runCard, cardMessage,
     withCard: run => run(async () => [0x90, 0]),
   };
@@ -1146,7 +1152,7 @@ test.each([
     return 'interrupted';
   };
   const tree = await mount({
-    ...f, hardwareValidated: true, serviceFor: () => f.service, runCard,
+    ...f, hardwareValidated: true, makerStorage: makerStorageWith(), serviceFor: () => f.service, runCard,
   });
   await signIn();
   await act(async () => { await flow.create(config); });
@@ -1169,7 +1175,7 @@ test('real mint discovery never substitutes demo endpoints and can retry a faile
     .mockRejectedValueOnce(new Error('offline'))
     .mockResolvedValue(['https://mint.test']);
   const f = fixture();
-  const tree = await mount({...f, hardwareValidated: true, serviceFor: () => f.service});
+  const tree = await mount({...f, hardwareValidated: true, makerStorage: makerStorageWith(), serviceFor: () => f.service});
   expect(tree.root.findAllByProps({testID: 'mint-https://forge.flashapp.me'})).toHaveLength(0);
   await signIn();
   expect(tree.root.findAllByProps({testID: 'mint-https://forge.flashapp.me'})).toHaveLength(0);
@@ -1192,7 +1198,7 @@ test('an explicit recovery export contains public full identities without secret
     return 'quarantined';
   };
   const share = jest.spyOn(Share, 'share').mockResolvedValue({action: Share.sharedAction});
-  const tree = await mount({...f, hardwareValidated: true, serviceFor: () => f.service, runCard});
+  const tree = await mount({...f, hardwareValidated: true, makerStorage: makerStorageWith(), serviceFor: () => f.service, runCard});
   await signIn();
   await act(async () => {await flow.create(config); await flow.program();});
   expect(share).not.toHaveBeenCalled();
@@ -1227,7 +1233,7 @@ test('a reconciliation conflict exports bounded context and names the chip block
   const f = fixture();
   const share = jest.spyOn(Share, 'share').mockResolvedValue({action: Share.sharedAction});
   const tree = await mount({
-    ...f, hardwareValidated: true, serviceFor: () => f.service,
+    ...f, hardwareValidated: true, makerStorage: makerStorageWith(), serviceFor: () => f.service,
     runCard: async () => {throw new ApiServiceError('chip-unresolved', 409, 'bind-card');},
   });
   await signIn();
@@ -1253,7 +1259,7 @@ test('stale independent backup pauses before NFC and retains the reserved attemp
   const withCard = jest.fn();
   const tree = await mount({
     ...f,
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: () => f.service,
     withCard,
   });
@@ -1277,7 +1283,7 @@ test('stale independent backup pauses before NFC and retains the reserved attemp
 test('a canceled operation waiting for the shared queue never arms a later card session', async () => {
   const f = fixture();
   const resetWithCard = jest.fn(async () => {throw new Error('canceled read must not arm');});
-  const options = {...f, hardwareValidated: true, serviceFor: () => f.service, resetWithCard};
+  const options = {...f, hardwareValidated: true, makerStorage: makerStorageWith(), serviceFor: () => f.service, resetWithCard};
   await mount(options);
   await signIn();
   const first = flow;
@@ -1300,7 +1306,7 @@ test('a canceled operation waiting for the shared queue never arms a later card 
 test('one explicit start creates the reviewed batch and reaches the first card run without another tap', async () => {
   const f = fixture();
   const runCard = jest.fn(async () => 'interrupted' as const);
-  const tree = await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
+  const tree = await mount({...f, hardwareValidated: true, makerStorage: makerStorageWith(), runCard, serviceFor: () => f.service});
   await signIn();
   expect(runCard).not.toHaveBeenCalled();
   await act(async () => {await flow.startAndRead({...config, count: 1});});
@@ -1318,7 +1324,7 @@ test('Stop while batch creation is waiting retains its original request and prev
   let finish!: () => void;
   f.service.batch = jest.fn(request => new Promise(resolve => {finish = async () => resolve(await create(request));}));
   const runCard = jest.fn(async () => 'interrupted' as const);
-  const tree = await mount({...f, hardwareValidated: true, runCard, serviceFor: () => f.service});
+  const tree = await mount({...f, hardwareValidated: true, makerStorage: makerStorageWith(), runCard, serviceFor: () => f.service});
   await signIn();
   let running!: Promise<boolean>;
   await act(async () => {running = flow.startAndRead({...config, count: 1});});
@@ -1329,4 +1335,327 @@ test('Stop while batch creation is waiting retains its original request and prev
   expect(JSON.parse(f.bytes()!).batch.request).toEqual(request);
   expect(f.service.reserve).not.toHaveBeenCalled();
   expect(runCard).not.toHaveBeenCalled();
+});
+
+// The card maker setting (D239).
+const FOXY = {name: 'Foxy', tagAddress: 'https://getfoxy.io/card'};
+const FORK_FILE = {
+  example: false,
+  name: 'Island Cards',
+  tagAddress: 'https://cards.islandbitcoin.com/c',
+};
+function MakerProbe() {
+  app = useApp();
+  flow = useProvisioning();
+  return (
+    <>
+      <MakerScreen onBack={() => undefined} />
+      <SettingsScreen
+        onBack={() => undefined}
+        onBench={() => undefined}
+        onMaker={() => undefined}
+        maker={flow.installGate.allowed ? flow.installGate.maker : null}
+      />
+    </>
+  );
+}
+async function mountMaker(options: ProvisioningProviderOptions) {
+  let tree!: Renderer.ReactTestRenderer;
+  await act(async () => {
+    tree = Renderer.create(
+      <AppStore clientOptions={{baseUrl: 'https://ops.test'}}>
+        <ProvisioningProvider options={options}>
+          <MakerProbe />
+        </ProvisioningProvider>
+      </AppStore>,
+    );
+  });
+  trees.push(tree);
+  return tree;
+}
+const byId = (tree: Renderer.ReactTestRenderer, testID: string) =>
+  tree.root.findAll(n => n.props.testID === testID)[0];
+
+test('a profile an earlier build saved has no maker: the app asks for it and installs nothing', async () => {
+  const f = fixture();
+  const runCard = jest.fn(async () => 'interrupted' as const);
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makerStorageWith(null),
+    runCard,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  expect(flow.installGate).toMatchObject({allowed: false, reason: 'no-maker'});
+  expect(flow.makerSaved).toBe(false);
+  expect(text(tree)).toContain(GATE_WORDS.none);
+  await act(async () => {
+    expect(await flow.create(config)).toBe(false);
+    expect(await flow.startAndRead(config)).toBe(false);
+    expect(await flow.program()).toBe(false);
+  });
+  expect(f.service.batch).not.toHaveBeenCalled();
+  expect(f.service.reserve).not.toHaveBeenCalled();
+  expect(runCard).not.toHaveBeenCalled();
+});
+
+test('a batch left open by an earlier build installs no card until the maker is set', async () => {
+  const f = fixture();
+  const runCard = jest.fn(async () => 'interrupted' as const);
+  // the earlier build: its gate was the compiled maker file, and it opened a batch
+  await mount({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makerStorageWith(null),
+    makerFile: FORK_FILE,
+    runCard,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(true);
+  });
+  await act(async () => {
+    trees.forEach(t => t.unmount());
+  });
+  trees = [];
+  // this build, from the shared repository: the batch is there, the maker is not
+  const makers = makerStorageWith(null);
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makers,
+    runCard,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  expect(flow.snapshot?.batch).toBeTruthy();
+  expect(flow.installGate).toMatchObject({allowed: false, reason: 'no-maker'});
+  expect(text(tree)).toContain(GATE_WORDS.none);
+  expect(byId(tree, 'real-program').props.disabled).toBe(true);
+  await act(async () => {
+    expect(await flow.program()).toBe(false);
+  });
+  expect(f.service.reserve).not.toHaveBeenCalled();
+  expect(runCard).not.toHaveBeenCalled();
+  // a first maker may be set with the batch open; then the card is installed
+  await act(async () => {
+    expect(await flow.saveMaker(FOXY.name, FOXY.tagAddress)).toBeNull();
+  });
+  await act(async () => {
+    await flow.program();
+  });
+  expect(runCard).toHaveBeenCalledTimes(1);
+});
+
+test('the saved maker opens the gate, the batch screen shows it, and the tap installs with exactly that address', async () => {
+  const f = fixture();
+  const makers = makerStorageWith(null);
+  let tapOptions:
+    | Parameters<NonNullable<ProvisioningProviderOptions['runCard']>>[2]
+    | undefined;
+  const runCard: NonNullable<ProvisioningProviderOptions['runCard']> = async (
+    _w,
+    _service,
+    options,
+  ) => {
+    tapOptions = options;
+    return 'interrupted';
+  };
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makers,
+    runCard,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  // refused values change nothing
+  for (const [name, address] of [
+    ['Foxy', 'https://example.com/card'],
+    ['Foxy', 'http://getfoxy.io/card'],
+    ['Example card maker', FOXY.tagAddress],
+    ['', FOXY.tagAddress],
+  ]) {
+    await act(async () => {
+      expect(await flow.saveMaker(name, address)).toEqual(expect.any(String));
+    });
+  }
+  expect(makers.saved.size).toBe(0);
+  expect(flow.installGate.allowed).toBe(false);
+  await act(async () => {
+    expect(await flow.saveMaker(' Foxy ', ` ${FOXY.tagAddress} `)).toBeNull();
+  });
+  // one maker per ops service, under a cashu.provisioner.* key
+  expect([...makers.saved]).toEqual([
+    ['https://ops.test', encodeSavedMaker(FOXY)],
+  ]);
+  expect(flow.installGate).toMatchObject({
+    allowed: true,
+    source: 'profile',
+    maker: FOXY,
+  });
+  // the batch form shows the maker and the address before any card is installed
+  expect(byId(tree, 'maker-summary-name').props.children).toBe('Foxy');
+  expect(byId(tree, 'maker-summary-address').props.children).toBe(
+    FOXY.tagAddress,
+  );
+  expect(text(tree)).toContain(MAKER_SETTING.batchNote);
+  expect(f.service.batch).not.toHaveBeenCalled();
+  await act(async () => {
+    expect(await flow.create(config)).toBe(true);
+  });
+  // the open batch shows it again beside the install button
+  expect(byId(tree, 'maker-summary-address').props.children).toBe(
+    FOXY.tagAddress,
+  );
+  // with a batch open the maker is not changed in passing
+  await act(async () => {
+    expect(
+      await flow.saveMaker('Foxy', 'https://getfoxy.io/other'),
+    ).toMatch(/Close the open batch/);
+  });
+  expect(makers.saved.get('https://ops.test')).toBe(encodeSavedMaker(FOXY));
+  await act(async () => {
+    await flow.program();
+  });
+  expect(tapOptions?.maker).toEqual(FOXY);
+  expect(tapOptions?.maker).toBe(
+    flow.installGate.allowed ? flow.installGate.maker : null,
+  );
+});
+
+test("a fork's maker file pre-fills the setting; an unreadable setting installs nothing even then", async () => {
+  const f = fixture();
+  await mount({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makerStorageWith(null),
+    makerFile: FORK_FILE,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  expect(flow.installGate).toMatchObject({
+    allowed: true,
+    source: 'file',
+    maker: {name: FORK_FILE.name, tagAddress: FORK_FILE.tagAddress},
+  });
+  expect(flow.makerSaved).toBe(false);
+  await act(async () => {
+    trees.forEach(t => t.unmount());
+  });
+  trees = [];
+  for (const read of [
+    async () => '{"schema":1,"name":"Foxy"}',
+    async () => {
+      throw new Error('disk unavailable');
+    },
+  ]) {
+    const g = fixture();
+    const runCard = jest.fn(async () => 'interrupted' as const);
+    const tree = await mount({
+      ...g,
+      hardwareValidated: true,
+      makerStorage: {read, write: async () => undefined},
+      makerFile: FORK_FILE,
+      runCard,
+      serviceFor: () => g.service,
+    });
+    await signIn();
+    expect(flow.installGate).toMatchObject({
+      allowed: false,
+      reason: 'maker-unread',
+    });
+    expect(text(tree)).toContain(GATE_WORDS.unread);
+    await act(async () => {
+      expect(await flow.create(config)).toBe(false);
+    });
+    expect(g.service.batch).not.toHaveBeenCalled();
+  }
+});
+
+test('the build half of the gate still closes installation with a maker saved', async () => {
+  const f = fixture();
+  const tree = await mount({
+    ...f,
+    hardwareValidated: false,
+    makerStorage: makerStorageWith(),
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  expect(flow.installGate).toMatchObject({allowed: false, reason: 'load-file'});
+  expect(text(tree)).toContain(GATE_WORDS.loadFile);
+  expect(tree.root.findAll(n => n.props.testID === 'open-maker')).toEqual([]);
+  await act(async () => {
+    expect(await flow.create(config)).toBe(false);
+  });
+});
+
+test('the maker screen explains the tag address, saves a first maker, and changes a saved one only after a second step', async () => {
+  const f = fixture();
+  const makers = makerStorageWith(null);
+  const tree = await mountMaker({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makers,
+    serviceFor: () => f.service,
+  });
+  await signIn();
+  const words = text(tree);
+  for (const line of [
+    MAKER_SETTING.what,
+    MAKER_SETTING.tagWhat,
+    MAKER_SETTING.published,
+    MAKER_SETTING.scope,
+  ]) {
+    expect(words).toContain(line);
+    expect(line).not.toMatch(/—/);
+  }
+  expect(MAKER_SETTING.published).toMatch(/card maker publishes this address/);
+  expect(byId(tree, 'settings-maker-name').props.children).toBe(
+    MAKER_SETTING.notSet,
+  );
+  // nothing is pre-filled from the shared repository's example
+  expect(byId(tree, 'maker-name').props.value).toBe('');
+  expect(byId(tree, 'maker-address').props.value).toBe('');
+  const type = async (name: string, address: string) => {
+    await act(async () => {
+      byId(tree, 'maker-name').props.onChangeText(name);
+      byId(tree, 'maker-address').props.onChangeText(address);
+    });
+  };
+  const press = async (testID: string) => {
+    await act(async () => {
+      await byId(tree, testID).props.onPress();
+    });
+  };
+  await type('Foxy', 'https://example.com/card');
+  await press('maker-save');
+  expect(byId(tree, 'maker-notice').props.children).toMatch(/example address/);
+  expect(makers.saved.size).toBe(0);
+  await type('Foxy', FOXY.tagAddress);
+  await press('maker-save');
+  expect(byId(tree, 'maker-notice').props.children).toBe(MAKER_SETTING.saved);
+  expect(makers.saved.get('https://ops.test')).toBe(encodeSavedMaker(FOXY));
+  expect(byId(tree, 'settings-maker-name').props.children).toBe('Foxy');
+  expect(byId(tree, 'settings-maker-address').props.children).toContain(
+    FOXY.tagAddress,
+  );
+  // a change is reviewed first, and can be dropped
+  await type('Foxy', 'https://getfoxy.io/new');
+  await press('maker-save');
+  expect(makers.saved.get('https://ops.test')).toBe(encodeSavedMaker(FOXY));
+  expect(text(tree)).toContain(MAKER_SETTING.changeNote);
+  expect(byId(tree, 'maker-review-address').props.children).toBe(
+    'https://getfoxy.io/new',
+  );
+  await press('maker-keep');
+  expect(makers.saved.get('https://ops.test')).toBe(encodeSavedMaker(FOXY));
+  await press('maker-save');
+  await press('maker-confirm');
+  expect(makers.saved.get('https://ops.test')).toBe(
+    encodeSavedMaker({name: 'Foxy', tagAddress: 'https://getfoxy.io/new'}),
+  );
+  expect(TEST_MAKER.tagAddress).not.toBe(FOXY.tagAddress);
 });

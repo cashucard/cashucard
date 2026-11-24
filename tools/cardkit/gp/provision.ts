@@ -38,6 +38,7 @@ import {
   OPENER_AID,
   TAG_AID,
   TAG_CLASS_AID,
+  CARD_VERSIONS,
   supportedCardVersion,
 } from './aids';
 import {changeOwedByte, readChangeOwed} from './change-owed';
@@ -629,7 +630,7 @@ export async function provision(
       expectOk(selected, 0xa4);
       if (!supportedCardVersion(selected.data)) {
         throw new Guard(
-          `${toHex(guard)} answers ${toHex(selected.data)} ${swHex(selected.sw)}, not a card applet version this kit knows (2.1, 2.2 or 3.0): the app will not remove it`,
+          `${toHex(guard)} answers ${toHex(selected.data)} ${swHex(selected.sw)}, not a card applet version this kit knows (${CARD_VERSIONS.map(([major, minor]) => `${major}.${minor}`).join(', ')}): the app will not remove it`,
         );
       }
       const info = expectOk(await run.plain(GET_INFO), 0x01);

@@ -103,6 +103,8 @@ the correct card-manager keys and a manager state that permits loading.
 What is a maker's own (its name, the address the card's NFC tag carries, its
 security domain, its design codes) is in one file, [`maker/maker.json`](../maker/README.md),
 never in the load file, which is the same for every maker ([D227](DECISIONS.md#d227)).
+The phone set-up app takes the maker's name and tag address in its settings instead
+([D239](DECISIONS.md#d239)).
 
 **Install parameters**: the bytes an `INSTALL` hands an applet's `install` method
 (GlobalPlatform's `C9`). The NFC tag's are its address; the opener's and the card

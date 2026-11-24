@@ -1,3 +1,4 @@
+import {CLOSED_GATE} from '../test-support/maker';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import {BackHandler} from 'react-native';
@@ -22,6 +23,7 @@ test('saved reset has an explicit exit to Settings without running or deleting i
     status: 'ready',
     scopeMatches: true,
     busy: false,
+    installGate: CLOSED_GATE,
     cancel: jest.fn(),
     cardActive: false,
     snapshot: {batch: null},

@@ -1,7 +1,8 @@
 /** The screen's words for each way a run can end. */
 import {NfcError} from 'react-native-nfc-manager';
 
-import {CARD_AID, CASHU_PLAN, provision, toHex} from '../src/cardkit';
+import {CARD_AID, provision, toHex} from '../src/cardkit';
+import {CASHU_PLAN} from '../test-support/maker';
 import {
   HOLD,
   describeResult,

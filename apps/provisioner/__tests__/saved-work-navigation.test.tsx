@@ -1,3 +1,4 @@
+import {CLOSED_GATE, OPEN_GATE} from '../test-support/maker';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import App from '../App';
@@ -19,7 +20,7 @@ function flow(active = false, foreign = false) {
     status: 'ready',
     scopeMatches: !foreign,
     busy: false,
-    hardwareValidated: true,
+    hardwareValidated: true, installGate: OPEN_GATE,
     snapshot: {
       device_id: 'device',
       batch: {
@@ -253,7 +254,7 @@ test.each(['busy', 'foreign', 'loading', 'blocked'] as const)(
 );
 
 test('installation-disabled builds still allow card checks and reset, which loads nothing', async () => {
-  const state = {...idle(), hardwareValidated: false};
+  const state = {...idle(), hardwareValidated: false, installGate: CLOSED_GATE};
   jest.mocked(useProvisioning).mockReturnValue(state);
   const tree = await signedIn();
   expect(tree.root.findByProps({testID: 'home-new'}).props.disabled).toBe(true);

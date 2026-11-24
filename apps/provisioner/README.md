@@ -22,8 +22,8 @@ SDK edits. See the [architecture](../../docs/ARCHITECTURE.md) and
 The original ENG-738 spare-card bench is retained for approved laboratory Debug
 builds only. `BENCH_RUNS_ENABLED` defaults to false: Settings hides it, navigation
 rejects entry and its handlers cannot open NFC. Even with the bench on, its
-Cashu card install also needs `CARD_INSTALLATION_VALIDATED` (the build's load
-file one a chip has installed), so the bench never installs a load file no chip
+Cashu card install also needs `LOAD_FILE_VALIDATED` (the build's load
+file one a chip has installed) and a card maker that passed the installation gate, so the bench never installs a load file no chip
 has taken; the chip run that validates a new one is made with gp and cardctl.
 Native Release builds require that flag and recovery drills to remain disabled. Do not enable bench writes to
 bypass the production coordinator or its stopped-card evidence.
@@ -41,12 +41,12 @@ workflow. The decision behind the GlobalPlatform implementation is
 - **Install Cashu card.** The three-step install of
   [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 42,741-byte
   load file in 174 blocks, the opener, the card's applet, then the tag under
-  `D2760000850101` with the card maker's address (`tagAddress` in
-  [`maker/maker.json`](../../maker/README.md), read at build time by `src/maker.ts`).
+  `D2760000850101` with the card maker's address (the card maker setting, which
+  must have passed the installation gate, [D239](../../docs/DECISIONS.md#d239)).
   Then it checks the card's applet answers `03 01`, `GET_INFO` (30 bytes),
   `GET_PUBKEY` (33 bytes), the tag's SELECT, and that the tag's NDEF file is the
-  maker's address with `#new`. A build whose maker file is the shared example
-  (`"example": true`) installs nothing (`makerGiven` in `src/releaseGates.ts`).
+  maker's address with `#new`. With no card maker set, the bench installs no card
+  (`cashuPlanFor` in `src/cardkit.ts` takes only a maker that passed `installGate`).
 - **Rotate keys and back.** The card manager from its factory keys (`40` to `4F`)
   to the spike's public test set (ENC `10` to `1F`, MAC `20` to `2F`, DEK `30` to
   `3F`) and back, each proved by a fresh login.
@@ -191,8 +191,8 @@ cancellation during key prefetch prevents NFC from opening later.
 
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
-chip has installed and the operator approved, and only when its maker file is a maker's
-own (`makerGiven`). The tracked 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
+chip has installed and the operator approved (`LOAD_FILE_VALIDATED`, fixed when the app is
+built), and only when a card maker's own name and tag address are set (below). The tracked 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
 as `firmware-v3.1.0`, is on it since the owner's approval of 2026-11-24 for Setup build 16
 (ENG-870). The evidence is the desktop tools' runs of 2026-11-23: that exact file (by sha256)
 was installed and paid from at a test mint on card 58206920, with GlobalPlatformPro,
@@ -202,9 +202,25 @@ The same day cards 36813121 and 09334220 took it, counted by the owner on the co
 statement and logs, which do not give the file's sha256 (D238; see
 [the release notes](../../docs/RELEASE-NOTES.md)). This app's own install
 path has not yet run on a 3.1 card on a chip. The operator's own install of a card with this
-app is the check before the build 16 tag. The shared repository's maker file is the example,
-so a build from this tree, as it stands, still installs no card: the build carries a maker's
-own `maker/maker.json` ([`maker/README.md`](../../maker/README.md)).
+app is the check before the build 16 tag.
+
+**The card maker.** The build carries no maker ([D239](../../docs/DECISIONS.md#d239)). The
+person making cards sets the maker's name and tag address in the app (Settings, Card maker),
+once for each ops service; the tag address is the web address a phone opens when it taps a
+card, and the maker publishes it. There is no default and no list. `installGate` in
+`src/releaseGates.ts` is the whole gate, one pure function: the build's half above, and a
+name and an address that pass the rules (`src/maker.ts`: cardkit's `tagAddressProblem`, the
+name rule of `maker/maker.schema.json`, and a refusal of the example maker and of example
+addresses). Until then the app installs nothing and asks for the maker; a service saved by
+an earlier build has none. A fork's own [`maker/maker.json`](../../maker/README.md)
+pre-fills the setting, and the shared repository's example pre-fills nothing. The batch
+screen shows the name and the address before any card is installed, and the install uses
+exactly that address: the card plan is built only by `cashuPlanFor`, from a maker that
+passed the gate, in the install tap (`src/provisioningTap.ts`) and on the bench screen, the
+only two callers of `provision`. A saved maker changes only in Settings, with a second
+step, and not while a batch is open. The setting is kept on the phone
+(`cashu.provisioner.maker.v1:` and the service's origin); it is not sent to the ops service
+and is in no record or export.
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
 The J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, installed the tracked

@@ -1,3 +1,4 @@
+import {makerStorageWith} from '../test-support/maker';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import {AppStore, useApp} from '../src/store';
@@ -28,7 +29,7 @@ test('an old account’s late batch reply is retained only in its own workspace 
   const options = {
     workspaces,
     uuid: () => uuid(++ids),
-    hardwareValidated: true,
+    hardwareValidated: true, makerStorage: makerStorageWith(),
     serviceFor: (session: {operator_id: number}) => {
       const scope = {
         service_origin: 'https://ops.test',
@@ -144,7 +145,7 @@ test('switching services with the same operator number restores only that servic
   let profile: string | null = null;
   let tree!: Renderer.ReactTestRenderer;
   await act(async () => {tree = Renderer.create(<AppStore clientOptions={{baseUrl: 'https://ops.test'}} serviceStorage={{read: async () => profile, write: async v => {profile = v;}}}>
-    <ProvisioningProvider options={{workspaces, hardwareValidated: true, uuid: () => uuid(++ids),
+    <ProvisioningProvider options={{workspaces, hardwareValidated: true, makerStorage: makerStorageWith(), uuid: () => uuid(++ids),
       serviceFor: (session, origin) => {
         let service = services.get(origin);
         if (!service) {

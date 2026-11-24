@@ -22,7 +22,8 @@ import {
 } from 'react-native';
 
 import {ApiClient, type MintInfo, type MintProbeResult} from '../api';
-import {SETUP} from '../strings';
+import {MAKER_SETTING, SETUP} from '../strings';
+import {MakerSummary} from './MakerScreen';
 import {useApp, type BatchConfig} from '../store';
 import {readBatchDefaults} from '../batchDefaults';
 import {FONT, useTheme, type Theme} from '../theme';
@@ -218,6 +219,7 @@ export function BatchSetupScreen({
   installationOnly = false,
   loadSha256,
   lead,
+  maker,
 }: {
   onStart: () => void;
   onSettings: () => void;
@@ -230,6 +232,8 @@ export function BatchSetupScreen({
   loadSha256?: string;
   /** Shown first inside the form's scroll, within the screen's safe area. */
   lead?: React.ReactNode;
+  /** The maker and tag address this batch's cards are installed with (the gate's). */
+  maker?: {name: string; tagAddress: string};
 }) {
   const app = useApp();
   const t = useTheme();
@@ -503,6 +507,9 @@ export function BatchSetupScreen({
             <Text style={s.buildLine}>
               Creating this batch assigns manager keys for {review.count} cards.
             </Text>
+            {maker ? (
+              <MakerSummary maker={maker} note={MAKER_SETTING.batchNote} />
+            ) : null}
           </View>
           <View style={s.footer}>
             <PrimaryButton
@@ -570,6 +577,9 @@ export function BatchSetupScreen({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag">
             {lead}
+            {maker ? (
+              <MakerSummary maker={maker} note={MAKER_SETTING.batchNote} />
+            ) : null}
             {previousMintMissing ? (
               <Text style={s.note}>
                 Choose a mint reference. Your previous choice is no longer

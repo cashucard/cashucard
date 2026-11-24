@@ -1,3 +1,4 @@
+import {makerStorageWith} from '../test-support/maker';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import {ApiClient} from '../src/api';
@@ -62,7 +63,7 @@ test('Home Stop cancels the owned wait and retains a pending batch closure for r
             storage,
             resetStorage: {read: async () => null, replace: async () => {}},
             uuid,
-            hardwareValidated: true,
+            hardwareValidated: true, makerStorage: makerStorageWith(),
             serviceFor: () => service,
           }}>
           <Probe />

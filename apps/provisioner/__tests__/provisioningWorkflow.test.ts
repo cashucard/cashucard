@@ -1,3 +1,4 @@
+import {gatedMaker} from '../test-support/maker';
 import {
   ProvisioningWorkflow,
   type ReservationService,
@@ -477,6 +478,7 @@ test('completion retry uses the frozen record without keys or NFC whether its fi
     expect(
       await runReservedAttempt(w, service, {
         withCard,
+        maker: gatedMaker(),
         random: () => [],
         now: () => 0,
         verifiedAt: () => 999,

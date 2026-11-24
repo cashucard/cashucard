@@ -10,7 +10,7 @@
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 
-import {SETTINGS} from '../strings';
+import {MAKER_SETTING, SETTINGS} from '../strings';
 import appInfo from '../../package.json';
 import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {useApp} from '../store';
@@ -93,6 +93,8 @@ export function SettingsScreen({
   onBench,
   onIdentity,
   onChangeService,
+  onMaker,
+  maker = null,
   hardwareBusy = false,
   hasSavedBatch = false,
 }: {
@@ -100,6 +102,9 @@ export function SettingsScreen({
   onBench: () => void;
   onIdentity?: () => void;
   onChangeService?: () => void;
+  onMaker?: () => void;
+  /** The maker cards are installed with now, or null when none is set. */
+  maker?: {name: string; tagAddress: string} | null;
   hardwareBusy?: boolean;
   hasSavedBatch?: boolean;
 }) {
@@ -137,6 +142,38 @@ export function SettingsScreen({
             </View>
           </View>
         </View>
+
+        {onMaker ? (
+          <View style={s.section}>
+            <HelpHeading
+              title={MAKER_SETTING.title}
+              titleStyle={s.header}
+              testID="settings-maker-help">
+              {`${MAKER_SETTING.what} ${MAKER_SETTING.tagWhat} ${MAKER_SETTING.published}`}
+            </HelpHeading>
+            <View style={s.card}>
+              <Pressable
+                testID="settings-maker"
+                accessibilityRole="button"
+                onPress={onMaker}
+                disabled={hardwareBusy}
+                accessibilityState={{disabled: hardwareBusy}}
+                style={s.row}>
+                <View style={s.rowLabelCol}>
+                  <Text style={s.rowLabel} testID="settings-maker-name">
+                    {maker ? maker.name : MAKER_SETTING.notSet}
+                  </Text>
+                  <Text style={s.rowSub} testID="settings-maker-address">
+                    {maker
+                      ? `${MAKER_SETTING.address}: ${maker.tagAddress}`
+                      : MAKER_SETTING.tagWhat}
+                  </Text>
+                </View>
+                <Text style={s.chevron}>›</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         {onIdentity || BENCH_RUNS_ENABLED ? (
           <View style={s.section}>

@@ -9537,3 +9537,58 @@ four askings.
 **Changed.** The README, `COMPONENT-RELEASES.md`, `RELEASE-NOTES.md`, `HARDWARE_DEPLOYMENT.md`, `CASHU-CARD-HARDWARE.md`,
 `SECURITY-MODEL.md` and the provisioner's README name the two runs as counted and point here;
 `tools/refcheck.py`'s `SIZES` comment for 42,741. Nothing about a J3R180 keyed for SCP02 and 3.0 changes.
+
+## <a id="d239"></a>D239: In the set-up app the card maker sets its name and tag address; no build carries one
+
+**Decided (2026-11-24, the project owner; amends rule 3 of [D227](#d227) for the phone app, Setup build 16, ENG-870).**
+Under D227 the set-up app (`apps/provisioner`) took the tag's address from `maker/maker.json`, compiled into the build, and
+refused the shared repository's example. So a build from this repository installed nothing, and a build given to a store
+could serve one card maker only: the one whose file it was built with. This is a protocol. Developers such as Foxy build
+products on it and give their cards their own tag address (Foxy's opens its wallet); one address compiled into the store
+app, or a list of makers kept in this repository, would make the app one maker's or this repository's to hand out.
+
+**The rule.** (1) The person making cards sets the maker's name and its tag address in the app, once for each ops service
+the phone uses (the app's service profile). They are kept on the phone under `cashu.provisioner.maker.v1:` and the
+service's origin; no other storage key changes its name or its form. (2) There is no default and no list. The rules for the
+address are the applet's and cardkit's, unchanged (`tagAddressProblem`: `https://`, the lengths and bytes of D227), and the
+name's are `maker.schema.json`'s. The example is still refused: the example maker's name, and an address at a name the
+internet keeps for examples (`example.com`, `.net`, `.org`, and names ending `.example`, `.test`, `.invalid` or
+`localhost`). (3) The installation gate is one function, `installGate` in `src/releaseGates.ts`, and it wants both halves:
+the build's load file on the approved list ([D74](#d74), unchanged and fixed at build time), and a maker's own name and
+valid address, now read at run time. The card plan is built only from a maker that passed the gate (`cashuPlanFor`), which
+checks the rules once more before a card is touched. (4) The batch screen shows the maker's name and the tag address before
+any card is installed, the open batch shows them beside the install button, and the install uses exactly that address;
+cardkit still reads the tag back after the install and stops on any other. (5) A fork's own `maker/maker.json` (not the
+example) pre-fills the setting until one is saved on the phone; the shared repository's example pre-fills nothing. (6) A
+service profile an earlier build saved has no maker: the app asks for it before the first install and installs nothing
+until it is given. A saved setting that cannot be read installs nothing either, and is never replaced by a fork's file.
+(7) The address is one for the service profile, never one for a card: no batch form and no card screen takes it. Changing a
+saved maker is an act in Settings with a second step, and is refused while a batch is open, so that every card of a batch
+carries one address. The screen says that the card maker publishes the address.
+
+**What stays.** The card's side of D227: the tag takes its address at install, keeps it, and refuses an install without
+one. The refusal of a default (D227, "Why refuse rather than default") and of the example. One published address for
+every card of a maker ([D228](#d228), [`CARD-DESIGNS.md`](CARD-DESIGNS.md)): a card whose address is not its maker's
+published one is still suspect. The desktop tools (`tools/maker/maker.py`, `tools/cardctl`) still read `maker/maker.json`,
+and a maker's fork still differs from this repository in that file alone. Nothing new is sent to the ops service and
+nothing new is written into the app's records or exports: the maker's name and address stay on the phone and go to the
+card's tag.
+
+**Rejected.** *One compiled maker for each store build:* each maker would need its own listing and its own review to use
+an open protocol, and the store build from this repository would be one maker's. *A registry list in the repository:*
+this repository would decide who may make cards, every new maker would wait for a merge and a release, and a list is a
+default with more names in it. *An address for each card:* the address survives a reset, so one per card is a tracker
+that every phone reading the tag can follow (D228); the app takes no address with a batch or a card.
+
+**Not carried over.** `maker.py`'s guess at an address that looks per card (a long run of digits or hex, a UUID, a serial)
+is not applied in the app: it refuses some innocent addresses, including one of `spec/vectors/tag-address.json`'s valid
+ones, and the app has no `--allow-per-card` to answer it with. The app's guard is rule 7.
+
+**Not done here.** The ops service does not hand the maker's name or address to the app, and does not record them. The
+app's install path, with an address set in the app, has not yet run on a chip.
+
+**Built.** `src/maker.ts` (the rules, the saved setting, the fork's pre-fill), `src/releaseGates.ts` (`installGate`,
+`LOAD_FILE_VALIDATED`; `CARD_INSTALLATION_VALIDATED` and `makerGiven` are gone), `src/cardkit.ts` (`cashuPlanFor`; the
+constant `CASHU_PLAN` is gone), the install tap and the bench screen (the only two callers of `provision`),
+`ProvisioningStore`, the card maker screen, the Settings row, the batch and installation screens; `installGate.test.ts`
+and the tests beside them. The docs that said a build carries a maker's file.

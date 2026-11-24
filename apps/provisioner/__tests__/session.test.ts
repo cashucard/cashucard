@@ -14,7 +14,8 @@
 import {AppState, Platform, type AppStateStatus} from 'react-native';
 import NfcManager, {NfcError, NfcTech} from 'react-native-nfc-manager';
 
-import {CASHU_PLAN, provision} from '../src/cardkit';
+import {provision} from '../src/cardkit';
+import {CASHU_PLAN} from '../test-support/maker';
 import {describeSessionError} from '../src/copy';
 import {randomBytes} from '../src/random';
 import {formatReadout, makeReadout} from '../src/readout';

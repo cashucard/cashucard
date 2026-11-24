@@ -2,11 +2,12 @@
 import React from 'react';
 import {ScrollView, Share, StyleSheet, Text, View} from 'react-native';
 import {RECOVERY_BOUNDARIES} from '../recoveryDrills';
-import {CASHU_PLAN} from '../cardkit';
+import {CASHU_LOAD_FILE} from '../assets/cashu';
 import {CardFigure} from '../CardFigure';
 import {useProvisioning} from '../ProvisioningStore';
 import {BatchSetupScreen} from './BatchSetupScreen';
-import {PHASES} from '../strings';
+import {MakerSummary} from './MakerScreen';
+import {MAKER_SETTING, PHASES} from '../strings';
 import {recoveryDetails} from '../recoveryExport';
 import type {AttemptJournal} from '../journal';
 import {FONT, useTheme} from '../theme';
@@ -19,8 +20,6 @@ import {
   SecondaryButton,
 } from '../ui';
 
-const GATE =
-  'Installation is unavailable in this build. Ask your administrator for an installation-enabled release.';
 const STAGES: Record<string, string> = {
   reserved: 'Ready to check this card. Installation has not been confirmed.',
   install_intent:
@@ -127,14 +126,28 @@ export function ProvisioningScreen({
   onHome,
   onReset,
   onCheck,
+  onMaker,
 }: {
   onSettings: () => void;
   onHome?: () => void;
   onReset?: () => void;
   onCheck?: () => void;
+  /** Opens the card maker setting. */
+  onMaker?: () => void;
 }) {
   const flow = useProvisioning();
   const t = useTheme();
+  // The whole installation gate: the build's load file and the card maker (D239).
+  const gate = flow.installGate;
+  const makerWanted = !gate.allowed && gate.reason !== 'load-file' && !!onMaker;
+  const setMaker = (
+    <SecondaryButton
+      title={MAKER_SETTING.set}
+      testID="open-maker"
+      disabled={flow.busy}
+      onPress={onMaker ?? (() => undefined)}
+    />
+  );
   const [confirmQuarantine, setConfirmQuarantine] = React.useState(false);
   const [confirmEndBatch, setConfirmEndBatch] = React.useState(false);
   React.useEffect(() => {
@@ -282,7 +295,7 @@ export function ProvisioningScreen({
   if (!snapshot.batch) {
     // The setup form is its own Screen; these lead it inside its safe area.
     const lead =
-      onCheck || !flow.hardwareValidated || flow.notice ? (
+      onCheck || !gate.allowed || flow.notice ? (
         <View style={s.lead}>
           {onCheck ? (
             <SecondaryButton
@@ -292,9 +305,10 @@ export function ProvisioningScreen({
               disabled={flow.busy}
             />
           ) : null}
-          {!flow.hardwareValidated ? (
-            <View style={s.card}>
-              <Dim>{GATE}</Dim>
+          {!gate.allowed ? (
+            <View style={s.card} testID="install-gate">
+              <Dim>{gate.problem}</Dim>
+              {makerWanted ? setMaker : null}
             </View>
           ) : null}
           {flow.notice ? (
@@ -312,9 +326,10 @@ export function ProvisioningScreen({
         onStop={flow.cancel}
         onCreate={flow.create}
         onStartAndRead={flow.startAndRead}
-        canStart={flow.hardwareValidated && !flow.busy}
+        canStart={gate.allowed && !flow.busy}
+        maker={gate.allowed ? gate.maker : undefined}
         installationOnly
-        loadSha256={CASHU_PLAN.loadFile.sha256}
+        loadSha256={CASHU_LOAD_FILE.sha256}
         lead={lead}
       />
     );
@@ -402,7 +417,7 @@ export function ProvisioningScreen({
                   key={boundary}
                   title={boundary}
                   testID={`drill-arm-${boundary}`}
-                  disabled={flow.busy || !flow.hardwareValidated}
+                  disabled={flow.busy || !gate.allowed}
                   onPress={() => flow.drill!.arm(boundary)}
                 />
               ))}
@@ -525,14 +540,21 @@ export function ProvisioningScreen({
             testID="real-program"
             disabled={
               flow.busy ||
-              !flow.hardwareValidated ||
+              !gate.allowed ||
               (!!snapshot.active && !journal)
             }
             onPress={() => {
               flow.program();
             }}
           />
-          {!flow.hardwareValidated ? <Dim>{GATE}</Dim> : null}
+          {gate.allowed ? (
+            <MakerSummary maker={gate.maker} note={MAKER_SETTING.batchNote} />
+          ) : (
+            <>
+              <Dim>{gate.problem}</Dim>
+              {makerWanted ? setMaker : null}
+            </>
+          )}
         </>
       ) : null}
       {canQuarantine ? (

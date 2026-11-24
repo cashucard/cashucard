@@ -2,19 +2,18 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {
   BENCH_RUNS_ENABLED,
-  CARD_INSTALLATION_VALIDATED,
+  LOAD_FILE_VALIDATED,
   VALIDATED_LOAD_FILE_SHA256S,
   benchActionAllowed,
+  installGate,
   loadFileValidated,
-  makerGiven,
 } from '../src/releaseGates';
-import {MAKER} from '../src/maker';
+import {MAKER_FILE} from '../src/maker';
 import {CASHU_LOAD_FILE} from '../src/assets/cashu';
 
 test('installation follows the load file this build carries, never a bare switch', () => {
-  expect(CARD_INSTALLATION_VALIDATED).toBe(
-    VALIDATED_LOAD_FILE_SHA256S.includes(CASHU_LOAD_FILE.sha256) &&
-      !MAKER.example,
+  expect(LOAD_FILE_VALIDATED).toBe(
+    VALIDATED_LOAD_FILE_SHA256S.includes(CASHU_LOAD_FILE.sha256),
   );
   for (const sha of VALIDATED_LOAD_FILE_SHA256S) {
     expect(sha).toMatch(/^[0-9a-f]{64}$/);
@@ -40,9 +39,16 @@ test('the released 3.1 load file is validated, with the owner approval of 2026-1
     '28ddfb9d47af16e565f565149a91fddfa7af94ca4bed0ef686e7a6c2fe0285d3',
     'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
   ]);
-  // installation still wants a maker's own file: this repository's example keeps it off
-  expect(CARD_INSTALLATION_VALIDATED).toBe(!MAKER.example);
-  expect(CARD_INSTALLATION_VALIDATED).toBe(false);
+  // installation still wants a maker of its own (D239): with none saved on the phone, this repository's example
+  // file keeps it off (installGate.test.ts has every case)
+  expect(LOAD_FILE_VALIDATED).toBe(true);
+  expect(
+    installGate({
+      loadFileValidated: LOAD_FILE_VALIDATED,
+      saved: null,
+      file: MAKER_FILE,
+    }).allowed,
+  ).toBe(false);
   // the 2.2 load file the chip took on 2026-11-06 stays validated
   expect(
     loadFileValidated(
@@ -60,9 +66,9 @@ test('the bench installs the Cashu card only where this build may install its lo
   for (const action of ['hello', 'cashu', 'rotate'] as const) {
     expect(benchActionAllowed(action, false, true)).toBe(false);
   }
-  // this build: the bench is off, and the example maker file keeps installation off
+  // this build: the bench is off
   expect(benchActionAllowed('cashu')).toBe(
-    BENCH_RUNS_ENABLED && CARD_INSTALLATION_VALIDATED,
+    BENCH_RUNS_ENABLED && LOAD_FILE_VALIDATED,
   );
   expect(benchActionAllowed('cashu')).toBe(false);
 });
@@ -83,10 +89,53 @@ test('the bench screen asks the gate before every run and for every button', () 
   expect(screen).not.toMatch(/if \(!BENCH_RUNS_ENABLED \|\| running/);
 });
 
-test("installation wants a maker's own file: the shared repository's example installs nothing", () => {
-  expect(MAKER.example).toBe(true);
-  expect(MAKER.tagAddress).toBe('https://example.com/card');
-  expect(makerGiven()).toBe(false);
-  expect(makerGiven({example: false})).toBe(true);
-  expect(CARD_INSTALLATION_VALIDATED).toBe(false);
+test('the bench installs the Cashu card only with a maker that passed the gate', () => {
+  const screen = readFileSync(
+    resolve(__dirname, '../src/screens/LoadTestScreen.tsx'),
+    'utf8',
+  );
+  // the plan comes from cashuPlanFor (a gated maker) and from nowhere else
+  expect(screen).toContain("if (action === 'cashu' && !maker) {");
+  expect(screen).toContain('cashuPlanFor(maker!)');
+  expect(screen).not.toMatch(/CASHU_PLAN|cashuPlan\(/);
+});
+
+test('no source file builds a card plan except from a gated maker', () => {
+  // cashuPlan (cardkit's, any address) is called in src/cardkit.ts alone: by cashuPlanFor, and for the order of
+  // installs in a plan that never leaves its function
+  const {readdirSync} = require('node:fs');
+  const files = (dir: string): string[] =>
+    readdirSync(dir, {withFileTypes: true}).flatMap(
+      (e: {name: string; isDirectory(): boolean}) =>
+        e.isDirectory()
+          ? e.name === 'assets'
+            ? []
+            : files(`${dir}/${e.name}`)
+          : /\.tsx?$/.test(e.name)
+          ? [`${dir}/${e.name}`]
+          : [],
+    );
+  const src = resolve(__dirname, '../src');
+  const all = [...files(src), resolve(__dirname, '../App.tsx')];
+  expect(all.length).toBeGreaterThan(30);
+  for (const file of all) {
+    const text = readFileSync(file, 'utf8');
+    const calls = text.match(/\bcashuPlan\(/g) ?? [];
+    expect([file, calls.length]).toEqual([
+      file,
+      file.endsWith('/src/cardkit.ts') ? 2 : 0,
+    ]);
+    expect([file, /\bCASHU_PLAN\b|MAKER\.tagAddress/.test(text)]).toEqual([
+      file,
+      false,
+    ]);
+    // provision() is called with a plan in two places: the install tap and the bench
+    const provisions = (text.match(/\bprovision\(/g) ?? []).length;
+    expect([file, provisions]).toEqual([
+      file,
+      /\/src\/(provisioningTap\.ts|screens\/LoadTestScreen\.tsx)$/.test(file)
+        ? 1
+        : 0,
+    ]);
+  }
 });

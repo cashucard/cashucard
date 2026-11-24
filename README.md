@@ -206,7 +206,9 @@ byte for byte. The file here is a neutral example (`"example": true`, a tag at
 `https://example.com/card`) that the tools refuse to put on a card in the field. A
 card maker's fork changes that file and nothing else, so `git diff` against this
 repository shows exactly what the maker added:
-[Forks for a card maker](maker/README.md#forks-for-a-card-maker).
+[Forks for a card maker](maker/README.md#forks-for-a-card-maker). The phone set-up app
+needs no fork: the person making cards sets the maker's name and tag address in the app
+([D239](docs/DECISIONS.md#d239)).
 
 ## Test
 
