@@ -37,13 +37,15 @@ import {
 } from './provisioningWorkflow';
 import {runReservedAttempt, type AttemptRunOptions} from './provisioningTap';
 import {randomBytes, randomUuid} from './random';
-import {PHASES} from './strings';
+import {MAKER_SETTING, PHASES, batchMakerDiffers} from './strings';
 import {rememberBatchDefaults} from './batchDefaults';
 import {CASHU_LOAD_FILE} from './assets/cashu';
 import {
   MAKER_FILE,
   decodeSavedMaker,
   encodeSavedMaker,
+  makerAnswerFor,
+  makerFromFile,
   makerProblem,
   makerStorage,
   type MakerChoice,
@@ -157,6 +159,15 @@ interface RealProvisioning {
   installGate: InstallGate;
   /** Whether a maker is saved on this phone for the active ops service. */
   makerSaved: boolean;
+  /** The maker saved on this phone for the active ops service, whatever the gate answers. */
+  savedMaker: MakerChoice | null;
+  /** What a fork's own maker file pre-fills in the Card maker form; it opens no gate. */
+  makerPrefill: MakerChoice | null;
+  /**
+   * Why the open batch takes no card now: the saved maker's tag address is not
+   * the one the batch was opened with. Null when they agree.
+   */
+  batchMakerProblem: string | null;
   /** Saves the maker for the active ops service; answers what is wrong, or null when saved. */
   saveMaker(name: string, tagAddress: string): Promise<string | null>;
   drill?: DrillState & {
@@ -347,37 +358,48 @@ function ProvisioningSession({
   const settings = useRef(options).current;
   const hardwareValidated = settings.hardwareValidated ?? LOAD_FILE_VALIDATED;
   const makerDisk = settings.makerStorage ?? makerStorage;
-  // undefined: not read yet, or unreadable. null: this service has none saved.
-  const [savedMaker, setSavedMaker] = useState<{
+  // What the phone holds for one ops service. No answer for the active
+  // service yet means the read is in flight. value undefined: unreadable.
+  // value null: this service has none saved.
+  const [makerRead, setMakerRead] = useState<{
     origin: string;
-    value: MakerChoice | null;
+    value: MakerChoice | null | undefined;
   }>();
+  // The origins a save has completed for: a read that answers later is stale.
+  const makerSavedFor = useRef(new Set<string>());
   useEffect(() => {
     let live = true;
     const origin = app.serviceUrl;
-    setSavedMaker(undefined);
+    makerSavedFor.current.delete(origin);
+    const answer = (value: MakerChoice | null | undefined) => {
+      if (live && !makerSavedFor.current.has(origin)) {
+        setMakerRead({origin, value});
+      }
+    };
     makerDisk
       .read(origin)
-      .then(saved => {
-        const value = decodeSavedMaker(saved);
-        if (live) {
-          setSavedMaker({origin, value});
-        }
-      })
-      .catch(() => undefined); // unread: the gate installs nothing
+      .then(saved => answer(decodeSavedMaker(saved)))
+      .catch(() => answer(undefined)); // unreadable: the gate installs nothing
     return () => {
       live = false;
     };
   }, [app.serviceUrl, makerDisk]);
+  // A maker read for another ops service is never this one's. (A change of
+  // service also starts this component afresh; this holds without that.)
+  const makerAnswer = makerAnswerFor(makerRead, app.serviceUrl);
+  const savedMaker = makerAnswer?.value ?? null;
   const gate = useMemo(
     () =>
       installGate({
         loadFileValidated: hardwareValidated,
-        saved:
-          savedMaker?.origin === app.serviceUrl ? savedMaker.value : undefined,
-        file: settings.makerFile ?? MAKER_FILE,
+        saved: makerAnswer?.value,
+        reading: makerAnswer === undefined,
       }),
-    [hardwareValidated, savedMaker, app.serviceUrl, settings.makerFile],
+    [hardwareValidated, makerAnswer],
+  );
+  const makerPrefill = useMemo(
+    () => makerFromFile(settings.makerFile ?? MAKER_FILE),
+    [settings.makerFile],
   );
   const gateRef = useRef(gate);
   gateRef.current = gate;
@@ -789,6 +811,21 @@ function ProvisioningSession({
     if (!allowed() || !installing.allowed) {
       return;
     }
+    // Every card of a batch gets the address the batch was opened with. A
+    // batch an earlier build opened records this one before its first install.
+    const kept = await w.keepMaker(service, {
+      name: installing.maker.name,
+      tag_address: installing.maker.tagAddress,
+    });
+    if (kept.tag_address !== installing.maker.tagAddress) {
+      if (allowed()) {
+        setSnapshot(w.snapshot());
+        setNotice(
+          batchMakerDiffers({name: kept.name, tagAddress: kept.tag_address}),
+        );
+      }
+      return;
+    }
     if (!w.snapshot().active) {
       await w.reserveNext(service);
     }
@@ -1043,8 +1080,18 @@ function ProvisioningSession({
     notice: notice ?? interruption,
     hardwareValidated,
     installGate: gate,
-    makerSaved:
-      savedMaker?.origin === app.serviceUrl && savedMaker.value !== null,
+    makerSaved: savedMaker !== null,
+    savedMaker,
+    makerPrefill,
+    batchMakerProblem:
+      gate.allowed &&
+      snapshot?.batch?.maker &&
+      snapshot.batch.maker.tag_address !== gate.maker.tagAddress
+        ? batchMakerDiffers({
+            name: snapshot.batch.maker.name,
+            tagAddress: snapshot.batch.maker.tag_address,
+          })
+        : null,
     saveMaker: async (name, tagAddress) => {
       const origin = latest.current.serviceUrl;
       const choice = {name: name.trim(), tagAddress: tagAddress.trim()};
@@ -1055,22 +1102,27 @@ function ProvisioningSession({
       if (busyRef.current) {
         return 'Wait for the current card work to finish, then save.';
       }
+      // The open batch keeps the address it was opened with, whatever the
+      // gate answers now. A batch an earlier build opened has none recorded:
+      // it takes the gate's at its first install, so an open gate's address
+      // stays until then.
+      const batch = snapshot?.batch;
       const now = gateRef.current;
-      if (
-        snapshot?.batch &&
-        now.allowed &&
-        (now.maker.name !== choice.name ||
-          now.maker.tagAddress !== choice.tagAddress)
-      ) {
-        return 'Close the open batch before you change the card maker. Every card in a batch gets the same tag address.';
+      const batchAddress =
+        batch?.maker?.tag_address ??
+        (batch && now.allowed ? now.maker.tagAddress : undefined);
+      if (batchAddress !== undefined && batchAddress !== choice.tagAddress) {
+        return MAKER_SETTING.batchLocked;
       }
       try {
         await makerDisk.write(origin, encodeSavedMaker(choice));
       } catch {
         return 'The card maker could not be saved. Nothing changed.';
       }
+      // A read still in flight for this service is older than this save.
+      makerSavedFor.current.add(origin);
       if (mounted.current && latest.current.serviceUrl === origin) {
-        setSavedMaker({origin, value: choice});
+        setMakerRead({origin, value: choice});
       }
       return null;
     },
@@ -1120,14 +1172,22 @@ function ProvisioningSession({
         return Promise.resolve(false);
       }
       return operate(async (w, service) => {
-        await w.start(service, {
-          count: config.count,
-          mint_url: config.mint,
-          pin_policy: config.pinPolicy,
-          daily_usd: config.dailyUsd,
-          no_pin_usd: config.noPinUsd,
-          load_sha256: CASHU_LOAD_FILE.sha256,
-        });
+        const opening = gateRef.current;
+        if (!opening.allowed) {
+          throw new Error(opening.problem);
+        }
+        await w.start(
+          service,
+          {
+            count: config.count,
+            mint_url: config.mint,
+            pin_policy: config.pinPolicy,
+            daily_usd: config.dailyUsd,
+            no_pin_usd: config.noPinUsd,
+            load_sha256: CASHU_LOAD_FILE.sha256,
+          },
+          {name: opening.maker.name, tag_address: opening.maker.tagAddress},
+        );
         rememberBatchDefaults(service.scope, {
           count: config.count,
           mint: config.mint,
@@ -1146,14 +1206,22 @@ function ProvisioningSession({
       return operate(async (w, service) => {
         const actor = latest.current,
           generation = actorGeneration.current;
-        await w.start(service, {
-          count: config.count,
-          mint_url: config.mint,
-          pin_policy: 'perCard',
-          daily_usd: 0,
-          no_pin_usd: 0,
-          load_sha256: CASHU_LOAD_FILE.sha256,
-        });
+        const opening = gateRef.current;
+        if (!opening.allowed) {
+          throw new Error(opening.problem);
+        }
+        await w.start(
+          service,
+          {
+            count: config.count,
+            mint_url: config.mint,
+            pin_policy: 'perCard',
+            daily_usd: 0,
+            no_pin_usd: 0,
+            load_sha256: CASHU_LOAD_FILE.sha256,
+          },
+          {name: opening.maker.name, tag_address: opening.maker.tagAddress},
+        );
         if (
           !mounted.current ||
           cancelRequested.current ||

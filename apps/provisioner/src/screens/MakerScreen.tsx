@@ -1,7 +1,8 @@
 /**
  * The card maker setting (D239): the maker's name and the address every card's
  * NFC tag opens, set once per ops service by the person making cards. The
- * installation gate (releaseGates.ts) installs nothing until it is saved.
+ * installation gate (releaseGates.ts) installs nothing until it is saved on
+ * this phone. A fork's own maker file only pre-fills this form.
  */
 import React, {useState} from 'react';
 import {Keyboard, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
@@ -58,10 +59,12 @@ export function MakerScreen({onBack}: {onBack(): void}) {
   const flow = useProvisioning();
   const t = useTheme();
   const s = local(t);
-  const gate = flow.installGate;
-  const current = gate.allowed ? gate.maker : null;
-  const [name, setName] = useState(current?.name ?? '');
-  const [address, setAddress] = useState(current?.tagAddress ?? '');
+  // The saved maker, not the gate's answer: it shows when the gate is closed too.
+  const current = flow.savedMaker;
+  // With none saved, a fork's own maker file fills the form in. Nothing is saved by that.
+  const prefill = current ?? flow.makerPrefill;
+  const [name, setName] = useState(prefill?.name ?? '');
+  const [address, setAddress] = useState(prefill?.tagAddress ?? '');
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -159,7 +162,7 @@ export function MakerScreen({onBack}: {onBack(): void}) {
             />
             <Dim>{MAKER_SETTING.published}</Dim>
             <Dim>{MAKER_SETTING.scope}</Dim>
-            {gate.allowed && gate.source === 'file' ? (
+            {!current && flow.makerPrefill ? (
               <Dim>{MAKER_SETTING.fromFile}</Dim>
             ) : null}
             <PrimaryButton

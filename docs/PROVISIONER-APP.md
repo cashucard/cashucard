@@ -194,9 +194,12 @@ durable work exists.
 Card maker opens the maker's name and tag address for the current ops service. The screen
 says what the tag address is and that the card maker publishes it. There is no default and
 no list; the example maker and example addresses are refused, with the same address rules
-as the card. Changing a saved maker takes a second step and is refused while a batch is
-open: cards already installed keep their address. A service saved by an earlier build has
-no maker until one is set here. A fork's own `maker/maker.json` pre-fills the setting.
+as the card. Changing a saved maker takes a second step; cards already installed keep their address.
+While a batch is open its tag address cannot be changed, and if the saved address is not
+the one the batch was opened with, no card is installed until the batch is closed or the
+maker is set back. A service saved by an earlier build has no maker until one is set here.
+A fork's own `maker/maker.json` pre-fills this form; nothing installs until the maker is
+saved on the phone.
 
 Change Ops Service signs out before opening the service selector and confirms
 when saved work exists. Each service uses its own operator accounts and records.

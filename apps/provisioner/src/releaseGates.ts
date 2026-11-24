@@ -1,5 +1,5 @@
 import {CASHU_LOAD_FILE} from './assets/cashu';
-import {makerFromFile, makerProblem, type MakerChoice} from './maker';
+import {makerProblem, type MakerChoice} from './maker';
 
 /**
  * The card load files a chip has installed and the operator approved for
@@ -46,13 +46,24 @@ declare const gated: unique symbol;
  * cashuPlanFor): no address reaches a card without passing the gate.
  */
 export type InstallMaker = Readonly<MakerChoice> & {readonly [gated]: true};
+/** The frozen objects installGate handed out: the type's mark, kept at run time. */
+const passed = new WeakSet<object>();
+/** Whether `maker` is an object installGate itself handed out, not a look-alike. */
+export function passedInstallGate(maker: unknown): maker is InstallMaker {
+  return typeof maker === 'object' && maker !== null && passed.has(maker);
+}
 
 export type InstallGate =
-  | {allowed: true; maker: InstallMaker; source: 'profile' | 'file'}
+  | {allowed: true; maker: InstallMaker}
   | {
       allowed: false;
-      reason: 'load-file' | 'maker-unread' | 'no-maker' | 'bad-maker';
-      /** Words for the person making cards. */
+      reason:
+        | 'load-file'
+        | 'maker-reading'
+        | 'maker-unread'
+        | 'no-maker'
+        | 'bad-maker';
+      /** Words for the person making cards; empty while the setting is being read. */
       problem: string;
     };
 
@@ -62,35 +73,44 @@ export const GATE_WORDS = {
   unread:
     'The card maker saved on this phone could not be read. Set it again in Settings. No card is installed until then.',
   none: 'Set the card maker first. No card is installed until a maker name and a tag address are saved.',
+  /** The phone's setting is still being read: nothing to say yet, nothing installs. */
+  reading: '',
 };
 
 /**
  * The installation gate (D74, D239). What LOADs the card's file (a batch and
  * its installs) wants both halves:
  *  - `loadFileValidated`: the build's load file is on the approved list;
- *  - a maker's own name and a tag address that keeps the rules (maker.ts): the
- *    one saved for the active ops service (`saved`), or, when that service has
- *    none (`null`), the one a fork's own maker file pre-fills (`file`). The
- *    shared repository's example file pre-fills nothing.
- * `saved` undefined means the phone's setting is not read yet or cannot be
- * read: nothing installs, and the file is not used in its place. A saved maker
- * that breaks a rule is refused, never replaced by the file's.
+ *  - a maker's own name and a tag address that keeps the rules (maker.ts),
+ *    saved on this phone for the active ops service (`saved`). `null` means
+ *    that service has none saved: nothing installs. A fork's own maker file
+ *    only pre-fills the Card maker form; it opens no gate.
+ * `saved` undefined means the phone's setting cannot be read, and `reading`
+ * that it is not read yet: nothing installs in either case. A saved maker
+ * that breaks a rule is refused.
  * This gates no owned-card reset, which removes an installation and restores
  * the manager keys without loading anything.
  */
 export function installGate(input: {
   loadFileValidated: boolean;
   saved: MakerChoice | null | undefined;
-  file: {example: boolean; name: string; tagAddress: string};
+  /** The first read of the phone's setting is still in flight. */
+  reading?: boolean;
 }): InstallGate {
   if (input.loadFileValidated !== true) {
     return {allowed: false, reason: 'load-file', problem: GATE_WORDS.loadFile};
   }
+  if (input.reading === true) {
+    return {
+      allowed: false,
+      reason: 'maker-reading',
+      problem: GATE_WORDS.reading,
+    };
+  }
   if (input.saved === undefined) {
     return {allowed: false, reason: 'maker-unread', problem: GATE_WORDS.unread};
   }
-  const source = input.saved === null ? 'file' : 'profile';
-  const choice = input.saved ?? makerFromFile(input.file);
+  const choice = input.saved;
   if (choice === null) {
     return {allowed: false, reason: 'no-maker', problem: GATE_WORDS.none};
   }
@@ -98,14 +118,12 @@ export function installGate(input: {
   if (problem) {
     return {allowed: false, reason: 'bad-maker', problem};
   }
-  return {
-    allowed: true,
-    source,
-    maker: Object.freeze({
-      name: choice.name,
-      tagAddress: choice.tagAddress,
-    }) as InstallMaker,
-  };
+  const maker = Object.freeze({
+    name: choice.name,
+    tagAddress: choice.tagAddress,
+  }) as InstallMaker;
+  passed.add(maker);
+  return {allowed: true, maker};
 }
 
 /** Local validation builds only (including owner-built iOS Release binaries).

@@ -103,7 +103,7 @@ export function SettingsScreen({
   onIdentity?: () => void;
   onChangeService?: () => void;
   onMaker?: () => void;
-  /** The maker cards are installed with now, or null when none is set. */
+  /** The maker saved on this phone for this ops service, or null when none is. */
   maker?: {name: string; tagAddress: string} | null;
   hardwareBusy?: boolean;
   hasSavedBatch?: boolean;

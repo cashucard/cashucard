@@ -241,7 +241,7 @@ node_modules/.bin/react-native bundle --platform android --dev false --entry-fil
   for byte, and a maker's fork differs from this repository in that one file. The
   NFC tag's address comes in the tag's install parameters, and an install without
   one is refused. The phone set-up app compiles in no maker: its user sets the
-  maker's name and tag address in the app, and nothing installs before that
+  maker's name and tag address in the app, and nothing installs until they are saved on the phone
   ([D239](docs/DECISIONS.md#d239)). Never add a default address or a list of makers.
 - **Every design change gets a D-entry in [`docs/DECISIONS.md`](docs/DECISIONS.md):**
   what was decided, what was rejected and why. Use the next unused D-number; anchors are

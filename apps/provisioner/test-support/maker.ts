@@ -27,7 +27,6 @@ export function gatedMaker(choice: MakerChoice = TEST_MAKER): InstallMaker {
   const gate = installGate({
     loadFileValidated: true,
     saved: choice,
-    file: EXAMPLE_FILE,
   });
   if (!gate.allowed) {
     throw new Error(gate.problem);
@@ -56,11 +55,9 @@ export function makerStorageWith(
 /** The gate's answers, for tests that stand in for the provisioning store. */
 export const OPEN_GATE = {
   allowed: true as const,
-  source: 'profile' as const,
   maker: gatedMaker(),
 };
 export const CLOSED_GATE = installGate({
   loadFileValidated: false,
   saved: null,
-  file: EXAMPLE_FILE,
 });

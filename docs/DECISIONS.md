@@ -9549,30 +9549,41 @@ app, or a list of makers kept in this repository, would make the app one maker's
 
 **The rule.** (1) The person making cards sets the maker's name and its tag address in the app, once for each ops service
 the phone uses (the app's service profile). They are kept on the phone under `cashu.provisioner.maker.v1:` and the
-service's origin; no other storage key changes its name or its form. (2) There is no default and no list. The rules for the
+service's origin; no other storage key changes its name. The
+batch record on the phone gains one field, which may be absent (rule 7); a record without it still loads. (2) There is no default and no list. The rules for the
 address are the applet's and cardkit's, unchanged (`tagAddressProblem`: `https://`, the lengths and bytes of D227), and the
 name's are `maker.schema.json`'s. The example is still refused: the example maker's name, and an address at a name the
 internet keeps for examples (`example.com`, `.net`, `.org`, and names ending `.example`, `.test`, `.invalid` or
-`localhost`). (3) The installation gate is one function, `installGate` in `src/releaseGates.ts`, and it wants both halves:
+`localhost`). An address with a `%` in its host (before the first `/` or `?`) is refused as well: a phone decodes it, and
+an example name could hide behind it. An IP address as the host is not on the refused list, on purpose: the list is the
+example and the reserved names, and a maker's address is the maker's choice. (3) The installation gate is one function, `installGate` in `src/releaseGates.ts`, and it wants both halves:
 the build's load file on the approved list ([D74](#d74), unchanged and fixed at build time), and a maker's own name and
-valid address, now read at run time. The card plan is built only from a maker that passed the gate (`cashuPlanFor`), which
-checks the rules once more before a card is touched. (4) The batch screen shows the maker's name and the tag address before
+valid address, saved on the phone and read at run time. The card plan is built only from a maker that passed the gate:
+`cashuPlanFor` takes only the very object the gate handed out (the gate keeps them in a private set, so an object that
+merely looks like one is refused), and checks the rules once more before a card is touched. (4) The batch screen shows the maker's name and the tag address before
 any card is installed, the open batch shows them beside the install button, and the install uses exactly that address;
 cardkit still reads the tag back after the install and stops on any other. (5) A fork's own `maker/maker.json` (not the
-example) pre-fills the setting until one is saved on the phone; the shared repository's example pre-fills nothing. (6) A
+example, and passing the rules) pre-fills the Card maker form and does nothing more: nothing installs until the maker is
+saved on the phone. The shared repository's example pre-fills nothing. (6) A
 service profile an earlier build saved has no maker: the app asks for it before the first install and installs nothing
-until it is given. A saved setting that cannot be read installs nothing either, and is never replaced by a fork's file.
+until it is given. A saved setting that cannot be read installs nothing either, and nothing installs while it is still
+being read.
 (7) The address is one for the service profile, never one for a card: no batch form and no card screen takes it. Changing a
-saved maker is an act in Settings with a second step, and is refused while a batch is open, so that every card of a batch
-carries one address. The screen says that the card maker publishes the address.
+saved maker is an act in Settings with a second step. Every card of a batch carries one address, and the app holds to that:
+when a batch is opened, its record on the phone takes the maker's name and tag address. While the batch is open a save that
+would change its tag address is refused, and the install step refuses when the saved address is not the batch's (the
+setting is one for the ops service, so another operator on the same service may have saved another): the person closes the
+batch, or sets the maker back. A batch an earlier build left open has no address in its record; it takes the saved one at
+its first install under this build and keeps it. The Card maker screen and the Settings help say that the card maker
+publishes the address.
 
 **What stays.** The card's side of D227: the tag takes its address at install, keeps it, and refuses an install without
 one. The refusal of a default (D227, "Why refuse rather than default") and of the example. One published address for
 every card of a maker ([D228](#d228), [`CARD-DESIGNS.md`](CARD-DESIGNS.md)): a card whose address is not its maker's
 published one is still suspect. The desktop tools (`tools/maker/maker.py`, `tools/cardctl`) still read `maker/maker.json`,
 and a maker's fork still differs from this repository in that file alone. Nothing new is sent to the ops service and
-nothing new is written into the app's records or exports: the maker's name and address stay on the phone and go to the
-card's tag.
+nothing new is put in an export: the maker's name and address stay on the phone (the setting, and the open batch's
+record) and go to the card's tag.
 
 **Rejected.** *One compiled maker for each store build:* each maker would need its own listing and its own review to use
 an open protocol, and the store build from this repository would be one maker's. *A registry list in the repository:*
@@ -9590,5 +9601,5 @@ app's install path, with an address set in the app, has not yet run on a chip.
 **Built.** `src/maker.ts` (the rules, the saved setting, the fork's pre-fill), `src/releaseGates.ts` (`installGate`,
 `LOAD_FILE_VALIDATED`; `CARD_INSTALLATION_VALIDATED` and `makerGiven` are gone), `src/cardkit.ts` (`cashuPlanFor`; the
 constant `CASHU_PLAN` is gone), the install tap and the bench screen (the only two callers of `provision`),
-`ProvisioningStore`, the card maker screen, the Settings row, the batch and installation screens; `installGate.test.ts`
+`ProvisioningStore`, the batch record (`src/provisioningWorkflow.ts`, `keepMaker`), the card maker screen, the Settings row, the batch and installation screens; `installGate.test.ts`
 and the tests beside them. The docs that said a build carries a maker's file.

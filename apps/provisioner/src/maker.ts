@@ -3,7 +3,8 @@
  * NFC tag opens. The person making cards sets the maker's name and tag address
  * in the app, once per ops service (D239). Nothing here is a default: the
  * shared repository's maker/maker.json is an example and pre-fills nothing; a
- * fork's own file pre-fills the setting until one is saved on the phone.
+ * fork's own file pre-fills the Card maker form, and nothing installs until
+ * the maker is saved on the phone.
  * The rules for the address are cardkit's (tagAddressProblem), the same ones
  * the applet keeps (D227). releaseGates.ts decides whether a card is installed.
  */
@@ -61,6 +62,10 @@ export function makerAddressProblem(tagAddress: unknown): string | null {
   if (problem) {
     return `This tag address cannot be used: ${problem}.`;
   }
+  // A phone decodes %78 in a host to x: no % there, so no example name hides.
+  if (tagAddress.slice('https://'.length).split(/[/?]/)[0].includes('%')) {
+    return 'This tag address cannot be used: the host name cannot hold %.';
+  }
   if (EXAMPLE_HOSTS.test(hostOf(tagAddress))) {
     return 'That is an example address. Enter the address your cards open.';
   }
@@ -73,8 +78,9 @@ export function makerProblem(name: unknown, tagAddress: unknown): string | null 
 }
 
 /**
- * What a fork's maker file pre-fills: its name and address when the file is a
- * maker's own and passes the rules, nothing for the shared example.
+ * What a fork's maker file pre-fills in the Card maker form: its name and
+ * address when the file is a maker's own and passes the rules, nothing for the
+ * shared example. It opens no gate: only a maker saved on the phone does.
  */
 export function makerFromFile(file: {
   example: boolean;
@@ -84,6 +90,18 @@ export function makerFromFile(file: {
   return file.example || makerProblem(file.name, file.tagAddress)
     ? null
     : {name: file.name, tagAddress: file.tagAddress};
+}
+
+/**
+ * What the phone answered for the ops service at `origin`: `read` when it is
+ * that service's answer, undefined (not read yet) when it is another's. One
+ * service's maker is never used for another.
+ */
+export function makerAnswerFor<T extends {origin: string}>(
+  read: T | undefined,
+  origin: string,
+): T | undefined {
+  return read?.origin === origin ? read : undefined;
 }
 
 /** One saved maker per ops service: the key ends with the service's origin. */

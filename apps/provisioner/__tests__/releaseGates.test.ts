@@ -8,7 +8,6 @@ import {
   installGate,
   loadFileValidated,
 } from '../src/releaseGates';
-import {MAKER_FILE} from '../src/maker';
 import {CASHU_LOAD_FILE} from '../src/assets/cashu';
 
 test('installation follows the load file this build carries, never a bare switch', () => {
@@ -39,14 +38,13 @@ test('the released 3.1 load file is validated, with the owner approval of 2026-1
     '28ddfb9d47af16e565f565149a91fddfa7af94ca4bed0ef686e7a6c2fe0285d3',
     'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
   ]);
-  // installation still wants a maker of its own (D239): with none saved on the phone, this repository's example
-  // file keeps it off (installGate.test.ts has every case)
+  // installation still wants a maker of its own (D239): with none saved on the phone it stays off
+  // (installGate.test.ts has every case)
   expect(LOAD_FILE_VALIDATED).toBe(true);
   expect(
     installGate({
       loadFileValidated: LOAD_FILE_VALIDATED,
       saved: null,
-      file: MAKER_FILE,
     }).allowed,
   ).toBe(false);
   // the 2.2 load file the chip took on 2026-11-06 stays validated

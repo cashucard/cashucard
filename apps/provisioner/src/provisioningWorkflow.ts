@@ -113,12 +113,22 @@ function terminal(j: AttemptJournal): boolean {
   );
 }
 
+/**
+ * The card maker a batch is installed with (D239): kept on this phone only,
+ * never sent to the ops service. Every card of the batch gets `tag_address`.
+ */
+export interface BatchMaker {
+  name: string;
+  tag_address: string;
+}
 interface BatchState {
   scope: JournalScope;
   request: BatchRequest;
   batch_id: number | null;
   next_ordinal: number;
   ending?: true;
+  /** Absent in a batch an earlier build opened, until its first install under this one. */
+  maker?: BatchMaker;
 }
 interface PendingAttempt {
   attempt_id: string;
@@ -249,7 +259,16 @@ export class ProvisioningWorkflow {
       'batch_id',
       'next_ordinal',
       ...(b.ending === true ? ['ending'] : []),
+      ...(b.maker !== undefined ? ['maker'] : []),
     ]);
+    if (b.maker !== undefined) {
+      exact(b.maker, ['name', 'tag_address']);
+      check(
+        [b.maker.name, b.maker.tag_address].every(
+          v => typeof v === 'string' && v.length > 0 && v.length <= 4096,
+        ),
+      );
+    }
     exact(b.scope, ['service_origin', 'operator_id', 'device_id', 'key_env']);
     assertJournalScope(b.scope);
     check(
@@ -349,9 +368,40 @@ export class ProvisioningWorkflow {
     });
   }
 
-  /** Persist request identity and exact PIN-free settings before the first POST. */
-  start(service: ReservationService, input: BatchSettings): Promise<void> {
+  /**
+   * The maker this batch is installed with. A batch that has none recorded (an
+   * earlier build opened it) takes `maker` and records it before any card of
+   * this build is reserved. The caller installs nothing when the answer's
+   * address is not the one it is about to install.
+   */
+  keepMaker(
+    service: ReservationService,
+    maker: BatchMaker,
+  ): Promise<BatchMaker> {
+    const captured = clone(maker);
+    return this.serial(async () => {
+      const b = this.actor(service);
+      if (b.maker) {
+        return clone(b.maker);
+      }
+      const next = this.snapshot();
+      next.batch!.maker = captured;
+      await this.commit(next);
+      return clone(captured);
+    });
+  }
+
+  /**
+   * Persist request identity and exact PIN-free settings before the first POST,
+   * with the maker whose tag address every card of the batch gets (D239).
+   */
+  start(
+    service: ReservationService,
+    input: BatchSettings,
+    maker?: BatchMaker,
+  ): Promise<void> {
     const captured = clone(input);
+    const keptMaker = maker ? clone(maker) : undefined;
     return this.serial(async () => {
       check(this.state.batch === null);
       exact(captured, settings);
@@ -366,6 +416,7 @@ export class ProvisioningWorkflow {
         },
         batch_id: null,
         next_ordinal: 0,
+        ...(keptMaker ? {maker: keptMaker} : {}),
       };
       await this.commit(next);
       await this.syncBatch(service);

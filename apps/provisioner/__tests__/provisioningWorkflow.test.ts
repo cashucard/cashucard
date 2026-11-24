@@ -324,6 +324,46 @@ test('untrusted settings and unsupported/secret-bearing snapshots stop without n
   expect(f.ids()).toBe(1);
 });
 
+test("the batch record keeps its maker's tag address on the phone; a record without one still loads and takes the first given", async () => {
+  const X = {name: 'Foxy', tag_address: 'https://getfoxy.io/card'};
+  const Y = {name: 'Island Cards', tag_address: 'https://cards.islandbitcoin.com/c'};
+  const f = fixture();
+  let w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  await w.start(f.service, config, X);
+  expect(w.snapshot().batch?.maker).toEqual(X);
+  // it stays on the phone: the ops service is sent the settings only
+  expect(JSON.stringify((f.service.batch as jest.Mock).mock.calls)).not.toMatch(
+    /getfoxy|Foxy|maker/,
+  );
+  // a recorded maker is never replaced
+  w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  expect(await w.keepMaker(f.service, Y)).toEqual(X);
+  expect(w.snapshot().batch?.maker).toEqual(X);
+  // a batch an earlier build opened has no maker in its record: it loads, and records the first one given
+  const older = w.snapshot();
+  delete older.batch!.maker;
+  await f.storage.replace(JSON.stringify(older));
+  w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  expect(w.snapshot().batch).toBeTruthy();
+  expect(w.snapshot().batch).not.toHaveProperty('maker');
+  expect(await w.keepMaker(f.service, Y)).toEqual(Y);
+  expect(JSON.parse((await f.storage.read())!).batch.maker).toEqual(Y);
+  expect(await w.keepMaker(f.service, X)).toEqual(Y);
+  // a damaged maker in the record stops the batch; it is not read as "none"
+  for (const maker of [
+    {name: 'Foxy'},
+    {name: 'Foxy', tag_address: 7},
+    {name: '', tag_address: X.tag_address},
+    {...X, extra: 1},
+    null,
+  ]) {
+    const damaged = w.snapshot() as unknown as {batch: {maker: unknown}};
+    damaged.batch.maker = maker;
+    await f.storage.replace(JSON.stringify(damaged));
+    await expect(ProvisioningWorkflow.open(f.storage, f.newId)).rejects.toThrow();
+  }
+});
+
 test('closing a batch cannot hide incomplete work', async () => {
   const f = fixture();
   const w = await ProvisioningWorkflow.open(f.storage, f.newId);

@@ -139,7 +139,11 @@ export function ProvisioningScreen({
   const t = useTheme();
   // The whole installation gate: the build's load file and the card maker (D239).
   const gate = flow.installGate;
-  const makerWanted = !gate.allowed && gate.reason !== 'load-file' && !!onMaker;
+  const makerWanted =
+    !gate.allowed &&
+    gate.reason !== 'load-file' &&
+    gate.reason !== 'maker-reading' &&
+    !!onMaker;
   const setMaker = (
     <SecondaryButton
       title={MAKER_SETTING.set}
@@ -305,7 +309,7 @@ export function ProvisioningScreen({
               disabled={flow.busy}
             />
           ) : null}
-          {!gate.allowed ? (
+          {!gate.allowed && gate.problem ? (
             <View style={s.card} testID="install-gate">
               <Dim>{gate.problem}</Dim>
               {makerWanted ? setMaker : null}
@@ -541,19 +545,28 @@ export function ProvisioningScreen({
             disabled={
               flow.busy ||
               !gate.allowed ||
+              !!flow.batchMakerProblem ||
               (!!snapshot.active && !journal)
             }
             onPress={() => {
               flow.program();
             }}
           />
-          {gate.allowed ? (
-            <MakerSummary maker={gate.maker} note={MAKER_SETTING.batchNote} />
-          ) : (
+          {!gate.allowed ? (
             <>
-              <Dim>{gate.problem}</Dim>
+              {gate.problem ? <Dim>{gate.problem}</Dim> : null}
               {makerWanted ? setMaker : null}
             </>
+          ) : flow.batchMakerProblem ? (
+            <>
+              <Dim>{flow.batchMakerProblem}</Dim>
+              {onMaker ? setMaker : null}
+            </>
+          ) : (
+            <MakerSummary
+              maker={gate.maker}
+              note={MAKER_SETTING.openBatchNote}
+            />
           )}
         </>
       ) : null}

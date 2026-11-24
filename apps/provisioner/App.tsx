@@ -132,9 +132,7 @@ function Navigator(): React.JSX.Element {
           }}
           onIdentity={() => openTool('identity', 'settings')}
           onMaker={() => openMaker('settings')}
-          maker={
-            recovery.installGate.allowed ? recovery.installGate.maker : null
-          }
+          maker={recovery.savedMaker}
           hardwareBusy={recovery.busy}
           hasSavedBatch={
             !!recovery.snapshot?.batch ||

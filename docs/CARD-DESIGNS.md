@@ -33,8 +33,8 @@ maker's published one is suspect ([D228](DECISIONS.md#d228)). `python3 tools/mak
 check` refuses an address that looks per card (a long run of digits or hex, a UUID, a
 serial or a uid in the path or the query) unless `--allow-per-card` is given. The set-up
 app takes one address for each ops service, in its settings and never with a batch or a
-card, shows it on the batch screen before any card is installed, and says there that the
-maker publishes it.
+card, shows it on the batch screen before any card is installed, and says in its settings
+that the maker publishes it.
 
 ## How a card names its design
 

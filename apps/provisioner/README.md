@@ -213,14 +213,18 @@ name and an address that pass the rules (`src/maker.ts`: cardkit's `tagAddressPr
 name rule of `maker/maker.schema.json`, and a refusal of the example maker and of example
 addresses). Until then the app installs nothing and asks for the maker; a service saved by
 an earlier build has none. A fork's own [`maker/maker.json`](../../maker/README.md)
-pre-fills the setting, and the shared repository's example pre-fills nothing. The batch
+pre-fills the Card maker form and no more: nothing installs until the maker is saved on the
+phone. The shared repository's example pre-fills nothing. The batch
 screen shows the name and the address before any card is installed, and the install uses
 exactly that address: the card plan is built only by `cashuPlanFor`, from a maker that
 passed the gate, in the install tap (`src/provisioningTap.ts`) and on the bench screen, the
 only two callers of `provision`. A saved maker changes only in Settings, with a second
-step, and not while a batch is open. The setting is kept on the phone
-(`cashu.provisioner.maker.v1:` and the service's origin); it is not sent to the ops service
-and is in no record or export.
+step. An open batch keeps the maker's name and tag address it was opened with in its record
+on the phone: a save that would change that address is refused while the batch is open, and
+the install step refuses when the saved address is not the batch's (close the batch, or set
+the maker back). A batch an earlier build left open takes the saved address at its first
+install. The setting is kept on the phone (`cashu.provisioner.maker.v1:` and the service's
+origin); it is not sent to the ops service and is in no export.
 The gate holds back only what loads the file: an owned-card reset removes an
 installation and restores the manager keys, loads nothing, and is not held to it.
 The J3R310-355 sample card 58206920, a J3R180 keyed for SCP03 according to the card's supplier, installed the tracked

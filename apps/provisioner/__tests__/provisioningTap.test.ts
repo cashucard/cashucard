@@ -603,6 +603,8 @@ test('the install gives the tag exactly the gated maker\'s address, and a maker 
     undefined,
     {name: 'Example card maker', tagAddress: 'https://example.com/card'},
     {name: 'Foxy', tagAddress: 'http://getfoxy.io/card'},
+    // a good name and address that the gate did not hand out
+    {name: 'Foxy', tagAddress: 'https://getfoxy.io/card'},
   ]) {
     const g = fixture();
     const fresh = await g.open();

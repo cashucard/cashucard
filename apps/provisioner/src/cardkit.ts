@@ -11,7 +11,7 @@ import {
   type Plan,
 } from '@cashu-card/cardkit';
 import {makerProblem} from './maker';
-import type {InstallMaker} from './releaseGates';
+import {passedInstallGate, type InstallMaker} from './releaseGates';
 
 export * from '@cashu-card/cardkit';
 // Holder PIN/settlement helpers are explicit: the ops reset runner does not
@@ -20,10 +20,14 @@ export * from '@cashu-card/cardkit/cleanup';
 
 /**
  * The card plan, its tag carrying the maker's address. It takes only a maker
- * that passed the installation gate (releaseGates.ts, installGate), and checks
- * the rules once more, so no other address reaches a card (D239).
+ * that passed the installation gate (releaseGates.ts, installGate): the very
+ * object the gate handed out, not one that looks like it. It checks the rules
+ * once more, so no other address reaches a card (D239).
  */
 export function cashuPlanFor(maker: InstallMaker): Plan {
+  if (!passedInstallGate(maker)) {
+    throw new RangeError('This card maker did not pass the installation gate.');
+  }
   const problem = makerProblem(maker.name, maker.tagAddress);
   if (problem) {
     throw new RangeError(problem);
