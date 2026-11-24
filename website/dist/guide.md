@@ -2,7 +2,7 @@
 
 This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.1, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
-This is the released 3.1.0 file. On 2026-11-23 it was installed and paid from at a test mint on three cards: a J3R180 keyed for SCP03, a J3R180 keyed for SCP02 and a J3R452. If the install in step 4 fails, stop and tell the person.
+The released 3.1.0 file: this exact file has run on a chip. It was installed on a J3R180 keyed for SCP03 (sample card 58206920) and paid from at a test mint on 2026-11-23. A contributor's logs of the same day show an install and payments on a J3R180 keyed for SCP02 and on a J3R452. Those logs do not record the file's hash. If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
