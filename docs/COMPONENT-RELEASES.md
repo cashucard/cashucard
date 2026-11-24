@@ -14,7 +14,7 @@ authorities. Do not generate replacement signing keys to make CI pass.
 | Firmware    | `applet/pom.xml`: 3.1.0; tracked CAP `cashu-javacard-3.1.0.cap`, APDU version 3.1 | `firmware-v3.1.0`            |
 | cardkit     | `tools/cardkit/package.json`: 0.4.0                              | `cardkit-v0.4.0`             |
 | Ops-service | `ops/package.json`: 0.2.0                                        | `ops-v0.2.0`                 |
-| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 15                  | `provisioner-v1.0.0-build.15` |
+| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 16                  | `provisioner-v1.0.0-build.16` |
 
 These examples identify source versions. Existing store build numbers remain
 reserved; use a new build number for a new upload. The next mobile release needs
@@ -22,6 +22,12 @@ a new monotonically increasing build in package.json, Android Gradle and iOS
 Info.plist. Historical `v2.1.0` and `provisioner-v1.0.0-beta.1` releases remain
 valid historical records; do not move or retag them. Corrected firmware Maven
 metadata does not alter the CAP.
+
+Provisioner build 16 (the app is named Cashu Card Setup; the version stays 1.0.0) holds, since build 15: the released 3.1 card
+file (`firmware-v3.1.0`, load file sha256 `b2afa9a8…`) on the app's list of approved load files (#266); the app reads 2.1, 2.2,
+3.0 and 3.1 cards; the new name (#265); the card maker's name and tag address set in the app, with no maker built in (D239,
+#267); and the "Other mint…" cell (ENG-857, #251). This app's install has not yet run on a chip; the operator's own card
+install with the built app comes before the tag `provisioner-v1.0.0-build.16` is pushed (see `apps/provisioner/README.md`).
 
 Firmware 3.1.0 is the first released card version of the 3.x line: 3.0 is never released, and no `firmware-v3.0.0` tag
 will be cut (D237). 3.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`

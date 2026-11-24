@@ -364,7 +364,7 @@ banner.setFillColor(cgColor(hex("ground"))); banner.fill(CGRect(x: 0, y: 0, widt
 drawMark(banner, in: CGRect(x: 60, y: 100, width: 300, height: 300), fill: .chip, small: false)
 banner.saveGState()
 banner.translateBy(x: 0, y: 500); banner.scaleBy(x: 1, y: -1)   // text draws with y up
-for (text, size, y) in [("Cashu", CGFloat(64), CGFloat(300)), ("Provisioner", 64, 224), ("Install card software over NFC.", 24, 155)] {
+for (text, size, y) in [("Cashu Card", CGFloat(64), CGFloat(300)), ("Setup", 64, 224), ("Install card software over NFC.", 24, 155)] {
     let attributes = [kCTFontAttributeName as String: figtreeFont(size, weight: 600),
                       kCTForegroundColorAttributeName as String: cgColor(hex("ink"))] as CFDictionary
     banner.textPosition = CGPoint(x: 410, y: y)
