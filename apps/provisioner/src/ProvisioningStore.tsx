@@ -828,11 +828,6 @@ function ProvisioningSession({
     }
     if (!w.snapshot().active) {
       await w.reserveNext(service);
-      // show the new card at once: the screen reads its picture's fill from
-      // this snapshot, which still held the finished card until the run ended
-      if (allowed()) {
-        setSnapshot(w.snapshot());
-      }
     }
     if (mounted.current) {
       setCardActive(true);

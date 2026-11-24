@@ -359,8 +359,10 @@ export function ProvisioningScreen({
     'record_pending',
     'recorded',
   ].includes(stage ?? '');
+  // the snapshot still shows the card before while the next one runs (it is
+  // refreshed when a run ends), so a run in progress is never "just recorded"
   const recentlyRecorded =
-    !snapshot.active && lastHistory?.stage === 'recorded';
+    !flow.busy && !snapshot.active && lastHistory?.stage === 'recorded';
   const figureFill = loadVerified || recentlyRecorded ? 1 : loadFraction;
   const figureState = flow.busy
     ? 'running'
