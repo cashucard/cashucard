@@ -71,7 +71,7 @@ def card(x, y, width, height, mobile=False):
 <path d="M{width-40} 21q9 8 0 16m5-21q14 13 0 26" class="card-chip"/>
 {text(17, 76 if mobile else 80, 'Cashu card', 'card-title')}
 {text(17, 101 if mobile else 106, 'Applet on chip', 'card-body')}
-{text(17, 124 if mobile else 129, 'Spending key' if mobile else 'Spending key + ecash', 'card-body')}
+{text(17, 124 if mobile else 129, 'Spending key' if mobile else 'Spending key + eCash', 'card-body')}
 </g>'''
 
 
@@ -97,12 +97,12 @@ def render(mobile=False):
                  edge('M147 556V644', 'recovery'), label(229, 583, 'Encrypted export', 'recovery'),
                  edge('M262 697H385', 'recovery'), label(323, 680, 'Copy + verify', 'recovery'),
                  edge('M147 750V796H853V750', 'recovery'), label(500, 796, 'Failure / stale-copy alerts', 'recovery'),
-                 node(390,52,220,96,'mint','MINT OPERATOR','Cashu mint',['Issues + settles ecash']),
+                 node(390,52,220,96,'mint','MINT OPERATOR','Cashu mint',['Issues + settles eCash']),
                  node(32,198,230,126,'wallet','HOLDER','Wallet',['Owner key + funding']),
                  card(385,192,230,146),
                  node(738,198,230,126,'till','MERCHANT','Till app',['Accepts + queues taps']),
                  node(32,432,230,124,'ops','CARD ISSUER','Ops-service',['Manager keys + records','SQLite · files / R2']),
-                 node(385,432,230,124,'ccp','OPERATOR','CCP app',['NFC installation + reset']),
+                 node(385,432,230,124,'ccp','OPERATOR','Setup app',['NFC installation + reset']),
                  node(738,432,230,124,'key','SEPARATE CUSTODY','Backup key',['Vault + offline copy'], True),
                  node(32,644,230,106,'copy','HOST-SPECIFIC','Backup / copy job',['Scheduler or Atoll*'], True),
                  node(385,644,230,106,'storage','INDEPENDENT STORAGE','Backup files',['e.g. Nextcloud'], True),
@@ -121,11 +121,11 @@ def render(mobile=False):
                  edge('M164 914H196','recovery'), label(180,843,'Copy + verify','recovery'),
                  edge('M90 968V1062H196','recovery'), label(95,1004,'Alerts','recovery'),
                  node(102,56,156,92,'mint','','Cashu mint',['Issue + settle'], mobile=True),
-                 node(16,203,148,120,'wallet','','Wallet',['Owner key','Load ecash'],mobile=True),
+                 node(16,203,148,120,'wallet','','Wallet',['Owner key','Load eCash'],mobile=True),
                  node(196,203,148,120,'till','','Till app',['Accept taps','Settle online'],mobile=True),
                  card(102,378,156,146,True),
                  node(16,620,148,112,'ops','','Ops-service',['Manager keys','Card records'],mobile=True),
-                 node(196,620,148,112,'ccp','','CCP app',['Install + reset'],mobile=True),
+                 node(196,620,148,112,'ccp','','Setup app',['Install + reset'],mobile=True),
                  node(16,860,148,108,'copy','','Backup job',['Scheduler /','Atoll*'],True,True),
                  node(196,860,148,108,'storage','','Backup files',['e.g. Nextcloud'],True,True),
                  node(196,1020,148,86,'alerts','','Notifications',['e.g. ntfy'],True,True),
@@ -136,7 +136,7 @@ def render(mobile=False):
     style = STYLE + ('.title{font-size:19px}.body{font-size:16px}.card-title{font-size:22px}.card-body{font-size:16px}' if mobile else '')
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">
 <title id="title">Cashu Card ecosystem</title>
-<desc id="desc">Wallets and tills use the mint and tap one physical card running the applet. The ops-service authorizes CCP to install or reset that card. Encrypted exports go through a backup job to independent storage and alerts. The backup decryption key has separate custody.</desc>
+<desc id="desc">Wallets and tills use the mint and tap one physical card running the applet. The ops-service authorizes Cashu Card Setup to install or reset that card. Encrypted exports go through a backup job to independent storage and alerts. The backup decryption key has separate custody.</desc>
 <style>{style}</style>
 {defs}
 <rect width="{width}" height="{height}" rx="16" fill="#0a1d15"/>

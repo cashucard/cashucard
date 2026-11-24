@@ -12,7 +12,7 @@ byte-range requests, as the host must: Safari plays the film only from a
 server that returns 206 for a range. No package install or backend is needed.
 
 `tools/browser-smoke.cjs` uses Node 22 and installed Chrome to check desktop
-and phone layouts, footer protocol and code links, the three card finishes,
+and phone layouts, footer protocol and code links,
 the film (autoplay once in view, pause out of view, replay, sound, chapters,
 arrow keys), reduced motion, the page without JavaScript, and that the host
 answers ranges and applies `_headers` with no policy violations. It creates
@@ -120,12 +120,8 @@ The site carries the Cashu Card mark (D119, D120). The header's lockup
 card's mark (`dist/assets/cashu-card-mark-green.svg`) are copies of files in
 `brand/`; after `swift brand/generate.swift`, copy them here again. The film's
 card face paints the same mark, and `dist/assets/provisioner-icon.png` is the
-provisioner's new icon. The Cashu mascot (`dist/assets/cashu.png`, from
-https://cashu.space/cashu-no-bg.png) stays only in the finish studies of
-`dist/concepts.html`, which record the card before the mark.
-Physical card artwork is native HTML/CSS/SVG. `dist/concepts.html` is an
-unindexed comparison of Ops Sage, Forest Emboss and Ivory Signal; Ops Sage is
-on the homepage. Figtree fonts are bundled from the provisioner app under
+provisioner's new icon.
+Physical card artwork is native HTML/CSS/SVG. Figtree fonts are bundled from the provisioner app under
 the SIL Open Font License in `dist/assets/OFL.txt`. The site links to the
 project's MIT license.
 
@@ -155,7 +151,7 @@ copies together. The diagrams
 show the same physical card on the payment and installation paths, distinguish
 NFC, online APIs and recovery links, and retain a text explanation in the page. `/ops-service`
 explains manager-key custody and provides the standalone Docker setup, HTTPS,
-CCP service selection and backup/recovery procedures. The manual card guide links
+Cashu Card Setup service selection and backup/recovery procedures. The manual card guide links
 both paths. The downloadable `dist/ops-compose.yaml` uses the public release
 image pinned by digest, with no source build or platform-specific hosting dependency.
 Update its image pin and the guide together after testing a new ops release.

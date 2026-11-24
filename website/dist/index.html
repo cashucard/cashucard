@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Cashu, now on a card. An experimental open source NFC ecash protocol: wallets load ecash, and terminals can accept a tap offline and settle with the mint when connected." />
-    <meta property="og:title" content="Cashu Card | Experimental NFC ecash protocol" />
-    <meta property="og:description" content="Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected." />
+    <meta name="description" content="Cashu, now on a card. An experimental open source NFC eCash protocol: wallets load eCash, and terminals can accept a tap offline and settle with the mint when connected." />
+    <meta property="og:title" content="Cashu Card | Experimental NFC eCash protocol" />
+    <meta property="og:description" content="Wallets load eCash onto the card. Terminals can accept a tap offline, then settle with the mint when connected." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://cashucard.org/" />
     <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="/styles.css" />
     <script src="/seq/tap-3/anchors.js" defer></script>
     <script src="/motion.js" defer></script>
-    <title>Cashu Card | Experimental NFC ecash protocol</title>
+    <title>Cashu Card | Experimental NFC eCash protocol</title>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -37,7 +37,7 @@
         <div class="hero-copy">
           <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
           <h1 id="hero-title">Cashu,<br /><em>now on a card.</em></h1>
-          <p>Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.</p>
+          <p>Wallets load eCash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.</p>
           <p class="hero-status">An experimental open source project, built on a draft NUT with little outside testing or review. <a href="#risks">Read the risks</a> before you load a card.</p>
           <div class="hero-actions">
             <a class="button button-bright" href="https://github.com/cashucard/nut/blob/main/CCP.md">Read the draft <span aria-hidden="true">↗</span></a>
@@ -87,7 +87,7 @@
           <ol>
             <li><b>Card.</b> The Cashu Card is an NFC smart card that runs an open protocol.</li>
             <li><b>Key.</b> The card makes its key on the chip, and the key stays there.</li>
-            <li><b>Load.</b> A wallet writes eight pieces of ecash into the card's 128 slots.</li>
+            <li><b>Load.</b> A wallet writes eight pieces of eCash into the card's 128 slots.</li>
             <li><b>Tap.</b> The till is offline. It selects the card and names the pieces for a 21 sat bill.</li>
             <li><b>Sign.</b> The card signs once for the whole payment and burns the pieces it signed for.</li>
             <li><b>Settle.</b> The till accepts the payment offline. Later, it settles with the mint.</li>
@@ -135,20 +135,20 @@
           <p>Cashu Card is an experimental open source project. It runs NUT-CCP, a draft NUT with little testing or review outside this project. Keep only small amounts on a card, amounts you can afford to lose.</p>
         </div>
         <ul class="risk-list">
-          <li><b>A lost card loses its balance.</b> The key that spends the card's ecash lives only on its chip, and a backup cannot recreate it.</li>
-          <li><b>The mint backs the ecash.</b> A card's ecash is a claim on one mint. If that mint fails, the ecash loses its value.</li>
+          <li><b>A lost card loses its balance.</b> The key that spends the card's eCash lives only on its chip, and a backup cannot recreate it.</li>
+          <li><b>The mint backs the eCash.</b> A card's eCash is a claim on one mint. If that mint fails, the eCash loses its value.</li>
           <li><b>The owner key needs a backup.</b> The wallet that set the card up holds its owner key. Without it, a blocked PIN stays blocked and a large balance can be stranded.</li>
           <li><b>Three wrong PINs block a card with an owner.</b> Any reader in range can send them. The owner's wallet sets a new PIN. A card with no owner never blocks: each wrong PIN makes the next try wait longer.</li>
           <li><b>Any reader can read the card.</b> Its balance and unspent pieces are readable without the PIN; its payment history needs the PIN. Spending takes the chip's signature, within the owner's limits.</li>
           <li><b>Offline payments carry risk for the merchant.</b> Until a till settles with the mint, the merchant carries the risk that a piece was spent elsewhere first.</li>
-          <li class="risk-wide"><b>Testing is limited.</b> Protocol 2.1 has run end to end on NXP J3R180 cards with a few named phones, as the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">23 October report</a> records. Protocol 3.0 is not yet on a card; an earlier source, as 2.3, ran on a J3R180 at a test mint, not yet with a phone. Tests on silicon for a card pulled mid-write and for timing attacks, and an independent security review, are still to come. The <a href="https://github.com/cashucard/cashucard/blob/main/docs/SECURITY-MODEL.md">security model</a> lists every open item.</li>
+          <li class="risk-wide"><b>Testing is limited.</b> Card version 3.1.0, released on 24 November 2026, has been installed and paid from at a test mint on three cards: two NXP J3R180 and one J3R452. Version 2.1 ran end to end with a few named phones, as the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">23 October report</a> records. Tests on silicon for a card pulled mid-write and for timing attacks, and an independent security review, are still to come. Two review rounds were done on the card applet, and their fixes are in firmware 3.1. The <a href="https://github.com/cashucard/cashucard/blob/main/docs/SECURITY-MODEL.md">security model</a> lists every open item.</li>
         </ul>
       </section>
       <section class="buy-section" id="buy" aria-labelledby="buy-title">
         <div class="buy-head">
           <div class="eyebrow"><span class="status-dot"></span> CARDS <span class="eyebrow-divider">/</span> NXP J3R180</div>
           <h2 id="buy-title">Where to get cards</h2>
-          <p>The Cashu Card applet runs on NXP J3R180 cards (JCOP 4, Java Card 3.0.5) with contact and contactless interfaces. Buy them unfused and initialized, with the default GlobalPlatform keys, then <a href="#install">install the applet</a> from a phone or a computer.</p>
+          <p>The Cashu Card applet runs on NXP J3R180 cards (JCOP 4, Java Card 3.0.5) with contact and contactless interfaces. It has also run on the NXP J3R452. Buy them unfused and initialized, with the default GlobalPlatform keys, then <a href="#install">install the applet</a> from a phone or a computer.</p>
         </div>
         <div class="buy-grid">
           <article class="buy-option" aria-labelledby="buy-test-title">
@@ -187,18 +187,18 @@
         <div class="buy-head">
           <div class="eyebrow"><span class="status-dot"></span> SETUP <span class="eyebrow-divider">/</span> CASHU CARD APPLET</div>
           <h2 id="install-title">Install the applet</h2>
-          <p>A blank card needs the Cashu Card applet before it can hold ecash. Install it from a phone or from a computer.</p>
+          <p>A blank card needs the Cashu Card applet before it can hold eCash. Install it from a phone or from a computer.</p>
         </div>
         <div class="install-grid">
           <article class="buy-option install-app" aria-labelledby="install-app-title">
             <span class="buy-kicker">01 / WITH A PHONE</span>
-            <div class="app-id"><img src="/assets/provisioner-icon.png" width="60" height="60" alt="" /><div><h3 id="install-app-title">Cashu Card Setup</h3><span>1.0.0 beta for iPhone and Android</span></div></div>
-            <p>The app installs the applet on blank cards over the phone's NFC. Card issuers sign in with an operator account.</p>
+            <div class="app-id"><img src="/assets/provisioner-icon.png" width="60" height="60" alt="" /><div><h3 id="install-app-title">Cashu Card Setup</h3><span>1.0.0, build 16. Beta for iPhone and Android</span></div></div>
+            <p>The app installs the applet on blank cards over the phone's NFC. Card issuers sign in with an operator account, then enter their own name and the web address the card's NFC tag opens. The app installs nothing until both are saved.</p>
             <div class="app-stores">
               <a class="button button-bright" href="https://testflight.apple.com/join/M3JucFNy">iPhone beta on TestFlight <span aria-hidden="true">↗</span></a>
               <a class="button button-outline" href="https://play.google.com/apps/testing/com.islandbitcoin.provisioner">Android beta on Google Play <span aria-hidden="true">↗</span></a>
             </div>
-            <a class="app-release" href="https://github.com/cashucard/cashucard/releases/tag/provisioner-v1.0.0-build.9">Release files and checksums <span aria-hidden="true">↗</span></a>
+            <a class="app-release" href="https://github.com/cashucard/cashucard/releases/tag/provisioner-v1.0.0-build.16">Release files and checksums <span aria-hidden="true">↗</span></a>
           </article>
           <article class="buy-option" aria-labelledby="install-guide-title">
             <span class="buy-kicker">02 / WITH A COMPUTER</span>

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Build a wallet or till for Cashu Card, an experimental NFC ecash protocol: the NUT-CCP draft, the card's commands byte for byte, test vectors, the applet, the client library and the tools." />
+    <meta name="description" content="Build a wallet or till for Cashu Card, an experimental NFC eCash protocol: the NUT-CCP draft, the card's commands byte for byte, test vectors, the applet, the client library and the tools." />
     <meta property="og:title" content="Developers | Cashu Card" />
     <meta property="og:description" content="The NUT-CCP draft, the card's commands, test vectors, the applet and the tools, for wallets and tills that read and pay from a Cashu Card." />
     <meta property="og:type" content="article" />
@@ -104,10 +104,10 @@
             </figure>
             <details class="more"><summary>Who runs each part?</summary><div class="more-body">
               <dl class="faults">
-                <div><dt>Card hardware and applet firmware</dt><dd>A compatible secure chip is the physical card. The open source applet is the software installed on it. Together they hold ecash and answer NFC commands.</dd></div>
-                <div><dt>Holder wallet</dt><dd>The holder runs a compatible wallet to set ownership and a PIN, load ecash and manage their card.</dd></div>
+                <div><dt>Card hardware and applet firmware</dt><dd>A compatible secure chip is the physical card. The open source applet is the software installed on it. Together they hold eCash and answer NFC commands.</dd></div>
+                <div><dt>Holder wallet</dt><dd>The holder runs a compatible wallet to set ownership and a PIN, load eCash and manage their card.</dd></div>
                 <div><dt>Till app</dt><dd>The merchant runs a compatible till on an NFC device to accept payments and settle them with the card's mint.</dd></div>
-                <div><dt>Mint</dt><dd>The mint operator issues the ecash proofs and checks redemption. A card issuer can reference an existing compatible mint.</dd></div>
+                <div><dt>Mint</dt><dd>The mint operator issues the eCash proofs and checks redemption. A card issuer can reference an existing compatible mint.</dd></div>
                 <div><dt>Cashu Card Setup and ops-service</dt><dd>The card issuer's operators use Cashu Card Setup. The issuer runs an ops-service or uses an existing service they trust. The service manages issuance; holder wallets and tills handle payments through the card and mint.</dd></div>
               </dl>
             </div></details>
@@ -135,7 +135,7 @@
 
           <section id="status" aria-labelledby="status-title">
             <h2 id="status-title">Status</h2>
-            <p>Cashu Card is an experimental open source project. NUT-CCP is a draft written by this project for proposal to <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>, where it is still to be proposed, numbered or merged, and it has had little testing or review outside the project. The applet's current release is <a href="https://github.com/cashucard/cashucard/releases/tag/v2.1.0">2.1.0</a>, tested on NXP J3R180 cards with a few named phones. An independent security review is still to come.</p>
+            <p>Cashu Card is an experimental open source project. NUT-CCP is a draft written by this project for proposal to <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>, where it is still to be proposed, numbered or merged, and it has had little testing or review outside the project. The applet's current release is <a href="https://github.com/cashucard/cashucard/releases/tag/firmware-v3.1.0">3.1.0</a>, installed and paid from at a test mint on NXP J3R180 and J3R452 cards. An independent security review is still to come. Two review rounds were done on the card applet, and their fixes are in firmware 3.1.</p>
             <p>Build against it to learn, test and give feedback. Read the <a href="/#risks">risks</a> before your users hold real value on a card.</p>
           </section>
 
@@ -179,7 +179,7 @@
           <section id="hardware" aria-labelledby="hardware-title">
             <h2 id="hardware-title">Testing on a card</h2>
             <p>cardsim runs the applet without a card. To test on a real one, the <a href="/guide">install guide</a> puts the applet on a card from a computer and lists the cards it runs on.</p>
-            <p>The tests on silicon are recorded as dated reports, among them the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">end-to-end payment run</a> of 23 October 2026, on Android and iOS.</p>
+            <p>The tests on silicon are recorded as dated reports, among them the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">end-to-end payment run</a> of 23 October 2026, on Android and iOS, and the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md">3.1 run</a> of 23 November 2026.</p>
           </section>
 
           <section id="report" aria-labelledby="report-title">
