@@ -134,6 +134,7 @@ docker compose run --rm --entrypoint node setup -e 'require("node:fs").unlinkSyn
               <li>Open <a href="/#install">Cashu Card Setup</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
               <li>Add your HTTPS origin, for example <code>https://ops.example.com</code>, and confirm the service selection. Use the origin without <code>/ops/operators</code>.</li>
               <li>Sign in with an operator account created on this service. Confirm the displayed hostname before creating a batch.</li>
+              <li>Enter your card maker name and the web address your cards' NFC tag opens. The app asks once for each service and installs nothing until both are saved.</li>
             </ol>
             <p>Each service has its own accounts, card records and manager keys. Saved batches and resets remain bound to their original service address and operator. Use the same canonical hostname on every operator phone.</p>
           </section>

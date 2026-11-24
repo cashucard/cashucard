@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Questions and answers about Cashu Card, an experimental open source project that puts Cashu ecash on an NFC card: what it is, what it costs, what happens if a card is lost, and how to build on it." />
+    <meta name="description" content="Questions and answers about Cashu Card, an experimental open source project that puts Cashu eCash on an NFC card: what it is, what it costs, what happens if a card is lost, and how to build on it." />
     <meta property="og:title" content="Questions and answers | Cashu Card" />
-    <meta property="og:description" content="What Cashu Card is, how a card holds and pays ecash, the risks of an experimental project, and how to build on it." />
+    <meta property="og:description" content="What Cashu Card is, how a card holds and pays eCash, the risks of an experimental project, and how to build on it." />
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://cashucard.org/faq" />
     <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
@@ -75,11 +75,11 @@
             <div class="faq">
               <details class="more" id="what">
                 <summary>What is Cashu Card?</summary>
-                <div class="more-body"><p>An open protocol and a Java Card applet that put Cashu ecash on an NFC smart card. A wallet loads ecash onto the card, and its holder pays by tapping the card on a merchant's phone or till. The till can accept the tap while offline and settle with the mint once it is connected again.</p></div>
+                <div class="more-body"><p>An open protocol and a Java Card applet that put Cashu eCash on an NFC smart card. A wallet loads eCash onto the card, and its holder pays by tapping the card on a merchant's phone or till. The till can accept the tap while offline and settle with the mint once it is connected again.</p></div>
               </details>
               <details class="more" id="cashu">
                 <summary>What is Cashu?</summary>
-                <div class="more-body"><p>Cashu is an ecash protocol for Bitcoin. A mint issues ecash backed by the bitcoin it holds, and wallets pass that ecash between people privately. Its specifications are called NUTs and live in <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>. <a href="https://cashu.space">cashu.space</a> introduces it.</p></div>
+                <div class="more-body"><p>Cashu is an eCash protocol for Bitcoin. A mint issues eCash backed by the bitcoin it holds, and wallets pass that eCash between people privately. Its specifications are called NUTs and live in <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>. <a href="https://cashu.space">cashu.space</a> introduces it.</p></div>
               </details>
               <details class="more" id="nut-ccp">
                 <summary>What is NUT-CCP, and is it part of Cashu?</summary>
@@ -87,7 +87,7 @@
               </details>
               <details class="more" id="experimental">
                 <summary>Why is it called experimental?</summary>
-                <div class="more-body"><p>The protocol is a draft, the applet has run end to end on one card model with a few phones, and an independent security review is still to come. Expect changes. The move from the 0.x applet to 2.0 changed the card's commands, and cards on 0.x had to be emptied and reinstalled; a later change could need the same.</p></div>
+                <div class="more-body"><p>The protocol is a draft, the applet has run on two card models, one of them with a few phones, and an independent security review is still to come. Two review rounds were done on the card applet, and their fixes are in firmware 3.1. Expect changes. The move from the 0.x applet to 2.0 changed the card's commands, and cards on 0.x had to be emptied and reinstalled; a later change could need the same.</p></div>
               </details>
               <details class="more" id="who">
                 <summary>Who makes Cashu Card?</summary>
@@ -113,7 +113,7 @@
               </details>
               <details class="more" id="load">
                 <summary>How does money get onto the card?</summary>
-                <div class="more-body"><p>A wallet that supports Cashu Card names the card's mint, then writes ecash onto it, each piece locked to a key the card made on its own chip. A card holds up to 128 pieces, all from one mint, in sats.</p></div>
+                <div class="more-body"><p>A wallet that supports Cashu Card names the card's mint, then writes eCash onto it, each piece locked to a key the card made on its own chip. A card holds up to 128 pieces, all from one mint, in sats.</p></div>
               </details>
               <details class="more" id="how-much">
                 <summary>How much should I keep on a card?</summary>
@@ -121,19 +121,19 @@
               </details>
               <details class="more" id="mint">
                 <summary>Who holds the money behind the card?</summary>
-                <div class="more-body"><p>The mint. The card's ecash is a claim on one mint, named on the card when it is set up, and that mint holds the bitcoin that backs it. You trust the mint to honor its ecash. A reader can check that each piece was signed by the mint; whether the mint stays solvent is a matter of trust in its operator.</p></div>
+                <div class="more-body"><p>The mint. The card's eCash is a claim on one mint, named on the card when it is set up, and that mint holds the bitcoin that backs it. You trust the mint to honor its eCash. A reader can check that each piece was signed by the mint; whether the mint stays solvent is a matter of trust in its operator.</p></div>
               </details>
               <details class="more" id="lost">
                 <summary>What happens if I lose the card or it breaks?</summary>
-                <div class="more-body"><p>Its balance is lost. The key that spends the card's ecash is made on the chip and stays there, so a backup of your wallet cannot recreate it. This is a deliberate design choice, recorded as <a href="https://github.com/cashucard/cashucard/blob/main/docs/DECISIONS.md#d5">decision D5</a>. The applet has a dated refund path for a lost card, and the apps keep it switched off for now.</p></div>
+                <div class="more-body"><p>Its balance is lost. The key that spends the card's eCash is made on the chip and stays there, so a backup of your wallet cannot recreate it. This is a deliberate design choice, recorded as <a href="https://github.com/cashucard/cashucard/blob/main/docs/DECISIONS.md#d5">decision D5</a>. The applet has a dated refund path for a lost card, and the apps keep it switched off for now.</p></div>
               </details>
               <details class="more" id="phones">
                 <summary>Which phones work?</summary>
-                <div class="more-body"><p>The October 2026 tests used named Android phones and iPhones with NFC, recorded in the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">end-to-end report</a> and the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md">reset report</a>. Other phones with NFC may work and are untested.</p></div>
+                <div class="more-body"><p>The October 2026 tests used named Android phones and iPhones with NFC, recorded in the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-full-e2e.md">end-to-end report</a> and the <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-reset.md">reset report</a>. Other phones with NFC may work and are untested. In November 2026 the Cashu Card Setup app installed card version 3.1 from an iPhone, as <a href="https://github.com/cashucard/cashucard/blob/main/docs/reports/HARDWARE_TEST_REPORT_2026-11-24_setup-build-16.md">that report</a> records.</p></div>
               </details>
               <details class="more" id="terminals">
                 <summary>Can I pay at an ordinary card terminal?</summary>
-                <div class="more-body"><p>A Cashu Card pays readers that speak its protocol, such as a merchant's phone running a till app that supports it. Bank card terminals use EMV, a different system, and they cannot read a Cashu Card's ecash.</p></div>
+                <div class="more-body"><p>A Cashu Card pays readers that speak its protocol, such as a merchant's phone running a till app that supports it. Bank card terminals use EMV, a different system, and they cannot read a Cashu Card's eCash.</p></div>
               </details>
               <details class="more" id="reuse">
                 <summary>Can a card be reset and used again?</summary>
@@ -147,7 +147,7 @@
             <div class="faq">
               <details class="more" id="found">
                 <summary>Can someone who finds my card spend it?</summary>
-                <div class="more-body"><p>Up to the limits the card's owner set. A payment needs the PIN unless it fits the no-PIN allowance the owner chose, and that allowance renews only when the PIN is typed in a tap that pays nothing or the owner's wallet visits the card. A card with no PIN holds nothing and pays nothing.</p></div>
+                <div class="more-body"><p>Up to the limits the card's owner set. A payment needs the PIN unless it fits the no-PIN allowance the owner chose. On a card with an owner, that allowance comes back only when the owner's wallet visits the card. A PIN typed at a till does not bring it back. A card with no owner brings it back with its PIN and a held tap. A card with no PIN holds nothing and pays nothing.</p></div>
               </details>
               <details class="more" id="pin">
                 <summary>What if I forget the PIN, or someone blocks it?</summary>
@@ -167,7 +167,7 @@
               </details>
               <details class="more" id="audit">
                 <summary>Has it been audited?</summary>
-                <div class="more-body"><p>An independent security review is still to come. The project's <a href="https://github.com/cashucard/cashucard/blob/main/docs/SECURITY-MODEL.md">security model</a> lists each threat, its control and the open items, among them pulling a card mid-write and timing attacks, which are still untested on silicon.</p></div>
+                <div class="more-body"><p>An independent security review is still to come. Two review rounds were done on the card applet, and their fixes are in firmware 3.1. The project's <a href="https://github.com/cashucard/cashucard/blob/main/docs/SECURITY-MODEL.md">security model</a> lists each threat, its control and the open items, among them pulling a card mid-write and timing attacks, which are still untested on silicon.</p></div>
               </details>
             </div>
           </section>

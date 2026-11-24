@@ -13,8 +13,6 @@ https://:worker.:subdomain.workers.dev/*
 # HTML pages: no-transform keeps Cloudflare from injecting scripts (its analytics beacon, bot detections) that the policy above would block
 /
   Cache-Control: public, max-age=0, must-revalidate, no-transform
-/concepts
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
 /guide
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 /privacy

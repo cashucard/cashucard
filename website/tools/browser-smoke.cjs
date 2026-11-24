@@ -139,9 +139,9 @@ async function main() {
     assert.equal(await evaluate("!!document.querySelector('#story')"), false, "Four-step section is gone");
     assert.equal(await evaluate("document.querySelectorAll('h1').length"), 1, "One page heading");
     assert.equal(await evaluate("document.querySelector('#hero-title').innerText.replace(/\\s+/g,' ').trim()"), "Cashu, now on a card.", "Hero names the card innovation");
-    assert.equal(await evaluate("document.querySelector('.hero-copy p').innerText.trim()"), "Wallets load ecash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.", "Hero distinguishes offline acceptance from mint settlement");
+    assert.equal(await evaluate("document.querySelector('.hero-copy p').innerText.trim()"), "Wallets load eCash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.", "Hero distinguishes offline acceptance from mint settlement");
     assert.equal(await evaluate("[...document.querySelectorAll('script[src]')].map(s=>new URL(s.src).pathname).join()"), "/seq/tap-3/anchors.js,/motion.js", "Two scripts: the sequence anchors and the controls");
-    // the Cashu Card mark (D120): the header's lockup, the tab icons and the hero card; the mascot stays only in /concepts' studies
+    // the Cashu Card mark (D120): the header's lockup, the tab icons and the hero card
     await until("[...document.querySelectorAll('.wordmark img, .hero-mark')].every(i=>i.complete&&i.naturalWidth>0)", "the lockup and the hero card's mark loaded");
     assert.equal(await evaluate("document.querySelector('.wordmark img').getAttribute('src')"), "/assets/cashu-card-lockup.svg", "The header shows the Cashu Card lockup");
     assert.equal(await evaluate("document.querySelector('.hero-card .hero-mark').getAttribute('src')"), "/assets/cashu-card-mark-green.svg", "The hero card carries the mark");
@@ -277,14 +277,6 @@ async function main() {
       await evaluate("document.querySelector('#source').scrollIntoView()");
       await screenshot("source-" + width);
     }
-    await viewport(1440, 900);
-    await send("Page.navigate", { url: origin + "/concepts.html" });
-    await until("document.querySelectorAll('.concept-option').length===3", "Card artwork options load");
-    assert.equal(await evaluate("document.querySelector('meta[name=robots]').content"), "noindex,nofollow", "Artwork options stay unindexed");
-    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Artwork options fit desktop");
-    await screenshot("03-card-options");
-    await viewport(390, 844);
-    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Artwork options fit mobile");
     // the install guide: its own page, linked from where to get cards, publishing the tracked CAP's hash
     await viewport(1440, 900);
     await send("Page.navigate", { url: origin + "/guide.html" });
