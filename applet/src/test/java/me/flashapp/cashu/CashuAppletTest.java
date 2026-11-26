@@ -996,7 +996,7 @@ class CashuAppletTest {
         // too (today its 1.x card's ten bytes, F0 FOXYCARD 01); on 2.0 the whole AID is these eleven
         ResponseAPDU whole = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_HEX), 256));
         assertEquals(SW_OK, whole.getSW());
-        assertArrayEquals(new byte[] { 0x03, 0x01 }, whole.getData(), "the same answer either way: version 3.1");
+        assertArrayEquals(new byte[] { 0x03, 0x02 }, whole.getData(), "the same answer either way: version 3.2");
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_GET_INFO, 0, 0, 256)), "and its instructions follow");
     }
 
@@ -1005,7 +1005,7 @@ class CashuAppletTest {
     void testSelect() {
         ResponseAPDU resp = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR)));
         assertEquals(SW_OK, resp.getSW());
-        assertArrayEquals(new byte[] { 0x03, 0x01 }, resp.getData(), "version 3.1: the wait a limit's worth past the first two askings with no larger first step and the held taps shorter (D231, D232), on 3.0: the card finishes its own change, two units, keyset keys, the paid list and the certificate (D183 to D193), on 2.2: the assisted-settlement record and GET_OUTBOX (D175), on 2.1: the shared protocol (D18), Foxy's 1.20 under the neutral AID with the fixes of D19 to D24, and D26's rollover rules (1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
+        assertArrayEquals(new byte[] { 0x03, 0x02 }, resp.getData(), "version 3.2: 3.1's wire with the review's fixes and quicker writes (D244); 3.1: the wait a limit's worth past the first two askings with no larger first step and the held taps shorter (D231, D232), on 3.0: the card finishes its own change, two units, keyset keys, the paid list and the certificate (D183 to D193), on 2.2: the assisted-settlement record and GET_OUTBOX (D175), on 2.1: the shared protocol (D18), Foxy's 1.20 under the neutral AID with the fixes of D19 to D24, and D26's rollover rules (1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
         assertNotEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(UPSTREAM_AID))),
             "an upstream reader must not find this applet under upstream's AID: the wire is not the same");
     }
@@ -3044,7 +3044,7 @@ class CashuAppletTest {
                 // and the answer says what the marked places make it say
                 byte[] d = torn.getData();
                 if (name.equals("SELECT")) {
-                    assertArrayEquals(new byte[] { 0x03, 0x01 }, d, what);
+                    assertArrayEquals(new byte[] { 0x03, 0x02 }, d, what);
                 } else if (name.equals("GET_INFO")) {
                     assertEquals(others, d[3] & 0xFF, what + ": unspent");
                     assertEquals(n + others, d[4] & 0xFF, what + ": spent");
@@ -4100,7 +4100,7 @@ class CashuAppletTest {
         assertEquals(CashuApplet.CARD_BITS_OFFSET + 4 + 32 + 29, CashuApplet.CARD_NOW_OFFSET, "bits, hash and 29 zeros take the 65 bytes the time key had, and the clock is where it was");
         assertEquals(185, CashuApplet.CARD_NOW_OFFSET);
         assertEquals(0x03, CashuApplet.VERSION_MAJOR);
-        assertEquals(0x01, CashuApplet.VERSION_MINOR);
+        assertEquals(0x02, CashuApplet.VERSION_MINOR);
         assertEquals(212, CashuApplet.CARD_RECORD_LEN, "and the record is the length it was");
         assertEquals(212, field("cardRecord").length);
     }
@@ -8500,7 +8500,7 @@ class CashuAppletTest {
         readyWithLimit(0);
         byte[] more = infoTap();
         assertEquals(3, more[0]);
-        assertEquals(1, more[1], "version 3.1");
+        assertEquals(2, more[1], "version 3.2");
         assertEquals((byte) 0xFF, more[6], "capabilities FF: the limit on one payment is waited for, not refused, the 1.6 forms are there, so are 128 places with the short listing, a payment burned outside its transaction, and the PIN taken sealed");
         assertEquals(SW_OK, setLimits(1000, 100));
         assertEquals(100, paymentLimit());

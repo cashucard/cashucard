@@ -353,7 +353,7 @@ class SchnorrHWMathTest {
         { "CashuApplet.java", "private void processSetCard(",
           "if (outbox == null) { try { outbox = new byte[OUTBOX_LEN]; } catch (SystemException e) { outbox = null; } }" },
         { "CashuApplet.java", "private void processSetCard(",
-          "if (outbox != null && outStage == null) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e) { outStage = null; } }" },
+          "if (outbox != null && outStage == null) { try { outStage = JCSystem.makeTransientByteArray(OUT_STAGE_LEN, JCSystem.CLEAR_ON_DESELECT); } catch (SystemException e) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e2) { outStage = null; } } }" },
         // 3.0's openings' B_ and K (D183) with their shown mark (D190), 536 bytes, for the same reason
         { "CashuApplet.java", "private void processSetCard(",
           "if (openKeys == null) { try { openKeys = new byte[(short)(CHANGE_MOST * OPEN_KEYS_ROW)]; } catch (SystemException e) { openKeys = null; } }" },
@@ -577,7 +577,7 @@ class SchnorrHWMathTest {
         int guard = body.indexOf("if (outbox == null)");
         int allocation = body.indexOf("outbox = new byte[OUTBOX_LEN]");
         int stageGuard = body.indexOf("if (outbox != null && outStage == null)");
-        int stage = body.indexOf("outStage = new byte[OUT_STAGE_LEN]");
+        int stage = body.indexOf("outStage = JCSystem.makeTransientByteArray(OUT_STAGE_LEN, JCSystem.CLEAR_ON_DESELECT)");
         int begin = body.indexOf("JCSystem.beginTransaction()");
         org.junit.jupiter.api.Assertions.assertTrue(store > 0 && store < guard && guard < allocation && allocation < stageGuard && stageGuard < stage && stage < begin,
             "after the store, each behind its guard, the staging after the record, before the transaction that writes the record");
@@ -590,7 +590,8 @@ class SchnorrHWMathTest {
                 org.junit.jupiter.api.Assertions.assertTrue(assigned.start() > setCard[0] && assigned.start() < setCard[1],
                     name + " is assigned only in SET_CARD, near: ..." + src.substring(Math.max(0, assigned.start() - 60), Math.min(src.length(), assigned.start() + 40)).replaceAll("\\s+", " "));
             }
-            org.junit.jupiter.api.Assertions.assertEquals(2, assignments, name + ": the allocation, and the null the catch leaves it as");
+            // outStage (D244): RAM, and where the chip gives none persistent, and the null the second catch leaves
+            org.junit.jupiter.api.Assertions.assertEquals(name.equals("outStage") ? 3 : 2, assignments, name + ": the allocation, and the null the catch leaves it as");
         }
     }
 
@@ -985,9 +986,15 @@ class SchnorrHWMathTest {
         return evaluated(k.get(token), k);
     }
 
-    /** { bytes CLEAR_ON_DESELECT, bytes CLEAR_ON_RESET, arrays } asked for by every JCSystem.makeTransientByteArray in the two sources. */
+    /**
+     * { bytes CLEAR_ON_DESELECT, bytes CLEAR_ON_RESET, arrays } asked for by every JCSystem.makeTransientByteArray in the two sources
+     * at install: SET_CARD's one reservation (3.2, D244: the staged outputs, asked for at the first SET_CARD, persistent where
+     * the chip gives no room) is not the install's, and is counted by `transientMemoryAtSetCard`.
+     */
     static int[] transientMemoryAskedFor() throws Exception {
-        String applet = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        String whole = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        int[] setCard = bodyRange(whole, "private void processSetCard(");
+        String applet = whole.substring(0, setCard[0]) + whole.substring(setCard[1]);
         String signer = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8));
         java.util.Map<String, String> constants = constantExpressions(applet, signer);
         int onDeselect = 0, onReset = 0, arrays = 0;
@@ -1023,6 +1030,35 @@ class SchnorrHWMathTest {
         org.junit.jupiter.api.Assertions.assertEquals(15, asked[2], "the parse found the 13 of CashuApplet and the 2 of SchnorrHW (3.0 has no change grant, D185)");
         org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 (3.0: a held tap's count, one byte, D187, D189) and SchnorrHW 544");
         org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 3.0 adds a byte of marks, TAP_PAID, TAP_CLAIMED and TAP_READ, D187, D189); 1.14 kept six bytes for a clock told twice, and eight with the flags");
+    }
+
+    /** { bytes CLEAR_ON_DESELECT, arrays } SET_CARD asks for (3.2, D244), with the statement that asks. */
+    static int[] transientMemoryAtSetCard() throws Exception {
+        String whole = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        String signer = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8));
+        int[] setCard = bodyRange(whole, "private void processSetCard(");
+        String body = whole.substring(setCard[0], setCard[1]);
+        java.util.Map<String, String> constants = constantExpressions(whole, signer);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("JCSystem\\.makeTransientByteArray\\(\\s*([^,]+?)\\s*,\\s*JCSystem\\.(CLEAR_ON_DESELECT|CLEAR_ON_RESET)\\s*\\)").matcher(body);
+        int bytes = 0, arrays = 0;
+        while (m.find()) {
+            org.junit.jupiter.api.Assertions.assertEquals("CLEAR_ON_DESELECT", m.group(2), "SET_CARD's RAM is one payment's, cleared at a selection");
+            bytes += evaluated(m.group(1), constants);
+            arrays++;
+        }
+        return new int[] { bytes, arrays };
+    }
+
+    @Test
+    @DisplayName("3.2 (D244): SET_CARD asks for one transient array, the staged outputs (601 bytes, CLEAR_ON_DESELECT), once, and where the chip gives no room it is persistent as before; the constructors' figures are as they were")
+    void setCardAsksForTheStagedOutputsInRam() throws Exception {
+        int[] asked = transientMemoryAtSetCard();
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601, 1 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8");
+        org.junit.jupiter.api.Assertions.assertEquals(941, transientMemoryAskedFor()[0], "and the install's CLEAR_ON_DESELECT is the 941 of the build that installs");
+        String src = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        org.junit.jupiter.api.Assertions.assertNotNull(findIgnoringSpace(src,
+            "try { outStage = JCSystem.makeTransientByteArray(OUT_STAGE_LEN, JCSystem.CLEAR_ON_DESELECT); } catch (SystemException e) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e2) { outStage = null; } }",
+            0, src.length()), "the RAM asked for, and persistent memory where the chip refuses it, and nothing where it refuses that too");
     }
 
     @Test

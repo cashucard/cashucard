@@ -91,6 +91,12 @@ public final class TearHook {
                 if (v == null) continue;
                 boolean tr = false;
                 for (String t : TRANSIENT) if (t.equals(f.getName())) tr = true;
+                // and any array the runtime made transient (3.2, D244: `outStage`, RAM where the chip gives the room)
+                try {
+                    if (v instanceof byte[] && JCSystem.isTransient(v) != JCSystem.NOT_A_TRANSIENT_OBJECT) tr = true;
+                } catch (RuntimeException e) {
+                    // a runtime that cannot say: the name list alone
+                }
                 if ((v instanceof byte[] || v instanceof short[] || v instanceof boolean[]) && !tr && !stat) {
                     persistent.add(v);
                     names.put(v, f.getName());
@@ -338,7 +344,8 @@ public final class TearHook {
         } catch (IllegalAccessException e) {
             throw new IllegalStateException(e);
         }
-        if (snapOwnerW != null) ownerKeyObj.setW(snapOwnerW, (short) 0, (short) 65);
+        // a chip whose key writes take no part in a transaction keeps the owner's key a rolled-back transaction wrote (`keysOutsideTx`)
+        if (snapOwnerW != null && !keysOutsideTx) ownerKeyObj.setW(snapOwnerW, (short) 0, (short) 65);
         // OwnerPIN's value rolls back (update takes part in a transaction); its try counter does not (check never does)
         restorePinValue(pinObj, snapPin);
         // NonAtomic writes never took part
@@ -412,6 +419,35 @@ public final class TearHook {
 
     public static void genKeyPair(KeyPair kp) {
         kp.genKeyPair();
+        if (freshKeys) freshPair(kp);
         if (keyPairs.contains(kp)) ev("genKeyPair" + (depth > 0 ? " (key data: on a chip it may not take part in the transaction)" : ""));
+    }
+
+    /**
+     * 3.2 (D244): a key pair of its own at every draw. jCardSim's generator is seeded with nothing, so every genKeyPair gives the
+     * same pair, and a key drawn again looks unchanged: a tear between a reset's new card key and the commit that makes the card
+     * new could not be seen (the review of 3.1, APP-H1). With this set, the n-th draw is d = SHA-256("tear key" || n) mod n and
+     * W = d*G, compressed as the simulator gives its own.
+     */
+    public static boolean freshKeys;
+    static int drawn;
+    /**
+     * A chip whose key writes take no part in a transaction (JavaCard does not promise that they do): an owner's key written in a
+     * transaction that is then rolled back stays written (the review of 3.1, APP-M5, APP-L6).
+     */
+    public static boolean keysOutsideTx;
+
+    static void freshPair(KeyPair kp) {
+        drawn++;
+        java.math.BigInteger d = new java.math.BigInteger(1, CashuAppletTest.sha256(("tear key " + drawn).getBytes(java.nio.charset.StandardCharsets.US_ASCII)))
+            .mod(DateKeys.N);
+        if (d.signum() == 0) d = java.math.BigInteger.ONE;
+        byte[] s = ReviewFixesTest.to32(d);
+        java.math.BigInteger[] w = DateKeys.mul(d, DateKeys.G);
+        byte[] comp = new byte[33];
+        comp[0] = (byte) (w[1].testBit(0) ? 3 : 2);
+        System.arraycopy(ReviewFixesTest.to32(w[0]), 0, comp, 1, 32);
+        ((javacard.security.ECPrivateKey) kp.getPrivate()).setS(s, (short) 0, (short) 32);
+        ((ECPublicKey) kp.getPublic()).setW(comp, (short) 0, (short) 33);
     }
 }

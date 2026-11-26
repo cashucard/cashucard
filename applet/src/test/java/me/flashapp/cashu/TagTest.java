@@ -513,7 +513,7 @@ class TagTest {
         assertEquals(0x6999, selectTag().getSW(), "the tag application refuses its name");
         ResponseAPDU card = selectCard();
         assertEquals(SW_OK, card.getSW(), "the card's own name is selected");
-        assertArrayEquals(new byte[] { 0x03, 0x01 }, card.getData(), "and answers its version, 3.1");
+        assertArrayEquals(new byte[] { 0x03, 0x02 }, card.getData(), "and answers its version, 3.2");
         assertEquals(1, infoTag().getData()[42], "and says the tag is off");
         assertEquals(0x6999, selectTag().getSW(), "the tag asks at each selection, and it is still off");
         selectCard();
@@ -614,7 +614,7 @@ class TagTest {
         assertEquals(59, four.getData().length);
         assertArrayEquals(three.getData(), Arrays.copyOf(four.getData(), 51), "P1 = 4 begins with the 51 of P1 = 3");
         assertEquals(0xF7, four.getData()[55] & 0xFF, "every profile of byte 55 but bit 3, the wait on every payment (D211, D228)");
-        assertEquals(0x03, four.getData()[56], "and the certificate's (bit 0) and keys per load (bit 1, D197)");
+        assertEquals(0x03, four.getData()[56] & ~CashuApplet.INFO_FLAG_FIELD_P, "and the certificate's (bit 0) and keys per load (bit 1, D197); bit 2 (D244) is the chip's, and bits 3 to 7 are 0");
         for (int p1 : new int[] { 5, 0x10, 0x7F, 0x80, 0xFF }) {
             ResponseAPDU other = send(new CommandAPDU(CLA, INS_GET_INFO, p1, 0, 256));
             assertEquals(SW_OK, other.getSW(), "P1 = " + p1);
