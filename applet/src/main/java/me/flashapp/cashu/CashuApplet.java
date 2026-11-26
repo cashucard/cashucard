@@ -1477,6 +1477,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     /** Working room for a sealed command (RAM): `scratch`, by another name. */
     private byte[] seal;
     private RandomData rng;
+    /** The signer's count (D257): persistent, stepped at the first signature of each time in the field; and its RAM part. */
+    private byte[] signCount, signCountHere;
 
     // -------------------------------------------------------------------------
     // Install / init
@@ -1554,6 +1556,11 @@ public class CashuApplet extends Applet implements TagSwitch {
         schnorrHW = new SchnorrHW();
         schnorrHW.init();
         rng.generateData(chain, (short) 0, (short) 32);
+        /* The signer's count (D257), the install's last objects, so that nothing made before them moves: four bytes kept, and
+         * one of RAM cleared at power loss. A reset keeps the count: it never runs back. */
+        signCount       = new byte[4];
+        signCountHere   = JCSystem.makeTransientByteArray((short) 1, JCSystem.CLEAR_ON_RESET);
+        schnorrHW.counted(signCount, signCountHere);
     }
 
     /**

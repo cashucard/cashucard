@@ -10267,3 +10267,64 @@ CAP the build makes has, the kept place is the one warned of.
 
 **The 3.2 file** is padded by this rule: unpadded, its kept package ends 86 past; with five writes it ends 120 past
 (40,312 bytes), its load file 44,592 bytes (48 past), a size no chip has been given. The chip run of that file confirms it.
+
+## <a id="d257"></a>D257: A count that never comes again mixed into every signature's aux
+
+**Proposed (applet 3.2, 2026-11-26; not released, not yet on a chip; the red team's recommended fix for its C-f7bdac4-1).**
+No command, answer or stored format of the protocol changes; the card keeps four bytes more.
+
+**The rule.** BIP-340's aux, the 32 bytes the signer draws for each signing (step 2), is the generator's 32 bytes with a
+count XORed into its last five: `signCount`, four bytes kept, stepped before the first signing of each time in the field
+and before the first after every 255 more, then `signCountHere`, one byte of RAM cleared at power loss
+(`CLEAR_ON_RESET`), the signings since that step. The pair is never the same twice, so the aux of two signings is never
+the same whatever the generator answers, and neither is the nonce, k = H(t ‖ P ‖ m) with t = d XOR H_aux(aux). Every
+signing counts: AUTH, a wait's, the PIN key's (GET_NONCE P1 = 1), a payment's SIGN, the record's descriptor, and the
+bytecode's signing again after the chip's path was refused.
+
+**What it closes.** The red team's C-f7bdac4-1 (MEDIUM, older than 3.2, proved on both paths): with a stuck generator two
+signatures of one message have one nonce, and one bit of k flipped between its hash and R = kG gives a signature that
+verifies for its own nonce, which no check can refuse; with the good one of the same message, d. Every other way to the
+key by a stuck generator rests on the same thing, one nonce twice: D250's fault in e and the message fault of its
+follow-up among them. `CountedAuxTest`: with the generator stuck, 600 signings of one message across two power cuts and two
+wraps of the RAM count have 600 R on each path; the red team's nonce fault and message fault give no key (the same search
+finds it on a signer with no count); on a card, two AUTHs of one reader nonce with both of the card's generators stuck give
+two R, and the count steps once a time in the field.
+
+**A tear.** The step is written (an atomic `Util.arrayCopy`) before the aux is drawn. Torn before it commits, the count is
+as it was, which was used only with RAM counts of an earlier time in the field, and the next time in the field steps it;
+torn after, it is stepped. A signing is never asked to step it inside a transaction (6F00 there), where an abort would take
+the step back while the RAM count went on. No code path signs inside one.
+
+**BIP-340 and its vectors.** BIP-340's aux is any 32 bytes of auxiliary data; how the card chooses it changes no signature's
+validity. A signer with no count (a test's signer of its own, `counted` not called) draws the generator's aux alone, so the
+tests that pin signatures to a given aux are as they were; with the count, a vector's aux is had again by giving the
+generator that aux XOR the count, and `CountedAuxTest.theCountIsXoredIntoTheAux` pins the card's signature to BIP-340's own
+signing of the aux that comes out, byte for byte.
+
+**The vectors.** `spec/vectors/secret.json`'s signatures and the transcript's 64 signed answers are made again: each is a
+fresh jCardSim card's, whose count is 0 at the install and is stepped by the first signature of each time in the field. A
+model held to the transcript byte for byte mixes the count the same way. The tests that read them (cardsim's
+`cashu-crypto.test.cjs`, cardctl's `test_apdu.py` and `test_spec_consistency.py`, cardkit's `settled-cleanup.test.ts`) pass
+on them. Two of CashuAppletTest's tests made the burn's transaction fail by leaving one open between commands, which
+jCardSim allows and a card does not; they now sign once (an AUTH) before the payment, outside it, as any card's tap would.
+
+**What it costs.** Each signing: five XORs and one byte of RAM, nothing measurable. Each time in the field: one atomic write
+of four persistent bytes at its first signing (one page write with the transaction's log on the chip, a few milliseconds;
+not measured), and one more each 255 signings in one time in the field. Wear: one write a tap; a payment writes far more (the
+paid list, the burn, the day's count). AUTH, which any reader may ask, now causes that one write a tap (SECURITY-MODEL open
+item 7). Memory: four persistent bytes and one of `CLEAR_ON_RESET` at install, made last in the constructor so that nothing
+made before them moves; the install's RAM is then 941 bytes cleared on deselect and 8 on reset in 16 arrays, the budget of
+the build known to install (8 and 16 at their limits).
+
+**What it does not close.** A generator whose output an attacker chooses (not stuck, but steered) can cancel a count it knows:
+the count is no secret. A fault that skips the count's step, or its RAM step, makes two signings share a count: with a stuck
+generator that is the old case again, at the price of one more fault.
+
+**And D250, with this in.** The cheapest way left to the key is a stuck generator, one fault to make two signings share a
+count, and one fault in k before R = kG, which no check after R can see; the re-hash of e stops the variant with the second
+fault in e instead of k, at the same price, and so no longer raises the price of the key. What it still does is hold the
+card's check to BIP-340's own challenge: a fault in e between its hash and the product makes a signature the card refuses
+and makes again (or 6F00), where without it the card would release a signature that verifies under the faulted e alone,
+which no mint takes; on a payment's SIGN that is pieces burned for a signature that is no good. That is the money's safety
+against a fault, not the key's. The project lead decides (D250: about 17 ms a signature, 28 a payment's SIGN); the final file is
+built both ways.

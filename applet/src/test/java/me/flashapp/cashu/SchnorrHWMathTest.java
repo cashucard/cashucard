@@ -608,10 +608,11 @@ class SchnorrHWMathTest {
      * and D196's 37: what left the card and the message's hash kept beside the last signature (36), and the openings whose change
      * the running day counted (1): 29,889; and D197's 162: the card's secret c and the refund key's y (64), and the keys of the
      * payment in hand (98): 30,051; and the mark of a forgotten PIN's history owed (D196, 1): 30,052; and D202's count of the owners' c
-     * the card has taken (4, after c and the refund key's y): 30,056, within the +300 measured to install.
+     * the card has taken (4, after c and the refund key's y): 30,056; and D257's count of the signer's signings (4, the install's last
+     * array): 30,060, within the +300 measured to install.
      */
     @Test
-    @DisplayName("the constructors make 30,056 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36), less 3.0's one byte of no change grant (D185) and with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195), and D196's 37, and D197's 162 (c, the refund key's y, the payment's keys), and the PIN's mark of a forgotten history (D196, 1), and D202's 4 (the count of the owners' c): neither the 12,288 of the mint's proofs nor the record's 4,293 are among them, for the chip refuses a constructor that asks for that much more")
+    @DisplayName("the constructors make 30,060 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36), less 3.0's one byte of no change grant (D185) and with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195), and D196's 37, and D197's 162 (c, the refund key's y, the payment's keys), and the PIN's mark of a forgotten history (D196, 1), and D202's 4 (the count of the owners' c), and D257's 4 (the signer's count): neither the 12,288 of the mint's proofs nor the record's 4,293 are among them, for the chip refuses a constructor that asks for that much more")
     void theConstructorsAskForNoMorePersistentMemoryThanTheBuildThatInstalls() throws Exception {
         String applet = stripCommentsAndCharLiterals(new String(
             java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -629,10 +630,10 @@ class SchnorrHWMathTest {
                 arrays++;
             }
         }
-        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36 - 1 + 1 + 10 + 37 + 64 + 98 + 1 + 4, total,
+        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36 - 1 + 1 + 10 + 37 + 64 + 98 + 1 + 4 + 4, total,
             "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install) "
-            + "and 2.2's installation and generation, 36 (the record's 4,293 are made at SET_CARD, D176), less 3.0's one byte of no change grant (D185), with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195) and D196's 37 (the receipt's figures kept with the last signature, the counted openings) and D197's 162 (c and the refund key's y, the payment's keys), and one byte more of the PIN's marks: a forgotten PIN's history owed (D196), and D202's count of the owners' c the card has taken (4). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
-        org.junit.jupiter.api.Assertions.assertEquals(25, arrays, "the parse found the 22 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
+            + "and 2.2's installation and generation, 36 (the record's 4,293 are made at SET_CARD, D176), less 3.0's one byte of no change grant (D185), with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195) and D196's 37 (the receipt's figures kept with the last signature, the counted openings) and D197's 162 (c and the refund key's y, the payment's keys), and one byte more of the PIN's marks: a forgotten PIN's history owed (D196), and D202's count of the owners' c the card has taken (4), and D257's count of the signer's signings (4). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
+        org.junit.jupiter.api.Assertions.assertEquals(26, arrays, "the parse found the 23 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
         org.junit.jupiter.api.Assertions.assertTrue(total + 12_288 > 29_806 + 300, "and the store is the kind of figure the chip refuses there");
     }
 
@@ -1027,9 +1028,9 @@ class SchnorrHWMathTest {
         org.junit.jupiter.api.Assertions.assertTrue(asked[1] <= RAM_ON_RESET_MOST, "CLEAR_ON_RESET is " + asked[1] + " bytes, over " + RAM_ON_RESET_MOST + "." + why);
         org.junit.jupiter.api.Assertions.assertTrue(asked[2] <= RAM_ARRAYS_MOST, "transient arrays are " + asked[2] + ", over " + RAM_ARRAYS_MOST + "." + why);
         // a parse that found nothing would prove nothing
-        org.junit.jupiter.api.Assertions.assertEquals(15, asked[2], "the parse found the 13 of CashuApplet and the 2 of SchnorrHW (3.0 has no change grant, D185)");
+        org.junit.jupiter.api.Assertions.assertEquals(16, asked[2], "the parse found the 14 of CashuApplet and the 2 of SchnorrHW (3.0 has no change grant, D185; 3.2 adds the signer's count of a time in the field, D257)");
         org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 (3.0: a held tap's count, one byte, D187, D189) and SchnorrHW 544");
-        org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 3.0 adds a byte of marks, TAP_PAID, TAP_CLAIMED and TAP_READ, D187, D189); 1.14 kept six bytes for a clock told twice, and eight with the flags");
+        org.junit.jupiter.api.Assertions.assertEquals(8, asked[1], "the time the terminal told (4), the tap's three flags (3: 3.0 adds a byte of marks, TAP_PAID, TAP_CLAIMED and TAP_READ, D187, D189) and the signer's count of this time in the field (1, D257); 1.14 kept six bytes for a clock told twice, and eight with the flags");
     }
 
     /** { bytes CLEAR_ON_DESELECT, arrays } SET_CARD asks for (3.2, D244), with the statement that asks. */

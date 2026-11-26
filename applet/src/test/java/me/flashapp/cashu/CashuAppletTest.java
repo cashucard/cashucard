@@ -2711,6 +2711,10 @@ class CashuAppletTest {
         int[] all = new int[128];
         for (int i = 0; i < 128; i++) all[i] = i;
         byte[] storage = field("proofStorage").clone(), receipts = field("cardReceipts").clone(), cardLog = field("cardLog").clone(), lastSig = field("lastSig").clone();
+        /* the signer's count (D257) stepped by this time in the field's first signature, an AUTH before the payment, outside any
+         * transaction, as on a card: a card never has a transaction open between commands, and a signing asked inside one is
+         * refused 6F00 */
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_AUTH, 0, 0, new byte[16], 256)));
         assertEquals(SW_OK, sw(beginCommand(all)));
         runtime.leaveATransactionOpen();        // the applet's own beginTransaction at the burn now throws TransactionException
         ResponseAPDU r = signAll();
@@ -3179,6 +3183,8 @@ class CashuAppletTest {
             ready();
             loadMany(128, i -> buildProof(KEYSET, 1 + i, i + 1));
             int[] places = scrambled(n);
+            // the signer's count (D257) stepped first, outside any transaction, as on a card (see testAFailedBurnIs6A96AndBurnsNothing)
+            assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_AUTH, 0, 0, new byte[16], 256)), what);
             assertEquals(SW_OK, sw(beginCommand(places)), what);
             java.util.Map<String, byte[]> before = persistent();
             runtime.leaveATransactionOpen();

@@ -64,7 +64,9 @@ public final class TearHook {
     static final String[] TRANSIENT = { "pinVerifiedFlag", "ownerNonce", "nonceLive", "loadGrant", "scratch", "seal", "allOut",
         "tapTime", "tapOpen", "allSlots", "allState", "allSum", "allChange", "allNet",
         // D247: the engines' flags, RAM a selection clears (null where the chip refused it: no write at all); D249: the kept y
-        "engineReady", "groupY" };
+        "engineReady", "groupY",
+        // D257: the signer's count of this time in the field, RAM cleared at power loss
+        "signCountHere" };
 
     /** The last exception, not an ISOException, that left process(): what jCardSim answers 6F00 for. */
     public static Throwable lastThrown;

@@ -478,7 +478,11 @@ final class SchnorrHW {
         // BIP-340 default signing. `a` is fresh secure randomness per signature;
         // it is what stops a fault-injected repeat of this call from reusing k.
         // sc[TMP..TMP+31] = a, sc[TMP+32..TMP+63] = taggedHash(aux, a) -> t
+        // D257: the count stepped where it must be, then the aux drawn and the count mixed into it, so that no two signings
+        // have one aux, however the generator answers
+        step(sc, SC_TMP);
         rng.generateData(sc, SC_TMP, (short)32);
+        count(sc, SC_TMP);
         taggedHash(tagHashAux, sc, SC_TMP, (short)32, sc, (short)(SC_TMP+32));
         for (short i = 0; i < 32; i++) {
             sc[(short)(SC_TMP+32+i)] =
@@ -1482,6 +1486,49 @@ final class SchnorrHW {
      * first. A signature never writes it (D228). Where it is true the signature's e·d is made by `mulModNChip`, else by `mulModN`.
      */
     boolean chipMul;
+
+    /*
+     * D257: a count mixed into BIP-340's aux at every signing, so that a generator that is stuck never gives two signings one
+     * nonce (the red team's C-f7bdac4-1: with the same aux, one bit of k flipped between its hash and R = kG gives a signature
+     * that verifies and, with the good one of the same message, the card key). `steps`, four bytes of persistent memory, is
+     * stepped before the first signing of each time in the field and before the first after every 255 more; `stepsHere`, one
+     * byte of RAM cleared at power loss, counts the signings since. The pair is never the same twice. Null until the applet
+     * gives them (`counted`), as in a test's signer of its own: the aux is then the generator's alone, as BIP-340's vectors have
+     * it.
+     */
+    private byte[] steps, stepsHere;
+
+    /** The count's two arrays (D257), the install's last objects (CashuApplet's constructor). */
+    void counted(byte[] persistent4, byte[] ram1) {
+        steps = persistent4;
+        stepsHere = ram1;
+    }
+
+    /**
+     * `steps` stepped where this signing must (D257): where this time in the field has signed nothing yet, or 255 times since the
+     * last step (`stepsHere` 0). Atomically and before it is used: a tear leaves it as it was (used with no count of this time
+     * in the field) or stepped. Never inside a transaction (6F00), where an abort would take the step back while the RAM count
+     * went on, and a pair could come again. `a[off .. off + 4)` is the room, which the generator fills after it.
+     */
+    private void step(byte[] a, short off) {
+        if (steps == null || stepsHere == null || stepsHere[0] != (byte) 0) return;
+        if (JCSystem.getTransactionDepth() != (byte) 0) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        Util.arrayCopyNonAtomic(steps, (short) 0, a, off, (short) 4);
+        for (short i = 3; i >= 0; i--) {
+            a[(short)(off + i)]++;
+            if (a[(short)(off + i)] != (byte) 0) break;
+        }
+        Util.arrayCopy(a, off, steps, (short) 0, (short) 4);
+        stepsHere[0] = (byte) 1;
+    }
+
+    /** This signing's count (D257) XORed into the aux's last five bytes, `steps` then `stepsHere`, and `stepsHere` stepped (255 to 0). */
+    private void count(byte[] a, short off) {
+        if (steps == null || stepsHere == null) return;
+        for (short i = 0; i < 4; i++) a[(short)(off + 27 + i)] ^= steps[i];
+        a[(short)(off + 31)] ^= stepsHere[0];
+        stepsHere[0]++;
+    }
     /** The chip's RSA and its key for squaring mod n: made at the first SET_CARD (not in the constructor: the chip's first create is kept light), and never again. */
     private Cipher rsaC;
     private RSAPrivateKey sqKey;

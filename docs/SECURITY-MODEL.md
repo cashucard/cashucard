@@ -476,6 +476,9 @@ a few hundred taps. Treat simulator results accordingly, see
    (see EEPROM wear above). How a chip wears under a reader that asks without
    end is not measured. The bench J3R180 gives the key in RAM (2026-11-13, by a
    test-only build that reports it); another chip or configuration may not.
+   Since [D257](DECISIONS.md#d257) the first signature of each time in the field,
+   an `AUTH` any reader may ask among them, also writes the signer's four-byte count,
+   and one more each 255 signatures in one time in the field: one write a tap.
 8. **A header far ahead and the card's days** (3.0): a header with a time far ahead,
    given by anyone holding the card with no PIN, moves the clock there, and no real
    header moves it on.
