@@ -1418,7 +1418,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     private boolean fieldOwn;
     /**
      * Which engine holds its key in this selection (D247, D248): [0] to [3] the cube's, the root's, Euler's and the square's
-     * own, [4] the signature's squaring (SchnorrHW's `ready`). RAM a selection clears, and put down in `select()` as well (for
+     * own, [4] the signature's squaring, [5] agrees()'s key agreement (D251; SchnorrHW's `ready`). RAM a selection clears, and put down in `select()` as well (for
      * a chip that keeps it across a SELECT of the tag and back), by every write of a key (`fieldKey`, and chipMulInit for the
      * squaring's), and while an engine works, up after it answers. An engine that throws at its power is given its key again
      * and asked once more before the exception is let out (D248): one that lost what it was given, whatever the cause, costs
@@ -1641,7 +1641,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         // the tag's code of its last selection (D222), in this applet's working memory: not left for this one to find
         Util.arrayFillNonAtomic(scratch, X_TAG, (short)(TAG_R_LEN + TAG_MAC_LEN), (byte) 0);
         // and every engine is given its key again at its first use in this selection (D248), whatever the chip kept of it
-        if (engineReady != null) Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 5, (byte) 0);
+        if (engineReady != null) Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 6, (byte) 0);
         return true;
     }
 
@@ -4991,12 +4991,12 @@ public class CashuApplet extends Applet implements TagSwitch {
                 groupY = null;
             }
         }
-        /* The engines' flags (D247), five bytes of the same memory: which engine holds its key in this selection. Given to the
-         * signer too, for its squaring. Where the chip will not give it, null: every engine is given its key at each use, as
-         * before. */
+        /* The engines' flags (D247), six bytes of the same memory: which engine holds its key in this selection. Given to the
+         * signer too, for its squaring and agrees()'s agreement (D251). Where the chip will not give it, null: every engine is
+         * given its key at each use, as before. */
         if (engineReady == null) {
             try {
-                engineReady = JCSystem.makeTransientByteArray((short) 5, JCSystem.CLEAR_ON_DESELECT);
+                engineReady = JCSystem.makeTransientByteArray((short) 6, JCSystem.CLEAR_ON_DESELECT);
                 schnorrHW.ready = engineReady;
             } catch (SystemException e) {
                 engineReady = null;
@@ -7814,9 +7814,14 @@ public class CashuApplet extends Applet implements TagSwitch {
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
         // the 3.2 speed commits (D245 on): writes added to hold the file at 245 past, made again by each (pad.py)
-        a[110] = 0;
-        a[111] = 1;
-        a[112] = 2;
+        a[110] = 6;
+        a[111] = 7;
+        a[112] = 8;
+        a[113] = 9;
+        a[114] = 10;
+        a[115] = 11;
+        a[116] = 12;
+        a[117] = 13;
         // padding ends
     }
 }

@@ -378,6 +378,8 @@ class ChipEnginesTest {
         Object applet = c.applet();
         PerPaymentKeyTest.CountingCipher rsa = (PerPaymentKeyTest.CountingCipher) PerPaymentKeyTest.wrap(applet, CashuApplet.class, "rsa", o -> new PerPaymentKeyTest.CountingCipher((Cipher) o));
         PerPaymentKeyTest.CountingAgreement ecdh = (PerPaymentKeyTest.CountingAgreement) PerPaymentKeyTest.wrap(signerOf(c), SchnorrHW.class, "ecdh", o -> new PerPaymentKeyTest.CountingAgreement((javacard.security.KeyAgreement) o));
+        // D251: and agrees()'s own, which the curve tests by agreement ask
+        PerPaymentKeyTest.CountingAgreement curve = (PerPaymentKeyTest.CountingAgreement) PerPaymentKeyTest.wrap(signerOf(c), SchnorrHW.class, "curveKA", o -> new PerPaymentKeyTest.CountingAgreement((javacard.security.KeyAgreement) o));
         java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("curveByAgreement");
         f.setAccessible(true);
         f.setBoolean(applet, byAgreement);
@@ -386,9 +388,9 @@ class ChipEnginesTest {
         byte[] row = payWithChange(c, place, 8, A.keyFor(8), null);
         c.power();
         assertEquals(SW_OK, show(c, row[0], A, 8));
-        int p0 = rsa.powers, a0 = ecdh.made;
+        int p0 = rsa.powers, a0 = ecdh.made + curve.made;
         assertEquals(SW_OK, KeysetKeysTest.loadChange(c, row, A.privFor(8)).getSW());
-        return new int[] { rsa.powers - p0, ecdh.made - a0 };
+        return new int[] { rsa.powers - p0, ecdh.made + curve.made - a0 };
     }
 
     @Test
@@ -433,8 +435,8 @@ class ChipEnginesTest {
     void aLyingAgreementIsNotLeanedOn() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         SchnorrHW s = signerOf(c);
-        javacard.security.KeyAgreement real = (javacard.security.KeyAgreement) FullPointLoadTest.ecdhField().get(s);
-        FullPointLoadTest.ecdhField().set(s, new FullPointLoadTest.Agreement(real, true));
+        // D251: the agreement agrees() asks is its own, kept at the first SET_CARD where it is given beforehand
+        FullPointLoadTest.agreesThrough(s, new FullPointLoadTest.Agreement(javacard.security.KeyAgreement.getInstance(javacard.security.KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false), true));
         c.ready(UnitsTest.SAT, true);
         c.grant();
         assertFalse(FullPointLoadTest.curveByAgreement(c), "the test failed");

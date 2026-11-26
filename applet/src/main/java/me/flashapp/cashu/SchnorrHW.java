@@ -212,10 +212,19 @@ final class SchnorrHW {
     /**
      * Which engine holds its key in this selection (D247, D248): the applet's `engineReady`, made at its first SET_CARD and
      * given here then, put down at every selection; null before it (and in a signer of its own), and every engine is then
-     * given its key at each use, as before. [R_SQUARE]: rsaC holds sqKey.
+     * given its key at each use, as before. [R_SQUARE]: rsaC holds sqKey; [R_CURVE]: curveKA holds curveKey (D251).
      */
     byte[]                      ready;
     private static final short  R_SQUARE = (short) 4;
+    private static final short  R_CURVE  = (short) 5;
+    /**
+     * agrees()'s own key and key agreement (D251): the key persistent, holding G's x, a public number, for good, and never the
+     * temporary key (which since D245 holds e, s or t between calls, and an agreement that references its key would multiply
+     * by them). Made at the first SET_CARD (`curveEngine`); null where the chip refused either, and agrees() then uses the
+     * temporary key at G's x, as before.
+     */
+    private ECPrivateKey        curveKey;
+    private KeyAgreement        curveKA;
     // NB: there is deliberately no ECPublicKey for the generator. R = k*G is
     // computed by handing the raw 65-byte G to generateSecret(), so a key object
     // for G would be built, parameterised and then never read — dead weight in
@@ -745,15 +754,59 @@ final class SchnorrHW {
      * first. Leaned on only where `checksCurve` held.
      */
     boolean agrees(byte[] p, short off) {
-        ready();
-        tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32);
-        ecdh.init(tmpPriv);
+        if (curveKA == null || curveKey == null || ready == null) {
+            ready();
+            tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32);
+            ecdh.init(tmpPriv);
+            try {
+                ecdh.generateSecret(p, off, (short) 65, sc, SC_TMP);
+            } catch (RuntimeException x) {
+                return false;
+            }
+            return true;
+        }
+        /* D251: on the key and the agreement of agrees()'s own, the agreement given the key at its first ask of a selection
+         * (`ready[R_CURVE]`), so that only the curve work is left. The flag is down while it works and up only after it
+         * answers. A CryptoException is asked once more with the key given again before it is taken as a refusal (the red
+         * team's A5-d): an agreement that lost what it was given at a selection, or a power cut, must not refuse a good point,
+         * nor turn D212 off for a set-up life at SET_CARD's test. */
+        if (ready[R_CURVE] != (byte) 1) curveKA.init(curveKey);
+        ready[R_CURVE] = (byte) 0;
         try {
-            ecdh.generateSecret(p, off, (short) 65, sc, SC_TMP);
+            try {
+                curveKA.generateSecret(p, off, (short) 65, sc, SC_TMP);
+            } catch (CryptoException x) {
+                curveKA.init(curveKey);
+                curveKA.generateSecret(p, off, (short) 65, sc, SC_TMP);
+            }
         } catch (RuntimeException x) {
             return false;
         }
+        ready[R_CURVE] = (byte) 1;
         return true;
+    }
+
+    /**
+     * agrees()'s own key and key agreement (D251), at the first SET_CARD of a set-up life, before `checksCurve` asks through
+     * them: the key made once, persistent, its curve and G's x set once and never again (so that the answer, [G.x]p, tells
+     * nothing of any key, as the temporary key at its resting scalar did), and the agreement given it at its first ask in a
+     * selection. Where the chip refuses the key, the agreement or the flags' room, `curveKA` stays null and agrees() uses the
+     * temporary key, as before; either way `checksCurve` tests the one agrees() then uses.
+     */
+    private void curveEngine() {
+        readyOff(R_CURVE);
+        if (ready == null) return;
+        try {
+            if (curveKey == null) {
+                ECPrivateKey k = (ECPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PRIVATE, KeyBuilder.LENGTH_EC_FP_256, false);
+                CashuApplet.curve(k);
+                k.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32);
+                curveKey = k;
+            }
+            if (curveKA == null) curveKA = KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false);
+        } catch (RuntimeException e) {
+            // refused: the temporary key's way
+        }
     }
 
     /** Flag `r` of `ready` put down, where there is one: its engine is given its key at its next use (D247). */
@@ -781,6 +834,7 @@ final class SchnorrHW {
      */
     boolean checksCurve() {
         byte[] g = CashuApplet.SECP256K1_G;
+        curveEngine();
         Util.arrayCopyNonAtomic(g, (short) 0, work, (short) 0, (short) 65);
         if (!agrees(work, (short) 0)) return false;
         for (short k = 0; k < 6; k++) {

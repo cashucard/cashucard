@@ -4,6 +4,7 @@ import static me.flashapp.cashu.CashuAppletTest.*;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigInteger;
@@ -255,6 +256,18 @@ class FullPointLoadTest {
         f.setAccessible(true);
         return f;
     }
+    /** The key agreement agrees() asks (D251: its own, `curveKA`, made at the first SET_CARD; null before it). */
+    static java.lang.reflect.Field curveField() throws Exception {
+        java.lang.reflect.Field f = SchnorrHW.class.getDeclaredField("curveKA");
+        f.setAccessible(true);
+        return f;
+    }
+    /** agrees() pointed at `ka` (D251), its flag put down so that `ka` is given the key at its first ask; a signer not yet set up keeps it at the first SET_CARD, which makes the key beside it. */
+    static void agreesThrough(SchnorrHW s, KeyAgreement ka) throws Exception {
+        curveField().set(s, ka);
+        byte[] ready = (byte[]) SchnorrHWSignTest.hidden(s, "ready");
+        if (ready != null) ready[5] = 0;
+    }
 
     /** An agreement that takes every point (a chip that does not hold to the curve: good points answered right, others with made-up bytes), or refuses every one, around the real one. */
     static final class Agreement extends KeyAgreement {
@@ -285,28 +298,37 @@ class FullPointLoadTest {
         assertTrue(curveByAgreement(c), "set at the first SET_CARD");
         SchnorrHW s = (SchnorrHW) schnorr(c);
         assertTrue(checks(s));
-        KeyAgreement real = (KeyAgreement) ecdhField().get(s);
+        // D251: agrees() asks an agreement of its own, the one the test must hold to account
+        KeyAgreement real = (KeyAgreement) curveField().get(s);
+        assertNotNull(real, "made at the first SET_CARD");
         try {
-            ecdhField().set(s, new Agreement(real, true));
+            agreesThrough(s, new Agreement(real, true));
             assertFalse(checks(s), "a chip that takes a point off the curve is not leaned on");
-            ecdhField().set(s, new Agreement(real, false));
+            agreesThrough(s, new Agreement(real, false));
             assertFalse(checks(s), "nor one that refuses G");
         } finally {
-            ecdhField().set(s, real);
+            agreesThrough(s, real);
         }
         assertTrue(checks(s));
+        // and where the chip gave no room for the flags (so no agreement of agrees()'s own is leaned on), the temporary key's
+        // way is the one held to account, as before
+        Object ready = SchnorrHWSignTest.hidden(s, "ready");
+        KeyAgreement ecdh = (KeyAgreement) ecdhField().get(s);
+        try {
+            SchnorrHWSignTest.setHidden(s, "ready", null);
+            ecdhField().set(s, new Agreement(ecdh, true));
+            assertFalse(checks(s), "the temporary key's agreement that takes a point off the curve is not leaned on either");
+        } finally {
+            ecdhField().set(s, ecdh);
+            SchnorrHWSignTest.setHidden(s, "ready", ready);
+        }
         // a SET_CARD on a chip whose agreement takes every point: the flag goes false and the 04 form is 6B00
         UnitsTest.Card d = new UnitsTest.Card();
         SchnorrHW ds = (SchnorrHW) schnorr(d);
-        KeyAgreement dreal = (KeyAgreement) ecdhField().get(ds);
-        ecdhField().set(ds, new Agreement(dreal, true));
-        try {
-            assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
-            d.pin();
-            assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, UnitsTest.recordIn(UnitsTest.SAT))), "set up: the framing check's points are all on the curve");
-        } finally {
-            ecdhField().set(ds, dreal);
-        }
+        agreesThrough(ds, new Agreement(KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false), true));
+        assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, TEST_PIN)));
+        d.pin();
+        assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, UnitsTest.recordIn(UnitsTest.SAT))), "set up: the framing check's points are all on the curve");
         assertFalse(curveByAgreement(d), "a chip that takes off-curve points: the flag is false");
         d.pin();
         assertEquals(0x6B00, loadFull(d, fullPiece(d.piece(UnitsTest.SAT_A, 8), whole(hexToBytes(GOOD[0])))).getSW());

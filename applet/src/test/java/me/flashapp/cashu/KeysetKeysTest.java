@@ -783,8 +783,10 @@ class KeysetKeysTest {
         SchnorrHW signer = (SchnorrHW) fs.get(c.applet());
         SchnorrHWSignTest.WatchedAgreement ecdh = new SchnorrHWSignTest.WatchedAgreement(javacard.security.KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY);
         SchnorrHWSignTest.WatchedAgreement gm = new SchnorrHWSignTest.WatchedAgreement(javacard.security.KeyAgreement.ALG_EC_PACE_GM);
+        SchnorrHWSignTest.WatchedAgreement curve = new SchnorrHWSignTest.WatchedAgreement(javacard.security.KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY);
         SchnorrHWSignTest.setHidden(signer, "ecdh", ecdh);
         SchnorrHWSignTest.setHidden(signer, "gm", gm);
+        FullPointLoadTest.agreesThrough(signer, curve);
         BigInteger fp = CashuAppletTest.SECP_P;
         for (int at : new int[] { 0, 65 }) {
             byte[] bad = good.clone();
@@ -793,8 +795,11 @@ class KeysetKeysTest {
             assertEquals(SW_WRONG_DATA, c.sw(CashuAppletTest.loadChangeCommand(row[0], bad)), (at == 0 ? "C_" : "K") + " off the curve");
             byte[] off = Arrays.copyOfRange(bad, at, at + 65);
             // D215: the point is given to the chip's key agreement once, as the curve test itself (which refuses it, and the command ends),
-            // and to nothing that does arithmetic with it: not the generic mapping, not a second agreement
-            assertEquals(1, ecdh.given.stream().filter(g -> Arrays.equals(g, off)).count(), (at == 0 ? "C_" : "K") + ": the point off the curve is given to the chip's agreement once, as its curve test");
+            // and to nothing that does arithmetic with it: not the generic mapping, not a second agreement. D251: the curve test's
+            // agreement is agrees()'s own (asked once more on a CryptoException: the simulator's refusal is not one), and the one
+            // that multiplies (ecdh) is never given it
+            assertEquals(1, curve.given.stream().filter(g -> Arrays.equals(g, off)).count(), (at == 0 ? "C_" : "K") + ": the point off the curve is given to the chip's agreement once, as its curve test");
+            assertFalse(ecdh.given.stream().anyMatch(g -> Arrays.equals(g, off)), (at == 0 ? "C_" : "K") + ": and never to the agreement that multiplies");
             assertFalse(gm.given.stream().anyMatch(g -> Arrays.equals(g, off)), (at == 0 ? "C_" : "K") + ": the point off the curve is not given to the generic mapping");
             assertFalse(gm.generators.stream().anyMatch(g -> Arrays.equals(g, off)), (at == 0 ? "C_" : "K") + ": nor made the generic mapping's generator");
         }

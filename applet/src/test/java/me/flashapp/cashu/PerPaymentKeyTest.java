@@ -382,11 +382,19 @@ class PerPaymentKeyTest {
     /** Every point the wrapped key agreement makes. */
     static final class CountingAgreement extends KeyAgreement {
         final KeyAgreement in;
-        int made;
+        int made, inits;
+        /** The key of each init (D251: agrees()'s own key, never the temporary key). */
+        final java.util.List<PrivateKey> given = new java.util.ArrayList<>();
+        /** Throws CryptoException at the next generateSecret, as an agreement that lost its init may (D251: asked once more). */
+        boolean lost;
         CountingAgreement(KeyAgreement in) { this.in = in; }
-        @Override public void init(PrivateKey k) throws CryptoException { in.init(k); }
+        @Override public void init(PrivateKey k) throws CryptoException { inits++; given.add(k); lost = false; in.init(k); }
         @Override public byte getAlgorithm() { return in.getAlgorithm(); }
-        @Override public short generateSecret(byte[] a, short o, short l, byte[] out, short oo) throws CryptoException { made++; return in.generateSecret(a, o, l, out, oo); }
+        @Override public short generateSecret(byte[] a, short o, short l, byte[] out, short oo) throws CryptoException {
+            made++;
+            if (lost) CryptoException.throwIt(CryptoException.INVALID_INIT);
+            return in.generateSecret(a, o, l, out, oo);
+        }
     }
     /** Every power the wrapped RSA takes. */
     static final class CountingCipher extends Cipher {

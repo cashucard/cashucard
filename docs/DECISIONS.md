@@ -9941,3 +9941,32 @@ the signature that leaves verifies, where on f394b29 the faulted one left.
 **What it costs.** One tagged hash of 96 bytes (two blocks with the tag's prefix) a signature, about 8 ms by JCAlgTest's
 figures: on every AUTH, every wait's signature (D218: a wait is a checked signature), the payment's SIGN and the PIN key's
 signature. That gives back about a quarter of D249's 35 ms on a payment, and adds about 8 ms to every wait. Not measured.
+
+## <a id="d251"></a>D251: The curve test by agreement on a key and an agreement of its own
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** The `agrees()` half of item A5 of
+the 3.2 speed review (the PIN key's half is not built: the red team's A5-1 and A5-2, a stale key after a reset and PIN tries
+lost after a lost init, against 27 ms a sealed PIN; `agree()` stays as it is for the PIN key). No command, answer or stored
+byte changes.
+
+**The rule.** `agrees()` (D212's curve test of a piece in the 04 form, D215's of LOAD_CHANGE's points) asks a key agreement
+of its own (`curveKA`) with a persistent key of its own (`curveKey`), made at the first SET_CARD (`curveEngine`, before
+`checksCurve`), whose curve and scalar, G's x, are set once and never again. The agreement is given that key at its first ask
+of a selection (`engineReady[5]`: down at every selection, while it works, and at SET_CARD); where it throws
+`CryptoException` it is given the key again and asked once more before the answer is "refused", in `agrees()` and so in
+`checksCurve`. Where the chip refuses the key, the agreement or the flags' room, agrees() uses the temporary key at G's x
+and `ecdh`, as before, and `checksCurve` tests whichever one agrees() then uses.
+
+**Why it is safe (the red team's A5-c, A5-d).**
+- **A5-c.** The key is never the temporary key, which since D245 holds e, s or t between calls: an agreement that kept a
+  reference to it would multiply by them. Any scalar does for a curve test; a public one keeps the answer, [G.x]p, telling
+  nothing.
+- **A5-d.** A lost init is asked once more, so one stale state at SET_CARD does not turn D212 off for the set-up life, and a
+  good piece is not refused at a load; a point off the curve is refused after its one more ask (both fail closed).
+- The agreement that does the card's arithmetic (`ecdh`) is no longer given a loaded point at all: a point off the curve
+  reaches only the curve test's agreement (`KeysetKeysTest.loadChangeGivesTheChipNoPointOffTheCurve`).
+
+**Counts (jCardSim; times JCAlgTest's).** A piece in the 04 form: `setS` and the agreement's init (about 11 ms of the curve
+test's 31) at its first ask of a selection only, so about 11 ms a piece after the first in a selection; LOAD_CHANGE's three
+asks, about 33 ms. One persistent EC key and one key agreement more at the first SET_CARD, and one byte of RAM.
+`CurveAgreementTest` fails on 4f610e6.

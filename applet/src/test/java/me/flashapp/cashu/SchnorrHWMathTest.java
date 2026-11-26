@@ -1056,7 +1056,7 @@ class SchnorrHWMathTest {
         // D247: and the engines' flags (5: the field's four engines and the signature's squaring), at the first SET_CARD and not at
         // install; the 3.2 chip run had 1,596 bytes of this memory free after the first SET_CARD
         // D249: and the kept y of the payment's date key, 32
-        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601 + 5 + 32, 3 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8; the engines' flags; the kept y");
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601 + 6 + 32, 3 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8; the engines' flags (six, D251: agrees()'s too); the kept y");
         org.junit.jupiter.api.Assertions.assertEquals(941, transientMemoryAskedFor()[0], "and the install's CLEAR_ON_DESELECT is the 941 of the build that installs");
         String src = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
         org.junit.jupiter.api.Assertions.assertNotNull(findIgnoringSpace(src,
@@ -1095,7 +1095,8 @@ class SchnorrHWMathTest {
         int[] inApplet = { 1, 1, 2, 1, 2, 2, 0, 2, 0, 0 };
         // SchnorrHW names KeyAgreement in its fields' types and in the getInstance calls, and in its agree-less comments only
         // D216: the signature's squaring on the chip's RSA: one buildKey site and one Cipher, made at the first SET_CARD (`chipMulInit`), not in the constructor
-        int[] inSigner = { 0, 0, 1, 1, 0, 2, 2, 1, 0, -1 };
+        // D251: and agrees()'s own key and key agreement, made at the first SET_CARD (`curveEngine`), not in the constructor
+        int[] inSigner = { 0, 0, 1, 1, 0, 3, 3, 1, 0, -1 };
         for (int i = 0; i < kinds.length; i++) {
             long a = java.util.regex.Pattern.compile(kinds[i]).matcher(applet).results().count();
             org.junit.jupiter.api.Assertions.assertEquals(inApplet[i], a, "CashuApplet.java: " + kinds[i] + " is called " + a + " times where the build that installs called it " + inApplet[i] + ". A chip counts these; measure a larger figure on a card first.");
