@@ -9659,11 +9659,16 @@ fixed cards apart.
 2. **A reset clears the self-tests' verdicts (APP-M2).** `curveByAgreement`, `fieldP`, the square's verdict (5) and
    `SchnorrHW.chipMul` are cleared with `selfTested` in the reset's last transaction: until the next `SET_CARD` works
    them out again every path is the slow, checked one. jCardSim: `aResetClearsTheVerdicts`.
-3. **A forgotten PIN's replacement frees the spent places and draws a new c (APP-M1, part 1).** D195 and D196 let anyone
-   with an empty card replace a forgotten PIN; the spent places and c linked the last holder's payments at the mint.
-   Now that `SET_PIN` draws a new c in its transaction, and `forgetOwed` frees the spent places, the kept proofs and the
-   paid list as it did after an owner was replaced. Part 2 of APP-M1 (`OwnerPIN.update` outside a transaction) is wrong on
-   a conforming chip and is not changed. jCardSim: `aForgottenPinsReplacementFreesTheSpentPlacesAndDrawsANewC`.
+3. **A forgotten PIN's replacement frees the spent places (APP-M1, part 1, in part).** D195 and D196 let anyone with an
+   empty card replace a forgotten PIN; the spent places said which pieces the last holder paid with. Now `forgetOwed`
+   frees the spent places and their kept proofs after a forgotten PIN too, as after an owner was replaced. c and the paid
+   list stay. Rejected for 3.2: a new c at that `SET_PIN`, as the review proposed. On a card with no owner and no refund
+   key, c is given only in the first set-up (D196), so the holder who replaced their own forgotten PIN could never read
+   the new c, and a phone that went on locking loads to the old c's keys would load pieces the card never signs for.
+   With c kept, the paid list must stay: it keeps a piece under that c from being loaded twice. What is left of APP-M1 is
+   c linking the holder's earlier payments to a reader that replaces the PIN; closing it needs the phone side (re-reading
+   c) decided first. Part 2 of APP-M1 (`OwnerPIN.update` outside a transaction) is wrong on a conforming chip and is not
+   changed. jCardSim: `aForgottenPinsReplacementFreesTheSpentPlaces`.
 4. **A hand-over commits what it forgets before the new owner's key (APP-M5).** `SET_OWNER` that replaces an owner now
    commits the new c, the record let go and the forget mark first, then the flag, the clock and the key in a second
    transaction. On a chip whose key writes take no part in a transaction (the harness's `keysOutsideTx`), a tear in the
@@ -9689,5 +9694,5 @@ fixed cards apart.
    meets after a hand-over; `spec/APDU.md` now says so plainly. APP-M3 (accepted by D233, D234) and APP-M6 (a doc gap)
    are not changed. The review's rejected speedups R1 to R7 are not taken.
 
-**Built (applet 3.2, not released).** Load file 43,765 bytes, 245 past a multiple of 256 (`sizeTheFile` at sixty-eight
-writes; 43,598 unpadded), 1,024 bytes over 3.1's 42,741: no chip has been given a file of this size. jCardSim only.
+**Built (applet 3.2, not released).** Load file 43,765 bytes, 245 past a multiple of 256 (`sizeTheFile` at seventy-seven
+writes; 43,547 with the forty writes of 3.1), 1,024 bytes over 3.1's 42,741: no chip has been given a file of this size. jCardSim only.

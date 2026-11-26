@@ -1015,7 +1015,7 @@ class CashuAppletTest {
     void testInfoFresh() {
         byte[] d = info();
         assertEquals(30, d.length);
-        assertEquals(3, d[0]); assertEquals(1, d[1]);
+        assertEquals(3, d[0]); assertEquals(2, d[1]);
         assertEquals(MAX_PROOFS, d[2] & 0xFF);
         assertEquals(0, d[3]); assertEquals(0, d[4]);
         assertEquals(MAX_PROOFS, d[5] & 0xFF);
@@ -3660,7 +3660,7 @@ class CashuAppletTest {
         String loadOne = body(code, "private short loadOne(", "private void processClearSpent(");
         int hexFirst = loadOne.indexOf("slotHex");
         int hexLast = loadOne.lastIndexOf("slotHex");
-        int data = loadOne.indexOf("Util.arrayCopy(buf, in, proofStorage");
+        int data = loadOne.indexOf("Util.arrayCopyNonAtomic(buf, in, proofStorage");
         int status = loadOne.indexOf("STATUS_UNSPENT", data);
         assertTrue(hexFirst > 0 && hexFirst < hexLast && hexLast < data && data < status,
             "both halves of the text are written before the piece's data, and the status byte is last");
@@ -5658,13 +5658,16 @@ class CashuAppletTest {
         int note = finish.indexOf("burnPending[0] = (byte) 0;");
         assertTrue(row > 0 && row < copy && copy < mark && mark < note, "the row, then the status byte, then the note");
         String reset = body(code, "private void processResetCard(", "\n    private ");
-        int key = reset.indexOf("if (!certified) cardKeyPair.genKeyPair();");
+        // 3.2 (D244): the new keys owed in the last transaction (ROTATE_KEYS) and drawn after its commit (finishResetKeys)
         int last = reset.lastIndexOf("JCSystem.beginTransaction();");
+        int owed = reset.indexOf("= ROTATE_KEYS;");
         int keeps = reset.indexOf("if (!certified && paid != null) {");
         int empty = reset.indexOf("Util.setShort(paid, PAID_NEXT, (short) 0);");
         int unround = reset.indexOf("paid[PAID_ROUND] = (byte) 0;");
         int done = reset.indexOf("JCSystem.commitTransaction();", last);
-        assertTrue(key > 0 && key < last && last < keeps && keeps < empty && empty < unround && unround < done, "after the new key, in the last transaction, and only where there is a new key: a certified card keeps its key and its list (D192)");
+        int key = reset.indexOf("finishResetKeys();", done);
+        assertTrue(owed > 0 && owed < last && last < keeps && keeps < empty && empty < unround && unround < done && done < key,
+            "in the last transaction with the new keys owed, the keys drawn after it, and only where there is a new key: a certified card keeps its key and its list (D192)");
         // nothing else writes the list
         // but the signatures kept beside the receipts, after the list (SPEND_ALL_AGAIN P1 = 1 reads them)
         String again = body(code, "private void processSpendAllAgain(", "\n    private ");
@@ -6282,7 +6285,8 @@ class CashuAppletTest {
         assertEquals(7, count(code, "checkHeader("), "its declaration and five callers, RESET_CARD's twice (D200), and firstAnchor (D204)");
         for (String[] caller : new String[][] { { "private void processRefresh(", "private void processSetHeader(" }, { "private void processSetOwner(", "private void processGetNonce(" } }) {
             String b = body(code, caller[0], caller[1]);
-            int ch = b.indexOf("checkHeader("), bg = b.indexOf("JCSystem.beginTransaction()"), wr = b.indexOf("writeHeader("), cm = b.indexOf("JCSystem.commitTransaction()");
+            // the transaction the header is written in (3.2, D244: a hand-over commits what it forgets in a transaction before it)
+            int ch = b.indexOf("checkHeader("), wr = b.indexOf("writeHeader("), bg = b.lastIndexOf("JCSystem.beginTransaction()", wr), cm = b.indexOf("JCSystem.commitTransaction()", wr);
             assertTrue(ch > 0 && ch < bg && bg < wr && wr < cm, caller[0] + ": the checks, then the header written inside one transaction");
             assertTrue(b.indexOf("cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;") > wr && b.indexOf("cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;") < cm, caller[0] + ": and the rollover budget full again, in the same transaction");
         }
@@ -9492,7 +9496,9 @@ class CashuAppletTest {
         // 3.0 (D184): the putting on of pieces is one helper, logLoaded, which LOAD_PROOF and LOAD_CHANGE call; every entry says its unit
         assertEquals(1, count(code, "private short logEntry("));
         assertEquals(5, count(code, "logEntry("), "its declaration, and the four that ask for it: the spend, the refusal, the putting on of pieces and the let-go, and nowhere else");
-        assertEquals(3, count(code, "logLoaded("), "its declaration, LOAD_PROOF and LOAD_CHANGE");
+        // 3.2 (D244): LOAD_CHANGE logs in its own transaction, by logLoadedIn, which logLoaded wraps in one of its own for LOAD_PROOF
+        assertEquals(2, count(code, "logLoaded("), "its declaration and LOAD_PROOF");
+        assertEquals(3, count(code, "logLoadedIn("), "its declaration, logLoaded's and LOAD_CHANGE's");
         assertTrue(body(code, "private void processLoadChange(", "private boolean unblind(").contains("logLoaded("));
         assertTrue(body(code, "private void processLetGo(", "private void processSetTag(").contains("logEntry(LOG_ANY)"), "the let-go, which has no amount, takes the tap's entry whatever its unit");
         assertTrue(body(code, "private void processSpendAllSign(", "private void processSpendAllAgain(").contains("logEntry(unit)"));
@@ -13365,7 +13371,7 @@ class CashuAppletTest {
         byte[] d = info();
         assertEquals(30, d.length);
         byte[] fresh = new byte[30];
-        fresh[0] = 3; fresh[1] = 1; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
+        fresh[0] = 3; fresh[1] = 2; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
         System.arraycopy(u32(nowBefore), 0, fresh, 17, 4);
         assertArrayEquals(fresh, d, "GET_INFO: a new card, with the clock it had");
         assertEquals(nowBefore, now());
@@ -13637,9 +13643,15 @@ class CashuAppletTest {
         int[] order = { r.indexOf("OFFSET_P2] != RESET_CONFIRM_BYTE"), r.indexOf("ownerSet[0] == (byte) 1"), r.indexOf("requireOwnerProof(LABEL_RESET"),
             r.indexOf("requireLoadAuthority()"), r.indexOf("requireHeld()"),
             r.indexOf("cardLocked[0] == (byte) 1 && pinVerifiedFlag[0] != (byte) 1"), r.indexOf("requireNothingOwed()"), r.indexOf("holdOn(buf"), r.indexOf("freeSpent()"),
-            r.indexOf("pinKeySig[0] = (byte) 0"), r.indexOf("cardKeyPair.genKeyPair()"), r.indexOf("pinKeyPair.genKeyPair()"), r.lastIndexOf("beginTransaction"),
+            r.lastIndexOf("beginTransaction"),
             r.indexOf("cardLocked[0] = (byte) 0"), r.indexOf("pinState[0] = (byte) 0"), r.indexOf("ownerSet[0] = (byte) 0"), r.lastIndexOf("commitTransaction"),
-            r.indexOf("pin.update(") };
+            r.indexOf("finishResetKeys();"), r.indexOf("pin.update(") };
+        /* 3.2 (D244): the keys after the commit, in finishResetKeys (which follows processResetCard in the source): the
+         * signature over the PIN key let go first, then the card key, then the PIN key, then the mark */
+        String keys = body(code, "private void finishResetKeys(", "\n    /**");
+        int sigGone = keys.indexOf("pinKeySig[0] = (byte) 0"), card = keys.indexOf("cardKeyPair.genKeyPair()"), pinKey = keys.indexOf("pinKeyPair.genKeyPair()"),
+            markDown = keys.indexOf("~ROTATE_KEYS");
+        assertTrue(sigGone > 0 && sigGone < card && card < pinKey && pinKey < markDown, "the signature let go, the card key, the PIN key, the mark down");
         for (int i = 0; i < order.length; i++) {
             assertTrue(order[i] > 0, "step " + i + " is there");
             if (i > 0) assertTrue(order[i - 1] < order[i], "step " + i + " follows step " + (i - 1));

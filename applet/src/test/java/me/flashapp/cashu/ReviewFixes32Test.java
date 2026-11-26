@@ -151,8 +151,8 @@ class ReviewFixes32Test {
     // ---- APP-M1: a forgotten PIN's replacement -----------------------------------------------------------------------------
 
     @Test
-    @DisplayName("D244 (APP-M1): a forgotten PIN replaced on an empty card with no owner frees the spent places and their proofs, empties the paid list and draws a new c, so the reader that replaced it reads no piece and no date's keys of the holder before it")
-    void aForgottenPinsReplacementFreesTheSpentPlacesAndDrawsANewC() throws Exception {
+    @DisplayName("D244 (APP-M1): a forgotten PIN replaced on an empty card with no owner frees the spent places and their proofs, so the reader that replaced it reads no piece of the holder before it; c and the paid list stay (a new c would be one the holder's phone cannot read again on a card with no refund key)")
+    void aForgottenPinsReplacementFreesTheSpentPlaces() throws Exception {
         UnitsTest.Card c = SimpleCardTest.inFirstSetUp(UnitsTest.SAT);
         int p = c.put(-1, KeysetKeysTest.A.id8(), 64);
         c.tap();
@@ -165,8 +165,8 @@ class ReviewFixes32Test {
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, NEW_PIN)), "three wrong tries on an empty card: replaced");
         assertEquals(0, c.info(0)[4], "no spent place left");
         assertEquals(SW_SLOT_EMPTY, c.sw(new CommandAPDU(CLA, INS_GET_PROOF, p, 0, 256)), "the holder's spent piece is gone");
-        assertFalse(Arrays.equals(cBefore, Arrays.copyOf(c.field("chain"), 32)), "a new c: no date's keys of the holder before");
-        assertEquals(0, Util16.get(c.field("paid"), 1024 * 8), "the paid list empty");
+        assertArrayEquals(cBefore, Arrays.copyOf(c.field("chain"), 32), "c stays: the holder's phone keeps the one it read");
+        assertTrue(Util16.get(c.field("paid"), 1024 * 8) > 0, "the paid list stays: it keeps a piece under this c from being loaded twice");
         assertEquals(0, c.field("pinMarks")[CashuApplet.PM_FORGET], "and nothing owed");
         assertEquals(SW_OK, PinWaitTest.verify(c, NEW_PIN).getSW(), "the new PIN");
     }

@@ -199,7 +199,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     // 3.2 (D244): fixes a card in the field is told apart by, and quicker writes, with no command, answer or count a 3.1 reader
     // meets changed: a reset draws its keys after the transaction that makes the card new, and the next command finishes them
     // where the card left the field first (`finishResetKeys`); a reset clears the self-tests' verdicts with `selfTested`; a
-    // forgotten PIN's replacement frees the spent places and draws a new c; a hand-over commits what it forgets before the new
+    // forgotten PIN's replacement frees the spent places; a hand-over commits what it forgets before the new
     // owner's key; the staged outputs in RAM, the settlement record written a page at a time, an opening's B_ kept whole, a
     // piece's data written before its status byte with no transaction of its own, and the curve checked by squaring (`rsaSquare`).
     // One bit more in GET_INFO P1 = 4's byte 56 (bit 2, the field's arithmetic over p: a compressed C is as quick to load as a
@@ -5548,10 +5548,6 @@ public class CashuApplet extends Applet implements TagSwitch {
             if (pinLen < PIN_MIN_LEN || pinLen > PIN_MAX_LEN) {
                 ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
             }
-            /* A forgotten PIN replaced (D244): a new c, drawn here and written in the PIN's transaction, as a reset draws one, so
-             * that the reader that replaced it, which anyone may be (D195), is told no date's keys of the holder before it: with
-             * the old c it could tie every one of the holder's payments at the mint together (GROUP_KEYS, the spent places) */
-            if (spent) rng.generateData(scratch, X_MSG, (short) 32);
             /* The PIN, then its state byte, which is the commit (D22): torn between the two, a card that was
              * blocked is still blocked (VERIFY_PIN reads the byte), and one that had no PIN still has none. In
              * a transaction as well, for a chip whose OwnerPIN takes part in one; nothing relies on that. */
@@ -5566,12 +5562,8 @@ public class CashuApplet extends Applet implements TagSwitch {
             /* a blocked PIN has no one to give it: the history goes with it, the last packet and the signatures kept too (D189,
              * D196), owed from this commit and taken down after it (`forgetOwed`), here or at the card's next command: torn
              * before the commit, the old PIN and all of the history; after it, the new PIN and none */
-            if (spent) {
-                pinMarks[PM_FORGET] = FORGET_HISTORY;
-                Util.arrayCopy(scratch, X_MSG, chain, (short) 0, (short) 32);
-            }
+            if (spent) pinMarks[PM_FORGET] = FORGET_HISTORY;
             JCSystem.commitTransaction();
-            if (spent) Util.arrayFillNonAtomic(scratch, X_MSG, (short) 32, (byte) 0);
             /* a new PIN has not been typed yet: any session that had verified the old one is over; but a card's first PIN, on a card
              * that had none (new or reset), was chosen by this reader in this selection, and stands as given for the rest of it (D235:
              * CLEAR_ON_DESELECT, so a SELECT ends it; a PIN replaced on a card that had one is never given by its SET_PIN) */
@@ -5597,19 +5589,19 @@ public class CashuApplet extends Applet implements TagSwitch {
     private void forgetOwed() {
         byte owed = pinMarks[PM_FORGET];
         if ((owed & (FORGET_HISTORY | FORGET_PLACES)) == 0) return;
-        /* the spent places and their kept proofs, as RESET_CARD frees them, and the paid list emptied, as a reset empties it:
-         * nothing unspent or owed is on the card, and its rows are pieces locked to the last c's keys, which the card never
-         * signs for again (it signs only with d + t of its c). After an owner replaced (D197), and since 3.2 after a forgotten
-         * PIN replaced too, whose SET_PIN drew a new c (D244): the spent places said which pieces, at what amounts and dates,
-         * the holder before had paid with, to the reader that replaced the PIN */
+        /* the spent places and their kept proofs, as RESET_CARD frees them: nothing unspent or owed is on the card. After an
+         * owner replaced (D197), and since 3.2 after a forgotten PIN replaced too (D244): the spent places said which pieces, at
+         * what amounts and dates, the holder before had paid with, to the reader that replaced the PIN. The paid list stays
+         * with a forgotten PIN: c stays, and the list is what keeps a piece of it from being loaded twice. */
         freeSpent();
         if (dleq != null) Util.arrayFillNonAtomic(dleq, (short) 0, (short)(MAX_PROOFS * DLEQ_LEN), (byte) 0);
-        if (paid != null) {
-            paid[PAID_ROUND] = (byte) 0;
-            Util.setShort(paid, PAID_NEXT, (short) 0);
-        }
         if ((owed & FORGET_PLACES) != 0) {
-            // an owner replaced (D197): what was the last owner's
+            /* an owner replaced (D197): what was the last owner's, and the paid list emptied, as a reset empties it: its rows
+             * are pieces locked to the last c's keys, which the card never signs for again (it signs only with d + t of its c) */
+            if (paid != null) {
+                paid[PAID_ROUND] = (byte) 0;
+                Util.setShort(paid, PAID_NEXT, (short) 0);
+            }
             if (outStage != null) outStage[0] = (byte) 0;
             Util.arrayFillNonAtomic(changeOpen, (short) 0, (short)(CHANGE_MOST * OPEN_LEN), (byte) 0);
             Util.arrayFillNonAtomic(openState, (short) 0, CHANGE_MOST, (byte) 0);
@@ -7672,10 +7664,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.2 (D244): sixty-eight writes, the forty below and twenty-eight more (the last a value of one byte's push), 167 bytes,
-         * so the load file is 43,765 bytes, 245 past a multiple of 256 again, the place of every 3.x file card 58206920 has
-         * installed, at a size no chip has been given. D244's code took the forty writes' file to 43,598 (78 past, a place not
-         * tried). */
+        /* 3.2 (D244): seventy-seven writes, the forty below and thirty-seven more (the last four a value of one byte's push),
+         * 218 bytes, so the load file is 43,765 bytes, 245 past a multiple of 256 again, the place of every 3.x file card
+         * 58206920 has installed, at a size no chip has been given. D244's code took the forty writes' file to 43,547 (27 past,
+         * a place not tried). */
         /* 3.1 with the review's fixes (D236): forty writes, the thirteen below and twenty-seven more, 228 bytes, so the load file
          * is 42,741 bytes, 245 past a multiple of 256, the place (not the size) of every 3.x file card 58206920 (a J3R180 keyed
          * for SCP03, D229) has installed. D236's code took the thirteen writes' file to 42,579 (83 past; 42,513 unpadded, 17 past,
@@ -7773,6 +7765,15 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[81] = 91;
         a[82] = 92;
         a[83] = 93;
-        a[84] = 4;
+        a[84] = 94;
+        a[85] = 95;
+        a[86] = 96;
+        a[87] = 97;
+        a[88] = 98;
+        a[89] = 99;
+        a[90] = 1;
+        a[91] = 2;
+        a[92] = 3;
+        a[93] = 4;
     }
 }

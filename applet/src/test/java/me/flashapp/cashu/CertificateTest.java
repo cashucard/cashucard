@@ -769,9 +769,10 @@ class CertificateTest {
             assertTrue(m.start() > w[0] && m.start() < w[1], "the store is written in CERT_WRITE alone, near ..." + src.substring(Math.max(0, m.start() - 40), m.start() + 20));
         }
         assertEquals(5, named, "the allocation, its null, a page, the length and the seal, and nothing else");
-        int[] reset = SchnorrHWMathTest.bodyRange(src, "private void processResetCard(");
+        // 3.2 (D244): the reset's keys are drawn by finishResetKeys, after its last commit
+        int[] reset = SchnorrHWMathTest.bodyRange(src, "private void finishResetKeys(");
         String r = src.substring(reset[0], reset[1]);
-        assertTrue(r.contains("boolean certified = certSealed();") && r.contains("if (!certified) cardKeyPair.genKeyPair();")
-            && r.indexOf("pinKeyPair.genKeyPair();") > r.indexOf("if (!certified) cardKeyPair.genKeyPair();"), "a new PIN key always, a new card key only where none is sealed");
+        assertTrue(r.contains("if (!certSealed()) cardKeyPair.genKeyPair();")
+            && r.indexOf("pinKeyPair.genKeyPair();") > r.indexOf("if (!certSealed()) cardKeyPair.genKeyPair();"), "a new PIN key always, a new card key only where none is sealed");
     }
 }
