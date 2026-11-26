@@ -105,22 +105,24 @@ class ReaderChecksTest {
     }
 
     @Test
-    @DisplayName("LOAD_PROOF refuses a C that is not a point of the curve (6A80): an x whose x^3 + 7 is no square, and an x of p or more; nothing is written; in a batch, the pieces before it go on and it stops there")
+    @DisplayName("D255: LOAD_PROOF in the 33-byte form checks C's form alone: an x of p or more is refused (6A80, nothing written), and in a batch the pieces before it go on and it stops there; an x whose x^3 + 7 is no square is of the form and is stored as it came (until D255, 6A80): the mint refuses it when it is spent")
     void aCThatIsNoPointIsRefused() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card().ready(UnitsTest.SAT, true);
-        byte[] p1 = c.piece(UnitsTest.SAT_A, 64);
-        System.arraycopy(offCurve(), 0, p1, 44, 33);
-        java.util.Map<String, byte[]> before = c.snapshot();
-        assertEquals(SW_WRONG_DATA, c.load(p1).getSW(), "x^3 + 7 no square");
         byte[] p2 = c.piece(UnitsTest.SAT_A, 64);
         Arrays.fill(p2, 45, 77, (byte) 0xFF);
         p2[44] = 3;
+        java.util.Map<String, byte[]> before = c.snapshot();
         assertEquals(SW_WRONG_DATA, c.load(p2).getSW(), "x past p");
         c.assertUnchanged(before, "nothing written");
         byte[] good = c.piece(UnitsTest.SAT_A, 8);
-        ResponseAPDU batch = c.load(good, p1);
+        ResponseAPDU batch = c.load(good, p2);
         assertEquals(SW_OK, batch.getSW());
-        assertEquals(1, batch.getData().length, "the good piece went on, and the batch stopped at the one that is no point");
+        assertEquals(1, batch.getData().length, "the good piece went on, and the batch stopped at the one not of its form");
+        byte[] p1 = c.piece(UnitsTest.SAT_A, 64);
+        System.arraycopy(offCurve(), 0, p1, 44, 33);
+        ResponseAPDU stored = c.load(p1);
+        assertEquals(SW_OK, stored.getSW(), "x^3 + 7 no square: stored");
+        assertArrayEquals(Arrays.copyOfRange(p1, 44, 77), Arrays.copyOfRange(c.slot(stored.getData()[0] & 0xFF), 45, 78), "its C as it came");
     }
 
     /** GET_NONCE P1 = 1 on this card: the nonce (16) and the PIN key (33). */

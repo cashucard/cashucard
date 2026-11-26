@@ -337,10 +337,12 @@ payment ([The clock and the limits](#the-clock-and-the-limits)), bit 4
 [keyset keys](#keyset-keys), bit 7 [the paid list](#the-paid-list). Byte 56: bit 0
 [the certificate](#the-certificate), bit 1 [keys per load](#keys-per-load), bit 2
 the field over p (3.2, [D244](../docs/DECISIONS.md#d244)): the chip's powers held to their
-known answers at this set-up life's first `SET_CARD`, so a compressed C is held to the
-curve as quickly as a whole one and a loader need not send the longer form
-([D212](../docs/DECISIONS.md#d212)); it is `0` before that `SET_CARD`, after a reset, on a
-chip whose answers did not hold, and on every card before 3.2; bits 3
+known answers at this set-up life's first `SET_CARD`, so the curve checks the card makes with
+them (a sealed command's reader key, a change point's) are quick. It says nothing of a loaded C:
+since [D255](../docs/DECISIONS.md#d255) a 33-byte C at `LOAD_PROOF` has its form checked alone, and
+a 65-byte one is held to the curve by the chip's key agreement whatever this bit says. It is `0`
+before that `SET_CARD`, after a reset, on a chip whose answers did not hold, and on every card
+before 3.2; bits 3
 to 7 are `0`. Byte 55 bit 3 is `0` on every 3.0 card: 3.0 keeps no wait on a
 payment within its limit (D211, D228), and a file that set it answered `FF 03`. A 3.0
 card from this repository answers `F7 03` (a 3.2 card `F7 07` once its first `SET_CARD` has found the field over p); byte 55
@@ -1440,15 +1442,30 @@ the proof was kept (`00` with no room for proofs).
 **P2 bit 3 (`08`), C whole** ([D212](../docs/DECISIONS.md#d212)): one piece a command, its C as
 `04` ‖ x ‖ y (65 bytes) in place of the 33. The card checks the length exactly, the `04`, x under p and
 y under p itself, and the curve by one key agreement of its chip (`ALG_EC_SVDP_DH_PLAIN_XY`, with a
-scalar that is a public number, G's x, and no key of the card's), in place of its own test of a
-33-byte C (Euler's criterion on x³ + 7 by the chip's RSA); a point the agreement refuses is `6A80`,
-with nothing written. The piece is then stored exactly as the same piece in the 33-byte form:
+scalar that is a public number, G's x, and no key of the card's); a point the agreement refuses is
+`6A80`, with nothing written, so that a y that is not the point's is never stored as the other point.
+Since [D255](../docs/DECISIONS.md#d255) this is the form a loader sends to have the card hold C to the
+curve: a 33-byte C has its form checked alone (`02` or `03`, an x under p), and the card stores it as it
+came. The piece is then stored exactly as the same piece in the 33-byte form:
 C compressed, `02` or `03` by y's low bit, then x. The card leans on its chip's agreement only
 where it holds a point to the curve: at each `SET_CARD`, once the record is written, the card asks
 it of G (taken) and of six points off the curve (refused: G with y one more, an x with no root, a point of the twist, a valid x with a wrong y, y near p and 04 with zeros, [D219](../docs/DECISIONS.md#d219)); where any answer is another, P2 bit 3 is
 `6B00` before the data is read, and the reader sends the 33-byte form. So is it on a card before
 its first `SET_CARD`, and on a card before D212. A reader that has a piece's C compressed works y
 out as the root of x³ + 7 of C's parity.
+
+**What a loader must do since D255** ([D255](../docs/DECISIONS.md#d255)): the card holds a 33-byte C
+to its form alone, so a `9000` to a load says nothing of the piece (item 10 of the
+[Reader requirements](#reader-requirements-what-the-cards-answers-do-not-prove), which holds the first two rules here):
+- a piece whose mint's proof has not held (the reader's own check of the DLEQ proof against the mint's
+  key) is never paid to another or with other pieces: the card does not tell a real piece from a false
+  one, and the kept proof does;
+- a loader gives up its own copy of a piece only after its own check of that piece (its proof, and its
+  C a point of the curve), because the card no longer refuses a compressed C that is no point: a piece
+  stored with a mangled C is lost at the mint when it is spent;
+- a loader that wants the card's own curve check sends the 65-byte form (P2 bit 3), where the chip has
+  held a point to the curve at its last `SET_CARD`. A loader may time both forms on a card and use the
+  quicker.
 
 **P2 bit 1 (`02`), the reader's word on keys per load** ([D197](../docs/DECISIONS.md#d197)):
 the loader says each piece is locked to the card's keys for its date, P + t·G and
@@ -1470,7 +1487,7 @@ a unit over `01`, and `6A9C` for a label of the other unit on a card with no
 keyset table; `6A99` once, for pieces of the other unit than the card's on a card
 with a limit set and no rate; then for each piece: `6A84` no slot left or no paid
 list ([The paid list](#the-paid-list)), `6A8E` a dated piece on a card with no
-refund key, `6A80` a C that is not a point of the curve (`02` or `03` and an x under p for which x^3 + 7 is a square, checked by the card itself; with P2 bit 3, `04`, x and y under p, and the chip's key agreement taking the point), an amount of 0 or a proof of 96 zeros,
+refund key, `6A80` a C not of its form (`02` or `03` and an x under p; since [D255](../docs/DECISIONS.md#d255) a 33-byte C whose x has no root is of the form and is stored, and fails at the mint when it is spent, where a 3.1 card refused it here) or, with P2 bit 3, a C that is not a point of the curve (`04`, x and y under p, and the chip's key agreement taking the point), an amount of 0 or a proof of 96 zeros,
 `6A9B` a keyset in the table as the other unit, `6A9D` a new keyset of the other
 unit that is not the last payment's, without the holder's say in this tap, `6A9C`
 no entry free for a new keyset, `6A94` a nonce already in any slot, spent or
@@ -3112,7 +3129,7 @@ tell it is the same card under every holder, and no reset changes that.
 | 6984 | PIN not set |
 | 6985 | Conditions not satisfied: already spent, no payment begun, already locked; a clock that has taken no header (`INBOX`); outputs after the card's own change (`SPEND_ALL_OUTPUTS`); outputs or change after the payment's first `SPEND_ALL_SIGN` (`SPEND_ALL_OUTPUTS`, `SPEND_ALL_CHANGE`, D225); no sixteen bytes live (a sealed command, `GET_CARD` P1 = `03`); no owner's c kept for a claim or hand-over that gives its check (`SET_OWNER`); a teaching not begun (`KEYSET_KEYS` P1 = 1 or 2); an allowance on a card with no PIN (`SET_LIMIT`); a payment in a time in the field that claimed an owner or read a history, and a claim, a history, a rewrite or another key in one that paid; a certificate sealed, or a card that has had a PIN (`CERT_WRITE`) |
 | 6986 | Card locked |
-| 6A80 | Wrong data: not a point, a bad refund key or unit, a factory record on a card that has had a PIN or holds a holder's record, bits no header could carry, a budget outside 1–30, a key not bound, a proof that does not hold, a path that does not reach the top, an owner's c that does not open or a check that is not its (`SET_OWNER`), a certificate that does not name the card or is not the one hashed, outputs and change past the pieces, a keyset's unit or amounts not its ID's |
+| 6A80 | Wrong data: not a point (since D255 not said of a 33-byte C at `LOAD_PROOF`, whose form alone is checked), a bad refund key or unit, a factory record on a card that has had a PIN or holds a holder's record, bits no header could carry, a budget outside 1–30, a key not bound, a proof that does not hold, a path that does not reach the top, an owner's c that does not open or a check that is not its (`SET_OWNER`), a certificate that does not name the card or is not the one hashed, outputs and change past the pieces, a keyset's unit or amounts not its ID's |
 | 6A82 | Not found (the card's runtime): no applet of this name (an earlier 0.x or 1.x applet is one possible cause) |
 | 6A83 | Slot or opening out of range, or an offset at or past the end (`GET_OUTBOX`, `CERT_READ`, `CERT_WRITE`) |
 | 6A84 | No space: no slot, no change opening, no keyset table to make change in, or no room the card could reserve |
@@ -3356,6 +3373,19 @@ blinding factors, before its first `SIGN`).
    with HTTP `500`. A reader reads the code and the words, in both fields and by both numberings, and never ends an
    obligation on a code it does not know, a `5xx`, a `429`, a lost answer or one answer of any kind; it takes `11002` as
    "pending" only from a mint it knows to use the later numbering.
+10. **A load's `9000` is not evidence that a piece is real, nor that its C is a point** ([D255](../docs/DECISIONS.md#d255)).
+    Since 3.2 the card holds a C sent in the 33-byte form to its form alone (`02` or `03`, an x under p), and no card ever
+    told a piece a mint signed from one it did not; the piece's DLEQ proof, checked by the reader under the mint's key,
+    does. So:
+    - a piece whose proof has not held is never paid to another or with other pieces; a reader learns its standing only
+      as item 6 says, alone and to itself. A mint that cannot read a C that is no point refuses in words of its own, which
+      item 9 never takes as an end: a payment that carried such a piece would wait where it should give back;
+    - a loader gives up its own copy of a piece only after its own check of that piece (its DLEQ proof, and its C a point
+      of the curve), never on the card's `9000`: a piece stored with a mangled C is lost at the mint when it is spent. A
+      loader that wants the card to hold C to the curve sends the 65-byte form (`LOAD_PROOF` P2 bit 3) where the card
+      takes it; a loader may time both forms on a card and use the quicker.
+
+    NUT-CCP's list does not carry this item yet; it takes it when it is next updated.
 
 ---
 

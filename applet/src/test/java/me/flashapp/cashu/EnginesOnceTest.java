@@ -38,9 +38,16 @@ class EnginesOnceTest {
         m.setAccessible(true);
         return m.invoke(o);
     }
-    /** Three pieces of 8 in the 33-byte form, in one LOAD_PROOF. */
-    static int loadThree(UnitsTest.Card c) {
-        return c.sw(new CommandAPDU(CLA, INS_LOAD_PROOF, 0, 2, concat(c.piece(UnitsTest.SAT_A, 8), c.piece(UnitsTest.SAT_A, 8), c.piece(UnitsTest.SAT_A, 8)), 256));
+    /**
+     * A sealed VERIFY_PIN with the right PIN: its reader's point held to the curve by the cube and the square (the field's
+     * powers over p padded, on their own engines). D255 took the curve check off a 33-byte load, which these tests used before.
+     */
+    static int sealedPin(UnitsTest.Card c) throws Exception {
+        byte[] w = new byte[65];
+        ((javacard.security.ECPublicKey) get(c.applet(), CashuApplet.class, "pinPubKey")).getW(w, (short) 0);
+        byte[] pinKey33 = compressed(new BigInteger[] { new BigInteger(1, Arrays.copyOfRange(w, 1, 33)), new BigInteger(1, Arrays.copyOfRange(w, 33, 65)) });
+        byte[] nonce = Arrays.copyOf(c.send(new CommandAPDU(CLA, INS_GET_NONCE, 1, 0, 256)).getData(), 16);
+        return c.sw(new CommandAPDU(CLA, INS_VERIFY_PIN, 1, 0, envelope(EPH[3], pinKey33, nonce, INS_VERIFY_PIN, pinBlock(TEST_PIN))));
     }
     static final CommandAPDU AUTH = new CommandAPDU(CLA, INS_AUTH, 0, 0, new byte[16], 256);
 
@@ -57,7 +64,7 @@ class EnginesOnceTest {
     }
 
     @Test
-    @DisplayName("D248: in one selection three LOAD_PROOFs of three pieces in the 33-byte form (a cube and Euler's test each) give the cube's and Euler's engines their keys once in all, every power on them and none on `rsa`; a new selection (each engine having lost what it was given) once again, and never a power asked of an engine that holds nothing")
+    @DisplayName("D248: in one selection three sealed VERIFY_PINs (a cube and a square each, the reader's point held to the curve) give the cube's and the square's engines their keys once in all, every power on them and none on `rsa`; a new selection (each engine having lost what it was given) once again, and never a power asked of an engine that holds nothing")
     void theFieldsEnginesAreGivenTheirKeysOnceASelection() throws Exception {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
@@ -65,16 +72,15 @@ class EnginesOnceTest {
             c.tap();
             int[] i0 = inits(e.own), p0 = powers(e.own);
             int rsaPowers = e.field.powers;
-            for (int k = 0; k < 3; k++) assertEquals(SW_OK, loadThree(c), "three pieces, " + selection + "." + k);
+            for (int k = 0; k < 3; k++) assertEquals(SW_OK, sealedPin(c), "a sealed PIN, " + selection + "." + k);
             int[] i1 = inits(e.own), p1 = powers(e.own);
             assertEquals(1, i1[0] - i0[0], "the cube's engine given its key once in the selection, " + selection);
-            assertEquals(1, i1[2] - i0[2], "and Euler's, " + selection);
-            assertEquals(9, p1[0] - p0[0], "nine cubes on it");
-            assertEquals(9, p1[2] - p0[2], "nine of Euler's tests");
+            assertEquals(1, i1[3] - i0[3], "and the square's, " + selection);
+            assertEquals(3, p1[0] - p0[0], "three cubes on it");
+            assertEquals(3, p1[3] - p0[3], "three squares");
             assertEquals(rsaPowers, e.field.powers, "no padded key's power on `rsa`");
         }
         assertEquals(0, e.stale(), "select() put the flags down: no engine was asked a power with nothing given it");
-        assertEquals(144, readUint32(c.balance(0), 0), "the eighteen pieces of 8 went on");
     }
 
     @Test
@@ -83,22 +89,22 @@ class EnginesOnceTest {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
         c.tap();
-        assertEquals(SW_OK, loadThree(c));
+        assertEquals(SW_OK, sealedPin(c));
         int i0 = e.own[0].inits, s0 = e.own[0].stale;
         e.own[0].forget();
-        e.own[2].forget();
-        assertEquals(SW_OK, loadThree(c), "the load goes on");
+        e.own[3].forget();
+        assertEquals(SW_OK, sealedPin(c), "the sealed PIN opens");
         assertEquals(s0 + 1, e.own[0].stale, "the cube's engine threw once");
         assertEquals(i0 + 1, e.own[0].inits, "and was given its key again");
-        assertEquals(SW_OK, loadThree(c));
+        assertEquals(SW_OK, sealedPin(c));
         assertEquals(i0 + 1, e.own[0].inits, "and no init after");
         // the signature's squaring the same way
-        int j0 = e.sign.inits;
         assertEquals(SW_OK, c.sw(AUTH));
+        int j0 = e.sign.inits;
         e.sign.forget();
         assertEquals(SW_OK, c.sw(AUTH));
         assertEquals(1, e.sign.stale, "the squaring's engine threw once");
-        assertEquals(j0 + 2, e.sign.inits, "its first use in the selection, and again after it lost the key");
+        assertEquals(j0 + 1, e.sign.inits, "and was given its key again after it lost it");
     }
 
     @Test
@@ -107,7 +113,7 @@ class EnginesOnceTest {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
         c.tap();
-        assertEquals(SW_OK, loadThree(c));
+        assertEquals(SW_OK, sealedPin(c));
         e.own[0].forget();
         e.own[3].forget();
         byte[] w = new byte[65];
@@ -127,7 +133,7 @@ class EnginesOnceTest {
         Engines e = new Engines();
         UnitsTest.Card c = setUpCard(e);
         assertTrue(flag(c.applet(), CashuApplet.class, "fieldOwn"));
-        assertEquals(SW_OK, loadThree(c));
+        assertEquals(SW_OK, sealedPin(c));
         int[] before = inits(e.own);
         // the keys written again, as the self-tests write them after a reset (which leaves fieldP false)
         Object applet = c.applet();
@@ -240,8 +246,8 @@ class EnginesOnceTest {
         assertTrue(flag(c.applet(), CashuApplet.class, "fieldP"));
         assertFalse(flag(c.applet(), CashuApplet.class, "fieldOwn"), "the root's engine lied: none is leaned on");
         int p0 = e.field.powers, i0 = e.field.inits, o = e.own[0].powers;
-        assertEquals(SW_OK, c.load(c.piece(UnitsTest.SAT_A, 8)).getSW());
-        assertEquals(2, e.field.powers - p0, "the cube and Euler's test on `rsa`");
+        assertEquals(SW_OK, sealedPin(c));
+        assertEquals(2, e.field.powers - p0, "the cube and the square on `rsa`");
         assertEquals(2, e.field.inits - i0, "each given its key");
         assertEquals(o, e.own[0].powers, "nothing on the engines of their own");
     }

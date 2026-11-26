@@ -182,7 +182,7 @@ class FullPointLoadTest {
     // =========================================================================
 
     @Test
-    @DisplayName("D212: every case the chip was tried with that is no point of the curve in its one encoding is refused 6A80 with nothing written: no-curve x, the twist, wrong y, y +- 1, the other root + 1, y = 0, x = p, x = 2^256 - 1, y = p, y = p + 1, y = 2^256 - 1, wraps, zeros, P-256's G and y, every other prefix")
+    @DisplayName("D212, D255: in the 04 form every case the chip was tried with that is no point of the curve in its one encoding is refused 6A80 with nothing written (no-curve x, the twist, wrong y, y +- 1, the other root + 1, y = 0, x = p, x = 2^256 - 1, y = p, y = p + 1, y = 2^256 - 1, wraps, zeros, P-256's G and y, every other prefix): a y that is not the point's is never stored as the other point; while in the 33-byte form (D255) an x with no root is of the form and goes on")
     void badPointsAreRefused() throws Exception {
         UnitsTest.Card c = UnitsTest.owned(UnitsTest.SAT);
         Map<String, byte[]> before = kept(c);
@@ -199,6 +199,10 @@ class FullPointLoadTest {
         assertEquals(SW_OK, loadFull(c, fullPiece(c.piece(UnitsTest.SAT_A, 8), whole(hexToBytes(GOOD[0])))).getSW());
         assertEquals(8, readUint32(c.balance(0), 0));
         assertEquals(1, c.count());
+        // D255: the 33-byte form of an x with no root is stored, as it came
+        byte[] noRoot = withC(c.piece(UnitsTest.SAT_A, 4), ReaderChecksTest.offCurve());
+        assertEquals(SW_OK, c.load(noRoot).getSW(), "the 33-byte form: its form alone");
+        assertEquals(2, c.count());
     }
 
     @Test

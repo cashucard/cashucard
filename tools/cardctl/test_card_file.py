@@ -897,6 +897,50 @@ def test_dump_skips_two_half_cleared_slots_without_calling_them_duplicates():
     assert "skipped spent slot(s) 1, 2" in doc["note"], doc["note"]
 
 
+def _no_point_c() -> bytes:
+    """02 || an x with no root: the form a 3.2 card checks (D255), and no point of the curve."""
+    x = 5
+    while bip340.lift_x(x) is not None:
+        x += 1
+    return b"\x02" + x.to_bytes(32, "big")
+
+
+def test_dump_skips_an_unspent_slot_whose_c_is_no_point():
+    """
+    D255 (the red team's F2): a 3.2 card stores a 33-byte C as it is loaded, so a slot can hold an unspent piece whose
+    C is no point of the curve. No mint can redeem it and the card file cannot carry it, but it is no reason to write
+    nothing of the rest of the card: it is skipped and said so, and the other slots are written.
+    """
+    class _NoPointCard(_DumpCard):
+        def __init__(self):
+            super().__init__()
+            self._slots[0] = dict(self._slots[0], c=_no_point_c())
+
+    printed, warned = _run_dump_on(_NoPointCard())
+    doc = json.loads(printed)
+    assert [(s["amount"], s["spent"]) for s in doc["slots"]] == [(16, True)], doc["slots"]
+    assert "slot 0: skipped: unspent, and its C is no point of the curve" in warned, warned
+    assert "cardctl proof 0" in warned, warned
+    assert "skipped slot(s) 0, whose C is no point of the curve" in doc["note"], doc["note"]
+    assert "half-cleared" not in warned, warned
+    cardctl.read_card_file(_write(doc))
+
+
+def test_dump_says_a_spent_slot_whose_c_is_no_point_is_not_half_cleared():
+    """D255: a spent slot whose one fault is a C that is no point was loaded so; it is not blamed on a torn CLEAR_SPENT."""
+    printed, warned = _run_dump_on(_HalfClearedCard(c=_no_point_c()))
+    doc = json.loads(printed)
+    assert [(s["amount"], s["spent"]) for s in doc["slots"]] == [(8, False)], doc["slots"]
+    assert "slot 1: skipped: spent, and its C is no point of the curve" in warned, warned
+    assert "half-cleared" not in warned and "half-cleared" not in doc["note"], (warned, doc["note"])
+
+
+def test_dump_still_calls_a_slot_with_a_zeroed_amount_and_no_point_c_half_cleared():
+    """A spent slot with more wrong than its C (its amount zeroed too) is what a torn CLEAR_SPENT leaves, as before."""
+    printed, warned = _run_dump_on(_HalfClearedCard(c=_no_point_c(), amount=0))
+    assert "half-cleared by an interrupted CLEAR_SPENT" in warned, warned
+
+
 def test_dump_never_skips_an_unspent_slot_that_is_not_a_proof():
     """
     Only a spent slot is skipped. CLEAR_SPENT never touches an unspent one, so

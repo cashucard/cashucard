@@ -10055,3 +10055,61 @@ itself, when a refusal by the chip's agreement was the only curve check). Since 
 agreement throwing after it: 6F00, no try, the sixteen bytes used up, and the right PIN opens once the engine works. A tag
 sealed to another key and a reader's point off the curve: a wrong PIN's answer and a try, as before. The two engine tests
 fail on 7fe7ec6 (63C1, a try gone).
+
+## <a id="d255"></a>D255: A piece loaded in the 33-byte form is held to its form alone
+
+**Decided (the project lead, 2026-11-26, after both red teams: the curve check dropped on the 33-byte form only, kept on the
+65-byte form, with the conditions below); not released; gated by the red team's code pass, the review and the chip run.**
+This supersedes, on this one point, D196's "`LOAD_PROOF` checks that C is a point of the curve itself (`6A80`)" and D212's
+33-byte test (Euler's criterion on x³ + 7, which D214 made the chip's RSA over p); those entries are left as they were
+written. The answer on the wire changes for one input only: a `LOAD_PROOF` piece in the 33-byte form whose x has no root,
+`6A80` until now, is stored (`9000`).
+
+**The rule.** In `loadOne`, a piece that comes by `LOAD_PROOF` in the 33-byte form has its C held to its form alone: `02`
+or `03`, and an x under p; it is stored as it came. Everything else stays:
+- the 65-byte form (P2 bit 3) is held to the curve by the chip's key agreement exactly as before (D212, D251), and stored
+  as the 33-byte form by y's low bit, so that a C is always one canonical encoding;
+- every other refusal of `loadOne`: an amount of nothing, a proof of zeros, a nonce already on the card or on the paid
+  list, the unit, the day's count, the limit;
+- `LOAD_CHANGE` is not touched: the card computes with K and C_ there (the unblinding and the mint's proof), and holds them
+  and the unblinded C to the curve as before.
+
+**Why it is safe.** The card never computes with a loaded piece's C: its bytes are copied out (GET_PROOF, GET_PIECES, the
+settlement record) and its hex is hashed into a payment's message; no point arithmetic takes `proofStorage` or `slotHex`
+(the red team's applet pass read every reader of a stored C, planted pieces and ran every read and payment command: all
+answered, nothing parsed C). A loader that wants to harm a card can load a point of the curve that no mint signed just as
+well, so the check never told a real piece from a false one; the mint's proof kept beside the piece does (its DLEQ proof, which GET_DLEQ gives).
+A piece's identity is its nonce: a no-root C cannot shadow or replace another piece (`FormOnlyTest`: the same nonce with a
+good C is refused 6A94).
+
+**What is given up, plainly.** A piece with a mangled point is now stored and fails at the mint when it is spent, where 3.1
+refused it at the load; about half of all corruptions of a 33-byte C were refused, none is now. A loader that drops its own
+copy of a piece on `9000` and sent a corrupted C has lost that piece. The 65-byte form keeps its check because without it a
+y that is not the point's would be stored, silently, as the other point (the red team's F1).
+
+**The conditions (the red team's), and where each is met.**
+- **F1:** the 65-byte form keeps the chip's key agreement (above).
+- **F2:** `cardctl dump` writes the rest of the card where a slot's one fault is a C that is no point: it skips that slot,
+  spent or not, with a true message, and says so in the file's note; a spent slot so made is no longer blamed on a torn
+  CLEAR_SPENT (`tools/cardctl/test_card_file.py`, three tests). An unspent slot with any other fault still refuses the dump.
+- **F3, F4 and the reader requirements:** `spec/APDU.md` (the byte 56 bit 2 text, P2 bit 3, `LOAD_PROOF`'s refusals and the
+  `6A80` row) says the rule, and states what a loader must do: never pay a piece whose proof has not held (to another or
+  with other pieces; its standing is learnt alone, as the reader requirements' item 6 says); give up its own copy of a
+  piece only after its own check of it; send the 65-byte form for the card's own curve check. A loader may time both forms
+  on a card and use the quicker. The first two rules are also item 10 of the spec's reader requirements, the list
+  SECURITY-MODEL #30 and NUT-CCP send a library author to; NUT-CCP's own list takes them when it is next updated.
+  cardctl's `placeholder_c` says why its placeholder is still a point (its own card file refuses one that is not).
+- **Tests:** `ReaderChecksTest.aCThatIsNoPointIsRefused` and `FullPointLoadTest.badPointsAreRefused` hold the new rule (a
+  33-byte C with no root is stored, an x at or over p refused, the 65-byte form's bad points refused); `FormOnlyTest` adds
+  the stored no-root piece paying, the form checks (prefixes other than 02 and 03, x of p, p + 1, 2^256 − 1), the 65-byte
+  form with a wrong y (6A80), and LOAD_CHANGE refusing a C_ off the curve by the agreement and by the card's own test.
+  `EnginesOnceTest`, which drove the field's engines by 33-byte loads, drives them by sealed VERIFY_PINs.
+- **The recording** (`spec/vectors/transcript.json`, which `testWriteTranscript` writes and holds to): unchanged, byte for
+  byte. Its "not a point" exchanges are a 33-byte C of prefix `04`, a form the card still refuses (6A80). The tests here
+  that read it (`tools/cardkit/gp/test/settled-cleanup.test.ts`) need no new recording.
+
+**What each form's check costs (counted, `FormOnlyTest`; times JCAlgTest's and the chip run's).** The 33-byte form: two
+powers of the chip's RSA (the cube and Euler's test, about 2 × 7.8 ms with D247/D248's engines, more where an engine is
+given its key) before D255, none after. The 65-byte form: one key agreement (about 20 ms of curve work; its init once a
+selection with D251) and 32 more bytes a piece on the wire; measured on the test card, `LOAD_PROOF` in the 04 form 115.6 ms
+at 3.2 and 107.0 ms with D251.

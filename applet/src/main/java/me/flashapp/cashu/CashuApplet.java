@@ -4715,12 +4715,21 @@ public class CashuApplet extends Applet implements TagSwitch {
             && cardRecord[CARD_REFUND_OFFSET] == (byte) 0) {
             return SW_NO_REFUND_KEY;
         }
-        /* not a point of the curve (allSlots for room: no payment is in hand), or worth nothing, or a proof of nothing: not a
-         * piece. A C that came whole (D212, `compact`) is held to the curve whole, by the chip's key agreement, in place of
-         * Euler's test of its x: the same points go on, stored the same. */
+        /* a C not of its form, or not a point of the curve where the card holds it to the curve (allSlots for room: no payment is
+         * in hand), or worth nothing, or a proof of nothing: not a piece. D255: a piece loaded in the 33-byte form has its form
+         * checked alone, 02 or 03 and an x under p, and is stored as it came: the card computes nothing with a loaded piece's C
+         * (its bytes are copied out and its hex hashed into a payment's message), and the mint's proof kept beside it, not the
+         * curve, tells a real piece from a false one. A C that came whole (D212) is still held to the curve whole, by the chip's
+         * key agreement, so that a y that is not the point's is never stored as the other point; and the card's own change
+         * (LOAD_CHANGE, `unit` -1), not held to the curve by the agreement as it came out, is held to it here as before. */
         try {
-            if (form == LOAD_C_COMPRESSED) {
-                requireCompressedPoint(buf, (short)(in + PROOF_C_OFFSET - 1), allSlots, (short) 0);
+            short c = (short)(in + PROOF_C_OFFSET - 1);
+            if (form == LOAD_C_COMPRESSED && unit < 0) {
+                requireCompressedPoint(buf, c, allSlots, (short) 0);
+            } else if (form == LOAD_C_COMPRESSED) {
+                if ((buf[c] != (byte) 0x02 && buf[c] != (byte) 0x03) || SchnorrHW.cmp32(buf, (short)(c + 1), SECP256K1_P, (short) 0) >= 0) {
+                    return ISO7816.SW_WRONG_DATA;
+                }
             } else if (form == LOAD_C_WHOLE) {
                 requireFullForm(allSlots, (short) 0);
                 if (!schnorrHW.agrees(allSlots, (short) 0)) return ISO7816.SW_WRONG_DATA;
@@ -7877,15 +7886,6 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[120] = 16;
         a[121] = 17;
         a[122] = 18;
-        a[123] = 19;
-        a[124] = 20;
-        a[125] = 21;
-        a[126] = 22;
-        a[127] = 23;
-        a[110] = 24;
-        a[111] = 25;
-        a[112] = 26;
-        a[130] = 6;
         // padding ends
     }
 }

@@ -1851,9 +1851,11 @@ def change_signature(sig, what: str = "the change") -> Tuple[bytes, bytes, bytes
 
 
 def placeholder_c(nonce: bytes) -> bytes:
-    """A placeholder C for `load` without --c: a point of the curve (a 3.0 card refuses one that is not, 6A80), found
-    from the nonce by SHA-256("cardctl/placeholder-C" || nonce || counter) until its x is on the curve. Nobody knows
-    its discrete log and no mint signed it: it cannot be redeemed."""
+    """A placeholder C for `load` without --c: a point of the curve, found from the nonce by
+    SHA-256("cardctl/placeholder-C" || nonce || counter) until its x is on the curve (a 3.0 or 3.1 card refuses a
+    33-byte C that is not, 6A80; a 3.2 card checks its form alone and stores it, D255, but this tool's own card file
+    refuses a C that is no point, so it is still made one). Nobody knows its discrete log and no mint signed it: it
+    cannot be redeemed."""
     for counter in range(256):
         x = hashlib.sha256(b"cardctl/placeholder-C" + nonce + bytes([counter])).digest()
         if bip340.lift_x(int.from_bytes(x, "big")) is not None:
@@ -2486,11 +2488,37 @@ def cmd_load_file(args) -> int:
     return 0
 
 
+def _only_c_is_no_point(entry, index: int) -> bool:
+    """
+    Whether a slot's one fault is a C that is no point of the curve, its prefix 02 or 03 and the rest of the slot
+    sound: what a 3.2 card stores when a reader loads a 33-byte C whose x has no root (D255: the card checks the form
+    alone). Such a piece is no money (no mint can redeem it) and was not left by a torn CLEAR_SPENT.
+    """
+    try:
+        c = bytes.fromhex(entry["C"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if len(c) != 33 or c[0] not in (0x02, 0x03) or bip340.lift_x(int.from_bytes(c[1:], "big")) is not None:
+        return False
+    try:
+        # the same slot with a C that is a point: sound but for its C
+        _slot_from_json(dict(entry, C=bytes([c[0]]).hex() + _NO_POINT_STAND_IN), index)
+    except SystemExit:
+        return False
+    return True
+
+
+# G's x, a point of the curve: put in a slot's place to ask whether anything but its C is wrong (_only_c_is_no_point)
+_NO_POINT_STAND_IN = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+
+
 def cmd_dump(args) -> int:
     """
     Write every non-empty slot to a card file for the mint side to redeem,
     except a spent slot whose data fails the slot checks (most likely
-    half-cleared by an interrupted CLEAR_SPENT).
+    half-cleared by an interrupted CLEAR_SPENT), and a slot of either kind
+    whose one fault is a C that is no point of the curve (a 3.2 card stores
+    a 33-byte C as it is loaded, D255: no mint can redeem such a piece).
     """
     card = connect(args)
     pubkey = card.get_pubkey()
@@ -2498,6 +2526,7 @@ def cmd_dump(args) -> int:
 
     slots = []
     half_cleared = []
+    no_point = []
     for index, status in enumerate(statuses):
         if status == 0x00:
             continue
@@ -2529,6 +2558,18 @@ def cmd_dump(args) -> int:
             # spent ones as spendable. See spec/CARD-FILE.md.
             "spent": p["status"] == "spent",
         }
+        if _only_c_is_no_point(entry, index):
+            # D255: a 3.2 card stores a 33-byte C it is given as it came, and one whose x has no root is no point: a piece no
+            # mint can redeem, which the card file cannot carry (its C must be a point). Skipped, and said so, spent or not;
+            # never a reason to write nothing of the rest of the card.
+            no_point.append(index)
+            print(
+                f"slot {index}: skipped: {'spent' if entry['spent'] else 'unspent'}, and its C is no point of the curve "
+                f"(a 3.2 card stores a 33-byte C as it is loaded, D255): no mint can redeem it, and the card file "
+                f"cannot carry it. `cardctl proof {index}` prints it.",
+                file=sys.stderr,
+            )
+            continue
         if entry["spent"]:
             # CLEAR_SPENT zeroes a spent slot's data before it marks the slot
             # empty (D14), and the fill is not atomic, so a card pulled
@@ -2572,6 +2613,11 @@ def cmd_dump(args) -> int:
             f"; skipped spent slot(s) {', '.join(str(i) for i in half_cleared)}, "
             f"whose data is not a proof (most likely half-cleared by an "
             f"interrupted CLEAR_SPENT)"
+        )
+    if no_point:
+        note += (
+            f"; skipped slot(s) {', '.join(str(i) for i in no_point)}, whose C is "
+            f"no point of the curve (no mint can redeem them, D255)"
         )
     doc = {
         "version": CARD_FILE_VERSION,
