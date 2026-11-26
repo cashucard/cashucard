@@ -159,10 +159,13 @@ class ReaderChecksTest {
     void theReadersPointIsChecked() throws Exception {
         String src = SchnorrHWMathTest.stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(
             SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), StandardCharsets.UTF_8));
-        int from = src.indexOf("private short unseal("), to = src.indexOf("private static void moveDown(");
+        int from = src.indexOf("private short unseal("), to = src.indexOf("private boolean sealedPoint(");
         String unseal = src.substring(from, to);
-        int check = unseal.indexOf("requireFullPoint(buf, e);"), agree = unseal.indexOf("schnorrHW.agree(");
+        // D254: the check is `sealedPoint`'s, which calls requireFullPoint and tells its 6A80 from an engine's fault
+        int check = unseal.indexOf("sealedPoint(buf, e)"), agree = unseal.indexOf("schnorrHW.agree(");
         assertTrue(check > 0 && check < agree, "the point checked, then agreed with");
+        String sealed = src.substring(src.indexOf("private boolean sealedPoint("), src.indexOf("private static void moveDown("));
+        assertTrue(sealed.contains("requireFullPoint(buf, e);"), "by the card's own curve check");
         // and a point off the curve is an envelope that does not open
         UnitsTest.Card c = new UnitsTest.Card().ready(UnitsTest.SAT, true);
         byte[][] k = pinKey(c);

@@ -10025,3 +10025,33 @@ last of all, and one past the next), refused 6A94; one differing in a row's last
 row of a list not gone round, taken; a filled place's nonce among places whose nonces share their first 31 bytes, refused,
 and one differing in its last byte, taken: each as on 3b9b5a4. jCardSim cannot count the chip's compares; the time is the
 chip run's to show (the same script).
+
+## <a id="d254"></a>D254: An engine's fault in a sealed command answers 6F00 and costs no PIN try
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team; the project lead's and the maintainers'
+call).** The red team's A5-e, its own commit, to be taken or left alone: it changes what a sealed refusal costs. D247, D248
+and D251 are safe without it (D248 asks an engine that threw once more before anything is refused).
+
+**The rule.** In `unseal` (a sealed VERIFY_PIN, SET_PIN, CHANGE_PIN, and the owner's sealed commands) and `stageOwnerC`:
+- the reader's point refused by the card's own curve check (`requireFullPoint`'s 6A80) is an envelope that does not open,
+  as before: it costs what a wrong PIN costs;
+- a tag that does not match is an envelope that does not open, as before;
+- any other exception, in the curve check (its RSA powers) or after it (the PIN key's agreement, the seal's sums), is the
+  card's own fault: the command answers 6F00, no try is counted, and the sixteen bytes are used up as an envelope that does
+  not open uses them.
+
+**Why.** The red team proved on 3.2 (`anEngineExceptionInASealedPinCostsATry`) that an engine that throws inside a sealed
+VERIFY_PIN cost the holder a try with the right PIN: three such, and a card with an owner is blocked. An exception there was
+taken as "the envelope does not open" (the code's own words, from before the card held the reader's point to the curve
+itself, when a refusal by the chip's agreement was the only curve check). Since the card holds the point to the curve itself, an exception is not the reader's doing.
+- **No new oracle.** The 6A80-and-try answer for a point that is no point is unchanged, and 6F00 is given only where the point
+  has been held to the curve: what a terminal learns is that the card's engine failed on a point it chose, which tells it
+  nothing of the PIN or the PIN key ([d]Q for a point Q of the curve's prime order is never refused for d's sake).
+- **What it gives up.** A terminal that can make the card's engine throw at will (a fault injection) is no longer charged a
+  try for each attempt. It learns nothing from it, and a PIN guess needs a tag that matches, which it cannot make without
+  the PIN.
+
+**Tests (`SealedFaultTest`).** The RSA engine throwing in the curve check (after D248's one more ask) and the PIN key's
+agreement throwing after it: 6F00, no try, the sixteen bytes used up, and the right PIN opens once the engine works. A tag
+sealed to another key and a reader's point off the curve: a wrong PIN's answer and a try, as before. The two engine tests
+fail on 7fe7ec6 (63C1, a try gone).
