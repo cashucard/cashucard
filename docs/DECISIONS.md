@@ -9955,7 +9955,12 @@ the point to d + t, so nothing that check stops gets out. Its conditions:
   with none), each with one point addition in its check.
 
 **Counts.** One point addition less a payment's SIGN (`PerPaymentKeyTest.whatItCosts`: waits + 1, where it was waits + 2):
-about 35 ms by JCAlgTest's figures. 32 bytes of RAM at the first SET_CARD. `KeptYTest` fails on f621b23.
+about 35 ms by JCAlgTest's figures. 32 bytes of RAM at the first SET_CARD. `KeptYTest` fails on f621b23. **Measured** on
+card 57723320 (2026-11-26, the files of f621b23 and of this commit): a payment's last SIGN 506.9 to 461.0 ms, about 46 ms.
+A wait's signature went from 344.1 to 332.5 ms as well, which this entry does not explain: a wait signs under the card key
+with no date (`work()`, `g` null), and on that path the check works W out as before, with no point addition before or
+after this change. The 12 ms is about the spread between installs, each with a new card key (the files of 7fe7ec6 and
+eedd741, with no change to signing between them, differ by 11.4 ms).
 
 **The red team's code pass (2026-11-26): cleared.** Its M20 (the kept y's clear in `select()` taken out) passed every test,
 as M12 did for D248, jCardSim clearing that RAM at every selection itself; `KeptYTest.selectItselfClearsTheKeptY` calls
@@ -9980,9 +9985,30 @@ a faulted e makes s'·G − e·Q = R + (e' − e)·d·G, which is not R: the chi
 with a fresh nonce (D218), or 6F00 on the bytecode's path. `CheckHashesETest` flips a bit of e as the chip's product begins:
 the signature that leaves verifies, where on f394b29 the faulted one left.
 
-**What it costs.** One tagged hash of 96 bytes (two blocks with the tag's prefix) a signature, about 8 ms by JCAlgTest's
-figures: on every AUTH, every wait's signature (D218: a wait is a checked signature), the payment's SIGN and the PIN key's
-signature. That gives back about a quarter of D249's 35 ms on a payment, and adds about 8 ms to every wait. Not measured.
+**What it costs.** One tagged hash of 96 bytes (three blocks of SHA-256 with the tag's prefix) a signature: on every AUTH,
+every wait's signature (D218: a wait is a checked signature), the payment's SIGN and the PIN key's signature. Estimated at
+8 ms by JCAlgTest's figures; **measured** on card 57723320 (2026-11-26, the files of f394b29 and of this commit, medians of
+57 waits and 14 last SIGNs): a wait's signature 332.5 to 349.2 ms, **about 17 ms**, and a payment's last SIGN 461.0 to
+489.4 ms, **about 28 ms** (the two differ by about the 12 ms that signatures vary from one install's card key to the
+next). That takes back about 28 of D249's 46 ms on a payment's SIGN, and adds about 17 ms to every wait. The project lead decides
+on these.
+
+**The red team's code pass (2026-11-26): cleared with a condition, met in a follow-up (its C-A4-3-1, MEDIUM, proved).**
+The check hashed e again from the caller's message buffer, and so did step 6: with a stuck generator, one fault in that
+buffer between step 3 (the nonce's hash) and step 6 (the challenge's) gave a signature of the same R with another e,
+which the check passed, reading the same faulted buffer; with the good signature of the same message, d fell out (the red
+team's test recovered it on 4f610e6). Now step 6 hashes the message as step 3 read it: its last 31 bytes stay in the
+scratch where step 3 put them (nothing writes there before step 6), and its first, which R's last byte takes at step 4, is
+kept in a local of `signOnce`. The nonce and the challenge are then of one message whatever the buffer does, and the check
+hashes e from the buffer as it is then: a message that changed after step 3 fails the check (6F00 on the bytecode's path;
+on the chip's, the bytecode signs again from the message as it now is, with another nonce). The red team proposed a
+32-byte copy of the message kept in RAM and compared with the buffer in the check: no 32 bytes of the signer's RAM are
+free from step 3 to the check (`sc` and `work` are both in use through step 7, on either path), and a new array would be
+RAM made at the first SET_CARD, leaving the signatures before it (AUTH) without the check, under the card key the card
+keeps for life; the hash binds the same three messages to one. It costs nothing measurable (one byte kept, one 32-byte
+copy less). `CheckHashesETest`: the message flipped at step 4 with a stuck generator gives no second signature of one R on
+either path (on 1e2b2d3 the faulted signature leaves the bytecode's path); and, on the bytecode's path, a fault in e as its
+hash answers is refused 6F00 with nothing written out (on f394b29 the faulted signature left).
 
 ## <a id="d251"></a>D251: The curve test by agreement on a key and an agreement of its own
 

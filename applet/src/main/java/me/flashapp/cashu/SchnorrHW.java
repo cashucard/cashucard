@@ -490,6 +490,9 @@ final class SchnorrHW {
         Util.arrayCopy(sc,  (short)(SC_TMP+32), sc, SC_TMP,          (short)32); // t
         Util.arrayCopy(sc,  SC_PX,              sc, (short)(SC_TMP+32),(short)32); // Px
         Util.arrayCopy(msg, msgOff,             sc, (short)(SC_TMP+64),(short)32); // msg
+        // the message as this step read it is the one step 6 hashes (D250): its 31 last bytes stay where they are, which
+        // nothing writes before step 6, and its first, which R's last byte takes at step 4, is kept here
+        byte m0 = sc[(short)(SC_TMP+64)];
         taggedHash(tagHashNonce, sc, SC_TMP, (short)96, sc, SC_K);
         reduceModN(sc, SC_K);         // k = k mod n (in place)
 
@@ -523,7 +526,11 @@ final class SchnorrHW {
         // sc[TMP..TMP+31]  = Rx  (already there at SC_TMP+1, shift left by 1)
         Util.arrayCopy(sc, (short)(SC_TMP+1), sc, SC_TMP,          (short)32); // Rx
         Util.arrayCopy(sc, SC_PX,             sc, (short)(SC_TMP+32),(short)32); // Px
-        Util.arrayCopy(msg, msgOff,           sc, (short)(SC_TMP+64),(short)32); // msg
+        /* msg: step 3's copy, its first byte put back, and not the caller's buffer read again (D250, the red team's C-A4-3-1).
+         * The nonce and the challenge are then of one message whatever the caller's buffer does in between, and the check
+         * (step 8) hashes e again from the caller's buffer: a message that changed after step 3 fails it, where until this a
+         * change between steps 3 and 6 was read the same by step 6 and by the check, and with a stuck generator gave d. */
+        sc[(short)(SC_TMP+64)] = m0;
         taggedHash(tagHashChallenge, sc, SC_TMP, (short)96, sc, SC_E);
         reduceModN(sc, SC_E);         // e = e mod n
 
@@ -653,7 +660,8 @@ final class SchnorrHW {
         Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
         /* e hashed again from what the signature names (D250), Rx, Px and the message, where until D250 the check took the e that
          * step 6 left in sc: a fault in e after its hash, which the product would take with the rest, would then pass the
-         * check, the check reading the same faulted e. sc's room for points (from V_W) is not used yet. */
+         * check, the check reading the same faulted e. The message is the caller's buffer as it is now, where step 6 hashed
+         * the one step 3 read: a buffer that changed in between fails here. sc's room for points (from V_W) is not used yet. */
         Util.arrayCopyNonAtomic(work, V_RX, sc, SC_TMP, (short)32);
         Util.arrayCopyNonAtomic(work, V_PX, sc, (short)(SC_TMP + 32), (short)32);
         Util.arrayCopyNonAtomic(msg, msgOff, sc, (short)(SC_TMP + 64), (short)32);
