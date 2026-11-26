@@ -9806,3 +9806,49 @@ Its three conditions:
 - **A2-c (what this gives up).** SET_CARD's known answers (D219) run through `mulModNChip`, which signing no longer uses. The
   engine is the same, so D219's cover of the engine stands; `chipProduct`'s own bytecode is covered only by each signature's
   check, which refuses a wrong product and has the signature made again by the bytecode.
+
+## <a id="d247"></a>D247: The chip's RSA engines given their keys once a command
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A3 of the 3.2 speed review,
+in the red team's first, safe form (its "A3a"). `Cipher.init` is about 6 ms on a J3R180 (JCAlgTest); until 3.2 every power
+gave its engine its key first. No command, answer or stored byte changes.
+
+**The rule.**
+- **The signature's squaring** (`SchnorrHW.square`, D216): its engine is given `sqKey` at its first squaring in a command,
+  not at each: a signature's four squarings, one init. `chipMulInit` puts its flag down before it writes the key.
+- **The field's powers over p padded** (D214, D244): the cube, the root, Euler's test and the square each have an engine
+  of their own (`rsaCubeE` … `rsaSquareE`, made at the set-up life's first SET_CARD where the padded keys held), each given
+  its one key object at its first power in a command. Each is held to a known answer through itself at that SET_CARD
+  (`fieldEngines`: 2^3 = 8, the root of 4 is 2, Euler's test of 4 is 1; the square's through `squareInit`'s own answers);
+  `fieldOwn` says they held, is read only with `fieldP` (which a reset clears, so the reset's transaction writes nothing
+  more), and where one fails every power is on `rsa`, as before.
+- **Everything else stays on `rsa`, given its key before every power,** as before: the p*p keys (the simulator's, and the
+  owner point's check mod N, `requireOwnerPoint`).
+- The flags (`engineReady`, five bytes of RAM a selection clears, made at the first SET_CARD and handed to the signer) are
+  put down at the start of every command (`process`), by every write of a key (`fieldKey`, used for every key the field
+  powers take, and `chipMulInit` for the squaring's), and while an engine works (up again only after it answers, so one
+  that throws is given its key again at its next use).
+
+**Why it is safe (the red team's conditions).**
+- **A3-a: one engine per key object, never per exponent.** The p*p key and the padded key of one exponent never share a
+  cached engine: a cached engine is chosen in `powRaw` for its one padded key alone, and `rsa`, which serves every other key,
+  is given its key before every power. An engine given one key and used with the other would answer mod the wrong modulus
+  with no error (the red team's A3-2: off-curve owner keys taken about half the time, good sealed points refused).
+  `EnginesOnceTest.eachEngineServesOneKeyObject` reads the source.
+- **A3-c: a key written puts its engine's flag down.** Every `fieldKey` puts all four field flags down; `chipMulInit`
+  puts the squaring's down before `setModulus` and `setExponent` (`anEngineIsGivenItsKeyAgainAfterItsKeyIsWritten`).
+- **Nothing is assumed of what the chip keeps between commands.** Within one command no key is written but through those
+  calls, no selection or power loss can come between two powers, and the engine is the one the known answers ran through.
+  The red team's A3-1 (an engine exception inside a sealed PIN command costs a PIN try) is not made more likely by this form:
+  an engine is never used across a command boundary without being given its key.
+- A3-b, A3-d and A3-e (flags kept for the selection, a retry on an engine exception, a harness that loses an engine's init
+  at a power cut or a selection) belong to D248, which builds on this and can be left out alone.
+
+**Counts (jCardSim with ChipEnginesTest's engines; the times are JCAlgTest's).** A signature: four inits to one, about
+18 ms (a wait, AUTH, the payment's SIGN: each its own command). A LOAD_PROOF of three pieces in the 33-byte form: six inits
+to two (the cube's and Euler's engines, once each), about 24 ms. A change output (`SPEND_ALL_CHANGE`: K's check and the hash
+to the curve, about five to seven powers): one init a power to one an engine, about 20 to 25 ms. A sealed VERIFY_PIN (the
+cube and the square): no change, each engine's first use in its command. The persistent memory of four Cipher objects and
+five bytes of RAM at the first SET_CARD are what the chip run must show the room for (the 3.2 run had 71,372 bytes persistent
+and 1,596 of RAM free after the first SET_CARD); the load file grows by the code (see the build's size).
+`EnginesOnceTest` fails on d287eda (no such engines; four inits a signature).

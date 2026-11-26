@@ -1050,10 +1050,12 @@ class SchnorrHWMathTest {
     }
 
     @Test
-    @DisplayName("3.2 (D244): SET_CARD asks for one transient array, the staged outputs (601 bytes, CLEAR_ON_DESELECT), once, and where the chip gives no room it is persistent as before; the constructors' figures are as they were")
+    @DisplayName("3.2 (D244): SET_CARD asks for the staged outputs (601 bytes, CLEAR_ON_DESELECT), once, and where the chip gives no room it is persistent as before; and (D247) the engines' flags, 5 bytes; the constructors' figures are as they were")
     void setCardAsksForTheStagedOutputsInRam() throws Exception {
         int[] asked = transientMemoryAtSetCard();
-        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601, 1 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8");
+        // D247: and the engines' flags (5: the field's four engines and the signature's squaring), at the first SET_CARD and not at
+        // install; the 3.2 chip run had 1,596 bytes of this memory free after the first SET_CARD
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601 + 5, 2 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8; and the engines' flags");
         org.junit.jupiter.api.Assertions.assertEquals(941, transientMemoryAskedFor()[0], "and the install's CLEAR_ON_DESELECT is the 941 of the build that installs");
         String src = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
         org.junit.jupiter.api.Assertions.assertNotNull(findIgnoringSpace(src,
@@ -1087,7 +1089,9 @@ class SchnorrHWMathTest {
         String[] kinds = { "new\\s+OwnerPIN\\(", "Signature\\.getInstance\\(", "MessageDigest\\.getInstance\\(", "RandomData\\.getInstance\\(", "new\\s+KeyPair\\(",
             "KeyBuilder\\.buildKey\\(", "KeyAgreement\\.getInstance\\(", "Cipher\\.getInstance\\(", "Checksum\\.getInstance\\(", "KeyAgreement\\b" };
         // 1.12: the RSA keys of the change (one buildKey site, run three times) and their Cipher; SchnorrHW's second KeyAgreement is the chip's point addition
-        int[] inApplet = { 1, 1, 2, 1, 2, 2, 0, 1, 0, 0 };
+        // D247: and the field's four engines of their own, one Cipher site (`rsaEngine`) run four times at the first SET_CARD where the
+        // padded keys held, not at install: memory the chip run must show it gives
+        int[] inApplet = { 1, 1, 2, 1, 2, 2, 0, 2, 0, 0 };
         // SchnorrHW names KeyAgreement in its fields' types and in the getInstance calls, and in its agree-less comments only
         // D216: the signature's squaring on the chip's RSA: one buildKey site and one Cipher, made at the first SET_CARD (`chipMulInit`), not in the constructor
         int[] inSigner = { 0, 0, 1, 1, 0, 2, 2, 1, 0, -1 };

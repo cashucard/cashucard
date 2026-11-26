@@ -1398,6 +1398,26 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private RSAPrivateKey rsaSquare, rsaSquareP;
     /**
+     * The field's four powers over p padded (the cube, the root, Euler's test and the square) each on an engine of its own
+     * (D247), beside `rsa`, which keeps every other power (the p*p keys', the owner's point check's) and is given its key
+     * before each as before. Made at the set-up life's first SET_CARD where the padded keys held (`fieldEngines`), and leaned
+     * on only where each answered a known answer through itself there (`fieldOwn`, worked out there and nowhere else, and read
+     * only with `fieldP`, which a reset clears with the other verdicts: no write of its own in the reset's transaction). Each
+     * engine serves one key object alone, never one exponent's two keys (the p*p key and the padded one), and is given it at
+     * its first power of a command (`engineReady`), where until 3.2 every power gave its engine its key first (about 6 ms
+     * each): what the chip keeps of an engine between commands is never leaned on.
+     */
+    private Cipher rsaCubeE, rsaRootE, rsaEulerE, rsaSquareE;
+    private boolean fieldOwn;
+    /**
+     * Which engine holds its key in this command (D247): [0] to [3] the cube's, the root's, Euler's and the square's own, [4] the
+     * signature's squaring (SchnorrHW's `ready`). All put down at the start of every command (`process`), and by every write
+     * of a key (`fieldKey`, and chipMulInit for the squaring's); each put down while its engine works and up after it answers,
+     * so one that throws is given its key again. RAM a selection clears, made at the first SET_CARD; null before it and where
+     * the chip refused the room: every engine is then given its key at each use, as before.
+     */
+    private byte[] engineReady;
+    /**
      * Whether the square held to its known answers at this set-up life's first SET_CARD (`squareInit`, over the modulus `fieldP`
      * chose): a point's y is then held to x^3 + 7 by squaring it (`requireFullPoint` only: not `blindChange`, D244). False until then, after a
      * reset and where they did not hold: Euler's test and the root, as before.
@@ -1615,6 +1635,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     @Override
     public void process(APDU apdu) {
         byte[] buf = apdu.getBuffer();
+        // every engine is given its key at its first use in this command (D247): nothing the chip keeps of one between commands is leaned on
+        if (engineReady != null) Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 5, (byte) 0);
 
         /* A payment that was committed as the card left the field, with its
          * pieces not all marked spent yet: they are marked now, before
@@ -2611,11 +2633,26 @@ public class CashuApplet extends Applet implements TagSwitch {
         reduceModP(a, (short)(off + 64), scratch, X_OUT);
     }
 
-    /** The power mod N alone (`powModP` before its reduction): the 64 bytes at a[off] in, the 64 after them out. */
+    /**
+     * The power mod N alone (`powModP` before its reduction): the 64 bytes at a[off] in, the 64 after them out. A padded key's
+     * power on that key's own engine where `fieldOwn` holds with `fieldP` (D247), given its key only at its first power of a
+     * command (the keys are public; the flags are put down at the start of every command and by every write of a key); any
+     * other on `rsa`, given its key first, as before.
+     */
     private void powRaw(RSAPrivateKey key, byte[] a, short off) {
-        rsa.init(key, Cipher.MODE_DECRYPT);
+        Cipher c = rsa;
+        short i = -1;
+        if (fieldP && fieldOwn) {
+            if (key == rsaCubeP) { c = rsaCubeE; i = 0; }
+            else if (key == rsaRootP) { c = rsaRootE; i = 1; }
+            else if (key == rsaEulerP) { c = rsaEulerE; i = 2; }
+            else if (key == rsaSquareP) { c = rsaSquareE; i = 3; }
+        }
+        if (i < 0 || engineReady[i] != (byte) 1) c.init(key, Cipher.MODE_DECRYPT);
+        if (i >= 0) engineReady[i] = (byte) 0;
         short out = (short)(off + 64);
-        short n = rsa.doFinal(a, off, (short) 64, a, out);
+        short n = c.doFinal(a, off, (short) 64, a, out);
+        if (i >= 0) engineReady[i] = (byte) 1;
         if (n < (short) 64) {
             Util.arrayCopyNonAtomic(a, out, a, (short)(out + 64 - n), n);
             Util.arrayFillNonAtomic(a, out, (short)(64 - n), (byte) 0);
@@ -2730,8 +2767,12 @@ public class CashuApplet extends Applet implements TagSwitch {
         return (RSAPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_RSA_PRIVATE, KeyBuilder.LENGTH_RSA_512, false);
     }
 
-    /** `k` made the key of one power: the 64 bytes at m the modulus (RSA_PP's, or p padded), d the exponent. */
-    private static RSAPrivateKey fieldKey(RSAPrivateKey k, byte[] d, byte[] m) {
+    /**
+     * `k` made the key of one power: the 64 bytes at m the modulus (RSA_PP's, or p padded), d the exponent. Every engine of the
+     * field's own is given its key again at its next power (D247): the one that holds `k` must not go on as it was.
+     */
+    private RSAPrivateKey fieldKey(RSAPrivateKey k, byte[] d, byte[] m) {
+        if (engineReady != null) Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 4, (byte) 0);
         k.setModulus(m, (short) 0, (short) 64);
         k.setExponent(d, (short) 0, (short) d.length);
         return k;
@@ -2806,6 +2847,41 @@ public class CashuApplet extends Applet implements TagSwitch {
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    /**
+     * The field's own engines (D247), at the set-up life's first SET_CARD, after `fieldPInit` and where the padded keys held:
+     * made once (kept through a reset, as the keys are), every flag put down, then each of the three held to a known answer
+     * through itself and its key: 2^3 = 8, the root of 4 is 2, Euler's test of 4 is 1 (the square's engine answers the
+     * square's known answers in `squareInit`, which runs through it). `fieldOwn` true where all hold; false on a wrong answer,
+     * an engine refused or any exception, and every power is then on `rsa`, as before. allSlots is the room: no payment is in
+     * hand.
+     */
+    private void fieldEngines() {
+        fieldOwn = false;
+        if (!fieldP || engineReady == null) return;
+        try {
+            if (rsaCubeE == null) rsaCubeE = rsaEngine();
+            if (rsaRootE == null) rsaRootE = rsaEngine();
+            if (rsaEulerE == null) rsaEulerE = rsaEngine();
+            if (rsaSquareE == null) rsaSquareE = rsaEngine();
+            Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 4, (byte) 0);
+            fieldOwn = true;
+            byte[] b = allSlots;
+            for (short r = 0; r < (short) 3; r++) {
+                Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+                b[63] = (byte)(r == 0 ? 2 : 4);
+                powRaw(r == 0 ? rsaCubeP : r == 1 ? rsaRootP : rsaEulerP, b, (short) 0);
+                if (b[127] != (byte)(r == 0 ? 8 : r == 1 ? 2 : 1) || !isZero(b, (short) 64, (short) 63)) fieldOwn = false;
+            }
+        } catch (RuntimeException e) {
+            fieldOwn = false;
+        }
+    }
+
+    /** An engine of the chip's RSA (`fieldEngines`): one call site, run four times. */
+    private static Cipher rsaEngine() {
+        return Cipher.getInstance(Cipher.ALG_RSA_NOPAD, false);
     }
 
     /**
@@ -4887,6 +4963,17 @@ public class CashuApplet extends Applet implements TagSwitch {
                 try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e2) { outStage = null; }
             }
         }
+        /* The engines' flags (D247), five bytes of the same memory: which engine holds its key in this command. Given to the
+         * signer too, for its squaring. Where the chip will not give it, null: every engine is given its key at each use, as
+         * before. */
+        if (engineReady == null) {
+            try {
+                engineReady = JCSystem.makeTransientByteArray((short) 5, JCSystem.CLEAR_ON_DESELECT);
+                schnorrHW.ready = engineReady;
+            } catch (SystemException e) {
+                engineReady = null;
+            }
+        }
         /* And the keyset table (D184), 267 bytes, for the same reason and in the same way, before the openings' keys: a change
          * output is made only in a keyset the table says was taught. Refused, the card is a card of one unit, every piece its own
          * unit's, makes no change for itself (SPEND_ALL_CHANGE answers 6A84), and is set up all the same. */
@@ -4951,6 +5038,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         if (!selfTested) {
             curveByAgreement = schnorrHW.checksCurve();
             fieldP = fieldPInit();
+            // and the field's powers each on an engine of its own (D247), where the padded keys held and each engine answers
+            fieldEngines();
             // and the square's (D244), over the modulus fieldP chose: a point's y is squared only where its answers held
             fieldSquare = squareInit();
             schnorrHW.chipMul = schnorrHW.chipMulInit();
@@ -7656,7 +7745,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
+        /* 3.2's speed commits (D245 on): the writes below are made again at each commit, from the code alone (the earlier ones
+         * all taken out), as many as bring the load file to 245 past a multiple of 256: 44,021 bytes at D247, a size no chip
+         * has been given (43,765 is the largest installed, on card 57723320).
+         * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
          * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on
          * 2026-11-26 (other source of that size, not this file); unpadded 43,655 (135 past, a place a chip refused before).
          * 3.2 (D244): seventy-seven writes, the forty below and thirty-seven more (the last four a value of one byte's push),
@@ -7693,100 +7785,29 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the sizes not to be shipped untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
-        a[1] = 11;
-        a[2] = 12;
-        a[3] = 13;
-        a[4] = 14;
-        a[5] = 15;
-        a[1] = 1;
-        a[2] = 2;
-        a[24] = 34;
-        a[25] = 35;
-        a[26] = 36;
-        a[27] = 37;
-        a[3] = 41;
-        a[5] = 5;
-        a[30] = 40;
-        a[31] = 41;
-        a[32] = 42;
-        a[33] = 43;
-        a[34] = 44;
-        a[35] = 45;
-        a[36] = 46;
-        a[37] = 47;
-        a[38] = 48;
-        a[39] = 49;
-        a[40] = 50;
-        a[41] = 51;
-        a[42] = 52;
-        a[43] = 53;
-        a[44] = 54;
-        a[45] = 55;
-        a[46] = 56;
-        a[47] = 57;
-        a[48] = 58;
-        a[49] = 59;
-        a[50] = 60;
-        a[51] = 61;
-        a[52] = 62;
-        a[53] = 63;
-        a[54] = 64;
-        a[55] = 65;
-        a[56] = 66;
-        a[57] = 67;
-        a[58] = 68;
-        a[59] = 69;
-        a[60] = 70;
-        a[61] = 71;
-        a[62] = 72;
-        a[63] = 73;
-        a[64] = 74;
-        a[65] = 75;
-        a[66] = 76;
-        a[67] = 77;
-        a[68] = 78;
-        a[69] = 79;
-        a[70] = 80;
-        a[71] = 81;
-        a[72] = 82;
-        a[73] = 83;
-        a[74] = 84;
-        a[75] = 85;
-        a[76] = 86;
-        a[77] = 87;
-        a[78] = 88;
-        a[79] = 89;
-        a[80] = 90;
-        a[81] = 91;
-        a[82] = 92;
-        a[83] = 93;
-        a[84] = 94;
-        a[85] = 95;
-        a[86] = 96;
-        a[87] = 97;
-        a[88] = 98;
-        a[89] = 99;
-        a[90] = 1;
-        a[91] = 2;
-        a[92] = 3;
-        a[93] = 4;
-        a[94] = 10;
-        a[95] = 11;
-        a[96] = 12;
-        a[97] = 13;
-        a[98] = 14;
-        a[99] = 15;
-        a[100] = 16;
-        a[101] = 17;
-        a[102] = 18;
-        a[103] = 19;
-        a[104] = 20;
-        a[105] = 21;
-        a[106] = 22;
-        a[107] = 23;
-        a[108] = 24;
-        a[109] = 25;
-        a[200] = 26;
-        a[201] = 27;
+        // the 3.2 speed commits (D245 on): writes added to hold the file at 245 past, made again by each (pad.py)
+        a[110] = 0;
+        a[110] = 6;
+        a[111] = 7;
+        a[112] = 8;
+        a[113] = 9;
+        a[114] = 10;
+        a[115] = 11;
+        a[116] = 12;
+        a[117] = 13;
+        a[118] = 14;
+        a[119] = 15;
+        a[120] = 16;
+        a[121] = 17;
+        a[122] = 18;
+        a[123] = 19;
+        a[124] = 20;
+        a[125] = 21;
+        a[126] = 22;
+        a[127] = 23;
+        a[110] = 24;
+        a[111] = 25;
+        a[112] = 26;
+        // padding ends
     }
 }

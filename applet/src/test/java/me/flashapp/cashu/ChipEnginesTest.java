@@ -90,12 +90,14 @@ class ChipEnginesTest {
         final Cipher real;
         FakeKey key;
         int powers, oldPowers, garbage;
+        /** Every init, of a FakeKey (D247: an engine is given its key once a selection). */
+        int inits;
         boolean lie, refuse;
         /** Every power's key modulus, in order. */
         final List<BigInteger> moduli = new ArrayList<>();
         Engine(Cipher real) { this.real = real; }
         @Override public void init(Key k, byte m) throws CryptoException {
-            if (k instanceof FakeKey) { key = (FakeKey) k; return; }
+            if (k instanceof FakeKey) { key = (FakeKey) k; inits++; return; }
             key = null;
             real.init(k, m);
         }
