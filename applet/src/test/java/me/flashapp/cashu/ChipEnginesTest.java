@@ -360,12 +360,12 @@ class ChipEnginesTest {
     }
 
     @Test
-    @DisplayName("D215: LOAD_CHANGE's K, C_ and the unblinded C are held to the curve by the chip's key agreement (three agreements, and no Euler test of theirs: the RSA does nothing, 3.2 keeping the opening's B_ whole); where the set-up's agreement test did not hold, the old tests run (eight powers, no extra agreement)")
+    @DisplayName("D215: LOAD_CHANGE's K, C_ and the unblinded C are held to the curve by the chip's key agreement (three agreements, and no Euler test of theirs: the RSA does nothing, 3.2 keeping the opening's B_ whole); where the set-up's agreement test did not hold, the old tests run (six powers with the square, no extra agreement)")
     void loadChangeChecksByAgreement() throws Exception {
         int[] by = loadChangeCounts(KeysetKeysTest.card(), true), old = loadChangeCounts(KeysetKeysTest.card(), false);
         // 3.2 (D244): B_ is kept whole (its y beside it), so its cube and root are gone from both paths
         assertEquals(0, by[0], "by the agreement: no RSA power at all, B_ kept whole");
-        assertEquals(8, old[0], "by Euler's test: K's three and C_'s three, and the unblinded C's cube and Euler");
+        assertEquals(6, old[0], "by Euler's test: K's two and C_'s two (by the square, D244: a cube and a square where a cube, Euler and a root were three), and the unblinded C's cube and Euler");
         assertEquals(3, by[1] - old[1], "and three key agreements more");
     }
 

@@ -5660,13 +5660,13 @@ class CashuAppletTest {
         String reset = body(code, "private void processResetCard(", "\n    private ");
         // 3.2 (D244): the new keys owed in the last transaction (ROTATE_KEYS) and drawn after its commit (finishResetKeys)
         int last = reset.lastIndexOf("JCSystem.beginTransaction();");
-        int owed = reset.indexOf("= ROTATE_KEYS;");
+        int keysOwed = reset.indexOf("= ROTATE_KEYS;");
         int keeps = reset.indexOf("if (!certified && paid != null) {");
         int empty = reset.indexOf("Util.setShort(paid, PAID_NEXT, (short) 0);");
         int unround = reset.indexOf("paid[PAID_ROUND] = (byte) 0;");
         int done = reset.indexOf("JCSystem.commitTransaction();", last);
         int key = reset.indexOf("finishResetKeys();", done);
-        assertTrue(owed > 0 && owed < last && last < keeps && keeps < empty && empty < unround && unround < done && done < key,
+        assertTrue(keysOwed > 0 && keysOwed < last && last < keeps && keeps < empty && empty < unround && unround < done && done < key,
             "in the last transaction with the new keys owed, the keys drawn after it, and only where there is a new key: a certified card keeps its key and its list (D192)");
         // nothing else writes the list
         // but the signatures kept beside the receipts, after the list (SPEND_ALL_AGAIN P1 = 1 reads them)
@@ -9499,7 +9499,7 @@ class CashuAppletTest {
         // 3.2 (D244): LOAD_CHANGE logs in its own transaction, by logLoadedIn, which logLoaded wraps in one of its own for LOAD_PROOF
         assertEquals(2, count(code, "logLoaded("), "its declaration and LOAD_PROOF");
         assertEquals(3, count(code, "logLoadedIn("), "its declaration, logLoaded's and LOAD_CHANGE's");
-        assertTrue(body(code, "private void processLoadChange(", "private boolean unblind(").contains("logLoaded("));
+        assertTrue(body(code, "private void processLoadChange(", "private boolean unblind(").contains("logLoadedIn("));
         assertTrue(body(code, "private void processLetGo(", "private void processSetTag(").contains("logEntry(LOG_ANY)"), "the let-go, which has no amount, takes the tap's entry whatever its unit");
         assertTrue(body(code, "private void processSpendAllSign(", "private void processSpendAllAgain(").contains("logEntry(unit)"));
         assertTrue(body(code, "private void refuseOverLimit(", "private void processGetLog(").contains("logEntry(unit)"));
@@ -9511,7 +9511,7 @@ class CashuAppletTest {
         // and, since 2.2 (D175), read by the assisted-settlement record for its payment id, which writes none of them
         String outboxWrite = body(code, "private void writeOutbox(", "private static boolean isAllOnes(");
         assertEquals(2, count(outboxWrite, "cardReceipts"), "the record reads the count twice: to stop at FFFFFFFF, and to copy it");
-        assertTrue(outboxWrite.contains("isAllOnes(cardReceipts, (short) 0)") && outboxWrite.contains("arrayCopyNonAtomic(cardReceipts, (short) 0, outbox, at, (short) 4)"),
+        assertTrue(outboxWrite.contains("isAllOnes(cardReceipts, (short) 0)") && outboxWrite.contains("arrayCopyNonAtomic(cardReceipts, (short) 0, buf, p, (short) 4)"),
             "and writes none of it");
         // and SPEND_ALL_AGAIN P1 = 1 reads each receipt's hash, to find the signature kept beside it, and writes none
         String again = body(code, "private void processSpendAllAgain(", "private void requireUnderLimits(");
@@ -13648,7 +13648,7 @@ class CashuAppletTest {
             r.indexOf("finishResetKeys();"), r.indexOf("pin.update(") };
         /* 3.2 (D244): the keys after the commit, in finishResetKeys (which follows processResetCard in the source): the
          * signature over the PIN key let go first, then the card key, then the PIN key, then the mark */
-        String keys = body(code, "private void finishResetKeys(", "\n    /**");
+        String keys = body(code, "private void finishResetKeys(", "\n    private ");
         int sigGone = keys.indexOf("pinKeySig[0] = (byte) 0"), card = keys.indexOf("cardKeyPair.genKeyPair()"), pinKey = keys.indexOf("pinKeyPair.genKeyPair()"),
             markDown = keys.indexOf("~ROTATE_KEYS");
         assertTrue(sigGone > 0 && sigGone < card && card < pinKey && pinKey < markDown, "the signature let go, the card key, the PIN key, the mark down");
