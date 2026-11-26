@@ -9854,6 +9854,33 @@ five bytes of RAM at the first SET_CARD are what the chip run must show the room
 and 1,596 of RAM free after the first SET_CARD); the load file grows by the code (see the build's size).
 `EnginesOnceTest` fails on d287eda (no such engines; four inits a signature).
 
+**The red team's code pass (2026-11-26): cleared with one condition, met in a follow-up (its C-A3a-1, MEDIUM).** The
+engines of the field's own were held at SET_CARD to the three small answers alone: `fieldPInit`'s full-width answers (G's
+x, p - 1, p - 2) ran on `rsa`, `fieldP` being false while it runs, so an engine right on small values and wrong at full
+width was leaned on, and a root's engine wrong there loses every change output (nothing checks y^2 = x^3 + 7 after the root
+in `blindChange`). Now `fieldEngines` asks `fieldPInit`'s eleven known answers again through the engines (`fieldAnswers`,
+each power on its key's engine), where it asked three: eight powers more, once a set-up life, about 62 ms at JCAlgTest's
+7.8 ms a power (counted, not measured; each engine is still given its key once). The square's engine was already held to
+full-width answers by `squareInit`. `EnginesOnceTest.anEngineWrongAtFullWidthIsFoundAtSetUp` gives a card a cube's, a
+root's or an Euler's engine right below 2^128 and wrong above it, sets it up, and pays with four change outputs: `fieldOwn`
+is false, that engine is asked nothing after the set-up, and the change is right; on 1d9ac2a the three small answers pass
+the engine and the change output is refused (`6A80`).
+
+**What the set-up pays (card 57723320, a J3R180, 2026-11-26; the chip run's figures).** Two SET_CARDs that are not alike:
+- **The first SET_CARD after an install** makes what a reset keeps: the 12,288-byte proof store, the record's arrays, the
+  padded RSA keys and, since this entry and D251, the four engines and the curve check's own key and agreement. 2,007.5 ms
+  on 1d9ac2a (the paid-list run, which installs its file). Over every command of the set-up (the play-money harness's
+  `cardctl setup`, a fresh install each, the process's start included): 4,358 ms on 3b9b5a4, 4,193 ms on 1d9ac2a; by
+  commit, D245 and D246 -341 ms (D245's one wipe for SET_CARD's seventeen framing asks), this entry +141 ms (the four
+  engines made, three powers), D248 -117, D249 +14, D250 +31, D251 +105 (its key and agreement made), the rest within
+  20 ms, the harness's spread being about 100 ms either way. On 52be734 alone (01c): 4,058 ms.
+- **A SET_CARD after a reset by the owner** makes nothing: 1,602.7 ms on c816133 and 1,406.8 ms on 1d9ac2a. The owner's
+  claim after it (four askings, a card that has had a PIN, D236): 3 x 527 + 826 ms on c816133, 409.6 + 412.7 + 412.6 +
+  823.2 ms on 1d9ac2a.
+So no commit made the set-up slower: the 400 ms between the paid-list runs' two SET_CARDs is an install's first set-up
+against a reset's. The follow-up above adds about 62 ms to each set-up life's first SET_CARD. The project lead decided
+(2026-11-26) that a set-up this much longer is acceptable.
+
 ## <a id="d248"></a>D248: The chip's RSA engines given their keys once a selection
 
 **Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** The red team's second form of A3

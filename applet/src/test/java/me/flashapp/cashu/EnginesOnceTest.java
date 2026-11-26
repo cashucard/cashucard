@@ -237,6 +237,35 @@ class EnginesOnceTest {
     }
 
     @Test
+    @DisplayName("D247 (the red team's C-A3a-1): an engine of the field's own that is right on small values and wrong at full width (the cube's, the root's or Euler's) is found at SET_CARD, fieldPInit's eleven known answers being asked again through it: fieldOwn is false, that engine is asked nothing after the set-up, and a payment's four change outputs are made and written back right, on `rsa`; at 756a459 to 1d9ac2a the three small answers passed it, and the payment's change was refused (6A80) or lost")
+    void anEngineWrongAtFullWidthIsFoundAtSetUp() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            Engines e = new Engines();
+            UnitsTest.Card c = unsetCard(e);
+            // right below 2^128, the last bit of the answer wrong above it: a chip's engine that drops a carry at full width
+            Engine wide = new Engine(null) {
+                @Override public short doFinal(byte[] a, short o, short l, byte[] out, short oo) {
+                    short n = super.doFinal(a, o, l, out, oo);
+                    boolean big = false;
+                    for (int k = 0; k < 16; k++) if (a[o + 32 + k] != 0) big = true;
+                    if (big) out[oo + 63] ^= 1;
+                    return n;
+                }
+            };
+            e.own[i] = wide;
+            set(c.applet(), CashuApplet.class, OWN[i], wide);
+            c.ready(UnitsTest.SAT, true);
+            assertTrue(flag(c.applet(), CashuApplet.class, "fieldP"), "the padded keys held on `rsa`, " + OWN[i]);
+            assertFalse(flag(c.applet(), CashuApplet.class, "fieldOwn"), OWN[i] + " wrong at full width: no engine of the field's own is leaned on");
+            assertTrue(wide.powers > 1, OWN[i] + " was asked its full-width answers at the set-up");
+            int asked = wide.powers;
+            c.grant();
+            changeIsRight(c, 4);
+            assertEquals(asked, wide.powers, OWN[i] + " asked nothing after the set-up");
+        }
+    }
+
+    @Test
     @DisplayName("D247: where an engine of its own fails its known answer at SET_CARD, fieldOwn is false and every power is on `rsa`, given its key each time, as before")
     void aFailedEngineIsNotLeanedOn() throws Exception {
         Engines e = new Engines();

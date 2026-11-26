@@ -2815,64 +2815,76 @@ public class CashuApplet extends Applet implements TagSwitch {
             fieldKey(rsaCubeP, RSA_D_CUBE, b);
             fieldKey(rsaRootP, RSA_D_ROOT, b);
             fieldKey(rsaEulerP, RSA_D_EULER, b);
-            // 2^3 = 8, 4 is a square, and its root is 2 (p is 7 mod 8: 2 is a square)
-            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
-            b[63] = (byte) 2;
-            powRaw(rsaCubeP, b, (short) 0);
-            if (b[127] != (byte) 8 || !isZero(b, (short) 64, (short) 63)) return false;
-            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
-            b[63] = (byte) 4;
-            powRaw(rsaEulerP, b, (short) 0);
-            if (b[127] != (byte) 1 || !isZero(b, (short) 64, (short) 63)) return false;
-            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
-            b[63] = (byte) 4;
-            powRaw(rsaRootP, b, (short) 0);
-            if (b[127] != (byte) 2 || !isZero(b, (short) 64, (short) 63)) return false;
-            // at full width: x = G's x, s = x^3 + 7 is G's y squared; Euler's test of s is 1 and its root is y or p - y
-            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
-            Util.arrayCopyNonAtomic(SECP256K1_G, (short) 1, b, (short) 32, (short) 32);
-            powRaw(rsaCubeP, b, (short) 0);
-            if (!isZero(b, (short) 64, (short) 32)) return false;
-            add7ModP(b, (short) 96);
-            Util.arrayCopyNonAtomic(b, (short) 96, b, (short) 32, (short) 32);
-            Util.arrayFillNonAtomic(b, (short) 0, (short) 32, (byte) 0);
-            powRaw(rsaEulerP, b, (short) 0);
-            if (b[127] != (byte) 1 || !isZero(b, (short) 64, (short) 63)) return false;
-            // the input half is as it was: s again, for the root
-            powRaw(rsaRootP, b, (short) 0);
-            if (!isZero(b, (short) 64, (short) 32)) return false;
-            if (!sameBytes(b, (short) 96, SECP256K1_G, (short) 33, (short) 32)) {
-                SchnorrHW.sub32(SECP256K1_P, (short) 0, b, (short) 96, b, (short) 0);
-                if (!sameBytes(b, (short) 0, SECP256K1_G, (short) 33, (short) 32)) return false;
-            }
-            /* and at the top of the range (D219: G's numbers all have the top bit clear, and an engine wrong from 2^255 up would
-             * have passed): x = p - 1 (-1), whose cube, Euler's test and root are all p - 1 (p is 3 mod 4 and (p + 1)/4 is even:
-             * the root key's exponent is odd, and -1 to it is -1), and x = p - 2 (-2, a non-square as 2 is one), whose cube is
-             * p - 8 and whose Euler's test is p - 1 */
-            for (short r = 0; r < 5; r++) {
-                Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
-                Util.arrayCopyNonAtomic(SECP256K1_P, (short) 0, b, (short) 32, (short) 32);
-                b[63] -= (byte)(r < 3 ? 1 : 2);
-                powRaw(r == 0 || r == 3 ? rsaCubeP : r == 1 || r == 4 ? rsaEulerP : rsaRootP, b, (short) 0);
-                if (!isZero(b, (short) 64, (short) 32)) return false;
-                // the answer: p - 1 for all of the first three and the Euler of p - 2, p - 8 for the cube of p - 2
-                Util.arrayCopyNonAtomic(SECP256K1_P, (short) 0, b, (short) 0, (short) 32);
-                b[31] -= (byte)(r == 3 ? 8 : 1);
-                if (!sameBytes(b, (short) 0, b, (short) 96, (short) 32)) return false;
-            }
-            return true;
+            return fieldAnswers();
         } catch (RuntimeException e) {
             return false;
         }
     }
 
     /**
+     * The padded keys' eleven known answers (D214, D219), each power through the engine `powRaw` gives its key: on `rsa` from
+     * `fieldPInit`, and again on each key's engine of its own from `fieldEngines` (D247, the red team's C-A3a-1). True where
+     * all hold. The keys are written; allSlots is the room. An exception is the caller's to take.
+     */
+    private boolean fieldAnswers() {
+        byte[] b = allSlots;
+        // 2^3 = 8, 4 is a square, and its root is 2 (p is 7 mod 8: 2 is a square)
+        Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+        b[63] = (byte) 2;
+        powRaw(rsaCubeP, b, (short) 0);
+        if (b[127] != (byte) 8 || !isZero(b, (short) 64, (short) 63)) return false;
+        Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+        b[63] = (byte) 4;
+        powRaw(rsaEulerP, b, (short) 0);
+        if (b[127] != (byte) 1 || !isZero(b, (short) 64, (short) 63)) return false;
+        Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+        b[63] = (byte) 4;
+        powRaw(rsaRootP, b, (short) 0);
+        if (b[127] != (byte) 2 || !isZero(b, (short) 64, (short) 63)) return false;
+        // at full width: x = G's x, s = x^3 + 7 is G's y squared; Euler's test of s is 1 and its root is y or p - y
+        Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+        Util.arrayCopyNonAtomic(SECP256K1_G, (short) 1, b, (short) 32, (short) 32);
+        powRaw(rsaCubeP, b, (short) 0);
+        if (!isZero(b, (short) 64, (short) 32)) return false;
+        add7ModP(b, (short) 96);
+        Util.arrayCopyNonAtomic(b, (short) 96, b, (short) 32, (short) 32);
+        Util.arrayFillNonAtomic(b, (short) 0, (short) 32, (byte) 0);
+        powRaw(rsaEulerP, b, (short) 0);
+        if (b[127] != (byte) 1 || !isZero(b, (short) 64, (short) 63)) return false;
+        // the input half is as it was: s again, for the root
+        powRaw(rsaRootP, b, (short) 0);
+        if (!isZero(b, (short) 64, (short) 32)) return false;
+        if (!sameBytes(b, (short) 96, SECP256K1_G, (short) 33, (short) 32)) {
+            SchnorrHW.sub32(SECP256K1_P, (short) 0, b, (short) 96, b, (short) 0);
+            if (!sameBytes(b, (short) 0, SECP256K1_G, (short) 33, (short) 32)) return false;
+        }
+        /* and at the top of the range (D219: G's numbers all have the top bit clear, and an engine wrong from 2^255 up would
+         * have passed): x = p - 1 (-1), whose cube, Euler's test and root are all p - 1 (p is 3 mod 4 and (p + 1)/4 is even:
+         * the root key's exponent is odd, and -1 to it is -1), and x = p - 2 (-2, a non-square as 2 is one), whose cube is
+         * p - 8 and whose Euler's test is p - 1 */
+        for (short r = 0; r < 5; r++) {
+            Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
+            Util.arrayCopyNonAtomic(SECP256K1_P, (short) 0, b, (short) 32, (short) 32);
+            b[63] -= (byte)(r < 3 ? 1 : 2);
+            powRaw(r == 0 || r == 3 ? rsaCubeP : r == 1 || r == 4 ? rsaEulerP : rsaRootP, b, (short) 0);
+            if (!isZero(b, (short) 64, (short) 32)) return false;
+            // the answer: p - 1 for all of the first three and the Euler of p - 2, p - 8 for the cube of p - 2
+            Util.arrayCopyNonAtomic(SECP256K1_P, (short) 0, b, (short) 0, (short) 32);
+            b[31] -= (byte)(r == 3 ? 8 : 1);
+            if (!sameBytes(b, (short) 0, b, (short) 96, (short) 32)) return false;
+        }
+        return true;
+    }
+
+    /**
      * The field's own engines (D247), at the set-up life's first SET_CARD, after `fieldPInit` and where the padded keys held:
-     * made once (kept through a reset, as the keys are), every flag put down, then each of the three held to a known answer
-     * through itself and its key: 2^3 = 8, the root of 4 is 2, Euler's test of 4 is 1 (the square's engine answers the
-     * square's known answers in `squareInit`, which runs through it). `fieldOwn` true where all hold; false on a wrong answer,
-     * an engine refused or any exception, and every power is then on `rsa`, as before. allSlots is the room: no payment is in
-     * hand.
+     * made once (kept through a reset, as the keys are), every flag put down, then fieldPInit's eleven known answers asked
+     * again through them, each power on its key's engine (`fieldAnswers` with `fieldOwn` up): the small ones and the full-width
+     * ones (G's x, p - 1 and p - 2), so that an engine right on small values and wrong at full width is not leaned on (the red
+     * team's C-A3a-1: until this, three small answers alone, 2^3 = 8, the root of 4 and Euler's test of 4). The square's engine
+     * answers the square's known answers, full width among them, in `squareInit`, which runs through it. `fieldOwn` true where
+     * all hold; false on a wrong answer, an engine refused or any exception, and every power is then on `rsa`, as before.
+     * allSlots is the room: no payment is in hand.
      */
     private void fieldEngines() {
         fieldOwn = false;
@@ -2884,13 +2896,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             if (rsaSquareE == null) rsaSquareE = rsaEngine();
             Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 4, (byte) 0);
             fieldOwn = true;
-            byte[] b = allSlots;
-            for (short r = 0; r < (short) 3; r++) {
-                Util.arrayFillNonAtomic(b, (short) 0, (short) 128, (byte) 0);
-                b[63] = (byte)(r == 0 ? 2 : 4);
-                powRaw(r == 0 ? rsaCubeP : r == 1 ? rsaRootP : rsaEulerP, b, (short) 0);
-                if (b[127] != (byte)(r == 0 ? 8 : r == 1 ? 2 : 1) || !isZero(b, (short) 64, (short) 63)) fieldOwn = false;
-            }
+            if (!fieldAnswers()) fieldOwn = false;
         } catch (RuntimeException e) {
             fieldOwn = false;
         }
