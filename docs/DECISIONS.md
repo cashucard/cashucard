@@ -9852,3 +9852,37 @@ cube and the square): no change, each engine's first use in its command. The per
 five bytes of RAM at the first SET_CARD are what the chip run must show the room for (the 3.2 run had 71,372 bytes persistent
 and 1,596 of RAM free after the first SET_CARD); the load file grows by the code (see the build's size).
 `EnginesOnceTest` fails on d287eda (no such engines; four inits a signature).
+
+## <a id="d248"></a>D248: The chip's RSA engines given their keys once a selection
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** The red team's second form of A3
+("A3b"), on D247, and to be left out alone: it goes on a card only where the chip checks below hold. No command, answer or
+stored byte changes.
+
+**The rule.** D247's flags are no longer put down at the start of every command: an engine given its key keeps it for the
+rest of the selection. They are put down at every selection (their RAM is cleared at a deselection, and `select()` clears
+them too, for a chip that keeps a same-package applet's RAM across a SELECT of the tag and back, as D236 does for
+`allState`), at every write of a key (D247), and while an engine works. And an engine that throws `CryptoException` at its
+power (`powRaw`, the signature's squaring) is given its key again and asked once more before the exception is let out.
+
+**Why it is safe (the red team's conditions A3-b to A3-e).**
+- **A3-b.** The flags live in RAM a deselection clears and are cleared in `select()`; never in RAM cleared only at a reset.
+- **A3-c.** Every key written puts its engine's flag down (D247).
+- **A3-d.** A lost init is an init and a retry, never a refusal: an engine exception inside a sealed PIN command (the
+  reader's point held to the curve by the cube and the square) would otherwise be taken as an envelope that does not open
+  and cost a PIN try (the red team's A3-1, proved on 3.2). `EnginesOnceTest.aSealedPinWithLostEnginesCostsNoTry`.
+- **A3-e.** The tests' engines behave as a chip's may: an init copies the key's modulus and exponent, a power cut and a
+  selection lose what the engine was given (it then throws INVALID_INIT), and every Cipher the applet makes is one of them.
+  On that card SET_CARD's known answers hold through every fast path (fieldP, fieldOwn, fieldSquare, chipMul), and no power
+  is ever asked of an engine that holds nothing.
+- **What is still assumed, and only a chip can show:** within one selection an engine keeps what it was given across
+  commands, or loses it so that its next power throws. An engine that lost its key and answered garbage with no error would
+  give wrong powers: refused good points (PIN tries), and a change point off the curve (change lost). The red team's chip
+  check 1 asks exactly this of an RSA Cipher and a key agreement after a deselect and select, the tag selected and back, a
+  power cycle, a key written again with the same values, a key pair drawn again, and an exception on the previous use.
+
+**Counts (jCardSim, the tests' engines; times JCAlgTest's).** On D247: a selection's waits, AUTHs and SIGN give the squaring
+its key once in all (each wait about 6 ms less); a first load of 36 pieces in the 33-byte form, 2 inits in all where D247
+gives 2 a command (about 400 ms less over 35 LOAD_PROOFs); the change outputs of one payment, one init an engine for the
+whole payment; a sealed VERIFY_PIN, 2 inits less where the cube's and the square's engines were used earlier in the
+selection. `EnginesOnceTest` holds the once-a-selection counts, the retry and the sealed PIN.

@@ -1410,11 +1410,13 @@ public class CashuApplet extends Applet implements TagSwitch {
     private Cipher rsaCubeE, rsaRootE, rsaEulerE, rsaSquareE;
     private boolean fieldOwn;
     /**
-     * Which engine holds its key in this command (D247): [0] to [3] the cube's, the root's, Euler's and the square's own, [4] the
-     * signature's squaring (SchnorrHW's `ready`). All put down at the start of every command (`process`), and by every write
-     * of a key (`fieldKey`, and chipMulInit for the squaring's); each put down while its engine works and up after it answers,
-     * so one that throws is given its key again. RAM a selection clears, made at the first SET_CARD; null before it and where
-     * the chip refused the room: every engine is then given its key at each use, as before.
+     * Which engine holds its key in this selection (D247, D248): [0] to [3] the cube's, the root's, Euler's and the square's
+     * own, [4] the signature's squaring (SchnorrHW's `ready`). RAM a selection clears, and put down in `select()` as well (for
+     * a chip that keeps it across a SELECT of the tag and back), by every write of a key (`fieldKey`, and chipMulInit for the
+     * squaring's), and while an engine works, up after it answers. An engine that throws at its power is given its key again
+     * and asked once more before the exception is let out (D248): one that lost what it was given, whatever the cause, costs
+     * an init, never a refusal. Made at the first SET_CARD; null before it and where the chip refused the room: every engine
+     * is then given its key at each use, as before.
      */
     private byte[] engineReady;
     /**
@@ -1629,14 +1631,14 @@ public class CashuApplet extends Applet implements TagSwitch {
         Util.arrayFillNonAtomic(allOut, (short) 0, (short) 33, (byte) 0);
         // the tag's code of its last selection (D222), in this applet's working memory: not left for this one to find
         Util.arrayFillNonAtomic(scratch, X_TAG, (short)(TAG_R_LEN + TAG_MAC_LEN), (byte) 0);
+        // and every engine is given its key again at its first use in this selection (D248), whatever the chip kept of it
+        if (engineReady != null) Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 5, (byte) 0);
         return true;
     }
 
     @Override
     public void process(APDU apdu) {
         byte[] buf = apdu.getBuffer();
-        // every engine is given its key at its first use in this command (D247): nothing the chip keeps of one between commands is leaned on
-        if (engineReady != null) Util.arrayFillNonAtomic(engineReady, (short) 0, (short) 5, (byte) 0);
 
         /* A payment that was committed as the card left the field, with its
          * pieces not all marked spent yet: they are marked now, before
@@ -2636,8 +2638,8 @@ public class CashuApplet extends Applet implements TagSwitch {
     /**
      * The power mod N alone (`powModP` before its reduction): the 64 bytes at a[off] in, the 64 after them out. A padded key's
      * power on that key's own engine where `fieldOwn` holds with `fieldP` (D247), given its key only at its first power of a
-     * command (the keys are public; the flags are put down at the start of every command and by every write of a key); any
-     * other on `rsa`, given its key first, as before.
+     * selection (D248: the keys are public; the flags are put down at every selection and by every write of a key), and
+     * given it again, and asked once more, where the engine throws; any other on `rsa`, given its key first, as before.
      */
     private void powRaw(RSAPrivateKey key, byte[] a, short off) {
         Cipher c = rsa;
@@ -2650,8 +2652,14 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         if (i < 0 || engineReady[i] != (byte) 1) c.init(key, Cipher.MODE_DECRYPT);
         if (i >= 0) engineReady[i] = (byte) 0;
-        short out = (short)(off + 64);
-        short n = c.doFinal(a, off, (short) 64, a, out);
+        short out = (short)(off + 64), n;
+        try {
+            n = c.doFinal(a, off, (short) 64, a, out);
+        } catch (CryptoException x) {
+            // an engine that lost what it was given (D248): given its key again and asked once more before the exception is let out
+            c.init(key, Cipher.MODE_DECRYPT);
+            n = c.doFinal(a, off, (short) 64, a, out);
+        }
         if (i >= 0) engineReady[i] = (byte) 1;
         if (n < (short) 64) {
             Util.arrayCopyNonAtomic(a, out, a, (short)(out + 64 - n), n);
@@ -4963,7 +4971,7 @@ public class CashuApplet extends Applet implements TagSwitch {
                 try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e2) { outStage = null; }
             }
         }
-        /* The engines' flags (D247), five bytes of the same memory: which engine holds its key in this command. Given to the
+        /* The engines' flags (D247), five bytes of the same memory: which engine holds its key in this selection. Given to the
          * signer too, for its squaring. Where the chip will not give it, null: every engine is given its key at each use, as
          * before. */
         if (engineReady == null) {
@@ -7746,7 +7754,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private static void sizeTheFile(byte[] a) {
         /* 3.2's speed commits (D245 on): the writes below are made again at each commit, from the code alone (the earlier ones
-         * all taken out), as many as bring the load file to 245 past a multiple of 256: 44,021 bytes at D247, a size no chip
+         * all taken out), as many as bring the load file to 245 past a multiple of 256: 44,021 bytes at D247 and D248, a size no chip
          * has been given (43,765 is the largest installed, on card 57723320).
          * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
          * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on
@@ -7786,28 +7794,14 @@ public class CashuApplet extends Applet implements TagSwitch {
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
         // the 3.2 speed commits (D245 on): writes added to hold the file at 245 past, made again by each (pad.py)
-        a[110] = 0;
         a[110] = 6;
         a[111] = 7;
         a[112] = 8;
         a[113] = 9;
-        a[114] = 10;
-        a[115] = 11;
-        a[116] = 12;
-        a[117] = 13;
-        a[118] = 14;
-        a[119] = 15;
-        a[120] = 16;
-        a[121] = 17;
-        a[122] = 18;
-        a[123] = 19;
-        a[124] = 20;
-        a[125] = 21;
-        a[126] = 22;
-        a[127] = 23;
-        a[110] = 24;
-        a[111] = 25;
-        a[112] = 26;
+        a[130] = 6;
+        a[131] = 7;
+        a[132] = 8;
+        a[133] = 9;
         // padding ends
     }
 }

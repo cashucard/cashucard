@@ -210,8 +210,8 @@ final class SchnorrHW {
     private final boolean       keyInRam;  // the chip gave tmpPriv as a key cleared on deselect
     private final RandomData    rng;       // BIP-340 auxiliary randomness (step 2)
     /**
-     * Which engine holds its key in this command (D247): the applet's `engineReady`, made at its first SET_CARD and given here
-     * then, put down at the start of every command; null before it (and in a signer of its own), and every engine is then
+     * Which engine holds its key in this selection (D247, D248): the applet's `engineReady`, made at its first SET_CARD and
+     * given here then, put down at every selection; null before it (and in a signer of its own), and every engine is then
      * given its key at each use, as before. [R_SQUARE]: rsaC holds sqKey.
      */
     byte[]                      ready;
@@ -1464,15 +1464,22 @@ final class SchnorrHW {
      * The chip's squaring mod n: the 64 bytes at work[in] (32 zeros, then a value under n) squared into the 64 at work[out],
      * the value in the last 32. The answer is the modulus' length; any other is refused (6F00).
      *
-     * The engine is given its key once a command (D247: `ready[R_SQUARE]`, put down at the start of every command and by
-     * chipMulInit before it sets the key), not before every squaring: a signature's four squarings, one key. The key, n and 2,
-     * is public and is set nowhere else. The flag is down while the engine works and up again only after an answer, so an
-     * engine that throws is given its key again at the next squaring.
+     * The engine is given its key once a selection (D247, D248: `ready[R_SQUARE]`, put down at every selection and by
+     * chipMulInit before it sets the key), not before every squaring. The key, n and 2, is public and is set nowhere else. The
+     * flag is down while the engine works and up again only after an answer; an engine that throws is given its key again and
+     * asked once more before the exception is let out (to sign(), which then signs by the bytecode).
      */
     private void square(byte[] w, short in, short out) {
         if (ready == null || ready[R_SQUARE] != (byte)1) rsaC.init(sqKey, Cipher.MODE_DECRYPT);
         if (ready != null) ready[R_SQUARE] = (byte)0;
-        if (rsaC.doFinal(w, in, (short)64, w, out) != (short)64) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        short n;
+        try {
+            n = rsaC.doFinal(w, in, (short)64, w, out);
+        } catch (CryptoException x) {
+            rsaC.init(sqKey, Cipher.MODE_DECRYPT);
+            n = rsaC.doFinal(w, in, (short)64, w, out);
+        }
+        if (n != (short)64) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
         if (ready != null) ready[R_SQUARE] = (byte)1;
     }
 
