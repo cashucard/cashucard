@@ -9915,6 +9915,15 @@ gives 2 a command (about 400 ms less over 35 LOAD_PROOFs); the change outputs of
 whole payment; a sealed VERIFY_PIN, 2 inits less where the cube's and the square's engines were used earlier in the
 selection. `EnginesOnceTest` holds the once-a-selection counts, the retry and the sealed PIN.
 
+**The red team's code pass (2026-11-26): cleared with conditions; its C-A3b-1 (LOW) met in a follow-up.** The flags'
+clear in `select()` was reached by no test (its M12: taken out, all 431 tests passed), because jCardSim clears
+CLEAR_ON_DESELECT memory at every selection itself; the clear is there for a chip that keeps a same-package applet's RAM
+across a SELECT of the tag and back. `EnginesOnceTest.selectItselfPutsTheFlagsDown` sets every flag up, makes every engine
+lose what it was given, calls the applet's `select()` alone, and asks a sealed VERIFY_PIN: every flag down, each engine
+given its key, none asked a power while it held nothing. With the clear taken out it fails. On a chip a flag left up would
+cost one exception and a retry an engine, never a wrong answer. Chip checks 1 (a), (b), (c) and (f), room (check 2) and
+ten sealed VERIFY_PINs across a reselect and a tag (check 6) stay owed before this goes on a card.
+
 ## <a id="d249"></a>D249: The y of the payment's date key kept from SPEND_ALL_BEGIN
 
 **Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A4 of the 3.2 speed review.
@@ -9947,6 +9956,11 @@ the point to d + t, so nothing that check stops gets out. Its conditions:
 
 **Counts.** One point addition less a payment's SIGN (`PerPaymentKeyTest.whatItCosts`: waits + 1, where it was waits + 2):
 about 35 ms by JCAlgTest's figures. 32 bytes of RAM at the first SET_CARD. `KeptYTest` fails on f621b23.
+
+**The red team's code pass (2026-11-26): cleared.** Its M20 (the kept y's clear in `select()` taken out) passed every test,
+as M12 did for D248, jCardSim clearing that RAM at every selection itself; `KeptYTest.selectItselfClearsTheKeptY` calls
+`select()` alone with a payment in hand and fails with the clear taken out. Harmless on its own (SIGN needs `allState[0]`,
+which the same `select()` clears), it is pinned all the same.
 
 ## <a id="d250"></a>D250: The check of every signature hashes e again
 

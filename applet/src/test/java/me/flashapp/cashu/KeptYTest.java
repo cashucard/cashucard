@@ -86,6 +86,17 @@ class KeptYTest {
         assertArrayEquals(new byte[32], c.field("groupY"), "a selection clears it");
     }
 
+    @Test
+    @DisplayName("D249 (the red team's C-A3b-1, its M20): the applet's select() itself clears the kept y, with the payment in hand (jCardSim clears that RAM at every selection, so that no test through a SELECT reaches this clear; a chip may keep it across a SELECT of the tag and back, JCRE 3.0.5, 5.1.1)")
+    void selectItselfClearsTheKeptY() throws Exception {
+        UnitsTest.Card c = card(true);
+        int place = PerPaymentKeyTest.load(c, 8, 24, D1);
+        assertEquals(SW_OK, PerPaymentKeyTest.begin(c, place).getSW());
+        assertFalse(Arrays.equals(new byte[32], c.field("groupY")), "BEGIN kept the y");
+        assertTrue(((javacard.framework.Applet) c.applet()).select());
+        assertArrayEquals(new byte[32], c.field("groupY"), "cleared by select() itself");
+    }
+
     static final CommandAPDU AGAIN = new CommandAPDU(CLA, INS_SPEND_ALL_AGAIN, 0, 0, 256);
 
     /** BEGIN, then the kept y changed by `how`, then SIGN: answered 6F00, nothing burned, SPEND_ALL_AGAIN as never asked. */

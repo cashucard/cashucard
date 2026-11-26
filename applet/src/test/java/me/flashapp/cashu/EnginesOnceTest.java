@@ -2,6 +2,7 @@ package me.flashapp.cashu;
 
 import static me.flashapp.cashu.CashuAppletTest.*;
 import static me.flashapp.cashu.ChipEnginesTest.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -234,6 +235,26 @@ class EnginesOnceTest {
             assertEquals(12, e.sign.powers - p0, "for twelve squarings");
         }
         assertEquals(0, e.stale(), "never a power with nothing given");
+    }
+
+    @Test
+    @DisplayName("D248 (the red team's C-A3b-1): the applet's select() itself puts every engine's flag down, whatever its RAM kept (a chip may keep a same-package applet's RAM across a SELECT of the tag and back, JCRE 3.0.5, 5.1.1, where jCardSim clears it at every selection, so that no test through a SELECT reaches this clear): with the flags up and every engine having lost what it was given, select() alone, and the next sealed VERIFY_PIN gives each engine its key with no power asked of one that holds nothing")
+    void selectItselfPutsTheFlagsDown() throws Exception {
+        Engines e = new Engines();
+        UnitsTest.Card c = setUpCard(e);
+        assertEquals(SW_OK, sealedPin(c));
+        byte[] ready = c.field("engineReady");
+        Arrays.fill(ready, (byte) 1);
+        e.forget();
+        assertTrue(((javacard.framework.Applet) c.applet()).select());
+        assertArrayEquals(new byte[6], c.field("engineReady"), "every flag down, by select() itself");
+        int[] i0 = inits(e.own);
+        int s0 = e.stale();
+        assertEquals(SW_OK, sealedPin(c));
+        assertEquals(s0, e.stale(), "no power asked of an engine that holds nothing");
+        int[] i1 = inits(e.own);
+        assertEquals(1, i1[0] - i0[0], "the cube's engine given its key");
+        assertEquals(1, i1[3] - i0[3], "and the square's");
     }
 
     @Test
