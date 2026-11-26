@@ -9750,7 +9750,25 @@ bytecode's try). No branch or loop count depends on a secret.
 **Counts (jCardSim, `WipesTest`; the times are JCAlgTest's, not measured).** One signature: 4 wipes to 1 (5 to 1 under a
 date's key), the key agreement given a key 6 times to 3, the point addition 5 to 2 (7 to 3 dated): about 58 ms (77)
 less. LOAD_CHANGE: 5 wipes to 1, about 77 ms less. SET_CARD's framing: 17 wipes to 1, about 300 ms less once a set-up life.
-The four tests fail on 3b9b5a4. A wait is a signature's work (D218), so every wait is shorter with this (see D247's list).
+The four tests fail on 3b9b5a4. A wait is a signature's work (D218), so every wait is shorter with this; the wait counts
+stay as they are until the chip has been measured.
+
+**The red team's first pass (2026-11-26) found the change safe, with three conditions, which
+hold.**
+- **What is given up (its A1-1, LOW).** The nonce k now outlasts part of the check: from step 4 it stays in the temporary
+  key and in the key agreement through `getW`, through the 33-byte path's `agree(cardPrivKey)` (which does not touch the
+  temporary key), and through the date's compare, until the check's first public call puts t or e in its place; in the key
+  agreement until `[e]Q`'s init, on the date path too (`[t]G + W` gives the point addition its key, not the agreement). That
+  is a few milliseconds to about 30 ms, where it was none. On a chip that gives only a persistent temporary key (`keyInRam`
+  false), a tear in that window leaves k in persistent memory. No harm follows on its own: s never left the card, the next
+  signature draws fresh aux randomness, and no command reads a key's S. SECURITY-MODEL #10 says so.
+- **A1-a.** `mulPublic` and `addToPublic` are called only from `verify`, from `unblind`'s four proof steps and from
+  `checkFraming` (and from `mul` and `addTo`, which wipe after them): `WipesTest.thePublicCallsHaveTheseCallersOnly` fails on
+  any other caller, so no later edit can send a secret scalar through them unseen.
+- **A1-b.** In `unblind` the unblinding's `addTo` (n - r, wiped at once) comes before the four public steps, and `sign()`
+  keeps its wipe between the chip's try and the bytecode's: the same test reads both.
+- **A1-c.** After an AUTH, a payment's SIGN, a LOAD_CHANGE refused 6A80 and one taken, and a signature the chip's path got
+  wrong, neither agreement holds a nonce or an opening's r (`WipesTest.theAgreementsKeepNoNonceAndNoR`, jCardSim's copy).
 
 ## <a id="d246"></a>D246: The signature's product on the chip, its bytecode trimmed
 

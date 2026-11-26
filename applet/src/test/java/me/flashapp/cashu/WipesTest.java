@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
+import java.util.TreeSet;
 import javacard.security.ECPrivateKey;
 import javacard.security.ECPublicKey;
 import javacard.security.KeyAgreement;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import javax.smartcardio.CommandAPDU;
 
 /**
  * D245: the key's wipes where every scalar is public (A1 of the 3.2 speed review). A wipe (`rest()`) gives both key agreements
@@ -133,5 +135,76 @@ class WipesTest {
         assertEquals(1, gx(given), "one wipe in all");
         assertFalse(nr.equals(SchnorrHWSignTest.heldBy(signer)), "the key does not hold n - r");
         assertFalse(nr.equals(w[1].lastS), "nor does the point addition");
+    }
+
+    static String source(String file) throws Exception {
+        return SchnorrHWMathTest.stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(SchnorrHWMathTest.mainSourceDir().resolve(file)), java.nio.charset.StandardCharsets.UTF_8));
+    }
+    static TreeSet<String> set(String... s) { return new TreeSet<>(Arrays.asList(s)); }
+
+    @Test
+    @DisplayName("D245 (the red team's A1-a, A1-b): mulPublic and addToPublic are called only from verify, unblind's four proof steps and checkFraming (and mul and addTo, which wipe after them); in unblind the unblinding's addTo (n - r) comes before them; sign() keeps the wipe between the chip's try and the bytecode's")
+    void thePublicCallsHaveTheseCallersOnly() throws Exception {
+        String hw = source("SchnorrHW.java"), applet = source("CashuApplet.java");
+        assertEquals(set("(class body)", "mul", "verify", "checkFraming"), ProofStoreTest.methodsNaming(hw, "mulPublic"), "mulPublic's callers in the signer");
+        assertEquals(set("(class body)", "addTo", "verify", "checkFraming"), ProofStoreTest.methodsNaming(hw, "addToPublic"), "addToPublic's");
+        assertEquals(set("unblind"), ProofStoreTest.methodsNaming(applet, "mulPublic"), "and in the applet, unblind alone");
+        assertEquals(set("unblind"), ProofStoreTest.methodsNaming(applet, "addToPublic"), "for both");
+        int[] u = SchnorrHWMathTest.bodyRange(applet, "private boolean unblind(");
+        String unblind = applet.substring(u[0], u[1]);
+        assertEquals(2, unblind.split("schnorrHW\\.mulPublic\\(", -1).length - 1, "two of the proof's steps by mulPublic");
+        assertEquals(2, unblind.split("schnorrHW\\.addToPublic\\(", -1).length - 1, "two by addToPublic");
+        int unblinding = unblind.indexOf("schnorrHW.addTo(");
+        assertTrue(unblinding >= 0 && unblinding < unblind.indexOf("schnorrHW.mulPublic(") && unblinding < unblind.indexOf("schnorrHW.addToPublic("), "the unblinding, with its wipe, first");
+        int[] s = SchnorrHWMathTest.bodyRange(hw, "short sign(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,");
+        String sign = hw.substring(s[0], s[1]).replaceAll("\\s+", " ");
+        assertTrue(sign.contains("Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0); Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0); rest(); } return signOnce("),
+            "the wipe between the chip's try and the bytecode's");
+    }
+
+    @Test
+    @DisplayName("D245 (the red team's A1-c): after an AUTH, a payment's SIGN, a LOAD_CHANGE refused 6A80 and one taken, and a signature the chip's path got wrong (made again by the bytecode), the key agreement and the point addition hold no nonce and no opening's r: G's x after a signature, the proof's public scalars after LOAD_CHANGE, never r or n - r (simulator only: the copy read is jCardSim's)")
+    void theAgreementsKeepNoNonceAndNoR() throws Exception {
+        UnitsTest.Card c = KeysetKeysTest.card();
+        SchnorrHW signer = ChipEnginesTest.signerOf(c);
+        KeyAgreement ecdh = (KeyAgreement) SchnorrHWSignTest.hidden(signer, "ecdh"), gm = (KeyAgreement) SchnorrHWSignTest.hidden(signer, "gm");
+        assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_AUTH, 0, 0, new byte[16], 256)));
+        assertEquals(GX, RamAfterUseTest.kept(ecdh), "after AUTH: G's x in the key agreement");
+        assertEquals(GX, RamAfterUseTest.kept(gm), "and in the point addition");
+        taught(c, A);
+        int place = c.put(-1, A.id8(), 64);
+        byte[] row = payWithChange(c, place, 8, A.keyFor(8), null);
+        assertEquals(GX, RamAfterUseTest.kept(ecdh), "after a payment's SIGN: G's x");
+        assertEquals(GX, RamAfterUseTest.kept(gm), "in both");
+        c.power();
+        assertEquals(SW_OK, show(c, row[0], A, 8));
+        byte[] opens = c.field("changeOpen");
+        int at = (row[0] & 0xFF) * CashuApplet.OPEN_LEN + CashuApplet.OPEN_R;
+        BigInteger r = s(Arrays.copyOfRange(opens, at, at + 32)), nr = N.subtract(r).mod(N);
+        byte[] answer = mintAnswer(A.privFor(8), Arrays.copyOfRange(row, 17, 50), BigInteger.valueOf(77));
+        byte[] bad = answer.clone();
+        bad[130 + 31] ^= 1;
+        assertEquals(SW_WRONG_DATA, c.sw(loadChangeCommand(row[0], bad)), "a proof that does not hold");
+        for (KeyAgreement ka : new KeyAgreement[] { ecdh, gm }) {
+            BigInteger k = RamAfterUseTest.kept(ka);
+            assertFalse(r.equals(k) || nr.equals(k), "refused: no r in " + ka.getAlgorithm());
+        }
+        assertEquals(SW_OK, c.sw(loadChangeCommand(row[0], answer)), "the right one");
+        for (KeyAgreement ka : new KeyAgreement[] { ecdh, gm }) {
+            BigInteger k = RamAfterUseTest.kept(ka);
+            assertFalse(r.equals(k) || nr.equals(k), "taken: no r in " + ka.getAlgorithm());
+        }
+        assertEquals(s(Arrays.copyOfRange(answer, 162, 194)), RamAfterUseTest.kept(gm), "the point addition holds the proof's s, which GET_DLEQ gives anyone");
+        // a signature the chip's path gets wrong: refused by the check, made again by the bytecode, and nothing kept of either
+        ChipEnginesTest.Engines e = new ChipEnginesTest.Engines();
+        UnitsTest.Card d = ChipEnginesTest.setUpCard(e);
+        SchnorrHW ds = ChipEnginesTest.signerOf(d);
+        assertTrue(ChipEnginesTest.flag(ds, SchnorrHW.class, "chipMul"));
+        e.sign.lie = true;
+        int p0 = e.sign.powers;
+        assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_AUTH, 0, 0, new byte[16], 256)));
+        assertTrue(e.sign.powers > p0, "the chip's path was tried");
+        assertEquals(GX, RamAfterUseTest.kept((KeyAgreement) SchnorrHWSignTest.hidden(ds, "ecdh")), "after the bytecode's signature: G's x");
+        assertEquals(GX, RamAfterUseTest.kept((KeyAgreement) SchnorrHWSignTest.hidden(ds, "gm")), "in both");
     }
 }
