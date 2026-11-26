@@ -90,4 +90,35 @@ class ChipProductTest {
             else assertTrue(!firstU.equals(eng.ins.get(0)), "a fresh share each time");
         }
     }
+
+    @Test
+    @DisplayName("D246 (the red team's A2-b): the chip's product itself is right, not rescued: over 30 signatures (both parities, under a date's key too) each makes four squarings and exactly two key agreements (R and [e]Q): a product the check refused would send the signature to the bytecode, which asks for R and [e]Q again; and each signature verifies")
+    void theChipsProductIsRightAndNotRescued() throws Exception {
+        Random rnd = new Random(2420);
+        SignHardeningTest.Rec eng = new SignHardeningTest.Rec();
+        SchnorrHW s = SignHardeningTest.chipSigner(eng);
+        SchnorrHWSignTest.WatchedAgreement ecdh = new SchnorrHWSignTest.WatchedAgreement(javacard.security.KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY);
+        SchnorrHWSignTest.setHidden(s, "ecdh", ecdh);
+        int odd = 0;
+        for (int i = 0; i < 30; i++) {
+            BigInteger d = new BigInteger(255, rnd).add(BigInteger.ONE), t = i % 3 == 2 ? new BigInteger(255, rnd) : null;
+            BigInteger key = t == null ? d : d.add(t).mod(N);
+            BigInteger[] pt = ecMulTest(key, SECP_GX, SECP_GY);
+            if (pt[1].testBit(0)) odd++;
+            byte[] msg = new byte[32];
+            rnd.nextBytes(msg);
+            byte[] sig = new byte[64];
+            int a0 = ecdh.given.size(), p0 = eng.ins.size();
+            if (t == null) {
+                assertEquals(64, s.sign(SignHardeningTest.ecPriv(be(d)), SignHardeningTest.ecPub(point65(pt)), msg, (short) 0, sig, (short) 0));
+            } else {
+                BigInteger[] w = ecMulTest(d, SECP_GX, SECP_GY);
+                assertEquals(64, s.sign(SignHardeningTest.ecPriv(be(d)), SignHardeningTest.ecPub(point65(w)), concat(be(t), compressed(pt)), (short) 0, msg, (short) 0, sig, (short) 0));
+            }
+            assertTrue(schnorrVerify(be(pt[0]), msg, sig), "verifies, " + i);
+            assertEquals(4, eng.ins.size() - p0, "four squarings, " + i);
+            assertEquals(2, ecdh.given.size() - a0, "R and [e]Q once: the chip's signature passed its own check, " + i);
+        }
+        assertTrue(odd > 3 && odd < 27, "both parities");
+    }
 }

@@ -9792,3 +9792,17 @@ on d, d1, d2 or e·d. The check of every signature (D207, D218) is unchanged and
 **Counts.** The product's 32-byte bytecode loops: 36 to 22 a signature (each product 15 to 6, the quarter 4 once). About
 14 loops, by the review's estimate of 4 µs a bytecode about 55 ms a signature; not measured. `ChipProductTest` reads the
 engine's inputs: u_i + v_i = e/2 for both products and (u1 - v1 + u2 - v2)/2 = d; its first test fails on 3b9b5a4.
+
+**The red team's first pass (2026-11-26): safe as designed.** It ran the steps through the class's own `halve`, `addIf`,
+`addModN` and `sub32` for every edge pair (0 to 4, n - 1, n - 2, the halves of n, 2^255, 2^128, b = q, b = n - q, a borrow) and
+20,000 random ones: the product is e·b mod n and the engine is never given a number at or over n. Each operand alone is
+uniform (|e - d_i| was biased toward small values: this is an improvement), and the halvings now run on the public e alone.
+Its three conditions:
+- **A2-a.** q stays out of `sc[SC_E]` (it is at `work[256, 288)`): quartered in place, e would be wrong in the check, every
+  chip-path signature would fail it and go to the bytecode with no error.
+- **A2-b.** The chip's product itself is right, not rescued by the fallback: `ChipProductTest.theChipsProductIsRightAndNotRescued`
+  counts two key agreements a signature (R and [e]Q), where a product the check refused would send the signature to the
+  bytecode, which asks for both again. A wrong last subtraction in `chipProduct` fails it (tried: u^2 and v^2 swapped).
+- **A2-c (what this gives up).** SET_CARD's known answers (D219) run through `mulModNChip`, which signing no longer uses. The
+  engine is the same, so D219's cover of the engine stands; `chipProduct`'s own bytecode is covered only by each signature's
+  check, which refuses a wrong product and has the signature made again by the bytecode.
