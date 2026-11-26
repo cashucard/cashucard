@@ -7830,17 +7830,23 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /**
      * Nothing is done here, and nothing calls it: this method is in the
-     * package for its length alone. The chip the card runs on installs the
-     * card's applet only when the load file's size falls in a window of each
-     * 256 bytes (docs/CASHU-CARD-HARDWARE.md), the same code failing a few
-     * dozen bytes to either side. Each write below is five to seven bytes of the file;
-     * `tools/refcheck.py`, run after every build, says how many to add or to
-     * take away.
+     * package for its length alone. The chip the card runs on creates the
+     * card's applet at some layouts of the file and not at others, the same
+     * code refused a few dozen bytes to either side (docs/CASHU-CARD-HARDWARE.md).
+     * Since D256 the measure is where the package ends as the chip keeps it (the
+     * load file's components without RefLocation) in its 256-byte page, aimed at
+     * 60 to 180 past. Each write below is five to seven bytes of the file;
+     * `tools/refcheck.py`, run after every build, says where a build's kept
+     * package ends and how many bytes to add or to take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.2's speed commits (D245 on): the writes below are made again at each commit, from the code alone (the earlier ones
-         * all taken out), as many as bring the load file to 245 past a multiple of 256; each commit's size is in the chip run's
-         * list of load files. Every size over 43,765 (the largest installed, on card 57723320) is one no chip has been given.
+        /* 3.2 padded by D256, with the speed commits and their follow-ups (D245 to D255): the writes below, from the code
+         * alone (the earlier ones all taken out), as many as end the package as the chip keeps it 120 past a multiple of 256,
+         * the middle of the places card 57723320 created at on 2026-11-26 (48 to 213 past; refused at 218 and 223). Unpadded
+         * it ends 86 past. The load file is then 44,592 bytes (48 past), a size no chip has been given, at a load-file place
+         * that no longer says anything: on that card 52be734's file of 43,509 bytes (245 past) was refused twelve times where
+         * 7b87367's of the same 43,509 bytes was created at the first try (D256). Until D256 each speed commit held the load
+         * file at 245 past.
          * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
          * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on
          * 2026-11-26 (other source of that size, not this file); unpadded 43,655 (135 past, a place a chip refused before).
@@ -7878,20 +7884,13 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the sizes not to be shipped untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
-        // the 3.2 speed commits (D245 on): writes added to hold the file at 245 past, made again by each (pad.py)
+        // the writes that end the package as the chip keeps it 120 past a multiple of 256 (D256: refcheck says how far a
+        // build is from it)
         a[110] = 6;
-        a[111] = 7;
-        a[112] = 8;
-        a[113] = 9;
-        a[114] = 10;
-        a[115] = 11;
-        a[116] = 12;
-        a[117] = 13;
-        a[118] = 14;
-        a[119] = 15;
-        a[120] = 16;
-        a[121] = 17;
-        a[122] = 18;
+        a[130] = 6;
+        a[131] = 7;
+        a[132] = 8;
+        a[133] = 9;
         // padding ends
     }
 }

@@ -10253,3 +10253,6 @@ CAP the build makes has, the kept place is the one warned of.
 - The release run's create cycles delete and create the instances with the package loaded, so the package stays where it was
   loaded: five of them say the file creates there, not on a card where the package lands elsewhere. The release file is
   loaded and created on a card fresh from the batch it ships on, and once on a card that has held another package.
+
+**The 3.2 file** is padded by this rule: unpadded, its kept package ends 86 past; with five writes it ends 120 past
+(40,312 bytes), its load file 44,592 bytes (48 past), a size no chip has been given. The chip run of that file confirms it.
