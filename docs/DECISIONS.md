@@ -9682,9 +9682,9 @@ fixed cards apart.
    there where it worked y out again by the root, and logs the piece in its own transaction. `GET_CHANGE` answers as
    before. (c) `loadOne` writes a piece's data with `arrayCopyNonAtomic`: the status byte after it is still the place's
    commit (D14). (d) A square over p (`rsaSquare`), held to known answers at the set-up life's first `SET_CARD`, checks
-   y² = x³ + 7 in `requireFullPoint` and finds the change point's root in `blindChange`, where Euler's test and the
-   root took two powers; where its answers do not hold, the old path. Never the chip's key agreement in its place (the
-   review's R1).
+   y² = x³ + 7 in `requireFullPoint`, where Euler's test and the root took two powers; where its answers do not hold,
+   the old path. Never the chip's key agreement in its place (the review's R1). `blindChange` keeps Euler's test (see
+   the chip run below).
 6. **`LOAD_CHANGE` refuses an s at or over n (`6A80`)**, before any arithmetic: one proof has one s, and the kept one is
    the one a holder checks. No mint sends one.
 7. **GET_INFO P1 = 4, byte 56, bit 2 (`INFO_FLAG_FIELD_P`)**: set where `fieldP` holds at this set-up life, so a loader
@@ -9700,6 +9700,21 @@ The tracked CAP is `cashu-javacard-3.2.0.cap` (load file `ecb9a837…`), and the
 (`SELFTEST_VERSIONS`, byte 56 bit 2 named), cardkit (`CARD_VERSIONS`, `CARD_VERSION`, the pins), the set-up app (its 3.x
 line), the simulator bridge. The set-up app's approved list ([D74](#d74)) does not take the 3.2 load file: a build from
 this tree installs no card until a chip run and the owner add it, in a change of their own.
+
+**The chip run (2026-11-26, J3R180 57723320, against 3.1 on the J3R180 58206920 with the same harness and reader).**
+Two of the four speedups were smaller than the speed review said, for one reason each.
+- The square (5d): a sealed `VERIFY_PIN` took 111.5 ms against 3.1's 132.7 (the first load's, same script). The square
+  is used (with its answers failed it would be 3.1's path and time). The review priced Euler's test and the root at
+  45 to 55 ms each, which was their cost before D214; over p padded every power is about 13 ms whatever its exponent,
+  so `requireFullPoint` went from three powers (about 40 ms) to two (about 27), not to "about 25 from 115". What is left
+  of the 112 ms is the PIN key's agreement, the seal's sums, the PIN's try and the 90-byte command itself.
+  In `blindChange` the square's way was one power more for every x with no root (the root and its square for every x,
+  where Euler's test alone turns such an x away): `SPEND_ALL_CHANGE` steps of about 43 ms a further x against 3.1's 30.
+  `blindChange` is back on Euler's test, whatever the square's verdict.
+- The data copy without its own transaction (5c): 35 `LOAD_PROOF`s in 4,029 ms against 4,033. The change is on the
+  path the harness took (the 04 form goes through `loadOne` like the other forms), but a J3R180 makes an 81-byte
+  `Util.arrayCopy` outside a transaction as fast as `arrayCopyNonAtomic`: the 15 ms the review counted is not there.
+  The code stays (it writes in the same order, with the status byte as the commit), and no speed is claimed for it.
 
 A hand-over torn between its two transactions leaves the last owner's card with a c its phone did not draw (the next
 owner's, where it gave its own). The last owner asks the hand-over again, and its phone reads c again before it locks a

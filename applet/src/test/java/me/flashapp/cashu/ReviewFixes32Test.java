@@ -360,7 +360,7 @@ class ReviewFixes32Test {
     }
 
     @Test
-    @DisplayName("D244: blindChange by the square and by Euler's test makes the same points, each the one its opening gives, and leaves B_'s y at buf[33..65)")
+    @DisplayName("D244: blindChange takes Euler's test whatever the square's verdict (after the 3.2 chip run: a power costs the same whatever its exponent): each point the one its opening gives, B_'s y left at buf[33..65), and two powers for each x under p tried and one more for the root, never the square's three")
     void blindChangeBothWays() throws Exception {
         com.licel.jcardsim.smartcardio.CardSimulator sim;
         CashuAppletTest.ExposedRuntime fresh = new CashuAppletTest.ExposedRuntime();
@@ -375,18 +375,38 @@ class ReviewFixes32Test {
         java.lang.reflect.Method blind = CashuApplet.class.getDeclaredMethod("blindChange", short.class, short.class, byte[].class);
         blind.setAccessible(true);
         byte[] changeOpen = (byte[]) get(applet, "changeOpen");
+        PerPaymentKeyTest.CountingCipher rsa = (PerPaymentKeyTest.CountingCipher) PerPaymentKeyTest.wrap(applet, CashuApplet.class, "rsa", o -> new PerPaymentKeyTest.CountingCipher((javacardx.crypto.Cipher) o));
+        int moreThanOne = 0;
         for (boolean square : new boolean[] { true, false }) {
             set(applet, "fieldSquare", square);
             for (int i = 0; i < 60; i++) {
                 int open = (i % 8) * 80;
                 byte[] buf = new byte[261];
+                int p0 = rsa.powers;
                 blind.invoke(applet, (short) 0, (short) open, buf);
+                int powers = rsa.powers - p0;
                 byte[] made = Arrays.copyOfRange(buf, 0, 33);
                 byte[] nonce = Arrays.copyOfRange(changeOpen, open + 16, open + 48), r = Arrays.copyOfRange(changeOpen, open + 48, open + 80);
                 byte[] secret = keys.secret(nonce, 0).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                int tried = xsTried(secret);
+                if (tried > 1) moreThanOne++;
+                assertEquals(2 * tried + 1, powers, (square ? "the square's verdict on" : "off") + ", round " + i + ": a cube and Euler's test for each of " + tried + " x, and the root");
                 assertArrayEquals(made, blindedFor(secret, r), (square ? "the square" : "Euler") + ", round " + i);
                 assertArrayEquals(unsigned32(decompressed(made)[1]), Arrays.copyOfRange(buf, 33, 65), "and B_'s y beside it, round " + i);
             }
+        }
+        assertTrue(moreThanOne > 0, "some rounds tried an x with no root");
+    }
+
+    /** NUT-00's hash_to_curve for `secret`: how many x under p it tries, the last the one with a root. */
+    static int xsTried(byte[] secret) throws Exception {
+        byte[] msgHash = sha256(concat("Secp256k1_HashToCurve_Cashu_".getBytes(java.nio.charset.StandardCharsets.US_ASCII), secret));
+        int tried = 0;
+        for (long counter = 0; ; counter++) {
+            BigInteger x = new BigInteger(1, sha256(concat(msgHash, new byte[] { (byte) counter, (byte)(counter >> 8), (byte)(counter >> 16), (byte)(counter >> 24) })));
+            if (x.compareTo(SECP_P) >= 0) continue;
+            tried++;
+            if (liftX(x) != null) return tried;
         }
     }
 }

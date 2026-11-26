@@ -1399,7 +1399,7 @@ public class CashuApplet extends Applet implements TagSwitch {
     private RSAPrivateKey rsaSquare, rsaSquareP;
     /**
      * Whether the square held to its known answers at this set-up life's first SET_CARD (`squareInit`, over the modulus `fieldP`
-     * chose): a point's y is then held to x^3 + 7 by squaring it (`requireFullPoint`, `blindChange`). False until then, after a
+     * chose): a point's y is then held to x^3 + 7 by squaring it (`requireFullPoint` only: not `blindChange`, D244). False until then, after a
      * reset and where they did not hold: Euler's test and the root, as before.
      */
     private boolean fieldSquare;
@@ -2563,20 +2563,9 @@ public class CashuApplet extends Applet implements TagSwitch {
             powModP(rsaCube, buf, (short) 32);
             add7ModP(buf, (short) 128);
             Util.arrayCopyNonAtomic(buf, (short) 128, buf, (short) 0, (short) 32);
-            if (fieldSquare) {
-                /* 3.2 (D244): the root straight away, p being 3 mod 4, and squared back: x^3 + 7 again where it is a square, the
-                 * next counter where it is not. One power and a square where Euler's test and the root were two powers. */
-                Util.arrayCopyNonAtomic(buf, (short) 0, buf, (short) 64, (short) 32);
-                powModP(rsaRoot, buf, (short) 32);
-                Util.arrayCopyNonAtomic(buf, (short) 128, buf, (short) 193, (short) 32);
-                Util.arrayCopyNonAtomic(buf, (short) 128, buf, (short) 64, (short) 32);
-                powModP(rsaSquare, buf, (short) 32);
-                if (!sameBytes(buf, (short) 128, buf, (short) 0, (short) 32)) continue;
-                // the even root
-                if ((buf[224] & 1) != 0) negateModP(buf, (short) 193);
-                buf[160] = (byte) 0x04;
-                break;
-            }
+            /* Euler's test first, the root only for the x that has one (D244, after the 3.2 chip run): on a chip a power costs the same whatever its
+             * exponent (about 13 ms on a J3R180), so the square's way (the root and its square for every x, 3.2's D244) was one
+             * power more for each x that has no root, about 13 ms an output on average, and never fewer. */
             // Euler: a square, or the next counter
             Util.arrayCopyNonAtomic(buf, (short) 128, buf, (short) 64, (short) 32);
             powModP(rsaEuler, buf, (short) 32);
@@ -7664,7 +7653,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.2 (D244): seventy-seven writes, the forty below and thirty-seven more (the last four a value of one byte's push),
+        /* 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
+         * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on
+         * 2026-11-26 (other source of that size, not this file); unpadded 43,655 (135 past, a place a chip refused before).
+         * 3.2 (D244): seventy-seven writes, the forty below and thirty-seven more (the last four a value of one byte's push),
          * 218 bytes, so the load file is 43,765 bytes, 245 past a multiple of 256 again, the place of every 3.x file card
          * 58206920 has installed, at a size no chip has been given. D244's code took the forty writes' file to 43,547 (27 past,
          * a place not tried). */
@@ -7775,5 +7767,23 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[91] = 2;
         a[92] = 3;
         a[93] = 4;
+        a[94] = 10;
+        a[95] = 11;
+        a[96] = 12;
+        a[97] = 13;
+        a[98] = 14;
+        a[99] = 15;
+        a[100] = 16;
+        a[101] = 17;
+        a[102] = 18;
+        a[103] = 19;
+        a[104] = 20;
+        a[105] = 21;
+        a[106] = 22;
+        a[107] = 23;
+        a[108] = 24;
+        a[109] = 25;
+        a[200] = 26;
+        a[201] = 27;
     }
 }
