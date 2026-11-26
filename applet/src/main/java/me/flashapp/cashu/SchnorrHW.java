@@ -543,25 +543,46 @@ final class SchnorrHW {
 
     /**
      * SC_ED = e·d mod n by the chip, d never alone: a fresh random d1 (under n) and d2 = d - d1 mod n, then e·d = e·d1 + e·d2,
-     * each product by two squarings (`mulModNChip`), four squarings in all. Every operand the engine sees, e + d1 and |e - d1|,
-     * e + d2 and |e - d2|, is uniform and independent of d taken alone, whatever e is (e is public in every signature: a mask
-     * by it only, as D216 had it, hid nothing). The shares sit in sc[SC_TMP + 32, SC_TMP + 96) (Rx is below them) and the
-     * second product in work[256, 288), cleared here once added; the shares are cleared here too, and sc and work again by the
-     * check and by sign()'s `finally` on every way out. d at sc[SC_D] is read and left as it is.
+     * each product by two squarings (`chipProduct`), four squarings in all. With q = e/4 mod n, worked out once for both
+     * (D246), every operand the engine sees, q + d1 and q - d1, q + d2 and q - d2 (mod n), is uniform and independent of d
+     * taken alone, whatever e is (e is public in every signature: a mask by it only, as D216 had it, hid nothing; D217's
+     * shares are what hide d, and they are unchanged). q sits in work[256, 288) and the shares in sc[SC_TMP + 32,
+     * SC_TMP + 96) (Rx is below them); e·d2 goes in d1's place once d1 is done with; q, the shares and the squarings' room
+     * are cleared here, and sc and work again by the check and by sign()'s `finally` on every way out. d at sc[SC_D] and e
+     * at sc[SC_E] are read and left as they are. e is under n (step 6), d1 is (above), d2 is (d is a key's scalar, under
+     * n): none is reduced again. Were one not, the engine answers garbage for an input at or over n, and the check of step 8
+     * refuses the signature, which is then made again by the bytecode (D218).
      */
     private void splitProduct() {
-        short d1 = (short)(SC_TMP + 32), d2 = (short)(SC_TMP + 64), second = (short)256;
+        short d1 = (short)(SC_TMP + 32), d2 = (short)(SC_TMP + 64), q = (short)256;
         rng.generateData(sc, d1, (short)32);
         reduceModN(sc, d1);
         short borrow = sub32(sc, SC_D, sc, d1, sc, d2);       // d - d1, and whether it went below zero
         addIf(sc, d2, CashuApplet.SECP256K1_N, borrow);       // + n then: d2 = d - d1 mod n
-        mulModNChip(sc, SC_E, sc, d1, sc, SC_ED, work, (short)0);
-        Util.arrayFillNonAtomic(work, (short)0, (short)256, (byte)0);
-        mulModNChip(sc, SC_E, sc, d2, work, second, work, (short)0);
-        Util.arrayFillNonAtomic(work, (short)0, (short)256, (byte)0);
+        // q = e/4 mod n, by two halvings: e is public, and so is every mask its parities make
+        halve(sc, SC_E, work, (short)0);
+        halve(work, (short)0, work, q);
+        chipProduct(work, q, sc, d1, sc, SC_ED);
+        chipProduct(work, q, sc, d2, sc, d1);
+        Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
+        addModN(sc, SC_ED, sc, d1, sc, SC_ED);
         Util.arrayFillNonAtomic(sc, d1, (short)64, (byte)0);
-        addModN(sc, SC_ED, work, second, sc, SC_ED);
-        Util.arrayFillNonAtomic(work, second, (short)32, (byte)0);
+    }
+
+    /**
+     * out = 4·q·x mod n by two squarings on the chip (D246, splitProduct's alone): (q + x)^2 - (q - x)^2, u = q + x and
+     * v = q - x taken mod n, so both are under n, as the engine wants, and v^2 is (x - q)^2 whichever is larger: one
+     * subtraction and a masked add in place of `mulModNChip`'s two and a choice. q and x under n; no halving (q is e's quarter
+     * already). work[0, 256) is the room (u, u^2, v, v^2, 64 bytes each), filled first and left for the caller to clear;
+     * `out` is not in it, nor q or x. Every step is a mask or a fixed loop: the same work for every q and x.
+     */
+    private void chipProduct(byte[] q, short qOff, byte[] x, short xOff, byte[] out, short outOff) {
+        Util.arrayFillNonAtomic(work, (short)0, (short)256, (byte)0);
+        addModN(q, qOff, x, xOff, work, (short)32);
+        addIf(work, (short)160, CashuApplet.SECP256K1_N, sub32(q, qOff, x, xOff, work, (short)160));
+        square(work, (short)0, (short)64);
+        square(work, (short)128, (short)192);
+        addIf(out, outOff, CashuApplet.SECP256K1_N, sub32(work, (short)96, work, (short)224, out, outOff));
     }
 
     /**

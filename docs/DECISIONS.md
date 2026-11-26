@@ -9751,3 +9751,26 @@ bytecode's try). No branch or loop count depends on a secret.
 date's key), the key agreement given a key 6 times to 3, the point addition 5 to 2 (7 to 3 dated): about 58 ms (77)
 less. LOAD_CHANGE: 5 wipes to 1, about 77 ms less. SET_CARD's framing: 17 wipes to 1, about 300 ms less once a set-up life.
 The four tests fail on 3b9b5a4. A wait is a signature's work (D218), so every wait is shorter with this (see D247's list).
+
+## <a id="d246"></a>D246: The signature's product on the chip, its bytecode trimmed
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A2 of the 3.2 speed review.
+No command, answer or stored byte changes.
+
+**The rule.** `splitProduct` (D217) makes e·d = e·d1 + e·d2 by a private `chipProduct` in place of `mulModNChip`, which
+stays as it was for SET_CARD's known answers (D219):
+- q = e/4 mod n is worked out once, by two halvings, and each product is (q + d_i)^2 - (q - d_i)^2 = 4·q·d_i = e·d_i: no
+  halving of either product (8 loops become 4).
+- q - d_i is taken mod n (a subtraction and a masked add of n), which squares to what |e - d_i| did: 3 loops become 2.
+- e, d1 and d2 are under n already (step 6, the reduction of d1, and d2 = d - d1 mod n of a key's scalar) and are not
+  reduced again (4 loops go). Were one not, the engine answers garbage at or over its modulus and the check of step 8
+  refuses the signature, which is then made again by the bytecode (D218).
+
+**Why it is safe.** The engine is shown only what D217 shows it: two masked shares of d, each operand q ± d_i uniform and
+independent of d taken alone, d1 fresh at every signature. q is e's quarter, and e is public. Every step is a fixed loop or
+a mask (the borrow of q - d_i chooses an add of n by a mask, as `mulModNChip`'s choice did): no branch or loop count depends
+on d, d1, d2 or e·d. The check of every signature (D207, D218) is unchanged and still catches a wrong product.
+
+**Counts.** The product's 32-byte bytecode loops: 36 to 22 a signature (each product 15 to 6, the quarter 4 once). About
+14 loops, by the review's estimate of 4 µs a bytecode about 55 ms a signature; not measured. `ChipProductTest` reads the
+engine's inputs: u_i + v_i = e/2 for both products and (u1 - v1 + u2 - v2)/2 = d; its first test fails on 3b9b5a4.
