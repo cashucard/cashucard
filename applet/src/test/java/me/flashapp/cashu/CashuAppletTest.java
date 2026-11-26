@@ -9541,7 +9541,8 @@ class CashuAppletTest {
             "and by SET_PIN, for a blocked PIN alone, or one with three wrong tries in a row (D195): owed in the PIN's transaction, taken down after its commit (D196)");
         String owed = body(code, "private void forgetOwed(", "private void processChangePin(").replaceAll("\\s+", " ");
         assertTrue(owed.contains("byte owed = pinMarks[PM_FORGET]; if ((owed & (FORGET_HISTORY | FORGET_PLACES)) == 0) return;")
-            && owed.indexOf("forget();") < owed.indexOf("pinMarks[PM_FORGET] = (byte)(owed & PIN_OWED);"), "forget, then the mark (the new PIN owed after a hand-over kept, D197)");
+            && owed.indexOf("forget();") < owed.indexOf("pinMarks[PM_FORGET] = (byte)(owed & (PIN_OWED | ROTATE_KEYS));"),
+            "forget, then the mark (the new PIN owed after a hand-over kept, D197, and a reset's keys owed, D244)");
         assertTrue(body(code, "public void process(", "private void processGetInfo(").contains("forgetOwed();"), "and at every command, after a tear");
         assertTrue(setPin.contains("boolean spent = pinState[0] == (byte) 2 || pinMarks[PM_WRONG] >= (byte) 3;"));
         assertFalse(code.contains("cardLog = new byte[LOG_LEN];\n        cardLog"), "nor is it made again");

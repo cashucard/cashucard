@@ -5562,7 +5562,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             /* a blocked PIN has no one to give it: the history goes with it, the last packet and the signatures kept too (D189,
              * D196), owed from this commit and taken down after it (`forgetOwed`), here or at the card's next command: torn
              * before the commit, the old PIN and all of the history; after it, the new PIN and none */
-            if (spent) pinMarks[PM_FORGET] = FORGET_HISTORY;
+            if (spent) pinMarks[PM_FORGET] = (byte) 1;
             JCSystem.commitTransaction();
             /* a new PIN has not been typed yet: any session that had verified the old one is over; but a card's first PIN, on a card
              * that had none (new or reset), was chosen by this reader in this selection, and stands as given for the rest of it (D235:
