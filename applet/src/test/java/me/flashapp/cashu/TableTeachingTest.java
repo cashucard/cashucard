@@ -69,8 +69,8 @@ class TableTeachingTest {
         for (int i = 0; i < bad.length; i++) {
             UnitsTest.Card c = new UnitsTest.Card();
             SchnorrHW s = (SchnorrHW) FullPointLoadTest.schnorr(c);
-            KeyAgreement real = (KeyAgreement) FullPointLoadTest.ecdhField().get(s);
-            FullPointLoadTest.ecdhField().set(s, new TakesOne(real, bad[i]));
+            // since D251 the set-up's test asks agrees()'s own agreement, which the first SET_CARD keeps where one is given
+            FullPointLoadTest.agreesThrough(s, new TakesOne(KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false), bad[i]));
             c.ready(UnitsTest.SAT, false);
             assertFalse(curveByAgreement(c), "a chip that takes point " + i + " is not leaned on");
         }
