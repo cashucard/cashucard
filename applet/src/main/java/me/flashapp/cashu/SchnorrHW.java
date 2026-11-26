@@ -101,9 +101,12 @@ import javacardx.crypto.Cipher;
  *   nonce in sign(), the scalar addTo() and mul() are handed, and the key
  *   agree() is handed. Each of them ends, however it ends, by `rest()`;
  *   sign() first zeroes `sc` and `work`, which held d, k and e·d. The check
- *   of step 8 begins by zeroing d, k and e·d and taking the nonce out of the
- *   key (`rest()`): it needs none of them, and its own calls put only public
- *   scalars in the key (e, s, a date's t).
+ *   of step 8 begins by zeroing d, k and e·d: it needs none of them, and its
+ *   own calls put only public scalars in the key (e, s, a date's t), the
+ *   first of them in the nonce's place, and leave them there (D245:
+ *   `mulPublic`, `addToPublic`) for sign()'s one wipe at its end. The same
+ *   wipe-free calls serve every other run of public scalars: the mint's proof
+ *   in LOAD_CHANGE and the framing's asks (one wipe after the last).
  *
  * ENG-182 — cashucard/javacard
  */
@@ -337,7 +340,9 @@ final class SchnorrHW {
                byte[] out, short outOff) {
         // d, k and e·d are in sc and work, and k in the temporary key, for this
         // call and no longer: however it ends, the two are zeroed first and
-        // then the key is wiped, so a wipe the chip refuses leaves neither
+        // then the key is wiped, so a wipe the chip refuses leaves neither.
+        // This wipe is the signature's one (D245): the check's own calls put
+        // only public scalars in the key and leave them for it.
         try {
             if (chipMul) {
                 short made = signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, true);
@@ -565,25 +570,29 @@ final class SchnorrHW {
      * into e (work[V_PX]). False where it is not (signOnce answers 6F00 for it on the bytecode's path, and sign() signs
      * again on the chip's, D218); `6F00` (SW_CRYPTO_ERROR) at once for a key or a date's point that does not agree, which no
      * signing again would mend. Either way before anything is written to the caller's buffer; sign()'s `finally` then
-     * zeroes sc and work, s among them.
+     * zeroes sc and work, s among them, and wipes the key.
      *
      * Q comes of the card's own point W and nothing the signing worked out: W is getW's 65 bytes, or, where the chip's getW
      * gives the 33-byte form, [d]G by the key agreement with the card's private key (never a square root, which would take
      * the parity on trust). With `g` (a date's key, D197) Q = [t]G + W by the point addition (t is public) and must be the
-     * caller's 33-byte point at g + 32, its x and its parity: a wrong point there is refused, whatever the signature. Every
-     * scalar this puts in the temporary key (t, e, s) is public once the signature is out; [d]G gives the agreement the card's
-     * own key object, as agree() does for the PIN key; d, k and e·d are zeroed and the nonce taken out of the key and both
-     * agreements first. Its own calls each end by rest().
+     * caller's 33-byte point at g + 32, its x and its parity: a wrong point there is refused, whatever the signature.
+     *
+     * Every scalar this puts in the temporary key (t, e, s) is public once the signature is out, and the check's calls
+     * leave them there (D245: `mulPublic`, `addToPublic`), for sign()'s `finally` to wipe with the rest, where until 3.2
+     * the check began with a wipe and each of its calls ended with one. The nonce that step 4 left in the key and the key
+     * agreement goes at the first of them, on this one path whose every way out passes through that `finally`: setS puts t
+     * or e in the key in its place, and the agreement's init then holds that, as the wipe's would have held G's x. [d]G gives
+     * the agreement the card's own key object, as agree() does for the PIN key, and agree() wipes after it. d, k and e·d
+     * are zeroed first.
      *
      * What jCardSim cannot show of it (D10): the chip's answers for a scalar of 0 or a sum at infinity, which no key, date
      * or message reaches but by chance (e = 0, s = 0, t = d or t = -d, each about 2^-256); and its time on a chip.
      */
     private boolean verify(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff) {
-        // what the check reads, beside s and Rx; then d, k and e·d (all of sc) zeroed, and the nonce out of the key
+        // what the check reads, beside s and Rx; then d, k and e·d (all of sc) zeroed
         Util.arrayCopyNonAtomic(sc, SC_E, work, V_E, (short)32);
         Util.arrayCopyNonAtomic(sc, SC_PX, work, V_PX, (short)32);
         Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
-        rest();
 
         // W, the card's own point, whole
         short wLen = pubKey.getW(sc, V_W);
@@ -595,7 +604,7 @@ final class SchnorrHW {
         // Q: W, or W + [t]G, which must be the point the caller named, x and parity
         short q = V_W;
         if (g != null) {
-            addToG(g, gOff, sc, V_W, sc, V_Q);
+            addToPublic(g, gOff, CashuApplet.SECP256K1_G, (short)0, sc, V_W, sc, V_Q);
             q = V_Q;
             if (g[(short)(gOff + 32)] != (byte)(0x02 | (sc[(short)(V_Q + 64)] & 1))
                 || Util.arrayCompare(sc, (short)(V_Q + 1), g, (short)(gOff + 33), (short)32) != (byte)0) {
@@ -608,10 +617,10 @@ final class SchnorrHW {
         }
         if ((sc[(short)(q + 64)] & 1) != 0) sub32(CashuApplet.SECP256K1_P, (short)0, sc, (short)(q + 33), sc, (short)(q + 33));
 
-        // T = [e]Q by the key agreement, made -T; R' = [s]G + (-T) by the point addition
-        mul(work, V_E, sc, q, sc, V_T);
+        // T = [e]Q by the key agreement, made -T; R' = [s]G + (-T) by the point addition: public scalars, no wipe between
+        mulPublic(work, V_E, sc, q, sc, V_T);
         sub32(CashuApplet.SECP256K1_P, (short)0, sc, (short)(V_T + 33), sc, (short)(V_T + 33));
-        addToG(work, V_S, sc, V_T, work, V_R);
+        addToPublic(work, V_S, CashuApplet.SECP256K1_G, (short)0, sc, V_T, work, V_R);
         return (work[(short)(V_R + 64)] & 1) == 0
             && Util.arrayCompare(work, (short)(V_R + 1), work, V_RX, (short)32) == (byte)0;
     }
@@ -744,14 +753,24 @@ final class SchnorrHW {
     void addTo(byte[] s, short sOff, byte[] g, short gOff, byte[] h, short hOff, byte[] out, short outOff) {
         // s may be a secret (a change output's blinding factor): it is in the key for this call only, however the call ends
         try {
-            ready();
-            tmpPriv.setG(g, gOff, (short) 65);
-            tmpPriv.setS(s, sOff, (short) 32);
-            gm.init(tmpPriv);
-            framed(gm.generateSecret(h, hOff, (short) 65, out, outOff), out, outOff);
+            addToPublic(s, sOff, g, gOff, h, hOff, out, outOff);
         } finally {
             rest();
         }
+    }
+
+    /**
+     * `addTo` with no wipe after it (D245), for a scalar that is public: the check of a signature (t, s: sign()'s `finally`
+     * wipes after the whole check), the mint's proof in LOAD_CHANGE (its s) and the framing's asks. The scalar and the
+     * generator stay in the key and the point addition until the next use sets its own; nothing secret is ever given here. A
+     * secret scalar (a blinding factor, the unblinding's n - r) goes through `addTo`.
+     */
+    void addToPublic(byte[] s, short sOff, byte[] g, short gOff, byte[] h, short hOff, byte[] out, short outOff) {
+        ready();
+        tmpPriv.setG(g, gOff, (short) 65);
+        tmpPriv.setS(s, sOff, (short) 32);
+        gm.init(tmpPriv);
+        framed(gm.generateSecret(h, hOff, (short) 65, out, outOff), out, outOff);
     }
 
     /**
@@ -764,13 +783,21 @@ final class SchnorrHW {
     void mul(byte[] k, short kOff, byte[] p, short pOff, byte[] out, short outOff) {
         // k may be a secret (the sealing scalar): in the key for this call only, however the call ends
         try {
-            ready();
-            tmpPriv.setS(k, kOff, (short) 32);
-            ecdh.init(tmpPriv);
-            framed(ecdh.generateSecret(p, pOff, (short) 65, out, outOff), out, outOff);
+            mulPublic(k, kOff, p, pOff, out, outOff);
         } finally {
             rest();
         }
+    }
+
+    /**
+     * `mul` with no wipe after it (D245), for a scalar that is public: the check of a signature (e), the mint's proof in
+     * LOAD_CHANGE (-e) and the framing's asks. A secret scalar (the sealing scalar) goes through `mul`.
+     */
+    void mulPublic(byte[] k, short kOff, byte[] p, short pOff, byte[] out, short outOff) {
+        ready();
+        tmpPriv.setS(k, kOff, (short) 32);
+        ecdh.init(tmpPriv);
+        framed(ecdh.generateSecret(p, pOff, (short) 65, out, outOff), out, outOff);
     }
 
     /**
@@ -830,6 +857,8 @@ final class SchnorrHW {
      * change are the last check. Each addition adds two distinct points, as the card adds them.
      *
      * `6F00` (SW_CRYPTO_ERROR) for a chip that answers any of them otherwise.
+     * Every scalar asked is public, so no ask wipes the key after it (D245:
+     * `mulPublic`, `addToPublic`); the `finally` wipes once.
      * Asked at every SET_CARD, before anything is written (not at install,
      * where the chip takes as little work as it can): a card whose chip
      * answers otherwise is never set up, and so never takes a piece. `out` is
@@ -844,38 +873,38 @@ final class SchnorrHW {
         try {
             Util.arrayFillNonAtomic(s, (short)0, (short)32, (byte)0);
             s[31] = (byte)11;
-            mul(s, (short)0, g, (short)0, out, outOff);
+            mulPublic(s, (short)0, g, (short)0, out, outOff);
             isPoint(out, outOff, ELEVEN_G, (short)0, false);
             s[31] = (byte)13;
-            addToG(s, (short)0, MINUS_TWO_G, (short)0, out, outOff);
+            addToPublic(s, (short)0, g, (short)0, MINUS_TWO_G, (short)0, out, outOff);
             isPoint(out, outOff, ELEVEN_G, (short)0, false);
             // n - 1, then n - 2: n's last byte is 41, so neither borrows
             Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, s, (short)0, (short)32);
             s[31]--;
-            mul(s, (short)0, ELEVEN_G, (short)0, out, outOff);
+            mulPublic(s, (short)0, ELEVEN_G, (short)0, out, outOff);
             isPoint(out, outOff, ELEVEN_G, (short)0, true);
             s[31]--;
-            addTo(s, (short)0, ELEVEN_G, (short)0, ELEVEN_G, (short)0, out, outOff);
+            addToPublic(s, (short)0, ELEVEN_G, (short)0, ELEVEN_G, (short)0, out, outOff);
             isPoint(out, outOff, ELEVEN_G, (short)0, true);
             // -G and 2G: G and -2G with Y made p - Y
             negated(g, s, (short)32);
             negated(MINUS_TWO_G, s, (short)97);
             Util.arrayFillNonAtomic(s, (short)0, (short)32, (byte)0);
             s[31] = (byte)2;
-            mul(s, (short)0, s, (short)32, out, outOff);
+            mulPublic(s, (short)0, s, (short)32, out, outOff);
             isPoint(out, outOff, MINUS_TWO_G, (short)0, false);
             s[31] = (byte)4;
-            addTo(s, (short)0, s, (short)32, s, (short)97, out, outOff);
+            addToPublic(s, (short)0, s, (short)32, s, (short)97, out, outOff);
             isPoint(out, outOff, MINUS_TWO_G, (short)0, false);
             Util.arrayCopyNonAtomic(CashuApplet.SECP256K1_N, (short)0, s, (short)0, (short)32);
             s[31]--;
-            mul(s, (short)0, s, (short)97, out, outOff);
+            mulPublic(s, (short)0, s, (short)97, out, outOff);
             isPoint(out, outOff, MINUS_TWO_G, (short)0, false);
             // G with a scalar of the full width: [n - 1]G and [n - 2]G + G are -G
-            mul(s, (short)0, g, (short)0, out, outOff);
+            mulPublic(s, (short)0, g, (short)0, out, outOff);
             isPoint(out, outOff, g, (short)0, true);
             s[31]--;
-            addTo(s, (short)0, g, (short)0, g, (short)0, out, outOff);
+            addToPublic(s, (short)0, g, (short)0, g, (short)0, out, outOff);
             isPoint(out, outOff, g, (short)0, true);
             // k = SHA-256("BIP0340/aux") (tagHashAux), then m = SHA-256(tagHashNonce || tagHashNonce): [k](2G) at
             // s[162..227), then [k - 1](2G) + 2G, [2k - 2]G + 2G and [2k]G held to it, and the same with m. k is above n/2,
@@ -883,21 +912,24 @@ final class SchnorrHW {
             // nor 2k borrows or carries, nor m - 1 nor 2m
             Util.arrayCopyNonAtomic(tagHashAux, (short)0, s, (short)0, (short)32);
             for (short j = 0; ; j++) {
-                mul(s, (short)0, s, (short)97, s, (short)162);
+                mulPublic(s, (short)0, s, (short)97, s, (short)162);
                 s[31]--;
-                addTo(s, (short)0, s, (short)97, s, (short)97, out, outOff);
+                addToPublic(s, (short)0, s, (short)97, s, (short)97, out, outOff);
                 isPoint(out, outOff, s, (short)162, false);
                 addModN(s, (short)0, s, (short)0, s, (short)0);
-                addTo(s, (short)0, g, (short)0, s, (short)97, out, outOff);
+                addToPublic(s, (short)0, g, (short)0, s, (short)97, out, outOff);
                 isPoint(out, outOff, s, (short)162, false);
                 s[31] += 2;
-                mul(s, (short)0, g, (short)0, out, outOff);
+                mulPublic(s, (short)0, g, (short)0, out, outOff);
                 isPoint(out, outOff, s, (short)162, false);
                 if (j != (short)0) break;
                 taggedHash(tagHashNonce, s, (short)0, (short)0, s, (short)0);
             }
         } finally {
+            // every scalar above is public: the asks leave them in the key (D245), and one wipe after the last puts the key,
+            // its generator and both agreements back at rest
             tmpPriv.setG(g, (short)0, (short)65);
+            rest();
         }
     }
 

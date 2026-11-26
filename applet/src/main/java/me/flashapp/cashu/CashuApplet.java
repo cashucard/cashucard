@@ -4130,18 +4130,21 @@ public class CashuApplet extends Applet implements TagSwitch {
         // C is held to the curve now, while it is whole: K and C_ were, so it is, unless the sum was the point at infinity
         boolean checkedC = curveByAgreement && schnorrHW.agrees(scratch, X_PT);
 
-        // -e, the scalar of both halves of the proof
+        /* -e, the scalar of both halves of the proof. The proof's e and s are the mint's, public (they are kept with the piece and
+         * given to anyone who asks GET_DLEQ), and the points K, C_ and B_ are public too: the four steps below leave their scalars
+         * in the key (D245: `mulPublic`, `addToPublic`), where until 3.2 each was wiped after it. The one secret scalar of
+         * LOAD_CHANGE, the unblinding's n - r above, was wiped after its own step (`addTo`). */
         Util.arrayCopyNonAtomic(buf, (short)(in + LC_E), scratch, X_MSG, (short) 32);
         SchnorrHW.reduceModN(scratch, X_MSG);
         SchnorrHW.subtractFromN(scratch, X_MSG, scratch, X_MSG);
         // R1 = s*G + (-e)*K, and its text into the hash
-        schnorrHW.mul(scratch, X_MSG, buf, (short)(in + LC_K), scratch, X_HEX);
-        schnorrHW.addTo(buf, (short)(in + LC_S), SECP256K1_G, (short) 0, scratch, X_HEX, scratch, X_PT);
+        schnorrHW.mulPublic(scratch, X_MSG, buf, (short)(in + LC_K), scratch, X_HEX);
+        schnorrHW.addToPublic(buf, (short)(in + LC_S), SECP256K1_G, (short) 0, scratch, X_HEX, scratch, X_PT);
         sha.reset();
         pointText(scratch, X_PT);
         // R2 = s*B_ + (-e)*C_, then K and C_ as they came
-        schnorrHW.mul(scratch, X_MSG, buf, (short)(in + LC_C), scratch, X_HEX);
-        schnorrHW.addTo(buf, (short)(in + LC_S), allSlots, (short) 0, scratch, X_HEX, scratch, X_PT);
+        schnorrHW.mulPublic(scratch, X_MSG, buf, (short)(in + LC_C), scratch, X_HEX);
+        schnorrHW.addToPublic(buf, (short)(in + LC_S), allSlots, (short) 0, scratch, X_HEX, scratch, X_PT);
         pointText(scratch, X_PT);
         pointText(buf, (short)(in + LC_K));
         pointText(buf, (short)(in + LC_C));

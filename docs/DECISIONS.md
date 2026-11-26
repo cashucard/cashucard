@@ -9720,3 +9720,34 @@ A hand-over torn between its two transactions leaves the last owner's card with 
 owner's, where it gave its own). The last owner asks the hand-over again, and its phone reads c again before it locks a
 load to the card's keys; a phone checks `GROUP_KEYS` against its own keys before the mint swap, not only before the
 write (SECURITY-MODEL #20). `spec/APDU.md`'s SET_OWNER and its `6A96` row say so.
+
+## <a id="d245"></a>D245: The key wiped once where every scalar is public
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A1 of the 3.2 speed review,
+which found, by JCAlgTest's figures for the J3R180 (`setS` 3.45 ms, a key agreement's `init` 7.9 ms), that a wipe
+(`SchnorrHW.rest()`: G's x into the temporary key, both key agreements given it) is about 19 ms and that most of a
+signature's wipes follow a public scalar. No command, answer or stored byte changes.
+
+**The rule.** `mulPublic` and `addToPublic` are `mul` and `addTo` with no wipe after them, for a scalar that is public; `mul`
+and `addTo` are those two followed by the wipe, as before, and every secret scalar still goes through them (the sealing
+scalar, a change output's blinding factor, the unblinding's n - r, a date's t at SPEND_ALL_BEGIN). The public runs:
+- **A signature's check (step 8, D207, D218).** It no longer begins with a wipe, and its three calls (`[t]G + W` for a
+  date's key, `[e]Q`, `[s]G - T`) leave their scalars in the key. sign()'s `finally`, which runs on every way out, wipes
+  once. A signature wiped four times (five under a date's key); it wipes once.
+- **LOAD_CHANGE's check of the mint's proof** (`-e` twice, `s` twice): four wipes of five go. The unblinding (`addTo` with
+  n - r) keeps its own, at once after it.
+- **SET_CARD's seventeen framing asks** (`checkFraming`): one wipe after the last, in its `finally`, for seventeen.
+
+**Why it is safe.** No secret stays in a key object longer than in 3.2. The scalars left in the key are e, s, t and the
+proof's -e and s: each is public once its command answers (e and s are in the signature, the proof's in GET_DLEQ). A
+signature that fails its check never leaves the card, and its s is wiped by the same `finally` as before. The one secret
+the check's first wipe removed was the nonce k, in the key and the key agreement since step 4: the check's first call
+(`addToPublic` with t, or `mulPublic` with e) puts its public scalar in the key in k's place and gives the agreement that
+key, which is what the wipe did with G's x; between step 4 and that call nothing reads either object, and every way out
+passes through sign()'s `finally`. On the chip's path a refused signature is wiped as before (`sign()`, before the
+bytecode's try). No branch or loop count depends on a secret.
+
+**Counts (jCardSim, `WipesTest`; the times are JCAlgTest's, not measured).** One signature: 4 wipes to 1 (5 to 1 under a
+date's key), the key agreement given a key 6 times to 3, the point addition 5 to 2 (7 to 3 dated): about 58 ms (77)
+less. LOAD_CHANGE: 5 wipes to 1, about 77 ms less. SET_CARD's framing: 17 wipes to 1, about 300 ms less once a set-up life.
+The four tests fail on 3b9b5a4. A wait is a signature's work (D218), so every wait is shorter with this (see D247's list).
