@@ -7820,13 +7820,13 @@ public class CashuApplet extends Applet implements TagSwitch {
      * package ends and how many bytes to add or to take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.2 padded by D256, with the speed commits and their follow-ups (D245 to D255): the writes below, from the code
-         * alone (the earlier ones all taken out), as many as end the package as the chip keeps it 120 past a multiple of 256,
-         * the middle of the places card 57723320 created at on 2026-11-26 (48 to 213 past; refused at 218 and 223). Unpadded
-         * it ends 86 past. The load file is then 44,592 bytes (48 past), a size no chip has been given, at a load-file place
-         * that no longer says anything: on that card 52be734's file of 43,509 bytes (245 past) was refused twelve times where
-         * 7b87367's of the same 43,509 bytes was created at the first try (D256). Until D256 each speed commit held the load
-         * file at 245 past.
+        /* 3.2 padded by D256, with the speed commits and their follow-ups (D245 to D253, D255), D254 left out and D257's count:
+         * the writes below, from the code alone (the earlier ones all taken out), as many as end the package as the chip keeps it
+         * 120 past a multiple of 256, the middle of the places card 57723320 created at on 2026-11-26 (48 to 213 past; refused
+         * at 218 and 223). Unpadded it ends 229 past (40,421 bytes kept). The load file is then 44,869 bytes (69 past), a size
+         * no chip has been given, at a load-file place that no longer says anything: on that card 52be734's file of 43,509 bytes
+         * (245 past) was refused twelve times where 7b87367's of the same 43,509 bytes was created at the first try (D256).
+         * Until D256 each speed commit held the load file at 245 past.
          * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
          * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on
          * 2026-11-26 (other source of that size, not this file); unpadded 43,655 (135 past, a place a chip refused before).
@@ -7867,10 +7867,29 @@ public class CashuApplet extends Applet implements TagSwitch {
         // the writes that end the package as the chip keeps it 120 past a multiple of 256 (D256: refcheck says how far a
         // build is from it)
         a[110] = 6;
+        a[111] = 7;
+        a[112] = 8;
+        a[113] = 9;
+        a[114] = 10;
+        a[115] = 11;
+        a[116] = 12;
+        a[117] = 13;
+        a[118] = 14;
+        a[119] = 15;
+        a[120] = 16;
+        a[121] = 17;
+        a[122] = 18;
+        a[123] = 19;
+        a[124] = 20;
+        a[125] = 21;
+        a[126] = 22;
+        a[127] = 23;
+        a[110] = 24;
+        a[111] = 25;
+        a[112] = 26;
         a[130] = 6;
         a[131] = 7;
         a[132] = 8;
-        a[133] = 9;
         // padding ends
     }
 }

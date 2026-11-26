@@ -10265,8 +10265,10 @@ CAP the build makes has, the kept place is the one warned of.
   loaded: five of them say the file creates there, not on a card where the package lands elsewhere. The release file is
   loaded and created on a card fresh from the batch it ships on, and once on a card that has held another package.
 
-**The 3.2 file** is padded by this rule: unpadded, its kept package ends 86 past; with five writes it ends 120 past
-(40,312 bytes), its load file 44,592 bytes (48 past), a size no chip has been given. The chip run of that file confirms it.
+**The 3.2 file** is padded by this rule. At 9d14bde: unpadded, its kept package ended 86 past; with five writes it ended
+120 past (40,312 bytes), its load file 44,592 bytes (48 past). With D254 left out and D257 in, unpadded it ends 229 past
+(40,421 bytes, outside the aim); with twenty-four writes it ends 120 past (40,568 bytes), its load file 44,869 bytes
+(69 past), a size no chip has been given. The chip run of that file confirms it.
 
 ## <a id="d257"></a>D257: A count that never comes again mixed into every signature's aux
 
