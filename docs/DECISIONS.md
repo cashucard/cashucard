@@ -9637,3 +9637,57 @@ mints, the holder checks each entry with its issuing mint. The operator sees
 the current and proposed mint, including a test or real funds label where
 known. A new mint cannot confirm settlement of another mint's payments.
 [Holder handoff](PROVISIONER-HOLDER-HANDOFF.md#changing-the-mint-on-an-existing-card)
+## <a id="d244"></a>D244: 3.2: the 3.1 review's applet fixes, four quicker writes, and a profile bit for the field over p
+
+**Proposed (protocol 3.2, 2026-11-25; not released, not yet run on a chip).** An outside review of 3.1 (APP-H1, APP-M1 to
+APP-M6) and a speed review of the card's writes. No command, answer or count a 3.1 reader meets changes, but one more
+profile bit and one refusal of data no mint sends; the version moves to 3.2 (`03 02`) so that a reader can tell the
+fixed cards apart.
+
+1. **A reset draws its keys after the commit that makes the card new (APP-H1).** `RESET_CARD` drew a new card key (where
+   no certificate keeps it) and PIN key before its last transaction. A card torn between the two kept its owner under a
+   card key that was not the one its owner's key was worked out from: every owner command then answered `6A91`, and an
+   owned card has no reset by the PIN. Now that transaction also writes `ROTATE_KEYS` in `PM_FORGET`, and
+   `finishResetKeys` draws the keys right after it and at the top of every command while the mark is set, before any
+   command (`SELECT` and `GET_PUBKEY` among them) can read a key. Torn before the commit, the card is the old card, its
+   key with it; torn after, a new card whose keys are drawn at its next command. D236 (1) said a card torn before that
+   commit "is still the old card, verdicts and all"; for an uncertified card's key and its PIN key that was not so until
+   this change. jCardSim draws the same key pair every time, so the tear harness now draws a pair of its own at each draw
+   (`TearHook.freshKeys`); with it, the sweep fails on 3.1's order (`the owner kept under a new card key`, torn after
+   `genKeyPair`) and passes on 3.2's. jCardSim: `ReviewFixes32Test.aResetTornAnywhereIsTheOldCardOrANewOne`,
+   `aResetTornAfterItsCommitDrawsItsKeysAtTheNextCommand`.
+2. **A reset clears the self-tests' verdicts (APP-M2).** `curveByAgreement`, `fieldP`, the square's verdict (5) and
+   `SchnorrHW.chipMul` are cleared with `selfTested` in the reset's last transaction: until the next `SET_CARD` works
+   them out again every path is the slow, checked one. jCardSim: `aResetClearsTheVerdicts`.
+3. **A forgotten PIN's replacement frees the spent places and draws a new c (APP-M1, part 1).** D195 and D196 let anyone
+   with an empty card replace a forgotten PIN; the spent places and c linked the last holder's payments at the mint.
+   Now that `SET_PIN` draws a new c in its transaction, and `forgetOwed` frees the spent places, the kept proofs and the
+   paid list as it did after an owner was replaced. Part 2 of APP-M1 (`OwnerPIN.update` outside a transaction) is wrong on
+   a conforming chip and is not changed. jCardSim: `aForgottenPinsReplacementFreesTheSpentPlacesAndDrawsANewC`.
+4. **A hand-over commits what it forgets before the new owner's key (APP-M5).** `SET_OWNER` that replaces an owner now
+   commits the new c, the record let go and the forget mark first, then the flag, the clock and the key in a second
+   transaction. On a chip whose key writes take no part in a transaction (the harness's `keysOutsideTx`), a tear in the
+   second leaves the next owner's key with the first commit's c, never the last owner's. A claim is one transaction as
+   before. jCardSim: `aHandOverNeverGivesTheNextOwnerTheLastOwnersC`.
+5. **Four quicker writes and a quicker curve check (the speed review's PERF-CARD-04 to 07).** (a) The staged outputs
+   (601 bytes) are RAM cleared at a selection, asked for at the first `SET_CARD`, persistent where the chip gives no
+   room; the settlement record's body is made in the APDU buffer and written a buffer's worth at a time, and its own
+   transaction before the body is gone (SIGN's commit already lets the last record go, D224). (b) `SPEND_ALL_CHANGE`
+   keeps B_'s y beside B_ (`OPEN_KEYS_ROW` 99, 256 bytes more of persistent memory); `LOAD_CHANGE` takes B_ whole from
+   there where it worked y out again by the root, and logs the piece in its own transaction. `GET_CHANGE` answers as
+   before. (c) `loadOne` writes a piece's data with `arrayCopyNonAtomic`: the status byte after it is still the place's
+   commit (D14). (d) A square over p (`rsaSquare`), held to known answers at the set-up life's first `SET_CARD`, checks
+   y² = x³ + 7 in `requireFullPoint` and finds the change point's root in `blindChange`, where Euler's test and the
+   root took two powers; where its answers do not hold, the old path. Never the chip's key agreement in its place (the
+   review's R1).
+6. **`LOAD_CHANGE` refuses an s at or over n (`6A80`)**, before any arithmetic: one proof has one s, and the kept one is
+   the one a holder checks. No mint sends one.
+7. **GET_INFO P1 = 4, byte 56, bit 2 (`INFO_FLAG_FIELD_P`)**: set where `fieldP` holds at this set-up life, so a loader
+   may send C compressed (D212) with no loss of speed. A 3.1 reader does not read it.
+8. **APP-M4 is a spec sentence, not code, in 3.2.** An owned card with no refund key answers `GET_CARD` P1 = 3 sealed to
+   the reader's E, so a relay inside the owner's tap after the grant can read c. Refusing it would change what a reader
+   meets after a hand-over; `spec/APDU.md` now says so plainly. APP-M3 (accepted by D233, D234) and APP-M6 (a doc gap)
+   are not changed. The review's rejected speedups R1 to R7 are not taken.
+
+**Built (applet 3.2, not released).** Load file 43,765 bytes, 245 past a multiple of 256 (`sizeTheFile` at sixty-eight
+writes; 43,598 unpadded), 1,024 bytes over 3.1's 42,741: no chip has been given a file of this size. jCardSim only.

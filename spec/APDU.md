@@ -333,7 +333,12 @@ payment ([The clock and the limits](#the-clock-and-the-limits)), bit 4
 [two units on one card](#two-units-on-one-card), bit 5
 [a holder with no phone](#a-holder-with-no-phone), bit 6
 [keyset keys](#keyset-keys), bit 7 [the paid list](#the-paid-list). Byte 56: bit 0
-[the certificate](#the-certificate), bit 1 [keys per load](#keys-per-load); bits 2
+[the certificate](#the-certificate), bit 1 [keys per load](#keys-per-load), bit 2
+(3.2, [D244](../docs/DECISIONS.md#d244)) the field's arithmetic over p: the chip's powers
+held to their known answers at this set-up life's first `SET_CARD`, so a compressed C
+is held to the curve as quickly as a whole one and a loader need not send the longer
+form ([D212](../docs/DECISIONS.md#d212)); it is `0` before that `SET_CARD`, after a
+reset, on a chip whose answers did not hold, and on every card before 3.2; bits 3
 to 7 are `0`. Byte 55 bit 3 is `0` on every 3.0 card: 3.0 keeps no wait on a
 payment within its limit (D211, D228), and a file that set it answered `FF 03`. A 3.0
 card from this repository answers `F7 03`; byte 55
@@ -529,7 +534,13 @@ cannot work out, which says nothing of c; a relay in the tap after the holder's 
 or grant can ask its own `GET_NONCE` and `GET_CARD` P1 = 3, and gets one more sealed
 answer it cannot open, unless it holds r (a card with a refund key) or ran the first
 set-up itself (a card with none: whoever the PIN is typed into in that set-up can
-read c). With c the holder's phone works out every date's keys, locks its loads to
+read c). An owned card with no refund key (from a hand-over until the new owner's
+`SET_CARD` names one) is the exception: the answer is sealed to the E the reader
+sends, so a relay inside the owner's tap, after the grant, sends its own E and opens
+c. With the grant it could already do what the grant allows; what c adds is the
+link between the card's dated keys, its inbox and its tag. A phone that gave the
+owner's c at `SET_OWNER` ([D202](../docs/DECISIONS.md#d202)) need not read it
+([D244](../docs/DECISIONS.md#d244)). With c the holder's phone works out every date's keys, locks its loads to
 them and refunds with them: it keeps c with r, since a refund needs both (r + u). A
 `RESET_CARD` draws a new c; `SET_OWNER` takes the owner's c where it brings one
 ([D202](../docs/DECISIONS.md#d202)), and otherwise keeps the card's at a claim and

@@ -7672,6 +7672,10 @@ public class CashuApplet extends Applet implements TagSwitch {
      * take away.
      */
     private static void sizeTheFile(byte[] a) {
+        /* 3.2 (D244): sixty-eight writes, the forty below and twenty-eight more (the last a value of one byte's push), 167 bytes,
+         * so the load file is 43,765 bytes, 245 past a multiple of 256 again, the place of every 3.x file card 58206920 has
+         * installed, at a size no chip has been given. D244's code took the forty writes' file to 43,598 (78 past, a place not
+         * tried). */
         /* 3.1 with the review's fixes (D236): forty writes, the thirteen below and twenty-seven more, 228 bytes, so the load file
          * is 42,741 bytes, 245 past a multiple of 256, the place (not the size) of every 3.x file card 58206920 (a J3R180 keyed
          * for SCP03, D229) has installed. D236's code took the thirteen writes' file to 42,579 (83 past; 42,513 unpadded, 17 past,
@@ -7742,5 +7746,33 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[54] = 64;
         a[55] = 65;
         a[56] = 66;
+        a[57] = 67;
+        a[58] = 68;
+        a[59] = 69;
+        a[60] = 70;
+        a[61] = 71;
+        a[62] = 72;
+        a[63] = 73;
+        a[64] = 74;
+        a[65] = 75;
+        a[66] = 76;
+        a[67] = 77;
+        a[68] = 78;
+        a[69] = 79;
+        a[70] = 80;
+        a[71] = 81;
+        a[72] = 82;
+        a[73] = 83;
+        a[74] = 84;
+        a[75] = 85;
+        a[76] = 86;
+        a[77] = 87;
+        a[78] = 88;
+        a[79] = 89;
+        a[80] = 90;
+        a[81] = 91;
+        a[82] = 92;
+        a[83] = 93;
+        a[84] = 4;
     }
 }
