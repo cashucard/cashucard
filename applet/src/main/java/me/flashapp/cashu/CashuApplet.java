@@ -3285,9 +3285,12 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /** The place holding a piece with the 32-byte nonce at `off` in `a`, spent or not, or -1. */
     private short slotWithNonce(byte[] a, short off) {
+        // each filled place held to the nonce, its first byte first (D253), as the paid list's rows are
+        byte first = a[off];
         for (short i = 0; i < MAX_PROOFS; i++) {
             short at = (short)(i * PROOF_SIZE);
             if (proofStorage[(short)(at + PROOF_STATUS_OFFSET)] != STATUS_EMPTY
+                && proofStorage[(short)(at + PROOF_NONCE_OFFSET)] == first
                 && Util.arrayCompare(proofStorage, (short)(at + PROOF_NONCE_OFFSET), a, off, (short) 32) == 0) {
                 return i;
             }
@@ -4756,8 +4759,12 @@ public class CashuApplet extends Applet implements TagSwitch {
         if (slotWithNonce(buf, nonce) >= 0) return SW_PIECE_ON_CARD;
         // and not a piece the card has signed for, whose place may have been freed since: the paid list's rows in use (D191)
         short rows = paid[PAID_ROUND] != (byte) 0 ? PAID_NEXT : (short)(Util.getShort(paid, PAID_NEXT) * PAID_ROW);
+        /* every row in use is held to the nonce (D253): its first byte first, in bytecode, and the whole row by the chip's compare
+         * where that byte is the nonce's, so that most rows cost a byte read and not a native call (about 141 µs a row on a
+         * J3R180); no row is ever passed over, and nothing of the rows is kept between loads */
+        byte first = buf[nonce];
         for (short r = 0; r < rows; r += PAID_ROW) {
-            if (Util.arrayCompare(paid, r, buf, nonce, PAID_ROW) == 0) return SW_PIECE_ON_CARD;
+            if (paid[r] == first && Util.arrayCompare(paid, r, buf, nonce, PAID_ROW) == 0) return SW_PIECE_ON_CARD;
         }
         /* Not a piece no payment could take off (D196): one LOAD_PROOF brings above the day's limit, where one is set, its amount
          * in the card's unit (the other unit turned at the rate and rounded up, `turn`, so never counted for less; with no rate a
@@ -7864,12 +7871,6 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[123] = 37;
         a[124] = 38;
         a[125] = 39;
-        a[126] = 40;
-        a[127] = 41;
-        a[110] = 42;
-        a[111] = 43;
-        a[112] = 44;
-        a[113] = 45;
         a[130] = 6;
         a[131] = 7;
         // padding ends

@@ -5642,7 +5642,8 @@ class CashuAppletTest {
         assertTrue(load.contains("if (slot < 0 || paid == null) return SW_NO_SPACE;"));
         int places = load.indexOf("if (slotWithNonce(buf, nonce) >= 0) return SW_PIECE_ON_CARD;");
         int rows = load.indexOf("short rows = paid[PAID_ROUND] != (byte) 0 ? PAID_NEXT : (short)(Util.getShort(paid, PAID_NEXT) * PAID_ROW);");
-        int refuse = load.indexOf("if (Util.arrayCompare(paid, r, buf, nonce, PAID_ROW) == 0) return SW_PIECE_ON_CARD;");
+        // D253: each row's first byte first, then the whole row
+        int refuse = load.indexOf("if (paid[r] == first && Util.arrayCompare(paid, r, buf, nonce, PAID_ROW) == 0) return SW_PIECE_ON_CARD;");
         int entered = load.indexOf("if (entry >= 0) enter(entry, buf, in, state);");
         assertTrue(places > 0 && places < rows && rows < refuse && refuse < entered, "after the places, before anything is written");
         String sign = body(code, "private void processSpendAllSign(", "\n    private ");

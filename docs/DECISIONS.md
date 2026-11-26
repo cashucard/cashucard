@@ -9738,7 +9738,8 @@ scalar, a change output's blinding factor, the unblinding's n - r, a date's t at
   n - r) keeps its own, at once after it.
 - **SET_CARD's seventeen framing asks** (`checkFraming`): one wipe after the last, in its `finally`, for seventeen.
 
-**Why it is safe.** No secret stays in a key object longer than in 3.2. The scalars left in the key are e, s, t and the
+**Why it is safe.** No blinding factor, unblinding factor or sealing scalar stays in a key object longer than in 3.2, and
+the nonce longer only into the check, as the red team's A1-1 below says. The scalars left in the key are e, s, t and the
 proof's -e and s: each is public once its command answers (e and s are in the signature, the proof's in GET_DLEQ). A
 signature that fails its check never leaves the card, and its s is wiped by the same `finally` as before. The one secret
 the check's first wipe removed was the nonce k, in the key and the key agreement since step 4: the check's first call
@@ -9996,3 +9997,31 @@ speed review. No command, answer or stored byte changes.
 **Counts.** A LOAD_PROOF of one piece: two walks of the places to one (about 9 ms of bytecode by the review's estimate on a
 card with few places used, more on a fuller one). A proof's zero check: a 96-turn loop to one native compare (about 4 ms).
 Not measured.
+
+## <a id="d253"></a>D253: The paid list and the filled places held to a nonce by its first byte first
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Measured on the test card (J3R180
+57723320, 3.2 at c816133, 266 made-up pieces loaded and paid): a LOAD_PROOF's median grows from 100.3 ms with no row of the
+paid list in use to 132.5 ms with 224, 141 µs a row in a straight line (r² 0.992): 144 ms more on every loaded piece and every
+change piece written back at 1,024 rows. Most of it is the native `Util.arrayCompare` called once a row from a bytecode loop.
+A second, smaller slope, about 0.37 ms for each place already filled, is `slotWithNonce`'s compare of the nonce with every
+filled place. No command, answer or stored byte changes.
+
+**The rule.** In `loadOne`'s search of the paid list (D191) each row in use has its first byte read in bytecode and is
+compared whole by the chip only where that byte is the nonce's; `slotWithNonce` does the same for the filled places' nonces.
+
+**Why it is safe.** Every row in use is still held to the nonce: a row whose first byte is not the nonce's is not the nonce,
+and one whose first byte is is compared whole, as before. No row is passed over, the bounds are the same (the rows in use,
+all 1,024 once the ring has gone round), and nothing is kept between loads: there is no index that could go stale (a torn
+or stale index that hid a row would let a paid piece be loaded again, the red team's A6 HIGH). What a row holds, when rows
+are written and the ring are unchanged. The red team's model (`thePaidListSearches`: lists wrapped and not, stale rows past
+the next one, first bytes 00 and FF, a row's first byte off a row's start) gives today's answer for every nonce. The
+native `ArrayLogic.arrayFindGeneric` search is not built: jCardSim cannot run it, an import cannot fall back at run time on
+a chip without `javacardx.framework.util`, and its easy form misses paid rows. The worst case is today's cost and a byte read
+a row: rows that all begin with the nonce's first byte (a loader can choose its nonces) cost what they cost before.
+
+**Tests (`PaidListSearchTest`).** A nonce on the list at the first row, the last row in use, a row of a list gone round (the
+last of all, and one past the next), refused 6A94; one differing in a row's last byte or its first only, and one at the next
+row of a list not gone round, taken; a filled place's nonce among places whose nonces share their first 31 bytes, refused,
+and one differing in its last byte, taken: each as on 3b9b5a4. jCardSim cannot count the chip's compares; the time is the
+chip run's to show (the same script).
