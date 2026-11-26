@@ -542,12 +542,12 @@ final class SchnorrHW {
         boolean good;
         if (chip) {
             try {
-                good = verify(privKey, pubKey, g, gOff, gy, gyOff);
+                good = verify(privKey, pubKey, g, gOff, gy, gyOff, msg, msgOff);
             } catch (CryptoException x) {
                 good = false;
             }
             if (!good) return (short)0;
-        } else if (!verify(privKey, pubKey, g, gOff, gy, gyOff)) {
+        } else if (!verify(privKey, pubKey, g, gOff, gy, gyOff, msg, msgOff)) {
             ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
         }
 
@@ -637,11 +637,20 @@ final class SchnorrHW {
      * What jCardSim cannot show of it (D10): the chip's answers for a scalar of 0 or a sum at infinity, which no key, date
      * or message reaches but by chance (e = 0, s = 0, t = d or t = -d, each about 2^-256); and its time on a chip.
      */
-    private boolean verify(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff, byte[] gy, short gyOff) {
+    private boolean verify(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff, byte[] gy, short gyOff,
+                           byte[] msg, short msgOff) {
         // what the check reads, beside s and Rx; then d, k and e·d (all of sc) zeroed
-        Util.arrayCopyNonAtomic(sc, SC_E, work, V_E, (short)32);
         Util.arrayCopyNonAtomic(sc, SC_PX, work, V_PX, (short)32);
         Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
+        /* e hashed again from what the signature names (D250), Rx, Px and the message, where until D250 the check took the e that
+         * step 6 left in sc: a fault in e after its hash, which the product would take with the rest, would then pass the
+         * check, the check reading the same faulted e. sc's room for points (from V_W) is not used yet. */
+        Util.arrayCopyNonAtomic(work, V_RX, sc, SC_TMP, (short)32);
+        Util.arrayCopyNonAtomic(work, V_PX, sc, (short)(SC_TMP + 32), (short)32);
+        Util.arrayCopyNonAtomic(msg, msgOff, sc, (short)(SC_TMP + 64), (short)32);
+        taggedHash(tagHashChallenge, sc, SC_TMP, (short)96, work, V_E);
+        reduceModN(work, V_E);
+        Util.arrayFillNonAtomic(sc, SC_TMP, (short)96, (byte)0);
 
         short q = V_W;
         if (g != null && gy != null) {

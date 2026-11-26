@@ -7774,8 +7774,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private static void sizeTheFile(byte[] a) {
         /* 3.2's speed commits (D245 on): the writes below are made again at each commit, from the code alone (the earlier ones
-         * all taken out), as many as bring the load file to 245 past a multiple of 256: 44,021 bytes at D247 and D248, 44,277 at D249, sizes no chip
-         * has been given (43,765 is the largest installed, on card 57723320).
+         * all taken out), as many as bring the load file to 245 past a multiple of 256; each commit's size is in the chip run's
+         * list of load files. Every size over 43,765 (the largest installed, on card 57723320) is one no chip has been given.
          * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
          * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on
          * 2026-11-26 (other source of that size, not this file); unpadded 43,655 (135 past, a place a chip refused before).
@@ -7814,22 +7814,9 @@ public class CashuApplet extends Applet implements TagSwitch {
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
         // the 3.2 speed commits (D245 on): writes added to hold the file at 245 past, made again by each (pad.py)
-        a[110] = 6;
-        a[111] = 7;
-        a[112] = 8;
-        a[113] = 9;
-        a[114] = 10;
-        a[115] = 11;
-        a[116] = 12;
-        a[117] = 13;
-        a[118] = 14;
-        a[119] = 15;
-        a[120] = 16;
-        a[121] = 17;
-        a[122] = 18;
-        a[130] = 6;
-        a[131] = 7;
-        a[132] = 8;
+        a[110] = 0;
+        a[111] = 1;
+        a[112] = 2;
         // padding ends
     }
 }

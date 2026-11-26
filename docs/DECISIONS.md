@@ -9919,3 +9919,25 @@ the point to d + t, so nothing that check stops gets out. Its conditions:
 
 **Counts.** One point addition less a payment's SIGN (`PerPaymentKeyTest.whatItCosts`: waits + 1, where it was waits + 2):
 about 35 ms by JCAlgTest's figures. 32 bytes of RAM at the first SET_CARD. `KeptYTest` fails on f621b23.
+
+## <a id="d250"></a>D250: The check of every signature hashes e again
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team; the project lead decides with the measured
+figure).** The red team's A4-3, its own commit after D249, to be taken or left alone. No command, answer or stored byte
+changes.
+
+**The rule.** The check of step 8 (D207, D218) works e out again from what the signature names, the tagged hash of
+Rx ‖ Px ‖ msg, mod n, where it took the e that step 6 left in the scratch.
+
+**What it closes.** D228 accepted the check reading the stored e as "no key given away, the nonce being fresh". That holds
+only while the random generator works. With a stuck generator, AUTH with the same reader nonce gives the same message (the
+card's 16 bytes are stuck too) and the same k; one fault on e after step 6's hash then passes the check, because the check
+reads the same faulted e: s' = k + e'·d, and with the good s = k + e·d, d = (s − s') / (e − e'), e' found by trying the
+fault's few values against P. Two faults, one in the generator (D217 already trusts it) and one in e. With e hashed again,
+a faulted e makes s'·G − e·Q = R + (e' − e)·d·G, which is not R: the chip's signature is refused and the bytecode signs again
+with a fresh nonce (D218), or 6F00 on the bytecode's path. `CheckHashesETest` flips a bit of e as the chip's product begins:
+the signature that leaves verifies, where on f394b29 the faulted one left.
+
+**What it costs.** One tagged hash of 96 bytes (two blocks with the tag's prefix) a signature, about 8 ms by JCAlgTest's
+figures: on every AUTH, every wait's signature (D218: a wait is a checked signature), the payment's SIGN and the PIN key's
+signature. That gives back about a quarter of D249's 35 ms on a payment, and adds about 8 ms to every wait. Not measured.
