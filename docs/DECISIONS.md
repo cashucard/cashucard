@@ -9970,3 +9970,29 @@ and `ecdh`, as before, and `checksCurve` tests whichever one agrees() then uses.
 test's 31) at its first ask of a selection only, so about 11 ms a piece after the first in a selection; LOAD_CHANGE's three
 asks, about 33 ms. One persistent EC key and one key agreement more at the first SET_CARD, and one byte of RAM.
 `CurveAgreementTest` fails on 4f610e6.
+
+## <a id="d252"></a>D252: A load's places looked for once a piece, and a proof of zeros by the chip's compare
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** The two small items of A6 of the 3.2
+speed review. No command, answer or stored byte changes.
+
+**The rule.**
+- **Places.** `loadOne` no longer walks the 128 places for an empty one: its caller gives it the place. LOAD_PROOF's walk for
+  its "a full card says so" check gives the first piece's place, and after each piece stored the next is looked for again,
+  from the place after it (every place before it was taken when the first was looked for, and nothing frees a place during
+  the command). LOAD_CHANGE's one piece takes the place its own check found (nothing writes a place in between).
+- **Zeros.** A piece's mint's proof of 96 zeros (refused, 6A80) and a place's kept proof that is zeros already are found by
+  the chip's own compare (`zeros`): the first byte zero and each byte equal to the next.
+
+**Why it is safe (the red team's A6-5, A6-6).**
+- **A6-5.** A place is looked for once a piece, never kept from one piece to the next: a place kept across a batch would
+  write the second piece over the first's, and the first would be lost. `LoadWalkTest`: three pieces in one LOAD_PROOF take
+  three distinct places, on an empty card, on one with freed places between used ones, and on one with two places left
+  (two go on, the third is refused with nothing written over).
+- **A6-6.** No array of zeros is read: the 96 bytes are compared with themselves one place on, so no write anywhere can make
+  a proof of zeros pass as a proof. The compare answers at the first byte that differs: the bytes are public (GET_DLEQ gives
+  them to anyone), and `isZero`, which reads every byte whatever they are, stays everywhere else.
+
+**Counts.** A LOAD_PROOF of one piece: two walks of the places to one (about 9 ms of bytecode by the review's estimate on a
+card with few places used, more on a fuller one). A proof's zero check: a 96-turn loop to one native compare (about 4 ms).
+Not measured.

@@ -4137,7 +4137,9 @@ public class CashuApplet extends Applet implements TagSwitch {
             letGo(k);
             ISOException.throwIt(SW_PIECE_ON_CARD);
         }
-        if (emptySlot() < 0) ISOException.throwIt(SW_NO_SPACE);
+        // the place it goes in, found once (D252): one piece, and nothing below writes a place before `loadOne`
+        short slot = emptySlot((short) 0);
+        if (slot < 0) ISOException.throwIt(SW_NO_SPACE);
         if (apdu.setIncomingAndReceive() != LOAD_CHANGE_LEN) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         short in = ISO7816.OFFSET_CDATA;
         // the bound key shown to be one of its keyset's keys (KEYSET_KEYS P1 = 3, D190): nothing is written under another
@@ -4171,7 +4173,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* written as any piece is (its text, its proof, its data, the status byte last), and its opening let go; it enters
          * nothing in the keyset table (D184): it is in its opening's keyset, whose entry the opening has kept live, and its
          * log entry is of that keyset's unit */
-        short sw = loadOne(buf, in, X_NUM, (short)(in + LC_E), (byte) -1, checkedC ? LOAD_C_CHECKED : LOAD_C_COMPRESSED);
+        short sw = loadOne(buf, in, X_NUM, (short)(in + LC_E), (byte) -1, checkedC ? LOAD_C_CHECKED : LOAD_C_COMPRESSED, slot);
         if (sw != (short) 0) ISOException.throwIt(sw);
         byte unit = logUnit(placeUnit((short)((short)(scratch[X_NUM] & 0xFF) * PROOF_SIZE)));
         /* The day's count gives the change back now that it is on the card (it was counted with the payment's pieces at SIGN), to
@@ -4558,8 +4560,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         // owned or not (D189: a holder with no phone is loaded under the PIN), onto a record of the holder's: a factory record is none
         if (!holderRecord()) ISOException.throwIt(SW_NO_CARD_RECORD);
 
-        // a full card says so whatever it is sent
-        if (emptySlot() < 0) ISOException.throwIt(SW_NO_SPACE);
+        // a full card says so whatever it is sent; and the place found is the first piece's (D252: each piece's place is looked for once)
+        short slot = emptySlot((short) 0);
+        if (slot < 0) ISOException.throwIt(SW_NO_SPACE);
 
         /* One piece, or up to BATCH_MOST of them end to end: a card is loaded
          * with thirty at a time, and a command each was most of what loading
@@ -4628,12 +4631,15 @@ public class CashuApplet extends Applet implements TagSwitch {
         short done = 0;
         for (short k = 0; k < n; k++) {
             short sw = loadOne(buf, (short)(in + (short)(k * PROOF_DATA_LEN)), (short)(X_DEC + k),
-                               withProof ? (short)(in + PROOF_DATA_LEN) : (short) -1, unit, full ? LOAD_C_WHOLE : LOAD_C_COMPRESSED);
+                               withProof ? (short)(in + PROOF_DATA_LEN) : (short) -1, unit, full ? LOAD_C_WHOLE : LOAD_C_COMPRESSED, slot);
             if (sw != (short) 0) {
                 if (k == (short) 0) ISOException.throwIt(sw);
                 break;
             }
             done++;
+            /* the next piece's place, looked for again (D252: once a piece, never kept from one piece to the next): from the place
+             * after this one's, every place before it having been taken when the first was looked for, and this one now */
+            slot = emptySlot((short)(slot + 1));
         }
         logLoaded(buf, in, done, logUnit(unit));
         Util.arrayCopyNonAtomic(scratch, X_DEC, buf, (short) 0, done);
@@ -4670,9 +4676,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         cardLog[(short)(entry + LOG_E_LOADS)] = (byte)(loads > (short) 255 ? (short) 255 : loads);
     }
 
-    /** The first empty place, or -1. */
-    private short emptySlot() {
-        for (short i = 0; i < MAX_PROOFS; i++) {
+    /** The first empty place from place `from` on, or -1. */
+    private short emptySlot(short from) {
+        for (short i = from; i < MAX_PROOFS; i++) {
             if (proofStorage[(short)(i * PROOF_SIZE + PROOF_STATUS_OFFSET)] == STATUS_EMPTY) return i;
         }
         return (short) -1;
@@ -4696,8 +4702,8 @@ public class CashuApplet extends Applet implements TagSwitch {
      * The new entry is written before anything of the place, its state byte last: torn there, it is an entry nothing names,
      * which the next reclaim frees.
      */
-    private short loadOne(byte[] buf, short in, short out, short proofAt, byte unit, byte form) {
-        short slot = emptySlot();
+    private short loadOne(byte[] buf, short in, short out, short proofAt, byte unit, byte form, short slot) {
+        // `slot`: the first empty place, as the caller found it for this piece (D252)
         if (slot < 0 || paid == null) return SW_NO_SPACE;
         /* A piece with a date names the card's refund key in its secret, so a
          * card with none cannot hold one: the card could not build the secret
@@ -4720,7 +4726,7 @@ public class CashuApplet extends Applet implements TagSwitch {
             return ISO7816.SW_WRONG_DATA;
         }
         if (isZero(buf, (short)(in + PROOF_AMOUNT_OFFSET - 1), (short) 4)
-            || (proofAt >= 0 && isZero(buf, proofAt, DLEQ_LEN))) {
+            || (proofAt >= 0 && zeros(buf, proofAt, DLEQ_LEN))) {
             return ISO7816.SW_WRONG_DATA;
         }
         // the table (D184): which unit the keyset is, or where it is to be entered as `unit`
@@ -4797,7 +4803,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         if (dleq != null) {
             short rec = (short)(slot * DLEQ_LEN);
             if (proofAt >= 0) Util.arrayCopyNonAtomic(buf, proofAt, dleq, rec, DLEQ_LEN);
-            else if (!isZero(dleq, rec, DLEQ_LEN)) Util.arrayFillNonAtomic(dleq, rec, DLEQ_LEN, (byte) 0);
+            else if (!zeros(dleq, rec, DLEQ_LEN)) Util.arrayFillNonAtomic(dleq, rec, DLEQ_LEN, (byte) 0);
         }
         // The status byte is the slot's commit, written last (D14, ENG-620).
         // A single byte write into persistent memory is atomic, and the data
@@ -7702,6 +7708,16 @@ public class CashuApplet extends Applet implements TagSwitch {
         return any == (byte) 0;
     }
 
+    /**
+     * `isZero` by the chip's own compare (D252), for the 96 bytes of a mint's proof: the first byte zero, and each byte the
+     * next's (the bytes compared with themselves one place on, so no array of zeros is read at all: none that a write could
+     * make other than zeros, the red team's A6-6). It answers at the first byte that differs, so for public bytes only (a
+     * proof is given to anyone who asks GET_DLEQ); `isZero` reads every byte, whatever they are. `len` is 2 or more.
+     */
+    private static boolean zeros(byte[] a, short off, short len) {
+        return a[off] == (byte) 0 && Util.arrayCompare(a, off, a, (short)(off + 1), (short)(len - 1)) == (byte) 0;
+    }
+
     /** `len` bytes, 33 at most, as lowercase hex text into scratch[X_HEX]. */
     private void toHex(byte[] src, short off, short len) {
         hexInto(src, off, len, X_HEX);
@@ -7822,6 +7838,40 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[115] = 11;
         a[116] = 12;
         a[117] = 13;
+        a[118] = 14;
+        a[119] = 15;
+        a[120] = 16;
+        a[121] = 17;
+        a[122] = 18;
+        a[123] = 19;
+        a[124] = 20;
+        a[125] = 21;
+        a[126] = 22;
+        a[127] = 23;
+        a[110] = 24;
+        a[111] = 25;
+        a[112] = 26;
+        a[113] = 27;
+        a[114] = 28;
+        a[115] = 29;
+        a[116] = 30;
+        a[117] = 31;
+        a[118] = 32;
+        a[119] = 33;
+        a[120] = 34;
+        a[121] = 35;
+        a[122] = 36;
+        a[123] = 37;
+        a[124] = 38;
+        a[125] = 39;
+        a[126] = 40;
+        a[127] = 41;
+        a[110] = 42;
+        a[111] = 43;
+        a[112] = 44;
+        a[113] = 45;
+        a[130] = 6;
+        a[131] = 7;
         // padding ends
     }
 }
