@@ -6049,22 +6049,17 @@ public class CashuApplet extends Applet implements TagSwitch {
         short e = ISO7816.OFFSET_CDATA, ct = (short)(ISO7816.OFFSET_CDATA + EC_POINT_LEN);
         boolean good = false;
         try {
-            // the sender's point, a point of the curve (6A80 thrown and taken as an envelope that does not open; D254: an engine's
-            // exception, here or after it, is the card's, 6F00)
-            good = sealedPoint(buf, e);
+            // the sender's point, a point of the curve (6A80 thrown and taken as an envelope that does not open)
+            requireFullPoint(buf, e);
+            schnorrHW.agree(pinPrivKey, buf, e, EC_POINT_LEN, seal, S_POINT);
+            cBlock(buf, e, (byte) 0, ct, (short) 32);
+            good = sameBytes(seal, S_HASH, buf, (short)(ct + 32), SEAL_TAG_LEN);
             if (good) {
-                try {
-                    schnorrHW.agree(pinPrivKey, buf, e, EC_POINT_LEN, seal, S_POINT);
-                    cBlock(buf, e, (byte) 0, ct, (short) 32);
-                } catch (RuntimeException x) {
-                    ISOException.throwIt(SW_CRYPTO_ERROR);
-                }
-                good = sameBytes(seal, S_HASH, buf, (short)(ct + 32), SEAL_TAG_LEN);
-                if (good) {
-                    cBlock(buf, e, (byte) 1, ct, (short) 0);
-                    for (short k = 0; k < (short) 32; k++) allOut[k] = (byte)(buf[(short)(ct + k)] ^ seal[(short)(S_HASH + k)]);
-                }
+                cBlock(buf, e, (byte) 1, ct, (short) 0);
+                for (short k = 0; k < (short) 32; k++) allOut[k] = (byte)(buf[(short)(ct + k)] ^ seal[(short)(S_HASH + k)]);
             }
+        } catch (RuntimeException x) {
+            good = false;
         } finally {
             Util.arrayFillNonAtomic(seal, (short) 0, S_LEN, (byte) 0);
         }
@@ -6287,23 +6282,19 @@ public class CashuApplet extends Applet implements TagSwitch {
         short ct = (short)(e + EC_POINT_LEN);
         short tag = (short)(ct + n);
         seal[S_INS] = buf[ISO7816.OFFSET_INS];
-        boolean good;
+        boolean good = false;
         try {
-            good = sealedPoint(buf, e);
-            if (good) {
-                // D254: the point is held to the curve by the card itself: an engine's exception from here is the card's, not the reader's
-                short got = schnorrHW.agree(pinPrivKey, buf, e, EC_POINT_LEN, seal, S_POINT);
-                good = got == EC_POINT_LEN && seal[S_POINT] == (byte) 0x04;
-                if (good) {
-                    sealBlock(buf, e, (byte) 0, buf, ct, n);
-                    good = sameBytes(seal, S_HASH, buf, tag, SEAL_TAG_LEN);
-                }
+            // the reader's point, a point of the curve (6A80 thrown and taken as an envelope that does not open), checked here and not left to the chip
+            requireFullPoint(buf, e);
+            short got = schnorrHW.agree(pinPrivKey, buf, e, EC_POINT_LEN, seal, S_POINT);
+            if (got == EC_POINT_LEN && seal[S_POINT] == (byte) 0x04) {
+                sealBlock(buf, e, (byte) 0, buf, ct, n);
+                good = sameBytes(seal, S_HASH, buf, tag, SEAL_TAG_LEN);
             }
         } catch (RuntimeException x) {
-            /* D254: an engine that threw, in the curve check or after it: 6F00, the sixteen bytes used up, and no try counted (the
-             * caller's count is for an envelope that does not open: a point that is no point, or a tag that is not this sum's) */
-            nonceLive[0] = (byte) 0;
-            ISOException.throwIt(SW_CRYPTO_ERROR);
+            /* Whatever the key agreement throws for a point that is no point
+             * (a CryptoException on one platform, something else on another),
+             * the envelope does not open: it is not an error of the card's. */
             good = false;
         }
         if (!good) {
@@ -6320,24 +6311,6 @@ public class CashuApplet extends Applet implements TagSwitch {
         }
         moveDown(buf, ct, e, n);
         return n;
-    }
-
-    /**
-     * The reader's point of a sealed command held to the curve by the card itself (`requireFullPoint`), not left to the chip:
-     * false where it is no point (6A80: an envelope that does not open). Any other exception, an engine's (D254), is the card's,
-     * and is let out as 6F00: before D254 every exception here was taken as an envelope that does not open, so that an engine
-     * that threw cost the holder a PIN try (the red team's A3-1).
-     */
-    private boolean sealedPoint(byte[] buf, short e) {
-        try {
-            requireFullPoint(buf, e);
-        } catch (ISOException x) {
-            if (x.getReason() == ISO7816.SW_WRONG_DATA) return false;
-            ISOException.throwIt(SW_CRYPTO_ERROR);
-        } catch (RuntimeException x) {
-            ISOException.throwIt(SW_CRYPTO_ERROR);
-        }
-        return true;
     }
 
     /** `len` bytes of `buf` moved from `from` down to `to` (to < from), a byte at a time: the two ranges may overlap, and nothing is asked of how a copy treats that. */

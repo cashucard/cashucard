@@ -10105,35 +10105,32 @@ chip run's to show (the same script).
 **Measured after it** (card 57723320, 2026-11-26, the same script on 1d9ac2a's file, which has this): 62.8 µs a row in use
 (r² 0.999), where c816133 had 141.0; at 1,024 rows a load is 129 ms, where it was 245.
 
-## <a id="d254"></a>D254: An engine's fault in a sealed command answers 6F00 and costs no PIN try
+## <a id="d254"></a>D254: An engine's fault in a sealed command: considered, built, not taken
 
-**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; under the red team's code pass; the project lead's and the maintainers'
-call).** The red team's A5-e, its own commit, to be taken or left alone: it changes what a sealed refusal costs. D247, D248
-and D251 are safe without it (D248 asks an engine that threw once more before anything is refused).
+**Not taken (2026-11-26, on the red team's code pass; built in eedd741, reverted before the 3.2 file; the default
+the project lead was told).** The red team's A5-e: in `unseal` and `stageOwnerC`, any exception other than the card's own curve
+check refusing the reader's point (6A80) or a tag that does not match, in the curve check's RSA powers or after it (the PIN
+key's agreement, the seal's sums), would have been the card's own fault: 6F00, no try counted, the sixteen bytes used up.
+3.2 answers as 3.1 does: every exception there is an envelope that does not open, and costs what a wrong PIN costs.
 
-**The rule.** In `unseal` (a sealed VERIFY_PIN, SET_PIN, CHANGE_PIN, and the owner's sealed commands) and `stageOwnerC`:
-- the reader's point refused by the card's own curve check (`requireFullPoint`'s 6A80) is an envelope that does not open,
-  as before: it costs what a wrong PIN costs;
-- a tag that does not match is an envelope that does not open, as before;
-- any other exception, in the curve check (its RSA powers) or after it (the PIN key's agreement, the seal's sums), is the
-  card's own fault: the command answers 6F00, no try is counted, and the sixteen bytes are used up as an envelope that does
-  not open uses them.
+**What it would have closed.** The red team proved on 3.2's first form (`anEngineExceptionInASealedPinCostsATry`) that an
+engine that throws inside a sealed VERIFY_PIN cost the holder a try with the right PIN; three such, and a card with an owner
+is blocked (its owner can unblock it), while a card with no owner only waits longer.
 
-**Why.** The red team proved on 3.2 (`anEngineExceptionInASealedPinCostsATry`) that an engine that throws inside a sealed
-VERIFY_PIN cost the holder a try with the right PIN: three such, and a card with an owner is blocked. An exception there was
-taken as "the envelope does not open" (the code's own words, from before the card held the reader's point to the curve
-itself, when a refusal by the chip's agreement was the only curve check). Since the card holds the point to the curve itself, an exception is not the reader's doing.
-- **No new oracle.** The 6A80-and-try answer for a point that is no point is unchanged, and 6F00 is given only where the point
-  has been held to the curve: what a terminal learns is that the card's engine failed on a point it chose, which tells it
-  nothing of the PIN or the PIN key ([d]Q for a point Q of the curve's prime order is never refused for d's sake).
-- **What it gives up.** A terminal that can make the card's engine throw at will (a fault injection) is no longer charged a
-  try for each attempt. It learns nothing from it, and a PIN guess needs a tag that matches, which it cannot make without
-  the PIN.
+**Why it is not taken.**
+- **What it gives away.** An engine exception is what a chip's fault detector raises. With D254 it would cost nothing, so a
+  fault attacker probing the PIN key's multiplication would learn "fault detected" for free, as often as they like, at about
+  0.3 s a probe: a safe-error channel, limited but real. Without D254, each such probe costs a try on an owned card (three
+  block it) or a growing wait on one with no owner. The code was right (no free PIN tries: the try is counted before the PIN
+  is compared, and D254's exits are all before that; no oracle without fault equipment: the card holds the point to the curve
+  first, and no point it takes makes the powers or the agreement throw); what it gives is the probe.
+- **What the card keeps without it.** D248's retry (an RSA engine that throws is given its key again and asked once more) and
+  D251's (the curve check's agreement the same) already keep a lost init from costing a try. A try is now lost only where an
+  engine throws twice in a row inside a sealed command: a failing chip, not a normal event.
 
-**Tests (`SealedFaultTest`).** The RSA engine throwing in the curve check (after D248's one more ask) and the PIN key's
-agreement throwing after it: 6F00, no try, the sixteen bytes used up, and the right PIN opens once the engine works. A tag
-sealed to another key and a reader's point off the curve: a wrong PIN's answer and a try, as before. The two engine tests
-fail on 7fe7ec6 (63C1, a try gone).
+**To be looked at again** only if the chip run's checks 1 and 6 (an engine after a deselect, a tag's selection, a power cycle
+or an exception; ten sealed VERIFY_PINs across a reselect and a tag) show an exception in a sealed command that survives the
+retry. The reverted commits keep the code and its tests (`SealedFaultTest`) for that day.
 
 ## <a id="d255"></a>D255: A piece loaded in the 33-byte form is held to its form alone
 

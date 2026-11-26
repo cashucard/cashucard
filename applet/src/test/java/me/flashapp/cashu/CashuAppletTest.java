@@ -11094,9 +11094,7 @@ class CashuAppletTest {
             if (!stage.contains(name)) assertFalse(java.util.regex.Pattern.compile("\\bseal\\b|\\bS_(?:POINT|HASH|I|INS|LEN)\\b").matcher(bodies.get(name)).find(), name + ": the rest of SET_OWNER reaches no part of the room");
         }
         String st = bodies.get("stageOwnerC");
-        // D254: the curve check is sealedPoint's (requireFullPoint, its 6A80 told from an engine's fault)
-        assertTrue(bodies.get("sealedPoint").contains("requireFullPoint(buf, e);"), "sealedPoint holds the point to the curve");
-        int ptChecked = st.indexOf("sealedPoint(buf, e)"), ptAgreed = st.indexOf("schnorrHW.agree(pinPrivKey, buf, e, EC_POINT_LEN, seal, S_POINT);");
+        int ptChecked = st.indexOf("requireFullPoint(buf, e);"), ptAgreed = st.indexOf("schnorrHW.agree(pinPrivKey, buf, e, EC_POINT_LEN, seal, S_POINT);");
         assertTrue(ptChecked > 0 && ptChecked < ptAgreed && ptAgreed < st.indexOf("cBlock("), "the sender's point checked before the room is written, then agreed with the PIN key");
         assertTrue(st.contains("Util.arrayFillNonAtomic(seal, (short) 0, S_LEN, (byte) 0);") && st.indexOf("finally") < st.indexOf("Util.arrayFillNonAtomic(seal, (short) 0, S_LEN, (byte) 0);"), "and the room zeroed on every way out");
         String verify = bodies.get("processVerifyPin");
@@ -11105,7 +11103,7 @@ class CashuAppletTest {
         // unseal checks the reader's point (requireFullPoint: X_MSG, which overlaps S_HASH, and X_OUT past the room) before the
         // agreement writes S_POINT and the first block S_HASH: nothing of the room is in use while it runs
         String unseal = bodies.get("unseal");
-        int checked = unseal.indexOf("sealedPoint(buf, e)"), agreed = unseal.indexOf("schnorrHW.agree("), firstBlock = unseal.indexOf("sealBlock(");
+        int checked = unseal.indexOf("requireFullPoint(buf, e);"), agreed = unseal.indexOf("schnorrHW.agree("), firstBlock = unseal.indexOf("sealBlock(");
         int insKept = unseal.indexOf("seal[S_INS] = buf[ISO7816.OFFSET_INS];");
         assertTrue(checked > 0 && checked < agreed && agreed < firstBlock, "the point checked before the room is written");
         assertTrue(xMsg + 32 <= sIns && insKept < checked, "and X_MSG ends before S_INS, which is written before the check and read after it");
@@ -11137,7 +11135,7 @@ class CashuAppletTest {
             "if (spend) nonceLive[0] = (byte) 0;",
             "if (!live) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);",
             "seal[S_INS] = buf[ISO7816.OFFSET_INS];",
-            "good = sealedPoint(buf, e);",
+            "requireFullPoint(buf, e);",
             "short got = schnorrHW.agree(pinPrivKey, buf, e, EC_POINT_LEN, seal, S_POINT);",
             "sealBlock(buf, e, (byte) 0, buf, ct, n);",
             "good = sameBytes(seal, S_HASH, buf, tag, SEAL_TAG_LEN);",
@@ -11152,15 +11150,13 @@ class CashuAppletTest {
             from = at[s];
         }
         assertEquals(1, count(u, "^="), "one XOR in all, after the tag is checked");
-        // D254: what an engine throws once the point is held to the curve (sealedPoint) is the card's fault: 6F00, the sixteen bytes
-        // used up, no try; a point that is no point (sealedPoint false) and a tag that is not this sum's are the envelope not opening
-        assertTrue(u.contains("} catch (RuntimeException x) { nonceLive[0] = (byte) 0; ISOException.throwIt(SW_CRYPTO_ERROR); good = false; } if (!good) {"), "whatever an engine throws is 6F00 with the nonce used up, and the very next thing is the test of whether the envelope opened");
+        assertTrue(u.contains("} catch (RuntimeException x) { good = false; } if (!good) {"), "whatever the key agreement throws, the envelope does not open, and the very next thing is the test of whether it did");
         assertFalse(u.contains("CryptoException"), "the catch is not narrowed to one platform's exception");
-        assertEquals(4, java.util.regex.Pattern.compile("\\bgood\\s*=").matcher(u).results().count(), "good is set four times: by the curve check, by the agreement's framing, by the tag's comparison, and false after the catch's 6F00");
+        assertEquals(3, java.util.regex.Pattern.compile("\\bgood\\s*=").matcher(u).results().count(), "good is set three times: false to begin with, false in the catch, and by the tag's comparison");
         assertFalse(u.contains("good = true"), "and never to true but by the comparison of the tag");
         assertTrue(u.contains("good = sameBytes(seal, S_HASH, buf, tag, SEAL_TAG_LEN);"), "which is the one place it takes another value");
         assertEquals(0, count(u, "arrayCopy"), "unseal moves its clear text with moveDown and nothing else");
-        assertTrue(u.contains("good = got == EC_POINT_LEN && seal[S_POINT] == (byte) 0x04;"), "and so is an answer that is not a point");
+        assertTrue(u.contains("if (got == EC_POINT_LEN && seal[S_POINT] == (byte) 0x04) {"), "and so is an answer that is not a point");
         assertTrue(u.contains("sealBlock(buf, e, (byte) i, buf, (short) 0, (short) 0);"), "the keystream block i, with nothing more");
         assertTrue(u.contains("for (short at = 0; at < n; at += (short) 32) {") && u.contains("k < (short) 32 && (short)(at + k) < n"), "thirty-two bytes a block, to the end of the data");
         assertTrue(u.contains("short n = (short)(len - EC_POINT_LEN - SEAL_TAG_LEN);") && u.contains("short ct = (short)(e + EC_POINT_LEN);") && u.contains("short tag = (short)(ct + n);"), "E, the data, the tag");
@@ -11194,7 +11190,7 @@ class CashuAppletTest {
         assertEquals(2, count(code, "unseal(buf, pinLen, true)"), "VERIFY_PIN and SET_PIN spend the nonce");
         assertEquals(1, count(code, "unseal(buf, dataLen, false)"), "CHANGE_PIN leaves it for the proof");
         assertEquals(2, count(code, "nonceLive[0] = (byte) 1;"), "the nonce is made live by GET_NONCE's two forms and nowhere else");
-        assertEquals(6, count(code, "nonceLive[0] = (byte) 0;"), "and used up by unseal (three times: spent, an envelope that does not open, and an engine's fault, D254), by the owner's proof, by GET_CARD P1 = 3's sealed c and by an ALLOW_LOAD refused for its length before its proof");
+        assertEquals(5, count(code, "nonceLive[0] = (byte) 0;"), "and used up by unseal (twice), by the owner's proof, by GET_CARD P1 = 3's sealed c and by an ALLOW_LOAD refused for its length before its proof");
         // ---- VERIFY_PIN, SET_PIN, CHANGE_PIN
         String v = body(code, "private void processVerifyPin(", "private void failPinCheck(").replaceAll("\\s+", " ");
         String[] verify = { "boolean sealed = false;", "short got = (short)(buf[ISO7816.OFFSET_LC] & 0xFF);", "try {", "sealed = sealedForm(buf);", "if (pinState[0] == (byte) 0) ISOException.throwIt(SW_PIN_NOT_SET);", "if (pinState[0] == (byte) 2 || pin.getTriesRemaining() == 0) ISOException.throwIt(SW_PIN_BLOCKED);",
