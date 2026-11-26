@@ -9723,7 +9723,7 @@ write (SECURITY-MODEL #20). `spec/APDU.md`'s SET_OWNER and its `6A96` row say so
 
 ## <a id="d245"></a>D245: The key wiped once where every scalar is public
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A1 of the 3.2 speed review,
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Item A1 of the 3.2 speed review,
 which found, by JCAlgTest's figures for the J3R180 (`setS` 3.45 ms, a key agreement's `init` 7.9 ms), that a wipe
 (`SchnorrHW.rest()`: G's x into the temporary key, both key agreements given it) is about 19 ms and that most of a
 signature's wipes follow a public scalar. No command, answer or stored byte changes.
@@ -9754,6 +9754,11 @@ less. LOAD_CHANGE: 5 wipes to 1, about 77 ms less. SET_CARD's framing: 17 wipes 
 The four tests fail on 3b9b5a4. A wait is a signature's work (D218), so every wait is shorter with this; the wait counts
 stay as they are until the chip has been measured.
 
+**Measured** on card 57723320 (2026-11-26, play money; 52be734's file padded by D256, as 01c, against 3b9b5a4's): a wait's
+signature 424.8 ms (463.3), a payment's last SIGN 593.5 (646.2), LOAD_CHANGE 458.4 (508.9), the set-up's commands in all
+4,058 ms (4,358): about 38 ms a signature, 50 a LOAD_CHANGE and 300 a set-up. Signatures vary by about 12 ms from one
+install's card key to the next.
+
 **The red team's first pass (2026-11-26) found the change safe, with three conditions, which
 hold.**
 - **What is given up (its A1-1, LOW).** The nonce k now outlasts part of the check: from step 4 it stays in the temporary
@@ -9773,7 +9778,7 @@ hold.**
 
 ## <a id="d246"></a>D246: The signature's product on the chip, its bytecode trimmed
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A2 of the 3.2 speed review.
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Item A2 of the 3.2 speed review.
 No command, answer or stored byte changes.
 
 **The rule.** `splitProduct` (D217) makes e·d = e·d1 + e·d2 by a private `chipProduct` in place of `mulModNChip`, which
@@ -9808,9 +9813,13 @@ Its three conditions:
   engine is the same, so D219's cover of the engine stands; `chipProduct`'s own bytecode is covered only by each signature's
   check, which refuses a wrong product and has the signature made again by the bytecode.
 
+**Measured** on card 57723320 (2026-11-26, play money; 7b87367's file, with D245, against D245's alone): a wait's signature
+367.2 ms (424.8), a payment's last SIGN 524.6 (593.5), LOAD_CHANGE 458.5 (458.4), SPEND_ALL_CHANGE 223.9 (241.2 on
+3b9b5a4): about 58 ms a signature on top of D245's 38, and nothing on LOAD_CHANGE, whose products are not the signature's.
+
 ## <a id="d247"></a>D247: The chip's RSA engines given their keys once a command
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A3 of the 3.2 speed review,
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it with a condition, met in 696d4ba).** Item A3 of the 3.2 speed review,
 in the red team's first, safe form (its "A3a"). `Cipher.init` is about 6 ms on a J3R180 (JCAlgTest); until 3.2 every power
 gave its engine its key first. No command, answer or stored byte changes.
 
@@ -9883,7 +9892,7 @@ against a reset's. The follow-up above adds about 62 ms to each set-up life's fi
 
 ## <a id="d248"></a>D248: The chip's RSA engines given their keys once a selection
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** The red team's second form of A3
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it with conditions (a test, met in 1e2b2d3; chip checks 1, 2 and 6, owed)).** The red team's second form of A3
 ("A3b"), on D247, and to be left out alone: it goes on a card only where the chip checks below hold. No command, answer or
 stored byte changes.
 
@@ -9926,7 +9935,7 @@ ten sealed VERIFY_PINs across a reselect and a tag (check 6) stay owed before th
 
 ## <a id="d249"></a>D249: The y of the payment's date key kept from SPEND_ALL_BEGIN
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A4 of the 3.2 speed review.
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Item A4 of the 3.2 speed review.
 No command, answer or stored byte changes.
 
 **The rule.** SPEND_ALL_BEGIN works out P + t·G by the chip's point addition (`groupKeys`, D197) and keeps its x and parity
@@ -9969,7 +9978,7 @@ which the same `select()` clears), it is pinned all the same.
 
 ## <a id="d250"></a>D250: The check of every signature hashes e again
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team; the project lead decides with the measured
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it with a condition, met in f7bdac4; the project lead decides with the measured
 figure).** The red team's A4-3, its own commit after D249, to be taken or left alone. No command, answer or stored byte
 changes.
 
@@ -10012,7 +10021,7 @@ hash answers is refused 6F00 with nothing written out (on f394b29 the faulted si
 
 ## <a id="d251"></a>D251: The curve test by agreement on a key and an agreement of its own
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** The `agrees()` half of item A5 of
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** The `agrees()` half of item A5 of
 the 3.2 speed review (the PIN key's half is not built: the red team's A5-1 and A5-2, a stale key after a reset and PIN tries
 lost after a lost init, against 27 ms a sealed PIN; `agree()` stays as it is for the PIN key). No command, answer or stored
 byte changes.
@@ -10041,7 +10050,7 @@ asks, about 33 ms. One persistent EC key and one key agreement more at the first
 
 ## <a id="d252"></a>D252: A load's places looked for once a piece, and a proof of zeros by the chip's compare
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** The two small items of A6 of the 3.2
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** The two small items of A6 of the 3.2
 speed review. No command, answer or stored byte changes.
 
 **The rule.**
@@ -10067,7 +10076,7 @@ Not measured.
 
 ## <a id="d253"></a>D253: The paid list and the filled places held to a nonce by its first byte first
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Measured on the test card (J3R180
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Measured on the test card (J3R180
 57723320, 3.2 at c816133, 266 made-up pieces loaded and paid): a LOAD_PROOF's median grows from 100.3 ms with no row of the
 paid list in use to 132.5 ms with 224, 141 µs a row in a straight line (r² 0.992): 144 ms more on every loaded piece and every
 change piece written back at 1,024 rows. Most of it is the native `Util.arrayCompare` called once a row from a bytecode loop.
@@ -10093,9 +10102,12 @@ row of a list not gone round, taken; a filled place's nonce among places whose n
 and one differing in its last byte, taken: each as on 3b9b5a4. jCardSim cannot count the chip's compares; the time is the
 chip run's to show (the same script).
 
+**Measured after it** (card 57723320, 2026-11-26, the same script on 1d9ac2a's file, which has this): 62.8 µs a row in use
+(r² 0.999), where c816133 had 141.0; at 1,024 rows a load is 129 ms, where it was 245.
+
 ## <a id="d254"></a>D254: An engine's fault in a sealed command answers 6F00 and costs no PIN try
 
-**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team; the project lead's and the maintainers'
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; under the red team's code pass; the project lead's and the maintainers'
 call).** The red team's A5-e, its own commit, to be taken or left alone: it changes what a sealed refusal costs. D247, D248
 and D251 are safe without it (D248 asks an engine that threw once more before anything is refused).
 
@@ -10179,7 +10191,9 @@ y that is not the point's would be stored, silently, as the other point (the red
 powers of the chip's RSA (the cube and Euler's test, about 2 × 7.8 ms with D247/D248's engines, more where an engine is
 given its key) before D255, none after. The 65-byte form: one key agreement (about 20 ms of curve work; its init once a
 selection with D251) and 32 more bytes a piece on the wire; measured on the test card, `LOAD_PROOF` in the 04 form 115.6 ms
-at 3.2 and 107.0 ms with D251.
+at 3.2 and 107.0 ms with D251. **Measured** (card 57723320, 2026-11-26): a piece in the 33-byte form loaded in 91.6 ms on
+eedd741's file and in 75.9 ms on this commit's, so the check cost 15.7 ms a piece with the engines given their keys once a
+selection (D248); a first load of 36 pieces went from 4,134 to 3,560 ms in contact.
 
 ## <a id="d256"></a>D256: Where the package ends as the chip keeps it decides whether the card's applet is created
 
