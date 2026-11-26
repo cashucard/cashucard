@@ -9696,3 +9696,12 @@ fixed cards apart.
 
 **Built (applet 3.2, not released).** Load file 43,765 bytes, 245 past a multiple of 256 (`sizeTheFile` at seventy-seven
 writes; 43,547 with the forty writes of 3.1), 1,024 bytes over 3.1's 42,741: no chip has been given a file of this size. jCardSim only.
+The tracked CAP is `cashu-javacard-3.2.0.cap` (load file `ecb9a837…`), and the tools take a 3.2 card: cardctl's selftest
+(`SELFTEST_VERSIONS`, byte 56 bit 2 named), cardkit (`CARD_VERSIONS`, `CARD_VERSION`, the pins), the set-up app (its 3.x
+line), the simulator bridge. The set-up app's approved list ([D74](#d74)) does not take the 3.2 load file: a build from
+this tree installs no card until a chip run and the owner add it, in a change of their own.
+
+A hand-over torn between its two transactions leaves the last owner's card with a c its phone did not draw (the next
+owner's, where it gave its own). The last owner asks the hand-over again, and its phone reads c again before it locks a
+load to the card's keys; a phone checks `GROUP_KEYS` against its own keys before the mint swap, not only before the
+write (SECURITY-MODEL #20). `spec/APDU.md`'s SET_OWNER and its `6A96` row say so.

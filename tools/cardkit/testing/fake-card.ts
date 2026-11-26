@@ -80,18 +80,18 @@ export interface CardAppletState {
    */
   change?: number;
   /**
-   * The version SELECT and GET_INFO answer, major and minor: [3, 1] (the
-   * tracked CAP's) by default, [3, 0], [2, 1] or [2, 2] for an older card.
+   * The version SELECT and GET_INFO answer, major and minor: [3, 2] (the
+   * tracked CAP's) by default, [3, 1], [3, 0], [2, 1] or [2, 2] for an older card.
    */
   version?: readonly [number, number];
 }
 
-/** The tracked CAP's version, 3.1: what a card applet answers unless its state names another. */
-const TRACKED_VERSION: readonly [number, number] = [3, 1];
+/** The tracked CAP's version, 3.2: what a card applet answers unless its state names another. */
+const TRACKED_VERSION: readonly [number, number] = [3, 2];
 function versionOf(s: CardAppletState): readonly [number, number] {
   return s.version ?? TRACKED_VERSION;
 }
-// (3.1 is 3.0's wire: D231 and D232 move waits and held counts, nothing this fake card answers)
+// (3.1 and 3.2 are 3.0's wire: D231 and D232 move waits and held counts, D244 a profile bit, nothing this fake card answers)
 function isThreeZero(v: readonly [number, number]): boolean {
   return v[0] === 3;
 }

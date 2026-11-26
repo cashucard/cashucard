@@ -31,6 +31,20 @@ class TransactionSizeTest {
      * 11 and 152 before it, a no-PIN window begun with no clock among them (D203's 10 and 148 left that write out). */
     static final int CLAIM_WRITES = 12, CLAIM_BYTES = 156;
 
+    /**
+     * LOAD_CHANGE's one transaction (3.2, D244: the piece's status byte, the opening let go, the day given back and the log,
+     * a new tap's entry among them), measured at 7 writes and 35 bytes: held under the bound, so that a later change cannot
+     * push it toward what a chip takes without failing here. One that did not fit would leave the change owed, its r on the
+     * card alone.
+     */
+    static final int LOAD_CHANGE_WRITES_MOST = 8, LOAD_CHANGE_BYTES_MOST = 40;
+    /**
+     * RESET_CARD's last transaction (3.2, D244: who the card is, its new c, the day of loads with the keys owed, the paid
+     * list and the self-tests' verdicts), measured at 8 writes and 47 bytes. The harness does not count the five boolean
+     * fields written in it (selfTested, curveByAgreement, fieldP, fieldSquare, SchnorrHW.chipMul: about 5 bytes more).
+     */
+    static final int RESET_WRITES_MOST = 9, RESET_BYTES_MOST = 48;
+
     @AfterEach
     void noLimit() { TearHook.fullAt = null; TearHook.fullOverhead = 0; TearHook.fullHit.clear(); TearHook.tearAfterCommit = null; }
 
@@ -354,6 +368,35 @@ class TransactionSizeTest {
         String what = TearHook.TX_MAX_WHAT.entrySet().stream().filter(e -> e.getKey().startsWith("processSetOwner")).map(Map.Entry::getValue).findFirst().orElse("");
         System.out.println(String.format("CLAIM FIRST-ANCHOR WORST tx: writes %d bytes %d arrays %d pages64 %d  %s", t[0], t[1], t[2], t[3], what));
         assertTrue(t[0] <= CLAIM_WRITES && t[1] <= CLAIM_BYTES, "the claim's transaction: " + java.util.Arrays.toString(t));
+    }
+
+    @Test
+    @DisplayName("3.2 (D244): LOAD_CHANGE's one transaction in a new tap (the log's new entry in it): printed, and held to LOAD_CHANGE_WRITES_MOST and LOAD_CHANGE_BYTES_MOST")
+    void loadChangeInANewTap() throws Exception {
+        Card c = new Card();
+        readyOwed(c);
+        byte[] ans = answerFor(c);
+        TearHook.TX_MAX.clear();
+        assertEquals(SW_OK, c.sw(loadChangeCommand(0, ans)));
+        print("after a LOAD_CHANGE in a new tap");
+        int[] v = tx("loadOne");
+        System.out.println(String.format("LOAD_CHANGE tx: writes %d bytes %d arrays %d pages64 %d", v[0], v[1], v[2], v[3]));
+        assertTrue(v[0] <= LOAD_CHANGE_WRITES_MOST && v[1] <= LOAD_CHANGE_BYTES_MOST, "LOAD_CHANGE's transaction: " + java.util.Arrays.toString(v));
+        assertEquals(1, TearHook.TX_MAX.keySet().stream().filter(k -> k.startsWith("loadOne:") || k.startsWith("processLoadChange:") || k.startsWith("logLoaded")).count(),
+            "one transaction: " + TearHook.TX_MAX.keySet());
+    }
+
+    @Test
+    @DisplayName("3.2 (D244): RESET_CARD's last transaction by the owner: printed, and held to RESET_WRITES_MOST and RESET_BYTES_MOST (the keys drawn after it)")
+    void resetsLastTransaction() throws Exception {
+        Card c = new Card();
+        ready(c, 0);
+        TearHook.TX_MAX.clear();
+        assertEquals(SW_OK, ReviewFixes32Test.ownerReset(c, OWNER));
+        print("after an owner's reset");
+        int[] v = tx("processResetCard");
+        System.out.println(String.format("RESET tx: writes %d bytes %d arrays %d pages64 %d", v[0], v[1], v[2], v[3]));
+        assertTrue(v[0] <= RESET_WRITES_MOST && v[1] <= RESET_BYTES_MOST, "the reset's last transaction: " + java.util.Arrays.toString(v));
     }
 
     /** The payment's transaction in the cases a till meets most: with the PIN, and with no PIN under the allowance. */

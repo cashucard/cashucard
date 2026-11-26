@@ -418,6 +418,18 @@ public final class TearHook {
         if (k.getType() == javacard.security.KeyBuilder.TYPE_EC_FP_PRIVATE) { keyBytes += l; keyCalls++; }
     }
 
+    /**
+     * 3.2 (D244): a chip that refuses a transient array of this many bytes (SystemException NO_TRANSIENT_SPACE), -1 for none.
+     * jCardSim gives every transient array it is asked for; this lets a test take the applet's persistent fallback, as a
+     * chip with too little RAM would (`outStage`, OUT_STAGE_LEN, at the first SET_CARD).
+     */
+    public static int refuseTransientLen = -1;
+
+    public static byte[] makeTransientByteArray(short length, byte event) {
+        if (length == refuseTransientLen) javacard.framework.SystemException.throwIt(javacard.framework.SystemException.NO_TRANSIENT_SPACE);
+        return JCSystem.makeTransientByteArray(length, event);
+    }
+
     public static void genKeyPair(KeyPair kp) {
         kp.genKeyPair();
         if (freshKeys) freshPair(kp);

@@ -239,7 +239,7 @@ def test_the_applet_version_is_the_one_the_spec_the_guide_and_selftest_expect():
     """
     version = dict(re.findall(r"static final byte VERSION_(MAJOR|MINOR)\s*=\s*\(byte\)\s*0x([0-9A-Fa-f]{2})", _applet_text()))
     major, minor = int(version["MAJOR"], 16), int(version["MINOR"], 16)
-    assert (major, minor) == (3, 1)
+    assert (major, minor) == (3, 2)
     assert f"`{major:02X} {minor:02X}`" in _heading_body("SELECT APPLICATION"), "the spec's SELECT response"
     guide = DEPLOYMENT_MD.read_text(encoding="utf-8")
     tracked = re.search(r"The CAP tracked in this repo is \*\*applet version (\d+)\.(\d+)\*\*", guide)
@@ -432,8 +432,8 @@ def test_get_info_response_table_matches_the_decoder():
     for at, bit, name in cardctl.PROFILE_NAMES:
         part = byte55 if at == 55 else byte56
         assert f"bit {bit} [{name}]" in part or f"bit {bit} {name} " in part, (at, bit, name)
-    assert len(cardctl.PROFILE_NAMES) == 10 and "bits 2 to 7 are `0`" in byte56
-    assert cardctl.decode_info(INFO_59[:55] + b"\xff\x03" + INFO_59[57:])["profiles"] == [n for _, _, n in cardctl.PROFILE_NAMES]
+    assert len(cardctl.PROFILE_NAMES) == 11 and "bits 3 to 7 are `0`" in byte56
+    assert cardctl.decode_info(INFO_59[:55] + b"\xff\x07" + INFO_59[57:])["profiles"] == [n for _, _, n in cardctl.PROFILE_NAMES]
     assert "less than 57 bytes to P1 = 4 keeps none of them" in profiles and "profiles" not in cardctl.decode_info(INFO_59[:56])
     # the applet answers the documented sizes
     src = _applet_text()
@@ -441,8 +441,9 @@ def test_get_info_response_table_matches_the_decoder():
     assert "apdu.setOutgoingAndSend((short) 0, (short) 51);" in src, "P1 = 3's 51 bytes (D184)"
     assert "apdu.setOutgoingAndSend((short) 0, (short) 59);" in src, "P1 = 4's 59 bytes (D186, D195)"
     assert ("buf[55] = cardRecord[CARD_SET_OFFSET] == (byte) 1 && paid == null ? (byte) 0x77 : (byte) 0xF7;" in src
-            and "buf[56] = (byte) 0x03;" in src and "answers `F7 03`" in _section("GET_INFO")
-            and "`77 03`" in _section("GET_INFO")), "the profile bits, the paid list's (D210), and bit 3 clear (D228)"
+            and "buf[56] = fieldP ? (byte)(0x03 | INFO_FLAG_FIELD_P) : (byte) 0x03;" in src and "static final byte INFO_FLAG_FIELD_P = (byte) 0x04;" in src
+            and "answers `F7 03`" in _section("GET_INFO") and "`F7 07`" in _section("GET_INFO")
+            and "`77 03`" in _section("GET_INFO")), "the profile bits, the paid list's (D210), bit 3 clear (D228) and byte 56 bit 2 the field over p (D244)"
 
 
 def test_get_card_table_matches_the_decoder_and_the_applets_rollover_bytes():
@@ -1076,7 +1077,7 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
     label = "On a card" if not untried else "On a card, not yet proven" if refcheck.installed(parts) else "Not yet on a card"
     guide_html_note = re.search(r'<p class="note"><b>' + re.escape(label) + r'\.</b>(.*?)</p>', guide_html, re.S)
     try:
-        deployment_size = deployment[deployment.index("The 3.1 build is"):deployment.index("The 3.0 build was")]
+        deployment_size = deployment[deployment.index("The 3.2 build is"):deployment.index("The 3.1 build was")]
     except ValueError:
         deployment_size = ""
     for name, text, is_html in (("guide.md", guide_md.split("## Rules")[0], False),
@@ -1095,7 +1096,7 @@ def guide_findings(refcheck, cap_bytes, guide_md, guide_html, deployment, readme
     texts = (("guide.md", guide_md, False), ("guide.html", guide_html, True), ("HARDWARE_DEPLOYMENT.md", deployment, False),
              ("README.md", readme, False), ("RELEASE-NOTES.md", notes, False))
     if untried:
-        names = ("this exact file", "this exact", "3.1 file", "3.1 build", "3.1 cap", "3.1.0.cap", f"{size:,}", str(size),
+        names = ("this exact file", "this exact", "3.2 file", "3.2 build", "3.2 cap", "3.2.0.cap", f"{size:,}", str(size),
                  sha[:8], cap_sha[:8]) + UNTRIED_NAMES
         for name, text, is_html in texts:
             claims = file_claims(text, said, names, is_html)
@@ -1123,7 +1124,7 @@ def test_the_guides_say_what_refcheck_knows_of_the_tracked_file_and_where_the_fr
     tracked CAP; and the ECDH framing is checked at SET_CARD, not at install: the install's 6F00 points at the order and
     the size, the first SET_CARD's at the framing."""
     refcheck = _refcheck()
-    cap = ROOT / "applet" / "target" / "cashu-javacard-3.1.0.cap"
+    cap = ROOT / "applet" / "target" / "cashu-javacard-3.2.0.cap"
     guide_md = (ROOT / "website" / "dist" / "guide.md").read_text(encoding="utf-8")
     guide_html = GUIDE_HTML.read_text(encoding="utf-8")
     deployment = DEPLOYMENT_MD.read_text(encoding="utf-8")
@@ -1144,7 +1145,7 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
     them, in other words, as a flip, or hidden by entities, soft hyphens, zero-width characters, look-alike letters or
     full-width forms), finds it; and finds a checklist without refcheck's rule for PROVEN."""
     refcheck = _refcheck()
-    cap = (ROOT / "applet" / "target" / "cashu-javacard-3.1.0.cap").read_bytes()
+    cap = (ROOT / "applet" / "target" / "cashu-javacard-3.2.0.cap").read_bytes()
     md = (ROOT / "website" / "dist" / "guide.md").read_text(encoding="utf-8")
     html_ = GUIDE_HTML.read_text(encoding="utf-8")
     hd = DEPLOYMENT_MD.read_text(encoding="utf-8")
@@ -1218,8 +1219,8 @@ def test_the_untried_rule_finds_each_planted_claim_in_the_three_files():
         ("md", s, s + " It was \uff49nstalled."),
         ("hd", "adds its answer to\nrefcheck's table.", "adds its answer to\nrefcheck's table. On 2026-11-14 this exact "
                f"{size:,}-byte file installed on a J3R180 and passed its chip run."),
-        ("md", "## Rules", "## Rules\n\nThe 3.1 file installed and passed its chip run on a J3R180; it is safe to install.\n"),
-        ("html", "</body>", "<p>The 3.1 build has since been verified on the chip.</p></body>"),
+        ("md", "## Rules", "## Rules\n\nThe 3.2 file installed and passed its chip run on a J3R180; it is safe to install.\n"),
+        ("html", "</body>", "<p>The 3.2 build has since been verified on the chip.</p></body>"),
         ("hd", "## Install", "## Install\n\nThis exact file is ready for cards.\n"),
         # what the run of an earlier file did not cover, and the words a file tried somewhere is said in
         ("md", s, s + " The fix-15 file was tried on the bench J3R180 and every payment worked."),

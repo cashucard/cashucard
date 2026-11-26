@@ -72,7 +72,9 @@ an owner claimed, or a history read ([Session State](#session-state-transient)).
 | Data | `F0 43 41 53 48 55 43 41 52 44 01` (the card's applet: the package AID, "CASHUCARD" after the proprietary RID byte `F0`, and `01`) |
 | Le | `00` |
 
-**Response:** 2 bytes, the applet version, the major then the minor: `03 01` (3.1:
+**Response:** 2 bytes, the applet version, the major then the minor: `03 02` (3.2:
+3.1's wire with the review's fixes, quicker writes and one more profile bit, GET_INFO
+byte 56 bit 2, [D244](../docs/DECISIONS.md#d244); `03 01` is 3.1:
 3.0's wire with the wait over the limit made a rate and the held taps of a card with no
 owner shorter, [D231](../docs/DECISIONS.md#d231) and [D232](../docs/DECISIONS.md#d232);
 `03 00` is 3.0, whose waits are longer, and which a reader reads the same way). The
@@ -226,13 +228,13 @@ and c, with BIP-39's test words.
 A card is set up in one tap, owner last ([Personalisation](#personalisation)):
 `SET_PIN`, `VERIFY_PIN`, `SET_CARD` (the mint), then the owner's claim
 (`SET_OWNER` P1 = `01` with the owner's c, then `SET_OWNER`, carrying
-the tip block header as its anchor and the c's check). On a 3.1 card the `VERIFY_PIN`
+the tip block header as its anchor and the c's check). On a 3.1 or 3.2 card the `VERIFY_PIN`
 may be left out: a card's first PIN stands as given for the selection that set it
-([D235](../docs/DECISIONS.md#d235), 3.1 only). A 3.0 card needs it, and answers `6982`
+([D235](../docs/DECISIONS.md#d235), 3.1 and later). A 3.0 card needs it, and answers `6982`
 at `SET_CARD` without it. A reader may always send it, to either version. The claim is
 one asking right after `SET_CARD` in the same tap ([D221](../docs/DECISIONS.md#d221)),
-and on 3.1 only on a card that has never had a PIN
-([D234](../docs/DECISIONS.md#d234), [D236](../docs/DECISIONS.md#d236)). A 3.1 card that
+and on 3.1 and 3.2 only on a card that has never had a PIN
+([D234](../docs/DECISIONS.md#d234), [D236](../docs/DECISIONS.md#d236)). A 3.1 or 3.2 card that
 has had a PIN is asked four times, `6A98` to the first three
 ([SET_OWNER](#set_owner-0x43)), so a reader asks until `9000` on both. A card
 with no PIN takes nothing, and an owner is claimed only under the PIN.
@@ -334,14 +336,14 @@ payment ([The clock and the limits](#the-clock-and-the-limits)), bit 4
 [a holder with no phone](#a-holder-with-no-phone), bit 6
 [keyset keys](#keyset-keys), bit 7 [the paid list](#the-paid-list). Byte 56: bit 0
 [the certificate](#the-certificate), bit 1 [keys per load](#keys-per-load), bit 2
-(3.2, [D244](../docs/DECISIONS.md#d244)) the field's arithmetic over p: the chip's powers
-held to their known answers at this set-up life's first `SET_CARD`, so a compressed C
-is held to the curve as quickly as a whole one and a loader need not send the longer
-form ([D212](../docs/DECISIONS.md#d212)); it is `0` before that `SET_CARD`, after a
-reset, on a chip whose answers did not hold, and on every card before 3.2; bits 3
+the field over p (3.2, [D244](../docs/DECISIONS.md#d244)): the chip's powers held to their
+known answers at this set-up life's first `SET_CARD`, so a compressed C is held to the
+curve as quickly as a whole one and a loader need not send the longer form
+([D212](../docs/DECISIONS.md#d212)); it is `0` before that `SET_CARD`, after a reset, on a
+chip whose answers did not hold, and on every card before 3.2; bits 3
 to 7 are `0`. Byte 55 bit 3 is `0` on every 3.0 card: 3.0 keeps no wait on a
 payment within its limit (D211, D228), and a file that set it answered `FF 03`. A 3.0
-card from this repository answers `F7 03`; byte 55
+card from this repository answers `F7 03` (a 3.2 card `F7 07` once its first `SET_CARD` has found the field over p); byte 55
 bit 7 is `0` as well (`77 03`) on a card whose record is set (byte 11 = `01`) and whose first
 `SET_CARD` could not reserve the paid list: such a card refuses every `LOAD_PROOF`
 (`6A84`), and a loader reads the bit before it swaps ([Keys per load](#keys-per-load)). A card that answers less than 57 bytes to P1 = 4 keeps
@@ -2139,14 +2141,27 @@ otherwise), becomes the clock even where it is older than the card's
 one header ([A header far ahead](#set_header-0x36)), and the day of loads, cleared
 with the rest, begins again at the next load.
 
-One transaction: the owner's flag, c (the owner's, with n, or on a replacement a
-new one drawn), the settlement record let go and the history and the new PIN marked
-owed on a replacement, the anchor (on a replacement the clock, whether it is weak and
-the hardest bits alone: what else it would write, the hand-over clears), and the key
-last (9 writes and 113 bytes at the most for a hand-over, at a weak clock with a day's window begun with no clock, an anchor harder than the hardest and the owner's c; a claim at its worst, with a far clock, the day's window and the day of loads begun at it and a no-PIN window begun with no clock, 12 and 156, [D204](../docs/DECISIONS.md#d204)). What a hand-over loses (the
-list above) is cleared after it, and again by the next command if the card left the
-field first, before anything reads it. One the chip's transaction cannot hold is `6A96`, with nothing written: the
-card is as it was, and a claim is asked again from its first asking.
+A claim is one transaction: the owner's flag, c where the owner gives its own (with n),
+the anchor, and the key last (a claim at its worst, with a far clock, the day's window
+and the day of loads begun at it and a no-PIN window begun with no clock, 12 writes and
+156 bytes, [D204](../docs/DECISIONS.md#d204)). One the chip's transaction cannot hold is
+`6A96`, with nothing written: the card is as it was, and the claim is asked again from
+its first asking.
+
+A hand-over (an owner replaced) is two transactions since 3.2
+([D244](../docs/DECISIONS.md#d244)). The first: c (the next owner's, with n, or a new one
+drawn), the settlement record let go, and the history, the spent places and a new PIN
+marked owed (4 writes and 38 bytes). The second: the owner's flag, the anchor (the clock,
+whether it is weak and the hardest bits alone: what else it would write, the hand-over
+clears) and the key last. A chip whose key writes take no part in a transaction then
+never gives the next owner the last owner's c. What a hand-over loses (the list above) is
+cleared after the first, and again by the next command if the card left the field
+first, before anything reads it. A `6A96` there says the second transaction did not fit
+or the first did not: after the first, the card is still the last owner's, empty, under
+its key, with its history and spent places gone, a new PIN owed and a c its phone did
+not draw (where the next owner gave its own c, that one). The same answer, or a card
+torn between the two, leaves it so: the last owner asks the hand-over again, and its
+phone reads c again (`GET_CARD` P1 = `03`) before it locks a load to the card's keys.
 
 In order: `6986` locked; `6B00` for a P2 other than `00`, or a P1 other than `00` and `01` (P1 = `01` as above);
 owned, `6A91` with no good proof; a claim, `6A97` with no
@@ -2247,7 +2262,12 @@ openings, every entry of the keyset table free, the NFC tag on, a new PIN key.
 **The card key:** a card whose certificate is sealed keeps its card key, its
 certificate and its paid list ([The certificate](#the-certificate),
 [D192](../docs/DECISIONS.md#d192)); any other card makes a new card key and starts
-an empty paid list. Every card draws a new secret c, written in the reset's last
+an empty paid list. Since 3.2 ([D244](../docs/DECISIONS.md#d244)) the new keys (the card
+key where no certificate keeps it, and the PIN key) are drawn after the reset's last
+transaction, which marks them owed: a card that leaves the field before they are drawn
+draws them at its next command, before anything (`SELECT` and `GET_PUBKEY` among them)
+reads a key. Torn before that transaction, the card is the old card under its old key.
+Every card draws a new secret c, written in the reset's last
 transaction ([Keys per load](#keys-per-load)): the next holder's keys are not the
 last's. It is never the owner's: the reset ends the ownership, and the next claim
 brings the next owner's c; the count of the owners' c the card has taken stays
@@ -3106,7 +3126,7 @@ tell it is the same card under every holder, and no reset changes that.
 | 6A91 | The owner's proof missing, wrong or used, or a command not open to an owned card; on a card with no owner past its first set-up, a record (`SET_CARD`), a number (`SET_LIMIT_PIN`) or a claim (`SET_OWNER`), which are set once |
 | 6A93 | Too little work in a block header |
 | 6A94 | A piece already on the card or on the paid list (`LOAD_PROOF`), or an opening's piece already on it; the PIN needed for this payment (`SPEND_ALL_SIGN`: an allowance of 0 or a blocked PIN; `SPEND_ALL_BEGIN`: a sum past four bytes with a PIN set and not given) |
-| 6A96 | Too many places for one signature; a payment's, a record's (`SET_CARD`) or an owner's (`SET_OWNER`) transaction the chip cannot hold, nothing written |
+| 6A96 | Too many places for one signature; a payment's, a record's (`SET_CARD`) or a claim's (`SET_OWNER`) transaction the chip cannot hold, nothing written; on a hand-over (`SET_OWNER`, 3.2), the second transaction may not have fit after the first committed: the card is the last owner's, with what the hand-over clears gone ([SET_OWNER](#set_owner-0x43)) |
 | 6A97 | No PIN: the card takes and pays nothing until it is given one |
 | 6A98 | Keep holding: a held count not yet through (an owner's claim, a history, a reset by the PIN, the PIN's wait on a card with no owner); send the same command again |
 | 6A99 | No rate: a payment or a load of the other unit, or a new unit (`SET_CARD`, on a card with a holder's record), on a card with a limit set and no rate |

@@ -23,24 +23,31 @@ test('installation follows the load file this build carries, never a bare switch
   expect(loadFileValidated('')).toBe(false);
 });
 
-test('the released 3.1 load file is validated, with the owner approval of 2026-11-24', () => {
-  // 42,741 bytes, 3.1 with D236's review fixes, released as firmware-v3.1.0. Installed and paid from at a test mint on
-  // three chips on 2026-11-23 with GlobalPlatformPro and tools/cardctl, not this app; two of the runs are counted on the
-  // contributor's logs (D238). The owner approved it for build 16 (ENG-870). The files before it (9ed12359...,
-  // 99a66ba7..., d69742d0...) are on refcheck's PROVEN but were never approved here, and stay off the list.
-  expect(CASHU_LOAD_FILE.size).toBe(42741);
+test('the tracked 3.2 load file waits for a chip run and the owner; the released 3.1 file stays approved', () => {
+  // 43,765 bytes, 3.2 (D244): it has run only in a simulator, so it is not on the list, and this build installs
+  // nothing until a chip run and the owner's approval add it in a change of their own. 3.1 (42,741 bytes, D236's
+  // review fixes, released as firmware-v3.1.0) was installed and paid from at a test mint on three chips on 2026-11-23
+  // with GlobalPlatformPro and tools/cardctl, not this app; two of the runs are counted on the contributor's logs
+  // (D238). The owner approved it for build 16 (ENG-870). The files before it (9ed12359..., 99a66ba7...,
+  // d69742d0...) are on refcheck's PROVEN but were never approved here, and stay off the list.
+  expect(CASHU_LOAD_FILE.size).toBe(43765);
   expect(CASHU_LOAD_FILE.sha256).toBe(
-    'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
+    'ecb9a8378896f5105966fd0c06c9eae10984da66bcc0739dd829d12ad2b5865f',
   );
-  expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(true);
+  expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(false);
+  expect(
+    loadFileValidated(
+      'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
+    ),
+  ).toBe(true);
   expect(VALIDATED_LOAD_FILE_SHA256S).toEqual([
     'fe7d8ac31be1284f8a9a6d031cdee9b4690f8d02e0a9ab1fa3bac645f6bc13ee',
     '28ddfb9d47af16e565f565149a91fddfa7af94ca4bed0ef686e7a6c2fe0285d3',
     'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da',
   ]);
-  // installation still wants a maker of its own (D239): with none saved on the phone it stays off
-  // (installGate.test.ts has every case)
-  expect(LOAD_FILE_VALIDATED).toBe(true);
+  // so this build installs nothing (D74); and installation still wants a maker of its own (D239): with none saved on
+  // the phone it stays off (installGate.test.ts has every case)
+  expect(LOAD_FILE_VALIDATED).toBe(false);
   expect(
     installGate({
       loadFileValidated: LOAD_FILE_VALIDATED,

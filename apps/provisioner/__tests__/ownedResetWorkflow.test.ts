@@ -151,10 +151,11 @@ test('a card owed change, a 3.0 or 3.1 card with spent entries, or a review with
     expect(JSON.parse(f.raw()!).review.version).toBe(version);
   }
 });
-test('only 3.0 and 3.1 are of the 3.x line, and a review of any other version is never begun', async () => {
+test('only 3.0, 3.1 and 3.2 are of the 3.x line, and a review of any other version is never begun', async () => {
   expect(threeLine('3.0')).toBe(true);
   expect(threeLine('3.1')).toBe(true);
-  for (const version of ['3.2', '3.10', '3.01', '3.1.0', '3', '4.0', '2.3', '']) {
+  expect(threeLine('3.2')).toBe(true);
+  for (const version of ['3.3', '3.10', '3.01', '3.1.0', '3', '4.0', '2.3', '']) {
     expect(threeLine(version)).toBe(false);
     const f = fixture();
     const w = await OwnedResetWorkflow.open(f.storage);

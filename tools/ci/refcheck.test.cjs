@@ -205,34 +205,32 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
   assert.match(source, /40412: True/);
 });
 
-// The tracked CAP is 3.1 with D236's review fixes on top of bab8c5a's 3.1 file: a load file of 42,741 bytes, padded by
-// sizeTheFile to 245 past a multiple of 256, the place of every 3.x file card 58206920 (a J3R180 keyed for SCP03, D229)
-// installed. The card installed it at the first try on 2026-11-23 and paid from it at testnut with real signatures and real
-// change verified on the chip (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md), so its hash is on
-// PROVEN and its size in SIZES. The files before it stay on PROVEN as their own: 541aaef's 3.0 with D228's review fixes
-// (99a66ba7..., run on 2026-11-22, docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md), bab8c5a's 3.1
-// (9ed12359...), 9ac55c1's 3.0 (d69742d0...) and 330ffa1's 3.1 (4014e7f1...).
-test("the tracked 3.1 CAP's load file (D236) has run on a chip: its hash is on PROVEN and not on INSTALLED, and 99a66ba7, 9ed12359, d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
-  const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.1.0.cap");
+// The tracked CAP is 3.2 (D244): the 3.1 file with the 3.1 review's applet fixes and quicker writes, a load file of 43,765
+// bytes, padded by sizeTheFile to 245 past a multiple of 256, the place in its page of the earlier 3.x files. It has run
+// only in a simulator: its hash is on neither PROVEN nor INSTALLED, and its size is in no SIZES row. The released 3.1
+// file (D236, b2afa9a8..., 42,741 bytes) stays on PROVEN with its size in SIZES: card 58206920 installed it at the first
+// try on 2026-11-23 and paid from it at testnut with real signatures and real change verified on the chip
+// (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). The files before it stay on PROVEN as their own:
+// 541aaef's 3.0 with D228's review fixes (99a66ba7...), bab8c5a's 3.1 (9ed12359...), 9ac55c1's 3.0 (d69742d0...) and
+// 330ffa1's 3.1 (4014e7f1...).
+test("the tracked 3.2 CAP's load file (D244) has run only in a simulator, its size untried; the released 3.1 file (D236) and 99a66ba7, 9ed12359, d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
+  const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.2.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 42741 bytes \(245 past a multiple of 256\)/);
+  assert.match(r.stdout, /load file: 43765 bytes \(245 past a multiple of 256\)/);
   const sha = r.stdout.match(/load file sha256: ([0-9a-f]{64});/);
   assert.ok(sha, r.stdout);
-  assert.equal(sha[1], "b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da", "the tracked file is D236's");
-  assert.match(r.stdout, /; this exact file has run on a chip\.\n/, "the tracked file says it has run on a chip");
-  assert.doesNotMatch(r.stdout, /run only in a simulator/);
-  // the line refcheck prints for 42,741 bytes, exactly: SCP03_ONLY does not list the size, so it is the general line, not
-  // the SCP03 card's; the size has installed on a J3R180 keyed for SCP03, on one keyed for SCP02 and on a J3R452 (D238)
-  assert.match(r.stdout, /; this exact file has run on a chip\.\na size known to install on the chip\.\n$/, "the size is one known to install");
-  assert.doesNotMatch(r.stdout, /not yet tried on a chip/, "and its size is known");
+  assert.equal(sha[1], "ecb9a8378896f5105966fd0c06c9eae10984da66bcc0739dd829d12ad2b5865f", "the tracked file is D244's");
+  assert.match(r.stdout, /; this exact file has run only in a simulator so far, and no card has installed it or a file of its size\.\n/, "the tracked file says it has run only in a simulator");
+  assert.match(r.stdout, /not yet tried on a chip/, "and its size is not known");
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));
   const installed = source.slice(source.indexOf("\nINSTALLED = {"), source.indexOf("\n}", source.indexOf("\nINSTALLED = {")));
   assert.ok(proven.length > 1000, "PROVEN is read");
-  assert.match(proven, /'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da': '3\.1 with D236[^;]*42,741 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "the tracked file's hash is on PROVEN, with PROVEN_NEEDS's words");
-  assert.ok(!installed.includes(sha[1]), "and not on INSTALLED");
-  assert.match(source, /^ {4}42741: True,/m, "its size is in SIZES");
+  assert.ok(!proven.includes(sha[1]) && !installed.includes(sha[1]), "the tracked file's hash is on neither PROVEN nor INSTALLED");
+  assert.doesNotMatch(source, /^ {4}43765:/m, "nor its size in SIZES");
+  assert.match(proven, /'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da': '3\.1 with D236[^;]*42,741 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "the released 3.1 file's hash stays on PROVEN, with PROVEN_NEEDS's words");
+  assert.match(source, /^ {4}42741: True,/m, "and its size in SIZES");
   assert.match(proven, /'99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536': '3\.0 with the review fixes of D228[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "541aaef's 3.0 file stays on PROVEN as its own");
   assert.match(proven, /'9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "bab8c5a's 3.1 file stays on PROVEN as its own");
   assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the 3.0 file before it stays on PROVEN as its own, with PROVEN_NEEDS's words");

@@ -191,7 +191,7 @@ test("passes on a guard's reason, and says what each success means", () => {
   ).toContain('answered HELLO');
   expect(
     describeResult('cashu', {...result({}), ok: true, phase: 'done'}, 'Done'),
-  ).toContain('03 01');
+  ).toContain('03 02');
 });
 
 test("names a session that never reached the card, by the NFC library's own error classes", () => {

@@ -145,7 +145,7 @@ PIN_STATE_NAMES = {0: "none", 1: "set", 2: "blocked"}
 SELFTEST_MIN_VERSION = (2, 1)
 # The versions selftest knows, and so passes: a later minor of a major it knows,
 # or a later major, is not passed on trust.
-SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0), (3, 1))
+SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0), (3, 1), (3, 2))
 # The majors cardctl speaks outside the card file tools: those of SELFTEST_VERSIONS.
 PROTOCOL_MAJORS = tuple(sorted({v[0] for v in SELFTEST_VERSIONS}))
 # The versions cardctl drives a card as (`driven_as`, `connect`): those selftest knows, and 2.0, the release D26
@@ -179,6 +179,7 @@ PROFILE_NAMES = (
     (55, 0, "PIN before money"), (55, 1, "the no-PIN window"), (55, 2, "the owner claimed slowly"),
     (55, 3, "the wait on every payment"), (55, 4, "two units on one card"), (55, 5, "a holder with no phone"),
     (55, 6, "keyset keys"), (55, 7, "the paid list"), (56, 0, "the certificate"), (56, 1, "keys per load"),
+    (56, 2, "the field over p"),  # 3.2 (D244): set once the first SET_CARD has found the chip's arithmetic over p
 )
 LAST_UNIT_NAMES = {0x00: "none", 0x80: "the card's", 0xA0: "the other"}
 
@@ -3617,11 +3618,11 @@ def _versions_said(versions, last: str) -> str:
 def _select_verdict(version: bytes) -> Tuple[bool, str]:
     """
     Whether the applet version SELECT answered is a build selftest can pass:
-    protocol 2.1, 2.2, 3.0 or 3.1 (SELFTEST_VERSIONS). The shared AID (D19)
+    protocol 2.1, 2.2, 3.0, 3.1 or 3.2 (SELFTEST_VERSIONS). The shared AID (D19)
     answers nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26
     replaced: it is reinstalled. A later minor of a major this tool knows (2.3,
-    3.2), or a later major (4.0), is one it does not know, and is refused. That
-    is a statement about the test, not the wire: a 3.2 is still driven as 3.x by
+    3.3), or a later major (4.0), is one it does not know, and is refused. That
+    is a statement about the test, not the wire: a 3.3 is still driven as 3.x by
     the other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
     before the renumbering, is not, and is said so here.
     """

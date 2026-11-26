@@ -1055,10 +1055,24 @@ def test_selftest_fails_a_blocked_pin_and_names_the_owners_change_pin():
 
 
 def test_selftest_fails_a_card_of_a_version_it_does_not_know():
-    for version in ((1, 20), (0, 6), (2, 0), (2, 3), (3, 2), (4, 0)):
+    for version in ((1, 20), (0, 6), (2, 0), (2, 3), (3, 3), (4, 0)):
         rc, out = run_selftest(FakeApplet(version=version, pin_state=0))
         assert rc == 1, (version, out)
         assert "FAIL  SELECT applet" in out, out
+
+
+def test_selftest_passes_a_3_2_card_whose_byte_56_says_the_field_over_p():
+    """3.2 (D244): SELECT and GET_INFO answer 03 02, and GET_INFO P1 = 4's byte 56 is 07 once the first SET_CARD has found
+    the field over p (bit 2), 03 before: selftest passes both, and names the bit."""
+    for byte56 in (0x03, 0x07):
+        applet = FakeApplet(version=(3, 2), pin_state=0)
+        info = bytearray(applet.info_59)
+        info[56] = byte56
+        applet.info_59 = bytes(info)
+        rc, out = run_selftest(applet)
+        assert rc == 0, (byte56, out)
+        assert "PASS  SELECT applet  — version 3.2" in out and "PASS  keys per load (GET_INFO byte 56 bit 1)" in out, out
+    assert cardctl.decode_info(applet.info_59)["profiles"][-1] == "the field over p"
 
 
 def test_selftest_fails_a_card_whose_signatures_repeat_their_nonce():
@@ -1067,19 +1081,20 @@ def test_selftest_fails_a_card_whose_signatures_repeat_their_nonce():
     assert "FAIL  fresh nonce across identical requests" in out, out
 
 
-def test_select_verdict_passes_only_2_1_2_2_3_0_and_3_1():
+def test_select_verdict_passes_only_2_1_2_2_3_0_3_1_and_3_2():
     assert cardctl._select_verdict(bytes([2, 1])) == (True, "version 2.1")
     assert cardctl._select_verdict(bytes([2, 2]))[0] is True
     assert cardctl._select_verdict(bytes([3, 0])) == (True, "version 3.0")
     assert cardctl._select_verdict(bytes([3, 1])) == (True, "version 3.1")
+    assert cardctl._select_verdict(bytes([3, 2])) == (True, "version 3.2")
     # 2.0 is the v2.0.0 release, whose day a payment of nothing rolled (D26): swept and reinstalled
     for version in (bytes([2, 0]), bytes([1, 20]), bytes([0, 6])):
         ok, detail = cardctl._select_verdict(version)
-        assert ok is False and "not protocol 2.1, 2.2, 3.0 or 3.1:" in detail and "reinstall the tracked CAP" in detail, detail
+        assert ok is False and "not protocol 2.1, 2.2, 3.0, 3.1 or 3.2:" in detail and "reinstall the tracked CAP" in detail, detail
     # a later minor of a major this tool knows, or a later major, is a version it does not know: refused, not passed
-    for version in (bytes([3, 2]), bytes([4, 0])):
+    for version in (bytes([3, 3]), bytes([4, 0])):
         ok, detail = cardctl._select_verdict(version)
-        assert ok is False and "a version this cardctl does not know (it knows 2.1, 2.2, 3.0 and 3.1)" in detail, detail
+        assert ok is False and "a version this cardctl does not know (it knows 2.1, 2.2, 3.0, 3.1 and 3.2)" in detail, detail
     # a 2.x above 2.2 is no release: 02 03 is 3.0's wire before its renumbering (D205), said as such
     for version in (bytes([2, 3]), bytes([2, 4]), bytes([2, 0xFF])):
         ok, detail = cardctl._select_verdict(version)
@@ -3720,7 +3735,7 @@ def test_connect_takes_every_minor_of_3_as_3_0_and_the_known_versions_as_before(
             assert err == "", err
             assert got.at_least(3, 0) == (answer[0] == 3)
     assert cardctl.driven_as(b"\x03\x01") == (3, 1) and cardctl.driven_as(b"\x02\x03") is None
-    assert cardctl._select_verdict(b"\x03\x01")[0] is True and cardctl._select_verdict(b"\x03\x02")[0] is False
+    assert cardctl._select_verdict(b"\x03\x02")[0] is True and cardctl._select_verdict(b"\x03\x03")[0] is False
     for answer in (b"\x04\x00", b"\x01\x14"):
         for command in ("load", "info"):
             got, _, _ = _connect_with(answer, command)

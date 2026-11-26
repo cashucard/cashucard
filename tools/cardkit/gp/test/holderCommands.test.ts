@@ -141,6 +141,7 @@ test('invalid proof, wrong applet and refused owner command never retry', async 
     [2, 4],
     [3, 0],
     [3, 1],
+    [3, 2],
     [4, 0],
   ]) {
     const version = fixture();

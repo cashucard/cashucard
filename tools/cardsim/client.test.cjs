@@ -69,7 +69,7 @@ test("select uses the applet's 11-byte AID, F0 CASHUCARD 01, with the 10-byte pa
   assert.deepEqual(constants.APPLET_AID, Buffer.concat([constants.PACKAGE_AID, Buffer.from([0x01])]))
   assert.deepEqual(constants.OLD_AIDS.upstream0x, hex("D2760000850102"))
   assert.deepEqual(constants.OLD_AIDS.foxy1x, hex("F0464F585943415244"))
-  assert.deepEqual(constants.VERSION, { major: 3, minor: 1 }, "SELECT answers 03 01")
+  assert.deepEqual(constants.VERSION, { major: 3, minor: 2 }, "SELECT answers 03 02")
 })
 
 test("the INS of 3.0 (spec/APDU.md, Commands, by INS)", () => {
@@ -910,7 +910,7 @@ async function setUp(sim, extra = {}) {
   return { P: fresh.pubkey, ...keys }
 }
 
-test("the bridge answers both SELECTs as the chip does: the whole AID 03 01, the package AID the opener's bare 9000", integration, async () => {
+test("the bridge answers both SELECTs as the chip does: the whole AID 03 02, the package AID the opener's bare 9000", integration, async () => {
   const sim = new CardSim(URL)
   await sim.waitReady()
   await sim.reset()
@@ -920,13 +920,13 @@ test("the bridge answers both SELECTs as the chip does: the whole AID 03 01, the
   assert.equal((await sim.apdu(encode.getInfo())).sw, constants.SW.INS_NOT_SUPPORTED, "and refuses the next command")
   const whole = await sim.apdu(encode.select(constants.APPLET_AID))
   assert.equal(whole.sw, constants.SW.OK)
-  assert.deepEqual(whole.data, Buffer.from([3, 1]))
+  assert.deepEqual(whole.data, Buffer.from([3, 2]))
   const info = await sim.getInfo()
-  assert.equal(info.version, "3.1")
+  assert.equal(info.version, "3.2")
   assert.equal(info.keysPerLoad, true, "GET_INFO P1 4 byte 56 bit 1")
-  assert.equal(info.profilesRaw, 0xf703, "every profile but the wait on every payment (D228)")
+  assert.equal(info.profilesRaw, 0xf703, "every profile but the wait on every payment (D228); byte 56 bit 2, the field over p, waits for the first SET_CARD (D244)")
   await sim.apdu(encode.select(constants.PACKAGE_AID))
-  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 2 })
 })
 
 test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the owner's changePin → verifyPin; a card with no PIN takes nothing (6A97)", integration, async () => {
@@ -935,8 +935,8 @@ test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the ow
   const fresh = await sim.reset()
   assert.equal(fresh.pubkey.length, 66)
   assert.equal(fresh.slots.length, 128)
-  assert.equal(fresh.version, "3.1")
-  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
+  assert.equal(fresh.version, "3.2")
+  assert.deepEqual(await sim.select(), { major: 3, minor: 2 })
   await assert.rejects(sim.loadProof("0059534ce0bfa19a", 8, "11".repeat(32), pointHex(5)), e => e instanceof CardError && e.sw === constants.SW.NO_PIN)
   await assert.rejects(sim.spendAllBegin([0]), e => e.sw === constants.SW.NO_PIN)
   const state = await sim.fixture({ pin: "1234", mint: "http://m", owner: true, blockedPin: true })

@@ -213,7 +213,7 @@ export function cashuPlan(
     sweep: [TAG_AID, CARD_AID, OPENER_AID, CASHU_PACKAGE_AID],
     guard: CARD_AID,
     checks: [
-      // the whole AID, never the package AID (D25): the tracked CAP's version, 03 01
+      // the whole AID, never the package AID (D25): the tracked CAP's version, 03 02
       {apdu: selectAid(CARD_AID), data: [...CARD_VERSION]},
       {apdu: GET_INFO, length: 30},
       {apdu: GET_PUBKEY, length: 33},
@@ -514,7 +514,7 @@ export function notEmpty(info: Bytes): string | null {
   }
   if (
     info[0] === 3 &&
-    (info[1] === 0 || info[1] === 1) &&
+    (info[1] === 0 || info[1] === 1 || info[1] === 2) &&
     changeOwedByte(info)
   ) {
     return 'it is owed change that has not come back to it yet';

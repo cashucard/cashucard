@@ -11,7 +11,7 @@ authorities. Do not generate replacement signing keys to make CI pass.
 
 | Component   | Current manifest identity                                        | New release tag              |
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
-| Firmware    | `applet/pom.xml`: 3.1.0; tracked CAP `cashu-javacard-3.1.0.cap`, APDU version 3.1 | `firmware-v3.1.0`            |
+| Firmware    | `applet/pom.xml`: 3.2.0; tracked CAP `cashu-javacard-3.2.0.cap`, APDU version 3.2 (not released) | `firmware-v3.2.0` (after a chip run) |
 | cardkit     | `tools/cardkit/package.json`: 0.5.0                              | `cardkit-v0.5.0`             |
 | Ops-service | `ops/package.json`: 0.2.1                                        | `ops-v0.2.1`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 17                  | `provisioner-v1.0.0-build.17` |
@@ -35,10 +35,10 @@ file (`firmware-v3.1.0`, load file sha256 `b2afa9a8…`) on the app's list of ap
 3.0 and 3.1 cards; the new name (#265); the card maker's name and tag address set in the app, with no maker built in (D239,
 #267); and the "Other mint…" cell (ENG-857, #251). On 2026-11-24 the operator installed the released 3.1 file with a development-signed build of build 16 (commit `a5ed77e`) on a J3R180 keyed for SCP02 and on a J3R452 keyed for SCP03 (`reports/HARDWARE_TEST_REPORT_2026-11-24_setup-build-16.md`). Not shown: an install on a J3R180 keyed for SCP03, and an install by the released files themselves (they differ from that build by one display fix, #269).
 
-Firmware 3.1.0 is the first released card version of the 3.x line: 3.0 is never released, and no `firmware-v3.0.0` tag
+Firmware 3.2.0 (D244) is the tracked file: it has run only in a simulator so far, and no card has installed it or a file of its size; it is released only after a chip run. Firmware 3.1.0 is the first released card version of the 3.x line: 3.0 is never released, and no `firmware-v3.0.0` tag
 will be cut (D237). 3.0 is the 3.0 wire after the merge of 2026-11-19: `SELECT` and `GET_INFO`
 answer `03 00`, and the decisions are D183 to D230 (spec/APDU.md); it is a development step, as 2.3 was. Firmware 3.1.0 is
-3.0's wire answered sooner (`03 01`, D231 to D237). The tracked `cashu-javacard-3.1.0.cap` (load file `b2afa9a8…`, with
+3.0's wire answered sooner (`03 01`, D231 to D237). The `cashu-javacard-3.1.0.cap` tracked until 3.2 (load file `b2afa9a8…`, with
 D236's review fixes) was installed and paid from at a test mint on card 58206920, a J3R180 keyed for SCP03 according to
 the card's supplier, on 2026-11-23 (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). The same day it was installed and paid from at
 a test mint on a J3R452, card 36813121, and on a J3R180 keyed for SCP02, card 09334220: runs the owner counts on the

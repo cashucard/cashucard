@@ -140,7 +140,7 @@ async function block37(): Promise<number> {
     true,
   );
   const loads = clean.log.flatMap((a, i) => (a[1] === 0xe8 ? [i] : []));
-  expect(loads).toHaveLength(174);
+  expect(loads).toHaveLength(178);
   return loads[36];
 }
 

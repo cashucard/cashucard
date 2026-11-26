@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 /**
  * D244: the fixes of 3.2 from the outside review of 3.1 at de39f68. A reset torn anywhere is the old card or a new one, never
  * the old owner under a new card key (APP-H1); a reset clears the self-tests' verdicts (APP-M2); a forgotten PIN's replacement
- * frees the spent places and draws a new c (APP-M1); a hand-over on a chip whose key writes take no part in a transaction
+ * frees the spent places, keeping c and the paid list (APP-M1, in part); a hand-over on a chip whose key writes take no part in a transaction
  * never gives the next owner the last owner's c (APP-M5); LOAD_CHANGE refuses an s at or over n (APP-L5). The tear harness
  * draws a key pair of its own at every genKeyPair here (`TearHook.freshKeys`), which jCardSim's generator does not.
  */
@@ -255,6 +255,28 @@ class ReviewFixes32Test {
         assertTrue(small <= 1, "and no other write but the descriptor's mark: " + small);
         ResponseAPDU scope = c.send(new CommandAPDU(CLA, 0x1B, 0, 0, 256));
         assertEquals(SW_OK, scope.getSW(), "the record is there");
+    }
+
+    @Test
+    @DisplayName("D244: on a chip that refuses the staged outputs' RAM, SET_CARD keeps them in persistent memory as 3.1 did, the payment writes its record, and the payment sweep holds: torn anywhere, the record is whole or none")
+    void theStagedOutputsInPersistentMemoryWhereTheChipRefusesRam() throws Exception {
+        TearHook.refuseTransientLen = CashuApplet.OUT_STAGE_LEN;
+        try {
+            TearSweepTest.Card c = new TearSweepTest.Card();
+            readyWithTwo(c, 0);
+            byte[] stage = c.f("outStage");
+            assertNotNull(stage, "the staged outputs kept");
+            assertEquals(javacard.framework.JCSystem.NOT_A_TRANSIENT_OBJECT, javacard.framework.JCSystem.isTransient(stage), "in persistent memory");
+            assertEquals(64, pay(c).getData().length, "paid, with change");
+            assertEquals(1, c.f("outbox")[0], "the record written");
+            assertEquals(SW_OK, c.send(new CommandAPDU(CLA, 0x1B, 0, 0, 256)).getSW(), "and served");
+            // the whole payment sweep (TearSweepTest.payment) on this card: every tear, the record whole or none, never a mix
+            TearSweepTest.REF_BODY[0] = null;
+            new TearSweepTest().payment();
+        } finally {
+            TearHook.refuseTransientLen = -1;
+            TearSweepTest.REF_BODY[0] = null;
+        }
     }
 
     // ---- PERF-CARD-05: B_'s y kept, LOAD_CHANGE one transaction ---------------------------------------------------------------

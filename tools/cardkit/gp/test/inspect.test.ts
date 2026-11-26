@@ -162,7 +162,7 @@ test('unknown versions, malformed responses and card refusal stop without retrie
     [ok([2, 0])],
     [ok([2, 3])],
     [ok([2, 4])],
-    [ok([3, 2])],
+    [ok([3, 3])],
     [ok([4, 0])],
     [ok([2, 1, 0])],
     // a 3.0 card's GET_INFO saying 2.x
