@@ -194,8 +194,9 @@ compromised or truncated download.
         </javacard>
         <echo message="CAP file: ${cap.file} (three applets: install the opener first, and make the tag under the NFC Forum's name)"/>
         <!-- The Descriptor and Debug components are for tools off the card; the chip keeps nothing of them, so they
-             are taken out to shorten the load. Then the file's size is checked against what the chip installs
-             (docs/CASHU-CARD-HARDWARE.md): the opener first, and a size in the window of each 256 bytes. -->
+             are taken out to shorten the load. Then the file is checked against what the chip installs
+             (docs/CASHU-CARD-HARDWARE.md): the opener first, and where the package as the chip keeps it ends in its
+             256-byte page (D256). -->
         <exec executable="python3" dir="${basedir}/.." failonerror="true">
             <arg value="tools/stripcap.py"/>
             <arg value="applet/${cap.file}"/>

@@ -10180,3 +10180,76 @@ powers of the chip's RSA (the cube and Euler's test, about 2 × 7.8 ms with D247
 given its key) before D255, none after. The 65-byte form: one key agreement (about 20 ms of curve work; its init once a
 selection with D251) and 32 more bytes a piece on the wire; measured on the test card, `LOAD_PROOF` in the 04 form 115.6 ms
 at 3.2 and 107.0 ms with D251.
+
+## <a id="d256"></a>D256: Where the package ends as the chip keeps it decides whether the card's applet is created
+
+**Adopted (2026-11-26, from the chip run of that day on card 57723320, a J3R180 keyed for SCP03 from CardLogix): an
+inference from one chip and one card, which the chip run of each release file confirms.** It replaces, as the place a file
+is aimed at, the load file's own place in its 256-byte page (245 past for every 3.x file until now, CASHU-CARD-HARDWARE.md).
+
+**What was seen.** The per-commit files of the 3.2 speed work were each deleted and loaded again on that card in the same
+way (the opener first, then the card's applet, then the tag). By the load file, the card did not tell them apart: every file
+but two of the test ones was 245 past, and at 245 past it created some and refused others, at the very same sizes. By the
+package without its RefLocation component it did:
+
+| File | Commit | Load file, bytes (past) | Kept by the chip, bytes (past) | The card applet's create |
+|---|---|---|---|---|
+| the tracked 3.2 file | c816133 | 43,765 (245) | 39,637 (213) | created (the morning's run) |
+| 00 | 3b9b5a4 | 43,765 (245) | 39,647 (223) | refused once, created at the second try |
+| 01 | 52be734 | 43,509 (245) | 39,386 (218) | refused, 7 tries of 7 |
+| 01b | 52be734 | 44,021 (245) | 39,898 (218) | refused, 5 tries of 5 |
+| 01c | 52be734 | 43,487 (223) | 39,364 (196) | created at the first try |
+| 01d | 52be734 | 43,601 (81) | 39,478 (54) | created at the first try |
+| 02 | 7b87367 | 43,509 (245) | 39,368 (200) | created at the first try |
+| 03 | 756a459 | 44,021 (245) | 39,815 (135) | created at the first try |
+| 04 | f621b23 | 44,021 (245) | 39,806 (126) | created at the first try |
+| 05 | f394b29 | 44,277 (245) | 40,044 (108) | created at the first try |
+| 06 | 4f610e6 | 44,277 (245) | 40,031 (95) | created at the first try |
+| 07 | 2c38493 | 44,533 (245) | 40,253 (61) | created at the first try |
+| 08 | 4b09cc0 | 44,789 (245) | 40,508 (60) | created at the first try |
+| 09 | 7fe7ec6 | 44,789 (245) | 40,506 (58) | created at the first try |
+| 10 | eedd741 | 44,789 (245) | 40,499 (51) | created at the first try |
+| 11 | 1d9ac2a | 44,789 (245) | 40,496 (48) | created at the first try |
+
+01 and 02 are the same 43,509 bytes, and 01b, 03 and 04 the same 44,021: the outcomes split within each. The code that runs
+at the create is the same in 52be734 and 7b87367 (CashuApplet.java byte for byte; SchnorrHW's constructor and `init()`
+untouched; A2's change runs only inside a signature on the chip's path, which needs `chipMul`, first set by SET_CARD's
+`chipMulInit`), so 52be734's refusal is no use before an init. What A2 changed of the file is its layout: 22 bytes less of
+the Method component, 18 more of RefLocation and 4 more of the constant pool. Where the kept package ends separates every
+file the card has had: 48 to 213 past created, 218 past refused at every try, 223 past refused once in two. The Method
+component's own place fits worse (52be734's refused files at 87 past and 3b9b5a4's at 104 sit between places that created,
+65, 94, 95, 98 and 113). Two files of 52be734 were then padded to the kept places 196 and 54 to test it, and both were
+created at the first try: two foretold of two. A1 alone ran the whole play-money session from 01c (D245).
+
+**Why this measure.** RefLocation lists where the Method component's references to the constant pool are, so that the
+loader can link them; a chip that has linked the package has no use for it. What the install makes (the applets' objects)
+starts after what the chip keeps, and CASHU-CARD-HARDWARE.md already read the old windows as something the install makes
+that must not fall across an edge, where the image ends. The load file's size only approximates where that image ends, off
+by the RefLocation component's length, which differs from build to build by as much as A2's 18 bytes; so a window by the
+load file moved from one version to the next. How the chip lays the package out is not published: the measure is chosen
+because it separates the files, and the reason is an inference.
+
+**The rule.** A file is padded (`CashuApplet.sizeTheFile`) so that its kept package ends 60 to 180 past a multiple of 256,
+aimed at 120, the middle of the places that created, clear of both ends. `tools/refcheck.py` says, after every build, how
+many bytes the kept package is and where it ends, and warns of a file outside 60 to 180 past with the bytes that would move
+it to 120 (`kept_warning`, `KEPT_SEEN` with the table above; `tools/ci/refcheck.test.cjs`). SIZES, AVOID and the warnings by
+the load file's place stay as the record of what was measured that way; for a file with a RefLocation component, which every
+CAP the build makes has, the kept place is the one warned of.
+
+**What it does not know.**
+- One chip and one card. The card had held other packages, and today's deletes and loads put the package where it put it
+  each time (every file was created or refused the same way at every try, 3b9b5a4's alone once each way); a card fresh from
+  its maker may start the package elsewhere, and the places that create then sit elsewhere by the same offset.
+- The edges: 213 past created and 218 refused, so the refused places begin somewhere in between; where they end above 223
+  is not known, nor whether there are others below 48.
+- The earlier windows (1.x, 2.3, 3.0 on card 58206920) were measured by the load file alone and are not read again here.
+
+**What a maker does when the card applet's create answers 6F00** (and what the release run must show):
+- Check that no card applet was made (`gp --list`), then send the same create once more, in a fresh session. A create taken
+  at the second try was seen twice (3b9b5a4's file here; the 3.0 file at 175 past on card 58206920). SECURITY-MODEL open
+  item 10 has the provisioner's form of this: once, only after GET STATUS, logged.
+- Refused again, stop: the file's layout is one this chip refuses, and asking again does not change it (52be734's file was
+  refused twelve times on two sizes). The file is padded again by refcheck's measure and tried on a chip; it is not shipped.
+- The release run's create cycles delete and create the instances with the package loaded, so the package stays where it was
+  loaded: five of them say the file creates there, not on a card where the package lands elsewhere. The release file is
+  loaded and created on a card fresh from the batch it ships on, and once on a card that has held another package.

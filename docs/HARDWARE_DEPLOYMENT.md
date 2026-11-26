@@ -472,6 +472,15 @@ J3R180 keyed for SCP03 according to the card's supplier ([D229](DECISIONS.md#d22
 > `D2760000850101`, given as the instance AID. Measurements and the rest of what
 > the chip has room for: [CASHU-CARD-HARDWARE.md](CASHU-CARD-HARDWARE.md).
 
+> **A create answered `6F00`** ([D256](DECISIONS.md#d256)). Check that no card applet was
+> made (`gp --list`), then send the same create once more, in a fresh session: it was taken
+> at the second try twice. Refused again, stop: asking again does not change the file's
+> layout, which is what the chip refuses (where the package as the chip keeps it ends against
+> a page; one 3.2 test file was refused twelve times). Pad the file again by refcheck's
+> measure and try it on a spare card; never ship it. Create cycles (delete and create the
+> instances) leave the package where it was loaded, so they show the file creates there: the
+> release file is also loaded and created on a card fresh from the batch it ships on.
+
 > **The mint's proofs are reserved after install.** The 12,288 bytes that hold
 > them are not made at install: the chip would refuse the card's applet if its
 > constructor asked for them. The first `SET_CARD` reserves them. A card that is
@@ -873,7 +882,8 @@ agreement and eight of the point addition, each followed by the key's wipe.
 A chip that frames either otherwise answers `SET_CARD` with `6F00` and is never
 set up, so it takes no piece. The probe is not at
 install, where the chip takes as little work as it can: if `gp --install`
-fails with `6F00`, suspect the size of the load file (above), or a constructor
+fails with `6F00`, suspect the file's layout (where its package as the chip keeps it
+ends, which refcheck says, [D256](DECISIONS.md#d256)), or a constructor
 that asks for more than the chip gives at install ([D17](DECISIONS.md#d17),
 [D176](DECISIONS.md#d176)). If the first `SET_CARD` answers `6F00`, suspect the
 framing.

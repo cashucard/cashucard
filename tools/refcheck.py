@@ -11,18 +11,24 @@ Two things, both found on the chip (docs/CASHU-CARD-HARDWARE.md):
    (docs/HARDWARE_DEPLOYMENT.md). From software 1.19 the file lists a third applet,
    the NFC tag, last: it is made after the card's, under the NFC Forum's own name.
 
-2. Even then, the card's applet installs at some sizes of the load file and
-   not at others, and the same code fails a few dozen bytes to either side of
-   a size that works. The rule is not known: it looked like a window of each
-   256 bytes (130 to 186 past a multiple) for files of 17.3 to 17.7 KB, and
-   files of 18.1 to 18.5 KB install at 203 and 249 past and fail at 139 to
-   176. So this check keeps what has been measured on the chip (SIZES) and
-   says which it is: a size known to install, a size known to fail, or one
-   not tried yet. `CashuApplet.sizeTheFile` is in the package for its length
-   alone, five to seven bytes a line (an index above 127 takes a byte more),
-   so that a build can be moved to a size known to install; a size not tried
-   yet is tried on a chip, and the answer added here. A build inside a range around a size that failed (AVOID) is
-   refused whatever SIZES says.
+2. Even then, the card's applet installs at some layouts of the file and not
+   at others. Until 3.2 this was read by the load file's size (a window of each
+   256 bytes, which moved from one version to the next), and this check keeps
+   what has been measured that way (SIZES): a size known to install, a size
+   known to fail, or one not tried yet. A build inside a range around a size
+   that failed (AVOID) is refused whatever SIZES says. Since D256 the rule
+   aimed at is another measure: where the package ends as the chip keeps it,
+   the load file's components without RefLocation (which only tells the linker
+   where the references are), in bytes past a multiple of 256 (`kept_size`).
+   On card 57723320 every file whose kept package ended 48 to 213 past was
+   created, and files that ended 218 and 223 past were refused, where the load
+   file's own place (245 past for all of them) told the two apart in no way.
+   This check says where a file's kept package ends and, outside 60 to 180
+   past (KEPT_AIM), warns and says how far to move it, to 120 past
+   (KEPT_TARGET). It is an inference from one chip: the chip run of each
+   release file confirms it. `CashuApplet.sizeTheFile` is in the package for
+   its length alone, five to seven bytes a line (an index above 127 takes a
+   byte more), so that a build can be moved there.
 
 A size in SIZES says what a chip did with some source padded to that size, not
 that this file has run: whether this exact file has run on a chip is said by
@@ -152,7 +158,9 @@ EARLIER = frozenset({
 PAGE = 256
 # where in its 256-byte page a load file ended when the chip refused the card's applet (2.3 study builds at 135 and 153 past;
 # 1.x builds at 139, 164 and 176 past): refcheck's SIZES compares whole sizes only, so a new size near one of these places is
-# warned of, unless that very place has installed (`place_warning`)
+# warned of, unless that very place has installed (`place_warning`). Since D256 a file with a RefLocation component, which
+# every CAP the build makes has, is held to where its kept package ends instead (`kept_warning`); place_warning is kept for
+# a file without one, and as the record of what the load file's places were taken to say
 REFUSED_PAST = (135, 139, 153, 164, 176)
 NEAR_PAST = 8  # bytes either side of a refused place
 
@@ -169,6 +177,56 @@ def place_warning(size):
             'that installed ended here: move CashuApplet.sizeTheFile to a place known to install (%s past) before a chip run.'
             % (past, PAGE, 'at' if past in near else 'near', near[0], ', '.join(str(x) for x in sorted(installed))))
 LINE = 6  # bytes one line of sizeTheFile adds, about: five to seven, so the lines advised are an estimate
+
+# D256: where the package ends as the chip keeps it, against a 256-byte page, is what decided whether the card's applet was
+# created on card 57723320 (a J3R180 keyed for SCP03, CardLogix, 2026-11-26), where the load file's size did not: the
+# components the load file carries without RefLocation, which the chip needs only while it links. What that card did, by the
+# kept package's size (each file deleted and loaded again in the same way, the opener first): True created at the first try,
+# False refused (6F00) at every try, None refused and then created.
+KEPT_SEEN = {
+    39637: True,   # 3.2 at c816133 (load file 43,765 bytes), 213 past
+    39647: None,   # 3b9b5a4 (43,765 bytes), 223 past: refused once, created at the second try
+    39386: False,  # 52be734, A1 alone (43,509 bytes, the size of 7b87367's, which created), 218 past: refused 7 times of 7
+    39898: False,  # 52be734 (44,021 bytes, the size of 756a459's and f621b23's, which created), 218 past: refused 5 times of 5
+    39364: True,   # 52be734 (43,487 bytes), 196 past: created, as D256 foretold
+    39478: True,   # 52be734 (43,601 bytes), 54 past: created, as D256 foretold
+    39368: True,   # 7b87367 (43,509 bytes), 200 past
+    39815: True,   # 756a459 (44,021 bytes), 135 past
+    39806: True,   # f621b23 (44,021 bytes), 126 past
+    40044: True,   # f394b29 (44,277 bytes), 108 past
+    40031: True,   # 4f610e6 (44,277 bytes), 95 past
+    40253: True,   # 2c38493 (44,533 bytes), 61 past
+    40508: True,   # 4b09cc0 (44,789 bytes), 60 past
+    40506: True,   # 7fe7ec6 (44,789 bytes), 58 past
+    40499: True,   # eedd741 (44,789 bytes), 51 past
+    40496: True,   # 1d9ac2a (44,789 bytes), 48 past
+}
+KEPT_AIM = (60, 180)   # the middle of the places that created there (48 to 213 past), clear of both ends
+KEPT_TARGET = 120
+
+
+def kept_size(parts):
+    """The package as the chip keeps it (D256): the bytes of the load file's components without RefLocation."""
+    return sum(len(parts[k]) for k in LOADED if k in parts and k != 'RefLocation')
+
+
+def kept_warning(parts):
+    """A warning when the kept package ends outside KEPT_AIM in its 256-byte page, with the bytes and lines that would move it
+    to KEPT_TARGET, else None."""
+    past = kept_size(parts) % PAGE
+    if KEPT_AIM[0] <= past <= KEPT_AIM[1]:
+        return None
+    move = (KEPT_TARGET - past) % PAGE
+    if move > PAGE // 2:
+        move -= PAGE
+    seen = {k % PAGE: ok for k, ok in KEPT_SEEN.items()}
+    said = (' (card 57723320 refused a file whose kept package ended here)' if seen.get(past) is False else
+            ' (card 57723320 refused a file whose kept package ended here once, and created it at the second try)'
+            if past in seen and seen[past] is None else '')
+    return ('WARNING: the package as the chip keeps it (the load file without RefLocation, D256) ends %d past a multiple of %d%s, '
+            'outside %d to %d past, the middle of the places that created: move CashuApplet.sizeTheFile by %+d bytes (about %d '
+            'lines of five to seven bytes) to end it %d past, and try the file on a chip.'
+            % (past, PAGE, said, KEPT_AIM[0], KEPT_AIM[1], move, (abs(move) + LINE - 1) // LINE, KEPT_TARGET))
 
 
 def components(path):
@@ -248,10 +306,12 @@ def main(argv):
     print('load file: %d bytes (%d past a multiple of %d); applets, in order: %s'
           % (size, past, PAGE, ', '.join(a.hex().upper() for a in listed)))
     print('load file sha256: %s; %s.' % (hashlib.sha256(load_file(parts)).hexdigest(), said(parts)))
+    print('kept by the chip (D256, without RefLocation): %d bytes (%d past a multiple of %d; aimed at %d to %d past)'
+          % (kept_size(parts), kept_size(parts) % PAGE, PAGE, KEPT_AIM[0], KEPT_AIM[1]))
     if not listed or listed[0] != OPENER:
         print('REFUSED: the opener (%s) must be the first applet listed, so that it is instantiated first.' % OPENER.hex().upper())
         return 1
-    warning = place_warning(size)
+    warning = kept_warning(parts) if 'RefLocation' in parts else place_warning(size)
     if warning:
         print(warning)
     good = sorted(s for s, ok in SIZES.items() if ok)

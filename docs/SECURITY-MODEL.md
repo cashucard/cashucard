@@ -534,7 +534,9 @@ a few hundred taps. Treat simulator results accordingly, see
    175 past a multiple of 256 had its card applet's create answered `6F00` once and taken on an identical retry
    ([`CASHU-CARD-HARDWARE.md`](CASHU-CARD-HARDWARE.md)). `tools/cardkit/gp/provision.ts` ends the run on any error, so a
    provisioning would have stopped there. Proposed for the other maintainer, not built: retry the create once on `6F00`,
-   only after `GET STATUS` shows that no card applet was made, in a fresh secure session, logged, and once only.
+   only after `GET STATUS` shows that no card applet was made, in a fresh secure session, logged, and once only. Since
+   [D256](DECISIONS.md#d256) (3.2, card 57723320) a file is padded by where its package as the chip keeps it ends, and a
+   create refused twice is the file's layout, not chance: the provisioning stops, and the file is not shipped.
 11. **A reader cannot tell when the card's ring of signatures has rolled past its payment** (3.0, a proposal; not built).
    `SPEND_ALL_AGAIN` P1 = `01` finds a payment among the sixteen whose receipts the card keeps, and how many payments the
    card has signed is history (`GET_LOG` P1 = `01`, the owner's grant). A till that holds a claim asks at every later tap

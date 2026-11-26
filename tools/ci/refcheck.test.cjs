@@ -276,3 +276,52 @@ test("a load file ending at or near a refused place in its 256-byte page is warn
     assert.equal(r.stdout.trim(), "None", `${n}: ${r.stdout}`);
   }
 });
+
+// D256 (2026-11-26, card 57723320): what decided whether the card's applet was created was where the package ends as the
+// chip keeps it (the load file without its RefLocation component) against a 256-byte page, not the load file's own place:
+// 52be734 at 43,509 bytes, kept 218 past, was refused 7 times of 7 where 7b87367 at the same 43,509 bytes, kept 200 past,
+// was created. refcheck says the kept place of every file that has a RefLocation, and warns of one outside 60 to 180 past
+// with the bytes that would move it to 120 past.
+test("the kept package (the load file without RefLocation) is said, and a file outside 60 to 180 past is warned of with the bytes to move it to 120 past", () => {
+  const kept = (keptBytes, refBytes) => {
+    const dir = mkdtempSync(join(tmpdir(), "refcheck-kept-"));
+    try {
+      const cap = join(dir, "t.cap");
+      const make = `
+import sys, zipfile, importlib.util
+spec = importlib.util.spec_from_file_location("refcheck", sys.argv[1])
+r = importlib.util.module_from_spec(spec); spec.loader.exec_module(r)
+kept, ref, cap = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+applet = bytes([3, 0, 0, 1, len(r.OPENER)]) + r.OPENER + b"\\0\\0"
+with zipfile.ZipFile(cap, "w") as z:
+    z.writestr("p/javacard/Applet.cap", applet)
+    z.writestr("p/javacard/Header.cap", b"\\0" * (kept - len(applet)))
+    z.writestr("p/javacard/RefLocation.cap", b"\\0" * ref)
+assert r.kept_size(r.components(cap)) == kept
+`;
+      const built = spawnSync("python3", ["-I", "-c", make, REFCHECK, String(keptBytes), String(refBytes), cap], { encoding: "utf8" });
+      assert.equal(built.status, 0, built.stderr);
+      const run = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
+      return { status: run.status, out: run.stdout };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  // 52be734's two refused files: kept 218 past, whatever the load file's size
+  for (const [k, ref] of [[39386, 4119], [39898, 4119]]) {
+    const r = kept(k, ref);
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /^kept by the chip \(D256, without RefLocation\): \d+ bytes \(218 past a multiple of 256; aimed at 60 to 180 past\)$/m, r.out);
+    assert.match(r.out, /^WARNING: the package as the chip keeps it .* ends 218 past a multiple of 256 \(card 57723320 refused a file whose kept package ended here\), outside 60 to 180 past.*by -98 bytes \(about 17 lines of five to seven bytes\) to end it 120 past/m, r.out);
+  }
+  // 3b9b5a4's, refused once: said so
+  assert.match(kept(39647, 4114).out, /ends 223 past a multiple of 256 \(card 57723320 refused a file whose kept package ended here once, and created it at the second try\)/);
+  // 1d9ac2a's, 48 past, created there but outside the aim: warned of, to move up
+  assert.match(kept(40496, 4289).out, /ends 48 past a multiple of 256, outside 60 to 180 past.*by \+72 bytes/);
+  // inside the aim, at either end and the middle: no warning
+  for (const k of [40252, 40312, 40372]) {
+    const r = kept(k, 4276);
+    assert.equal(r.status, 0, r.out);
+    assert.doesNotMatch(r.out, /WARNING/, `${k}: ${r.out}`);
+  }
+});
