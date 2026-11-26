@@ -91,9 +91,10 @@ public final class TearHook {
                 if (v == null) continue;
                 boolean tr = false;
                 for (String t : TRANSIENT) if (t.equals(f.getName())) tr = true;
-                // and any array the runtime made transient (3.2, D244: `outStage`, RAM where the chip gives the room)
+                /* and `outStage` where the runtime made it transient (3.2, D244: RAM where the chip gives the room). Asked of that
+                 * field alone: jCardSim's isTransient searches a list every card made so far adds to, too slow for every field */
                 try {
-                    if (v instanceof byte[] && JCSystem.isTransient(v) != JCSystem.NOT_A_TRANSIENT_OBJECT) tr = true;
+                    if (!tr && "outStage".equals(f.getName()) && v instanceof byte[] && JCSystem.isTransient(v) != JCSystem.NOT_A_TRANSIENT_OBJECT) tr = true;
                 } catch (RuntimeException e) {
                     // a runtime that cannot say: the name list alone
                 }

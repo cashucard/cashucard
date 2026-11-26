@@ -450,7 +450,8 @@ class PerPaymentKeyTest {
         UnitsTest.Card d = new UnitsTest.Card();
         CountingCipher rsa2 = (CountingCipher) wrap(d.applet(), CashuApplet.class, "rsa", o -> new CountingCipher((Cipher) o));
         assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, record(MINT, REFUND))));
-        assertEquals(3, rsa2.powers, "SET_CARD: three powers of the chip's RSA, once");
+        // 3.2 (D244): and the square's known answers, once a set-up life (`squareInit`): 3^2, (p - 1)^2, (p - 2)^2, and G's x cubed and y squared
+        assertEquals(3 + 5, rsa2.powers, "SET_CARD: three powers of the chip's RSA, and the square's five checks, once");
         // on a chip (docs/CASHU-CARD-HARDWARE.md, contact reader): a point addition 85-100 ms, a SHA-256 of under 100 bytes 4 ms,
         // a power of the RSA 70-80 ms and about 50 ms of reduction
         System.out.println("keys per load, counted: BEGIN +" + begun[0] + " SHA-256 +" + begun[3] + " point additions (about "
