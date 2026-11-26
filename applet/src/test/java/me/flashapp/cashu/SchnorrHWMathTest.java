@@ -1055,7 +1055,8 @@ class SchnorrHWMathTest {
         int[] asked = transientMemoryAtSetCard();
         // D247: and the engines' flags (5: the field's four engines and the signature's squaring), at the first SET_CARD and not at
         // install; the 3.2 chip run had 1,596 bytes of this memory free after the first SET_CARD
-        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601 + 5, 2 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8; and the engines' flags");
+        // D249: and the kept y of the payment's date key, 32
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601 + 5 + 32, 3 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8; the engines' flags; the kept y");
         org.junit.jupiter.api.Assertions.assertEquals(941, transientMemoryAskedFor()[0], "and the install's CLEAR_ON_DESELECT is the 941 of the build that installs");
         String src = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
         org.junit.jupiter.api.Assertions.assertNotNull(findIgnoringSpace(src,

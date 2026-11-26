@@ -156,7 +156,8 @@ class WipesTest {
         assertEquals(2, unblind.split("schnorrHW\\.addToPublic\\(", -1).length - 1, "two by addToPublic");
         int unblinding = unblind.indexOf("schnorrHW.addTo(");
         assertTrue(unblinding >= 0 && unblinding < unblind.indexOf("schnorrHW.mulPublic(") && unblinding < unblind.indexOf("schnorrHW.addToPublic("), "the unblinding, with its wipe, first");
-        int[] s = SchnorrHWMathTest.bodyRange(hw, "short sign(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,");
+        // the sign() that signs (D249: the one with the kept y, which the others call)
+        int[] s = SchnorrHWMathTest.bodyRange(hw, "short sign(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff, byte[] gy, short gyOff,");
         String sign = hw.substring(s[0], s[1]).replaceAll("\\s+", " ");
         assertTrue(sign.contains("Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0); Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0); rest(); } return signOnce("),
             "the wipe between the chip's try and the bytecode's");

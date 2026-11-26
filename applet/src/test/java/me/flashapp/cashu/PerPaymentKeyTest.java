@@ -440,7 +440,8 @@ class PerPaymentKeyTest {
         java.lang.reflect.Field pk = CashuApplet.class.getDeclaredField("cardPubKey");
         pk.setAccessible(true);
         boolean w33 = ((javacard.security.ECPublicKey) pk.get(applet)).getW(new byte[65], (short) 0) == 33;
-        assertEquals(waits + 2, signed[3], "one point addition a signature, the check's, and the payment's Q");
+        // D249: the payment's Q is SPEND_ALL_BEGIN's own, its y kept, and is not worked out again at SIGN
+        assertEquals(waits + 1, signed[3], "one point addition a signature, the check's; the payment's Q is BEGIN's");
         assertEquals((2 + (w33 ? 1 : 0)) * (waits + 1), signed[4], "two key agreements a signature: k*G as before and the check's [e]Q" + (w33 ? ", and [d]G" : ""));
         int g0 = gm.made, h0 = sha.done;
         assertEquals(SW_OK, groupKeys(c, D2).getSW());

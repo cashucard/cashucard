@@ -345,6 +345,18 @@ final class SchnorrHW {
     short sign(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,
                byte[] msg, short msgOff,
                byte[] out, short outOff) {
+        return sign(privKey, pubKey, g, gOff, null, (short)0, msg, msgOff, out, outOff);
+    }
+
+    /**
+     * `sign` under a date's key whose y the caller kept from the point addition that made it (D249): the 32 bytes at gy[gyOff]
+     * are the y of the point at g + 32, as SPEND_ALL_BEGIN's addition gave it in this selection. The check of step 8 then takes
+     * Q whole from the point named and that y, where it would work W + [t]G out again; a y that is not that point's makes the
+     * check fail (6F00), never pass (`verify`). `gy` null: as `sign` above.
+     */
+    short sign(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff, byte[] gy, short gyOff,
+               byte[] msg, short msgOff,
+               byte[] out, short outOff) {
         // d, k and e·d are in sc and work, and k in the temporary key, for this
         // call and no longer: however it ends, the two are zeroed first and
         // then the key is wiped, so a wipe the chip refuses leaves neither.
@@ -352,7 +364,7 @@ final class SchnorrHW {
         // only public scalars in the key and leave them for it.
         try {
             if (chipMul) {
-                short made = signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, true);
+                short made = signOnce(privKey, pubKey, g, gOff, gy, gyOff, msg, msgOff, out, outOff, true);
                 if (made != (short)0) return made;
                 // The chip's product did not give a signature that verifies (or the chip refused the work): the chip path
                 // is given up for this signature only (D228: chipMul stays as SET_CARD's test left it, so one induced fault
@@ -366,7 +378,7 @@ final class SchnorrHW {
                 Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
                 rest();
             }
-            return signOnce(privKey, pubKey, g, gOff, msg, msgOff, out, outOff, false);
+            return signOnce(privKey, pubKey, g, gOff, gy, gyOff, msg, msgOff, out, outOff, false);
         } finally {
             Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
             Util.arrayFillNonAtomic(work, (short)0, WORK_LEN, (byte)0);
@@ -379,7 +391,7 @@ final class SchnorrHW {
      * the chip refused that work or the signature it gave does not verify, for sign() to make it again by the bytecode; with
      * `chip` false, e·d by `mulModN`, and 6F00 where the signature does not verify. 64 once `out` holds the signature.
      */
-    private short signOnce(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff,
+    private short signOnce(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff, byte[] gy, short gyOff,
                            byte[] msg, short msgOff,
                            byte[] out, short outOff, boolean chip) {
 
@@ -530,12 +542,12 @@ final class SchnorrHW {
         boolean good;
         if (chip) {
             try {
-                good = verify(privKey, pubKey, g, gOff);
+                good = verify(privKey, pubKey, g, gOff, gy, gyOff);
             } catch (CryptoException x) {
                 good = false;
             }
             if (!good) return (short)0;
-        } else if (!verify(privKey, pubKey, g, gOff)) {
+        } else if (!verify(privKey, pubKey, g, gOff, gy, gyOff)) {
             ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
         }
 
@@ -605,6 +617,15 @@ final class SchnorrHW {
      * the parity on trust). With `g` (a date's key, D197) Q = [t]G + W by the point addition (t is public) and must be the
      * caller's 33-byte point at g + 32, its x and its parity: a wrong point there is refused, whatever the signature.
      *
+     * With `gy` as well (D249: SPEND_ALL_SIGN, whose date's key SPEND_ALL_BEGIN made by the chip's addition in this selection),
+     * Q is the point named at g + 32 made whole with that y, and W + [t]G is not worked out again: 6F00 where the y's parity is
+     * not the one named. No y can make the check pass where Q's would not: s = k + e·(d + t), so s·G - e·Q' = R exactly where
+     * Q' = (d + t)·G (or e = 0); Q's x is held to the x in e below and its Y made even, so a y that is not that point's makes
+     * Q a point of the curve's other y (p - y, the same Q once even) or no point of the curve, which the chip's key agreement
+     * refuses (an exception: a failed check on the chip's path, 6F00 on the bytecode's) or multiplies on another curve, whose
+     * answer is R by a chance of about 2^-256. What is given up is the second, independent working-out of P + t·G at SIGN;
+     * the check's own algebra binds the point to d + t.
+     *
      * Every scalar this puts in the temporary key (t, e, s) is public once the signature is out, and the check's calls
      * leave them there (D245: `mulPublic`, `addToPublic`), for sign()'s `finally` to wipe with the rest, where until 3.2
      * the check began with a wipe and each of its calls ended with one. The nonce that step 4 left in the key and the key
@@ -616,27 +637,36 @@ final class SchnorrHW {
      * What jCardSim cannot show of it (D10): the chip's answers for a scalar of 0 or a sum at infinity, which no key, date
      * or message reaches but by chance (e = 0, s = 0, t = d or t = -d, each about 2^-256); and its time on a chip.
      */
-    private boolean verify(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff) {
+    private boolean verify(ECPrivateKey privKey, ECPublicKey pubKey, byte[] g, short gOff, byte[] gy, short gyOff) {
         // what the check reads, beside s and Rx; then d, k and e·d (all of sc) zeroed
         Util.arrayCopyNonAtomic(sc, SC_E, work, V_E, (short)32);
         Util.arrayCopyNonAtomic(sc, SC_PX, work, V_PX, (short)32);
         Util.arrayFillNonAtomic(sc, (short)0, (short)256, (byte)0);
 
-        // W, the card's own point, whole
-        short wLen = pubKey.getW(sc, V_W);
-        if (wLen == (short)33) {
-            agree(privKey, CashuApplet.SECP256K1_G, (short)0, (short)65, sc, V_W);
-        } else if (wLen != (short)65 || sc[V_W] != (byte)0x04) {
-            ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
-        }
-        // Q: W, or W + [t]G, which must be the point the caller named, x and parity
         short q = V_W;
-        if (g != null) {
-            addToPublic(g, gOff, CashuApplet.SECP256K1_G, (short)0, sc, V_W, sc, V_Q);
+        if (g != null && gy != null) {
+            // Q whole from the point named and the y kept with it (D249): its parity the one named
             q = V_Q;
-            if (g[(short)(gOff + 32)] != (byte)(0x02 | (sc[(short)(V_Q + 64)] & 1))
-                || Util.arrayCompare(sc, (short)(V_Q + 1), g, (short)(gOff + 33), (short)32) != (byte)0) {
+            sc[V_Q] = (byte)0x04;
+            Util.arrayCopyNonAtomic(g, (short)(gOff + 33), sc, (short)(V_Q + 1), (short)32);
+            Util.arrayCopyNonAtomic(gy, gyOff, sc, (short)(V_Q + 33), (short)32);
+            if (g[(short)(gOff + 32)] != (byte)(0x02 | (gy[(short)(gyOff + 31)] & 1))) ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+        } else {
+            // W, the card's own point, whole
+            short wLen = pubKey.getW(sc, V_W);
+            if (wLen == (short)33) {
+                agree(privKey, CashuApplet.SECP256K1_G, (short)0, (short)65, sc, V_W);
+            } else if (wLen != (short)65 || sc[V_W] != (byte)0x04) {
                 ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+            }
+            // Q: W, or W + [t]G, which must be the point the caller named, x and parity
+            if (g != null) {
+                addToPublic(g, gOff, CashuApplet.SECP256K1_G, (short)0, sc, V_W, sc, V_Q);
+                q = V_Q;
+                if (g[(short)(gOff + 32)] != (byte)(0x02 | (sc[(short)(V_Q + 64)] & 1))
+                    || Util.arrayCompare(sc, (short)(V_Q + 1), g, (short)(gOff + 33), (short)32) != (byte)0) {
+                    ISOException.throwIt(CashuApplet.SW_CRYPTO_ERROR);
+                }
             }
         }
         // its x the one in e; and its Y made even (p - Y), as lift_x has it

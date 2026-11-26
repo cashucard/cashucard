@@ -9381,8 +9381,8 @@ class CashuAppletTest {
         assertTrue(body.indexOf("Util.arrayCopyNonAtomic(allNet, (short) 0, lastSig, LAST_NET, (short) 4);") < begin && body.indexOf("Util.arrayCopyNonAtomic(scratch, X_MSG, lastSig, (short)(LAST_NET + 4), (short) 32);") < begin
             && body.contains("Util.arrayCopyNonAtomic(scratch, X_MSG, lastSig, (short)(LAST_NET + 4), (short) 32);")
             && tx.contains("Util.arrayCopy(buf, (short) 0, lastSig, (short) 0, SIG_KEPT);"), "what left the card and the hash signed beside the signature before the commit, and the signature with its mark kept in it");
-        assertTrue(body.contains("shaAll.doFinal(buf, (short) 0, (short) 0, scratch, X_MSG)") && body.contains("schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, scratch, X_MSG, buf, (short) 1)"),
-            "the hash that is signed is the hash that is kept (signed under the card's key for the payment's date, D197)");
+        assertTrue(body.contains("shaAll.doFinal(buf, (short) 0, (short) 0, scratch, X_MSG)") && body.contains("schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, groupY, (short) 0, scratch, X_MSG, buf, (short) 1)"),
+            "the hash that is signed is the hash that is kept (signed under the card's key for the payment's date, D197; its check takes BEGIN's y of that key, D249)");
         assertEquals(1, count(body.substring(0, commit), "Util.arrayCopy(cardRecord"), "a spend begins the day's window by copying the clock, in the payment's transaction, and writes no other part of the record");
         assertEquals(1, count(tx, "beginAtNow(CARD_NOPIN_START_OFFSET)"), "and the no-PIN window at the clock, or with none at a weak clock (D201), in the same transaction");
         String fin = body(code, "private boolean finishBurn(", "private void processSpendAllAgain(");

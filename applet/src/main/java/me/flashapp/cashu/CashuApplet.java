@@ -1152,6 +1152,13 @@ public class CashuApplet extends Applet implements TagSwitch {
     private byte[] chain;
     /** The payment in hand's keys (D197), written at SPEND_ALL_BEGIN: its tweak t (32), the card's key for its date P + t*G (33) and the refund key for it R + u*G (33, zeros with no refund key). */
     private byte[] group;
+    /**
+     * The y of `group`'s P + t*G (D249), as SPEND_ALL_BEGIN's point addition made it, in RAM a selection clears and cleared with
+     * the payment in hand (`allState`) in `select()`: SIGN's check of its signature takes the key whole from it and the x in
+     * `group`, where it worked W + t*G out again. Written by SPEND_ALL_BEGIN alone (`groupKeys`, before its refund step), read
+     * by SIGN alone. Made at the first SET_CARD; null where the chip refused the room.
+     */
+    private byte[] groupY;
 
     /** SHA-256 of AUTH_TAG, worked out once at install */
     private byte[] authTagHash;
@@ -1629,6 +1636,8 @@ public class CashuApplet extends Applet implements TagSwitch {
         Util.arrayFillNonAtomic(ownerNonce, (short) 0, OWNER_NONCE_LEN, (byte) 0);
         Util.arrayFillNonAtomic(allState, (short) 0, (short) 8, (byte) 0);
         Util.arrayFillNonAtomic(allOut, (short) 0, (short) 33, (byte) 0);
+        // and the payment's kept y with it (D249)
+        if (groupY != null) Util.arrayFillNonAtomic(groupY, (short) 0, (short) 32, (byte) 0);
         // the tag's code of its last selection (D222), in this applet's working memory: not left for this one to find
         Util.arrayFillNonAtomic(scratch, X_TAG, (short)(TAG_R_LEN + TAG_MAC_LEN), (byte) 0);
         // and every engine is given its key again at its first use in this selection (D248), whatever the chip kept of it
@@ -2348,7 +2357,7 @@ public class CashuApplet extends Applet implements TagSwitch {
          * to the hash, two of them its own hex as it was written at loading.
          * The key and the refund key in it are those of the payment's date (D197):
          * worked out here into `group`, which nothing reads before this writes it. */
-        groupKeys(proofStorage, (short)(first + PROOF_DATE_OFFSET), buf);
+        groupKeys(proofStorage, (short)(first + PROOF_DATE_OFFSET), buf, groupY);
         Util.arrayCopyNonAtomic(buf, (short) 0, group, (short) 0, GROUP_LEN);
         short tail = secretTail(buf, first);
         shaAll.reset();
@@ -3450,7 +3459,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         /* under the card's key for the payment's date (D197): d + t, whose key is P + t*G. A signature that does not verify
          * (SchnorrHW.sign's step 8) is 6F00 here, before the list below, the transaction and the signature kept: nothing is
          * burned or counted, SPEND_ALL_AGAIN gives what it gave before, and the payment is given up (allState[0], above) */
-        short sigLen = schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, scratch, X_MSG, buf, (short) 1);
+        short sigLen = schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, groupY, (short) 0, scratch, X_MSG, buf, (short) 1);
 
         /* The places, written down where `finishBurn` will find them. Not
          * yet a burn: nothing reads this list until the transaction below
@@ -3814,11 +3823,13 @@ public class CashuApplet extends Applet implements TagSwitch {
      * buf[98..228) and scratch[X_MSG] are its working room; it writes nothing of the card's state (the chip's key object for
      * the point addition is set, as at every payment).
      */
-    private void groupKeys(byte[] d, short dOff, byte[] buf) {
+    private void groupKeys(byte[] d, short dOff, byte[] buf, byte[] y) {
         tweak(LABEL_KEY, d, dOff, buf, (short) 0);
         cardPubKey.getW(buf, (short) 98);
         schnorrHW.addToG(buf, (short) 0, buf, (short) 98, buf, (short) 163);
         squeeze(buf, (short) 163, (short) 32);
+        // and its y, for SIGN's check, where the caller keeps it (SPEND_ALL_BEGIN, D249): now, before the refund step writes over it
+        if (y != null) Util.arrayCopyNonAtomic(buf, (short) 196, y, (short) 0, (short) 32);
         Util.arrayFillNonAtomic(buf, (short) 65, (short) 33, (byte) 0);
         if (isZero(cardRecord, CARD_REFUND_OFFSET, (short) 33) || isZero(d, dOff, (short) 4)) return;
         tweak(LABEL_REFUND_KEY, d, dOff, scratch, X_MSG);
@@ -3900,7 +3911,7 @@ public class CashuApplet extends Applet implements TagSwitch {
         if (apdu.setIncomingAndReceive() != (short) 4) ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         byte[] buf = apdu.getBuffer();
         Util.arrayCopyNonAtomic(buf, ISO7816.OFFSET_CDATA, scratch, X_NUM, (short) 4);
-        groupKeys(scratch, X_NUM, buf);
+        groupKeys(scratch, X_NUM, buf, null);
         apdu.setOutgoingAndSend((short) 0, GROUP_LEN);
     }
 
@@ -4969,6 +4980,15 @@ public class CashuApplet extends Applet implements TagSwitch {
                 outStage = JCSystem.makeTransientByteArray(OUT_STAGE_LEN, JCSystem.CLEAR_ON_DESELECT);
             } catch (SystemException e) {
                 try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e2) { outStage = null; }
+            }
+        }
+        /* The y of the payment's date key (D249), 32 bytes of the same memory: SPEND_ALL_BEGIN keeps it, SIGN's check reads it.
+         * Where the chip will not give it, null, and the check works the key out again, as before. */
+        if (groupY == null) {
+            try {
+                groupY = JCSystem.makeTransientByteArray((short) 32, JCSystem.CLEAR_ON_DESELECT);
+            } catch (SystemException e) {
+                groupY = null;
             }
         }
         /* The engines' flags (D247), five bytes of the same memory: which engine holds its key in this selection. Given to the
@@ -7754,7 +7774,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      */
     private static void sizeTheFile(byte[] a) {
         /* 3.2's speed commits (D245 on): the writes below are made again at each commit, from the code alone (the earlier ones
-         * all taken out), as many as bring the load file to 245 past a multiple of 256: 44,021 bytes at D247 and D248, a size no chip
+         * all taken out), as many as bring the load file to 245 past a multiple of 256: 44,021 bytes at D247 and D248, 44,277 at D249, sizes no chip
          * has been given (43,765 is the largest installed, on card 57723320).
          * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
          * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on
@@ -7798,10 +7818,18 @@ public class CashuApplet extends Applet implements TagSwitch {
         a[111] = 7;
         a[112] = 8;
         a[113] = 9;
+        a[114] = 10;
+        a[115] = 11;
+        a[116] = 12;
+        a[117] = 13;
+        a[118] = 14;
+        a[119] = 15;
+        a[120] = 16;
+        a[121] = 17;
+        a[122] = 18;
         a[130] = 6;
         a[131] = 7;
         a[132] = 8;
-        a[133] = 9;
         // padding ends
     }
 }

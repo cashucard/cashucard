@@ -9886,3 +9886,36 @@ its key once in all (each wait about 6 ms less); a first load of 36 pieces in th
 gives 2 a command (about 400 ms less over 35 LOAD_PROOFs); the change outputs of one payment, one init an engine for the
 whole payment; a sealed VERIFY_PIN, 2 inits less where the cube's and the square's engines were used earlier in the
 selection. `EnginesOnceTest` holds the once-a-selection counts, the retry and the sealed PIN.
+
+## <a id="d249"></a>D249: The y of the payment's date key kept from SPEND_ALL_BEGIN
+
+**Proposed (applet 3.2, 2026-11-26; not released, not run on a chip; under red team).** Item A4 of the 3.2 speed review.
+No command, answer or stored byte changes.
+
+**The rule.** SPEND_ALL_BEGIN works out P + t·G by the chip's point addition (`groupKeys`, D197) and keeps its x and parity
+in `group`, as before; it now keeps its y too, 32 bytes of RAM a selection clears (`groupY`, made at the first SET_CARD,
+cleared with the payment in hand in `select()`). SIGN's check of its signature (step 8, D207) takes Q whole from the point
+named in `group` and that y, where it worked W + t·G out again by the point addition. Where there is no kept y (the chip
+refused the room, a signature under no date: AUTH, the waits, PIN key's signature; the settlement record's, whose key is
+worked out again from c), the check is as before.
+
+**Why it is safe (the red team's first pass: the claim holds, by algebra).** s = k + e·(d + t) is made from the card's own d
+and the t in `group`; the check passes exactly when s·G − e·Q' = R, that is e·((d + t)·G − Q') = 0, so only Q' = (d + t)·G
+passes (or e = 0, a chance of 2^-256). Whatever the kept y gives (a fault in BEGIN's addition, a stale y, p − y, a faulted t
+in `group`), a correct Q' passes and any other fails; a fault in s passes only where δ·G = e·(Q' − Q), which no physical
+fault picks. What is given up is the second, independent working-out of P + t·G at SIGN; the check's algebra already binds
+the point to d + t, so nothing that check stops gets out. Its conditions:
+- **A4-a.** The y is copied straight after the first point addition in `groupKeys`, before the refund step writes R + u·G
+  over the same bytes, and only by SPEND_ALL_BEGIN (GROUP_KEYS passes none). Taken after the refund step, every dated
+  payment on a card with a refund key would be checked against a point off the curve and refused (its A4-1).
+- **A4-b.** It is used only where `g` is given (the payment's SIGN) and is cleared with `allState` in `select()`; SIGN needs
+  the payment in hand, which every other command gives up (A4-2).
+- **A4-c.** The check still holds Q's x to the x in e, still compares Q's parity with the one named (now of the kept y), and
+  still lifts Q to an even Y before [e]Q.
+- **A4-d.** `KeptYTest`: a kept y changed by one bit, or to p − y, between BEGIN and SIGN makes the SIGN 6F00 on the
+  bytecode's path and on the chip's, with nothing burned, the piece unspent and SPEND_ALL_AGAIN answering as if the SIGN was
+  never asked; dated and undated payments sign on cards with and without a refund key (a dated piece is refused on a card
+  with none), each with one point addition in its check.
+
+**Counts.** One point addition less a payment's SIGN (`PerPaymentKeyTest.whatItCosts`: waits + 1, where it was waits + 2):
+about 35 ms by JCAlgTest's figures. 32 bytes of RAM at the first SET_CARD. `KeptYTest` fails on f621b23.

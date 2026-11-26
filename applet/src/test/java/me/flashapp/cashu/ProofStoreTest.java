@@ -733,7 +733,7 @@ class ProofStoreTest {
             if (f.get(c.runtime.appletAt(c.aid)) == null) missing.add(f.getName());
         }
         // and 2.2's assisted-settlement record and its staging (D176), refused in the constructor too
-        assertEquals(new TreeSet<>(Arrays.asList("book", "cert", "dleq", "engineReady", "openKeys", "outStage", "outbox", "paid")), missing, "every other array of the applet is made at install, the store, the record (D176), the openings' keys (D183), the keyset table (D184), the paid list (D191) and the engines' flags (D247) after it, and the certificate (D192) at the first CERT_WRITE");
+        assertEquals(new TreeSet<>(Arrays.asList("book", "cert", "dleq", "engineReady", "groupY", "openKeys", "outStage", "outbox", "paid")), missing, "every other array of the applet is made at install, the store, the record (D176), the openings' keys (D183), the keyset table (D184), the paid list (D191), the engines' flags (D247) and the kept y (D249) after it, and the certificate (D192) at the first CERT_WRITE");
         c.setPin();
         c.pin();
         assertNull(c.store(), "a PIN does not reserve it");
