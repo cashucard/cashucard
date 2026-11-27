@@ -1,0 +1,157 @@
+/* The two app panels share platform rows; their posters use the actual mobile interfaces. */
+.downloads-page {
+  --ink: #142e22;
+  --paper: #f2f4eb;
+  --line: #c8d0c1;
+  background: var(--paper);
+  color: var(--ink);
+}
+.downloads-page .header { color: #edf3e7; }
+.downloads-page .header [aria-current="page"] { color: #e3f5bc; text-decoration: underline; text-underline-offset: 5px; }
+.downloads-main {
+  max-width: 1490px;
+  margin-inline: auto;
+  padding: clamp(38px, 5vw, 78px) clamp(20px, 5vw, 86px) clamp(56px, 7vw, 110px);
+}
+.downloads-intro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: clamp(28px, 3vw, 46px);
+}
+.downloads-intro h1 {
+  margin: 0;
+  font-size: clamp(3.6rem, 8.2vw, 7.6rem);
+  font-weight: 800;
+  line-height: .91;
+  letter-spacing: -.081em;
+}
+.downloads-intro p {
+  width: 19ch;
+  margin: 0 0 2px;
+  color: #3c5547;
+  font-size: clamp(1.15rem, 2vw, 1.7rem);
+  line-height: 1.2;
+  letter-spacing: -.036em;
+}
+.app-jumps { display: none; }
+.download-products { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(16px, 2.15vw, 32px); }
+.download-product {
+  min-width: 0;
+  scroll-margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+  background: #fefff8;
+  display: flex;
+  flex-direction: column;
+}
+.app-poster {
+  container-type: inline-size;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: clamp(220px, 20.5vw, 294px);
+  background: linear-gradient(118deg, #e6f7a7 3%, #d2e994 59%, #9dbc79);
+}
+.pos-product .app-poster { background: linear-gradient(119deg, #153d30 8%, #20513d 60%, #416a4c); color: #e6f8bb; }
+.poster-title {
+  position: absolute;
+  z-index: 2;
+  left: 6.3%;
+  inset-block: 12%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.app-icon { width: clamp(38px, 8.4cqw, 52px); height: auto; aspect-ratio: 1; border-radius: 24%; box-shadow: 0 2px 5px #0c221a1f; }
+.poster-title h2 { margin: 0; font-size: clamp(3.7rem, 13.5cqw, 5.6rem); line-height: .92; letter-spacing: -.073em; }
+.poster-title h2 span { display: block; font-size: clamp(1.02rem, 3.9cqw, 1.5rem); line-height: 1.45; letter-spacing: -.04em; }
+.poster-art { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.waves {
+  position: absolute;
+  width: 105%;
+  height: 250%;
+  left: 40%;
+  top: -77%;
+  transform: rotate(-25deg);
+  border-radius: 50%;
+  border: 1px solid #354f2e27;
+  box-shadow: 0 0 0 16px #354f2e0c, 0 0 0 17px #354f2e20, 0 0 0 41px #354f2e09, 0 0 0 42px #354f2e1c, 0 0 0 70px #354f2e08, 0 0 0 71px #354f2e14;
+}
+.pos-product .waves {
+  left: 48%; top: -64%; transform: rotate(27deg);
+  border-color: #d6ebb736;
+  box-shadow: 0 0 0 16px #d6ebb70b, 0 0 0 17px #d6ebb727, 0 0 0 41px #d6ebb708, 0 0 0 42px #d6ebb71a, 0 0 0 70px #d6ebb706, 0 0 0 71px #d6ebb713;
+}
+.device {
+  position: absolute;
+  width: 39%;
+  padding: clamp(3px, .8cqw, 5px);
+  overflow: hidden;
+  border: 2px solid #536653;
+  border-radius: 14% / 7%;
+  background: #13241b;
+  box-shadow: 1px 2px 0 #15281c, 8px 13px 24px #14352452;
+}
+.device img { display: block; width: 100%; height: auto; border-radius: 12% / 6%; }
+.setup-product .device { top: 13%; right: 2%; transform: rotate(11deg); }
+.physical-card {
+  position: absolute;
+  bottom: 3%; right: 24%;
+  width: 32%;
+  height: auto;
+  border-radius: 5% / 8%;
+  border: 1px solid #d7ecac;
+  box-shadow: 1px 2px 0 #809768, 1px 9px 15px #28432550;
+  transform: rotate(-13deg);
+}
+.pos-product .device { width: 42%; right: 7%; top: 10%; transform: rotate(-10deg); }
+.app-body { flex: 1; display: flex; flex-direction: column; padding: clamp(19px, 2vw, 32px); }
+.app-summary { margin: 0 0 16px; max-width: 42ch; font-size: clamp(1rem, 1.25vw, 1.15rem); line-height: 1.5; color: #344e3c; }
+.platforms { margin: auto 0 0; border-top: 1px solid var(--line); }
+.platforms > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 66px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.platforms dt { font-size: 1.12rem; font-weight: 750; letter-spacing: -.045em; }
+.platforms dd { margin: 0; }
+.store-link {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px;
+  padding: 8px 17px; background: #193e2a; color: #f3f9e5;
+  border: 1px solid #193e2a; border-radius: 9px;
+  font-weight: 700; font-size: .94rem; line-height: 1.25;
+}
+.store-link:hover { background: #2a5639; }
+.store-state { display: grid; justify-items: end; color: #4f6353; font-size: .95rem; text-align: right; line-height: 1.35; }
+.store-state a { display: inline-flex; min-height: 26px; align-items: center; color: #285139; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #93a58e; }
+.app-detail { align-self: start; display: inline-flex; align-items: center; min-height: 44px; margin-top: 6px; color: #285139; font-weight: 650; font-size: .95rem; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #93a58e; }
+.app-detail:hover { text-decoration-color: currentColor; }
+.downloads-main a:focus-visible { outline-color: #39652c; }
+@media (hover:hover) and (prefers-reduced-motion:no-preference) {
+  .device, .physical-card { transition: transform .35s ease-out; }
+  .setup-product:is(:hover, :focus-within) .device { transform: translateY(-4px) rotate(9deg); }
+  .setup-product:is(:hover, :focus-within) .physical-card { transform: translateY(-3px) rotate(-11deg); }
+  .pos-product:is(:hover, :focus-within) .device { transform: translateY(-4px) rotate(-8deg); }
+}
+@media (max-width: 760px) {
+  .download-products { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .downloads-main { max-width: 640px; padding-top: 36px; }
+  .downloads-intro { display: block; margin-bottom: 16px; }
+  .downloads-intro h1 { font-size: clamp(3.55rem, 12.8vw, 5rem); }
+  .downloads-intro p { width: auto; margin-top: 14px; font-size: 1.12rem; }
+  .app-jumps { display: flex; gap: 8px; margin: 0 0 18px; }
+  .app-jumps a { display: inline-flex; min-height: 44px; gap: 7px; align-items: center; padding: 6px 13px 6px 9px; border: 1px solid #aebaa9; border-radius: 100px; font-weight: 650; font-size: .94rem; }
+  .app-jumps img { border-radius: 6px; }
+  .app-poster { height: clamp(168px, 49vw, 250px); }
+  .physical-card { right: 13%; width: 30%; }
+  .app-body { padding: 17px 20px 7px; }
+  .download-product { border-radius: 16px; }
+  .app-summary { margin-bottom: 13px; }
+  .platforms > div { min-height: 58px; }
+}
+@media (max-width: 360px) {
+  .downloads-main { padding-inline: 14px; }
+  .poster-title h2 { font-size: 3.35rem; }
+  .app-body { padding-inline: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

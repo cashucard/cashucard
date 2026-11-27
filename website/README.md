@@ -33,10 +33,10 @@ guide's facts, and each footer. The home page states the risks once, in
 merchants' and developers' questions from the security model, the decisions and
 the dated reports, and `/developers` (`dist/developers.html`) links the draft,
 the APDU reference, the vectors and the code. Both use the install guide's
-layout and `guide.js`. When a doc they link moves, update its link here. There
-is no page for merchants yet, by choice: it waits for more wallets and tills.
-Footer links point to the draft NUT and the Cashu Card source, with the Cashu
-Card Setup under Apps. The install guide's Apps also link Flash and Foxy
+layout and `guide.js`. When a doc they link moves, update its link here.
+The main navigation and homepage hero lead to `/downloads` for Setup and POS.
+Footer links point to the draft NUT and the Cashu Card source, with both
+apps in the Apps group. The install guide's Apps also link Flash and Foxy
 at their own sites, getflash.io and getfoxy.io, since its setup step sends a
 new holder to the wallets there (D118).
 The links do not claim completed integrations.
@@ -85,17 +85,9 @@ states those for testing, and for volume CardLogix and Feitian's J3R180 on
 Alibaba, with prices as listed on 23 October 2026; check them before relying
 on them.
 
-"Install the applet" (`#install`, the nav's "Install") gives the two ways to
-put the applet on a blank card. The first is the Cashu Card Setup
-(`apps/provisioner`; see the linked release for the build identity), for card issuers with an operator
-account. It shows the app's icon (`dist/assets/provisioner-icon.png`, its
-180-pixel iOS icon) and links the TestFlight public beta, Google Play's
-testing opt-in for `com.islandbitcoin.provisioner` and the GitHub release
-with the build's files and checksums. A Play visitor who has not joined the
-test gets no store listing, so the opt-in page is the Android link; it lets
-anyone join once Google approves open testing. Replace both beta links with
-the store listings when the app is published. The second way is the install
-guide, for a computer with a card reader.
+The homepage’s “Install the applet” section (`#install`) links phone users to
+Cashu Card Setup on `/downloads#setup` and computer users to `/guide`. Keep
+app installation links and current platform availability on `/downloads`.
 
 `dist/guide.html` (with `guide.css` and `guide.js`) is the install guide at
 `/guide`: the steps of `docs/HARDWARE_DEPLOYMENT.md` for someone with a blank

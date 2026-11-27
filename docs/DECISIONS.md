@@ -9603,3 +9603,11 @@ app's install path, with an address set in the app, has not yet run on a chip.
 constant `CASHU_PLAN` is gone), the install tap and the bench screen (the only two callers of `provision`),
 `ProvisioningStore`, the batch record (`src/provisioningWorkflow.ts`, `keepMaker`), the card maker screen, the Settings row, the batch and installation screens; `installGate.test.ts`
 and the tests beside them. The docs that said a build carries a maker's file.
+
+## <a id="d240"></a>D240: App downloads are part of the main site navigation
+
+The homepage and main menu link to `/downloads`. Each app has its own section
+and separately maintained iPhone and Android availability. Setup links to
+TestFlight and Google Play. POS lists testing status until each store accepts
+public installs. Its source link is labeled separately. The applet section
+still explains phone and computer installation and links to the app page.
