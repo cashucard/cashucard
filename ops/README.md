@@ -93,7 +93,7 @@ revokes sessions; secrets never appear in the CLI's success/error output.
 
 ## Backup configuration and monitoring
 
-The nightly schedule is 03:17 UTC. Before deployment, bind an R2 bucket as
+Staging and production both export at 03:17 and 15:17 UTC. This leaves six hours before Atoll Recovery’s 18-hour freshness warning if an export is late. Before deployment, bind an R2 bucket as
 `OPS_BACKUPS` and set `OPS_BACKUP_RECIPIENT` to the operator's public age
 recipient. Keep the matching private identity in an independently recoverable
 secret store outside this Cloudflare account. Missing configuration fails the

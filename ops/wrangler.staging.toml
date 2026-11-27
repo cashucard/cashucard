@@ -26,4 +26,4 @@ binding = "OPS_BACKUPS"
 bucket_name = "cashu-card-ops-staging-backups"
 
 [triggers]
-crons = ["17 3 * * *"]
+crons = ["17 3,15 * * *"]
