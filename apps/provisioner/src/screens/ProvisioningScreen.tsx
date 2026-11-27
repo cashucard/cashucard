@@ -342,6 +342,7 @@ export function ProvisioningScreen({
   const ending = batch.ending === true;
   const journal = snapshot.active?.journal;
   const stage = journal?.stage;
+  const StopButton = flow.blankRetryAvailable ? SecondaryButton : PrimaryButton;
   const recorded = snapshot.history.filter(j => j.stage === 'recorded');
   const stopped = snapshot.history.length - recorded.length;
   const complete =
@@ -473,12 +474,22 @@ export function ProvisioningScreen({
         <View style={s.card} testID="real-attempt">
           <Text style={s.line}>Card {snapshot.active.ordinal + 1}</Text>
           <Text style={s.line}>
-            {stage
+            {flow.blankRetryAvailable
+              ? 'Hold the same card still. Setup will check that it is blank before continuing this installation.'
+              : stage
               ? STAGES[stage]
               : 'The reservation is awaiting confirmation from the service.'}
           </Text>
           {journal?.installation_id ? (
             <Dim>Card …{journal.installation_id.slice(-4)}</Dim>
+          ) : null}
+          {flow.blankRetryAvailable ? (
+            <PrimaryButton
+              title="CHECK CARD AND RETRY"
+              testID="retry-blank-card"
+              disabled={flow.busy || !gate.allowed || !!flow.batchMakerProblem}
+              onPress={flow.retryBlank}
+            />
           ) : null}
           <SecondaryButton
             title={
@@ -491,7 +502,7 @@ export function ProvisioningScreen({
             }}
           />
           {stage === 'quarantined' ? (
-            <PrimaryButton
+            <StopButton
               title="SAVE STOP AND CONTINUE"
               testID="recovery-acknowledge"
               disabled={flow.busy}

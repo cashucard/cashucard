@@ -444,6 +444,51 @@ test('sync saved work explains its service action and confirms a successful chec
   expect(text(tree)).toContain('Saved work checked. No card tap was started.');
 });
 
+test('a blank-card retry requires the operator to choose it on the original attempt', async () => {
+  const f = fixture();
+  const chip = 'cplc-v1:4790d3213180010203040506';
+  const retryScan = jest.fn();
+  const tree = await mount({
+    ...f,
+    hardwareValidated: true,
+    makerStorage: makerStorageWith(),
+    serviceFor: () => f.service,
+    runCard: async (w, service, options) => {
+      if (options.retryBlank) {
+        retryScan(options.retryBlank.chipId);
+        return retryScan.mock.calls.length === 1 ? 'interrupted' : 'quarantined';
+      }
+      const remote = f.remote();
+      remote.chip_id = chip;
+      remote.revision = 1;
+      remote.bind_receipt = {
+        attempt_id: remote.attempt_id, chip_id: chip, revision: 1, bound_at: 100,
+      };
+      await w.reconcile(service);
+      await w.withAttempt(service, async journal => {
+        await journal.installIntent({installation_id: null, replacement_consent: false});
+        await journal.quarantine('unsafe-partial-install');
+      });
+      return 'quarantined';
+    },
+  });
+  await signIn();
+  await act(async () => { await flow.create(config); await flow.program(); });
+  expect(text(tree)).toContain('CHECK CARD AND RETRY');
+  expect(text(tree)).toContain('Hold the same card still');
+  await act(async () => { await flow.recover(); });
+  expect(retryScan).not.toHaveBeenCalled();
+  await act(async () => {
+    await tree.root.findByProps({testID: 'retry-blank-card'}).props.onPress();
+  });
+  expect(retryScan).toHaveBeenCalledWith(chip);
+  expect(text(tree)).toContain('The card moved before the blank check finished');
+  await act(async () => { await flow.retryBlank(); });
+  expect(text(tree)).toContain('Setup could not verify this as the original blank card');
+  expect(f.service.reserve).toHaveBeenCalledTimes(1);
+  expect(f.service.disposition).not.toHaveBeenCalled();
+});
+
 test('acknowledged stop remains identifiable with its reason in batch history', async () => {
   const f = fixture();
   (f.service.disposition as jest.Mock).mockImplementation(
@@ -471,6 +516,7 @@ test('acknowledged stop remains identifiable with its reason in batch history', 
     await flow.create(config);
     await flow.program();
   });
+  expect(tree.root.findAllByProps({testID: 'retry-blank-card'})).toHaveLength(0);
   await act(async () => {
     await flow.acknowledge();
   });

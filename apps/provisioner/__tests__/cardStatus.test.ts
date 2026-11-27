@@ -151,7 +151,8 @@ test('a card owed change is told to bring it home through its holder wallet, bef
 test.each(['3.0', '3.1'])("a %s card's spent entries are its holder wallet's to free: no promise of this app's settlement check", version => {
   const s = cardStatus(installed({spent: 2, version}));
   expect(s.title).toBe('Check earlier payments');
-  expect(s.detail).toContain('holder wallet frees spent entries');
+  expect(s.detail).toContain('the mint that issued it');
+  expect(s.detail).toContain('including any test mint');
   expect(s.detail).not.toContain('Reset will independently check settlement');
   expect(cardStatus(installed({spent: 2, version: '2.2'})).detail).toContain(
     'Reset will independently check settlement',

@@ -1,6 +1,29 @@
 const test = require("node:test");
 const { execFileSync } = require("node:child_process");
 const { resolve } = require("node:path");
+
+test("Setup uses the short name on both launchers and keeps its full Android app name", () => {
+  execFileSync("python3", ["-c", `
+import plistlib
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+with Path("ios/CashuProvisioner/Info.plist").open("rb") as info:
+    assert plistlib.load(info)["CFBundleDisplayName"] == "Cashu Setup"
+
+base = Path("android/app/src/main")
+app = ET.parse(base / "AndroidManifest.xml").find("application")
+ns = {"android": "http://schemas.android.com/apk/res/android"}
+launcher = app.find(
+    "./activity/intent-filter/category[@android:name='android.intent.category.LAUNCHER']/../..", ns
+)
+strings = {s.get("name"): s.text for s in ET.parse(base / "res/values/strings.xml").findall("string")}
+label = "{%s}label" % ns["android"]
+assert strings[app.attrib[label].removeprefix("@string/")] == "Cashu Card Setup"
+assert strings[launcher.attrib[label].removeprefix("@string/")] == "Cashu Setup"
+`], { cwd: resolve(__dirname, "../../apps/provisioner") });
+});
+
 test("native preflight requires every candidate artifact and hash before store upload", () => {
   execFileSync(
     "python3",

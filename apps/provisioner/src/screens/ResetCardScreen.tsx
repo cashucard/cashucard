@@ -14,6 +14,7 @@ import {
 import {useProvisioning} from '../ProvisioningStore';
 import {useApp} from '../store';
 import {resetRecoveryDetails, threeLine} from '../ownedResetWorkflow';
+import {SPENT_ENTRY_GUIDANCE} from '../strings';
 
 import {CardFigure} from '../CardFigure';
 import {FONT, useTheme} from '../theme';
@@ -241,11 +242,7 @@ export function ResetCardScreen({
                   </Dim>
                 ) : null}
                 {card.spent > 0 && !cleanable ? (
-                  <Dim>
-                    The holder wallet frees this card’s spent entries once the
-                    mint has settled them. Reset is unavailable until they are
-                    freed.
-                  </Dim>
+                  <Dim>{SPENT_ENTRY_GUIDANCE}</Dim>
                 ) : card.spent > 0 ? (
                   <Dim>{`Settlement check: ${
                     card.mint || 'unsupported mint address'

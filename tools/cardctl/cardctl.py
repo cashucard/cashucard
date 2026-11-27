@@ -2697,6 +2697,30 @@ def cmd_set_owner(args) -> int:
     return 0
 
 
+def _mint_label(mint: str) -> str:
+    known = {"https://testnut.cashu.space": "Testnut (test sats)", "https://forge.flashapp.me": "Forge (real sats)"}
+    return known.get(mint.removesuffix("/"), repr(mint)) if mint else "an unset mint"
+
+
+def _check_mint_change(current: str, target: str, info: dict) -> None:
+    if current == target:
+        return
+    change = f"Changing the card mint from {_mint_label(current)} to {_mint_label(target)}"
+    if info["unspent"] or info["spent"] or info["change_owed"]:
+        steps = []
+        if info["change_owed"]:
+            steps.append("Collect the change owed to this card.")
+        if info["unspent"]:
+            steps.append(f"Move the {info['unspent']} unspent entries to your holder wallet.")
+        if info["spent"]:
+            steps.append(f"The card has {info['spent']} retained spent entries.")
+        steps.append("Use your holder wallet to check each spent entry with its issuing mint. "
+                     "Clear the retained entries only after every one is confirmed spent, then try again.")
+        raise SystemExit(change + " is blocked. " + " ".join(steps))
+    if current and current != FACTORY_MINT:
+        print(change + ". Funds stay with their issuing mint.", file=sys.stderr)
+
+
 def cmd_set_card(args) -> int:
     refund = check_refund_key(parse_hex(args.refund, 33, "--refund")) if args.refund else bytes(33)
     check_mint(args.mint, factory=True)
@@ -2704,6 +2728,7 @@ def cmd_set_card(args) -> int:
     card = connect(args)
     info = card.get_info()
     record = card.get_card()
+    _check_mint_change(record["mint"], args.mint, info)
     # the unit given, or the one the record has: a record sent with another unit turns the card's numbers (SET_CARD)
     unit = UNITS[args.unit] if args.unit else record["unit"]
     # the design given, or the one the record has: SET_CARD zeroes a design the record it is sent does not carry

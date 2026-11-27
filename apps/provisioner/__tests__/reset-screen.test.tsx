@@ -255,7 +255,7 @@ test.each(['3.0', '3.1'])("a %s card's spent entries are left to its holder wall
   const f = await mount({spent: 13, version});
   await press('reset-inspect');
   expect(JSON.stringify(tree.toJSON())).toContain(
-    'The holder wallet frees this card’s spent entries',
+    'the mint that issued it, including any test mint',
   );
   expect(tree.root.findAllByProps({testID: 'reset-prepare'})).toHaveLength(0);
   expect(f.service.keys).not.toHaveBeenCalled();

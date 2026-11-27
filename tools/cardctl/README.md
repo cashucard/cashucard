@@ -94,6 +94,12 @@ prints the same lines, and on a 3.0 card checks that it keeps keys per load
 
 ## The owner key
 
+When changing the mint on an existing card, `set-card` first checks for unspent
+pieces, retained spent entries and change owed. Collect any change, move the
+remaining balance to the holder wallet, and use that wallet to check each spent
+entry with its issuing mint. Clear the retained entries only after every one is confirmed spent.
+Once the card is empty, `set-card` can change the mint. Testnut uses test sats. Forge uses real sats.
+
 The owner's commands (`set-owner` on an owned card, `set-card` on an owned card,
 `set-limit`, `change-pin`, `refresh`, `lock`, and the owner's grant, `ALLOW_LOAD`,
 that `--owner` gives to `load`, `outbox`, `group-keys` and `card-secret`) sign a

@@ -1,6 +1,7 @@
 import {
   ProvisioningJournal,
   recoveryAction,
+  canRetryBlank,
   type JournalScope,
   type AttemptIdentity,
   type CompletionRecord,
@@ -187,4 +188,75 @@ test('serialized transitions preserve quarantine across restart without recordin
   await expect(reopened.rotated(1)).rejects.toThrow();
   await expect(reopened.quarantine('token=secret')).rejects.toThrow();
   expect((await storage.read())!).not.toMatch(/token|password|pin|enc|mac|dek/);
+});
+
+async function stoppedInstall(storage = disk()) {
+  const j = await ProvisioningJournal.open(storage, scope, attempt);
+  await j.bind(chip);
+  await j.installIntent({installation_id: null, replacement_consent: false});
+  await j.quarantine('unsafe-partial-install');
+  return {j, storage};
+}
+
+test('an old locally stopped install may receive a single durable verified-blank retry', async () => {
+  const {storage} = await stoppedInstall();
+  const j = await ProvisioningJournal.open(storage, scope);
+  expect(canRetryBlank(j.snapshot())).toBe(true);
+  await j.beginBlankRetry(chip, 1, 930);
+  const after = await ProvisioningJournal.open(storage, scope);
+  expect(after.snapshot()).toMatchObject({
+    ...attempt,
+    ...scope,
+    stage: 'install_intent',
+    chip_id: chip,
+    blank_retry: {
+      stopped_reason: 'unsafe-partial-install',
+      factory_key_version: 1,
+      verified_at: 930,
+    },
+  });
+  // The ordinary interrupted-install path can only inspect the result.
+  expect(
+    recoveryAction(after.snapshot(), {chip_id: chip, installation_id: null}),
+  ).toBe('inspect-install');
+  await after.quarantine('unsafe-partial-install');
+  expect(canRetryBlank(after.snapshot())).toBe(false);
+  await expect(after.beginBlankRetry(chip, 1, 931)).rejects.toThrow();
+});
+
+test.each([
+  ['chip', chip.replace(/.$/, '6'), 1, 930],
+  ['factory version', chip, 2, 930],
+  ['verification time', chip, 1, -1],
+] as const)(
+  'reject invalid verified-blank %s without consuming the attempt',
+  async (_label, id, version, time) => {
+    const {j} = await stoppedInstall();
+    await expect(j.beginBlankRetry(id, version, time)).rejects.toThrow();
+    expect(canRetryBlank(j.snapshot())).toBe(true);
+  },
+);
+
+test('a saved stop awaiting its service receipt cannot be retried', async () => {
+  const {j} = await stoppedInstall();
+  await j.beginDisposition('quarantined', 1);
+  expect(canRetryBlank(j.snapshot())).toBe(false);
+  await expect(j.beginBlankRetry(chip, 1, 930)).rejects.toThrow();
+});
+
+test('an uncertain retry-marker commit never dispatches a write or permits a repeated install', async () => {
+  const {j, storage} = await stoppedInstall();
+  const save = storage.replace;
+  storage.replace = async bytes => {
+    await save(bytes);
+    throw Error('lost storage acknowledgement');
+  };
+  const install = jest.fn();
+  await expect(j.beginBlankRetry(chip, 1, 930).then(install)).rejects.toThrow();
+  expect(install).not.toHaveBeenCalled();
+  const reopened = await ProvisioningJournal.open(storage, scope);
+  expect(
+    recoveryAction(reopened.snapshot(), {chip_id: chip, installation_id: null}),
+  ).toBe('inspect-install');
+  expect(canRetryBlank(reopened.snapshot())).toBe(false);
 });

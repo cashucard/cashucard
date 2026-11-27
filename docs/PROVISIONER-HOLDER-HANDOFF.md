@@ -86,6 +86,12 @@ card, or CHANGE_PIN once the expected owner is proved; neither is authorized
 as an automatic workaround by this contract. Keep it incomplete until the
 state, authority and explicit recovery action are established and tested.
 
+## Changing the mint on an existing card
+
+Before changing the mint in the holder wallet, show the current and proposed mint addresses. When the wallet knows one uses test funds and the other uses real funds, identify both in the warning. An unfamiliar mint address alone gives no assurance about the value it issues.
+
+Keep the current mint on the card while it holds value, is owed change, or retains spent entries. A zero balance can still leave payment records to settle. For a card that has already used multiple mints, check each retained entry with its own issuer. Once every issuer confirms its entries are spent, the holder can clear the records, read back the empty card, and change the mint. Changing the card's mint does not move funds between issuers.
+
 ## Persistence and service evidence
 
 Keep the existing installation journal/receipt immutable. Holder setup uses a

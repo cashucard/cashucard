@@ -132,6 +132,8 @@ export interface FakeCardOptions {
    * default, a blank card.
    */
   sellerApplets?: boolean;
+  /** Platform load files surfaced by the J3R180 in authenticated GET STATUS. */
+  platformPackages?: readonly (readonly [string, string])[];
   /**
    * What the test card did not do at first contact, for the guard that
    * catches it: PUT KEY with P1 00 at version FF keeps the FF set beside the
@@ -269,6 +271,7 @@ export class FakeCard {
     this.keepsShippedSet = options.keepsShippedSet;
     this.opts = {
       macOverModifiedApdu: options.macOverModifiedApdu ?? true,
+      platformPackages: options.platformPackages ?? [],
       openerRule: options.openerRule ?? 'mute',
       partialLoad: options.partialLoad ?? 'discard',
       heavyModules: options.heavyModules ?? [CARD_MODULE],
@@ -711,11 +714,12 @@ export class FakeCard {
         ...value,
       ];
       const aid = (tag: number, value: string) => tlv([tag], fromHex(value));
-      const entry = (id: string, pkg?: string) => {
+      const entry = (id: string, pkg?: string, version?: string) => {
         const fields = [
           ...aid(0x4f, id),
           ...tlv([0x9f, 0x70], [pkg ? 7 : 1]),
           ...(pkg ? [...tlv([0xc5], [0, 0, 0]), ...aid(0xc4, pkg)] : []),
+          ...(version ? [0xce, 2, ...fromHex(version)] : []),
           ...aid(0xcc, this.isdAid),
         ];
         return tlv([0xe3], fields);
@@ -723,9 +727,14 @@ export class FakeCard {
       const entries =
         p1 === 0x40
           ? [...this.instances.values()].flatMap(i => entry(i.aid, i.pkg))
-          : [...this.packages.keys(), ...this.partial.keys()].flatMap(id =>
-              entry(id),
-            );
+          : [
+              ...this.opts.platformPackages.flatMap(([id, version]) =>
+                entry(id, undefined, version),
+              ),
+              ...[...this.packages.keys(), ...this.partial.keys()].flatMap(id =>
+                entry(id),
+              ),
+            ];
       return sw(entries.length ? 0x9000 : 0x6a88, entries);
     }
     if (ins === 0xe6 && p1 === 0x02) {

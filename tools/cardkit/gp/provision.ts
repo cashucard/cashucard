@@ -41,12 +41,14 @@ import {
   CARD_VERSIONS,
   supportedCardVersion,
 } from './aids';
+import {readChipIdentity} from './identity';
 import {changeOwedByte, readChangeOwed} from './change-owed';
 import {type Bytes, equal, fromHex, swHex, toHex} from './bytes';
 import {
   RegistryEvidenceError,
   readCashuRegistry,
   readForeignTag,
+  requireBlankJ3R180Registry,
 } from './registry';
 import {
   CardError,
@@ -292,7 +294,18 @@ export interface RunOptions {
   sdAid?: Bytes;
 }
 
+/** CPLC fabricator and product family of the two qualified factory inventories. */
+export function supportedBlankRetryChip(chipId: string): boolean {
+  return /^cplc-v1:4790d321[0-9a-f]{16}$/.test(chipId);
+}
+export interface BlankRetry {
+  chipId: string;
+  factoryKeyVersion: number;
+}
 export interface ProvisionOptions extends RunOptions {
+  /** A quarantined, bound install may start once after this exact blank-card
+   * proof. The callback revalidates the service and persists that intent. */
+  blankRetry?: BlankRetry & {persistIntent: () => Promise<void>};
   /** Remove an installed card applet whose GET_INFO is empty. Spare cards only. */
   replace?: boolean;
   /** The card manager's keys; the factory set by default. */
@@ -664,6 +677,74 @@ export async function provision(
           : undefined;
     },
     auth: async () => {
+      if (options.blankRetry) {
+        const {chipId, factoryKeyVersion, persistIntent} = options.blankRetry;
+        if (
+          !supportedBlankRetryChip(chipId) ||
+          factoryKeyVersion !== FACTORY_KVN ||
+          !equal(sdAid, ISD_AID) ||
+          !equal(plan.packageAid, CASHU_PACKAGE_AID) ||
+          options.replace ||
+          options.macOverModifiedApdu === false
+        ) {
+          throw new Guard('unsupported blank-card retry');
+        }
+        await readChipIdentity(run.timed, chipId);
+        const info = expectOk(await run.plain(getKeyInformation()), 0xca);
+        const template = parseKeyInformation(info.data);
+        if (
+          template.length !== 3 ||
+          ![1, 2, 3].every(id =>
+            template.some(
+              k =>
+                k.id === id &&
+                k.kvn === FACTORY_KVN &&
+                k.components.length === 1 &&
+                k.components[0]!.type === 0x80 &&
+                k.components[0]!.length === 16,
+            ),
+          )
+        ) {
+          throw new Guard(
+            'the chip does not have the qualified factory key version',
+          );
+        }
+        const hs = await initializeUpdate(
+          run.timed,
+          options.random,
+          FACTORY_KVN,
+        );
+        if (hs.reply.kvn !== FACTORY_KVN || hs.reply.scp !== 2) {
+          throw new Guard('unexpected card manager profile');
+        }
+        const verified = sessionIfMatches(FACTORY_KEYS, hs);
+        if (!verified) throw new WrongKeys();
+        const authenticated = await externalAuthenticate(
+          run.timed,
+          verified,
+          hs,
+        );
+        const verifyRegistry = async () => {
+          try {
+            await requireBlankJ3R180Registry(cmd =>
+              authenticated.send(run.timed, cmd),
+            );
+          } catch (e) {
+            if (e instanceof RegistryEvidenceError)
+              throw new Guard(
+                'the card does not match its blank platform registry',
+              );
+            throw e;
+          }
+        };
+        await verifyRegistry();
+        await persistIntent();
+        // NFC stays open while the service and local storage acknowledge the retry.
+        // Verify again using this channel, which cannot survive card removal.
+        await verifyRegistry();
+        session = authenticated;
+        return;
+      }
       session = await openSession(
         run.timed,
         keys,
@@ -672,6 +753,7 @@ export async function provision(
       );
     },
     sweep: async () => {
+      if (options.blankRetry) return; // The authenticated registry proved there is nothing to delete.
       const channel = open();
       // SCP03 is the J3R452's, which ships with the seller's NDEF tag at the
       // tag's AID (scp03-07): before a Cashu AID is deleted, the registry must
@@ -820,6 +902,8 @@ export async function provision(
 }
 
 export interface RotateOptions extends RunOptions {
+  /** Revalidate an interrupted attempt's remote authority immediately before replacing keys. */
+  beforePutKey?: () => Promise<void>;
   /**
    * PUT KEY's P1 and the new set's version. By default the active set's
    * version for both (in place, as gp --lock does). P1 00 stops guarded on
@@ -989,6 +1073,7 @@ export async function rotateKeys(
       hs,
       sessionOptions,
     );
+    await options.beforePutKey?.();
     run.enter('putKey');
     const command = putKeys(to, session, {p1, newKvn});
     expectOk(await session.send(run.timed, command), 0xd8);
