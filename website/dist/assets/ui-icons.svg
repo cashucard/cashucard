@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="up-right" viewBox="0 0 16 16">
+    <path d="M3 13 13 3M4 3h9v9" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="right" viewBox="0 0 16 16">
+    <path d="M2 8h12m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="down" viewBox="0 0 16 16">
+    <path d="M8 2v12m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="play" viewBox="0 0 16 16">
+    <path d="M4 2.4 13 8l-9 5.6z" fill="currentColor"/>
+  </symbol>
+</svg>

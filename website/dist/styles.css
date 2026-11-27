@@ -18,7 +18,8 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .header nav a{color:#afc1b5}
 .header nav a:hover,.header-link:hover{color:#c9f18e}
 .header-link{display:flex;gap:14px;align-items:center}
-.header-link span{font-size:20px}
+.ui-icon{display:inline-block;width:1em;height:1em;vertical-align:-.12em;flex:none;pointer-events:none}
+.header-link .ui-icon{font-size:20px}
 .hero{position:relative;min-height:calc(100svh - 74px);max-height:960px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;isolation:isolate;padding:0 clamp(24px,5vw,86px) 55px;overflow:hidden;background:radial-gradient(circle at 73% 44%,#2b4c31 0,#173526 34%,#10271e 67%)}
 .hero-grid{position:absolute;inset:0;z-index:-1;opacity:.24;background-image:linear-gradient(#b8d1b313 1px,transparent 1px),linear-gradient(90deg,#b8d1b313 1px,transparent 1px);background-size:68px 68px;mask-image:linear-gradient(90deg,transparent 5%,#000 60%)}
 .hero-copy{position:relative;z-index:2;padding-top:14px}
@@ -35,7 +36,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:35px}
 .button{min-height:52px;padding:0 20px;display:inline-flex;align-items:center;justify-content:space-between;gap:30px;font-size:14px;font-weight:800;border-radius:3px;transition:transform .24s,background .24s,color .24s}
 .button:hover{transform:translateY(-3px)}
-.button span{font-size:21px;line-height:1;font-weight:400}
+.button .ui-icon{font-size:21px}
 .button-bright{background:#d3f39a;color:#12271d}
 .button-bright:hover{background:#e7ffb7}
 .button-outline{border:1px solid #a9c0a05c;color:#e9f0e7}
@@ -66,7 +67,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .hero-footer-rule{height:1px;flex:1;background:#bfd6b92c}
 .hero-footer a{white-space:nowrap}
 .hero-footer a:hover{color:#d3f39a}
-.hero-footer a span{font-size:15px;margin-left:12px}
+.hero-footer a .ui-icon{font-size:15px;margin-left:12px}
 .site-footer{background:#e5ebdf;color:#173227;border-top:1px solid #c8d4c8;padding:30px clamp(24px,5vw,86px) 18px;scroll-margin-top:12px}
 .footer-groups{display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:28px;padding-bottom:28px}
 .footer-group{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
@@ -199,7 +200,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .film-screen video{display:block;width:100%;height:100%;object-fit:cover;background:#000}
 .film-play{position:absolute;inset:0;z-index:4;margin:auto;width:max-content;height:52px;padding:0 20px;display:inline-flex;align-items:center;gap:18px;border:0;border-radius:3px;background:#d3f39a;color:#12271d;font-size:14px;font-weight:800;box-shadow:0 12px 40px #0008;transition:transform .24s,background .24s}
 .film-play:hover{transform:translateY(-3px);background:#e7ffb7}
-.film-play span{font-size:12px}
+.film-play .ui-icon{font-size:12px}
 .film-play[hidden],.film-ui[hidden]{display:none}
 .film-ui{display:grid;grid-template-columns:auto auto auto 1fr;gap:10px 16px;align-items:center;margin:14px 0 0}
 .ctl{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;min-width:38px;padding:0 13px;border:0;border-radius:999px;background:#edf3e712;box-shadow:inset 0 0 0 1px #b8d1b330;color:#edf3e7;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}

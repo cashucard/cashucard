@@ -25,7 +25,7 @@
     <header class="header">
       <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
       <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
     </header>
     <main id="main" class="guide">
       <section class="guide-hero" aria-labelledby="ops-title">
@@ -34,7 +34,7 @@
           <h1 id="ops-title">Host an <em>ops-service</em></h1>
           <p class="guide-lead">Run the operator console and provisioning API for your own cards. One Docker image provides the service and its SQLite storage tools. Your domain connects it to Cashu Card Setup.</p>
           <ul class="guide-facts" aria-label="At a glance"><li>Experimental</li><li>Linux AMD64 + ARM64</li><li>Docker Compose</li><li>Your HTTPS domain</li></ul>
-          <p class="guide-back"><a href="/developers#overview">See how all the parts fit together ↗</a></p>
+          <p class="guide-back"><a href="/developers#overview">See how all the parts fit together <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></p>
         </div>
       </section>
       <div class="guide-layout">
@@ -131,7 +131,7 @@ docker compose run --rm --entrypoint node setup -e 'require("node:fs").unlinkSyn
           <section id="phone" aria-labelledby="phone-title">
             <h2 id="phone-title">Connect the Cashu Card Setup app</h2>
             <ol>
-              <li>Open <a href="/downloads#setup">Cashu Card Setup</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
+              <li>Open <a href="/downloads#setup">Cashu Card Setup</a>. On sign-in, choose <b>Ops service</b>, then <b>Change</b>.</li>
               <li>Add your HTTPS origin, for example <code>https://ops.example.com</code>, and confirm the service selection. Use the origin without <code>/ops/operators</code>.</li>
               <li>Sign in with an operator account created on this service. Confirm the displayed hostname before creating a batch.</li>
               <li>Enter your card maker name and the web address your cards' NFC tag opens. The app asks once for each service and installs nothing until both are saved.</li>
@@ -178,12 +178,12 @@ docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-e
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">Ops-service release ↗</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">Ops-service release <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
         <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
       </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
     </footer>
   </body>
 </html>

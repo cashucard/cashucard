@@ -168,7 +168,7 @@
 .helps a { display: block; height: 100%; padding: 20px; border-radius: var(--f-r-md); border: 1px solid var(--f-line); background: var(--f-bg-soft); text-decoration: none; color: var(--f-ink); transition: border-color .18s, transform .18s; }
 .helps a:hover { border-color: var(--f-accent-line); transform: translateY(-2px); color: var(--f-ink); }
 .helps b { display: flex; justify-content: space-between; font-size: 17px; font-weight: 700; }
-.helps b::after { content: "\2197"; color: var(--f-accent); font-weight: 400; }
+.helps .ui-icon { color: var(--f-accent); align-self: center; }
 .helps span { display: block; margin-top: 6px; color: var(--f-mist); font-size: 15px; line-height: 1.5; }
 
 @keyframes give-pulse { 0% { box-shadow: 0 0 0 0 var(--f-accent-glow); } 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }

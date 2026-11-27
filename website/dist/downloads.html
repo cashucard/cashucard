@@ -24,7 +24,7 @@
     <header class="header">
       <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
       <nav aria-label="Main navigation"><a href="/downloads" aria-current="page">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a><a href="/fund">Fund</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
+      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
     </header>
     <main class="downloads-main" id="main">
       <header class="downloads-intro">
@@ -51,8 +51,19 @@
           <div class="app-body">
             <p class="app-summary">Install the card software on a compatible blank NFC card. You’ll need a Setup operator account.</p>
             <dl class="platforms">
-              <div><dt>iPhone</dt><dd><a class="store-link" href="https://testflight.apple.com/join/M3JucFNy" aria-label="Get Cashu Card Setup for iPhone on TestFlight">Get on TestFlight</a></dd></div>
-              <div><dt>Android</dt><dd><a class="store-link" href="https://play.google.com/store/apps/details?id=com.islandbitcoin.provisioner" aria-label="Get Cashu Card Setup for Android on Google Play">Get on Google Play</a></dd></div>
+              <div>
+                <dt>iPhone</dt>
+                <dd class="platform-action"><a class="store-link raised-badge testflight-badge" href="https://testflight.apple.com/join/M3JucFNy" aria-label="Join the Cashu Card Setup beta on TestFlight">
+                  <img src="/assets/downloads/phone-download.svg" width="32" height="32" alt="" />
+                  <span class="badge-type"><small>Join the beta on</small><strong>TestFlight</strong></span>
+                </a></dd>
+              </div>
+              <div>
+                <dt>Android</dt>
+                <dd class="platform-action"><a class="store-link play-download" href="https://play.google.com/store/apps/details?id=com.islandbitcoin.provisioner" aria-label="Get Cashu Card Setup on Google Play">
+                  <img src="/assets/downloads/google-play-badge.png" width="646" height="250" alt="Get it on Google Play" />
+                </a></dd>
+              </div>
             </dl>
             <a class="app-detail" href="/#buy">Find compatible blank cards</a>
           </div>
@@ -71,8 +82,22 @@
           <div class="app-body">
             <p class="app-summary">Take card, Cashu wallet and Lightning payments on your phone. POS is currently in private testing.</p>
             <dl class="platforms">
-              <div><dt>iPhone</dt><dd class="store-state"><span>Public beta in review</span><a href="https://testflight.apple.com/join/8whkd38v">Check TestFlight status</a></dd></div>
-              <div><dt>Android</dt><dd class="store-state"><span>Public beta pending</span><a href="https://play.google.com/apps/internaltest/4701217667850340732">Invited Android testers</a></dd></div>
+              <div>
+                <dt>iPhone</dt>
+                <dd class="platform-note" id="pos-iphone-status">Public beta in review</dd>
+                <dd class="platform-action"><a class="store-link raised-badge testflight-badge" href="https://testflight.apple.com/join/8whkd38v" aria-label="Check Cashu Card POS beta status on TestFlight" aria-describedby="pos-iphone-status">
+                  <img src="/assets/downloads/phone-download.svg" width="32" height="32" alt="" />
+                  <span class="badge-type"><small>Check status on</small><strong>TestFlight</strong></span>
+                </a></dd>
+              </div>
+              <div>
+                <dt>Android</dt>
+                <dd class="platform-note" id="pos-android-status">Public beta pending</dd>
+                <dd class="platform-action"><a class="store-link raised-badge invite-badge" href="https://play.google.com/apps/internaltest/4701217667850340732" aria-label="Invited testers of Cashu Card POS on Google Play" aria-describedby="pos-android-status">
+                  <img src="/assets/downloads/tester-pass.svg" width="32" height="32" alt="" />
+                  <span class="badge-type"><small>Invited testers</small><strong>Google Play</strong></span>
+                </a></dd>
+              </div>
             </dl>
             <a class="app-detail" href="https://github.com/cashucard/cashu-card-pos">View POS source on GitHub</a>
           </div>
@@ -81,12 +106,13 @@
     </main>
     <footer id="source" class="site-footer" aria-label="Protocol and code">
       <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="/fund">Fund the work</a></div>
+        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
+        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
+        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/fund">Fund the work</a></div>
         <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
       </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
+      <p class="store-attribution">Google Play and the Google Play logo are trademarks of Google LLC.</p>
+      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
     </footer>
   </body>
 </html>
