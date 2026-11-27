@@ -9,6 +9,7 @@ import {
 import {
   ProvisioningJournal,
   assertJournalScope,
+  canRetryBlank,
   type AttemptJournal,
   type CompletionReceipt,
   type DispositionIntent,
@@ -38,6 +39,12 @@ export interface ReservedAttempt {
   revision: number;
   state: 'active' | 'recorded' | 'quarantined' | 'abandoned';
   chip_id: string | null;
+  bind_receipt?: {
+    attempt_id: string;
+    chip_id: string;
+    revision: number;
+    bound_at: number;
+  } | null;
   completion_receipt: CompletionReceipt | null;
   disposition_receipt?: DispositionReceipt | null;
 }
@@ -143,6 +150,14 @@ export interface WorkflowSnapshot {
   active: PendingAttempt | null;
   history: AttemptJournal[];
   last_failure?: PublicFailureContext | null;
+  /** The last completed retry in this operator workspace, including after batch closure. */
+  last_blank_retry?: {
+    attempt_id: string;
+    batch_id: number;
+    verified_at: number;
+    stopped_reason: 'unsafe-partial-install';
+    outcome: 'recorded' | 'quarantined';
+  };
 }
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -243,10 +258,30 @@ export class ProvisioningWorkflow {
       ...(s && Object.prototype.hasOwnProperty.call(s, 'last_failure')
         ? ['last_failure']
         : []),
+      ...(s && s.last_blank_retry !== undefined ? ['last_blank_retry'] : []),
     ]);
     check(s.schema === 2 && UUID.test(s.device_id) && Array.isArray(s.history));
     if (s.last_failure !== undefined && s.last_failure !== null) {
       check(isPublicFailureContext(s.last_failure));
+    }
+    if (s.last_blank_retry !== undefined) {
+      const r = s.last_blank_retry;
+      exact(r, [
+        'attempt_id',
+        'batch_id',
+        'verified_at',
+        'stopped_reason',
+        'outcome',
+      ]);
+      check(
+        UUID.test(r.attempt_id) &&
+          uint(r.batch_id) &&
+          r.batch_id > 0 &&
+          uint(r.verified_at) &&
+          r.verified_at > 0 &&
+          r.stopped_reason === 'unsafe-partial-install' &&
+          ['recorded', 'quarantined'].includes(r.outcome),
+      );
     }
     if (!s.batch) {
       check(s.active === null && s.history.length === 0);
@@ -591,6 +626,80 @@ export class ProvisioningWorkflow {
     });
   }
 
+  /** A blank-card retry never reserves or binds. Recheck Ops after the phone sees
+   * the card, since waiting for the NFC tap can outlast the first status check. */
+  withBlankRetry<T>(
+    service: ReservationService,
+    expectedAttemptId: string,
+    run: (
+      journal: ProvisioningJournal,
+      confirmActive: () => Promise<void>,
+    ) => Promise<T>,
+  ): Promise<T> {
+    return this.serial(async () => {
+      const active = this.state.active;
+      check(active?.journal && canRetryBlank(active.journal));
+      const journal = await this.openActiveJournal(this.actor(service).scope);
+      const confirmActive = () =>
+        this.confirmActiveRetry(service, expectedAttemptId);
+      await confirmActive();
+      return run(journal, confirmActive);
+    });
+  }
+
+  /** Re-read the original binding before another card-side mutation. Read-only
+   * and safe to call inside the workflow's existing exclusive operation. */
+  async confirmActiveRetry(
+    service: ReservationService,
+    expectedAttemptId: string,
+  ): Promise<void> {
+    const b = this.actor(service);
+    const active = this.state.active;
+    const j = active?.journal;
+    check(
+      active &&
+        j &&
+        j.chip_id &&
+        (canRetryBlank(j) ||
+          (j.blank_retry &&
+            [
+              'install_intent',
+              'installed',
+              'rotation_intent',
+              'rotated',
+            ].includes(j.stage))) &&
+        active.attempt_id === expectedAttemptId &&
+        j.attempt_id === active.attempt_id &&
+        active.revision === 1 &&
+        active.ordinal === b.next_ordinal &&
+        j.batch_id === b.batch_id &&
+        j.ordinal === active.ordinal &&
+        j.load_sha256 === b.request.load_sha256 &&
+        !b.ending,
+    );
+    const remote = await service.attempt(
+      this.state.device_id,
+      expectedAttemptId,
+    );
+    const receipt = remote.bind_receipt;
+    check(
+      remote.state === 'active' &&
+        remote.revision === active.revision &&
+        remote.attempt_id === expectedAttemptId &&
+        remote.batch_id === b.batch_id &&
+        remote.ordinal === active.ordinal &&
+        remote.operator_id === b.scope.operator_id &&
+        remote.device_id === this.state.device_id &&
+        remote.chip_id === j.chip_id &&
+        remote.completion_receipt === null &&
+        remote.disposition_receipt === null &&
+        receipt?.attempt_id === expectedAttemptId &&
+        receipt.chip_id === j.chip_id &&
+        receipt.revision === remote.revision &&
+        uint(receipt.bound_at),
+    );
+  }
+
   private openActiveJournal(scope: JournalScope): Promise<ProvisioningJournal> {
     check(this.state.active?.journal);
     return ProvisioningJournal.open(
@@ -609,7 +718,20 @@ export class ProvisioningWorkflow {
   private async archiveActive(): Promise<void> {
     const next = this.snapshot();
     check(next.active?.journal && terminal(next.active.journal));
-    next.history.push(next.active.journal);
+    const journal = next.active.journal;
+    if (
+      journal.blank_retry &&
+      (journal.stage === 'recorded' || journal.stage === 'quarantined')
+    ) {
+      next.last_blank_retry = {
+        attempt_id: journal.attempt_id,
+        batch_id: journal.batch_id,
+        verified_at: journal.blank_retry.verified_at,
+        stopped_reason: journal.blank_retry.stopped_reason,
+        outcome: journal.stage,
+      };
+    }
+    next.history.push(journal);
     next.batch!.next_ordinal++;
     next.active = null;
     await this.commit(next);

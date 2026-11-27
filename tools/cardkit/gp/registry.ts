@@ -115,10 +115,10 @@ export function parseRegistryEntries(data: Bytes): RegistryEntry[] {
   });
 }
 /** One GET STATUS listing through `send`, every page of it, parsed; none at all (6A88) is []. */
-async function readEntries(
+async function readRegistryData(
   send: (command: number[]) => Promise<Reply>,
   kind: RegistryKind,
-): Promise<RegistryEntry[]> {
+): Promise<number[]> {
   const data: number[] = [];
   for (let page = 0; page < 16; page++) {
     const reply = await send(registryCommand(kind, page > 0));
@@ -131,9 +131,15 @@ async function readEntries(
     )
       throw new RegistryEvidenceError();
     data.push(...reply.data);
-    if (reply.sw === 0x9000) return parseRegistryEntries(data);
+    if (reply.sw === 0x9000) return data;
   }
   throw new RegistryEvidenceError();
+}
+async function readEntries(
+  send: (command: number[]) => Promise<Reply>,
+  kind: RegistryKind,
+): Promise<RegistryEntry[]> {
+  return parseRegistryEntries(await readRegistryData(send, kind));
 }
 /**
  * Which Cashu objects the card holds, from GET STATUS of the applications and
@@ -214,4 +220,42 @@ export async function readForeignTag(
   )
     throw new RegistryEvidenceError();
   return true;
+}
+
+/** Known J3R180 platform registries from gp-list.txt and the 2026-10-28 blank
+ * qualification. Only CardDocLite varies between the two factory images. */
+function platformEntry(aid: string, version: string): string {
+  return (
+    '4F' +
+    toHex([aid.length / 2]) +
+    aid +
+    '9F700101CE02' +
+    version +
+    'CC08' +
+    toHex(ISD_AID)
+  );
+}
+const platformEntries = [
+  platformEntry('A0000001515350', 'FFFF'),
+  platformEntry('A0000000620204', '0100'),
+  platformEntry('A0000000620202', '0103'),
+];
+const cardDocLite = platformEntry('A00000016443446F634C697465', '0100');
+export async function requireBlankJ3R180Registry(
+  send: (command: number[]) => Promise<Reply>,
+): Promise<void> {
+  if ((await readRegistryData(send, 'applications')).length !== 0)
+    throw new RegistryEvidenceError();
+  const entries = tlvs(await readRegistryData(send, 'load-files'));
+  const remaining = new Set(platformEntries);
+  let hasCardDocLite = false;
+  for (const {tag, value} of entries) {
+    if (tag !== 0xe3) throw new RegistryEvidenceError();
+    const entry = toHex(value);
+    if (remaining.delete(entry)) continue;
+    if (entry !== cardDocLite || hasCardDocLite)
+      throw new RegistryEvidenceError();
+    hasCardDocLite = true;
+  }
+  if (remaining.size) throw new RegistryEvidenceError();
 }

@@ -581,7 +581,7 @@ test.each([
   },
 );
 
-test('the install gives the tag exactly the gated maker\'s address, and a maker the gate did not pass touches no card', async () => {
+test("the install gives the tag exactly the gated maker's address, and a maker the gate did not pass touches no card", async () => {
   const address = 'https://getfoxy.io/card';
   const f = fixture();
   const j = await f.open();
@@ -592,11 +592,17 @@ test('the install gives the tag exactly the gated maker\'s address, and a maker 
       verifiedAt: () => 1700000000,
     }),
   ).toBe('record_pending');
-  const bytes = [0xc9, address.length, ...Array.from(address, c => c.charCodeAt(0))];
+  const bytes = [
+    0xc9,
+    address.length,
+    ...Array.from(address, c => c.charCodeAt(0)),
+  ];
   const carries = (apdu: number[], part: number[]) =>
     apdu.some((_, i) => part.every((b, k) => apdu[i + k] === b));
   expect(f.log.filter(a => carries(a, bytes)).length).toBe(1);
-  const other = Array.from('https://cards.testworks.dev/card', c => c.charCodeAt(0));
+  const other = Array.from('https://cards.testworks.dev/card', c =>
+    c.charCodeAt(0),
+  );
   expect(f.log.filter(a => carries(a, other)).length).toBe(0);
 
   for (const maker of [
@@ -618,4 +624,84 @@ test('the install gives the tag exactly the gated maker\'s address, and a maker 
     expect(g.log).toEqual([]);
     expect(fresh.snapshot().stage).toBe('reserved');
   }
+});
+
+const retryPackages = [
+  ['A0000001515350', 'FFFF'],
+  ['A0000000620204', '0100'],
+  ['A0000000620202', '0103'],
+  ['A00000016443446F634C697465', '0100'],
+] as const;
+async function stoppedBlank() {
+  const f = fixture(new FakeCard({platformPackages: retryPackages}));
+  const j = await f.open();
+  await j.bind(chip);
+  await j.installIntent({installation_id: null, replacement_consent: false});
+  await j.quarantine('unsafe-partial-install');
+  const retry = (confirm: () => Promise<void>, cardOptions = {}) =>
+    runProvisioningTap(
+      f.tx,
+      j,
+      SPIKE_KEYS,
+      f.bind,
+      {
+        ...options,
+        verifiedAt: () => 1700000000,
+        retryBlank: {chipId: chip, factoryKeyVersion: 1},
+        ...cardOptions,
+      },
+      confirm,
+    );
+  return {f, j, retry};
+}
+test('a stopped blank retry retains its original attempt and validates the active reservation at install and key rotation', async () => {
+  const {f, j, retry} = await stoppedBlank();
+  const confirm = jest.fn(async () => {});
+  expect(await retry(confirm)).toBe('record_pending');
+  expect(confirm).toHaveBeenCalledTimes(2);
+  expect(j.snapshot()).toMatchObject({
+    ...identity,
+    stage: 'record_pending',
+    gp_key_version: 1,
+  });
+  expect(j.snapshot().blank_retry).toBeDefined();
+  expect(f.bind).not.toHaveBeenCalled();
+  expect(f.card.insLog()).not.toContain(0xe4);
+  expect(f.card.insLog().filter(i => i === 0xd8)).toHaveLength(1);
+});
+test('unavailable or stale service during blank verification leaves the quarantine intact and sends no card mutation', async () => {
+  const {f, j, retry} = await stoppedBlank();
+  const before = j.snapshot();
+  await expect(
+    retry(async () => {
+      throw new Error('attempt no longer active');
+    }),
+  ).rejects.toThrow('attempt no longer active');
+  expect(j.snapshot()).toEqual(before);
+  expect(destructive(f.log)).toEqual([]);
+});
+test('loss after the durable retry intent cannot reissue, even if a later tap still sees a blank card', async () => {
+  const {f, j, retry} = await stoppedBlank();
+  expect(
+    await retry(async () => {}, {
+      checkpoint: async (step: string) => {
+        if (step === 'install-intent-saved') f.card.mute = true;
+      },
+    }),
+  ).toBe('interrupted');
+  expect(j.snapshot().stage).toBe('install_intent');
+  expect(j.snapshot().blank_retry).toBeDefined();
+  f.card.reset();
+  expect(await f.tap(await f.open())).toBe('quarantined');
+  expect(destructive(f.log)).toEqual([]);
+});
+test('a service disposition during loading prevents the assigned keys from being written', async () => {
+  const {f, j, retry} = await stoppedBlank();
+  const confirm = jest
+    .fn()
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('disposition'));
+  await expect(retry(confirm)).rejects.toThrow('disposition');
+  expect(j.snapshot().stage).toBe('rotation_intent');
+  expect(f.card.insLog()).not.toContain(0xd8);
 });

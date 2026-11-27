@@ -82,6 +82,15 @@ function journalDetails(j: AttemptJournal) {
     load_sha256: j.load_sha256,
     gp_key_version: j.gp_key_version ?? null,
     quarantine_reason: j.quarantine_reason ?? null,
+    ...(j.blank_retry
+      ? {
+          blank_retry: {
+            stopped_reason: j.blank_retry.stopped_reason,
+            factory_key_version: j.blank_retry.factory_key_version,
+            verified_at: j.blank_retry.verified_at,
+          },
+        }
+      : {}),
     record_pending: j.stage === 'record_pending',
     completion_acknowledged: !!j.completion_receipt,
     disposition_acknowledged: !!j.disposition_receipt,

@@ -16,6 +16,7 @@ import {
   CleanupError,
   CardError,
   readResetReview,
+  supportedBlankRetryChip,
   type ResetReview,
   type Transceiver,
 } from './cardkit';
@@ -28,7 +29,7 @@ import {
 } from './ownedResetWorkflow';
 import {mintSettlementJson, MintSettlementError} from './mintSettlement';
 import {readCardStatus, type CardReadout} from './cardStatus';
-import type {JournalStorage} from './journal';
+import {canRetryBlank, type JournalStorage} from './journal';
 import type {WorkspaceStorage, WorkspaceDisks} from './workspaceStorage';
 import {
   ProvisioningWorkflow,
@@ -181,6 +182,8 @@ interface RealProvisioning {
   recover(): Promise<boolean>;
   replacement: ReplacementReview | null;
   program(): Promise<boolean>;
+  blankRetryAvailable: boolean;
+  retryBlank(): Promise<boolean>;
   dismissReplacement(): void;
   quarantine(): Promise<boolean>;
   acknowledge(): Promise<boolean>;
@@ -787,7 +790,23 @@ function ProvisioningSession({
   const programWork = async (
     w: ProvisioningWorkflow,
     service: CardProvisioningService,
+    retryAttemptId?: string,
   ): Promise<void> => {
+    let retryBlank: AttemptRunOptions['retryBlank'];
+    if (retryAttemptId !== undefined) {
+      const active = w.snapshot().active;
+      if (
+        !active?.journal?.chip_id ||
+        !supportedBlankRetryChip(active.journal.chip_id) ||
+        active.attempt_id !== retryAttemptId ||
+        !canRetryBlank(active.journal)
+      ) {
+        throw new Error(
+          'The stopped installation has changed. Check saved work.',
+        );
+      }
+      retryBlank = {chipId: active.journal.chip_id, factoryKeyVersion: 1};
+    }
     setInterruption(null);
     setLoadProgress(null);
     let lastPhase: string | undefined;
@@ -826,7 +845,7 @@ function ProvisioningSession({
       }
       return;
     }
-    if (!w.snapshot().active) {
+    if (!retryBlank && !w.snapshot().active) {
       await w.reserveNext(service);
     }
     if (mounted.current) {
@@ -873,10 +892,11 @@ function ProvisioningSession({
     };
     const outcome = await (settings.runCard ?? runReservedAttempt)(w, service, {
       withCard,
+      retryBlank,
       maker: installing.maker,
       // a J3R452 ships with the seller's NDEF tag at the tag's AID: every tap
       // deletes it, with no prompt, once the registry shows it is the seller's (D182)
-      replaceSellerTag: true,
+      replaceSellerTag: !retryBlank,
       onReplacementRequired: value => {
         inspection = value;
       },
@@ -965,7 +985,19 @@ function ProvisioningSession({
     }
   };
   const program = (): Promise<boolean> =>
-    gate.allowed ? operate(programWork) : Promise.resolve(false);
+    gate.allowed
+      ? operate((w, service) => programWork(w, service))
+      : Promise.resolve(false);
+  const stoppedAttempt = snapshot?.active;
+  const blankRetryAvailable = !!(
+    gate.allowed &&
+    sameActor(snapshot, app.session, app.serviceUrl) &&
+    stoppedAttempt?.revision === 1 &&
+    stoppedAttempt.journal?.chip_id &&
+    supportedBlankRetryChip(stoppedAttempt.journal.chip_id) &&
+    stoppedAttempt.journal.load_sha256 === CASHU_LOAD_FILE.sha256 &&
+    canRetryBlank(stoppedAttempt.journal)
+  );
 
   const value: RealProvisioning = {
     cardReadout,
@@ -1240,7 +1272,14 @@ function ProvisioningSession({
       });
     },
     replacement,
-    program: () => program(),
+    program,
+    blankRetryAvailable,
+    retryBlank: () =>
+      blankRetryAvailable && stoppedAttempt
+        ? operate((w, service) =>
+            programWork(w, service, stoppedAttempt.attempt_id),
+          )
+        : Promise.resolve(false),
     dismissReplacement: () => setReplacement(null),
     quarantine: () =>
       operate((w, service) =>

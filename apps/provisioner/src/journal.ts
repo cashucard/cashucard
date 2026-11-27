@@ -65,6 +65,12 @@ export interface AttemptJournal extends JournalScope, AttemptIdentity {
   frozen_record?: string;
   completion_receipt?: string;
   quarantine_reason?: string;
+  /** Records the single retry of a locally stopped install. Kept through completion. */
+  blank_retry?: {
+    stopped_reason: 'unsafe-partial-install';
+    factory_key_version: 1;
+    verified_at: number;
+  };
   gp_key_version?: number;
   disposition_intent?: DispositionIntent;
   disposition_receipt?: string;
@@ -91,6 +97,7 @@ const fields = new Set([
   'frozen_record',
   'completion_receipt',
   'quarantine_reason',
+  'blank_retry',
   'gp_key_version',
   'disposition_intent',
   'disposition_receipt',
@@ -147,6 +154,26 @@ export function assertJournalScope(j: JournalScope): void {
       UUID.test(j.device_id),
   );
 }
+/** Bound original attempt, stopped before a verified install or key rotation. */
+export function canRetryBlank(j: AttemptJournal): boolean {
+  return (
+    j.stage === 'quarantined' &&
+    j.quarantine_reason === 'unsafe-partial-install' &&
+    j.chip_id !== undefined &&
+    j.preinstall?.inspection === 'absent' &&
+    j.preinstall.installation_id === null &&
+    j.preinstall.replacement_consent === false &&
+    j.installation_id === undefined &&
+    j.installation_verified === undefined &&
+    j.gp_key_version === undefined &&
+    j.frozen_record === undefined &&
+    j.completion_receipt === undefined &&
+    j.disposition_intent === undefined &&
+    j.disposition_receipt === undefined &&
+    j.blank_retry === undefined
+  );
+}
+
 function validate(j: AttemptJournal): void {
   requireState(j && typeof j === 'object' && !Array.isArray(j));
   requireState(Object.keys(j).every(k => fields.has(k)));
@@ -229,6 +256,22 @@ function validate(j: AttemptJournal): void {
       Number.isInteger(j.gp_key_version) &&
         j.gp_key_version! >= 0 &&
         j.gp_key_version! <= 255,
+    );
+  }
+  if (j.blank_retry !== undefined) {
+    const retry = j.blank_retry;
+    requireState(
+      retry &&
+        Object.keys(retry).sort().join(',') ===
+          'factory_key_version,stopped_reason,verified_at' &&
+        retry.stopped_reason === 'unsafe-partial-install' &&
+        retry.factory_key_version === 1 &&
+        Number.isSafeInteger(retry.verified_at) &&
+        retry.verified_at > 0 &&
+        j.stage !== 'reserved' &&
+        j.chip_id &&
+        j.preinstall?.inspection === 'absent' &&
+        j.preinstall.replacement_consent === false,
     );
   }
   if (j.disposition_intent !== undefined) {
@@ -462,6 +505,30 @@ export class ProvisioningJournal {
           ...captured,
           inspection:
             captured.installation_id === null ? 'absent' : 'empty-2.1-with-tag',
+        },
+      };
+    });
+  }
+
+  /** The caller has just verified the complete protected registry and this factory profile. */
+  beginBlankRetry(
+    chipId: string,
+    factoryKeyVersion: number,
+    verifiedAt: number,
+  ): Promise<void> {
+    return this.change(j => {
+      requireState(
+        canRetryBlank(j) && j.chip_id === chipId && factoryKeyVersion === 1,
+      );
+      const next = {...j};
+      delete next.quarantine_reason;
+      return {
+        ...next,
+        stage: 'install_intent',
+        blank_retry: {
+          stopped_reason: 'unsafe-partial-install',
+          factory_key_version: 1,
+          verified_at: verifiedAt,
         },
       };
     });

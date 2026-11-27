@@ -16,6 +16,7 @@ import {
   rotateKeys,
   confirmManagerKeys,
   type KeySet,
+  type BlankRetry,
   type RunOptions,
   type RotateResult,
   type Transceiver,
@@ -24,23 +25,22 @@ import {
 import {CASHU_LOAD_FILE} from './assets/cashu';
 import type {InstallMaker} from './releaseGates';
 import type {RecoveryBoundary} from './recoveryDrills';
-import type {ProvisioningJournal} from './journal';
+import {canRetryBlank, type ProvisioningJournal} from './journal';
 import {
   ProvisioningWorkflow,
   type CardProvisioningService,
 } from './provisioningWorkflow';
 
 export type TapOutcome =
-  | 'record_pending'
-  | 'interrupted'
-  | 'quarantined'
-  | 'reset-required';
+  'record_pending' | 'interrupted' | 'quarantined' | 'reset-required';
 export interface TapOptions extends RunOptions {
   /**
    * The maker whose tag address this install gives the card: one that passed
    * the installation gate (releaseGates.ts). Without it nothing is installed.
    */
   maker: InstallMaker;
+  /** Explicit retry of the current, previously blank, bound card. */
+  retryBlank?: BlankRetry;
   /** Legacy callers cannot authorize factory-key replacement; ignored. */
   replacementInstallationId?: string;
   /**
@@ -85,9 +85,17 @@ export async function runProvisioningTap(
   assigned: KeySet,
   bind: (chip_id: string) => Promise<void>,
   options: TapOptions,
+  confirmActive?: () => Promise<void>,
 ): Promise<TapOutcome> {
   let j = journal.snapshot();
-  if (j.stage === 'quarantined') {
+  const retry = options.retryBlank;
+  if (
+    retry &&
+    (!canRetryBlank(j) || retry.chipId !== j.chip_id || !confirmActive)
+  ) {
+    return 'quarantined';
+  }
+  if (j.stage === 'quarantined' && !retry) {
     return 'quarantined';
   }
   if (j.stage === 'record_pending') {
@@ -117,18 +125,37 @@ export async function runProvisioningTap(
       await bind(chip.id);
       await journal.bind(chip.id);
     }
-    if (j.stage === 'reserved') {
-      await journal.installIntent({
-        installation_id: null,
-        replacement_consent: false,
-      });
-      await options.checkpoint?.('install-intent-saved');
+    if (j.stage === 'reserved' || retry) {
+      if (!retry) {
+        await journal.installIntent({
+          installation_id: null,
+          replacement_consent: false,
+        });
+        await options.checkpoint?.('install-intent-saved');
+      }
       const installed = await provision(tx, plan, {
         ...options,
         keys: FACTORY_KEYS,
         replace: false,
+        blankRetry: retry
+          ? {
+              ...retry,
+              persistIntent: async () => {
+                await confirmActive!();
+                await journal.beginBlankRetry(
+                  retry.chipId,
+                  retry.factoryKeyVersion,
+                  options.verifiedAt(),
+                );
+                await options.checkpoint?.('install-intent-saved');
+              },
+            }
+          : undefined,
       });
       if (!installed.ok) {
+        if (retry && journal.snapshot().stage === 'quarantined') {
+          return installed.kind === 'pulled' ? 'interrupted' : 'quarantined';
+        }
         return stopped(journal, installed);
       }
       observed = await inspectInstallation(tx);
@@ -159,7 +186,14 @@ export async function runProvisioningTap(
     }
     j = journal.snapshot();
     if (j.stage === 'rotation_intent') {
-      const rotated = await rotateKeys(tx, FACTORY_KEYS, assigned, options);
+      if (j.blank_retry && !confirmActive)
+        throw new Error(
+          'active retry confirmation required before key rotation',
+        );
+      const rotated = await rotateKeys(tx, FACTORY_KEYS, assigned, {
+        ...options,
+        beforePutKey: j.blank_retry ? confirmActive : undefined,
+      });
       if (!rotated.ok) {
         return stopped(journal, rotated);
       }
@@ -211,13 +245,15 @@ export async function runProvisioningTap(
       e instanceof CardError ||
       e instanceof WrongKeys
     ) {
+      if (retry && journal.snapshot().stage === 'quarantined')
+        return 'quarantined';
       await journal.quarantine(
         e instanceof ChipIdentityMismatch
           ? 'identity-mismatch'
           : e instanceof WrongKeys ||
-            (e instanceof CardError && [0x50, 0x82].includes(e.ins))
-          ? 'authentication-failed'
-          : 'verification-failed',
+              (e instanceof CardError && [0x50, 0x82].includes(e.ins))
+            ? 'authentication-failed'
+            : 'verification-failed',
       );
       return 'quarantined';
     }
@@ -243,7 +279,14 @@ export async function runReservedAttempt(
   if (!active?.journal) {
     throw new Error('an acknowledged attempt is required');
   }
-  if (active.journal.stage === 'quarantined') {
+  if (
+    options.retryBlank &&
+    (!canRetryBlank(active.journal) ||
+      active.journal.chip_id !== options.retryBlank.chipId)
+  ) {
+    return 'quarantined';
+  }
+  if (active.journal.stage === 'quarantined' && !options.retryBlank) {
     return 'quarantined';
   }
   if (['record_pending', 'recorded'].includes(active.journal.stage)) {
@@ -267,7 +310,10 @@ export async function runReservedAttempt(
     mac: fromHex(keys.mac),
     dek: fromHex(keys.dek),
   };
-  const result = await workflow.withAttempt(service, async journal => {
+  const run = async (
+    journal: ProvisioningJournal,
+    confirmActive?: () => Promise<void>,
+  ) => {
     if (journal.snapshot().attempt_id !== active.attempt_id) {
       throw new Error('active attempt changed');
     }
@@ -292,9 +338,20 @@ export async function runReservedAttempt(
           }
         },
         options,
+        confirmActive,
       ),
     );
-  });
+  };
+  const result = options.retryBlank
+    ? await workflow.withBlankRetry(service, active.attempt_id, run)
+    : await workflow.withAttempt(service, journal =>
+        run(
+          journal,
+          journal.snapshot().blank_retry
+            ? () => workflow.confirmActiveRetry(service, active.attempt_id)
+            : undefined,
+        ),
+      );
   if (result === 'record_pending') {
     await options.checkpoint?.('record-frozen-session-closed');
     await workflow.postRecord(service);

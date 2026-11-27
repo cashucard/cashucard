@@ -238,14 +238,11 @@ from the inspected prior key, and full installation verification succeeds.
 Atomically save the new full key, verification evidence and `installed` stage;
 a keyless `installed` journal is invalid.
 
-If `install_intent` resumes with no card applet and only a recoverable partial
-load, the next deliberate tap may use the existing guarded clean-and-load path
-on the matched chip and same ordinal. If the applet exists but tag/package
-verification is incomplete, either finish only the missing non-destructive
-steps with a reviewed reconciliation helper or quarantine. Do not sweep a
-generated applet key merely to simplify recovery. This helper does not exist
-in current cardkit. The first orchestrator conservatively quarantines all absent
-or incomplete resumed installs; automatic clean-and-load recovery is not wired.
+### Retry an interrupted install on a verified blank card
+
+Setup 17 can continue an original, still-active attempt saved by Setup 16 or 17. On the original phone, sign in to the same service and operator account, open the saved batch, and select **Check card and retry**. Hold the same card against the phone until the result appears. **Check saved work** still performs only service reconciliation. Choosing **Save stop and continue** makes the stop final.
+
+The retry is for a supported J3R180 originally inspected as blank. The phone checks the bound chip and the service receipt, verifies the factory manager key, and reads the protected inventory. The inventory must contain zero applications and exactly a supported factory package profile. A residual package, unexpected application, different card or inconclusive response keeps the install stopped. The retry never deletes packages. The app records the verified retry before installing on the same batch and ordinal. After another interruption, ordinary recovery may adopt a fully verified installation; a second fresh load is blocked.
 
 An intentional reinstall is a new attempt with a new ordinal and installation
 history, explicit consent and the normal empty-card guards. Retain the old

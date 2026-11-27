@@ -1,3 +1,4 @@
+import {recoveryDetails} from '../src/recoveryExport';
 import {gatedMaker} from '../test-support/maker';
 import {
   ProvisioningWorkflow,
@@ -27,7 +28,7 @@ const chip = 'cplc-v1:4790d3213180072976207515';
 const key =
   '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
 const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v));
-function fixture() {
+function fixture(count = config.count) {
   let bytes: string | null = null;
   let ids = 0;
   const flags = {
@@ -65,7 +66,12 @@ function fixture() {
         operator_id: 7,
         device_id: request.device_id,
         next_ordinal: 0,
-        config: {...config, key_env: 'issued', configuration_revision: 1},
+        config: {
+          ...config,
+          count,
+          key_env: 'issued',
+          configuration_revision: 1,
+        },
       };
       if (flags.batchLost) {
         flags.batchLost = false;
@@ -326,7 +332,10 @@ test('untrusted settings and unsupported/secret-bearing snapshots stop without n
 
 test("the batch record keeps its maker's tag address on the phone; a record without one still loads and takes the first given", async () => {
   const X = {name: 'Foxy', tag_address: 'https://getfoxy.io/card'};
-  const Y = {name: 'Island Cards', tag_address: 'https://cards.islandbitcoin.com/c'};
+  const Y = {
+    name: 'Island Cards',
+    tag_address: 'https://cards.islandbitcoin.com/c',
+  };
   const f = fixture();
   let w = await ProvisioningWorkflow.open(f.storage, f.newId);
   await w.start(f.service, config, X);
@@ -360,7 +369,9 @@ test("the batch record keeps its maker's tag address on the phone; a record with
     const damaged = w.snapshot() as unknown as {batch: {maker: unknown}};
     damaged.batch.maker = maker;
     await f.storage.replace(JSON.stringify(damaged));
-    await expect(ProvisioningWorkflow.open(f.storage, f.newId)).rejects.toThrow();
+    await expect(
+      ProvisioningWorkflow.open(f.storage, f.newId),
+    ).rejects.toThrow();
   }
 });
 
@@ -530,4 +541,222 @@ test('completion retry uses the frozen record without keys or NFC whether its fi
     expect(w.snapshot().history[0].frozen_record).toBe(frozen);
     expect(w.snapshot().batch!.next_ordinal).toBe(1);
   }
+});
+
+async function blankRetryFixture() {
+  const f = fixture(1);
+  let w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  await w.start(f.service, {...config, count: 1});
+  await w.reserveNext(f.service);
+  const active = f.remote();
+  active.chip_id = chip;
+  active.revision = 1;
+  active.disposition_receipt = null;
+  active.bind_receipt = {
+    attempt_id: active.attempt_id,
+    chip_id: chip,
+    revision: 1,
+    bound_at: 99,
+  };
+  await w.reconcile(f.service);
+  await w.withAttempt(f.service, async j => {
+    await j.installIntent({installation_id: null, replacement_consent: false});
+    await j.quarantine('unsafe-partial-install');
+  });
+  // This is the old build's JSON, before any new retry field exists.
+  w = await ProvisioningWorkflow.open(f.storage, f.newId);
+  return {f, w, id: active.attempt_id};
+}
+
+test('resumed operator confirms the same active Ops binding; preserves recovery evidence through close', async () => {
+  const {f, w, id} = await blankRetryFixture();
+  const reserves = (f.service.reserve as jest.Mock).mock.calls.length;
+  await w.withBlankRetry(f.service, id, async (j, confirm) => {
+    await confirm();
+    await j.beginBlankRetry(chip, 1, 111);
+  });
+  expect(f.service.reserve).toHaveBeenCalledTimes(reserves);
+  await w.confirmActiveRetry(f.service, id);
+  const active = recoveryDetails(w.snapshot()).active!;
+  expect(active.journal?.blank_retry?.stopped_reason).toBe(
+    'unsafe-partial-install',
+  );
+  await w.withAttempt(f.service, j => j.quarantine('unsafe-partial-install'));
+  const service = {
+    ...f.service,
+    disposition: jest.fn(async () => {
+      const r = {
+        attempt_id: id,
+        kind: 'quarantined' as const,
+        reason: 'unsafe-partial-install',
+        revision: 2,
+        acknowledged_at: 170,
+      };
+      Object.assign(f.remote(), {
+        revision: 2,
+        state: 'quarantined',
+        disposition_receipt: r,
+      });
+      return r;
+    }),
+  };
+  await w.acknowledgeQuarantine(service, 'quarantined');
+  expect(w.snapshot().history).toHaveLength(1);
+  await w.closeBatch(f.service);
+  const reopened = await ProvisioningWorkflow.open(f.storage, f.newId);
+  expect(reopened.snapshot().last_blank_retry).toEqual({
+    attempt_id: id,
+    batch_id: 42,
+    outcome: 'quarantined',
+    verified_at: 111,
+    stopped_reason: 'unsafe-partial-install',
+  });
+  expect(reopened.snapshot().active).toBeNull();
+});
+
+test.each([
+  ['completed', {state: 'recorded'}],
+  ['disposed', {state: 'quarantined'}],
+  ['different device', {device_id: uuid(899)}],
+  ['different operator', {operator_id: 9089}],
+  ['different batch', {batch_id: 74}],
+  ['different ordinal', {ordinal: 1}],
+  ['mismatched binding', {chip_id: chip.replace(/.$/, '6')}],
+  ['unexpected revision', {revision: 2}],
+  ['missing signed-in scope receipt', {bind_receipt: null}],
+  ['missing disposition status', {disposition_receipt: undefined}],
+  [
+    'stale binding',
+    {
+      bind_receipt: {
+        attempt_id: uuid(990),
+        chip_id: chip,
+        revision: 1,
+        bound_at: 140,
+      },
+    },
+  ],
+])('changed service evidence %s blocks the retry', async (_why, edit) => {
+  const {f, w, id} = await blankRetryFixture();
+  Object.assign(f.remote(), edit);
+  const run = jest.fn();
+  await expect(w.withBlankRetry(f.service, id, run)).rejects.toThrow();
+  expect(run).not.toHaveBeenCalled();
+  expect(w.snapshot().active?.journal?.stage).toBe('quarantined');
+});
+
+test('a changed binding during the NFC wait cannot authorize an install', async () => {
+  const {f, w, id} = await blankRetryFixture();
+  const cardWrite = jest.fn();
+  await expect(
+    w.withBlankRetry(f.service, id, async (j, confirm) => {
+      f.remote().state = 'abandoned';
+      await confirm();
+      await j.beginBlankRetry(chip, 1, 321);
+      cardWrite();
+    }),
+  ).rejects.toThrow();
+  expect(cardWrite).not.toHaveBeenCalled();
+  expect(w.snapshot().active?.journal?.blank_retry).toBeUndefined();
+});
+
+test('a fresh read-only Ops check before resumed rotation catches a stop or changed scope', async () => {
+  const {f, w, id} = await blankRetryFixture();
+  await w.withBlankRetry(f.service, id, async j =>
+    j.beginBlankRetry(chip, 1, 321),
+  );
+  await w.withAttempt(f.service, async j => {
+    await j.installed(key, {complete: true});
+    await j.rotationIntent();
+  });
+  await expect(
+    w.confirmActiveRetry(
+      {...f.service, scope: {...f.service.scope, operator_id: 8}},
+      id,
+    ),
+  ).rejects.toThrow();
+  f.remote().state = 'quarantined';
+  const rotate = jest.fn();
+  await expect(
+    w.confirmActiveRetry(f.service, id).then(rotate),
+  ).rejects.toThrow();
+  expect(rotate).not.toHaveBeenCalled();
+});
+
+test('recovered install is recorded once under its original attempt, with the stop retained after closure', async () => {
+  const {f, w, id} = await blankRetryFixture();
+  const record = jest.fn(async () => {
+    const receipt: CompletionReceipt = {
+      attempt_id: id,
+      installation_id: key,
+      revision: 2,
+      recorded_at: 120,
+      verified_stage: 'rotated',
+      ready_for_holder: false,
+    };
+    Object.assign(f.remote(), {
+      state: 'recorded',
+      revision: 2,
+      completion_receipt: receipt,
+    });
+    return receipt;
+  });
+  await w.withBlankRetry(f.service, id, async (j, confirm) => {
+    await confirm();
+    await j.beginBlankRetry(chip, 1, 100);
+    await j.installed(key, {complete: true});
+    await j.rotationIntent();
+    await confirm();
+    await j.rotated(2);
+    await j.freezeRecord({
+      attempt_id: id,
+      batch_id: 42,
+      ordinal: 0,
+      operator_id: 7,
+      device_id: w.snapshot().device_id,
+      chip_id: chip,
+      installation_id: key,
+      display_id: key.slice(-4),
+      gp_key_version: 2,
+      load_sha256: config.load_sha256,
+      key_env: 'issued',
+      configuration_revision: 1,
+      verified_stage: 'rotated',
+      verified_at: 110,
+    });
+  });
+  await w.postRecord({...f.service, record});
+  expect(record).toHaveBeenCalledTimes(1);
+  expect(f.service.reserve).toHaveBeenCalledTimes(1);
+  const support = recoveryDetails(w.snapshot());
+  expect(support.recent_history[0]).toMatchObject({
+    attempt_id: id,
+    stage: 'recorded',
+    blank_retry: {verified_at: 100, stopped_reason: 'unsafe-partial-install'},
+  });
+  await w.closeBatch(f.service);
+  const after = (
+    await ProvisioningWorkflow.open(f.storage, f.newId)
+  ).snapshot();
+  expect(after.last_blank_retry).toMatchObject({
+    attempt_id: id,
+    batch_id: 42,
+    outcome: 'recorded',
+  });
+});
+
+test('malformed durable retry history is rejected on reopening a saved workspace', async () => {
+  const {f, w} = await blankRetryFixture();
+  const modified = {
+    ...w.snapshot(),
+    last_blank_retry: {
+      attempt_id: 'invalid',
+      batch_id: 42,
+      verified_at: 99,
+      stopped_reason: 'unsafe-partial-install',
+      outcome: 'recorded',
+    },
+  };
+  await f.storage.replace(JSON.stringify(modified));
+  await expect(ProvisioningWorkflow.open(f.storage, f.newId)).rejects.toThrow();
 });
