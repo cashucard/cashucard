@@ -308,7 +308,7 @@ async function main() {
     assert.ok(await evaluate("!!document.querySelector('.hero-status a[href=\"#risks\"]')"), "The hero points to the risks");
     assert.equal(await evaluate("document.querySelectorAll('#risks .risk-list li').length"), 7, "The risks are stated once, in seven points");
     assert.equal(await evaluate("[...document.querySelectorAll('section h2')].filter(h=>/risk/i.test(h.textContent)).length"), 1, "One risks section");
-    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 9, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 8, 0], ["/terms.html", 8, 0]]) {
+    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 9, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 9, 0], ["/terms.html", 8, 0]]) {
       // the host serves /faq for /faq.html, as it does /guide; the local preview serves the file name
       await send("Page.navigate", { url: origin + page });
       await until("location.pathname.replace(/\\.html$/,'')===" + JSON.stringify(page.replace(".html", "")) + "&&document.readyState==='complete'&&!!document.querySelector('.guide-doc')", page + " loads");
@@ -329,6 +329,9 @@ async function main() {
     for (const path of ["/privacy.html", "/terms.html"]) {
       assert.ok((await fetch(origin + path).then((r) => r.text())).includes("Island Bitcoin LLC"), path + " names Island Bitcoin LLC");
     }
+    await send("Page.navigate", { url: origin + "/privacy.html#pos" });
+    await until("location.hash === '#pos' && document.readyState === 'complete' && !!document.querySelector('#pos')", "POS privacy policy");
+    assert.equal(await evaluate("document.querySelector('#pos h2')?.textContent"), "The Cashu Card POS app", "The app's privacy link opens the POS notice");
     assert.ok((await fetch(origin + "/support.html").then((r) => r.text())).includes("mailto:support@cashucard.org"), "Support gives the support address");
     for (const path of ["/faq.html", "/developers.html"]) {
       const r = await fetch(origin + path);
