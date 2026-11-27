@@ -368,6 +368,30 @@ async function main() {
     }
     assert.ok((await fetch(origin + "/sitemap.xml").then((r) => r.text())).includes("https://cashucard.org/faq"), "The sitemap lists the FAQ");
     for (const r of ["support", "privacy", "terms"]) assert.ok((await fetch(origin + "/sitemap.xml").then((x) => x.text())).includes("https://cashucard.org/" + r), "The sitemap lists " + r);
+    // Visit every public page at phone width, including links with icons from CSS pseudo-elements.
+    await viewport(390, 844);
+    const siteMap = await fetch(origin + "/sitemap.xml").then(response => response.text());
+    const routes = [...siteMap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => new URL(match[1]).pathname);
+    assert.ok(routes.includes("/") && routes.includes("/fund"));
+    for (const route of routes) {
+      await load(origin + route, "Mobile link icons on " + route);
+      const unprotected = await evaluate(String.raw`(() => {
+        const emojiOrArrow = /[\p{Extended_Pictographic}\u2190-\u21ff\ufe0f]/u;
+        const controls = document.querySelectorAll("a, button, summary, .hero-card-bottom");
+        return [...controls].filter(control => {
+          if (emojiOrArrow.test(control.textContent)) return true;
+          return [control, ...control.querySelectorAll("*")].some(node =>
+            ["::before", "::after"].some(part => emojiOrArrow.test(getComputedStyle(node, part).content))
+          );
+        }).map(control => control.textContent.trim().slice(0, 64));
+      })()`);
+      assert.deepEqual(unprotected, [], "Mobile controls must not rely on emoji-capable text or arrows on " + route);
+      const drawnIcons = await evaluate(`[...document.querySelectorAll(".ui-icon")].filter(icon => icon.getClientRects().length).map(icon => {
+        const box = icon.querySelector("use")?.getBBox();
+        return icon.getAttribute("aria-hidden") === "true" && box?.width > 0 && box?.height > 0;
+      })`);
+      assert.ok(drawnIcons.length > 0 && drawnIcons.every(Boolean), "Visible link icons have drawable paths on " + route);
+    }
     assert.deepEqual(errors, [], "No browser exceptions");
     console.log("PASS: landing page, film and steps, direct source links, responsive artwork options, reduced motion, no JavaScript");
     console.log("Screenshots: " + output);
