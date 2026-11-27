@@ -91,13 +91,7 @@ import javacardx.crypto.Cipher;
  *   as CLEAR_ON_DESELECT transient memory, and threaded down through the
  *   arithmetic helpers as explicit (work, workOff) parameters.
  *
- *   No `new` may appear anywhere outside the constructor, init(), and the
- *   first SET_CARD's engine set-up of a set-up life (`chipMulInit`, and since
- *   D251 `curveEngine`, agrees()'s own key and agreement), each made once,
- *   behind a null check. One small leak is known there: if `curve(k)` or
- *   `setS` throws in `curveEngine` after `buildKey` has made its key, that key
- *   is dropped and made again at the next set-up life, so at most one key is
- *   lost a reset.
+ *   No `new` outside the constructor, init() and the first SET_CARD's engine set-up of a set-up life (`chipMulInit`, `curveEngine` since D251), each made once behind a null check; the one known leak, a key lost if `curve(k)` or `setS` throws after `buildKey` (at most once a reset), is in D259.
  *
  *   Transient footprint: `sc` (256 B scratchpad) + `work` (288 B arithmetic
  *   scratch, see WORK_LEN), and the temporary key's own room, where the chip
@@ -764,9 +758,7 @@ final class SchnorrHW {
 
     /**
      * Whether the chip's key agreement takes the 65 bytes at p[off] (04 || x || y, its caller has held them to that form,
-     * x and y under p: the agreement reduces both) as a point of the curve (D212). Since D251 it asks agrees()'s own key and
-     * agreement (`curveKey`, `curveKA`, made by `curveEngine`, its scalar G's x set once), as the comment in the body says;
-     * where the chip refused them, it falls back to what follows: one key agreement with the temporary key
+     * x and y under p: the agreement reduces both) as a point of the curve (D212). Since D251 it asks its own `curveKey` and `curveKA` (the body says how); where the chip refused them: one key agreement with the temporary key
      * at its resting scalar, G's x, a public number, so that the answer, [G.x]p, which goes into sc and nowhere else,
      * tells nothing of any key, and a point of another curve or of the twist learns nothing either. The J3R180 refuses
      * every point off the curve at generateSecret (CryptoException); a simulator throws its own exception: any is a

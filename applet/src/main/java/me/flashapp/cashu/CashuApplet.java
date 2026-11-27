@@ -7833,16 +7833,12 @@ public class CashuApplet extends Applet implements TagSwitch {
      * package ends and how many bytes to add or to take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.2 with D258's counts (70bff21): the same writes, untouched; D258's code moved the package as the chip keeps it to
-         * 40,580 bytes, 132 past a multiple of 256 (inside D256's 60 to 180), and the load file to 44,881 bytes (81 past). That
-         * file was created at the first try four times of four on each of three cards on 2026-11-26 (57723320 and 09344120,
-         * J3R180s, and 36813121, a J3R452), where the file from before the speed work (245 past) was refused on the J3R452.
-         * 3.2 padded by D256, with the speed commits and their follow-ups (D245 to D253, D255), D254 left out and D257's count:
-         * the writes below, from the code alone (the earlier ones all taken out), as many as ended the package as the chip keeps it
-         * 120 past a multiple of 256, the middle of the places card 57723320 created at on 2026-11-26 (48 to 213 past; refused
-         * at 218 and 223). Unpadded it ended 229 past (40,421 bytes kept); the load file was then 44,869 bytes (69 past), a size
-         * no chip had been given, at a load-file place that no longer says anything: on that card 52be734's file of 43,509 bytes
-         * (245 past) was refused twelve times where 7b87367's of the same 43,509 bytes was created at the first try (D256).
+        /* 3.2 with D258's counts (70bff21): the same writes, untouched; the kept package is 40,580 bytes, 132 past a multiple of 256
+         * (inside D256's 60 to 180), the load file 44,881 bytes (81 past), created at the first try four of four on three cards (D258).
+         * Before D258 (0249e32) the writes below, from the code alone (D245 to D253, D255, D257's count, D254 left out), ended it 120
+         * past, the middle of the places card 57723320 created at on 2026-11-26 (48 to 213 past; refused at 218 and 223); unpadded
+         * 229 past (40,421 bytes kept), the load file 44,869 bytes (69 past). The load file's place no longer says anything: on that
+         * card 52be734's file of 43,509 bytes (245 past) was refused twelve times where 7b87367's of the same size was created (D256).
          * Until D256 each speed commit held the load file at 245 past.
          * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
          * seventy-seven below and eighteen more, so the load file is 43,765 bytes again, the size card 57723320 installed on

@@ -93,9 +93,11 @@ past, [D256](DECISIONS.md#d256)), in 182 blocks of 247 bytes, the last 174: the 
 (`applet/target/cashu-javacard-3.2.0.cap`, load file sha256 `c525db93…`), whose own sha256 is not the CAP's
 ([Install](#install) gives both). It is the 3.1 file of the next paragraph with [D244](DECISIONS.md#d244), the speed work
 of [D245](DECISIONS.md#d245) to [D257](DECISIONS.md#d257) and the wait counts of [D258](DECISIONS.md#d258), padded by
-`sizeTheFile` (below): this exact file has been installed on a chip, and has not yet been proven with a payment at a mint. It was installed on 2026-11-26 on three cards: 57723320 (a J3R180 keyed for SCP03), 09344120 (a J3R180 keyed for
-SCP02) and 36813121 (a J3R452). The card's applet was created at the first try four times of four on every one of them
-([the report](reports/HARDWARE_TEST_REPORT_2026-11-26_3.2-final.md)). It is not released, and not on the set-up app's
+`sizeTheFile` (below): this exact file has run on a chip. It was installed on 2026-11-26 on three cards: 57723320 (a J3R180 keyed for SCP03), 09344120 (a J3R180 keyed for
+SCP02) and 36813121 (a J3R452). The card's applet was created at the first try four times of four on every one of them,
+and each was then paid from at testnut in both load forms, as the 3.1 file was: a first load of 36, payments taken by the
+mint in swaps, the change loaded back with the mint's DLEQ and spent again, `SPEND_ALL_AGAIN`, a withdrawal of all, the
+books at 0 ([the report](reports/HARDWARE_TEST_REPORT_2026-11-26_3.2-final.md)). It is not released, and not on the set-up app's
 approved list ([D74](DECISIONS.md#d74)): the owner approves a load file there.
 
 The 3.1 build was **42,741 bytes** by refcheck's measure (245 past a multiple of 256), in 174 blocks of 247 bytes, the

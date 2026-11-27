@@ -10423,6 +10423,11 @@ the record's transaction, `selfTested` would stay false, and every later `SET_CA
 the card to fall back to the temporary key; in `loadOne` and `unblind` the callers would answer 6A80 to a good point.
 `curveEngine` checks only that the key and the agreement can be made, not that the agreement takes the key.
 
+A second small one, also left: `curveEngine` makes its key with `buildKey` and then sets its curve and scalar
+(`CashuApplet.curve(k)`, `setS`); if either of those threw, the new key would be dropped and made again at the next set-up
+life, so at most one key is lost a reset. SchnorrHW's rule on `new` (outside the constructor, `init()` and the first
+SET_CARD's engine set-up, `chipMulInit` and `curveEngine`, each made once behind a null check) points here.
+
 The J3R180 and the J3R452 (JCOP 4.5, P71D600) both take the `init`: in the chip runs of 2026-11-26 `SET_CARD` passed and
 `GET_INFO` byte 56 was 07 on all three cards (D258). So it matters only on a chip not yet tried. **To fix in the next version
 that changes the applet's bytes:** move the conditional `init` inside the outer `try`, or have `curveEngine` try one
