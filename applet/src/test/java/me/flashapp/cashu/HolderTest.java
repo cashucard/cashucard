@@ -74,7 +74,7 @@ import java.util.Arrays;
 
 /**
  * The owner claimed slowly (3.0, D187) and a holder with no phone (3.0, D189): SET_OWNER on a card with no owner is a claim of
- * four askings under the PIN (one right after the set-up's record under the PIN, D221: ClaimAfterSetUpTest), never in a time in the field that paid, after which that time in the field pays nothing; the
+ * five askings under the PIN (four before D258) (one right after the set-up's record under the PIN, D221: ClaimAfterSetUpTest), never in a time in the field that paid, after which that time in the field pays nothing; the
  * card of a holder with no phone is loaded and set under its PIN, its history held for over five askings, and a held tap
  * stands where the owner's grant or proof stands; a factory record is no record; REFRESH P1 = 1. And the owner's key is a
  * point of P-256, which the card checks itself.
@@ -134,7 +134,7 @@ class HolderTest {
     // =========================================================================
 
     @Test
-    @DisplayName("A claim is four askings of the same data where no record was written under the PIN in this time in the field (D221): the first three answered 6A98 with nothing, no owner set; the fourth sets it on the empty card; and no payment is taken for the rest of that time in the field, through a SELECT, until the card leaves the field")
+    @DisplayName("A claim is five askings (four before D258) of the same data where no record was written under the PIN in this time in the field (D221): the first four answered 6A98 with nothing, no owner set; the fifth sets it on the empty card; and no payment is taken for the rest of that time in the field, through a SELECT, until the card leaves the field")
     void theClaimIsHeldForFourAskings() throws Exception {
         UnitsTest.Card c = claimableHeld();
         for (int k = 1; k < CLAIM_ASKINGS; k++) {
@@ -200,7 +200,7 @@ class HolderTest {
         notUncompressed[0] = 0x02;
         assertEquals(SW_WRONG_DATA, raw(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, notUncompressed)).getSW(), "a key not beginning 04");
         assertEquals(SW_WRONG_DATA, raw(c, new CommandAPDU(CLA, INS_SET_OWNER, 0, 0, concat(OWNER.pub, new byte[80]))).getSW(), "an anchor whose bits no header carries");
-        keepHolding(c, setOwnerOpenCommand(OWNER), CLAIM_ASKINGS - 3, "the count went on");
+        keepHolding(c, setOwnerOpenCommand(OWNER), (CLAIM_ASKINGS - 1) - (CLAIM_ASKINGS - 2), "the count went on");   // what is left of the held askings after the first CLAIM_ASKINGS - 2
         assertEquals(SW_OK, raw(c, setOwnerOpenCommand(OWNER)).getSW(), "the last good asking");
     }
 

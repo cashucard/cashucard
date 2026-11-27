@@ -204,6 +204,9 @@ public class CashuApplet extends Applet implements TagSwitch {
     // piece's data written before its status byte with no transaction of its own, and the curve checked by squaring (`rsaSquare`).
     // One bit more in GET_INFO P1 = 4's byte 56 (bit 2, the field's arithmetic over p: a compressed C is as quick to load as a
     // whole one), which a 3.1 reader does not read.
+    // And the waits' counts (D258), so that each wait keeps its seconds on 3.2's quicker signature: a reader that asks again while
+    // the card answers 00 01 or 6A98 meets more askings of the same seconds (a payment's 3 a limit's worth, the claim 5, the
+    // history 4, the reset 6, the PIN's stretch 22 and at most 22,527 owed); one that bounds the askings by 3.1's counts is short.
     static final byte VERSION_MINOR = (byte) 0x02;
     static final byte FORMAT        = (byte) 0x04;
     /** GET_INFO P1 = 4, byte 56, bit 2 (3.2, D244): the field's arithmetic runs over p on this chip (`fieldP`): a compressed C loads as fast as a whole one. */
@@ -760,22 +763,26 @@ public class CashuApplet extends Applet implements TagSwitch {
      * payment's wait does it: about half a second an asking on a slower chip, so the hold is seconds the holder sees. The
      * last asking does no work, so a hold of N askings is N - 1 signatures' work (D236).
      *
-     *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fourth asking, about 2.6 seconds; at the
+     *   CLAIM_ASKINGS    SET_OWNER on a card with no owner: the owner is set at the fifth asking (the fourth before D258); at the
      *                    first where this first set-up's PIN was set and then its record written in this time in the field
      *                    (TAP_SETUP, D221): SET_CARD's own seconds on the chip are the hold then.
-     *   HISTORY_ASKINGS  GET_LOG, the log or the receipts, under the PIN on a card with no owner: answered at the third,
-     *                    two signatures' work, 0.94 s measured on the chip (3.1, D232, D236; seven, 2.95 s measured, in 3.0); then open for the rest of the time in the
+     *   HISTORY_ASKINGS  GET_LOG, the log or the receipts, under the PIN on a card with no owner: answered at the fourth (D258;
+     *                    the third, two signatures' work, 0.94 s measured on the chip, in 3.1, D232, D236; seven, 2.95 s measured, in 3.0); then open for the rest of the time in the
      *                    field (TAP_READ): the holder's say for REFRESH, SET_PIN, LET_GO, KEYSET_KEYS, GET_OUTBOX and the reset,
      *                    and the arming of the no-PIN allowance (D208).
-     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the fourth asking, three signatures' work, 1.66 s
-     *                    measured on the chip (3.1, D232, D236; seventeen in 3.0); about 2.6 seconds in all with the history's three
-     *                    before it: 7 askings, five signatures' work (24 in 3.0).
+     *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the sixth asking, five signatures' work (D258;
+     *                    the fourth, three signatures' work, 1.66 s measured on the chip, in 3.1, D232, D236; seventeen in 3.0); with the
+     *                    history's four before it: 10 askings, eight signatures' work, about 2.9 s on the 3.2 file (7 and 2.6 s in 3.1).
      *
      * The counts are the project owner's choice of 2026-11-14 (D211), each from the 0.59 to 0.66 s an asking
      * measured on the J3R180 on 2026-11-14 (0.75 s was the first guess, and came out short). An asking is 0.49 to 0.58 s now (D216 made it
      * 0.23 to 0.31 s, and D217 and D218, the split of the product and the check of every signature, added 0.27 s): 4 askings about 2.6 s (the
      * claim), 7 about 3.0 s (the history), 24 about 11 s (the reset by the PIN: the history's 7 and its own 17). 3.1 (D232, the project owner,
      * 2026-11-21: "a person must not hold a card longer than the protection needs") makes the history 3 and the reset 4; the claim stays 4.
+     * 3.2 (D258, the project lead's rule that each wait keeps its seconds): 3.2's signature is about 22% quicker, so each count is the
+     * least whose seconds on the 3.2 file (card 57723320, 2026-11-26) are no fewer than 3.1's count took on the base file: the claim
+     * 5 (four askings' work, 1.66 s, where 4 took 1.62 s), the history 4 (1.08 s, where 3 took 0.95 s), the reset 6 (1.81 s,
+     * where 4 took 1.47 s); the PIN's stretch 22 and its most owed 22,527, and each wait owed 11/8 of 3.1's (`countTry`).
      *
      *   the PIN's wait  VERIFY_PIN on a card with no owner after a wrong try (D195): the askings owed (pinMarks), served
      *                    PIN_STRETCH at a time, each stretch written down as it ends.
@@ -784,17 +791,19 @@ public class CashuApplet extends Applet implements TagSwitch {
      * counts the PIN's wait, so that an asking of one never adds to a count of another. Any other command begins it again
      * (`process`).
      */
-    static final short CLAIM_ASKINGS   = (short) 4;
-    static final short HISTORY_ASKINGS = (short) 3;
+    static final short CLAIM_ASKINGS   = (short) 5;
+    static final short HISTORY_ASKINGS = (short) 4;
     static final byte  HELD_HISTORY    = (byte) 0x80;
     static final byte  HELD_PIN        = (byte) 0x40;
     /** A reset of a card with no owner, by its PIN (D196): both marks; its count in the low six bits. */
     static final byte  HELD_RESET      = (byte) 0xC0;
-    static final short RESET_ASKINGS   = (short) 4;
-    /** The PIN's wait (D195): the askings of one stretch, the wait that one tap is asked to hold for (about ten seconds). */
-    static final short PIN_STRETCH     = (short) 16;
-    /** The most askings owed before one try (16,384, about three hours): the wait after the fifteenth wrong try and every later one. */
-    static final short PIN_OWED_MOST   = (short) 0x4000;
+    static final short RESET_ASKINGS   = (short) 6;
+    /** The PIN's wait (D195): the askings of one stretch, the wait that one tap is asked to hold for (about eight seconds; 22 since
+     *  D258, where 16 were as long on 3.1's slower signature). */
+    static final short PIN_STRETCH     = (short) 22;
+    /** The most askings owed before one try (22,527, about two hours and twelve minutes; 16,384 before D258, as long on 3.1's
+     *  slower signature): the wait after the fifteenth wrong try and every later one. */
+    static final short PIN_OWED_MOST   = (short) 22527;
 
     // PIN constraints
     static final short PIN_MIN_LEN  = (short) 4;
@@ -1082,16 +1091,19 @@ public class CashuApplet extends Applet implements TagSwitch {
      *  the project owner's "a person must not hold a card longer than the protection needs"): two signatures of work, about 0.95 s on
      *  that chip, where 3.0 waited ten (about 4.7 s). It is counted after the change's credit (D232, amended): the change outputs
      *  take nothing off it. With the payment's own signature (about 1.1 s from its beginning), a reader that has the PIN takes one
-     *  limit's worth in about two seconds a payment: half the holder's rate, never faster. */
-    static final short WAIT_SECOND_SIGNS = (short) 2;
+     *  limit's worth in about two seconds a payment: half the holder's rate, never faster. Three since D258 (1.08 s on the 3.2
+     *  file, where two took 0.93 s on the base file). */
+    static final short WAIT_SECOND_SIGNS = (short) 3;
     /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14), and GET_INFO's
      * byte 55 bit 3 says so (D228). [M1, the other maintainer's floor of WAIT_FLOOR_SIGNS = 4, is closed by D228: D211 stands.]
      * WAIT_SECOND_SIGNS is not that floor: it holds only a second payment in the same time in the field. */
-    /** What each limit's worth past the first costs a payment: this many signatures of work, about 0.95 s on that chip. */
-    static final short WAIT_MORE_SIGNS   = (short) 2;
-    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about four minutes). */
+    /** What each limit's worth past the first costs a payment: this many signatures of work, about 0.95 s on that chip. 3.2 (D258,
+     *  the project lead's rule that each wait keeps its seconds): three, and three for WAIT_SECOND_SIGNS, 1.08 s on the 3.2 file at
+     *  361.4 ms a signature where two took 0.93 s on the base file at 463.3 ms. */
+    static final short WAIT_MORE_SIGNS   = (short) 3;
+    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about four and a half minutes since D258). */
     static final short WAIT_UNITS_MOST = (short) 255;
-    /** What 255 limits' worth waits: the most any payment does. */
+    /** What 255 limits' worth waits: the most any payment does (762 since D258, 4.6 minutes on the 3.2 file; 508 before). */
     static final short WAIT_SIGNS_MOST = (short)(WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 1));
     /** 10 seconds, big-endian: how close together refusals are one run of them, in the card's own log (6b). */
     private static final byte[] TAP_SECONDS = { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x0A };
@@ -5630,7 +5642,7 @@ public class CashuApplet extends Applet implements TagSwitch {
 
     /**
      * Before the PIN is checked on a card with no owner (D195): the try counted as wrong and the wait the next try would owe
-     * after it (2^w askings, w the wrong tries in a row before it, at most PIN_OWED_MOST), both written in one transaction
+     * after it (11/8 of 2^w askings rounded up, w the wrong tries in a row before it, at most PIN_OWED_MOST; 2^w before D258), both written in one transaction
      * BEFORE the check, as the chip takes a try before it compares; then the chip's own counter is full again, so that it
      * never blocks. A right PIN sets both to nothing after the check. Torn anywhere, the try is counted or was never made.
      */
@@ -5639,7 +5651,9 @@ public class CashuApplet extends Applet implements TagSwitch {
         short w = pinMarks[PM_WRONG];
         JCSystem.beginTransaction();
         pinMarks[PM_WRONG] = (byte)(w < (short) 15 ? w + 1 : w);
-        Util.setShort(pinMarks, PM_OWED, w < (short) 14 ? (short)(1 << w) : PIN_OWED_MOST);
+        // D258: 11/8 of 3.1's 2^w, rounded up (2, 3, 6, 11, 22, 44 ...), so that each wait keeps 3.1's seconds on the quicker signature
+        short x = (short)(1 << w);
+        Util.setShort(pinMarks, PM_OWED, w < (short) 14 ? (short)(x + (short)((short)(3 * x + 7) >> 3)) : PIN_OWED_MOST);
         JCSystem.commitTransaction();
         if (pin.getTriesRemaining() != PIN_MAX_TRIES) pin.resetAndUnblock();
     }

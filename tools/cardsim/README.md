@@ -238,7 +238,7 @@ the same bytes on the wire as `tools/cardctl/cardctl.py`.
 | `loadChange(k, C_, K, e, s)` | `LOAD_CHANGE` (`27`) | P2 `02`, Lc `C2`, C_ and K written in the `04` form (02/03 accepted), Le `53`; answers `{slot, proofKept, piece}` |
 | `loadProof(keyset, amount, nonce, C, date, dleq, {unit})` | `LOAD_PROOF` | P2 `02` (`03` with the unit first): the caller's word that the piece is locked to the card's keys for its date; the PIN in the tap |
 | `verifyPin(pin)` | `VERIFY_PIN` | sent again while the card answers `6A98` (a card with no owner serving the wait of wrong tries) |
-| `claimOwner(anchor?, key?)` | `SET_OWNER` on a card with no owner | the same data sent while the card answers `6A98` (four askings) |
+| `claimOwner(anchor?, key?)` | `SET_OWNER` on a card with no owner | the same data sent while the card answers `6A98` (five askings on 3.2, four on 3.1) |
 | `allowLoad()` | `ALLOW_LOAD` | `6200` is the grant (it opens no load); `9000`, a card of 2.2 or earlier, is refused |
 | `setLimit({day, payment, allowance, rollBudget, rate, noPinWindow})` | `SET_LIMIT` | 4, 8, 12, 13, 17 or 18 bytes (`limitValue`) |
 | `getPubkey`, `getBalance`, `getProofCount`, `getSlotStatus`, `getProof`, `auth`, `getDleq`, `getOutbox*`, `getNonce`, `clearSpent`, `setHeader`, `setPin`, `changePin`, `refresh` | as before | `getProof` of a spent slot, `clearSpent` and `getOutbox` outside the paying time in the field want the PIN (and the packet the owner's grant on an owned card) |

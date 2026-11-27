@@ -677,7 +677,7 @@ test("allowLoad takes 6200 as the grant, refuses 9000 (a card whose grant opens 
   await assert.rejects(new CardSim("http://127.0.0.1:9", { fetch: answer("6A91") }).allowLoad(), e => e instanceof CardError && e.sw === 0x6a91)
 })
 
-test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (four askings), bounded; VERIFY_PIN holds the same way", async () => {
+test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (five askings on 3.2), bounded; VERIFY_PIN holds the same way", async () => {
   const claim = encode.setOwner(ownerPublicKey()).toString("hex")
   const seen = []
   const sim = new CardSim("http://127.0.0.1:9", { fetch: scripted([...Array(3).fill([claim, "6A98"]), [claim, "9000"]], seen) })
@@ -694,6 +694,20 @@ test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (f
   await new CardSim("http://127.0.0.1:9", { fetch: scripted([...Array(40).fill([pin, "6A98"]), [pin, "9000"]], waited) }).verifyPin("1234")
   assert.equal(waited.length, 41)
   await assert.rejects(new CardSim("http://127.0.0.1:9", { fetch: scripted([[pin, "6A98"], [pin, "63C1"]]) }).verifyPin("1234"), e => e.sw === 0x63c1)
+})
+
+test("the held askings' bounds cover the applet's counts: the claim's and the longest PIN wait, read from CashuApplet.java (D258)", () => {
+  const src = fs.readFileSync(path.join(__dirname, "../../applet/src/main/java/me/flashapp/cashu/CashuApplet.java"), "utf8")
+  const count = name => {
+    const m = [...src.matchAll(new RegExp("static final short\\s+" + name + "\\s*=\\s*\\(short\\)\\s*(\\d+)\\s*;", "g"))]
+    assert.equal(m.length, 1, name)
+    return Number(m[0][1])
+  }
+  const most = count("PIN_OWED_MOST"), stretch = count("PIN_STRETCH")
+  assert.deepEqual([constants.PIN_OWED_MOST, constants.PIN_STRETCH], [most, stretch], "the client's mirror is the applet's")
+  // the askings answered 6A98 for the longest wait: each asking owed, and one more after every stretch but the last; then the try
+  assert.ok(constants.PIN_WAIT_MOST >= most + Math.ceil(most / stretch), `${constants.PIN_WAIT_MOST} askings cover a wait of ${most} in stretches of ${stretch}`)
+  assert.ok(constants.CLAIM_MOST >= count("CLAIM_ASKINGS"), "a claim is asked no fewer times than the card holds it")
 })
 
 test("groupKeys, certRead and getChange pages on the wire", async () => {

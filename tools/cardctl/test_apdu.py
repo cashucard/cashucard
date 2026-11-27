@@ -1528,8 +1528,9 @@ class FirstSetUpCard(Card23):
     RESET_CARD are held for as many askings as the applet holds them (test_the_mocks_held_askings_are_the_applets).
     """
 
-    HISTORY_ASKINGS = 3   # CashuApplet.HISTORY_ASKINGS (D232; 7 in 3.0, D211): GET_LOG answers at the third asking in a row
-    RESET_ASKINGS = 4     # CashuApplet.RESET_ASKINGS (D232; 17 in 3.0, D211): RESET_CARD resets at the fourth
+    CLAIM_ASKINGS = 5     # CashuApplet.CLAIM_ASKINGS (D258; 4 in 3.1 and 3.0, D211): SET_OWNER claims at the fifth asking in a row
+    HISTORY_ASKINGS = 4   # CashuApplet.HISTORY_ASKINGS (D258; 3 in 3.1, D232; 7 in 3.0, D211): GET_LOG answers at the fourth asking in a row
+    RESET_ASKINGS = 6     # CashuApplet.RESET_ASKINGS (D258; 4 in 3.1, D232; 17 in 3.0, D211): RESET_CARD resets at the sixth
 
     def __init__(self, factory=None, refuse=None, lift_at=None):
         super().__init__(has_owner=False, refund=False, pin_state=0)
@@ -1587,7 +1588,7 @@ class FirstSetUpCard(Card23):
             if not (self.verified and self.first and self.record):
                 return b"", 0x6A91 if not self.first else 0x6982
             self.askings += 1
-            if self.askings < 4:
+            if self.askings < self.CLAIM_ASKINGS:
                 return b"", 0x6A98
             sw = self.take_c(data)
             if sw not in (None, 0x9000):
@@ -1657,7 +1658,7 @@ def test_setup_is_one_selection_and_the_separate_commands_are_not():
                                "0", "--allowance", "0", "--budget", "7"])
     assert code == 0, out
     assert conn.record and conn.record[-17:] == b"https://mint.test", conn.record
-    assert conn.has_owner and conn.askings == 4
+    assert conn.has_owner and conn.askings == FirstSetUpCard.CLAIM_ASKINGS
     assert conn.limits and conn.limits.endswith((50000).to_bytes(4, "big") + bytes(8) + b"\x07"), conn.limits.hex()
     selects = [a for a in conn.sent if a[:2] == b"\x00\xA4"]
     assert len(selects) == 1, "one selection, the one the command began with"
@@ -2146,6 +2147,19 @@ def test_the_mocks_held_askings_are_the_applets():
             break
         assert (sw1, sw2) == (0x6A, 0x98), hex(sw1 << 8 | sw2)
     assert n == reset, f"the mock resets at asking {n}, the applet at {reset}"
+    assert FirstSetUpCard.CLAIM_ASKINGS == _applet_asking("CLAIM_ASKINGS"), "and claims at the applet's asking (D258)"
+
+
+def test_the_pin_wait_bound_covers_the_applets_longest_wait():
+    """VERIFY_PIN is sent again while the card answers 6A98 for at most PIN_WAIT_MOST askings: no fewer than the longest wait
+    the applet can owe (PIN_OWED_MOST askings of work, one asking more after each stretch of PIN_STRETCH but the last, then
+    the try), read from CashuApplet.java, so that a reader never gives up on a card still serving its wait (D258: 22,527 in
+    stretches of 22 on 3.2, where 3.1's bound of 16,384 + 1,024 + 2 was 6,141 askings short)."""
+    import math
+    most, stretch = _applet_asking("PIN_OWED_MOST"), _applet_asking("PIN_STRETCH")
+    assert (cardctl.PIN_OWED_MOST, cardctl.PIN_STRETCH) == (most, stretch), "cardctl's mirror is the applet's"
+    longest = most + math.ceil(most / stretch) - 1 + 1
+    assert cardctl.PIN_WAIT_MOST >= longest, (cardctl.PIN_WAIT_MOST, longest)
 
 
 def test_reset_by_the_pin_holds_the_history_then_seventeen_askings_and_frees_the_card_for_setup():

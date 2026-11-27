@@ -88,7 +88,7 @@ final class SimCard {
     static final int SW_OK = 0x9000;
     static final int SW_KEEP_HOLDING = 0x6A98;
     static final int SW_SLOT_EMPTY = 0x6A88;
-    /** The most askings the bridge sends an owner's claim: the card takes four, the first three answered 6A98. */
+    /** The most askings the bridge sends an owner's claim: the card takes five on 3.2 (four on 3.1), all but the last answered 6A98 (D258). */
     static final int CLAIM_MOST = 10;
 
     /** GET_INFO P1 = 4: 59 bytes on 3.0 (the keyset table, the no-PIN window, the profiles, the loads left). */
@@ -288,7 +288,7 @@ final class SimCard {
      *   <li>SET_CARD with the mint and refund key: the owner's proof where the card has an owner; on a card with none,
      *       before its first PIN or in its first set-up, under the PIN;</li>
      *   <li>SET_OWNER with the key and the anchor: on an owned card the old owner's proof; on a card with no owner the
-     *       claim, the same command four times, the first three answered 6A98, keep holding (once, right after the set-up's record, D221). After a claim the card pays
+     *       claim, the same command five times (four on 3.1, D258), all but the last answered 6A98, keep holding (once, right after the set-up's record, D221). After a claim the card pays
      *       nothing in that time in the field, so the card is then taken out of the field and back, selected, and the
      *       PIN given again;</li>
      *   <li>SET_HEADER for each header;</li>

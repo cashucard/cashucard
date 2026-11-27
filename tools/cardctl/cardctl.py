@@ -229,9 +229,13 @@ OWNER_C_CHECK_LEN = 16
 BIP39_SEED_LEN = 64
 PIN_KEY_ANSWER_LEN = 113
 # VERIFY_PIN on a card with no owner answers 6A98, keep holding, while it serves the wait its wrong tries left: at
-# most 16,384 askings, in stretches of 16 with one asking more at the end of each, then the try.
-PIN_WAIT_MOST = 16384 + 16384 // 16 + 2
-# SET_OWNER on a card with no owner (a claim): four askings, the first three answered 6A98 (D211; about 3 s on a J3R180).
+# most 22,527 askings on 3.2 (16,384 on 3.1), in stretches of 22 (16 on 3.1) with one asking more at the end of each, then
+# the try (CashuApplet.PIN_OWED_MOST and PIN_STRETCH, D258: the counts that keep 3.1's seconds). The bound is 3.2's, the larger.
+PIN_OWED_MOST = 22527
+PIN_STRETCH = 22
+PIN_WAIT_MOST = PIN_OWED_MOST + -(-PIN_OWED_MOST // PIN_STRETCH) + 2
+# SET_OWNER on a card with no owner (a claim): four askings on 3.1, the first three answered 6A98 (D211; about 3 s on a J3R180);
+# five on 3.2, the first four answered 6A98 (D258, the same seconds on a quicker signature).
 # The bound is more than the card's count, so a card of an earlier build is held for as before.
 CLAIM_MOST = 10
 
@@ -280,8 +284,9 @@ FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
 # the seventeenth asking after the history's seven (24 askings, about 11 s in all), D211: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D211 measured it).
-# 3.1 (D232) answers the history at the third asking and resets at the fourth (7 askings, about 2.6 s in all, D236): these bounds are
-# 3.0's, the most any card asks for, and a 3.1 card answers before them.
+# 3.1 (D232) answers the history at the third asking and resets at the fourth (7 askings, about 2.6 s in all, D236), and 3.2
+# (D258) at the fourth and the sixth (10 askings, about 2.9 s): these bounds are 3.0's, the most any card asks for, and a 3.1 or
+# 3.2 card answers before them.
 LOG_HOLD_MOST = 7
 RESET_MOST = 17
 RESET_CONFIRM_BYTE = 0xAD

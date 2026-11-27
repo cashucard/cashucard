@@ -182,9 +182,12 @@ const KEYSET_UNITS = Object.freeze(["sat", "usd"])
 const CERT_STATE = 0xff, CERT_PAGE = 256, CERT_PAGES = 4
 /** GET_NONCE P1 = 1 (3.0): the nonce (16), the PIN key (33), the card key's signature over it (64). */
 const PIN_KEY_ANSWER_LEN = 113
-/** Held commands (3.0): a claim is four askings (the bound is more); a VERIFY_PIN on a card with no owner waits at most 16,384 askings, in stretches of 16, then the try. */
+/** Held commands (3.0): a claim is five askings on 3.2 and four on 3.1 (the bound is more); a VERIFY_PIN on a card with no owner
+ *  waits at most 22,527 askings on 3.2 (16,384 on 3.1), in stretches of 22 (16 on 3.1), each with one asking more, then the try
+ *  (CashuApplet.PIN_OWED_MOST and PIN_STRETCH, D258). The bound is 3.2's, the larger. */
 const CLAIM_MOST = 10
-const PIN_WAIT_MOST = 16384 + 16384 / 16 + 2
+const PIN_OWED_MOST = 22527, PIN_STRETCH = 22
+const PIN_WAIT_MOST = PIN_OWED_MOST + Math.ceil(PIN_OWED_MOST / PIN_STRETCH) + 2
 /** GET_INFO P1 = 4, bytes 55 and 56: the profiles a card keeps, one bit each (spec/APDU.md, GET_INFO). */
 const PROFILE_NAMES = Object.freeze([
   [55, 0, "PIN before money"], [55, 1, "the no-PIN window"], [55, 2, "the owner claimed slowly"],
@@ -1227,7 +1230,7 @@ class CardSim {
   async setPin(pin) { await this.send(encode.setPin(pin), "SET_PIN") }
   /**
    * An owner's claim (SET_OWNER on a card with no owner): the PIN given in this tap, in the card's first set-up, on an
-   * empty card; the same data asked four times, the first three answered 6A98 (once, right after the set-up's record, D221). After a claim no payment is signed in that
+   * empty card; the same data asked five times on 3.2 (four on 3.1, D258), all but the last answered 6A98 (once, right after the set-up's record, D221). After a claim no payment is signed in that
    * time in the field (6985).
    */
   async claimOwner(anchor = null, ownerKeyHex = TEST_OWNER_PRIVATE) {
@@ -1267,7 +1270,7 @@ const constants = Object.freeze({
   PIN_STATE_NAMES, LABEL, TEST_OWNER_PRIVATE, BEGIN_DATE_KEYS, BEGIN_UNITS, BEGIN_ANSWER_LEN, LOAD_DATE_KEYS, LOAD_UNIT_FIRST,
   GROUP_KEYS_LEN, CHANGE_ROW_LEN, CHANGE_PAGE, CHANGE_MOST, SPEND_ALL_CHANGE_LEN, LOAD_CHANGE_LEN, LOAD_CHANGE_ANSWER_LEN,
   KEYSET_KEY_WIRE, KEYSET_KEYS_PER_COMMAND, KEYSET_KEYS_MOST, KEYSET_TAIL_MOST, KEYSET_PATH_MOST, KEYSET_UNITS, CERT_STATE,
-  CERT_PAGE, CERT_PAGES, PIN_KEY_ANSWER_LEN, CLAIM_MOST, PIN_WAIT_MOST, PROFILE_NAMES, LAST_UNIT_NAMES, UNIT_NAMES,
+  CERT_PAGE, CERT_PAGES, PIN_KEY_ANSWER_LEN, CLAIM_MOST, PIN_OWED_MOST, PIN_STRETCH, PIN_WAIT_MOST, PROFILE_NAMES, LAST_UNIT_NAMES, UNIT_NAMES,
 })
 
 module.exports = {

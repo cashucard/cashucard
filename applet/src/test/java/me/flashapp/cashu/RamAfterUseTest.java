@@ -313,7 +313,8 @@ class RamAfterUseTest {
         Chip c = new Chip();
         assertEquals(SW_OK, c.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, secret)));
         c.power();
-        for (int i = 0; i < 3; i++) c.sim.transmitCommand(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, new byte[] { 0x30, 0x30, 0x30, 0x30 }));
+        // a wrong try, its two askings of wait (D258; one before), a second wrong try: three askings owed
+        for (int i = 0; i < 4; i++) c.sim.transmitCommand(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, new byte[] { 0x30, 0x30, 0x30, 0x30 }));
         refusedLeavesNone(c, "VERIFY_PIN, the right PIN, a wait owed (clear)", INS_VERIFY_PIN, 0, secret, 0x6A98);
         refusedLeavesNone(c, "VERIFY_PIN, a wait owed (sealed)", INS_VERIFY_PIN, 1, sealed, 0x6A98);
         refusedLeavesNone(c, "VERIFY_PIN, a wait owed, 100 bytes (clear)", INS_VERIFY_PIN, 0, long100, 0x6A98);

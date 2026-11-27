@@ -15,9 +15,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The PIN on a card with no owner never blocks (D195): each wrong try makes the next VERIFY_PIN wait twice as long as the one
- * before, 1, 2, 4, 8, 16 askings (each a signature's work answered 6A98, about 0.7 s on a chip), then 16 a stretch, each
- * stretch written down as it ends; the count and what is owed are persistent, counted before the PIN is compared, and a
+ * The PIN on a card with no owner never blocks (D195): each wrong try makes the next VERIFY_PIN wait about twice as long as the
+ * one before, 2, 3, 6, 11, 22 askings (each a signature's work answered 6A98, 352.6 ms on the 3.2 file; 1, 2, 4, 8, 16 before
+ * D258, the same seconds on 3.1's slower signature), then 22 a stretch (16 before D258), each stretch written down as it ends; the count and what is owed are persistent, counted before the PIN is compared, and a
  * right PIN after its wait sets them to nothing. A card with an owner keeps three tries and the owner's unblock.
  */
 class PinWaitTest {
@@ -56,29 +56,31 @@ class PinWaitTest {
         c.power();
         assertEquals(0x63C1, verify(c, WRONG_PIN).getSW());
         assertEquals(SW_KEEP_HOLDING, verify(c, WRONG_PIN).getSW(), "the second try waits");
+        assertEquals(SW_KEEP_HOLDING, verify(c, WRONG_PIN).getSW(), "two askings (D258; one before)");
         assertEquals(0x63C2, verify(c, WRONG_PIN).getSW(), "and is counted after its wait");
-        assertEquals(SW_KEEP_HOLDING, verify(c, WRONG_PIN).getSW(), "the third waits two askings");
+        assertEquals(SW_KEEP_HOLDING, verify(c, WRONG_PIN).getSW(), "the third waits three askings");
         c.power();
         assertEquals(1, c.info(0)[7], "the PIN is not blocked");
         int[] r = asked(c, TEST_PIN);
-        assertEquals(2, r[0], "two askings of wait, the one before the power not kept");
+        assertEquals(3, r[0], "three askings of wait (D258; two before), the one before the power not kept");
         assertEquals(SW_OK, r[1], "the holder's right PIN");
         assertEquals(64, c.pay(a, b).getData().length, "and the money moves");
     }
 
     @Test
-    @DisplayName("Each wrong try in a row doubles the next try's wait: 1, 2, 4, 8 and 16 askings, then two stretches of 16 for the sixth (the asking that ends a stretch answers 6A98 with no work); 63CX says the wrong tries in a row; GET_INFO says set, never blocked; the chip's counter never runs out")
+    @DisplayName("Each wrong try in a row about doubles the next try's wait: 2, 3, 6, 11 and 22 askings, then two stretches of 22 for the sixth (D258: 11/8 of 3.1's 1, 2, 4, 8, 16 and 32, rounded up; the asking that ends a stretch answers 6A98 with no work); 63CX says the wrong tries in a row; GET_INFO says set, never blocked; the chip's counter never runs out")
     void theWaitDoubles() throws Exception {
         UnitsTest.Card c = HolderTest.noOwner();
         c.power();
         assertEquals(0x63C1, verify(c, WRONG_PIN).getSW(), "the first wrong try waits for nothing");
-        assertArrayEquals(new int[] { 1, 1 }, marks(c));
-        int[] askings = { 1, 2, 4, 8, 16, 33 };
+        int[] owed = { 2, 3, 6, 11, 22, 44, 88 };
+        assertArrayEquals(new int[] { 1, owed[0] }, marks(c));
+        int[] askings = { 2, 3, 6, 11, 22, 45 };
         for (int k = 0; k < askings.length; k++) {
             int[] r = asked(c, WRONG_PIN);
             assertEquals(askings[k], r[0], "the wait before wrong try " + (k + 2));
             assertEquals(0x63C0 | (k + 2), r[1]);
-            assertArrayEquals(new int[] { k + 2, 1 << (k + 1) }, marks(c), "after wrong try " + (k + 2));
+            assertArrayEquals(new int[] { k + 2, owed[k + 1] }, marks(c), "after wrong try " + (k + 2));
             assertEquals(1, c.info(0)[7], "set, not blocked");
             assertTrue(tries(c) >= 2, "the chip's counter refilled before each check");
         }
@@ -90,18 +92,19 @@ class PinWaitTest {
         UnitsTest.Card c = HolderTest.noOwner();
         c.power();
         byte[] m = c.field("pinMarks");
-        m[0] = 6; m[1] = 0; m[2] = 32;   // after the sixth wrong try in a row: 32 askings owed
+        assertEquals(22, CashuApplet.PIN_STRETCH, "a stretch is 22 askings, 7.76 s on the 3.2 file, as 16 were on 3.1's slower signature (D258)");
+        m[0] = 6; m[1] = 0; m[2] = 44;   // after the sixth wrong try in a row: 44 askings owed, two stretches
         for (int k = 0; k < 10; k++) assertEquals(SW_KEEP_HOLDING, verify(c, TEST_PIN).getSW());
         c.power();
-        assertArrayEquals(new int[] { 6, 32 }, marks(c), "ten askings of a stretch, then the power: nothing written");
-        for (int k = 0; k < 17; k++) assertEquals(SW_KEEP_HOLDING, verify(c, TEST_PIN).getSW(), "asking " + (k + 1));
-        assertArrayEquals(new int[] { 6, 16 }, marks(c), "a stretch ended: written");
+        assertArrayEquals(new int[] { 6, 44 }, marks(c), "ten askings of a stretch, then the power: nothing written");
+        for (int k = 0; k < 23; k++) assertEquals(SW_KEEP_HOLDING, verify(c, TEST_PIN).getSW(), "asking " + (k + 1));
+        assertArrayEquals(new int[] { 6, 22 }, marks(c), "a stretch ended: written");
         c.power();
-        assertArrayEquals(new int[] { 6, 16 }, marks(c), "and kept through the power");
+        assertArrayEquals(new int[] { 6, 22 }, marks(c), "and kept through the power");
         for (int k = 0; k < 5; k++) assertEquals(SW_KEEP_HOLDING, verify(c, TEST_PIN).getSW());
         c.info(0);
         int[] r = asked(c, TEST_PIN);
-        assertEquals(16, r[0], "GET_INFO between askings: the stretch from its first");
+        assertEquals(22, r[0], "GET_INFO between askings: the stretch from its first");
         assertEquals(SW_OK, r[1]);
         assertArrayEquals(new int[] { 0, 0 }, marks(c), "the right PIN: nothing");
         assertEquals(3, tries(c));
@@ -110,25 +113,26 @@ class PinWaitTest {
         assertEquals(SW_KEEP_HOLDING, verify(c, TEST_PIN).getSW());
         c.select();
         int[] again = asked(c, TEST_PIN);
-        assertEquals(1, again[0], "a SELECT between askings: from the first");
+        assertEquals(2, again[0], "a SELECT between askings: from the first (two owed since D258)");
         assertEquals(SW_OK, again[1]);
     }
 
     @Test
-    @DisplayName("The wait is at most 16,384 askings a try (about three hours), from the fifteenth wrong try in a row on; 63CF for fifteen or more")
+    @DisplayName("The wait is at most 22,527 askings a try (about two hours and twelve minutes, as 16,384 were on 3.1's slower signature: D258), from the fifteenth wrong try in a row on; 63CF for fifteen or more")
     void theWaitHasACeiling() throws Exception {
         UnitsTest.Card c = HolderTest.noOwner();
         c.power();
         byte[] m = c.field("pinMarks");
         m[0] = 14; m[1] = 0; m[2] = 0;
         assertEquals(0x63CF, verify(c, WRONG_PIN).getSW());
-        assertArrayEquals(new int[] { 15, 0x4000 }, marks(c));
+        assertArrayEquals(new int[] { 15, 22527 }, marks(c));
+        assertEquals(22527, CashuApplet.PIN_OWED_MOST, "the least whole count of 352.6 ms askings no shorter than 16,384 of 484.8 ms (D258)");
         m[1] = 0; m[2] = 0;
         assertEquals(0x63CF, verify(c, WRONG_PIN).getSW(), "fifteen stays fifteen");
-        assertArrayEquals(new int[] { 15, 0x4000 }, marks(c), "and the wait its ceiling");
+        assertArrayEquals(new int[] { 15, 22527 }, marks(c), "and the wait its ceiling");
         m[0] = 13; m[1] = 0; m[2] = 0;
         assertEquals(0x63CE, verify(c, WRONG_PIN).getSW());
-        assertArrayEquals(new int[] { 14, 0x2000 }, marks(c));
+        assertArrayEquals(new int[] { 14, 11264 }, marks(c), "11/8 of 8,192 (D258)");
     }
 
     @Test
@@ -184,6 +188,7 @@ class PinWaitTest {
         byte[] env = envelope(EPH[0], key, nonce, INS_VERIFY_PIN & 0xFF, pinBlock(TEST_PIN));
         CommandAPDU sealed = new CommandAPDU(CLA, INS_VERIFY_PIN, 1, 0, env);
         assertEquals(SW_KEEP_HOLDING, c.sim.transmitCommand(sealed).getSW(), "the wait");
+        assertEquals(SW_KEEP_HOLDING, c.sim.transmitCommand(sealed).getSW(), "the wait's second asking (D258)");
         assertEquals(SW_OK, c.sim.transmitCommand(sealed).getSW(), "the same envelope after it");
         assertArrayEquals(new int[] { 0, 0 }, marks(c));
     }

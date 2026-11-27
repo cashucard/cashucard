@@ -118,8 +118,8 @@ anything is sent. A 3.0 card with an owner refuses `SET_PIN` (`6A91`): its PIN
 is changed by `change-pin` with the owner's proof, so `set-pin --owner` (ADD
 PIN) is for cards of 2.2 and earlier only. Claiming a card with no owner
 (`set-owner`) wants the PIN in the same tap (`--pin`); the card answers `6A98`,
-keep holding, to the first three askings and cardctl asks again until the fourth
-sets the owner (about 2.6 seconds on a J3R180). An owner is replaced with the old owner's proof
+keep holding, to the first four askings on 3.2 (three on 3.1) and cardctl asks again until the fifth
+(the fourth on 3.1) sets the owner (about 1.7 seconds of holding on the 3.2 file, D258; about 2.6 seconds on a J3R180 on 3.1). An owner is replaced with the old owner's proof
 (`--old-owner-key`), and only with nothing unspent and no change owed (`6A8D`).
 After such a hand-over a 3.0 card answers `verify-pin` with `6982` until the new
 owner's `change-pin`, and a dated load with `6A8E` until the new owner's
