@@ -38,6 +38,7 @@ and the [mobile reset report](HARDWARE_TEST_REPORT_2026-10-23.j3r180-mobile-rese
 | 2026-11-14 | [2.3 with D206 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14c_J3R180_2.3.md) | `LOAD_PROOF`'s 04 form checked by the chip's key agreement; a first load of 45 pieces timed in both forms |
 | 2026-11-14 | [2.3 with D207 to D210 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14d_J3R180_2.3.md) | A keyset taught at set-up; the field, the change's point checks and the signature on the chip's own engines; a first load in 7.8 s, a payment with change in 2.2 s, the holds timed |
 | 2026-11-14 | [2.3 with D211 to D214 on the second J3R180](HARDWARE_TEST_REPORT_2026-11-14e_J3R180_2.3.md) | The signature in two shares and checked on the card, wider known answers, a taught keyset kept; every signature 0.27 s longer, the holds timed again |
+| 2026-11-27 | [Setup 17 on J3R180](HARDWARE_TEST_REPORT_2026-11-27.J3R180.md) | iPhone recovers the original interrupted installation after an in-place update |
 
 ## Hardware plans
 

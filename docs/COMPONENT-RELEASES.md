@@ -12,9 +12,9 @@ authorities. Do not generate replacement signing keys to make CI pass.
 | Component   | Current manifest identity                                        | New release tag              |
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
 | Firmware    | `applet/pom.xml`: 3.1.0; tracked CAP `cashu-javacard-3.1.0.cap`, APDU version 3.1 | `firmware-v3.1.0`            |
-| cardkit     | `tools/cardkit/package.json`: 0.4.0                              | `cardkit-v0.4.0`             |
+| cardkit     | `tools/cardkit/package.json`: 0.5.0                              | `cardkit-v0.5.0`             |
 | Ops-service | `ops/package.json`: 0.2.1                                        | `ops-v0.2.1`                 |
-| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 16                  | `provisioner-v1.0.0-build.16` |
+| Provisioner | `apps/provisioner/package.json`: 1.0.0, build 17                  | `provisioner-v1.0.0-build.17` |
 
 These examples identify source versions. Existing store build numbers remain
 reserved; use a new build number for a new upload. The next mobile release needs
@@ -22,6 +22,13 @@ a new monotonically increasing build in package.json, Android Gradle and iOS
 Info.plist. Historical `v2.1.0` and `provisioner-v1.0.0-beta.1` releases remain
 valid historical records; do not move or retag them. Corrected firmware Maven
 metadata does not alter the CAP.
+
+Provisioner build 17 can retry an interrupted install on the original blank J3R180.
+It shows the home-screen label **Cashu Setup** on iPhone and Android. The reset
+screen explains how the holder can settle retained entries when changing mints.
+The [physical qualification](reports/HARDWARE_TEST_REPORT_2026-11-27.J3R180.md)
+covers the iPhone retry. The [cardkit 0.5.0 notes](../tools/cardkit/README.md#050)
+describe the optional host API used by Setup.
 
 Provisioner build 16 (the app is named Cashu Card Setup; the version stays 1.0.0) holds, since build 15: the released 3.1 card
 file (`firmware-v3.1.0`, load file sha256 `b2afa9a8…`) on the app's list of approved load files (#266); the app reads 2.1, 2.2,

@@ -61,6 +61,19 @@ checks supported exports/private-path rejection, and scans app/ops imports.
 GP tests use fake cards and do not authorize a real reader or phone action.
 See [component releases](../../docs/COMPONENT-RELEASES.md).
 
+## 0.5.0
+
+A provisioner can opt into a single retry of an interrupted installation on a
+qualified blank J3R180. `supportedBlankRetryChip` checks the chip family.
+`provision` accepts a `blankRetry` option with the original chip ID, factory
+key version and a `persistIntent` callback. The authenticated inventory check
+runs before and after that callback. The caller must confirm the original
+attempt is still active and save the retry in durable storage before returning.
+`requireBlankJ3R180Registry` reads the inventory through an authenticated
+transport. `rotateKeys` accepts `beforePutKey` to recheck the attempt before it
+changes the manager keys. Existing callers can keep using both functions
+without the new options. [Setup recovery](../../docs/PROVISIONER-RECOVERY.md#retry-an-interrupted-install-on-a-verified-blank-card)
+
 ## 0.4.0: the tag's address is the card maker's
 
 The card's package names no address any more: the NFC tag takes its address from

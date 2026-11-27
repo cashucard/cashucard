@@ -9615,3 +9615,25 @@ still explains phone and computer installation and links to the app page.
 ## <a id="d241"></a>D241. Card reissue after a verified issuer reset
 
 An Ops administrator can approve an eligible stopped installation when a trusted issuer signs a completed reset for the same chip. The administrator can preview the evidence before approval. Ops records the approval and releases the installation together so that a retry returns the same receipt. Backup format v8 preserves that receipt when the service is restored.
+
+## <a id="d242"></a>D242. Resume the same interrupted installation
+
+Setup offers **Check card and retry** on the original operator's phone when a
+bound installation stopped before verification and its initial inspection found
+the card blank. The original attempt and ordinal persist. The phone verifies
+the chip identity, factory manager and supported blank J3R180 inventory while
+it has the card. It rechecks the active Ops binding, saves the retry intent
+and reads the inventory again before starting the load. Once the intent is
+saved, only reconciliation can continue that attempt. Restricting retries to
+a positively identified blank inventory preserves both existing applications
+and the single completion receipt. [Recovery flow](PROVISIONER-RECOVERY.md#retry-an-interrupted-install-on-a-verified-blank-card)
+
+## <a id="d243"></a>D243. Settle retained entries before changing mints
+
+A holder may have zero spendable balance while the card still retains entries
+from previous payments. Before changing mints, the host requires an empty card
+with no change owed and no retained entries. For a card used with multiple
+mints, the holder checks each entry with its issuing mint. The operator sees
+the current and proposed mint, including a test or real funds label where
+known. A new mint cannot confirm settlement of another mint's payments.
+[Holder handoff](PROVISIONER-HOLDER-HANDOFF.md#changing-the-mint-on-an-existing-card)
