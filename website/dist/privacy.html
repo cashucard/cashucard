@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="How cashucard.org, ops.cashucard.org and the Cashu Card Setup app handle personal information." />
+    <meta name="description" content="How cashucard.org, ops.cashucard.org and the Cashu Card Setup and Cashu Card POS apps handle personal information." />
     <meta property="og:title" content="Privacy policy | Cashu Card" />
-    <meta property="og:description" content="How cashucard.org, ops.cashucard.org and the Cashu Card Setup app handle personal information." />
+    <meta property="og:description" content="How cashucard.org, ops.cashucard.org and the Cashu Card Setup and Cashu Card POS apps handle personal information." />
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://cashucard.org/privacy" />
     <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
@@ -36,20 +36,20 @@
         <div class="guide-hero-inner">
           <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> PRIVACY</div>
           <h1 id="privacy-title">Privacy <em>policy</em></h1>
-          <p class="guide-lead">What cashucard.org, ops.cashucard.org and the Cashu Card Setup app collect, why, and how to reach us about it.</p>
-          <ul class="guide-facts" aria-label="At a glance"><li>Island Bitcoin LLC</li><li>No cookies</li><li>No tracking</li><li>26 Oct 2026</li></ul>
+          <p class="guide-lead">What cashucard.org, ops.cashucard.org and the Cashu Card Setup and Cashu Card POS apps collect, why, and how to reach us about it.</p>
+          <ul class="guide-facts" aria-label="At a glance"><li>Island Bitcoin LLC</li><li>No cookies</li><li>No tracking</li><li>26 Nov 2026</li></ul>
         </div>
       </section>
 
       <div class="guide-layout">
         <nav class="guide-rail" aria-label="On this page">
           <span class="rail-label">On this page</span>
-          <ol><li><a href="#who">Who this covers</a></li><li><a href="#site">cashucard.org</a></li><li><a href="#app">The Cashu Card Setup app</a></li><li><a href="#ops">ops.cashucard.org</a></li><li><a href="#cards">Cards, wallets and mints</a></li><li><a href="#sharing">Sharing</a></li><li><a href="#choices">Your choices</a></li><li><a href="#changes">Changes</a></li></ol>
+          <ol><li><a href="#who">Who this covers</a></li><li><a href="#site">cashucard.org</a></li><li><a href="#app">The Cashu Card Setup app</a></li><li><a href="#pos">The Cashu Card POS app</a></li><li><a href="#ops">ops.cashucard.org</a></li><li><a href="#cards">Cards, wallets and mints</a></li><li><a href="#sharing">Sharing</a></li><li><a href="#choices">Your choices</a></li><li><a href="#changes">Changes</a></li></ol>
         </nav>
         <article class="guide-doc">
           <section id="who" aria-labelledby="who-title">
             <h2 id="who-title">Who this covers</h2>
-            <p>Island Bitcoin LLC runs cashucard.org and ops.cashucard.org, and publishes the Cashu Card Setup app on the App Store and Google Play. This policy covers those three. Write to <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a> with any privacy question or request.</p>
+            <p>Island Bitcoin LLC runs cashucard.org and ops.cashucard.org, and publishes the Cashu Card Setup and Cashu Card POS apps. This policy covers these sites and apps. Write to <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a> with any privacy question or request.</p>
             <p>Cashu Card is an open source project. Anyone can run their own copy of the site, the ops service or the app, and a copy run by someone else follows that operator&#8217;s own policy.</p>
           </section>
 
@@ -64,6 +64,15 @@
             <p>The app is a tool for card operators: it installs the Cashu Card software on blank NFC cards. It works with the ops service the operator chooses.</p>
             <ul><li><strong>On the phone</strong>, the app keeps the ops service addresses you saved, your signed-in session and your saved batch work, so an interrupted batch can resume.</li><li><strong>To the ops service you choose</strong>, it sends your operator name and password when you sign in, and the batch and card records it creates: each card&#8217;s chip identifiers, its installation results and the batch it belongs to.</li><li><strong>To the cards</strong>, it sends the commands that install the software and set the card&#8217;s manager keys.</li></ul>
             <p>The app contains no analytics, advertising or tracking code. If you have chosen to share diagnostics with app developers in your phone&#8217;s settings, Apple or Google may pass crash reports to us.</p>
+          </section>
+
+          <section id="pos" aria-labelledby="pos-title">
+            <h2 id="pos-title">The Cashu Card POS app</h2>
+            <p>Island Bitcoin LLC publishes Cashu Card POS. The merchant can use the app without creating an account. For privacy questions or requests, write to <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a>.</p>
+            <p><strong>On your phone.</strong> POS stores the mints you add and keeps an encrypted local payment record, including sales, eCash available to withdraw, outstanding withdrawals and change owed to cards. The phone’s passcode or biometric check protects merchant actions. Your phone handles the identity check. The card PIN is used for the tap and is never saved in the payment record.</p>
+            <p><strong>At your mint.</strong> POS connects over HTTPS to the Cashu mints you add. The selected mint receives the requests and eCash data needed to check its capabilities, settle a payment and check a withdrawal. It also sees the network address making the request. Each mint operator controls its own records and retention. Island Bitcoin LLC does not receive a copy of your payment record through POS.</p>
+            <p><strong>When you withdraw or return eCash.</strong> If you show, copy or share an eCash token, whoever receives it can redeem its unspent value at the mint. Your phone’s share sheet lets you choose a destination.</p>
+            <p><strong>Retention and diagnostics.</strong> The payment record stays on this device. POS has no cloud backup. Withdraw your takings and resolve anything owed to cards before removing the app or erasing its data. The app includes no advertising, analytics or crash-reporting service. If you enable diagnostic sharing in your device settings or send beta feedback, Apple or Google may provide diagnostics or the feedback you submit to the publisher. Opening a project website in your browser is covered by the website privacy policy.</p>
           </section>
 
           <section id="ops" aria-labelledby="ops-title">
@@ -84,12 +93,12 @@
 
           <section id="choices" aria-labelledby="choices-title">
             <h2 id="choices-title">Your choices</h2>
-            <p>You can ask what we hold about you, ask us to correct it, or ask us to delete it, at <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a>. We answer within 30 days. The app and the ops service are tools for operators, and they are meant for adults.</p>
+            <p>You can ask what we hold about you, ask us to correct it, or ask us to delete it, at <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a>. We answer within 30 days. The Setup app and the ops service are tools for card operators. The POS app is a tool for merchants. These tools are intended for adults.</p>
           </section>
 
           <section id="changes" aria-labelledby="changes-title">
             <h2 id="changes-title">Changes</h2>
-            <p>Effective 26 October 2026. When this policy changes, the date above changes, and the <a href="https://github.com/cashucard/cashucard/commits/main/website/dist/privacy.html">full history</a> stays public on GitHub.</p>
+            <p>Effective 26 November 2026. When this policy changes, the date above changes, and the <a href="https://github.com/cashucard/cashucard/commits/main/website/dist/privacy.html">full history</a> stays public on GitHub.</p>
           </section>
         </article>
       </div>
