@@ -1959,6 +1959,47 @@ def test_a_hand_over_says_what_waits_for_the_new_owner():
     assert code == 0 and conn.has_owner and "6A8E" not in out, out
 
 
+def test_set_card_checks_old_entries_before_switching_mint():
+    testnut = "https://testnut.cashu.space"
+    forge = "https://forge.flashapp.me"
+
+    def run(current, target, owner=False, spent=0, unspent=0, owed=False):
+        calls = []
+        card = types.SimpleNamespace(
+            get_card=lambda: {"mint": current, "unit": 0, "design": b"FX1"},
+            get_info=lambda: {"spent": spent, "unspent": unspent, "change_owed": owed, "has_owner": owner},
+            verify_pin=lambda pin: calls.append("pin"),
+            set_card=lambda *args, **kwargs: calls.append("set-card"))
+        argv = ["set-card", "--mint", target, "--pin", "1234", "--owner-key", f"{_SETUP_OWNER:064x}"]
+        try:
+            code, _, warning = _run(card, argv)
+        except SystemExit as exc:
+            return calls, str(exc)
+        assert code == 0
+        return calls, warning
+
+    for current, target in ((testnut, forge), (forge, testnut), (forge, "-"),
+                            ("https://private-a.test", "https://private-b.test"), ("-", forge), ("", forge)):
+        for owner in (False, True):
+            for spent in (1, 15, 32):
+                calls, reason = run(current, target, owner=owner, spent=spent)
+                assert not calls, (current, target, calls)
+                assert str(spent) in reason and "issuing mint" in reason, reason
+            assert run(current, target, owner=owner, unspent=1)[0] == []
+            assert run(current, target, owner=owner, owed=True)[0] == []
+    for current, target in ((testnut, forge), (forge, testnut)):
+        calls, warning = run(current, target, owner=True)
+        assert calls == ["pin", "set-card"]
+        assert "test sats" in warning and "real sats" in warning and "Funds stay" in warning, warning
+    for current in ("", "-"):
+        calls, warning = run(current, forge)
+        assert calls == ["pin", "set-card"] and warning == "", (current, warning)
+    calls, warning = run(forge, forge, owner=True, spent=17)
+    assert calls == ["pin", "set-card"] and warning == ""
+    calls, warning = run("https://testnut.cashu.space.fake", "https://unknown.test")
+    assert calls == ["pin", "set-card"] and "test sats" not in warning and "real sats" not in warning
+
+
 def test_setup_and_set_card_take_a_design_and_set_card_keeps_the_records():
     """SET_CARD writes the design the record carries and zeroes one it does not: `setup --design` and
     `set-card --design` send the one given; set-card without it sends the design the card's record has. A design is
