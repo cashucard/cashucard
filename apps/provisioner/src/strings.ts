@@ -7,6 +7,9 @@
 
 export const APP_NAME = 'Cashu Card Setup';
 
+export const SPENT_ENTRY_GUIDANCE =
+  'Use the holder wallet to check each entry with the mint that issued it, including any test mint. Once all entries have settled, clear them in the wallet and scan the card again.';
+
 export const SIGNIN = {
   tagline: 'Programs blank cards into Cashu cards. Operators only.',
   button: 'Sign in',

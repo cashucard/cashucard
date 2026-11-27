@@ -11,6 +11,7 @@ import {
   type Transceiver,
 } from './cardkit';
 import {threeLine, type ResetLookup} from './ownedResetWorkflow';
+import {SPENT_ENTRY_GUIDANCE} from './strings';
 export type CardReadout =
   | {state: 'blank'; chipId: string}
   | {state: 'unsupported'; chipId: string; version: string}
@@ -145,7 +146,7 @@ export function cardStatus(
     return threeLine(c.version)
       ? {
           title: 'Check earlier payments',
-          detail: `${c.spent} spent entries remain. On this card the holder wallet frees spent entries once the mint has settled them; this app does not clear them. Reset is unavailable until they are freed.`,
+          detail: `${c.spent} spent entries remain. ${SPENT_ENTRY_GUIDANCE}`,
           action: 'holder',
           label: 'HOLDER WALLET INSTRUCTIONS',
         }
