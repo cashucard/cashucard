@@ -80,6 +80,7 @@ SIZES = {
     38809: False,  # the same study source at this size, 2026-11-14, J3R180 09301220: card applet 6F00 at create (153 past a multiple of 256)
     38893: True,   # the same study source at this size (load file 92b67948..., never shipped), 2026-11-14, J3R180 09301220: installed at the first try (237 past a multiple of 256); passed the study's chip tests
     35509: True,   # the 2.3 chip run's test-only build (2.3 with one command added that says the signer's temporary key's kind; never shipped, load file sha256 1bf178bc...), 2026-11-13, J3R180 09312320: three steps, opener first, load 16 s, card applet 2 s
+    44881: True,   # 3.2 with the speed work and the wait counts (70bff21, load file c525db93...), kept package 40,580 bytes, 132 past, 2026-11-26: created at the first try four of four on J3R180s 57723320 (SCP03) and 09344120 (SCP02) and on J3R452 36813121 (docs/reports/HARDWARE_TEST_REPORT_2026-11-26_3.2-final.md); on INSTALLED
     21540: False,  # 2.2 first build (sha256 51ddeee4...), ENG-823, 2026-11-06: loaded (88 blocks), card applet 6F00 at create; cause not isolated: the size window or the constructor's +4,321 B persistent (D176, docs/reports/HARDWARE_TEST_REPORT_2026-11-06.j3r180-2.2-install-refused.md)
 }
 # the sizes in SIZES that only a J3R180 keyed for SCP03 has installed, by the card that did (D229): the install sizes were
@@ -147,6 +148,10 @@ PROVEN = {
 # signatures and real change verified on the chip. A size in SIZES says what a chip did with some source of that size; an
 # entry here says this exact file installed.
 INSTALLED = {
+    'c525db93b62b963504c574f9147f4b1a5437c30a436e58b5c495f8247a79f3c9': '3.2 with the speed work and the wait counts (70bff21, D244 to '
+        'D258), 44,881 bytes, 2026-11-26: the card applet created at the first try four times of four on each of 57723320 (J3R180, '
+        'SCP03), 09344120 (J3R180, SCP02) and 36813121 (J3R452), set-up and play-money sessions there '
+        '(docs/reports/HARDWARE_TEST_REPORT_2026-11-26_3.2-final.md); not on PROVEN until its entry can say PROVEN_NEEDS',
 }
 # what every entry of PROVEN says of its chip run, word for word
 PROVEN_NEEDS = 'real signatures and real change verified on the chip'
@@ -200,6 +205,7 @@ KEPT_SEEN = {
     40506: True,   # 7fe7ec6 (44,789 bytes), 58 past
     40499: True,   # eedd741 (44,789 bytes), 51 past
     40496: True,   # 1d9ac2a (44,789 bytes), 48 past
+    40580: True,   # 70bff21 (44,881 bytes), 132 past: four of four, and four of four on J3R180 09344120 and J3R452 36813121
 }
 KEPT_AIM = (60, 180)   # the middle of the places that created there (48 to 213 past), clear of both ends
 KEPT_TARGET = 120

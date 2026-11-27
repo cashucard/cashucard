@@ -24,15 +24,15 @@ test('installation follows the load file this build carries, never a bare switch
 });
 
 test('the tracked 3.2 load file waits for a chip run and the owner; the released 3.1 file stays approved', () => {
-  // 43,765 bytes, 3.2 (D244): it has run only in a simulator, so it is not on the list, and this build installs
-  // nothing until a chip run and the owner's approval add it in a change of their own. 3.1 (42,741 bytes, D236's
+  // 44,881 bytes, 3.2 (D244 to D259): it has passed the chip run on three cards (2026-11-26) but the owner has not approved
+  // it, so it is not on the list, and this build installs nothing until the owner's approval adds it in a change of its own. 3.1 (42,741 bytes, D236's
   // review fixes, released as firmware-v3.1.0) was installed and paid from at a test mint on three chips on 2026-11-23
   // with GlobalPlatformPro and tools/cardctl, not this app; two of the runs are counted on the contributor's logs
   // (D238). The owner approved it for build 16 (ENG-870). The files before it (9ed12359..., 99a66ba7...,
   // d69742d0...) are on refcheck's PROVEN but were never approved here, and stay off the list.
-  expect(CASHU_LOAD_FILE.size).toBe(43765);
+  expect(CASHU_LOAD_FILE.size).toBe(44881);
   expect(CASHU_LOAD_FILE.sha256).toBe(
-    'ecb9a8378896f5105966fd0c06c9eae10984da66bcc0739dd829d12ad2b5865f',
+    'c525db93b62b963504c574f9147f4b1a5437c30a436e58b5c495f8247a79f3c9',
   );
   expect(loadFileValidated(CASHU_LOAD_FILE.sha256)).toBe(false);
   expect(

@@ -2,7 +2,7 @@
 
 This is the install guide at https://cashucard.org/guide, written for an AI agent that runs commands for a person on their own computer. It puts the Cashu Card applet, version 3.2, on a blank NXP J3R180 card in a PC/SC card reader, then checks that the card answers. Every command and expected answer here matches the guide.
 
-The 3.2 build: this exact file has run only in a simulator so far, and no card has installed it or a file of its size. It is the released 3.1 file with the 3.1 review's fixes and quicker writes (D244). If the install in step 4 fails, stop and tell the person.
+The 3.2 build: this exact file has been installed on a chip, and has not yet been proven with a payment at a mint. It is the released 3.1 file with the 3.1 review's fixes and quicker writes (D244), quicker signatures (D245 to D257) and the wait counts of D258. If the install in step 4 fails, stop and tell the person.
 
 Cashu Card is an experimental open source project, built on NUT-CCP, a draft NUT with little testing or review outside the project. Its risks are at https://cashucard.org/#risks.
 
@@ -61,7 +61,7 @@ sha256sum target/cashu-javacard-3.2.0.cap
 On a macOS release without `sha256sum`, run `shasum -a 256 target/cashu-javacard-3.2.0.cap`. Expected:
 
 ```
-13dc5bee6281cd63a756b546f700a8a6e3db08172d9fbd989306dbff07ea0588  target/cashu-javacard-3.2.0.cap
+a94f6acd705b89fa241714eb35406b2531174899a84c199bf78e4abd0493e45b  target/cashu-javacard-3.2.0.cap
 ```
 
 Stop if the hash differs.

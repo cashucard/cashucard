@@ -39,8 +39,8 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 43,765-byte
-  load file in 178 blocks, the opener, the card's applet, then the tag under
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 44,881-byte
+  load file in 182 blocks, the opener, the card's applet, then the tag under
   `D2760000850101` with the card maker's address (the card maker setting, which
   must have passed the installation gate, [D239](../../docs/DECISIONS.md#d239)).
   Then it checks the card's applet answers `03 02`, `GET_INFO` (30 bytes),
@@ -192,7 +192,7 @@ cancellation during key prefetch prevents NFC from opening later.
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
 chip has installed and the operator approved (`LOAD_FILE_VALIDATED`, fixed when the app is
-built), and only when a card maker's own name and tag address are set (below). The tracked 3.2 load file (43,765 bytes, sha256 `ecb9a837…`, D244) is not on it: it has run only in a simulator, so a build from this tree installs no card until a chip run and the owner's approval add it. The 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
+built), and only when a card maker's own name and tag address are set (below). The tracked 3.2 load file (44,881 bytes, sha256 `c525db93…`, D244 to D259) is not on it: it passed the chip run on three cards on 2026-11-26, but a build from this tree installs no card until the owner's approval adds it. The 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
 as `firmware-v3.1.0`, is on it since the owner's approval of 2026-11-24 for Setup build 16
 (ENG-870). The evidence is the desktop tools' runs of 2026-11-23: that exact file (by sha256)
 was installed and paid from at a test mint on card 58206920, with GlobalPlatformPro,

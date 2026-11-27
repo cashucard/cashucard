@@ -88,16 +88,15 @@ it as a size that installs ([D26](DECISIONS.md#d26),
 v2.0.0-rc.1 (sha256 `59f66673…`) installed on the J3R180 with the opener first, at
 20,057 bytes as the install counted the load file, and refcheck's table has it as a
 size that installs ([D25](DECISIONS.md#d25)).
-The 3.2 build is **43,765 bytes** by refcheck's measure (245 past a multiple of 256), in 178 blocks of 247 bytes, the
-last 46: the load file inside the tracked CAP (`applet/target/cashu-javacard-3.2.0.cap`, load file sha256 `ecb9a837…`),
-whose own sha256 is not the CAP's ([Install](#install) gives both). It is the 3.1 file of the next paragraph with
-[D244](DECISIONS.md#d244) (a reset's keys drawn after its last transaction, the self-tests' verdicts cleared with it, a
-forgotten PIN's spent places freed, a hand-over in two transactions, four quicker writes, the curve checked by squaring,
-and `GET_INFO` byte 56 bit 2), and `sizeTheFile` at seventy-seven writes, so that it is 245 past again, the place in its
-page of the earlier 3.x files, four 256-byte pages above 3.1's. Padded by `sizeTheFile`
-(below), this exact file has run only in a simulator so far, and no card has installed it or a file of its size. It is
-not released, and not on the set-up app's approved list ([D74](DECISIONS.md#d74)): the owner approves a load file there
-once a card has paid from it at a test mint.
+The 3.2 build is **44,881 bytes** by refcheck's measure (81 past a multiple of 256; its kept package 40,580 bytes, 132
+past, [D256](DECISIONS.md#d256)), in 182 blocks of 247 bytes, the last 174: the load file inside the tracked CAP
+(`applet/target/cashu-javacard-3.2.0.cap`, load file sha256 `c525db93…`), whose own sha256 is not the CAP's
+([Install](#install) gives both). It is the 3.1 file of the next paragraph with [D244](DECISIONS.md#d244), the speed work
+of [D245](DECISIONS.md#d245) to [D257](DECISIONS.md#d257) and the wait counts of [D258](DECISIONS.md#d258), padded by
+`sizeTheFile` (below): this exact file has been installed on a chip, and has not yet been proven with a payment at a mint. It was installed on 2026-11-26 on three cards: 57723320 (a J3R180 keyed for SCP03), 09344120 (a J3R180 keyed for
+SCP02) and 36813121 (a J3R452). The card's applet was created at the first try four times of four on every one of them
+([the report](reports/HARDWARE_TEST_REPORT_2026-11-26_3.2-final.md)). It is not released, and not on the set-up app's
+approved list ([D74](DECISIONS.md#d74)): the owner approves a load file there.
 
 The 3.1 build was **42,741 bytes** by refcheck's measure (245 past a multiple of 256), in 174 blocks of 247 bytes, the
 last 10: the load file inside the CAP tracked then (`applet/target/cashu-javacard-3.1.0.cap`, load file sha256 `b2afa9a8…`),
@@ -521,10 +520,10 @@ gp --list
 ## Install
 
 The CAP tracked in this repo is **applet version 3.2**, sha256
-`13dc5bee6281cd63a756b546f700a8a6e3db08172d9fbd989306dbff07ea0588`
+`a94f6acd705b89fa241714eb35406b2531174899a84c199bf78e4abd0493e45b`
 (`applet/target/cashu-javacard-3.2.0.cap`). The load file in it, the bytes a card
-is LOADed with (refcheck's measure, 43,765 bytes), has sha256
-`ecb9a8378896f5105966fd0c06c9eae10984da66bcc0739dd829d12ad2b5865f`: the hash the
+is LOADed with (refcheck's measure, 44,881 bytes), has sha256
+`c525db93b62b963504c574f9147f4b1a5437c30a436e58b5c495f8247a79f3c9`: the hash the
 provisioner checks before it loads a card, and the build a card's certificate
 names ([CERTIFIER.md](CERTIFIER.md)), not the CAP's. A CAP you build yourself hashes
 differently even from identical source, because the converter writes a creation

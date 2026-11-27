@@ -154,7 +154,7 @@ chmod +x /usr/local/bin/gp</code></pre>
           <section id="applet" aria-labelledby="applet-title">
             <h2 id="applet-title"><span class="step-no" aria-hidden="true">02</span>Get the applet</h2>
             <p>The applet ships as one CAP file, applet version 3.2, at <code>applet/target/cashu-javacard-3.2.0.cap</code> in the project's repository. The file holds three applets: an opener, the card's applet and an NFC tag.</p>
-            <p class="note"><b>Not yet on a card.</b> The 3.2 build: this exact file has run only in a simulator so far, and no card has installed it or a file of its size. It is the released 3.1 file with the 3.1 review's fixes and quicker writes (D244). If the install in step 4 fails, stop.</p>
+            <p class="note"><b>On a card, not yet proven.</b> The 3.2 build: this exact file has been installed on a chip, and has not yet been proven with a payment at a mint. It is the released 3.1 file with the 3.1 review's fixes and quicker writes (D244), quicker signatures (D245 to D257) and the wait counts of D258. If the install in step 4 fails, stop.</p>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal</figcaption>
               <pre><code>git clone https://github.com/cashucard/cashucard
@@ -164,7 +164,7 @@ cd cashucard/applet</code></pre>
             <figure class="cmd">
               <figcaption class="cmd-head">Terminal, in applet/</figcaption>
               <pre><code>sha256sum target/cashu-javacard-3.2.0.cap</code></pre>
-              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>13dc5bee6281cd63a756b546f700a8a6e3db08172d9fbd989306dbff07ea0588  target/cashu-javacard-3.2.0.cap</code></pre></div>
+              <div class="cmd-expect"><span class="cmd-label">Expected</span><pre><code>a94f6acd705b89fa241714eb35406b2531174899a84c199bf78e4abd0493e45b  target/cashu-javacard-3.2.0.cap</code></pre></div>
             </figure>
             <p>On a macOS release without <code>sha256sum</code>, <code>shasum -a 256</code> prints the same line.</p>
             <details class="more">
