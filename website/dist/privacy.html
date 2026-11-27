@@ -37,7 +37,7 @@
           <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> PRIVACY</div>
           <h1 id="privacy-title">Privacy <em>policy</em></h1>
           <p class="guide-lead">What cashucard.org, ops.cashucard.org and the Cashu Card Setup and Cashu Card POS apps collect, why, and how to reach us about it.</p>
-          <ul class="guide-facts" aria-label="At a glance"><li>Island Bitcoin LLC</li><li>No cookies</li><li>No tracking</li><li>26 Nov 2026</li></ul>
+          <ul class="guide-facts" aria-label="At a glance"><li>Island Bitcoin LLC</li><li>No cookies</li><li>No tracking</li><li>27 Nov 2026</li></ul>
         </div>
       </section>
 
@@ -69,8 +69,9 @@
           <section id="pos" aria-labelledby="pos-title">
             <h2 id="pos-title">The Cashu Card POS app</h2>
             <p>Island Bitcoin LLC publishes Cashu Card POS. The merchant can use the app without creating an account. For privacy questions or requests, write to <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a>.</p>
-            <p><strong>On your phone.</strong> POS stores the mints you add and keeps an encrypted local payment record, including sales, eCash available to withdraw, outstanding withdrawals and change owed to cards. The phone’s passcode or biometric check protects merchant actions. Your phone handles the identity check. The card PIN is used for the tap and is never saved in the payment record.</p>
-            <p><strong>At your mint.</strong> POS connects over HTTPS to the Cashu mints you add. The selected mint receives the requests and eCash data needed to check its capabilities, settle a payment and check a withdrawal. It also sees the network address making the request. Each mint operator controls its own records and retention. Island Bitcoin LLC does not receive a copy of your payment record through POS.</p>
+            <p><strong>On your phone.</strong> POS stores the mints you add and keeps an encrypted local payment record, including sales, offline payments awaiting settlement, card top-ups, eCash available to withdraw, outstanding withdrawals and change owed to cards. The phone’s passcode or biometric check protects merchant actions. Your phone handles the identity check. The card PIN is used for the tap and is never saved in the payment record.</p>
+            <p><strong>At your mint.</strong> POS connects over HTTPS to the Cashu mints you add. The selected mint receives the requests and eCash data needed to check its capabilities, issue a top-up invoice, settle a payment and check a withdrawal. POS keeps offline payments on the phone until it reconnects, then sends them to the mint for settlement. It also sees the network address making the request. Each mint operator controls its own records and retention. Island Bitcoin LLC does not receive a copy of your payment record through POS.</p>
+            <p><strong>Lightning address withdrawals.</strong> When you request a withdrawal quote, POS looks up the Lightning address you enter and asks the provider’s invoice service for an invoice for the amount you chose. These services can see your phone’s IP address. POS sends the invoice to your mint for a fee quote and asks the mint to pay when you confirm. If you enable automatic sweeps, POS saves the address, the balance to keep and your fee limit on this phone. While the till is open, it uses those settings to request and pay invoices automatically. You can turn sweeps off in Wallet.</p>
             <p><strong>When you withdraw or return eCash.</strong> If you show, copy or share an eCash token, whoever receives it can redeem its unspent value at the mint. Your phone’s share sheet lets you choose a destination.</p>
             <p><strong>Retention and diagnostics.</strong> The payment record stays on this device. POS has no cloud backup. Withdraw your takings and resolve anything owed to cards before removing the app or erasing its data. The app includes no advertising, analytics or crash-reporting service. If you enable diagnostic sharing in your device settings or send beta feedback, Apple or Google may provide diagnostics or the feedback you submit to the publisher. Opening a project website in your browser is covered by the website privacy policy.</p>
           </section>
@@ -98,7 +99,7 @@
 
           <section id="changes" aria-labelledby="changes-title">
             <h2 id="changes-title">Changes</h2>
-            <p>Effective 26 November 2026. When this policy changes, the date above changes, and the <a href="https://github.com/cashucard/cashucard/commits/main/website/dist/privacy.html">full history</a> stays public on GitHub.</p>
+            <p>Effective 27 November 2026. When this policy changes, the date above changes, and the <a href="https://github.com/cashucard/cashucard/commits/main/website/dist/privacy.html">full history</a> stays public on GitHub.</p>
           </section>
         </article>
       </div>
