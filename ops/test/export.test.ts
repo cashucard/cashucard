@@ -104,8 +104,8 @@ test('an ended batch stays fenced across encrypted backup and restore', async ()
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal(payload.version, 7);
-  if (payload.version !== 7) throw new Error('expected v7');
+  assert.equal(payload.version, 8);
+  if (payload.version !== 8) throw new Error('expected v8');
   assert.deepEqual(payload.provisioning_batch_closures, [
     {
       batch_id: 1,
@@ -192,7 +192,7 @@ test('recovery export restores card lookup without the derivation master or cred
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal((payload as unknown as {version: number}).version, 7);
+  assert.equal((payload as unknown as {version: number}).version, 8);
   assert.ok(!JSON.stringify(payload).includes('123456'));
   assert.ok(!JSON.stringify(payload).includes('password_hash'));
   const {restoreEscrowExport} = await import('../src/export');
@@ -284,7 +284,7 @@ test('recovery rejects invalid relationships and rolls back a failed insertion',
   );
 });
 
-test('v7 preserves provisioning retry identities, blocked chips and receipts; older versions stay readable', async () => {
+test('v8 preserves provisioning retry identities, blocked chips and receipts; older versions stay readable', async () => {
   const source = await seeded();
   const {restoreEscrowExport} = await import('../src/export');
   const {OpsDb} = await import('../src/db');
@@ -402,8 +402,8 @@ test('v7 preserves provisioning retry identities, blocked chips and receipts; ol
     await identityToRecipient(identity),
   );
   const payload = await decryptEscrowExport(armored, identity);
-  assert.equal(payload.version, 7);
-  if (payload.version !== 7) throw new Error('expected v7');
+  assert.equal(payload.version, 8);
+  if (payload.version !== 8) throw new Error('expected v8');
   const target = new OpsDb({sql: openSqliteFile(':memory:')});
   restoreEscrowExport(target.db, payload);
   for (const table of [
@@ -459,10 +459,14 @@ test('v7 preserves provisioning retry identities, blocked chips and receipts; ol
     empty.close();
   }
   // v1 retains old suffix-only mappings but must not invent modern ownership.
+  const {fedimint_reissues: _fedimint, ...v7Shape} = payload;
+  const legacy7 = new OpsDb({sql: openSqliteFile(':memory:')});
+  restoreEscrowExport(legacy7.db, {...v7Shape, version: 7});
+  legacy7.close();
   const {
     reset_reconciliations: _reconciliations,
     ...legacyWithoutReconciliations
-  } = payload;
+  } = v7Shape;
   const legacyPayload = {
     ...legacyWithoutReconciliations,
     provisioning_attempts: payload.provisioning_attempts.map(

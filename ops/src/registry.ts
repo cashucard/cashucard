@@ -89,11 +89,18 @@ export function recordCard(db: OpsDb, input: CardInput): UpsertResult {
   ) {
     throw new RegistryError('ordinal has no escrowed keys');
   }
+  // A verified reissue establishes this reservation ended before installation.
+  // A delayed legacy report must not attach a card to that retired batch slot.
   const info = db.db
     .prepare(
       `INSERT OR IGNORE INTO cards
        (short_id, batch_id, key_id, ordinal, installed_at, installer, load_sha256)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM provisioning_attempts a
+         JOIN fedimint_reissues f ON f.attempt_id = a.attempt_id
+         WHERE a.batch_id = ? AND a.ordinal = ?
+       )`,
     )
     .run(
       input.short_id,
@@ -103,14 +110,15 @@ export function recordCard(db: OpsDb, input: CardInput): UpsertResult {
       input.installed_at,
       input.installer,
       input.load_sha256,
+      input.batch_id,
+      input.ordinal,
     );
   if (info.changes === 0) {
-    // Another writer won the race between our read and our insert: re-read
-    // and apply the same identical/changed rule.
+    // A concurrent insert may have won, or recovery may have closed this slot.
     const raced = db.db
       .prepare('SELECT * FROM cards WHERE short_id = ?')
-      .get(input.short_id) as CardRow;
-    return sameRow(raced, input)
+      .get(input.short_id) as CardRow | undefined;
+    return raced && sameRow(raced, input)
       ? {kind: 'stored', row: raced}
       : {kind: 'conflict'};
   }

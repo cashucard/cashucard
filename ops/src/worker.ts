@@ -29,6 +29,7 @@ export default {
       policy ?? null,
       env.OPS_RECOVERY_ADMINS,
       env.OPS_OPERATOR_ADMINS,
+      env.OPS_FEDIMINT_REISSUE_TRUST,
     );
   },
 

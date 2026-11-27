@@ -13,7 +13,7 @@ authorities. Do not generate replacement signing keys to make CI pass.
 | ----------- | ---------------------------------------------------------------- | ---------------------------- |
 | Firmware    | `applet/pom.xml`: 3.1.0; tracked CAP `cashu-javacard-3.1.0.cap`, APDU version 3.1 | `firmware-v3.1.0`            |
 | cardkit     | `tools/cardkit/package.json`: 0.4.0                              | `cardkit-v0.4.0`             |
-| Ops-service | `ops/package.json`: 0.2.0                                        | `ops-v0.2.0`                 |
+| Ops-service | `ops/package.json`: 0.2.1                                        | `ops-v0.2.1`                 |
 | Provisioner | `apps/provisioner/package.json`: 1.0.0, build 16                  | `provisioner-v1.0.0-build.16` |
 
 These examples identify source versions. Existing store build numbers remain

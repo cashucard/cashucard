@@ -238,8 +238,8 @@ for (const backend of [testDb, testDoDb]) {
         db.now(),
       );
       const payload = await decryptEscrowExport(snapshot.armored, identity);
-      assert.equal(payload.version, 7);
-      if (payload.version !== 7) throw Error('expected v7');
+      assert.equal(payload.version, 8);
+      if (payload.version !== 8) throw Error('expected v8');
       // Existing receipt timestamps survive a backward correction of the export clock.
       await exportEscrowSql(
         db.db,

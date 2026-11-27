@@ -1,20 +1,24 @@
 /**
- * The BTC tip the daily-limit clock anchors to (D20): mempool.space REST,
+ * The BTC tip the daily-limit clock anchors to (D20): mempool.space and Blockstream Esplora,
  * a 60 s cache, and the last-good header kept for an upstream failure — the
- * plan's decision 4. Shape-validated only (80 bytes, like cardctl's
- * HEADER_LEN check at cardctl.py:479-480); proof-of-work is NOT verified and
- * the threat model's row 10 says so.
+ * plan's decision 4. The 80-byte header must hash to the block ID returned
+ * for its height. The upstream is trusted to select the canonical chain.
  *
  * The last-good header persists to the `anchor_tip` table (one row, id = 1)
  * and is seeded from it at boot, so a restart does not silently lose the
  * header the 503 fallback promises. The store is injectable; without one the
  * feed behaves exactly as before, in memory only.
  */
+import {createHash} from 'node:crypto';
+
 export const HEADER_LEN = 80;
 export const CACHE_SECONDS = 60;
-const MEMPOOL_TIP = 'https://mempool.space/api/blocks/tip/height';
-const MEMPOOL_BLOCK = (height: number) =>
-  `https://mempool.space/api/block-height/${height}`;
+const ESPLORA_ORIGINS = [
+  'https://mempool.space/api',
+  'https://blockstream.info/api',
+];
+// Each provider gets one deadline across all three reads, within cardctl's 15 s budget.
+const PROVIDER_TIMEOUT_MS = 5_000;
 
 export interface TipHeader {
   readonly header: Buffer;
@@ -23,7 +27,7 @@ export interface TipHeader {
 }
 
 /** The fetch, injectable so tests (and cardctl's offline suite) never touch a network. */
-export type TipFetcher = (url: string) => Promise<Buffer>;
+export type TipFetcher = (url: string, signal?: AbortSignal) => Promise<Buffer>;
 
 /** The last-good header's store; the ops DB's anchor_tip table in production. */
 export interface TipStore {
@@ -31,8 +35,10 @@ export interface TipStore {
   write(tip: {header: Buffer; height: number; fetchedAt: number}): void;
 }
 
-export const httpTipFetcher: TipFetcher = async url => {
-  const res = await fetch(url, {signal: AbortSignal.timeout(10_000)});
+export const httpTipFetcher: TipFetcher = async (url, signal) => {
+  const res = await fetch(url, {
+    signal: signal ?? AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new UpstreamError(`upstream answered ${res.status}`);
   }
@@ -40,6 +46,44 @@ export const httpTipFetcher: TipFetcher = async url => {
 };
 
 export class UpstreamError extends Error {}
+
+async function readProviderTip(
+  origin: string,
+  fetcher: TipFetcher,
+  fetchedAt: number,
+): Promise<TipHeader> {
+  const signal = AbortSignal.timeout(PROVIDER_TIMEOUT_MS);
+  const heightText = (await fetcher(`${origin}/blocks/tip/height`, signal))
+    .toString('utf8')
+    .trim();
+  const height = Number(heightText);
+  if (!/^[1-9][0-9]*$/.test(heightText) || !Number.isSafeInteger(height)) {
+    throw new UpstreamError('invalid tip height');
+  }
+  const blockId = (await fetcher(`${origin}/block-height/${height}`, signal))
+    .toString('utf8')
+    .trim();
+  if (!/^[0-9a-f]{64}$/i.test(blockId)) {
+    throw new UpstreamError('invalid block ID');
+  }
+  const headerHex = (await fetcher(`${origin}/block/${blockId}/header`, signal))
+    .toString('utf8')
+    .trim();
+  if (headerHex.length !== HEADER_LEN * 2 || !/^[0-9a-f]+$/i.test(headerHex)) {
+    throw new UpstreamError('invalid block header');
+  }
+  const header = Buffer.from(headerHex, 'hex');
+  const firstHash = createHash('sha256').update(header).digest();
+  const headerId = createHash('sha256')
+    .update(firstHash)
+    .digest()
+    .reverse()
+    .toString('hex');
+  if (headerId !== blockId.toLowerCase()) {
+    throw new UpstreamError('block header and block ID disagree');
+  }
+  return {header, height, fetchedAt};
+}
 
 export class AnchorFeed {
   private lastGood: TipHeader | null = null;
@@ -80,33 +124,23 @@ export class AnchorFeed {
     if (this.lastGood && now - this.fetchedAt < CACHE_SECONDS) {
       return {ok: true, tip: this.lastGood};
     }
-    try {
-      const heightBuf = await this.fetcher(MEMPOOL_TIP);
-      const height = Number.parseInt(heightBuf.toString('ascii').trim(), 10);
-      if (!Number.isInteger(height) || height <= 0) {
-        throw new UpstreamError('upstream height is not a number');
+    for (const origin of ESPLORA_ORIGINS) {
+      let tip: TipHeader;
+      try {
+        tip = await readProviderTip(origin, this.fetcher, now);
+      } catch {
+        continue;
       }
-      const header = await this.fetcher(MEMPOOL_BLOCK(height));
-      if (header.length !== HEADER_LEN) {
-        throw new UpstreamError(
-          `tip header is ${header.length} bytes, not ${HEADER_LEN}`,
-        );
-      }
-      const tip: TipHeader = {header, fetchedAt: now, height};
       this.lastGood = tip;
       this.fetchedAt = now;
       try {
-        this.store?.write({header: tip.header, height, fetchedAt: now});
+        this.store?.write(tip);
       } catch {
         // A failed persistence write must not take the tip down; the
         // in-memory last-good still serves, and the next fetch rewrites.
       }
       return {ok: true, tip};
-    } catch (e) {
-      if (e instanceof UpstreamError || e instanceof Error) {
-        // fall through to last-good
-      }
-      return {ok: false, stale: this.lastGood};
     }
+    return {ok: false, stale: this.lastGood};
   }
 }

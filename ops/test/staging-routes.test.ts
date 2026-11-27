@@ -6,6 +6,8 @@ test('staging permits only operator provisioning and backup-status methods', () 
   for (const [method, path] of [
     ['GET', '/mints'],
     ['GET', '/ops/operators'],
+    ['POST', `/admin/provisioning/attempts/${attempt}/fedimint-reset/preview`],
+    ['POST', `/admin/provisioning/attempts/${attempt}/fedimint-reset/approve`],
     ['GET', '/admin/operators'],
     ['GET', '/admin/operators/audit'],
     ['POST', '/admin/operators'],
@@ -66,6 +68,8 @@ test('staging blocks anchor, holder, legacy, unknown paths and wrong methods', (
     ['POST', `/provisioning/attempts/${attempt}`],
     ['GET', '/provisioning/attempts/not-a-uuid'],
     ['GET', '/unknown'],
+    ['GET', `/admin/provisioning/attempts/${attempt}/fedimint-reset/approve`],
+    ['POST', `/admin/provisioning/attempts/${attempt}/fedimint-reset/other`],
     ['DELETE', '/admin/operators/2'],
     ['GET', '/admin/operators/2/disable'],
     ['POST', '/recovery/exports'],

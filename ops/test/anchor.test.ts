@@ -6,9 +6,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {AnchorFeed, CACHE_SECONDS, HEADER_LEN} from '../src/anchor';
+import {AnchorFeed, CACHE_SECONDS} from '../src/anchor';
+import {
+  tipUrl,
+  blockIdUrl,
+  headerUrl,
+  headerHex,
+  recordedTip,
+  recordedFetch,
+} from './fixtures/esplora-tip';
 
-const HEADER = Buffer.alloc(HEADER_LEN, 0xab);
+const HEADER = Buffer.from(headerHex, 'hex');
 let clock = 1_000_000;
 
 function feed(
@@ -34,42 +42,112 @@ function feed(
   return f;
 }
 
-const heightOf = (h: number) => Buffer.from(String(h), 'ascii');
-const TIP_URL = 'https://mempool.space/api/blocks/tip/height';
-const blockUrl = (h: number) => `https://mempool.space/api/block-height/${h}`;
-
 test('a good tip is an 80-byte header with its height', async () => {
-  const f = feed(
-    new Map([
-      [TIP_URL, heightOf(900_000)],
-      [blockUrl(900_000), HEADER],
-    ]),
-  );
+  const f = feed(recordedTip());
   const r = await f.tip();
   assert.ok(r.ok);
   assert.ok(r.ok && r.tip.header.equals(HEADER));
   assert.ok(r.ok && r.tip.height === 900_000);
 });
 
-test('a wrong-length header is rejected (shape validation, cardctl parity)', async () => {
-  const f = feed(
-    new Map([
-      [TIP_URL, heightOf(900_000)],
-      [blockUrl(900_000), Buffer.alloc(79)],
-    ]),
+test('each malformed upstream response or fetch failure keeps the last good tip', async () => {
+  const cases: [string, Buffer | Error, number][] = [
+    [tipUrl, Buffer.from('900000junk'), 1],
+    [tipUrl, new Error('unreachable height'), 1],
+    [blockIdUrl, Buffer.from('../invalid'), 2],
+    [blockIdUrl, new Error('unreachable ID'), 2],
+    [headerUrl, Buffer.from('00'.repeat(79)), 3],
+    [headerUrl, Buffer.from('gg'.repeat(80)), 3],
+    [headerUrl, Buffer.from('00'.repeat(80)), 3],
+    [headerUrl, new Error('unreachable header'), 3],
+  ];
+  for (const [url, reply, expectedCalls] of cases) {
+    let time = 1000;
+    const replies = recordedTip();
+    const f = feed(replies, {now: () => time});
+    assert.ok((await f.tip()).ok);
+    replies.set(url, reply);
+    time += CACHE_SECONDS;
+    const result = await f.tip();
+    assert.equal(result.ok, false);
+    if (result.ok) throw new Error('unexpected live tip');
+    assert.deepEqual(result.stale, {
+      height: 900000,
+      header: HEADER,
+      fetchedAt: 1000,
+    });
+    assert.equal(
+      f.calls,
+      3 + expectedCalls + 1,
+      'also attempted fallback height',
+    );
+  }
+});
+
+const secondary = (url: string) =>
+  url.replace('mempool.space', 'blockstream.info');
+
+test('a primary timeout restarts the complete lookup at the independent provider', async () => {
+  const calls: string[] = [];
+  const signals = new Map<string, AbortSignal>();
+  const feed = new AnchorFeed(
+    async (url: string, signal?: AbortSignal) => {
+      calls.push(url);
+      assert.ok(signal, 'the complete provider lookup is bounded');
+      const host = new URL(url).host;
+      const previous = signals.get(host);
+      if (previous) assert.equal(signal, previous);
+      signals.set(host, signal);
+      if (url === blockIdUrl)
+        throw new DOMException('Timed out', 'TimeoutError');
+      return recordedFetch(url.replace('blockstream.info', 'mempool.space'));
+    },
+    () => 100,
   );
-  const r = await f.tip();
-  assert.ok(!r.ok);
-  assert.equal(r.ok === false ? r.stale : null, null, 'no last-good yet');
+  const result = await feed.tip();
+  assert.ok(result.ok && result.tip.header.equals(HEADER));
+  assert.deepEqual(calls, [
+    tipUrl,
+    blockIdUrl,
+    secondary(tipUrl),
+    secondary(blockIdUrl),
+    secondary(headerUrl),
+  ]);
+  assert.notEqual(
+    signals.get('mempool.space'),
+    signals.get('blockstream.info'),
+  );
+  assert.deepEqual(await feed.tip(), result);
+  assert.equal(calls.length, 5, 'the fallback result populates the cache');
+});
+
+test('an unusable secondary header cannot repair an incomplete primary lookup', async () => {
+  const badHeaders = [
+    Buffer.from('z'.repeat(160)),
+    Buffer.from('00'.repeat(80)),
+  ];
+  for (const badHeader of badHeaders) {
+    const replies = recordedTip();
+    replies.set(headerUrl, new Error('failed after resolving primary ID'));
+    for (const [url, response] of recordedTip())
+      replies.set(secondary(url), response);
+    replies.set(secondary(headerUrl), badHeader);
+    const f = feed(replies);
+    assert.deepEqual(await f.tip(), {ok: false, stale: null});
+    assert.equal(f.calls, 6, 'both complete lookup paths were checked');
+    replies.delete(secondary(blockIdUrl));
+    replies.set(secondary(headerUrl), Buffer.from(headerHex));
+    assert.deepEqual(await f.tip(), {ok: false, stale: null});
+    assert.equal(
+      f.calls,
+      11,
+      'an ID from the first source cannot supply the second',
+    );
+  }
 });
 
 test('the cache holds for CACHE_SECONDS, then refetches', async () => {
-  const f = feed(
-    new Map([
-      [TIP_URL, heightOf(900_000)],
-      [blockUrl(900_000), HEADER],
-    ]),
-  );
+  const f = feed(recordedTip());
   const first = await f.tip();
   assert.ok(first.ok);
   const callsAfterFirst = f.calls;
@@ -82,21 +160,18 @@ test('the cache holds for CACHE_SECONDS, then refetches', async () => {
   assert.ok(third.ok);
   assert.equal(
     f.calls,
-    callsAfterFirst + 2,
-    'cache expired: height + header refetched',
+    callsAfterFirst + 3,
+    'cache expired: height, block ID and header refetched',
   );
 });
 
 test('upstream failure answers the last-good header (503-shaped)', async () => {
-  const responses = new Map<string, Buffer | Error>([
-    [TIP_URL, heightOf(900_000)],
-    [blockUrl(900_000), HEADER],
-  ]);
+  const responses = recordedTip();
   const f = feed(responses);
   const first = await f.tip();
   assert.ok(first.ok);
   clock += CACHE_SECONDS + 1;
-  responses.set(TIP_URL, new Error('upstream down'));
+  responses.set(tipUrl, new Error('upstream down'));
   const second = await f.tip();
   assert.ok(!second.ok);
   assert.ok(
@@ -107,14 +182,14 @@ test('upstream failure answers the last-good header (503-shaped)', async () => {
 });
 
 test('upstream failure with no last-good is a bare 503-shaped answer', async () => {
-  const f = feed(new Map([[TIP_URL, new Error('down')]]));
+  const f = feed(new Map([[tipUrl, new Error('down')]]));
   const r = await f.tip();
   assert.ok(!r.ok);
   assert.equal(r.ok === false ? r.stale : undefined, null);
 });
 
 test('a garbage height is rejected like a failed upstream', async () => {
-  const f = feed(new Map([[TIP_URL, Buffer.from('not-a-number')]]));
+  const f = feed(new Map([[tipUrl, Buffer.from('not-a-number')]]));
   const r = await f.tip();
   assert.ok(!r.ok);
 });
@@ -136,7 +211,7 @@ function memoryStore() {
 
 test('a fetched tip is written to the store; a restarted feed seeds from it', async () => {
   const store = memoryStore();
-  const f = new AnchorFeed(okFetcher, () => clock, store);
+  const f = new AnchorFeed(recordedFetch, () => clock, store);
   await f.tip();
   assert.ok(store.peek(), 'the good tip was persisted');
   assert.equal(store.peek()!.height, 900_000);
@@ -179,26 +254,12 @@ test('a store row from before the height column (no height) does not seed', () =
 });
 
 test('a failed store write does not take the tip down', async () => {
-  const f = new AnchorFeed(
-    async url => (url === TIP_URL ? heightOf(900_000) : HEADER),
-    () => clock,
-    {
-      read: () => undefined,
-      write: () => {
-        throw new Error('disk full');
-      },
+  const f = new AnchorFeed(recordedFetch, () => clock, {
+    read: () => undefined,
+    write: () => {
+      throw new Error('disk full');
     },
-  );
+  });
   const r = await f.tip();
   assert.ok(r.ok, 'the tip still answers with the store broken');
 });
-
-async function okFetcher(url: string): Promise<Buffer> {
-  if (url === TIP_URL) {
-    return heightOf(900_000);
-  }
-  if (url === blockUrl(900_000)) {
-    return HEADER;
-  }
-  throw new Error('unexpected url ' + url);
-}

@@ -223,6 +223,20 @@ export const MIGRATIONS: readonly string[] = [
      reconciled_at INTEGER NOT NULL,
      UNIQUE (source_origin, reset_id)
    );`,
+  // 12. Preserve independently attested Fedimint resets apart from Cashu issuer receipts.
+  `CREATE TABLE fedimint_reissues (
+     attempt_id TEXT PRIMARY KEY REFERENCES provisioning_attempts(attempt_id),
+     actor_id INTEGER NOT NULL REFERENCES operators(id),
+     source_origin TEXT NOT NULL,
+     chip_id TEXT NOT NULL,
+     short_id TEXT NOT NULL,
+     completed_at_ms INTEGER NOT NULL,
+     public_key TEXT NOT NULL,
+     proof_json TEXT NOT NULL,
+     receipt_json TEXT NOT NULL,
+     approved_at INTEGER NOT NULL,
+     UNIQUE (source_origin, short_id)
+   );`,
 ];
 
 export interface DbOptions {
