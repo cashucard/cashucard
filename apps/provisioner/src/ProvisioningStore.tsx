@@ -952,7 +952,18 @@ function ProvisioningSession({
     // an attempt that stops or loses the card says so beside its own message
     // (operate adds it to the Stopped notice of a run the operator stopped)
     const tagNote = sellerTagNote(sellerTag);
-    if (allowed() && outcome === 'interrupted') {
+    const saved = w.snapshot().active?.journal;
+    const retryStillAvailable = !!(retryBlank && saved && canRetryBlank(saved));
+    if (allowed() && outcome === 'quarantined' && retryStillAvailable) {
+      setNotice(
+        'Setup could not verify this as the original blank card. Check that you have the same card, then choose Check card and retry.',
+      );
+    }
+    if (allowed() && outcome === 'interrupted' && retryStillAvailable) {
+      setInterruption(
+        'The card moved before the blank check finished. Choose Check card and retry, then keep the same card against the phone.',
+      );
+    } else if (allowed() && outcome === 'interrupted') {
       setInterruption(
         `Card connection lost. Last step: ${
           lastPhase ?? 'Not reported'

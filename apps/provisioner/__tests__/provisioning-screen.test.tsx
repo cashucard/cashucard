@@ -456,7 +456,7 @@ test('a blank-card retry requires the operator to choose it on the original atte
     runCard: async (w, service, options) => {
       if (options.retryBlank) {
         retryScan(options.retryBlank.chipId);
-        return 'interrupted';
+        return retryScan.mock.calls.length === 1 ? 'interrupted' : 'quarantined';
       }
       const remote = f.remote();
       remote.chip_id = chip;
@@ -482,6 +482,9 @@ test('a blank-card retry requires the operator to choose it on the original atte
     await tree.root.findByProps({testID: 'retry-blank-card'}).props.onPress();
   });
   expect(retryScan).toHaveBeenCalledWith(chip);
+  expect(text(tree)).toContain('The card moved before the blank check finished');
+  await act(async () => { await flow.retryBlank(); });
+  expect(text(tree)).toContain('Setup could not verify this as the original blank card');
   expect(f.service.reserve).toHaveBeenCalledTimes(1);
   expect(f.service.disposition).not.toHaveBeenCalled();
 });
