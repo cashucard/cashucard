@@ -50,3 +50,36 @@ The J3R452's sealed VERIFY_PIN on a set-up card, like for like: 222.6 on 3.1 and
   answered 6F00 at the first try, and at the second the card stopped answering for a few seconds. D256's rule (where the kept
   package ends) seen on a second chip. The final file went back on and was created at the first try.
 - The review's L1 (D259) does not arise on this chip: `SET_CARD` passed and byte 56 was 07.
+
+## The card key's parity in each session
+
+On the J3R180 a wait's signature takes about 350 ms when the card's public key has an even y (prefix 02) and about 361.5 ms
+when it is odd (prefix 03): the odd case runs two more 32-byte subtractions, about 5.7 ms each, measured. Each install draws
+a new card key, so two sessions are compared only at the same parity. The table gives each measuring session of 2026-11-26 as
+its output shows it: the file, the card, the first byte of the card key, and the median of a wait's signature (the waits after
+the first of each test payment, 46 a session; 76 on 18-final-waits.cap). Two early sessions of 01-a1.cap and 01b-a1.cap show
+no card key and are left out.
+
+| File | Card | Card key | A wait's signature |
+| --- | --- | --- | --- |
+| 00-base-3b9b5a4.cap (before the speed work) | 57723320 | 02 | 462.8 |
+| 01c-a1.cap (D245) | 57723320 | 02 | 424.7 |
+| 02-a2.cap (D246) | 57723320 | 03 | 367.2 |
+| 03-a3a.cap (D247) | 57723320 | 03 | 350.4 |
+| 04-a3b.cap (D248) | 57723320 | 03 | 343.9 |
+| 05-a4.cap (D249) | 57723320 | 02 | 332.4 |
+| 06-a4-3.cap (D250) | 57723320 | 02 | 349.2 |
+| 07-a5-agrees.cap (D251) | 57723320 | 02 | 348.8 |
+| 08-a6.cap (D252) | 57723320 | 03 | 360.3 |
+| 09-paid-list.cap (D253) | 57723320 | 03 | 360.2 |
+| 10-a5-e.cap (D254, not taken), two sessions | 57723320 | 02, 03 | 348.7, 360.1 |
+| 11-curve-33.cap (D255) | 57723320 | 03 | 360.1 |
+| 17-final-a43.cap (D257, padded), two sessions | 57723320 | 03, 03 | 361.4, 361.4 |
+| 18-final-waits.cap (D258, first counts), two sessions | 57723320 | 02, 03 | 350.0, 361.6 |
+| 19-final-waits2.cap (this file), two sessions | 57723320 | 03, 02 | 361.5, 349.9 |
+| 19-final-waits2.cap, two sessions | 09344120 | 02, 02 | 353.5, 353.2 |
+| 19-final-waits2.cap, two sessions | 36813121 (J3R452) | 02, 03 | 457.3, 469.7 |
+
+The 3.2 columns of the medians above are each card's first session: 57723320 with an odd key, 09344120 and 36813121 with an
+even one. On an even key 57723320's wait's signature is about 350 ms, not 362. The sessions of the 3.1 columns (other cards,
+2026-11-23) are not among these outputs, and their key's parity is not known here.

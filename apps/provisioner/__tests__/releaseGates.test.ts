@@ -23,7 +23,7 @@ test('installation follows the load file this build carries, never a bare switch
   expect(loadFileValidated('')).toBe(false);
 });
 
-test('the tracked 3.2 load file waits for a chip run and the owner; the released 3.1 file stays approved', () => {
+test('the tracked 3.2 load file has passed the chip run on three cards and waits for the owner; the released 3.1 file stays approved', () => {
   // 44,881 bytes, 3.2 (D244 to D259): it has passed the chip run on three cards (2026-11-26) but the owner has not approved
   // it, so it is not on the list, and this build installs nothing until the owner's approval adds it in a change of its own. 3.1 (42,741 bytes, D236's
   // review fixes, released as firmware-v3.1.0) was installed and paid from at a test mint on three chips on 2026-11-23

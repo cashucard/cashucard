@@ -9639,7 +9639,8 @@ known. A new mint cannot confirm settlement of another mint's payments.
 [Holder handoff](PROVISIONER-HOLDER-HANDOFF.md#changing-the-mint-on-an-existing-card)
 ## <a id="d244"></a>D244: 3.2: the 3.1 review's applet fixes, four quicker writes, and a profile bit for the field over p
 
-**Proposed (protocol 3.2, 2026-11-25; not released, not yet run on a chip).** An outside review of 3.1 (APP-H1, APP-M1 to
+**Proposed (protocol 3.2, 2026-11-25; not released; the final 3.2 file passed the chip run on three cards on 2026-11-26,
+[D258](#d258)).** An outside review of 3.1 (APP-H1, APP-M1 to
 APP-M6) and a speed review of the card's writes. No command, answer or count a 3.1 reader meets changes, but one more
 profile bit and one refusal of data no mint sends; the version moves to 3.2 (`03 02`) so that a reader can tell the
 fixed cards apart.
@@ -9695,11 +9696,12 @@ fixed cards apart.
    are not changed. The review's rejected speedups R1 to R7 are not taken.
 
 **Built (applet 3.2, not released).** Load file 43,765 bytes, 245 past a multiple of 256 (`sizeTheFile` at seventy-seven
-writes; 43,547 with the forty writes of 3.1), 1,024 bytes over 3.1's 42,741: no chip has been given a file of this size. jCardSim only.
+writes; 43,547 with the forty writes of 3.1), 1,024 bytes over 3.1's 42,741: when this was written no chip had been given a file of this size (jCardSim only). The chip
+run below followed, and the final 3.2 file (44,881 bytes) passed the chip run on three cards ([D258](#d258)).
 The tracked CAP is `cashu-javacard-3.2.0.cap` (load file `ecb9a837…`), and the tools take a 3.2 card: cardctl's selftest
 (`SELFTEST_VERSIONS`, byte 56 bit 2 named), cardkit (`CARD_VERSIONS`, `CARD_VERSION`, the pins), the set-up app (its 3.x
 line), the simulator bridge. The set-up app's approved list ([D74](#d74)) does not take the 3.2 load file: a build from
-this tree installs no card until a chip run and the owner add it, in a change of their own.
+this tree installs no card until the owner's approval adds it, in a change of its own.
 
 **The chip run (2026-11-26, J3R180 57723320, against 3.1 on the J3R180 58206920 with the same harness and reader).**
 Two of the four speedups were smaller than the speed review said, for one reason each.
@@ -9756,8 +9758,8 @@ stay as they are until the chip has been measured.
 
 **Measured** on card 57723320 (2026-11-26, play money; 52be734's file padded by D256, as 01c, against 3b9b5a4's): a wait's
 signature 424.8 ms (463.3), a payment's last SIGN 593.5 (646.2), LOAD_CHANGE 458.4 (508.9), the set-up's commands in all
-4,058 ms (4,358): about 38 ms a signature, 50 a LOAD_CHANGE and 300 a set-up. Signatures vary by about 12 ms from one
-install's card key to the next.
+4,058 ms (4,358): about 38 ms a signature, 50 a LOAD_CHANGE and 300 a set-up. Both sessions had a card key with an even y
+(prefix 02): an odd key (03) makes a signature about 11.5 ms longer on this chip ([D258](#d258), the card key's parity).
 
 **The red team's first pass (2026-11-26) found the change safe, with three conditions, which
 hold.**
@@ -9816,6 +9818,8 @@ Its three conditions:
 **Measured** on card 57723320 (2026-11-26, play money; 7b87367's file, with D245, against D245's alone): a wait's signature
 367.2 ms (424.8), a payment's last SIGN 524.6 (593.5), LOAD_CHANGE 458.5 (458.4), SPEND_ALL_CHANGE 223.9 (241.2 on
 3b9b5a4): about 58 ms a signature on top of D245's 38, and nothing on LOAD_CHANGE, whose products are not the signature's.
+D245's session had a card key with an even y (02) and this one an odd y (03), which costs about 11.5 ms a signature
+([D258](#d258)): at the same parity the saving is about 69 ms.
 
 ## <a id="d247"></a>D247: The chip's RSA engines given their keys once a command
 
@@ -9968,8 +9972,9 @@ about 35 ms by JCAlgTest's figures. 32 bytes of RAM at the first SET_CARD. `Kept
 card 57723320 (2026-11-26, the files of f621b23 and of this commit): a payment's last SIGN 506.9 to 461.0 ms, about 46 ms.
 A wait's signature went from 344.1 to 332.5 ms as well, which this entry does not explain: a wait signs under the card key
 with no date (`work()`, `g` null), and on that path the check works W out as before, with no point addition before or
-after this change. The 12 ms is about the spread between installs, each with a new card key (the files of 7fe7ec6 and
-eedd741, with no change to signing between them, differ by 11.4 ms).
+after this change. The 12 ms is the card key's parity, not this change: the session of f621b23's file had a key with an
+odd y (prefix 03) and this commit's an even one (02), and an odd key costs about 11.5 ms a signature ([D258](#d258)). The
+files of 7fe7ec6 and eedd741, with no change to signing between them, differ by 11.4 ms the same way (03, then 02).
 
 **The red team's code pass (2026-11-26): cleared.** Its M20 (the kept y's clear in `select()` taken out) passed every test,
 as M12 did for D248, jCardSim clearing that RAM at every selection itself; `KeptYTest.selectItselfClearsTheKeptY` calls
@@ -9998,8 +10003,8 @@ the signature that leaves verifies, where on f394b29 the faulted one left.
 every wait's signature (D218: a wait is a checked signature), the payment's SIGN and the PIN key's signature. Estimated at
 8 ms by JCAlgTest's figures; **measured** on card 57723320 (2026-11-26, the files of f394b29 and of this commit, medians of
 57 waits and 14 last SIGNs): a wait's signature 332.5 to 349.2 ms, **about 17 ms**, and a payment's last SIGN 461.0 to
-489.4 ms, **about 28 ms** (the two differ by about the 12 ms that signatures vary from one install's card key to the
-next). That takes back about 28 of D249's 46 ms on a payment's SIGN, and adds about 17 ms to every wait. The project lead decides
+489.4 ms, **about 28 ms** (both sessions had a card key with an even y, 02, so the wait's 17 ms is like for like; a payment's
+SIGN signs under a date's key, whose parity the sessions did not record). That takes back about 28 of D249's 46 ms on a payment's SIGN, and adds about 17 ms to every wait. The project lead decides
 on these.
 
 **The red team's code pass (2026-11-26): cleared with a condition, met in a follow-up (its C-A4-3-1, MEDIUM, proved).**
@@ -10268,11 +10273,14 @@ CAP the build makes has, the kept place is the one warned of.
 **The 3.2 file** is padded by this rule. At 9d14bde: unpadded, its kept package ended 86 past; with five writes it ended
 120 past (40,312 bytes), its load file 44,592 bytes (48 past). With D254 left out and D257 in, unpadded it ends 229 past
 (40,421 bytes, outside the aim); with twenty-four writes it ends 120 past (40,568 bytes), its load file 44,869 bytes
-(69 past), a size no chip has been given. The chip run of that file confirms it.
+(69 past). That was not the final file: with D258's counts the kept package ends 132 past (40,580 bytes) and the load
+file is 44,881 bytes (81 past), inside the aim, and that file was created at the first try four times of four on each of
+three cards ([D258](#d258)).
 
 ## <a id="d257"></a>D257: A count that never comes again mixed into every signature's aux
 
-**Proposed (applet 3.2, 2026-11-26; not released, not yet on a chip; the red team's recommended fix for its C-f7bdac4-1).**
+**Proposed (applet 3.2, 2026-11-26; not released; in the final file, which passed the chip run on three cards on 2026-11-26,
+[D258](#d258); the red team's recommended fix for its C-f7bdac4-1).**
 No command, answer or stored format of the protocol changes; the card keeps four bytes more.
 
 **The rule.** BIP-340's aux, the 32 bytes the signer draws for each signing (step 2), is the generator's 32 bytes with a
@@ -10333,7 +10341,8 @@ built both ways.
 
 ## <a id="d258"></a>D258: The holds and the PIN's wait keep their seconds; a payment's wait keeps its count
 
-**Proposed (applet 3.2, 2026-11-26; not released, not yet on a chip): the project lead's rule that each wait keeps its seconds, for
+**Proposed (applet 3.2, 2026-11-26; not released; the final file passed the chip run on three cards on 2026-11-26, below):
+the project lead's rule that each wait keeps its seconds, for
 the PIN's wait and the owner's holds; and the project lead's decision of 2026-11-26 that a payment's wait over its limit keeps its
 count.** No command, answer or stored format changes; the counts do, and a reader that asks again while the card answers
 `6A98` meets more askings of the same seconds.
@@ -10364,6 +10373,13 @@ at 0249e32, the chip run of 2026-11-26 on card 57723320, a J3R180):
 | A held PIN's asking (`VERIFY_PIN` answered `6A98`) | 484.8 | 352.6 |
 | A held history's asking (`GET_LOG` answered `6A98`) | 476.1 | 360.0 |
 | A held reset's asking (`RESET_CARD` answered `6A98`) | 491.3 | 361.4 |
+
+**The card key's parity.** On the J3R180 a wait's signature takes about 350 ms when the card's public key has an even y
+(prefix 02) and about 361.5 ms when it is odd (prefix 03), because the odd case runs two more 32-byte subtractions (about
+5.7 ms each, measured); on the J3R452 the final file's figures are 457.3 and 469.7 ms. Each install draws a new card key, so
+two sessions are compared at the same parity, and a difference of about 11.5 ms between sessions of different parity is the
+key, not the code. In the table above the base file's session had an even key and the 3.2 file's two sessions an odd one. The
+hardware report lists the parity of every measuring session of 2026-11-26.
 
 **The rule, for the holds and the PIN.** Never shorter than before: the new count is the least whole count whose time on the
 3.2 file is no less than the old count's time on the base file, with the smaller figure where the 3.2 file has two. A hold of
