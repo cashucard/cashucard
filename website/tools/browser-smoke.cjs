@@ -337,11 +337,22 @@ async function main() {
     assert.ok(await evaluate("!!document.querySelector('.hero-status a[href=\"#risks\"]')"), "The hero points to the risks");
     assert.equal(await evaluate("document.querySelectorAll('#risks .risk-list li').length"), 7, "The risks are stated once, in seven points");
     assert.equal(await evaluate("[...document.querySelectorAll('section h2')].filter(h=>/risk/i.test(h.textContent)).length"), 1, "One risks section");
-    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 9, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 9, 0], ["/terms.html", 8, 0]]) {
+    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 10, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 9, 0], ["/terms.html", 8, 0]]) {
       // the host serves /faq for /faq.html, as it does /guide; the local preview serves the file name
       await send("Page.navigate", { url: origin + page });
       await until("location.pathname.replace(/\\.html$/,'')===" + JSON.stringify(page.replace(".html", "")) + "&&document.readyState==='complete'&&!!document.querySelector('.guide-doc')", page + " loads");
       assert.equal(await evaluate("document.querySelectorAll('.guide-doc > section').length"), sections, page + " has its sections");
+      if (page === "/developers.html") {
+        const installs = await evaluate(`[...document.querySelectorAll('#sdks li')].map(item => ({
+          command: item.querySelector('pre code').textContent,
+          package: new URL(item.querySelector('.sdk-links a').href).hostname,
+          source: new URL(item.querySelector('.sdk-links a:last-child').href).hostname,
+          copy: Boolean(item.querySelector('button.copy'))
+        }))`);
+        assert.deepEqual(installs.map(item => item.package), ["www.npmjs.com", "www.npmjs.com", "crates.io", "pub.dev"]);
+        assert.ok(installs.every(item => item.source === "github.com" && item.copy));
+        assert.ok(installs[1].command.includes("react-native-nfc-manager@3.17.5"), "NFC install includes the supported peer");
+      }
       assert.ok(await evaluate("document.querySelectorAll('.faq details').length") >= minItems, page + " answers its questions");
       assert.ok(await evaluate("document.querySelector('.footer-bottom span').textContent.includes('EXPERIMENTAL')"), page + " footer says experimental");
       assert.equal(await evaluate("[...document.querySelectorAll('.guide-rail a')].every(a=>!!document.querySelector(a.hash))"), true, page + " contents links resolve");

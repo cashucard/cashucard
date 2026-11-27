@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#10271e" />
-    <meta name="description" content="Build a wallet or till for Cashu Card, an experimental NFC eCash protocol: the NUT-CCP draft, the card's commands byte for byte, test vectors, the applet, the client library and the tools." />
+    <meta name="description" content="Install the Cashu Card SDKs for TypeScript, React Native, Rust and Flutter. Build a wallet or till with the protocol draft, card commands and test vectors." />
     <meta property="og:title" content="Developers | Cashu Card" />
-    <meta property="og:description" content="The NUT-CCP draft, the card's commands, test vectors, the applet and the tools, for wallets and tills that read and pay from a Cashu Card." />
+    <meta property="og:description" content="Public SDKs, install commands and protocol references for wallets and tills that use Cashu Card." />
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://cashucard.org/developers" />
     <meta property="og:image" content="https://cashucard.org/assets/og.jpg" />
@@ -38,7 +38,7 @@
             <div class="guide-hero-copy">
               <div class="eyebrow"><span class="status-dot"></span> DEVELOPERS <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
               <h1 id="dev-title">Build on <em>Cashu Card</em></h1>
-              <p class="guide-lead">Cards, wallets and tills share NUT-CCP, a draft Cashu protocol. Issuance tools prepare the cards for use. Start with the parts below, then choose your guide.</p>
+              <p class="guide-lead">Build a wallet or till with the <a href="#sdks">Cashu Card SDKs</a>, or follow the <a href="#issuers">issuer guide</a> to prepare cards for use.</p>
               <ul class="guide-facts" aria-label="At a glance">
                 <li>Experimental</li>
                 <li>Applet 3.1</li>
@@ -61,6 +61,7 @@
         <nav class="guide-rail" aria-label="Developer contents">
           <span class="rail-label">On this page</span>
           <ol>
+            <li><a href="#sdks">Card reader SDKs</a></li>
             <li><a href="#overview">How the parts fit</a></li>
             <li><a href="#issuers">Issuing cards</a></li>
             <li><a href="#status">Status</a></li>
@@ -77,6 +78,7 @@
           <details class="guide-toc">
             <summary>Contents</summary>
             <ol>
+              <li><a href="#sdks">Card reader SDKs</a></li>
               <li><a href="#overview">How the parts fit</a></li>
               <li><a href="#issuers">Issuing cards</a></li>
               <li><a href="#status">Status</a></li>
@@ -88,6 +90,50 @@
               <li><a href="#contribute">Questions and contributions</a></li>
             </ol>
           </details>
+
+          <section id="sdks" aria-labelledby="sdks-title">
+            <h2 id="sdks-title">Card reader SDKs</h2>
+            <p>Choose a library for your app. All four work with Cashu Card 3.0 and 3.1.</p>
+            <ul class="dev-cards sdk-cards">
+              <li>
+                <h3>TypeScript</h3>
+                <p>Read balances, load eCash and accept payments using your own card transport.</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Install with npm</figcaption>
+                  <pre><code>npm install --save-exact cashucard@0.4.0</code></pre>
+                </figure>
+                <div class="sdk-links"><a href="https://www.npmjs.com/package/cashucard/v/0.4.0" aria-label="TypeScript package on npm">Package on npm</a><a href="https://github.com/cashucard/cashu-card-typescript" aria-label="TypeScript source on GitHub">Source on GitHub</a></div>
+              </li>
+              <li>
+                <h3>React Native NFC</h3>
+                <p>Connect the TypeScript reader to NFC on iOS and Android. The source includes the required phone permissions.</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Install with npm</figcaption>
+                  <pre><code>npm install --save-exact cashucard@0.4.0 cashucard-react-native@0.4.0 react-native-nfc-manager@3.17.5</code></pre>
+                </figure>
+                <div class="sdk-links"><a href="https://www.npmjs.com/package/cashucard-react-native/v/0.4.0" aria-label="React Native NFC package on npm">Package on npm</a><a href="https://github.com/cashucard/cashu-card-typescript/tree/main/react-native" aria-label="React Native NFC source on GitHub">Source on GitHub</a></div>
+              </li>
+              <li>
+                <h3>Rust</h3>
+                <p>Accept card payments and settle them with the mint. Your app supplies the NFC transport and stores the payment journal.</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Install with Cargo</figcaption>
+                  <pre><code>cargo add cashucard@0.6.0</code></pre>
+                </figure>
+                <div class="sdk-links"><a href="https://crates.io/crates/cashucard/0.6.0" aria-label="Rust package on crates.io">Package on crates.io</a><a href="https://github.com/cashucard/rust-sdk" aria-label="Rust source on GitHub">Source on GitHub</a></div>
+              </li>
+              <li>
+                <h3>Dart and Flutter</h3>
+                <p>Use the Rust reader in a Flutter app on iOS or Android. Supply the NFC transport. Native builds need Rust and a Flutter SDK with Dart 3.13.7 or newer in the 3.x series.</p>
+                <figure class="cmd">
+                  <figcaption class="cmd-head">Install with Flutter</figcaption>
+                  <pre><code>flutter pub add cashucard:0.4.0</code></pre>
+                </figure>
+                <div class="sdk-links"><a href="https://pub.dev/packages/cashucard/versions/0.4.0" aria-label="Dart and Flutter package on pub.dev">Package on pub.dev</a><a href="https://github.com/cashucard/dart-sdk" aria-label="Dart and Flutter source on GitHub">Source on GitHub</a></div>
+              </li>
+            </ul>
+            <p>See how <a href="https://github.com/cashucard/cashu-card-pos/blob/main/docs/developer-guide.md">Cashu Card POS handles a sale</a>, from the first tap to settlement and change.</p>
+          </section>
 
           <section id="overview" aria-labelledby="overview-title">
             <h2 id="overview-title">How the parts fit</h2>

@@ -15,6 +15,7 @@
 
 ## Protocol and code
 
+- [Card reader SDKs](https://cashucard.org/developers#sdks): install the TypeScript reader, React Native NFC transport, Rust crate or Flutter plugin, with links to their public packages and source.
 - [Developers](https://cashucard.org/developers): the draft, the card's commands, test vectors, the applet, the client library and the tools, with what a reader must check.
 - [Draft specification](https://github.com/cashucard/nut/blob/main/CCP.md): NUT-CCP, the core every card and reader share: selecting the card, card proofs, reading, paying, the card's change and loading.
 - [Test vectors](https://github.com/cashucard/nut/blob/main/tests/CCP-tests.md): NUT-CCP's card proof secrets, payments with and without change, and AUTH, worked through.
