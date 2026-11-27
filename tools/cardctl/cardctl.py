@@ -2715,7 +2715,7 @@ def _check_mint_change(current: str, target: str, info: dict) -> None:
         if info["spent"]:
             steps.append(f"The card has {info['spent']} retained spent entries.")
         steps.append("Use your holder wallet to check each spent entry with its issuing mint. "
-                     "Clear only confirmed spent entries, then try again.")
+                     "Clear the retained entries only after every one is confirmed spent, then try again.")
         raise SystemExit(change + " is blocked. " + " ".join(steps))
     if current and current != FACTORY_MINT:
         print(change + ". Funds stay with their issuing mint.", file=sys.stderr)
