@@ -5,6 +5,23 @@ One entry per component release, newest first, as
 in the reviewed pull request, and the tag follows the merge. A GitHub release lists
 the merged pull requests besides.
 
+## Cashu Card Setup 1.0.0 build 17
+
+If an installation stops on a supported J3R180, reopen the original batch on the
+same phone and choose **Check card and retry** when offered. Setup verifies that
+the original card is still blank before it continues. The home-screen label is
+now **Cashu Setup** on iPhone and Android.
+[Physical install test](reports/HARDWARE_TEST_REPORT_2026-11-27.J3R180.md)
+
+## cardkit 0.5.0
+
+Host apps can pass the optional `blankRetry` setting to `provision` for a
+verified blank J3R180. The host confirms and saves the original attempt in its
+`persistIntent` callback before installation begins. The optional `beforePutKey`
+callback on `rotateKeys` lets the host recheck the attempt before changing the
+card-manager keys. Existing callers can continue using both functions with
+their original arguments. [API details](../tools/cardkit/README.md#050)
+
 ## Ops 0.2.1
 
 Ops checks the Bitcoin tip header against its block ID. If mempool.space is unavailable, Ops requests the height, ID, and header from Blockstream.
