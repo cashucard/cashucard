@@ -187,6 +187,53 @@ test('attempt/bind retries persist; scope, active device, ordinal and revision g
   db.close();
 });
 
+test('a resumed install can distinguish a current chip binding from a past one', () => {
+  for (const terminal of ['quarantined', 'abandoned', 'recorded'] as const) {
+    const db = fixture();
+    const a = begin(db);
+    const bound = bindAttempt(db, scope, a.attempt_id, {
+      revision: a.revision,
+      chip_id: chip,
+    });
+    const active = getAttempt(db, scope, a.attempt_id);
+    assert.equal(active.state, 'active');
+    assert.equal(active.revision, bound.revision);
+    assert.equal(active.chip_id, chip);
+    assert.deepEqual(active.bind_receipt, bound);
+    assert.equal(active.completion_receipt, null);
+    assert.equal(active.disposition_receipt, null);
+    rejects(
+      () => getAttempt(db, {...scope, operator_id: 2}, a.attempt_id),
+      404,
+    );
+    rejects(
+      () => getAttempt(db, {...scope, device_id: uuid(99)}, a.attempt_id),
+      404,
+    );
+
+    // Another client with the same scope finishes the attempt after our first read.
+    if (terminal === 'recorded') {
+      recordAttempt(db, scope, a.attempt_id, {
+        revision: bound.revision,
+        record: record(a),
+      });
+    } else {
+      disposeAttempt(db, scope, a.attempt_id, {
+        revision: bound.revision,
+        kind: terminal,
+        reason: 'operator stopped the attempt',
+      });
+    }
+    const latest = getAttempt(db, scope, a.attempt_id);
+    assert.equal(latest.state, terminal);
+    assert.equal(latest.revision, bound.revision + 1);
+    assert.deepEqual(latest.bind_receipt, bound);
+    assert.equal(!!latest.completion_receipt, terminal === 'recorded');
+    assert.equal(!!latest.disposition_receipt, terminal !== 'recorded');
+    rejects(() => issueAttemptKeys(db, scope, a.attempt_id));
+  }
+});
+
 test('terminal dispositions release devices but retain blocked chip and consumed ordinal', () => {
   const db = fixture();
   const a = begin(db);
