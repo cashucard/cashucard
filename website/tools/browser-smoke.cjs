@@ -329,7 +329,8 @@ async function main() {
     for (const path of ["/privacy.html", "/terms.html"]) {
       assert.ok((await fetch(origin + path).then((r) => r.text())).includes("Island Bitcoin LLC"), path + " names Island Bitcoin LLC");
     }
-    await load(origin + "/privacy.html#pos", "POS privacy policy");
+    await send("Page.navigate", { url: origin + "/privacy.html#pos" });
+    await until("location.hash === '#pos' && document.readyState === 'complete' && !!document.querySelector('#pos')", "POS privacy policy");
     assert.equal(await evaluate("document.querySelector('#pos h2')?.textContent"), "The Cashu Card POS app", "The app's privacy link opens the POS notice");
     assert.ok((await fetch(origin + "/support.html").then((r) => r.text())).includes("mailto:support@cashucard.org"), "Support gives the support address");
     for (const path of ["/faq.html", "/developers.html"]) {
