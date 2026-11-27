@@ -24,7 +24,7 @@
     <a class="skip" href="#main">Skip to content</a>
     <header class="header">
       <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
+      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
       <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <span aria-hidden="true">↗</span></a>
     </header>
     <main id="main" class="guide">
@@ -131,7 +131,7 @@ docker compose run --rm --entrypoint node setup -e 'require("node:fs").unlinkSyn
           <section id="phone" aria-labelledby="phone-title">
             <h2 id="phone-title">Connect the Cashu Card Setup app</h2>
             <ol>
-              <li>Open <a href="/#install">Cashu Card Setup</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
+              <li>Open <a href="/downloads#setup">Cashu Card Setup</a>. On sign-in, choose <b>Ops service → Change</b>.</li>
               <li>Add your HTTPS origin, for example <code>https://ops.example.com</code>, and confirm the service selection. Use the origin without <code>/ops/operators</code>.</li>
               <li>Sign in with an operator account created on this service. Confirm the displayed hostname before creating a batch.</li>
               <li>Enter your card maker name and the web address your cards' NFC tag opens. The app asks once for each service and installs nothing until both are saved.</li>
@@ -181,7 +181,7 @@ docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-e
         <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification ↗</a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
         <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub ↗</a></div>
         <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card ↗</a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">Ops-service release ↗</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/#install">Cashu Card Setup</a></div>
+        <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
       </div>
       <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license ↗</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console ↗</a></div>
     </footer>

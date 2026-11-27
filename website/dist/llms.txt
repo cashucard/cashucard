@@ -11,7 +11,7 @@
 - [Install guide](https://cashucard.org/guide): the same steps as a page for people.
 - [Questions and answers](https://cashucard.org/faq): what the card is, what it costs, what happens if one is lost, and the risks of an experimental project.
 - [Risks](https://cashucard.org/#risks): what a holder and a merchant should know before a card holds value.
-- [Cashu Card Setup](https://cashucard.org/#install): an app for card issuers that installs the applet on blank cards over a phone's NFC, in beta on [TestFlight](https://testflight.apple.com/join/M3JucFNy) and [Google Play](https://play.google.com/apps/testing/com.islandbitcoin.provisioner).
+- [App downloads](https://cashucard.org/downloads): installation links and platform availability for Cashu Card Setup and Cashu Card POS on iPhone and Android.
 
 ## Protocol and code
 

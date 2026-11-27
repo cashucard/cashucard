@@ -155,10 +155,12 @@ async function main() {
     console.log("screens at 1440x900, reduced motion " + screens.toFixed(2));
     assert.ok(screens <= 6.6, "Desktop page stays within its budget");   // the risks section adds about 0.7
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.hero-card')).animationName"), "none", "Reduced motion stops card entrance");
-    assert.ok(await evaluate("document.querySelector('.button-bright').href==='https://github.com/cashucard/nut/blob/main/CCP.md'"), "Primary action opens the draft NUT");
-    assert.ok(await evaluate("document.querySelector('.button-outline').href==='https://github.com/cashucard/cashucard'"), "Secondary action opens the source repository");
+    assert.equal(await evaluate("document.querySelector('.hero-actions .button-bright').getAttribute('href')"), "/downloads", "Primary action opens app downloads");
+    assert.equal(await evaluate("document.querySelector('.hero-actions .button-outline').href"), "https://github.com/cashucard/nut/blob/main/CCP.md", "Secondary action opens the draft");
     assert.equal(await evaluate("document.querySelector('#source').tagName"), "FOOTER", "Source links live in the footer");
-    assert.equal(await evaluate("[...document.querySelectorAll('.footer-group')].some(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS' && g.querySelectorAll('a').length===1 && !!g.querySelector('a[href=\"#install\"]'))"), true, "The footer's Apps group holds the provisioner alone");
+    for (const app of ["setup", "pos"]) {
+      assert.ok(await evaluate(`!!document.querySelector('.footer-group a[href="/downloads#${app}"]')`), `Footer links to ${app} downloads`);
+    }
     assert.equal(await evaluate("[...document.querySelectorAll('a[href^=\"#\"]')].every(a=>!!document.querySelector(a.hash))"), true, "Every page anchor exists");
     assert.ok(await evaluate("[...document.querySelectorAll('#source a')].some(a=>a.href.includes('cashucard/cashucard'))"), "Linked source cashucard/cashucard");
     // the home page links no Flash or Foxy app, by repository or by site; the install guide's footer links their sites (D117, D118)
@@ -167,12 +169,11 @@ async function main() {
     assert.equal(await evaluate("document.querySelectorAll('#buy .buy-option').length"), 2, "Two ways to get cards");
     assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.amazon.com/dp/\"]')"), "Cards for testing link to an Amazon listing");
     assert.ok(await evaluate("!!document.querySelector('#buy a[href^=\"https://www.cardlogix.com/\"]')"), "Cards in bulk link to CardLogix");
-    // installing the applet: the provisioner's two betas, then the install guide
+    // The phone and computer installation options lead to their respective guides.
     assert.equal(await evaluate("document.querySelectorAll('#install .buy-option').length"), 2, "Two ways to install the applet");
-    assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://testflight.apple.com/join/M3JucFNy\"]')"), "The provisioner links its TestFlight beta");
-    assert.ok(await evaluate("!!document.querySelector('#install a[href=\"https://play.google.com/apps/testing/com.islandbitcoin.provisioner\"]')"), "The provisioner links its Google Play beta");
+    assert.ok(await evaluate(`!!document.querySelector('#install a[href="/downloads#setup"]')`), "The install section opens the Setup downloads");
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"/guide\"]')"), "The install section opens the install guide");
-    assert.equal(await evaluate("[...document.querySelectorAll('.header nav a')].map(a=>a.textContent).join('|')"), "Get cards|Developers", "The nav holds Get cards and Developers only");
+    assert.equal(await evaluate("[...document.querySelectorAll('.header nav a')].map(a=>a.textContent).join('|')"), "Downloads|Get cards|Developers|Fund", "Main navigation offers downloads first");
     // the till in the steps is a phone, with the card held to its back
     assert.ok(await evaluate("document.querySelector('#steps li p').textContent.includes(\"to the back of the merchant's phone\")"), "The steps show a phone as the till");
     // the film: custom controls over the native video; with reduced motion it waits for a press
@@ -263,11 +264,20 @@ async function main() {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
       assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "No overflow at " + width);
-      // the two-item menu shows at every width, clear of the wordmark and the screen edge
-      const nav = await evaluate("(()=>{const a=[...document.querySelectorAll('.header nav a')].map(e=>e.getBoundingClientRect());const w=document.querySelector('.wordmark').getBoundingClientRect();return {n:a.length,shown:a.every(r=>r.width>0),right:Math.max(...a.map(r=>r.right)),left:Math.min(...a.map(r=>r.left)),mark:w.right}})()");
+      // The menu may sit next to the wordmark or on its own row on a narrow phone.
+      const nav = await evaluate(`(() => {
+        const links = [...document.querySelectorAll('.header nav a')].map(a => a.getBoundingClientRect());
+        const mark = document.querySelector('.wordmark').getBoundingClientRect();
+        return {
+          n: links.length,
+          shown: links.every(r => r.width > 0 && r.height > 0),
+          inside: links.every(r => r.left >= 12 && r.right <= innerWidth - 12),
+          clear: links.every(r => r.top >= mark.bottom || r.left >= mark.right + 12),
+        };
+      })()`);
       console.log("menu at " + width + ": " + JSON.stringify(nav));
-      assert.ok(nav.n === 2 && nav.shown, "The menu shows at " + width);
-      assert.ok(nav.right <= width - 12 && nav.left >= nav.mark + 12, "The menu fits the header at " + width);
+      assert.ok(nav.n === 4 && nav.shown, "The menu shows at " + width);
+      assert.ok(nav.inside && nav.clear, "The menu fits the header at " + width);
       const ratio = await evaluate("document.documentElement.scrollHeight/innerHeight");
       console.log("screens at " + width + "x" + height + " " + ratio.toFixed(2));
       assert.ok(ratio <= maxScreens, "Page within its budget at " + width);
@@ -285,9 +295,9 @@ async function main() {
     assert.ok(await evaluate("document.body.textContent.includes('4ff8d8a20bf1106a3a31db5824a80d8626838d237c974157197d3fac1104845a')"), "Guide publishes the CAP's sha256");
     assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "Install guide fits desktop");
     assert.ok(await evaluate("!!document.querySelector('#need a[href^=\"https://www.amazon.com/dp/\"]')"), "The guide links a card reader to buy");
-    assert.ok(await evaluate("!!document.querySelector('#need a[href=\"/#install\"]')"), "The guide points card issuers at the provisioner");
+    assert.ok(await evaluate("!!document.querySelector('#need a[href=\"/downloads#setup\"]')"), "The guide points card issuers at the provisioner");
     // its Apps link the wallets' own sites, where its setup step sends a new holder (D118)
-    assert.equal(await evaluate("[...[...document.querySelectorAll('.footer-group')].find(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS').querySelectorAll('a')].map(a=>a.getAttribute('href')).join()"), "https://getflash.io/,https://getfoxy.io/,/#install", "The guide's Apps link Flash's and Foxy's sites, then the provisioner");
+    assert.equal(await evaluate("[...[...document.querySelectorAll('.footer-group')].find(g=>g.querySelector('.footer-label')?.textContent.trim()==='APPS').querySelectorAll('a')].map(a=>a.getAttribute('href')).join()"), "https://getflash.io/,https://getfoxy.io/,/downloads#setup,/downloads#pos", "The guide's Apps link Flash's and Foxy's sites, then both Cashu Card apps");
     assert.ok(await evaluate("document.querySelector('.agent pre code').textContent.includes('https://cashucard.org/guide.md')"), "The guide hands the install to an AI agent");
     const agentGuide = await fetch(origin + "/guide.md").then(async (r) => ({ status: r.status, type: r.headers.get("content-type") || "", text: await r.text() }));
     assert.equal(agentGuide.status, 200, "The agent's guide is served");

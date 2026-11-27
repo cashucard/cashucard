@@ -31,6 +31,7 @@ http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   let rel = decodeURIComponent(url.pathname);
   if (rel.endsWith("/")) rel += "index.html";
+  else if (/^\/[a-z][a-z0-9-]*$/.test(rel)) rel += ".html";
   const file = path.join(root, rel);
   if (!file.startsWith(root + path.sep) || path.basename(file) === "_headers" || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     res.writeHead(404, { "Content-Type": "text/plain" });

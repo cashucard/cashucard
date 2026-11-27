@@ -113,6 +113,14 @@ a:focus-visible,button:focus-visible{outline:3px solid #c9f18e;outline-offset:4p
 .footer-bottom{flex-wrap:wrap;gap:10px 20px;font-size:8px}
 .footer-bottom span{width:100%}
 }
+@media(max-width:480px){
+.header{height:auto;min-height:80px;padding:12px 20px 0;display:grid;grid-template-columns:1fr auto;column-gap:16px;row-gap:3px}
+.header .wordmark{grid-row:1;grid-column:1;justify-self:start}
+.header .wordmark img{height:28px}
+.header .header-link{grid-row:1;grid-column:2;display:flex;gap:6px}
+.header nav{grid-row:2;grid-column:1/-1;width:100%;align-items:center;justify-content:space-between;flex-wrap:wrap;column-gap:12px;row-gap:0}
+.header nav a{display:inline-flex;align-items:center;min-height:40px;font-size:14px;white-space:nowrap}
+}
 @media(max-width:350px){
 .wordmark{font-size:22px}
 .wordmark img{height:28px}
