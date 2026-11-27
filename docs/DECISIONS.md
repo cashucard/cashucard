@@ -10331,16 +10331,27 @@ which no mint takes; on a payment's SIGN that is pieces burned for a signature t
 against a fault, not the key's. The project lead decides (D250: about 17 ms a signature, 28 a payment's SIGN); the final file is
 built both ways.
 
-## <a id="d258"></a>D258: Each wait keeps its seconds: the counts raised for 3.2's quicker signature
+## <a id="d258"></a>D258: The holds and the PIN's wait keep their seconds; a payment's wait keeps its count
 
-**Proposed (applet 3.2, 2026-11-26; not released, not yet on a chip): the project lead's rule that each wait keeps its seconds.**
-No command, answer or stored format changes; the counts do, and a reader that asks again while the card answers `00 01` or
+**Proposed (applet 3.2, 2026-11-26; not released, not yet on a chip): the project lead's rule that each wait keeps its seconds, for
+the PIN's wait and the owner's holds; and the project lead's decision of 2026-11-26 that a payment's wait over its limit keeps its
+count.** No command, answer or stored format changes; the counts do, and a reader that asks again while the card answers
 `6A98` meets more askings of the same seconds.
 
 **Why.** Every wait on the card is counted in its own work: a payment's wait in signatures (`SPEND_ALL_SIGN` answered
 `00 01`), a held tap's and the PIN's wait in askings, each but the last a signature's work answered `6A98` (`work`, D218). The
 3.2 speed work (D245 to D253, D255, D257) made that signature about 22% quicker, so with 3.1's counts every wait was about a
-fifth shorter than the project lead agreed. The counts are made again so that no wait is shorter than it was.
+fifth shorter than the project lead agreed.
+
+**Which waits keep their seconds:** the PIN's wait after wrong tries, the owner's claim, the history of a card with no owner,
+and its reset by the PIN. These are what slow a reader that is guessing a PIN or taking a card over; their counts are raised.
+
+**Which wait keeps its count:** a payment's wait over its limit on one payment (`WAIT_MORE_SIGNS`) and a second payment's least
+in one time in the field (`WAIT_SECOND_SIGNS`), 2 and 2 as in 3.1, and so `WAIT_SIGNS_MOST` 508. Raised to 3 they kept their
+seconds on the reader (1.08 s a limit's worth on the 3.2 file against 0.93 s for 2 on the base file), but by an estimate of a
+client's pacing in a phone's field (not measured: each signature taken as about a third longer there), 3 would make a
+payment over the limit slower on 3.2 than on 3.1, about 1.45 s a limit's worth against 1.25 s, and 2 about 1.0 s. The project lead chose 2 (2026-11-26) and accepts that a desk reader with the PIN then paces at 2 x 361.4 ms = 0.72 s a
+limit's worth on the test card, against 0.93 s (2 x 463.3 ms) on the base file: faster than L a second there.
 
 **What was measured** (the reader, medians, milliseconds; the base file 00-base-3b9b5a4.cap, the 3.2 file 17-final-a43.cap
 at 0249e32, the chip run of 2026-11-26 on card 57723320, a J3R180):
@@ -10354,50 +10365,44 @@ at 0249e32, the chip run of 2026-11-26 on card 57723320, a J3R180):
 | A held history's asking (`GET_LOG` answered `6A98`) | 476.1 | 360.0 |
 | A held reset's asking (`RESET_CARD` answered `6A98`) | 491.3 | 361.4 |
 
-**The rule.** Never shorter than before: the new count is the least whole count whose time on the 3.2 file is no less than
-the old count's time on the base file, with the smaller figure where the 3.2 file has two (so that a quick run is not short).
-A hold of N askings is N - 1 askings' work (D236), so its seconds are (N - 1) times an asking's.
+**The rule, for the holds and the PIN.** Never shorter than before: the new count is the least whole count whose time on the
+3.2 file is no less than the old count's time on the base file, with the smaller figure where the 3.2 file has two. A hold of
+N askings is N - 1 askings' work (D236), so its seconds are (N - 1) times an asking's.
 
 | Constant | Old | Base, s | 3.2 file, old count, s | New | 3.2 file, new count, s |
 |---|---|---|---|---|---|
-| `WAIT_MORE_SIGNS` | 2 | 0.927 | 0.723 | 3 | 1.084 |
-| `WAIT_SECOND_SIGNS` | 2 | 0.927 | 0.723 | 3 | 1.084 |
-| `WAIT_SIGNS_MOST` (3 x 254) | 508 | 235.4 | 183.6 | 762 | 275.4 |
 | `CLAIM_ASKINGS` (3 askings' work, then 4) | 4 | 1.615 | 1.243 | 5 | 1.657 |
 | `HISTORY_ASKINGS` (2, then 3) | 3 | 0.952 | 0.720 | 4 | 1.080 |
 | `RESET_ASKINGS` (3, then 5) | 4 | 1.474 | 1.084 | 6 | 1.807 |
 | `PIN_STRETCH` | 16 | 7.757 | 5.642 | 22 | 7.757 |
 | `PIN_OWED_MOST` | 16,384 | 7,943 (2 h 12 min) | 5,777 (1 h 36 min) | 22,527 | 7,943 |
 | the PIN's wait after the w-th wrong try, 2^(w-1) | 1, 2, 4 ... 8,192 | | | 2, 3, 6, 11, 22 ... 11,264 | no less |
+| `WAIT_MORE_SIGNS` (kept by the project lead's decision) | 2 | 0.927 | 0.723 | 2 | 0.723 |
+| `WAIT_SECOND_SIGNS` (kept) | 2 | 0.927 | 0.723 | 2 | 0.723 |
+| `WAIT_SIGNS_MOST` (2 x 254, kept) | 508 | 235.4 | 183.6 | 508 | 183.6 |
 
-- `WAIT_SIGNS_MOST` is a ceiling, not a wait of its own: it is what 255 limits' worth waits (`WAIT_MORE_SIGNS` x
-  (`WAIT_UNITS_MOST` - 1)), and the wait of a sum that wrapped. It stays that product, 762 (275 s, longer than 3.1's 235 s), so
-  that a wrapped sum still waits the most any payment does; the least count by the rule alone would be 652, below what 255
-  limits' worth now waits. `WAIT_UNITS_MOST` (255) counts limits' worth, not seconds, and is not changed.
 - The PIN's wait owed after a wrong try is a count too, 2^w askings for w wrong tries before it: it is now 11/8 of that, rounded
   up (`countTry`: x + (3x + 7) / 8 with x = 2^w, w under 14), which is the least by the rule at every w (484.8 / 352.6 is
   1.37493, just under 11/8), and `PIN_OWED_MOST` from the fifteenth wrong try on. A wrong try still makes the next wait about
   twice as long (exactly twice from the fourth on).
-- The change outputs' credit (one wait off for every two outputs, D231) is not a wait and is not changed: an output is
-  197.7 ms on the 3.2 file, two of them 395 ms against a wait's 361.4.
-- A payment over its limit is then about 8% slower than L a second on this chip (1.08 s a limit's worth), where 3.1 on card
-  58206920 was 5 to 8% faster (D231): each wait keeps its seconds, which is the rule the project lead chose.
+- `WAIT_SIGNS_MOST` is a ceiling, not a wait of its own: what 255 limits' worth waits, and the wait of a sum that wrapped. It
+  stays `WAIT_MORE_SIGNS` x (`WAIT_UNITS_MOST` - 1). `WAIT_UNITS_MOST` (255) counts limits' worth, not seconds.
+- The change outputs' credit (one wait off for every two outputs, D231) is not a wait and is not changed.
 
-**Widths.** Every count stays in the type it had. A payment's waits are a short (`allState` bytes 2 and 3): 762 fits. The
-held counts are in `nonceLive[1]`'s low six bits (the PIN and the reset, with their marks) or seven (the claim, the history):
-the most counted is the PIN's stretch, 22 + 1, under 63. The askings owed are a short in `pinMarks` (`PM_OWED`): 22,527 fits
-(under 32,767), and `countTry`'s 3x is at most 24,576. No count is sent in `GET_INFO` or kept elsewhere on the card.
+**Widths.** Every count stays in the type it had. The held counts are in `nonceLive[1]`'s low six bits (the PIN and the
+reset, with their marks) or seven (the claim, the history): the most counted is the PIN's stretch, 22 + 1, under 63. The
+askings owed are a short in `pinMarks` (`PM_OWED`): 22,527 fits (under 32,767), and `countTry`'s 3x + 7 is at most 24,583.
+No count is sent in `GET_INFO` or kept elsewhere on the card.
 
-**What follows it.** spec/APDU.md says the new counts; cardctl and the cardsim client bound a PIN wait by
-`PIN_OWED_MOST` + its stretches (3.1's bound, 17,410 askings, was short of the longest 3.2 wait, 23,550), and their tests read
-the bound against the applet's constants; cardctl's mock card claims, reads and resets at the applet's counts. The claim's,
-history's and reset's bounds of 10, 7 and 17 (3.0's) are more than 3.2's counts and are not changed. spec/vectors/transcript.json
-and secret.json are made again: the PIN's longer waits are more askings in the transcript, and more waits are more signatures
-before the vectors' own, so D257's count and the generator's draws give other signatures and another card nonce; nothing in
-their form changes. The tests that pinned 3.1's counts by number say 3.2's (and 3.1's beside them); a first payment's credit
-taking its wait to none is shown with six outputs (3 - 3), as four did on 3.1 (2 - 2). WaitSecondsTest works each count out
-from the measured figures above and fails on 3.1's counts.
+**What follows it.** spec/APDU.md says the new counts; cardctl and the cardsim client bound a PIN wait by `PIN_OWED_MOST` +
+its stretches (3.1's bound, 17,410 askings, was short of the longest 3.2 wait, 23,551 askings), and their tests read the bound
+against the applet's constants; cardctl's mock card claims, reads and resets at the applet's counts. The claim's, history's
+and reset's bounds of 10, 7 and 17 (3.0's) are more than 3.2's counts and are not changed. spec/vectors/transcript.json and
+secret.json are made again: the PIN's longer waits are more askings in the transcript, and more work before the vectors' own
+signatures moves D257's count and the generator's draws, so their signatures and the card's nonce differ; nothing in their
+form changes. WaitSecondsTest works each hold's count out from the measured figures above and fails on 3.1's, and pins the
+payment's 2 and 2 on purpose, noting that the rule alone would say 3.
 
-**The file.** The counts and `countTry`'s rounding change the code by 12 bytes: with `sizeTheFile`'s writes as D256 left
-them the kept package is 40,580 bytes, 132 past a multiple of 256 (inside 60 to 180; 120 before), and the load file 44,881
-bytes (81 past). The writes are not changed. The chip run of that file confirms it: the counts' seconds and the create.
+**The file.** With `sizeTheFile`'s writes as D256 left them the kept package is 40,580 bytes, 132 past a multiple of 256
+(inside 60 to 180; 120 before), and the load file 44,881 bytes (81 past). The writes are not changed. The chip run of that
+file confirms it: the holds' seconds and the create.

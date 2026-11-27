@@ -74,8 +74,8 @@ an owner claimed, or a history read ([Session State](#session-state-transient)).
 
 **Response:** 2 bytes, the applet version, the major then the minor: `03 02` (3.2:
 3.1's wire with the review's fixes, quicker writes and one more profile bit, GET_INFO
-byte 56 bit 2, [D244](../docs/DECISIONS.md#d244), and the waits' counts raised so that
-each wait keeps 3.1's seconds on 3.2's quicker signature, [D258](../docs/DECISIONS.md#d258); `03 01` is 3.1:
+byte 56 bit 2, [D244](../docs/DECISIONS.md#d244), and the holds' and the PIN's counts raised so that
+each keeps 3.1's seconds on 3.2's quicker signature (a payment's wait keeps 3.1's count), [D258](../docs/DECISIONS.md#d258); `03 01` is 3.1:
 3.0's wire with the wait over the limit made a rate and the held taps of a card with no
 owner shorter, [D231](../docs/DECISIONS.md#d231) and [D232](../docs/DECISIONS.md#d232);
 `03 00` is 3.0, whose waits are longer, and which a reader reads the same way). The
@@ -2649,9 +2649,9 @@ bit 3 says so.)
 [D232](../docs/DECISIONS.md#d232)).** A limit of L on one payment is L a second at the
 most, with the payment's own signature (about 1.1 s from `SPEND_ALL_BEGIN` on card
 58206920, a J3R180 keyed for SCP03, D229) as the first second: every limit's worth past the
-first costs `WAIT_MORE_SIGNS` (3 since 3.2, [D258](../docs/DECISIONS.md#d258); 2 in 3.1) signatures of work, about 0.95 s on that
-chip in 3.1 and 1.08 s on the 3.2 file, with no larger first step. The card's change outputs take off one wait for every two, and a
-second payment in the same time in the field waits `WAIT_SECOND_SIGNS` (3 since 3.2; 2 in 3.1) at the least
+first costs `WAIT_MORE_SIGNS` (2) signatures of work, about 0.95 s on that chip, with no
+larger first step. The card's change outputs take off one wait for every two, and a
+second payment in the same time in the field waits `WAIT_SECOND_SIGNS` (2) at the least
 after that credit (D232, amended 2026-11-22: its change takes nothing off the least):
 
     W = WAIT_MORE_SIGNS × (N − 1)
@@ -2664,12 +2664,14 @@ N = 1 and no second payment waiting nothing; with no limit, W is 0, or
 `WAIT_SECOND_SIGNS` for a second payment in the time in the field (unless the owner's
 grant is in the tap). Outputs are the change outputs the card made in this payment
 (each about half a signature's work, 0.23 s against 0.47 s). Each wait is one
-`SPEND_ALL_SIGN` answered `00 01`; the most a payment waits is 762 answers (508 in 3.1). On the
+`SPEND_ALL_SIGN` answered `00 01`; the most a payment waits is 508 answers. On the
 sample card 58206920 at 473.6 ms an asking a limit's worth is taken in about 0.95 s past
 the first (0.92 s at the 462 ms of its 3.1 run), so a card can be paid from about 5 to 8%
 faster than L a second over a long run (the project owner accepted it, D231); a slower chip pays slower than L a second, never faster.
-On the 3.2 file (card 57723320, 361.4 ms a wait's signature, [D258](../docs/DECISIONS.md#d258)) a limit's worth past the first is about
-1.08 s, so the same card is paid about 8% slower than L a second: each wait keeps 3.1's seconds, the project lead's rule.
+3.2 keeps these counts, not their seconds (the project lead's decision of 2026-11-26, [D258](../docs/DECISIONS.md#d258)): on the 3.2 file
+(card 57723320, 361.4 ms a wait's signature on a desk reader) a limit's worth past the first is about 0.72 s there, so a desk
+reader that has the PIN can pay from it faster than L a second; in a phone's field, by an estimate (not measured) of about a third
+slower, it is about 1.0 s. The project lead accepted the desk reader's pace.
 (2.2 to 3.0 waited `WAIT_OVER_SIGNS`, ten, for the first limit's worth over and four for
 each after, about 4.7 s and then 1.9 s; ten for a second payment; and took two waits off
 for every three outputs. A card answering `03 00` keeps that rule, and a reader tells

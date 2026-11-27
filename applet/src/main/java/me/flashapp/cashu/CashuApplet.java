@@ -204,9 +204,9 @@ public class CashuApplet extends Applet implements TagSwitch {
     // piece's data written before its status byte with no transaction of its own, and the curve checked by squaring (`rsaSquare`).
     // One bit more in GET_INFO P1 = 4's byte 56 (bit 2, the field's arithmetic over p: a compressed C is as quick to load as a
     // whole one), which a 3.1 reader does not read.
-    // And the waits' counts (D258), so that each wait keeps its seconds on 3.2's quicker signature: a reader that asks again while
-    // the card answers 00 01 or 6A98 meets more askings of the same seconds (a payment's 3 a limit's worth, the claim 5, the
-    // history 4, the reset 6, the PIN's stretch 22 and at most 22,527 owed); one that bounds the askings by 3.1's counts is short.
+    // And the holds' and the PIN's counts (D258), so that each keeps its seconds on 3.2's quicker signature: a reader that asks again while
+    // the card answers 6A98 meets more askings of the same seconds (the claim 5, the history 4, the reset 6, the PIN's stretch 22
+    // and at most 22,527 owed); one that bounds the askings by 3.1's counts is short. A payment's wait keeps 3.1's count (2).
     static final byte VERSION_MINOR = (byte) 0x02;
     static final byte FORMAT        = (byte) 0x04;
     /** GET_INFO P1 = 4, byte 56, bit 2 (3.2, D244): the field's arithmetic runs over p on this chip (`fieldP`): a compressed C loads as fast as a whole one. */
@@ -779,7 +779,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      * 0.23 to 0.31 s, and D217 and D218, the split of the product and the check of every signature, added 0.27 s): 4 askings about 2.6 s (the
      * claim), 7 about 3.0 s (the history), 24 about 11 s (the reset by the PIN: the history's 7 and its own 17). 3.1 (D232, the project owner,
      * 2026-11-21: "a person must not hold a card longer than the protection needs") makes the history 3 and the reset 4; the claim stays 4.
-     * 3.2 (D258, the project lead's rule that each wait keeps its seconds): 3.2's signature is about 22% quicker, so each count is the
+     * 3.2 (D258, the project lead's rule that each hold keeps its seconds; a payment's wait keeps its count): 3.2's signature is about 22% quicker, so each count is the
      * least whose seconds on the 3.2 file (card 57723320, 2026-11-26) are no fewer than 3.1's count took on the base file: the claim
      * 5 (four askings' work, 1.66 s, where 4 took 1.62 s), the history 4 (1.08 s, where 3 took 0.95 s), the reset 6 (1.81 s,
      * where 4 took 1.47 s); the PIN's stretch 22 and its most owed 22,527, and each wait owed 11/8 of 3.1's (`countTry`).
@@ -1091,19 +1091,18 @@ public class CashuApplet extends Applet implements TagSwitch {
      *  the project owner's "a person must not hold a card longer than the protection needs"): two signatures of work, about 0.95 s on
      *  that chip, where 3.0 waited ten (about 4.7 s). It is counted after the change's credit (D232, amended): the change outputs
      *  take nothing off it. With the payment's own signature (about 1.1 s from its beginning), a reader that has the PIN takes one
-     *  limit's worth in about two seconds a payment: half the holder's rate, never faster. Three since D258 (1.08 s on the 3.2
-     *  file, where two took 0.93 s on the base file). */
-    static final short WAIT_SECOND_SIGNS = (short) 3;
+     *  limit's worth in about two seconds a payment: half the holder's rate, never faster. */
+    static final short WAIT_SECOND_SIGNS = (short) 2;
     /* No WAIT_FLOOR_SIGNS: 3.0's D188 floor is taken away by D211 (the project owner's choice of 2026-11-14), and GET_INFO's
      * byte 55 bit 3 says so (D228). [M1, the other maintainer's floor of WAIT_FLOOR_SIGNS = 4, is closed by D228: D211 stands.]
      * WAIT_SECOND_SIGNS is not that floor: it holds only a second payment in the same time in the field. */
-    /** What each limit's worth past the first costs a payment: this many signatures of work, about 0.95 s on that chip. 3.2 (D258,
-     *  the project lead's rule that each wait keeps its seconds): three, and three for WAIT_SECOND_SIGNS, 1.08 s on the 3.2 file at
-     *  361.4 ms a signature where two took 0.93 s on the base file at 463.3 ms. */
-    static final short WAIT_MORE_SIGNS   = (short) 3;
-    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about four and a half minutes since D258). */
+    /** What each limit's worth past the first costs a payment: this many signatures of work, about 0.95 s on that chip. */
+    /* 3.2 keeps two (D258, the project lead's decision of 2026-11-26): the payment's wait keeps its COUNT, not its seconds, so that a
+     * phone paces about 1.0 s a limit's worth by an estimate, not measured (0.72 s measured on a desk reader with the 3.2 file). */
+    static final short WAIT_MORE_SIGNS   = (short) 2;
+    /** The most limits' worth a payment is counted as: past this it waits as 255 do (about four minutes). */
     static final short WAIT_UNITS_MOST = (short) 255;
-    /** What 255 limits' worth waits: the most any payment does (762 since D258, 4.6 minutes on the 3.2 file; 508 before). */
+    /** What 255 limits' worth waits: the most any payment does. */
     static final short WAIT_SIGNS_MOST = (short)(WAIT_MORE_SIGNS * (WAIT_UNITS_MOST - 1));
     /** 10 seconds, big-endian: how close together refusals are one run of them, in the card's own log (6b). */
     private static final byte[] TAP_SECONDS = { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x0A };
