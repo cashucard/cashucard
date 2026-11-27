@@ -9611,3 +9611,7 @@ and separately maintained iPhone and Android availability. Setup links to
 TestFlight and Google Play. POS lists testing status until each store accepts
 public installs. Its source link is labeled separately. The applet section
 still explains phone and computer installation and links to the app page.
+
+## <a id="d241"></a>D241. Card reissue after a verified issuer reset
+
+An Ops administrator can approve an eligible stopped installation when a trusted issuer signs a completed reset for the same chip. The administrator can preview the evidence before approval. Ops records the approval and releases the installation together so that a retry returns the same receipt. Backup format v8 preserves that receipt when the service is restored.

@@ -30,6 +30,7 @@ export interface ServeOptions {
   readonly host?: string;
   readonly db?: OpsDb;
   readonly operatorAdmins?: () => string | undefined;
+  readonly fedimintReissueTrust?: () => string | undefined;
   /** NIP-87 discovery (D180); default on, off under an explicit `mints`. */
   readonly mintDiscovery?: boolean;
   /** Mint URLs never offered as discovered (OPS_MINT_DENYLIST). */
@@ -69,6 +70,9 @@ export function serve(options: ServeOptions): http.Server {
       : undefined;
   const deps: RouterDeps = {
     db,
+    fedimintReissueTrust:
+      options.fedimintReissueTrust ??
+      (() => process.env.OPS_FEDIMINT_REISSUE_TRUST),
     operatorAdmins:
       options.operatorAdmins ?? (() => process.env.OPS_OPERATOR_ADMINS),
     // The last-good header persists to the anchor_tip table and seeds the

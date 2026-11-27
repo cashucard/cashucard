@@ -49,6 +49,7 @@ const BODY_LIMIT = 1 << 20; // 1 MiB; a registry row is a few hundred bytes
 
 export interface RouterDeps {
   readonly operatorAdmins?: () => string | undefined;
+  readonly fedimintReissueTrust?: () => string | undefined;
   readonly db: OpsDb;
   readonly passwordHasher?: PasswordHasher;
   readonly anchor: AnchorFeed;

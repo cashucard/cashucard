@@ -76,6 +76,17 @@ export const adminClient =
     .querySelectorAll('[data-environment]')
     .forEach((e) => (e.textContent = environment));
   const messages = {
+    'bad-fedimint-reset-proof':'The service could not verify this proof. Choose the original signed file from the trusted offline tool.',
+    'fedimint-reissue-disabled':'Fedimint reset review is disabled for this Cashu service.',
+    'fedimint-reissue-policy-invalid':'Ask your service administrator to check the trusted reset verifier configuration.',
+    'reissue-target-changed':'The proof does not match the current Cashu installation attempt. Refresh and check the chip and attempt.',
+    'reissue-evidence-next-second':'The reader check just finished. Wait one second and retry with the same proof file.',
+    'reissue-evidence-stale':'The independent chip check has expired or has a future date. Obtain a fresh check before approval.',
+    'reissue-evidence-order':'The times do not establish the required order of the Cashu attempt, Fedimint reset and independent chip check. Review the records.',
+    'reissue-chip-history':'The chip has other installation or reset records that prevent approval. Review its history.',
+    'reissue-source-used':'This Fedimint reset was already used to approve a Cashu installation. Refresh and review the saved records.',
+    'reissue-proof-changed':'A different proof was already approved for this attempt. Refresh and review its saved status.',
+    'reissue-audit-invalid':'The saved review could not be verified. Ask your service administrator to check the record.',
     'independent-backup-stale':'Card changes are paused until a fresh independent backup is confirmed. Check the backup service, then retry.',
     'recovery-required':'The service is being recovered. Keep the original phone and saved card details until recovery is complete.',
     'reconciliation-evidence-stale':'The card check is too old or does not follow the required reset. Obtain a new independent check before submitting.',
@@ -217,7 +228,7 @@ export const adminClient =
         b.dataset.wasDisabled = b.disabled ? 'true' : 'false';
         b.disabled = true;
       } else {
-        b.disabled = b.dataset.wasDisabled === 'true';
+        if (b.dataset.wasDisabled !== undefined) b.disabled = b.dataset.wasDisabled === 'true';
         delete b.dataset.wasDisabled;
       }
     });
@@ -240,6 +251,11 @@ export const adminClient =
   }
   const nameOf = (id) =>
     operators.find((o) => o.id === id)?.name || 'Operator #' + id;
+  function approvedFedimintReceipt(a) {
+    const r = a.fedimint_reissue_receipt;
+    return a.fence_released && r && r.attempt_id === a.attempt_id &&
+      r.chip_id === a.chip_id && r.revision === a.revision ? r : null;
+  }
   const badge = (state, label) =>
     '<span class="status-badge ' +
     esc(state) +
@@ -350,8 +366,9 @@ export const adminClient =
           '</span><div class="account-sub">' +
           esc(ago(a.created)) +
           '</div></td><td>' +
-          badge(a.state,attemptLabels[a.state]) +
-          (a.fence_released ? '<div class="state-note">New installation allowed</div>' : '') +
+          (approvedFedimintReceipt(a) ? badge('recorded', 'Reissue approved') :
+            badge(a.state,attemptLabels[a.state]) +
+            (a.fence_released ? '<div class="state-note">New installation allowed</div>' : '')) +
           '<div class="state-note">Revision ' +
           esc(a.revision) +
           '</div></td><td><button class="icon-btn" data-action="attempt" data-id="' +
@@ -736,6 +753,7 @@ export const adminClient =
   function openAttempt(id) {
     const a = attempts.find((a) => a.attempt_id === id);
     if (!a) return;
+    const receipt = approvedFedimintReceipt(a);
     const guidance = {
       quarantined:
         'Further installation is paused for this chip. Keep the original phone’s support details for administrator review. This status does not report the card’s balance or wallet state.',
@@ -750,14 +768,16 @@ export const adminClient =
       'Installation details',
       'Saved provisioning status and identifiers.',
       '<div class="notice ' +
-        (['quarantined', 'abandoned'].includes(a.state) ? 'warning' : '') +
+        (!receipt && ['quarantined', 'abandoned'].includes(a.state) ? 'warning' : '') +
         '">' +
-        icon(a.state === 'quarantined' ? 'shield' : 'info') +
+        icon(receipt ? 'check' : a.state === 'quarantined' ? 'shield' : 'info') +
         '<p><strong>' +
-        esc(attemptLabels[a.state]||'Unknown state') +
+        esc(receipt ? 'Reissue approved' : attemptLabels[a.state]||'Unknown state') +
         '</strong>' +
         esc(
-          a.fence_released
+          receipt
+            ? 'Start a new reservation in Cashu Card Setup and follow the usual installation steps for this chip. Keep the approval receipt with this stopped attempt.'
+            : a.fence_released
             ? 'A reviewed reset allows a new installation attempt. The original stopped record and its history are retained.'
             : guidance[a.state] || 'Review the saved evidence before continuing.',
         ) +
@@ -777,12 +797,99 @@ export const adminClient =
         copyValue(a.chip_id) +
         '</dd></div><div class="detail-full"><dt>Device identity</dt><dd>' +
         copyValue(a.device_id) +
-        '</dd></div></dl>',
+        '</dd></div></dl>' + (receipt ? jsonDownload('fedimint-receipt-file', 'cashu-reissue-' + a.attempt_id,
+          JSON.stringify(receipt, null, 2), 'Download approval receipt') : ''),
       '<button class="btn btn-secondary" data-action="close-dialog" autofocus>Close details</button>' +
         (a.chip_id && !a.fence_released && ['quarantined','abandoned'].includes(a.state)
-          ? '<button class="btn btn-primary" id="review-reset">Review completed reset</button>' : ''),
+          ? '<button class="btn btn-secondary" id="review-reset">Review completed Cashu reset</button>' : '') +
+        (a.fedimint_reset_reviewable === true && a.fedimint_reset_target && !attemptsError
+          ? '<button class="btn btn-primary" id="review-fedimint-reset">Review Fedimint reset</button>' : ''),
     );
+    if ($('review-fedimint-reset')) $('review-fedimint-reset').onclick = () => importFedimintProof(a);
     if ($('review-reset')) $('review-reset').onclick = () => reviewReset(a);
+  }
+  function jsonDownload(id, filename, json, label) {
+    return '<a id="' + esc(id) + '" class="btn btn-secondary" download="' + esc(filename) +
+      '.json" href="data:application/json;charset=utf-8,' + esc(encodeURIComponent(json)) + '">' + esc(label) + '</a>';
+  }
+  function importFedimintProof(a) {
+    const t = a.fedimint_reset_target;
+    const target = JSON.stringify({
+      target_origin:t.target_origin, source_origin:t.source_origin, attempt_id:t.attempt_id,
+      revision:t.revision, chip_id:t.chip_id, target_bound_at:t.target_bound_at,
+    }, null, 2);
+    dialog(
+      'Review Fedimint reset',
+      'Setup reported a card manager authentication failure. The signed proof must confirm it happened before Setup recorded an installation.',
+      '<p>Give the Cashu target file and the public support export from the original Setup phone to the person verifying this chip. They will return a signed proof for this attempt.</p>' +
+      jsonDownload('fedimint-target-file', 'cashu-target-' + a.attempt_id, target, 'Download Cashu target') +
+      '<details class="proof-target"><summary>View target details</summary><pre>' + esc(target) + '</pre></details>' +
+      '<label class="field">Signed proof file<input id="fedimint-proof" type="file" accept=".json,application/json" required autofocus></label>',
+      cancel + '<button type="submit" class="btn btn-primary">Preview signed proof</button>', true,
+    );
+    $('operator-form').onsubmit = (event) => {
+      event.preventDefault();
+      perform(async () => {
+        const file = $('fedimint-proof').files[0];
+        if (!file || !file.size || file.size > 65536) throw Error('Choose a signed JSON proof file of 64 KiB or less.');
+        let proof;
+        try { proof = JSON.parse(await file.text()); }
+        catch { throw Error('The file could not be read as a JSON proof. Choose the signed file from the offline tool.'); }
+        if (!proof || Object.keys(proof).length !== 2 ||
+            proof.payload?.purpose !== 'cashu-card/fedimint-reset-reissue/v1' ||
+            typeof proof.signature_hex !== 'string' || !/^[0-9a-f]{128}$/.test(proof.signature_hex))
+          throw Error('Choose the signed proof file produced by the offline verification tool.');
+        if (['target_origin','source_origin','attempt_id','revision','chip_id','target_bound_at']
+          .some(field => proof.payload[field] !== t[field]))
+          throw Error('This file belongs to a different installation or registry. Choose the proof for the displayed Cashu target.');
+        const body = {proof};
+        const base = '/admin/provisioning/attempts/' + encodeURIComponent(a.attempt_id) + '/fedimint-reset/';
+        const {preview} = await request(base + 'preview', body);
+        if (!preview || preview.attempt_id !== a.attempt_id || preview.chip_id !== a.chip_id ||
+            preview.revision !== a.revision || preview.target_origin !== t.target_origin ||
+            preview.source_origin !== t.source_origin || typeof preview.short_id !== 'string' || !preview.short_id)
+          throw Error('The verified proof does not match this installation attempt. Refresh its details and check the proof.');
+        confirmFedimintReset(preview, body, base);
+      });
+    };
+  }
+  function reviewField(name, value) {
+    return '<div class="detail-full"><dt>' + esc(name) + '</dt><dd>' + esc(value) + '</dd></div>';
+  }
+  function proofTime(seconds) {
+    const time = new Date(seconds * 1000);
+    if (!Number.isSafeInteger(seconds) || seconds <= 0 || !Number.isFinite(time.getTime()))
+      throw Error('The verification service returned an unreadable timestamp. Refresh before trying again.');
+    return time.toISOString().replace('T', ' ').replace('.000Z', ' UTC');
+  }
+  function confirmFedimintReset(v, body, base) {
+    // All displayed identifiers and times are from the server's verified preview.
+    const details = reviewField('Cashu service', v.target_origin) + reviewField('Cashu attempt', v.attempt_id) +
+      reviewField('Attempt revision', v.revision) + reviewField('Chip identity', v.chip_id) +
+      reviewField('Fedimint registry', v.source_origin) + reviewField('Original Fedimint card ID', v.short_id) +
+      reviewField('Factory state verified', proofTime(v.verified_at)) +
+      reviewField('Registry reset completed', proofTime(v.completed_at)) +
+      reviewField('Chip independently observed', proofTime(v.observed_at));
+    dialog(
+      'Approve this card for reissue?',
+      'The service verified the signed proof. Compare these details with the original card and your reset record.',
+      '<dl class="detail-grid">' + details + '</dl>' +
+      '<label class="check-field"><input id="fedimint-confirm" type="checkbox" required autofocus>' +
+      '<span>I checked the chip, the original Fedimint card and the times. I approve a new Cashu installation on this chip.</span></label>',
+      cancel + '<button id="fedimint-approve" class="btn btn-primary" type="submit" disabled>Approve this chip</button>', true,
+    );
+    const check = $('fedimint-confirm');
+    check.onchange = () => { $('fedimint-approve').disabled = !check.checked; };
+    $('operator-form').onsubmit = (event) => {
+      event.preventDefault();
+      if (!check.checked) return;
+      perform(async () => {
+        const {receipt} = await request(base + 'approve', body);
+        if (!receipt || receipt.attempt_id !== v.attempt_id || receipt.chip_id !== v.chip_id)
+          throw Error('The service did not return a matching approval receipt. Refresh the installation to check its status.');
+        await saved('Reissue approved for this chip. The original stopped attempt is retained.');
+      });
+    };
   }
   function reviewReset(a) {
     dialog(

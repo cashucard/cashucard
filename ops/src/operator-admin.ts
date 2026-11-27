@@ -6,6 +6,37 @@ import {
 } from './auth';
 import {HttpError, type RouterDeps} from './router';
 import {reconcileReset} from './reconciliation';
+import {
+  approveFedimintReissue,
+  previewFedimintReissue,
+  type FedimintReissuePolicy,
+} from './fedimint-reissue';
+
+/** Only deployment configuration can select the evidence signer and the two issuers. */
+function recoveryPolicy(raw?: string): FedimintReissuePolicy | undefined {
+  if (raw === undefined) return undefined;
+  try {
+    const value = JSON.parse(raw);
+    const httpsOrigin = (s: unknown) => {
+      if (typeof s !== 'string' || s.length > 256) return false;
+      const url = new URL(s);
+      return url.protocol === 'https:' && url.origin === s;
+    };
+    if (
+      Object.keys(value).sort().join(',') ===
+        'public_key_hex,source_origin,target_origin' &&
+      httpsOrigin(value.target_origin) &&
+      httpsOrigin(value.source_origin) &&
+      value.source_origin !== value.target_origin &&
+      typeof value.public_key_hex === 'string' &&
+      /^[0-9a-f]{64}$/.test(value.public_key_hex)
+    )
+      return value;
+  } catch {
+    /* Do not echo a malformed deployment setting. */
+  }
+  return undefined;
+}
 
 const fail = (status: number, code: string): never => {
   throw new HttpError(status, code, code);
@@ -46,17 +77,72 @@ export async function operatorAdminRequest(
     /^\/admin\/provisioning\/attempts\/([^/]+)\/reconcile-reset$/.exec(path);
   if (method === 'POST' && reconciliation)
     return [200, {receipt: reconcileReset(db, actor, reconciliation[1], body)}];
-  if (method === 'GET' && path === '/admin/provisioning/attempts')
-    return [
-      200,
-      {
-        attempts: db.db
-          .prepare(
-            'SELECT attempt_id,batch_id,ordinal,operator_id,device_id,state,revision,chip_id,created,fence_released FROM provisioning_attempts ORDER BY created DESC,attempt_id DESC LIMIT 100',
-          )
-          .all(),
+  const fedimint =
+    /^\/admin\/provisioning\/attempts\/([^/]+)\/fedimint-reset\/(preview|approve)$/.exec(
+      path,
+    );
+  if (method === 'POST' && fedimint) {
+    const configured = deps.fedimintReissueTrust?.();
+    if (configured === undefined) return fail(503, 'fedimint-reissue-disabled');
+    const policy = recoveryPolicy(configured);
+    if (!policy) return fail(503, 'fedimint-reissue-policy-invalid');
+    const [, attemptId, action] = fedimint;
+    return action === 'preview'
+      ? [200, {preview: previewFedimintReissue(db, attemptId, body, policy)}]
+      : [
+          200,
+          {receipt: approveFedimintReissue(db, actor, attemptId, body, policy)},
+        ];
+  }
+  if (method === 'GET' && path === '/admin/provisioning/attempts') {
+    const policy = recoveryPolicy(deps.fedimintReissueTrust?.());
+    const attempts = db.db
+      .prepare(
+        `SELECT a.attempt_id,a.batch_id,a.ordinal,a.operator_id,a.device_id,a.state,a.revision,
+        a.chip_id,a.created,a.fence_released,
+        json_extract(a.bind_receipt,'$.bound_at') AS target_bound_at,
+        f.receipt_json AS approved_receipt,
+        (a.state='quarantined' AND a.revision=2 AND a.chip_id IS NOT NULL AND a.fence_released=0
+         AND a.bind_receipt IS NOT NULL AND a.disposition_receipt IS NOT NULL
+         AND a.disposition_json=? AND NOT EXISTS (
+           SELECT 1 FROM provisioning_records r WHERE r.attempt_id=a.attempt_id
+         )) AS candidate
+        FROM provisioning_attempts a LEFT JOIN fedimint_reissues f ON f.attempt_id=a.attempt_id
+        ORDER BY a.created DESC,a.attempt_id DESC LIMIT 100`,
+      )
+      .all(
+        JSON.stringify({kind: 'quarantined', reason: 'authentication-failed'}),
+      ) as {
+      candidate: number;
+      approved_receipt: string | null;
+      [field: string]: unknown;
+    }[];
+    const visible = attempts.map(
+      ({candidate, target_bound_at, approved_receipt, ...row}) => {
+        const reviewable = candidate === 1 && policy !== undefined;
+        return {
+          ...row,
+          fedimint_reset_reviewable: reviewable,
+          ...(approved_receipt
+            ? {fedimint_reissue_receipt: JSON.parse(approved_receipt)}
+            : {}),
+          ...(reviewable
+            ? {
+                fedimint_reset_target: {
+                  target_origin: policy.target_origin,
+                  source_origin: policy.source_origin,
+                  attempt_id: row.attempt_id,
+                  revision: row.revision,
+                  chip_id: row.chip_id,
+                  target_bound_at,
+                },
+              }
+            : {}),
+        };
       },
-    ];
+    );
+    return [200, {attempts: visible}];
+  }
   if (method === 'GET' && path === '/admin/operators')
     return [
       200,

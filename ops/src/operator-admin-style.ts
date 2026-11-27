@@ -40,5 +40,6 @@ dialog{color:var(--ink);border:1px solid #dfe6d7;border-radius:20px;padding:0;ma
 #view-attempts .data-table .state-note{display:none}
 }
 ${adminIdentityStyle}
+.proof-target{margin:14px 0 20px}.proof-target summary{cursor:pointer;color:var(--ink);font-weight:600}.proof-target pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 `;

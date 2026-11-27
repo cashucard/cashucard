@@ -41,6 +41,7 @@ import {recoveryHttp, type RecoveryBindings} from './recovery-http.workers';
 
 export interface Env extends RecoveryBindings {
   OPS_OPERATOR_ADMINS?: string;
+  OPS_FEDIMINT_REISSUE_TRUST?: string;
   OPS_MASTER_KEY: string;
   /** Explicit opt-in; must match this deployment's recovery issuer UUID. */
   OPS_INDEPENDENT_BACKUP_ISSUER?: string;
@@ -111,6 +112,7 @@ export class OpsStore extends DurableObject<Env> {
     issuer: string | undefined;
     recoveryAdmins: string | undefined;
     operatorAdmins: string | undefined;
+    fedimintReissueTrust: string | undefined;
   }>();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -137,6 +139,12 @@ export class OpsStore extends DurableObject<Env> {
     this.deps = {
       db,
       passwordHasher,
+      fedimintReissueTrust: () => {
+        const current = this.requestPolicy.getStore();
+        return current
+          ? current.fedimintReissueTrust
+          : this.env.OPS_FEDIMINT_REISSUE_TRUST;
+      },
       operatorAdmins: () =>
         this.requestPolicy.getStore()
           ? this.requestPolicy.getStore()!.operatorAdmins
@@ -177,6 +185,7 @@ export class OpsStore extends DurableObject<Env> {
     requiredIssuer: string | null,
     recoveryAdmins?: string,
     operatorAdmins?: string,
+    fedimintReissueTrust?: string,
   ): Promise<Response> {
     if (
       requiredIssuer !== null &&
@@ -186,7 +195,12 @@ export class OpsStore extends DurableObject<Env> {
         'independent backup issuer does not match recovery issuer',
       );
     return this.requestPolicy.run(
-      {issuer: requiredIssuer ?? undefined, recoveryAdmins, operatorAdmins},
+      {
+        issuer: requiredIssuer ?? undefined,
+        recoveryAdmins,
+        operatorAdmins,
+        fedimintReissueTrust,
+      },
       () => this.fetch(request),
     );
   }

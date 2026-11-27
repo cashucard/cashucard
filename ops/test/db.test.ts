@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {AnchorFeed, CACHE_SECONDS, HEADER_LEN} from '../src/anchor';
+import {recordedFetch, headerHex} from './fixtures/esplora-tip';
 import {BatchError, createBatch} from '../src/batches';
 import {MIGRATIONS, OpsDb} from '../src/db';
 import {openSqliteFile} from '../src/sqlite-file';
@@ -235,12 +236,11 @@ test('a tip written through one OpsDb tipStore() seeds a fresh feed over the sam
     now: () => 1_700_000_000,
     master: {getMaster: () => TEST_MASTER},
   });
-  const HEADER = Buffer.alloc(HEADER_LEN, 0xab);
-  const TIP_URL = 'https://mempool.space/api/blocks/tip/height';
+  const HEADER = Buffer.from(headerHex, 'hex');
 
   // A live fetch writes the last-good header through the REAL store.
   const live = new AnchorFeed(
-    async url => (url === TIP_URL ? Buffer.from('900000', 'ascii') : HEADER),
+    recordedFetch,
     () => 1_700_000_000,
     db.tipStore(),
   );

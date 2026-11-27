@@ -5,6 +5,12 @@ One entry per component release, newest first, as
 in the reviewed pull request, and the tag follows the merge. A GitHub release lists
 the merged pull requests besides.
 
+## Ops 0.2.1
+
+Ops checks the Bitcoin tip header against its block ID. If mempool.space is unavailable, Ops requests the height, ID, and header from Blockstream.
+
+Administrators can review a signed issuer reset and approve an eligible card for reissue. Backup format v8 preserves the approval receipt. The updated restore tool also reads v1 through v7 archives. [Reissue decision](DECISIONS.md#d241)
+
 ## `firmware-v3.1.0`: Cashu Card protocol 3.1 (released 2026-11-24)
 
 The first released card version of the 3.x line. 3.0, below, is never released: it is a development step, as 2.3 was,
