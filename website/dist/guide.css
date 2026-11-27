@@ -186,3 +186,11 @@
 .ecosystem figcaption{padding:16px}
 .ecosystem-legend a{margin-left:0}
 }
+
+/* Published SDKs on the developer guide. */
+.sdk-cards li { padding: 20px; }
+.sdk-cards h3 { margin: 0; font-size: 20px; }
+.sdk-cards p { margin: 0 0 8px; }
+.sdk-cards .cmd { margin: auto 0 0; }
+.sdk-cards .cmd pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sdk-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 14px; }
