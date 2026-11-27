@@ -35,6 +35,9 @@ the dated reports, and `/developers` (`dist/developers.html`) links the draft,
 the APDU reference, the vectors and the code. Both use the install guide's
 layout and `guide.js`. When a doc they link moves, update its link here.
 The main navigation and homepage hero lead to `/downloads` for Setup and POS.
+The iPhone buttons link to TestFlight. The public Android install uses the
+[English Google Play badge](https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png)
+with its original artwork and clear space. The POS Android button opens the invited test.
 Footer links point to the draft NUT and the Cashu Card source, with both
 apps in the Apps group. The install guide's Apps also link Flash and Foxy
 at their own sites, getflash.io and getfoxy.io, since its setup step sends a
