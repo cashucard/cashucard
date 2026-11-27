@@ -772,7 +772,7 @@ public class CashuApplet extends Applet implements TagSwitch {
      *                    and the arming of the no-PIN allowance (D208).
      *   RESET_ASKINGS    RESET_CARD by the PIN on a card with no owner: reset at the sixth asking, five signatures' work (D258;
      *                    the fourth, three signatures' work, 1.66 s measured on the chip, in 3.1, D232, D236; seventeen in 3.0); with the
-     *                    history's four before it: 10 askings, eight signatures' work, about 2.9 s on the 3.2 file (7 and 2.6 s in 3.1).
+     *                    history's four before it: 10 askings, eight signatures' work, about 2.9 s on the 3.2 file (7 askings in 3.1, 2.43 s on the base file, D258).
      *
      * The counts are the project owner's choice of 2026-11-14 (D211), each from the 0.59 to 0.66 s an asking
      * measured on the J3R180 on 2026-11-14 (0.75 s was the first guess, and came out short). An asking is 0.49 to 0.58 s now (D216 made it
@@ -7833,11 +7833,15 @@ public class CashuApplet extends Applet implements TagSwitch {
      * package ends and how many bytes to add or to take away.
      */
     private static void sizeTheFile(byte[] a) {
-        /* 3.2 padded by D256, with the speed commits and their follow-ups (D245 to D253, D255), D254 left out and D257's count:
-         * the writes below, from the code alone (the earlier ones all taken out), as many as end the package as the chip keeps it
+        /* 3.2 with D258's counts (70bff21): the same writes, untouched; D258's code moved the package as the chip keeps it to
+         * 40,580 bytes, 132 past a multiple of 256 (inside D256's 60 to 180), and the load file to 44,881 bytes (81 past). That
+         * file was created at the first try four times of four on each of three cards on 2026-11-26 (57723320 and 09344120,
+         * J3R180s, and 36813121, a J3R452), where the file from before the speed work (245 past) was refused on the J3R452.
+         * 3.2 padded by D256, with the speed commits and their follow-ups (D245 to D253, D255), D254 left out and D257's count:
+         * the writes below, from the code alone (the earlier ones all taken out), as many as ended the package as the chip keeps it
          * 120 past a multiple of 256, the middle of the places card 57723320 created at on 2026-11-26 (48 to 213 past; refused
-         * at 218 and 223). Unpadded it ends 229 past (40,421 bytes kept). The load file is then 44,869 bytes (69 past), a size
-         * no chip has been given, at a load-file place that no longer says anything: on that card 52be734's file of 43,509 bytes
+         * at 218 and 223). Unpadded it ended 229 past (40,421 bytes kept); the load file was then 44,869 bytes (69 past), a size
+         * no chip had been given, at a load-file place that no longer says anything: on that card 52be734's file of 43,509 bytes
          * (245 past) was refused twelve times where 7b87367's of the same 43,509 bytes was created at the first try (D256).
          * Until D256 each speed commit held the load file at 245 past.
          * 3.2 after its chip run (D244: blindChange back on Euler's test, 110 bytes less code): ninety-five writes, the
@@ -7877,8 +7881,8 @@ public class CashuApplet extends Applet implements TagSwitch {
          * the sizes not to be shipped untried. The 1.20 build of 19,634 bytes (178 past a multiple of 256) installs, as a 1.19 build
          * of 19,269 (69 past) did; 1.16 installs at 203 past a
          * multiple of 256 (and 249), and not at 139, 164 or 176. */
-        // the writes that end the package as the chip keeps it 120 past a multiple of 256 (D256: refcheck says how far a
-        // build is from it)
+        // the writes that end the package as the chip keeps it 60 to 180 past a multiple of 256 (D256: refcheck says how far a
+        // build is from it; 132 past at 70bff21, 120 before D258's counts)
         a[110] = 6;
         a[111] = 7;
         a[112] = 8;

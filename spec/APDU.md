@@ -2864,7 +2864,7 @@ history on another phone as a guest.
    (three wrong tries, `SET_PIN`, then the reset of item 8) unless it was claimed.
 8. **Other numbers, or an owner, later.** The holder empties the card, resets it by
    the PIN in a held tap ([RESET_CARD](#reset_card-0x51): six askings after the history's four,
-   10 askings and about 2.9 seconds in all; 7 and about 2.6 seconds in 3.1; 24 and about 11 seconds in 3.0), and sets it up again: with a phone, which claims it in that first set-up
+   10 askings and about 2.9 seconds in all; 7 and about 2.4 seconds in 3.1 (2.43 s measured on the base file, D258); 24 and about 11 seconds in 3.0), and sets it up again: with a phone, which claims it in that first set-up
    ([The owner claimed slowly](#the-owner-claimed-slowly)), or by the PIN alone. The
    reset is held for so that no brush of a tap does it, and no till in the tap that takes a payment; anyone with the
    PIN who holds the empty card for about 2.9 seconds can, and can set it up again with

@@ -10404,5 +10404,26 @@ form changes. WaitSecondsTest works each hold's count out from the measured figu
 payment's 2 and 2 on purpose, noting that the rule alone would say 3.
 
 **The file.** With `sizeTheFile`'s writes as D256 left them the kept package is 40,580 bytes, 132 past a multiple of 256
-(inside 60 to 180; 120 before), and the load file 44,881 bytes (81 past). The writes are not changed. The chip run of that
-file confirms it: the holds' seconds and the create.
+(inside 60 to 180; 120 before), and the load file 44,881 bytes (81 past). The writes are not changed.
+
+**On the chips (2026-11-26).** That file (19-final-waits2.cap, load file sha256 `c525db93…`) passed the whole chip run on
+three cards: 57723320 (a J3R180 keyed for SCP03), 09344120 (a fresh J3R180 from another seller, SCP02) and 36813121 (a
+J3R452, JCOP 4.5, P71D600). The card applet was created at the first try four times of four on each; `GET_INFO` byte 56 was
+07 on all three. The same test payments waited 57 times, as on 3.1. The file from before the speed work (00-base-3b9b5a4,
+245 past) could not be created on the J3R452 (`INSTALL` 6F00): D256's rule seen on a second chip.
+[The report](reports/HARDWARE_TEST_REPORT_2026-11-26_3.2-final.md) has the figures.
+
+## <a id="d259"></a>D259: A known low left in 3.2: agrees()'s first init is outside its try
+
+**Recorded (applet 3.2, 2026-11-26), not fixed: the fix changes the applet's bytes, and the file of 70bff21 has passed its
+chip runs.** The ordinary review of the 3.2 speed code (its L1) found that in `SchnorrHW.agrees` the line
+`if (ready[R_CURVE] != (byte) 1) curveKA.init(curveKey);` sits outside the `try` that turns a refusal into `false`. On a chip
+that refused that `init`, agrees() would throw instead of answering: `checksCurve` at `SET_CARD` would end the command after
+the record's transaction, `selfTested` would stay false, and every later `SET_CARD` would fail the same way, where D251 means
+the card to fall back to the temporary key; in `loadOne` and `unblind` the callers would answer 6A80 to a good point.
+`curveEngine` checks only that the key and the agreement can be made, not that the agreement takes the key.
+
+The J3R180 and the J3R452 (JCOP 4.5, P71D600) both take the `init`: in the chip runs of 2026-11-26 `SET_CARD` passed and
+`GET_INFO` byte 56 was 07 on all three cards (D258). So it matters only on a chip not yet tried. **To fix in the next version
+that changes the applet's bytes:** move the conditional `init` inside the outer `try`, or have `curveEngine` try one
+`curveKA.init(curveKey)` in its own `try` and leave `curveKA` null where it fails; then pad again by D256 and run the chips.
