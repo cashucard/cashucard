@@ -1,42 +1,26 @@
+# Apply the HTML policy to missing URLs as well as known pages.
+# no-transform prevents the hosting layer from adding scripts.
 /*
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 /film/*
-  Cache-Control: public, max-age=31536000, immutable
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable, no-transform
 /seq/*
-  Cache-Control: public, max-age=31536000, immutable
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable, no-transform
 https://:worker.:subdomain.workers.dev/*
   X-Robots-Tag: noindex
-# HTML pages: no-transform keeps Cloudflare from injecting scripts (its analytics beacon, bot detections) that the policy above would block
-/
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/downloads
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/guide
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/privacy
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/terms
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/support
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/faq
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/developers
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
-/ops-service
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
 /ops-compose.yaml
   Content-Type: application/yaml; charset=utf-8
   Content-Disposition: attachment; filename="compose.yaml"
-  Cache-Control: public, max-age=0, must-revalidate, no-transform
 # The fund page runs the donation card: first-party scripts, requests to the donations service, and the camera for scanning a wallet's QR code.
 /fund
   ! Content-Security-Policy
   ! Permissions-Policy
   Permissions-Policy: camera=(self), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self'; connect-src https://donate.islandbitcoin.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
-  Cache-Control: public, max-age=0, must-revalidate, no-transform

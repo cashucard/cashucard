@@ -127,6 +127,9 @@ async function main() {
     const media = await fetch(origin + "/film/cashu-card-film-4.mp4", { headers: { Range: "bytes=0-1" } });
     assert.equal(media.status, 206, "Host answers byte-range requests for the film");
     await media.arrayBuffer();
+    const missing = await fetch(origin + "/website-smoke-missing");
+    assert.equal(missing.status, 404);
+    assert.match(missing.headers.get("cache-control") || "", /no-transform/, "Missing pages preserve the site's HTML");
     const home = await fetch(origin + "/");
     assert.match(home.headers.get("content-security-policy") || "", /media-src 'self'/, "Host applies _headers, media allowed");
     await send("Emulation.setEmulatedMedia", {
