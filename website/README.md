@@ -19,6 +19,10 @@ answers ranges and applies `_headers` with no policy violations. It creates
 and removes a separate browser profile. Set `SITE_TEST_ORIGIN` to another
 preview origin if needed.
 
+The ten public pages and the custom 404 share the static header and footer in
+`tools/navigation.html`. After editing it, run `node tools/sync-navigation.mjs`
+from `website/`. Pass `--check` to verify that every page has the current links.
+
 ## Content and assets
 
 Protocol facts come from NUT-CCP (`CCP.md` in cashucard/nut), and from

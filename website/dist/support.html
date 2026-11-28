@@ -23,61 +23,89 @@
     <link rel="stylesheet" href="/guide.css" />
     <script src="/guide.js" defer></script>
     <title>Support | Cashu Card</title>
+    <link rel="stylesheet" href="/help.css?v=1" />
+    <link rel="stylesheet" href="/navigation.css">
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-    <header class="header">
-      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
-    </header>
-    <main id="main" class="guide">
+    <!-- site header -->
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <div class="mast-bar">
+    <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34"></a>
+    <nav class="mast-wide" aria-label="Main navigation"><a href="/downloads">Downloads</a> <a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support" aria-current="page">Support</a></nav>
+    <a class="mast-download" href="/downloads">Downloads</a>
+    <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+  <details class="mast-menu">
+    <summary>Menu<span aria-hidden="true"></span></summary>
+    <nav aria-label="Main navigation"><a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support" aria-current="page">Support</a></nav>
+  </details>
+</header>
+<!-- end site header -->
+    <main id="main" class="guide support-page" tabindex="-1">
       <section class="guide-hero" aria-labelledby="support-title">
-        <div class="guide-hero-inner">
-          <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> SUPPORT</div>
-          <h1 id="support-title">Get <em>help</em></h1>
-          <p class="guide-lead">Answers, email and where to report problems.</p>
-          <ul class="guide-facts" aria-label="At a glance"><li>support@cashucard.org</li><li>GitHub Discussions</li></ul>
+        <div class="guide-hero-inner help-cover">
+          <div>
+            <h1 id="support-title">Card <em>support</em></h1>
+            <p class="guide-lead">Get help with Cashu Card POS, Setup or your hosted operator account.</p>
+          </div>
+          <aside id="email" class="support-contact" aria-labelledby="email-title">
+            <h2 id="email-title">Email the team</h2>
+            <p>Tell us which phone and app version you use and what happened. Keep passwords, PINs, withdrawal QR codes and wallet secrets private.</p>
+            <a class="support-primary" href="mailto:support@cashucard.org">support@cashucard.org</a>
+          </aside>
         </div>
       </section>
-
-      <div class="guide-layout">
-        <nav class="guide-rail" aria-label="On this page">
-          <span class="rail-label">On this page</span>
-          <ol><li><a href="#answers">Common answers</a></li><li><a href="#email">Email</a></li><li><a href="#community">Questions and bugs</a></li><li><a href="#other">Security, conduct and privacy</a></li></ol>
-        </nav>
-        <article class="guide-doc">
-          <section id="answers" aria-labelledby="answers-title">
-            <h2 id="answers-title">Common answers</h2>
-            <p>Most questions have an answer already:</p>
-            <ul><li><a href="/faq">Questions and answers</a> covers what a card is, holding and paying with one, and safety.</li><li>The <a href="/guide">install guide</a> walks through putting the software on a blank card.</li><li>The <a href="/developers">developer page</a> is for building a wallet, till or service.</li></ul>
-          </section>
-
-          <section id="email" aria-labelledby="email-title">
-            <h2 id="email-title">Email</h2>
-            <p>Write to <a href="mailto:support@cashucard.org">support@cashucard.org</a> for help with Cashu Card POS, Cashu Card Setup or an operator account on ops.cashucard.org. Say which phone and app version you use and what happened. Leave out passwords, PINs, withdrawal QR codes and wallet secrets.</p>
-          </section>
-
-          <section id="community" aria-labelledby="community-title">
-            <h2 id="community-title">Questions and bugs</h2>
-            <p>Ask questions in <a href="https://github.com/cashucard/cashucard/discussions">GitHub Discussions</a>, where answers help the next person too. Report a bug as a <a href="https://github.com/cashucard/cashucard/issues">GitHub issue</a>.</p>
-          </section>
-
-          <section id="other" aria-labelledby="other-title">
-            <h2 id="other-title">Security, conduct and privacy</h2>
-            <ul><li>Report a security problem privately to <a href="mailto:security@cashucard.org">security@cashucard.org</a> or through a <a href="https://github.com/cashucard/cashucard/security/advisories/new">GitHub security advisory</a>.</li><li>Report a code of conduct problem to <a href="mailto:conduct@cashucard.org">conduct@cashucard.org</a>.</li><li>Send privacy requests to <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a>. The <a href="/privacy">privacy policy</a> explains what we hold.</li></ul>
-          </section>
-        </article>
+      <div class="help-sections">
+        <section id="answers" class="help-section" aria-labelledby="answers-title">
+          <h2 id="answers-title">Common questions</h2>
+          <nav class="help-list" aria-labelledby="answers-title">
+            <a href="/downloads"><span><strong>Where do I get the apps?</strong><small>Downloads and testing access for each platform</small></span></a>
+            <a href="/guide"><span><strong>How do I set up a card?</strong><small>Install Cashu Card on a compatible blank card</small></span></a>
+            <a href="/faq"><span><strong>How do payments work?</strong><small>Holding ecash, paying by tap and card safety</small></span></a>
+            <a href="/developers"><span><strong>How do I build card support?</strong><small>Libraries and guidance for wallets, tills and services</small></span></a>
+          </nav>
+        </section>
+        <section id="community" class="help-section" aria-labelledby="community-title">
+          <h2 id="community-title">Questions and bugs</h2>
+          <div class="help-copy">
+            <p>Ask in <a href="https://github.com/cashucard/cashucard/discussions">GitHub Discussions</a> so other people can find the answer. For a software bug, <a href="https://github.com/cashucard/cashucard/issues">open a GitHub issue</a>.</p>
+          </div>
+        </section>
+        <section id="other" class="help-section" aria-labelledby="other-title">
+          <h2 id="other-title">Private reports</h2>
+          <dl class="report-list">
+            <div><dt>Security</dt><dd>Email <a href="mailto:security@cashucard.org">security@cashucard.org</a> or open a <a href="https://github.com/cashucard/cashucard/security/advisories/new">private security advisory</a>.</dd></div>
+            <div><dt>Conduct</dt><dd>Report a code of conduct issue to <a href="mailto:conduct@cashucard.org">conduct@cashucard.org</a>.</dd></div>
+            <div><dt>Privacy</dt><dd>Email <a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a>. The <a href="/privacy">privacy policy</a> explains the records we keep.</dd></div>
+          </dl>
+        </section>
       </div>
     </main>
-    <footer id="source" class="site-footer" aria-label="Protocol and code">
-      <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
-      </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-    </footer>
+    <!-- site footer -->
+<footer id="source" class="site-footer" aria-label="Protocol and code">
+  <div class="footer-groups">
+    <div class="footer-group"><span class="footer-label">PROTOCOL</span>
+      <a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an Ops service</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">HELP</span>
+      <a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support" aria-current="page">Support</a>
+      <a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">PROJECT</span>
+      <a href="https://github.com/cashucard/cashucard">Source code <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/fund">Fund the work</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">APPS</span>
+      <a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span>
+    <a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+</footer>
+<!-- end site footer -->
   </body>
 </html>

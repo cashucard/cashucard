@@ -1,0 +1,107 @@
+/* The homepage film, installation guide and FAQ share the site's Cashu palette. */
+.learn-home .hero-actions { margin-top: 24px; }
+.learn-home .hero-copy .hero-status { margin-top: 18px; }
+.learn-home .film-ui {
+  grid-template-columns: auto auto auto minmax(50px, 1fr) auto;
+  grid-template-areas: "play sound captions seek time" "chapters chapters chapters chapters chapters";
+  gap: 4px 12px;
+}
+#film-toggle { grid-area: play; }
+#film-sound { grid-area: sound; }
+#film-captions { grid-area: captions; }
+#film-scrub { grid-area: seek; min-height: 44px; margin-inline: 5px; }
+#film-tc { grid-area: time; display: block; min-width: 0; letter-spacing: .02em; white-space: nowrap; }
+.learn-home .ctl { min-width: 44px; height: 44px; }
+.film-chapter-list {
+  grid-area: chapters;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 8px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid #344438;
+  list-style: none;
+}
+.film-chapter-list button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #bed0bc;
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 650;
+}
+.film-chapter-list button:hover,
+.film-chapter-list [aria-current="step"] { color: #d3f39a; border-color: #667b55; background: #142218; }
+.learn-home .film-text summary { min-height: 44px; align-content: center; }
+.install-guide .install-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.install-guide .install-caution { margin: 16px 0 0; color: #b9cdbb; font-size: .875rem; line-height: 1.5; }
+.install-caution a { color: #d3f39a; text-underline-offset: .2em; text-decoration: underline; }
+.install-guide .agent { display: block; max-width: 1180px; padding: 0; border-radius: 6px; }
+.install-guide .agent summary { padding: 16px 20px; color: #d3f39a; font-weight: 700; cursor: pointer; }
+.install-guide .agent-content { display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr); align-items: start; gap: 20px; padding: 2px 20px 20px; }
+.install-guide .guide-toc a { align-items: center; min-height: 44px; }
+.install-guide .guide-toc summary { min-height: 44px; align-content: center; }
+.question-shortcuts { display: none; }
+.question-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 22px;
+}
+.question-topics a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #648363;
+  border-radius: 3px;
+  color: #d3f39a;
+  font-size: .9rem;
+  font-weight: 650;
+}
+.question-topics a:hover { background: #263d2d; border-color: #d3f39a; }
+.questions-guide .faq { gap: 0; border-top: 1px solid #45604a; }
+.questions-guide .faq .more { border: 0; border-bottom: 1px solid #45604a; border-radius: 0; background: transparent; }
+.questions-guide .faq summary { justify-content: space-between; padding: 16px 4px; gap: 16px; }
+.questions-guide .faq summary::before { order: 1; }
+.questions-guide .faq .more[open] { background: #133123; }
+.questions-guide .faq .more[open] summary { color: #d3f39a; }
+.questions-guide .faq .more[open] summary,
+.questions-guide .faq .more-body { padding-inline: 14px; }
+@media (min-width: 961px) {
+  .questions-guide .guide-hero-inner { display: grid; grid-template-columns: 1fr minmax(245px,.42fr); gap: 0 clamp(40px,8vw,120px); }
+  .questions-guide .guide-hero-inner > :not(nav) { grid-column: 1; }
+  .questions-guide .question-topics { display: none; }
+  .questions-guide .question-shortcuts { grid-column: 2; grid-row: 1 / span 3; display: grid; align-self: end; gap: 0; margin: 0; border-top: 1px solid #648363; }
+  .question-shortcuts a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; border-bottom: 1px solid #648363; padding-inline: 6px; color: #d3f39a; font-weight: 650; }
+  .question-shortcuts a:hover { background: #263d2d; }
+  .question-shortcuts a::after { content: ""; width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); margin-right: 5px; }
+}
+@media (min-width: 1181px) {
+  .install-guide .agent { width: calc(100% - 2 * clamp(24px,5vw,86px)); }
+}
+@media (max-width: 720px) {
+  .learn-home .film-ui {
+    grid-template-columns: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "play sound captions time" "seek seek seek seek" "chapters chapters chapters chapters";
+    gap: 2px 8px;
+  }
+  #film-tc { text-align: right; }
+  .film-chapter-list { margin: 0; gap: 2px; }
+  .film-chapter-list button { padding-inline: 8px; }
+  .install-guide .agent-content { grid-template-columns: minmax(0,1fr); }
+  .install-guide .guide-hero,
+  .questions-guide .guide-hero { padding-block: 32px; }
+  .questions-guide .guide-layout,
+  .install-guide .guide-layout { padding-top: 30px; }
+  .install-guide .guide-toc { margin-bottom: 24px; }
+}
+
+/* Wrapping is visual only. Copying a command still uses the original text. */
+.install-guide .cmd pre,
+.install-guide .cmd pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.install-guide .table-wrap:focus-visible { outline: 2px solid #d3f39a; outline-offset: 3px; }

@@ -6,10 +6,14 @@
   "compatibility_date": "2026-10-23",
   "workers_dev": true,
   "preview_urls": true,
-  "routes": [{ "pattern": "cashucard.org", "custom_domain": true }],
+  "routes": [
+    { "pattern": "cashucard.org", "custom_domain": true },
+    { "pattern": "www.cashucard.org", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
+    "not_found_handling": "404-page",
     "run_worker_first": ["/film/*"]
   },
   // Workers Caching: Cloudflare keeps the full film and serves byte-range slices of it from cache

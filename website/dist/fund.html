@@ -21,25 +21,35 @@
     <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
     <title>Fund the work | Cashu Card</title>
-<link rel="stylesheet" href="/fund.css">
+<link rel="stylesheet" href="/fund.css?v=2">
 <link rel="preconnect" href="https://donate.islandbitcoin.com" crossorigin>
-</head>
+  <link rel="stylesheet" href="/navigation.css">
+  </head>
 <body class="fund-backdrop">
-    <a class="skip" href="#main">Skip to content</a>
-    <header class="header">
-      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a><a href="/fund">Fund</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
-    </header>
-    <main id="main" class="fund">
+    <!-- site header -->
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <div class="mast-bar">
+    <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34"></a>
+    <nav class="mast-wide" aria-label="Main navigation"><a href="/downloads">Downloads</a> <a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund" aria-current="page">Fund</a> <a href="/support">Support</a></nav>
+    <a class="mast-download" href="/downloads">Downloads</a>
+    <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+  <details class="mast-menu">
+    <summary>Menu<span aria-hidden="true"></span></summary>
+    <nav aria-label="Main navigation"><a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund" aria-current="page">Fund</a> <a href="/support">Support</a></nav>
+  </details>
+</header>
+<!-- end site header -->
+    <main id="main" class="fund" tabindex="-1">
   <div class="fund-hero">
     <div class="fund-intro">
-      <p class="fund-eyebrow"><span class="dot"></span> Experimental <span aria-hidden="true">/</span> Fund</p>
       <h1>Fund <em>the work</em></h1>
-      <p class="fund-lede">Cashu Card is built by a very small team and paid for out of pocket. Gifts pay for development, testing, and security work, and every sat appears in the public ledger on this page.</p>
+      <p class="fund-lede">The team pays for Cashu Card development out of pocket. Gifts help the maintainers build, test and review the card software.</p>
+      <nav class="fund-jumps" aria-label="Funding information"><a href="#ledger">View the gift ledger</a><a href="#grants">Discuss a grant</a></nav>
     </div>
     <div class="fund-card-wrap">
-<div class="give" data-give data-api="https://donate.islandbitcoin.com" data-site="cashucard" data-ecash-default="cashu" data-contact="hello@cashucard.org" data-address="ecashcard@islandbitcoin.com" aria-labelledby="give-title">
+<div class="give" role="region" data-give data-api="https://donate.islandbitcoin.com" data-site="cashucard" data-ecash-default="cashu" data-contact="hello@cashucard.org" data-address="ecashcard@islandbitcoin.com" aria-label="Send a gift">
   <div class="give-sr" aria-live="polite" data-live></div>
   <div class="give-scan" data-scan role="dialog" aria-label="Scan a QR code" hidden>
     <video class="give-scan-video" data-scan-video playsinline muted></video>
@@ -52,14 +62,16 @@
     <div class="give-head">
       <h2 class="give-title" id="give-title">Send a gift</h2>
       <div class="give-tabs" role="tablist" aria-label="Payment method">
-        <button type="button" role="tab" data-rail="lightning" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg>Lightning</button>
-        <button type="button" role="tab" data-rail="ecash" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg>eCash</button>
-        <button type="button" role="tab" data-rail="onchain" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>On-chain</button>
+        <button type="button" role="tab" id="give-rail-lightning" data-rail="lightning" aria-controls="give-options" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg>Lightning</button>
+        <button type="button" role="tab" id="give-rail-ecash" data-rail="ecash" aria-controls="give-options" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg>eCash</button>
+        <button type="button" role="tab" id="give-rail-onchain" data-rail="onchain" aria-controls="give-options" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>On-chain</button>
       </div>
     </div>
+    <p class="give-noscript">Send Lightning directly to <b>ecashcard@islandbitcoin.com</b>. You can also use the BOLT12 offer below.</p>
+    <div id="give-options" role="tabpanel" aria-labelledby="give-rail-lightning">
     <div class="give-kind" role="radiogroup" aria-label="Kind of eCash" data-ecash-kinds hidden>
       <button type="button" role="radio" data-kind="cashu" aria-checked="true">Cashu</button>
-      <button type="button" role="radio" data-kind="fedimint" aria-checked="false">Fedimint</button>
+      <button type="button" role="radio" data-kind="fedimint" aria-checked="false" tabindex="-1">Fedimint</button>
     </div>
     <div class="give-fm" data-fm hidden>
       <label class="give-label" for="give-fm-notes">Fedimint eCash notes</label>
@@ -73,8 +85,8 @@
     <div data-amount-area>
     <p class="give-label" id="give-amount-label">Amount in sats</p>
     <div class="give-amounts" role="radiogroup" aria-labelledby="give-amount-label">
-      <button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="2100" aria-label="2,100 sats"><b>2,100</b><span data-usd>about $1.59</span></button><button type="button" class="give-chip" role="radio" aria-checked="true" data-sats="21000" aria-label="21,000 sats"><b>21,000</b><span data-usd>about $16</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="100000" aria-label="100,000 sats"><b>100,000</b><span data-usd>about $76</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="500000" aria-label="500,000 sats"><b>500,000</b><span data-usd>about $379</span></button><button type="button" class="give-chip" role="radio" aria-checked="false" data-sats="2100000" aria-label="2,100,000 sats"><b>2,100,000</b><span data-usd>about $1,593</span></button>
-      <button type="button" class="give-chip" role="radio" aria-checked="false" data-other><b>Other</b><span>Any amount</span></button>
+      <button type="button" class="give-chip" role="radio" aria-checked="false" tabindex="-1" data-sats="2100" aria-label="2,100 sats"><b>2,100</b><span data-usd></span></button><button type="button" class="give-chip" role="radio" aria-checked="true" data-sats="21000" aria-label="21,000 sats"><b>21,000</b><span data-usd></span></button><button type="button" class="give-chip" role="radio" aria-checked="false" tabindex="-1" data-sats="100000" aria-label="100,000 sats"><b>100,000</b><span data-usd></span></button><button type="button" class="give-chip" role="radio" aria-checked="false" tabindex="-1" data-sats="500000" aria-label="500,000 sats"><b>500,000</b><span data-usd></span></button><button type="button" class="give-chip" role="radio" aria-checked="false" tabindex="-1" data-sats="2100000" aria-label="2,100,000 sats"><b>2,100,000</b><span data-usd></span></button>
+      <button type="button" class="give-chip" role="radio" aria-checked="false" tabindex="-1" data-other><b>Other</b><span>Choose amount</span></button>
     </div>
     <div class="give-custom" data-custom hidden>
       <label class="give-field"><input data-custom-input id="give-custom-amount" name="amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Amount" aria-label="Amount in sats" autocomplete="off"><span>sats</span></label>
@@ -82,10 +94,10 @@
     </div>
     <p class="give-hint" data-ecash-hint hidden>Cashu eCash from any mint. Your wallet pays a request on the next step, or you paste a token.</p>
     <p class="give-hint" data-onchain-hint hidden>On-chain fees make small gifts costly. Lightning suits amounts under 100,000 sats.</p>
-    <button type="button" class="give-cta" data-continue><span><span data-continue-label>Continue with 21,000 sats</span><br><small data-continue-usd>about $16</small></span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
+    <button type="button" class="give-cta" data-continue><span><span data-continue-label>Continue with 21,000 sats</span><small data-continue-usd></small></span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
+    </div>
     </div>
     <p class="give-fine">Gifts go directly to the maintainers, toward work on Cashu Card. They buy no goods, services, or equity, and they are not tax deductible.</p>
-    <noscript><p class="give-noscript">This card needs JavaScript. Any Lightning wallet can still pay <b>ecashcard@islandbitcoin.com</b>.</p></noscript>
     <details class="give-more">
       <summary>Pay from your wallet directly</summary>
       <div class="give-rows">
@@ -157,22 +169,22 @@
 </div>
     <div class="fund-proof">
       <dl class="fund-stats">
-        <div><dt>Raised so far</dt><dd><span data-raised>0</span> sats<small data-raised-usd></small></dd></div>
-        <div><dt>Gifts</dt><dd data-gifts>0</dd></div>
+        <div><dt>Shared ledger total</dt><dd><span data-raised>Unavailable</span><small data-raised-usd></small></dd></div>
+        <div><dt>Gifts received</dt><dd data-gifts>Unavailable</dd></div>
       </dl>
-      <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Any wallet works.</b> Pay by Lightning, BOLT12, Cashu or Fedimint eCash, or on-chain from the wallet you already use.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>Every gift is public.</b> Amounts and dates appear in the ledger below. Names appear only when you ask.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
+      <ul class="fund-promise"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2 4.8 13.4h6.1L9.9 22l8.4-11.5h-6.1z"/></svg><span><b>Ways to give.</b> Send Lightning, use a BOLT12 offer, give Cashu or Fedimint ecash, or send bitcoin on-chain.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span><b>A shared ledger.</b> Cashu Card and Fedimint Card publish gift amounts and dates together. Names appear only on request.</span></li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span><b>The code stays open.</b> Everything funded here ships under the MIT license.</span></li></ul>
     </div>
   </div>
 
   <section class="fund-section" id="ledger" aria-labelledby="ledger-title">
-    <div class="side"><p class="kicker">01 / The receipts</p><h2 id="ledger-title">Where it went</h2>
-      <p>Every gift, newest first.</p></div>
-    <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Amount</th><th>Via</th></tr></thead>
-      <tbody data-ledger><tr><td class="empty" colspan="3">No gifts yet.</td></tr></tbody></table></div>
+    <div class="side"><h2 id="ledger-title">Gift ledger</h2>
+      <p>Recent gifts to Cashu Card and Fedimint Card, newest first.</p></div>
+    <div class="ledger-wrap"><table class="ledger" aria-labelledby="ledger-title"><thead><tr><th scope="col">Project and date</th><th scope="col">Amount</th><th scope="col">Method</th></tr></thead>
+      <tbody data-ledger><tr><td class="empty" colspan="3">Gift history is unavailable.</td></tr></tbody></table><noscript><p class="ledger-noscript">Enable JavaScript to see recent gifts.</p></noscript></div>
   </section>
 
   <section class="fund-section" id="grants" aria-labelledby="grants-title">
-    <div class="side"><p class="kicker">02 / Larger gifts</p><h2 id="grants-title">Grants and larger gifts</h2></div>
+    <div class="side"><h2 id="grants-title">Grants and larger gifts</h2></div>
     <div class="fund-contact">
       <p>Foundations and companies that want to fund a specific piece of work, such as an independent security review, can write to us. We send a one-page scope with the deliverable, the reviewer or vendor, the timeline, and what gets published at the end. Reviews and test reports funded this way are published in full in the repository.</p>
       <a class="give-cta" href="mailto:hello@cashucard.org?subject=Funding%20Cashu%20Card"><span>Write to hello@cashucard.org</span><span class="arrow"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
@@ -181,21 +193,37 @@
   </section>
 
   <section class="fund-section" id="other" aria-labelledby="other-title">
-    <div class="side"><p class="kicker">03 / Beyond sats</p><h2 id="other-title">Other ways to help</h2>
+    <div class="side"><h2 id="other-title">Other ways to help</h2>
       <p>Gifts pay for time on the work. Scrutiny, code, and real use in the field help just as much.</p></div>
     <ul class="helps"><li><a href="https://github.com/cashucard/cashucard"><b>Break it <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></b><span>Audit the applet, the host code, and the draft NUT, and report what you find to security@cashucard.org.</span></a></li><li><a href="/developers"><b>Build on it <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></b><span>Add card support to your wallet or till. The developer page has the protocol, the simulator, and the test vectors.</span></a></li><li><a href="/guide"><b>Issue cards <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></b><span>Run cards on your own mint with the install guide and an operator account, load small amounts, and tell us what fails.</span></a></li><li><a href="https://github.com/cashucard/cashucard/discussions"><b>Talk about it <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></b><span>Questions and ideas go in GitHub Discussions.</span></a></li></ul>
   </section>
 </main>
-    <footer id="source" class="site-footer" aria-label="Protocol and code">
-      <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/fund">Fund the work</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
-      </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-    </footer>
+    <!-- site footer -->
+<footer id="source" class="site-footer" aria-label="Protocol and code">
+  <div class="footer-groups">
+    <div class="footer-group"><span class="footer-label">PROTOCOL</span>
+      <a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an Ops service</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">HELP</span>
+      <a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a>
+      <a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">PROJECT</span>
+      <a href="https://github.com/cashucard/cashucard">Source code <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/fund" aria-current="page">Fund the work</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">APPS</span>
+      <a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span>
+    <a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+</footer>
+<!-- end site footer -->
   <script src="/qrcode.js" defer></script>
-<script src="/give.js" defer></script>
+<script src="/give.js?v=2" defer></script>
 </body>
 </html>

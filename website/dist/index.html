@@ -23,26 +23,37 @@
     <script src="/seq/tap-3/anchors.js" defer></script>
     <script src="/motion.js" defer></script>
     <title>Cashu Card | Experimental NFC eCash protocol</title>
+    <link rel="stylesheet" href="/learn.css">
+    <link rel="stylesheet" href="/navigation.css">
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-    <header class="header">
-      <a class="wordmark" href="#main" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="#buy">Get cards</a><a href="/developers">Developers</a><a href="/fund">Fund</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
-    </header>
-    <main id="main">
+    <!-- site header -->
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <div class="mast-bar">
+    <a class="wordmark" href="/" aria-current="page" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34"></a>
+    <nav class="mast-wide" aria-label="Main navigation"><a href="/downloads">Downloads</a> <a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+    <a class="mast-download" href="/downloads">Downloads</a>
+    <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+  <details class="mast-menu">
+    <summary>Menu<span aria-hidden="true"></span></summary>
+    <nav aria-label="Main navigation"><a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+  </details>
+</header>
+<!-- end site header -->
+    <main id="main" class="learn-home" tabindex="-1">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-copy">
           <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
           <h1 id="hero-title">Cashu,<br /><em>now on a card.</em></h1>
           <p>Wallets load eCash onto the card. Terminals can accept a tap offline, then settle with the mint when connected.</p>
-          <p class="hero-status">An experimental open source project, built on a draft NUT with little outside testing or review. <a href="#risks">Read the risks</a> before you load a card.</p>
           <div class="hero-actions">
             <a class="button button-bright" href="/downloads">Download the apps</a>
             <a class="button button-outline" href="https://github.com/cashucard/nut/blob/main/CCP.md">Read the draft <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
           </div>
+          <p class="hero-status">An experimental open source project, built on a draft NUT with little outside testing or review. <a href="#risks">Read the risks</a> before you load a card.</p>
         </div>
         <div class="hero-visual" aria-hidden="true">
           <div class="hero-halo halo-one"></div><div class="hero-halo halo-two"></div><div class="hero-halo halo-three"></div>
@@ -69,17 +80,19 @@
             <video id="reel" controls playsinline muted preload="metadata" poster="/film/poster-4.jpg" aria-label="Cashu Card film, 48 seconds. A wallet loads the card, an offline till takes a tap, and the till settles with the mint later." aria-describedby="film-text">
               <source src="/film/cashu-card-film-4-720.mp4" type="video/mp4" media="(max-width: 800px)" />
               <source src="/film/cashu-card-film-4.mp4" type="video/mp4" />
+              <track kind="captions" srclang="en" label="English" src="/film/cashu-card-film-4-en.vtt">
             </video>
             <button class="film-play" id="film-play" type="button" hidden>Play the film <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#play"/></svg></button>
           </div>
           <figcaption class="film-ui" id="film-ui" hidden>
             <button class="ctl" id="film-toggle" type="button" aria-label="Play the film"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" /></svg></button>
             <button class="ctl" id="film-sound" type="button" aria-pressed="false">Sound off</button>
-            <span class="tc" id="film-tc">00:00:00:00</span>
+            <button class="ctl" id="film-captions" type="button" aria-label="English captions" aria-pressed="false">CC</button>
+            <span class="tc" id="film-tc">0:00 / 0:48</span>
             <div class="scrub" id="film-scrub" role="slider" tabindex="0" aria-label="Film position" aria-valuemin="0" aria-valuemax="48" aria-valuenow="0" aria-valuetext="0 seconds">
               <div class="scrub-track"><div class="scrub-fill" id="film-fill"></div></div>
-              <ol class="chapters" id="film-chapters"></ol>
             </div>
+            <ol class="film-chapter-list" id="film-chapters" aria-label="Film chapters"></ol>
           </figcaption>
         </figure>
         <details class="film-text" id="film-text">
@@ -193,14 +206,30 @@
         </div>
       </section>
     </main>
-    <footer id="source" class="site-footer" aria-label="Protocol and code">
-      <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/fund">Fund the work</a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
-      </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-    </footer>
+    <!-- site footer -->
+<footer id="source" class="site-footer" aria-label="Protocol and code">
+  <div class="footer-groups">
+    <div class="footer-group"><span class="footer-label">PROTOCOL</span>
+      <a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an Ops service</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">HELP</span>
+      <a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a>
+      <a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">PROJECT</span>
+      <a href="https://github.com/cashucard/cashucard">Source code <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/fund">Fund the work</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">APPS</span>
+      <a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span>
+    <a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+</footer>
+<!-- end site footer -->
   </body>
 </html>

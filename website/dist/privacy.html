@@ -23,28 +23,44 @@
     <link rel="stylesheet" href="/guide.css" />
     <script src="/guide.js" defer></script>
     <title>Privacy policy | Cashu Card</title>
+    <link rel="stylesheet" href="/help.css?v=1" />
+    <link rel="stylesheet" href="/navigation.css">
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-    <header class="header">
-      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
-    </header>
-    <main id="main" class="guide">
+    <!-- site header -->
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <div class="mast-bar">
+    <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34"></a>
+    <nav class="mast-wide" aria-label="Main navigation"><a href="/downloads">Downloads</a> <a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+    <a class="mast-download" href="/downloads">Downloads</a>
+    <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+  <details class="mast-menu">
+    <summary>Menu<span aria-hidden="true"></span></summary>
+    <nav aria-label="Main navigation"><a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+  </details>
+</header>
+<!-- end site header -->
+    <main id="main" class="guide policy-page" tabindex="-1">
       <section class="guide-hero" aria-labelledby="privacy-title">
-        <div class="guide-hero-inner">
-          <div class="eyebrow"><span class="status-dot"></span> EXPERIMENTAL <span class="eyebrow-divider">/</span> PRIVACY</div>
+        <div class="guide-hero-inner help-cover">
+          <div>
           <h1 id="privacy-title">Privacy <em>policy</em></h1>
           <p class="guide-lead">What cashucard.org, ops.cashucard.org and the Cashu Card Setup and Cashu Card POS apps collect, why, and how to reach us about it.</p>
-          <ul class="guide-facts" aria-label="At a glance"><li>Island Bitcoin LLC</li><li>No cookies</li><li>No tracking</li><li>27 Nov 2026</li></ul>
+          </div>
+          <dl class="policy-meta">
+            <div><dt>Publisher</dt><dd>Island Bitcoin LLC</dd></div>
+            <div><dt>Effective</dt><dd>27 November 2026</dd></div>
+            <div><dt>Privacy questions</dt><dd><a href="mailto:privacy@cashucard.org">privacy@cashucard.org</a></dd></div>
+          </dl>
         </div>
       </section>
 
       <div class="guide-layout">
-        <nav class="guide-rail" aria-label="On this page">
+        <nav class="policy-nav" aria-label="On this page">
           <span class="rail-label">On this page</span>
-          <ol><li><a href="#who">Who this covers</a></li><li><a href="#site">cashucard.org</a></li><li><a href="#app">The Cashu Card Setup app</a></li><li><a href="#pos">The Cashu Card POS app</a></li><li><a href="#ops">ops.cashucard.org</a></li><li><a href="#cards">Cards, wallets and mints</a></li><li><a href="#sharing">Sharing</a></li><li><a href="#choices">Your choices</a></li><li><a href="#changes">Changes</a></li></ol>
+          <ol><li><a href="#who">Who this covers</a></li><li><a href="#site">cashucard.org</a></li><li><a href="#app">Setup app</a></li><li><a href="#pos">POS app</a></li><li><a href="#ops">ops.cashucard.org</a></li><li><a href="#cards">Cards, wallets and mints</a></li><li><a href="#sharing">Sharing</a></li><li><a href="#choices">Your choices</a></li><li><a href="#changes">Changes</a></li></ol>
         </nav>
         <article class="guide-doc">
           <section id="who" aria-labelledby="who-title">
@@ -106,14 +122,30 @@
         </article>
       </div>
     </main>
-    <footer id="source" class="site-footer" aria-label="Protocol and code">
-      <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
-      </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-    </footer>
+    <!-- site footer -->
+<footer id="source" class="site-footer" aria-label="Protocol and code">
+  <div class="footer-groups">
+    <div class="footer-group"><span class="footer-label">PROTOCOL</span>
+      <a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an Ops service</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">HELP</span>
+      <a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a>
+      <a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">PROJECT</span>
+      <a href="https://github.com/cashucard/cashucard">Source code <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/fund">Fund the work</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">APPS</span>
+      <a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span>
+    <a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    <a href="/privacy" aria-current="page">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+</footer>
+<!-- end site footer -->
   </body>
 </html>
