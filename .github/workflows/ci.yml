@@ -158,7 +158,7 @@ jobs:
       - name: Smoke-test SELECT over HTTP
         run: |
           curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000BF043415348554341524401"}' \
-            | grep -q '"hex":"03019000"'
+            | grep -q '"hex":"03029000"'
           curl -sf -X POST localhost:9876/apdu -d '{"hex":"00A404000AF0434153485543415244"}' \
             | grep -q '"hex":"9000"'
 
