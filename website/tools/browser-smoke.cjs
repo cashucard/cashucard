@@ -347,7 +347,7 @@ async function main() {
     assert.ok(await evaluate("!!document.querySelector('.hero-status a[href=\"#risks\"]')"), "The hero points to the risks");
     assert.equal(await evaluate("document.querySelectorAll('#risks .risk-list li').length"), 7, "The risks are stated once, in seven points");
     assert.equal(await evaluate("[...document.querySelectorAll('section h2')].filter(h=>/risk/i.test(h.textContent)).length"), 1, "One risks section");
-    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 10, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 9, 0], ["/terms.html", 8, 0]]) {
+    for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 10, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 9, 0], ["/terms.html", 9, 0]]) {
       // the host serves /faq for /faq.html, as it does /guide; the local preview serves the file name
       await send("Page.navigate", { url: origin + page });
       const isSupport = page === "/support.html";
@@ -365,6 +365,10 @@ async function main() {
         assert.ok(image, "The downloadable manifest pins an immutable Ops image");
         assert.equal(release, "https://github.com/cashucard/cashucard/releases/tag/ops-v" + image[1],
           "The guide links the release in the Compose download");
+      }
+      if (page === "/terms.html") {
+        assert.equal(await evaluate("document.querySelector('#pos h2')?.textContent"), "Using Cashu Card POS");
+        assert.ok(await evaluate("!!document.querySelector('#pos a[href=\"/privacy#pos\"]')"), "Merchant terms link to the POS privacy notice");
       }
       if (page === "/developers.html") {
         const installs = await evaluate(`[...document.querySelectorAll('#sdks li')].map(item => ({
