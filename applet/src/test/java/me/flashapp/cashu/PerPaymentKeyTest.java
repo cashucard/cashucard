@@ -382,11 +382,19 @@ class PerPaymentKeyTest {
     /** Every point the wrapped key agreement makes. */
     static final class CountingAgreement extends KeyAgreement {
         final KeyAgreement in;
-        int made;
+        int made, inits;
+        /** The key of each init (D251: agrees()'s own key, never the temporary key). */
+        final java.util.List<PrivateKey> given = new java.util.ArrayList<>();
+        /** Throws CryptoException at the next generateSecret, as an agreement that lost its init may (D251: asked once more). */
+        boolean lost;
         CountingAgreement(KeyAgreement in) { this.in = in; }
-        @Override public void init(PrivateKey k) throws CryptoException { in.init(k); }
+        @Override public void init(PrivateKey k) throws CryptoException { inits++; given.add(k); lost = false; in.init(k); }
         @Override public byte getAlgorithm() { return in.getAlgorithm(); }
-        @Override public short generateSecret(byte[] a, short o, short l, byte[] out, short oo) throws CryptoException { made++; return in.generateSecret(a, o, l, out, oo); }
+        @Override public short generateSecret(byte[] a, short o, short l, byte[] out, short oo) throws CryptoException {
+            made++;
+            if (lost) CryptoException.throwIt(CryptoException.INVALID_INIT);
+            return in.generateSecret(a, o, l, out, oo);
+        }
     }
     /** Every power the wrapped RSA takes. */
     static final class CountingCipher extends Cipher {
@@ -440,7 +448,8 @@ class PerPaymentKeyTest {
         java.lang.reflect.Field pk = CashuApplet.class.getDeclaredField("cardPubKey");
         pk.setAccessible(true);
         boolean w33 = ((javacard.security.ECPublicKey) pk.get(applet)).getW(new byte[65], (short) 0) == 33;
-        assertEquals(waits + 2, signed[3], "one point addition a signature, the check's, and the payment's Q");
+        // D249: the payment's Q is SPEND_ALL_BEGIN's own, its y kept, and is not worked out again at SIGN
+        assertEquals(waits + 1, signed[3], "one point addition a signature, the check's; the payment's Q is BEGIN's");
         assertEquals((2 + (w33 ? 1 : 0)) * (waits + 1), signed[4], "two key agreements a signature: k*G as before and the check's [e]Q" + (w33 ? ", and [d]G" : ""));
         int g0 = gm.made, h0 = sha.done;
         assertEquals(SW_OK, groupKeys(c, D2).getSW());
@@ -450,7 +459,8 @@ class PerPaymentKeyTest {
         UnitsTest.Card d = new UnitsTest.Card();
         CountingCipher rsa2 = (CountingCipher) wrap(d.applet(), CashuApplet.class, "rsa", o -> new CountingCipher((Cipher) o));
         assertEquals(SW_OK, d.sw(new CommandAPDU(CLA, INS_SET_CARD, 0, 0, record(MINT, REFUND))));
-        assertEquals(3, rsa2.powers, "SET_CARD: three powers of the chip's RSA, once");
+        // 3.2 (D244): and the square's known answers, once a set-up life (`squareInit`): 3^2, (p - 1)^2, (p - 2)^2, and G's x cubed and y squared
+        assertEquals(3 + 5, rsa2.powers, "SET_CARD: three powers of the chip's RSA, and the square's five checks, once");
         // on a chip (docs/CASHU-CARD-HARDWARE.md, contact reader): a point addition 85-100 ms, a SHA-256 of under 100 bytes 4 ms,
         // a power of the RSA 70-80 ms and about 50 ms of reduction
         System.out.println("keys per load, counted: BEGIN +" + begun[0] + " SHA-256 +" + begun[3] + " point additions (about "

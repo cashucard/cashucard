@@ -58,26 +58,26 @@ class AidVersionTest {
     }
 
     @Test
-    @DisplayName("SELECT by the package AID and by the applet's whole AID both answer 03 01")
+    @DisplayName("SELECT by the package AID and by the applet's whole AID both answer 03 02")
     void selectAnswersThreeZero() {
         ResponseAPDU byPackage = select(PACKAGE);
         assertEquals(CashuAppletTest.SW_OK, byPackage.getSW());
-        assertArrayEquals(new byte[] { 0x03, 0x01 }, byPackage.getData(), "3.1 by the package's name");
+        assertArrayEquals(new byte[] { 0x03, 0x02 }, byPackage.getData(), "3.2 by the package's name");
         ResponseAPDU whole = select(APPLET);
         assertEquals(CashuAppletTest.SW_OK, whole.getSW());
-        assertArrayEquals(new byte[] { 0x03, 0x01 }, whole.getData(), "3.1 by the applet's");
+        assertArrayEquals(new byte[] { 0x03, 0x02 }, whole.getData(), "3.2 by the applet's");
     }
 
     @Test
-    @DisplayName("GET_INFO's first two bytes are the version, 03 01")
+    @DisplayName("GET_INFO's first two bytes are the version, 03 02")
     void getInfoSaysThreeZero() {
         assertEquals(CashuAppletTest.SW_OK, select(PACKAGE).getSW());
         ResponseAPDU info = sim.transmitCommand(new CommandAPDU(CashuAppletTest.CLA, CashuAppletTest.INS_GET_INFO, 0, 0, 256));
         assertEquals(CashuAppletTest.SW_OK, info.getSW());
         assertEquals(3, info.getData()[0], "major 3: the card's own change finished on the card, two units, keyset keys, the paid list and the certificate (D183 to D193), which a 2.2 reader cannot read");
-        assertEquals(1, info.getData()[1], "minor 1: 3.0's wire with the wait made a second a limit and the held taps shorter (D231, D232), which a 3.0 reader meets as sooner answers");
+        assertEquals(2, info.getData()[1], "minor 2: 3.1's wire with the review's fixes and quicker writes (D244), which a 3.1 reader meets as sooner answers, and one more profile bit it does not read");
         assertEquals(3, CashuApplet.VERSION_MAJOR);
-        assertEquals(1, CashuApplet.VERSION_MINOR);
+        assertEquals(2, CashuApplet.VERSION_MINOR);
     }
 
     @Test

@@ -205,34 +205,33 @@ test("the 2.3 files that ran on a chip stay proven: their sizes and their hashes
   assert.match(source, /40412: True/);
 });
 
-// The tracked CAP is 3.1 with D236's review fixes on top of bab8c5a's 3.1 file: a load file of 42,741 bytes, padded by
-// sizeTheFile to 245 past a multiple of 256, the place of every 3.x file card 58206920 (a J3R180 keyed for SCP03, D229)
-// installed. The card installed it at the first try on 2026-11-23 and paid from it at testnut with real signatures and real
-// change verified on the chip (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md), so its hash is on
-// PROVEN and its size in SIZES. The files before it stay on PROVEN as their own: 541aaef's 3.0 with D228's review fixes
-// (99a66ba7..., run on 2026-11-22, docs/reports/HARDWARE_TEST_REPORT_2026-11-22_58206920_3.0-ib.md), bab8c5a's 3.1
-// (9ed12359...), 9ac55c1's 3.0 (d69742d0...) and 330ffa1's 3.1 (4014e7f1...).
-test("the tracked 3.1 CAP's load file (D236) has run on a chip: its hash is on PROVEN and not on INSTALLED, and 99a66ba7, 9ed12359, d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
-  const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.1.0.cap");
+// The tracked CAP is 3.2 (D244 to D259): the speed work and D258's wait counts, a load file of 44,881 bytes whose kept
+// package ends 132 past a multiple of 256 (D256). It was installed and paid from at testnut on three cards on 2026-11-26
+// (D258), as the 3.1 file was: its hash is on PROVEN, and its size and its kept size are in SIZES and KEPT_SEEN. The released 3.1
+// file (D236, b2afa9a8..., 42,741 bytes) stays on PROVEN with its size in SIZES: card 58206920 installed it at the first
+// try on 2026-11-23 and paid from it at testnut with real signatures and real change verified on the chip
+// (docs/reports/HARDWARE_TEST_REPORT_2026-11-23_58206920_3.1-review.md). The files before it stay on PROVEN as their own:
+// 541aaef's 3.0 with D228's review fixes (99a66ba7...), bab8c5a's 3.1 (9ed12359...), 9ac55c1's 3.0 (d69742d0...) and
+// 330ffa1's 3.1 (4014e7f1...).
+test("the tracked 3.2 CAP's load file (70bff21) is on PROVEN from three cards; the released 3.1 file (D236) and 99a66ba7, 9ed12359, d69742d0 and 4014e7f1 stay on PROVEN as the files before it", () => {
+  const cap = join(__dirname, "..", "..", "applet", "target", "cashu-javacard-3.2.0.cap");
   const r = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /load file: 42741 bytes \(245 past a multiple of 256\)/);
+  assert.match(r.stdout, /load file: 44881 bytes \(81 past a multiple of 256\)/);
   const sha = r.stdout.match(/load file sha256: ([0-9a-f]{64});/);
   assert.ok(sha, r.stdout);
-  assert.equal(sha[1], "b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da", "the tracked file is D236's");
+  assert.equal(sha[1], "c525db93b62b963504c574f9147f4b1a5437c30a436e58b5c495f8247a79f3c9", "the tracked file is the 3.2 final file (70bff21, 19-final-waits2.cap)");
   assert.match(r.stdout, /; this exact file has run on a chip\.\n/, "the tracked file says it has run on a chip");
-  assert.doesNotMatch(r.stdout, /run only in a simulator/);
-  // the line refcheck prints for 42,741 bytes, exactly: SCP03_ONLY does not list the size, so it is the general line, not
-  // the SCP03 card's; the size has installed on a J3R180 keyed for SCP03, on one keyed for SCP02 and on a J3R452 (D238)
-  assert.match(r.stdout, /; this exact file has run on a chip\.\na size known to install on the chip\.\n$/, "the size is one known to install");
-  assert.doesNotMatch(r.stdout, /not yet tried on a chip/, "and its size is known");
   const source = readFileSync(REFCHECK, "utf8");
   const proven = source.slice(source.indexOf("\nPROVEN = {"), source.indexOf("\nINSTALLED = {"));
   const installed = source.slice(source.indexOf("\nINSTALLED = {"), source.indexOf("\n}", source.indexOf("\nINSTALLED = {")));
   assert.ok(proven.length > 1000, "PROVEN is read");
-  assert.match(proven, /'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da': '3\.1 with D236[^;]*42,741 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "the tracked file's hash is on PROVEN, with PROVEN_NEEDS's words");
-  assert.ok(!installed.includes(sha[1]), "and not on INSTALLED");
-  assert.match(source, /^ {4}42741: True,/m, "its size is in SIZES");
+  assert.ok(proven.includes(sha[1]) && !installed.includes(sha[1]), "the tracked file's hash is on PROVEN, not INSTALLED");
+  assert.match(proven, /'c525db93b62b963504c574f9147f4b1a5437c30a436e58b5c495f8247a79f3c9': '3\.2 with the speed work[^;]*44,881 bytes[^;]*57723320[^;]*09344120[^;]*36813121[^;]*real signatures and real change verified on the chip'/, "with PROVEN_NEEDS's words");
+  assert.match(source, /^ {4}44881: True,/m, "and its size in SIZES");
+  assert.match(source, /^ {4}40580: True,/m, "and its kept size in KEPT_SEEN");
+  assert.match(proven, /'b2afa9a8128967df04bff02a6120d942d51eb21ea4b32d13e6c98647d13753da': '3\.1 with D236[^;]*42,741 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "the released 3.1 file's hash stays on PROVEN, with PROVEN_NEEDS's words");
+  assert.match(source, /^ {4}42741: True,/m, "and its size in SIZES");
   assert.match(proven, /'99a66ba7fdc1da0090b5361c98a315cfd591c5c7c43220d25410a04073262536': '3\.0 with the review fixes of D228[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "541aaef's 3.0 file stays on PROVEN as its own");
   assert.match(proven, /'9ed123597844573aae7fdb35af1b015a90b00b042acd7a66b95892b8688a7a8b': '3\.1[^;]*42,485 bytes[^;]*J3R310-355[^;]*sample card 58206920[^;]*real signatures and real change verified on the chip'/, "bab8c5a's 3.1 file stays on PROVEN as its own");
   assert.match(proven, /'d69742d0034f77253882efa1c0f924c0d45bcd067c94cc2a3d05b83b6c834a1e': 'neutral 3\.0[^;]*42,485 bytes[^;]*real signatures and real change verified on the chip'/, "the 3.0 file before it stays on PROVEN as its own, with PROVEN_NEEDS's words");
@@ -276,5 +275,54 @@ test("a load file ending at or near a refused place in its 256-byte page is warn
     const r = warn(n);
     assert.equal(r.status, 0, r.stderr);
     assert.equal(r.stdout.trim(), "None", `${n}: ${r.stdout}`);
+  }
+});
+
+// D256 (2026-11-26, card 57723320): what decided whether the card's applet was created was where the package ends as the
+// chip keeps it (the load file without its RefLocation component) against a 256-byte page, not the load file's own place:
+// 52be734 at 43,509 bytes, kept 218 past, was refused 7 times of 7 where 7b87367 at the same 43,509 bytes, kept 200 past,
+// was created. refcheck says the kept place of every file that has a RefLocation, and warns of one outside 60 to 180 past
+// with the bytes that would move it to 120 past.
+test("the kept package (the load file without RefLocation) is said, and a file outside 60 to 180 past is warned of with the bytes to move it to 120 past", () => {
+  const kept = (keptBytes, refBytes) => {
+    const dir = mkdtempSync(join(tmpdir(), "refcheck-kept-"));
+    try {
+      const cap = join(dir, "t.cap");
+      const make = `
+import sys, zipfile, importlib.util
+spec = importlib.util.spec_from_file_location("refcheck", sys.argv[1])
+r = importlib.util.module_from_spec(spec); spec.loader.exec_module(r)
+kept, ref, cap = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+applet = bytes([3, 0, 0, 1, len(r.OPENER)]) + r.OPENER + b"\\0\\0"
+with zipfile.ZipFile(cap, "w") as z:
+    z.writestr("p/javacard/Applet.cap", applet)
+    z.writestr("p/javacard/Header.cap", b"\\0" * (kept - len(applet)))
+    z.writestr("p/javacard/RefLocation.cap", b"\\0" * ref)
+assert r.kept_size(r.components(cap)) == kept
+`;
+      const built = spawnSync("python3", ["-I", "-c", make, REFCHECK, String(keptBytes), String(refBytes), cap], { encoding: "utf8" });
+      assert.equal(built.status, 0, built.stderr);
+      const run = spawnSync("python3", ["-I", REFCHECK, cap], { encoding: "utf8" });
+      return { status: run.status, out: run.stdout };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  // 52be734's two refused files: kept 218 past, whatever the load file's size
+  for (const [k, ref] of [[39386, 4119], [39898, 4119]]) {
+    const r = kept(k, ref);
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /^kept by the chip \(D256, without RefLocation\): \d+ bytes \(218 past a multiple of 256; aimed at 60 to 180 past\)$/m, r.out);
+    assert.match(r.out, /^WARNING: the package as the chip keeps it .* ends 218 past a multiple of 256 \(card 57723320 refused a file whose kept package ended here\), outside 60 to 180 past.*by -98 bytes \(about 17 lines of five to seven bytes\) to end it 120 past/m, r.out);
+  }
+  // 3b9b5a4's, refused once: said so
+  assert.match(kept(39647, 4114).out, /ends 223 past a multiple of 256 \(card 57723320 refused a file whose kept package ended here once, and created it at the second try\)/);
+  // 1d9ac2a's, 48 past, created there but outside the aim: warned of, to move up
+  assert.match(kept(40496, 4289).out, /ends 48 past a multiple of 256, outside 60 to 180 past.*by \+72 bytes/);
+  // inside the aim, at either end and the middle: no warning
+  for (const k of [40252, 40312, 40372]) {
+    const r = kept(k, 4276);
+    assert.equal(r.status, 0, r.out);
+    assert.doesNotMatch(r.out, /WARNING/, `${k}: ${r.out}`);
   }
 });

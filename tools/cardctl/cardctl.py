@@ -145,7 +145,7 @@ PIN_STATE_NAMES = {0: "none", 1: "set", 2: "blocked"}
 SELFTEST_MIN_VERSION = (2, 1)
 # The versions selftest knows, and so passes: a later minor of a major it knows,
 # or a later major, is not passed on trust.
-SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0), (3, 1))
+SELFTEST_VERSIONS = ((2, 1), (2, 2), (3, 0), (3, 1), (3, 2))
 # The majors cardctl speaks outside the card file tools: those of SELFTEST_VERSIONS.
 PROTOCOL_MAJORS = tuple(sorted({v[0] for v in SELFTEST_VERSIONS}))
 # The versions cardctl drives a card as (`driven_as`, `connect`): those selftest knows, and 2.0, the release D26
@@ -179,6 +179,7 @@ PROFILE_NAMES = (
     (55, 0, "PIN before money"), (55, 1, "the no-PIN window"), (55, 2, "the owner claimed slowly"),
     (55, 3, "the wait on every payment"), (55, 4, "two units on one card"), (55, 5, "a holder with no phone"),
     (55, 6, "keyset keys"), (55, 7, "the paid list"), (56, 0, "the certificate"), (56, 1, "keys per load"),
+    (56, 2, "the field over p"),  # 3.2 (D244): set once the first SET_CARD has found the chip's arithmetic over p
 )
 LAST_UNIT_NAMES = {0x00: "none", 0x80: "the card's", 0xA0: "the other"}
 
@@ -228,9 +229,13 @@ OWNER_C_CHECK_LEN = 16
 BIP39_SEED_LEN = 64
 PIN_KEY_ANSWER_LEN = 113
 # VERIFY_PIN on a card with no owner answers 6A98, keep holding, while it serves the wait its wrong tries left: at
-# most 16,384 askings, in stretches of 16 with one asking more at the end of each, then the try.
-PIN_WAIT_MOST = 16384 + 16384 // 16 + 2
-# SET_OWNER on a card with no owner (a claim): four askings, the first three answered 6A98 (D211; about 3 s on a J3R180).
+# most 22,527 askings on 3.2 (16,384 on 3.1), in stretches of 22 (16 on 3.1) with one asking more at the end of each, then
+# the try (CashuApplet.PIN_OWED_MOST and PIN_STRETCH, D258: the counts that keep 3.1's seconds). The bound is 3.2's, the larger.
+PIN_OWED_MOST = 22527
+PIN_STRETCH = 22
+PIN_WAIT_MOST = PIN_OWED_MOST + -(-PIN_OWED_MOST // PIN_STRETCH) + 2
+# SET_OWNER on a card with no owner (a claim): four askings on 3.1, the first three answered 6A98 (D211; about 3 s on a J3R180);
+# five on 3.2, the first four answered 6A98 (D258, the same seconds on a quicker signature).
 # The bound is more than the card's count, so a card of an earlier build is held for as before.
 CLAIM_MOST = 10
 
@@ -279,8 +284,9 @@ FACTORY_MINT = "-"
 # The reset by the PIN on a card with no owner (spec/APDU.md, RESET_CARD and A holder with no phone): a held tap
 # (GET_LOG answered at the seventh asking in a row, about 4 s on a J3R180), then RESET_CARD P2 AD with no data, reset at
 # the seventeenth asking after the history's seven (24 askings, about 11 s in all), D211: the project owner's counts, 0.49 to 0.50 s an asking on the J3R180 now (0.59 to 0.66 s when D211 measured it).
-# 3.1 (D232) answers the history at the third asking and resets at the fourth (7 askings, about 2.6 s in all, D236): these bounds are
-# 3.0's, the most any card asks for, and a 3.1 card answers before them.
+# 3.1 (D232) answers the history at the third asking and resets at the fourth (7 askings, about 2.6 s in all, D236), and 3.2
+# (D258) at the fourth and the sixth (10 askings, about 2.9 s): these bounds are 3.0's, the most any card asks for, and a 3.1 or
+# 3.2 card answers before them.
 LOG_HOLD_MOST = 7
 RESET_MOST = 17
 RESET_CONFIRM_BYTE = 0xAD
@@ -1850,9 +1856,11 @@ def change_signature(sig, what: str = "the change") -> Tuple[bytes, bytes, bytes
 
 
 def placeholder_c(nonce: bytes) -> bytes:
-    """A placeholder C for `load` without --c: a point of the curve (a 3.0 card refuses one that is not, 6A80), found
-    from the nonce by SHA-256("cardctl/placeholder-C" || nonce || counter) until its x is on the curve. Nobody knows
-    its discrete log and no mint signed it: it cannot be redeemed."""
+    """A placeholder C for `load` without --c: a point of the curve, found from the nonce by
+    SHA-256("cardctl/placeholder-C" || nonce || counter) until its x is on the curve (a 3.0 or 3.1 card refuses a
+    33-byte C that is not, 6A80; a 3.2 card checks its form alone and stores it, D255, but this tool's own card file
+    refuses a C that is no point, so it is still made one). Nobody knows its discrete log and no mint signed it: it
+    cannot be redeemed."""
     for counter in range(256):
         x = hashlib.sha256(b"cardctl/placeholder-C" + nonce + bytes([counter])).digest()
         if bip340.lift_x(int.from_bytes(x, "big")) is not None:
@@ -2485,11 +2493,37 @@ def cmd_load_file(args) -> int:
     return 0
 
 
+def _only_c_is_no_point(entry, index: int) -> bool:
+    """
+    Whether a slot's one fault is a C that is no point of the curve, its prefix 02 or 03 and the rest of the slot
+    sound: what a 3.2 card stores when a reader loads a 33-byte C whose x has no root (D255: the card checks the form
+    alone). Such a piece is no money (no mint can redeem it) and was not left by a torn CLEAR_SPENT.
+    """
+    try:
+        c = bytes.fromhex(entry["C"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if len(c) != 33 or c[0] not in (0x02, 0x03) or bip340.lift_x(int.from_bytes(c[1:], "big")) is not None:
+        return False
+    try:
+        # the same slot with a C that is a point: sound but for its C
+        _slot_from_json(dict(entry, C=bytes([c[0]]).hex() + _NO_POINT_STAND_IN), index)
+    except SystemExit:
+        return False
+    return True
+
+
+# G's x, a point of the curve: put in a slot's place to ask whether anything but its C is wrong (_only_c_is_no_point)
+_NO_POINT_STAND_IN = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+
+
 def cmd_dump(args) -> int:
     """
     Write every non-empty slot to a card file for the mint side to redeem,
     except a spent slot whose data fails the slot checks (most likely
-    half-cleared by an interrupted CLEAR_SPENT).
+    half-cleared by an interrupted CLEAR_SPENT), and a slot of either kind
+    whose one fault is a C that is no point of the curve (a 3.2 card stores
+    a 33-byte C as it is loaded, D255: no mint can redeem such a piece).
     """
     card = connect(args)
     pubkey = card.get_pubkey()
@@ -2497,6 +2531,7 @@ def cmd_dump(args) -> int:
 
     slots = []
     half_cleared = []
+    no_point = []
     for index, status in enumerate(statuses):
         if status == 0x00:
             continue
@@ -2528,6 +2563,18 @@ def cmd_dump(args) -> int:
             # spent ones as spendable. See spec/CARD-FILE.md.
             "spent": p["status"] == "spent",
         }
+        if _only_c_is_no_point(entry, index):
+            # D255: a 3.2 card stores a 33-byte C it is given as it came, and one whose x has no root is no point: a piece no
+            # mint can redeem, which the card file cannot carry (its C must be a point). Skipped, and said so, spent or not;
+            # never a reason to write nothing of the rest of the card.
+            no_point.append(index)
+            print(
+                f"slot {index}: skipped: {'spent' if entry['spent'] else 'unspent'}, and its C is no point of the curve "
+                f"(a 3.2 card stores a 33-byte C as it is loaded, D255): no mint can redeem it, and the card file "
+                f"cannot carry it. `cardctl proof {index}` prints it.",
+                file=sys.stderr,
+            )
+            continue
         if entry["spent"]:
             # CLEAR_SPENT zeroes a spent slot's data before it marks the slot
             # empty (D14), and the fill is not atomic, so a card pulled
@@ -2571,6 +2618,11 @@ def cmd_dump(args) -> int:
             f"; skipped spent slot(s) {', '.join(str(i) for i in half_cleared)}, "
             f"whose data is not a proof (most likely half-cleared by an "
             f"interrupted CLEAR_SPENT)"
+        )
+    if no_point:
+        note += (
+            f"; skipped slot(s) {', '.join(str(i) for i in no_point)}, whose C is "
+            f"no point of the curve (no mint can redeem them, D255)"
         )
     doc = {
         "version": CARD_FILE_VERSION,
@@ -3617,11 +3669,11 @@ def _versions_said(versions, last: str) -> str:
 def _select_verdict(version: bytes) -> Tuple[bool, str]:
     """
     Whether the applet version SELECT answered is a build selftest can pass:
-    protocol 2.1, 2.2, 3.0 or 3.1 (SELFTEST_VERSIONS). The shared AID (D19)
+    protocol 2.1, 2.2, 3.0, 3.1 or 3.2 (SELFTEST_VERSIONS). The shared AID (D19)
     answers nothing below 2.0, and a 2.0 card is the v2.0.0 release, which D26
     replaced: it is reinstalled. A later minor of a major this tool knows (2.3,
-    3.2), or a later major (4.0), is one it does not know, and is refused. That
-    is a statement about the test, not the wire: a 3.2 is still driven as 3.x by
+    3.3), or a later major (4.0), is one it does not know, and is refused. That
+    is a statement about the test, not the wire: a 3.3 is still driven as 3.x by
     the other commands (D205, `driven_as`), while a 2.3, which is 3.0's wire from
     before the renumbering, is not, and is said so here.
     """

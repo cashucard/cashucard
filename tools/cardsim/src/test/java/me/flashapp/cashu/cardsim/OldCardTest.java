@@ -46,19 +46,19 @@ class OldCardTest {
             int sw = SimCard.sw(card.transmit(select));
             assertTrue(sw == 0x6A82 || sw == 0x6999 || sw == 0x6E00, "not found, got " + Hex.sw(sw));
         }
-        assertEquals("03019000", Hex.format(card.transmit(SimCard.SELECT)), "the shared AID (D19, since 2.0) answers 03 01");
+        assertEquals("03029000", Hex.format(card.transmit(SimCard.SELECT)), "the shared AID (D19, since 2.0) answers 03 02");
     }
 
     @Test
-    @DisplayName("GET_INFO answers version 3.1, thirty bytes, capabilities FF and format 4: no masked 8-byte answer")
+    @DisplayName("GET_INFO answers version 3.2, thirty bytes, capabilities FF and format 4: no masked 8-byte answer")
     void getInfoIsThreeZero() {
         byte[] info = data(card.transmit(GET_INFO));
         assertEquals(30, info.length);
         assertEquals(3, info[0]);
-        assertEquals(1, info[1]);
+        assertEquals(2, info[1]);
         assertEquals((byte) 0xFF, info[6]);
         assertEquals(4, info[8]);
-        assertEquals("3.1", card.state().get("version").getAsString());
+        assertEquals("3.2", card.state().get("version").getAsString());
         assertFalse(card.state().has("appletVersion"), "no masked version in state");
         assertFalse(card.state().has("realVersion"));
         assertFalse(card.state().has("pukState"));

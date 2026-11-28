@@ -94,7 +94,7 @@ const INSTALL_ORDER = [
   0xe4,
   0xe4, // sweep: tag, card, opener, package
   0xe6, // INSTALL [for load]
-  ...new Array(174).fill(0xe8), // LOAD
+  ...new Array(182).fill(0xe8), // LOAD
   0xe6,
   0xe6,
   0xe6, // the opener, the card's applet, the tag
@@ -164,7 +164,7 @@ describe('provision: the Cashu card', () => {
       PHASES,
     );
     assert.equal(r.apdus.length, card.log.length);
-    assert.deepEqual(r.blocks, {at: 174, of: 174});
+    assert.deepEqual(r.blocks, {at: 182, of: 182});
     assert.ok(
       r.freeBefore &&
         r.freeAfter &&
@@ -335,7 +335,7 @@ describe('provision: the Cashu card', () => {
       const first = await provision(pull.tx, CASHU, options());
       assert.equal(first.kind, 'pulled');
       assert.equal(first.phase, 'load');
-      assert.deepEqual(first.blocks, {at: 37, of: 174});
+      assert.deepEqual(first.blocks, {at: 37, of: 182});
       card.reset();
       assert.equal(card.partial.size, partialLoad === 'keep' ? 1 : 0);
       const again = await provision(card.transceive, CASHU, options());
@@ -354,7 +354,7 @@ describe('provision: the Cashu card', () => {
       options({onEvent: event => events.push(event)}),
     );
     assert.equal(result.kind, 'pulled');
-    assert.deepEqual(result.blocks, {at: 37, of: 174});
+    assert.deepEqual(result.blocks, {at: 37, of: 182});
     const written = events.filter(
       (event): event is Extract<RunEvent, {type: 'block'}> =>
         event.type === 'block',
@@ -578,12 +578,12 @@ describe('provision: the Cashu card', () => {
     assertInstalled(card);
   });
 
-  it('leaves alone a card applet of a version this kit does not know (2.0, 2.3, 2.4, 3.2, 4.0), even empty and with replace on', async () => {
+  it('leaves alone a card applet of a version this kit does not know (2.0, 2.3, 2.4, 3.3, 4.0), even empty and with replace on', async () => {
     for (const version of [
       [2, 0],
       [2, 3],
       [2, 4],
-      [3, 2],
+      [3, 3],
       [4, 0],
     ] as const) {
       const card = new FakeCard();
@@ -601,10 +601,10 @@ describe('provision: the Cashu card', () => {
       );
       assert.equal(r.kind, 'guarded');
       assert.match(r.reason ?? '', /version this kit knows/);
-      // the message names every version in CARD_VERSIONS, 3.1 among them
+      // the message names every version in CARD_VERSIONS, 3.2 among them
       assert.match(
         r.reason ?? '',
-        /version this kit knows \(2\.1, 2\.2, 3\.0, 3\.1\)/,
+        /version this kit knows \(2\.1, 2\.2, 3\.0, 3\.1, 3\.2\)/,
       );
       assert.deepEqual(
         card.log.slice(before).map(a => a[1]),
@@ -686,9 +686,9 @@ describe('provision: the Cashu card', () => {
     }[];
     assert.deepEqual(
       blocks.map(b => b.index),
-      Array.from({length: 174}, (_, i) => i + 1),
+      Array.from({length: 182}, (_, i) => i + 1),
     );
-    assert.ok(blocks.every(b => b.of === 174));
+    assert.ok(blocks.every(b => b.of === 182));
     assert.equal(
       events.filter(e => e.type === 'apdu').length,
       INSTALL_ORDER.length,
@@ -736,7 +736,7 @@ describe('provision: the Cashu card', () => {
       options(),
     );
     assert.equal(r.ok, true, r.reason);
-    assert.equal(card.insLog().filter(i => i === 0xe8).length, 214);
+    assert.equal(card.insLog().filter(i => i === 0xe8).length, 225);
     assertInstalled(card);
   });
 });
@@ -771,7 +771,7 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
         `INS ${toHex([a[1]])} ends in Le 00`,
       );
     }
-    assert.deepEqual(r.blocks, {at: 174, of: 174});
+    assert.deepEqual(r.blocks, {at: 182, of: 182});
   });
 
   it("installs the 3.1 file on a J3R180 keyed for SCP03 at key version 01, with no seller's tag, then rotates its keys and installs again over itself, as the app's tap does", async () => {
@@ -814,11 +814,11 @@ describe('provision: the Cashu card on a J3R452, which opens SCP03', () => {
       );
       assert.ok(!card.insLog().includes(0xd8), 'no PUT KEY in the install');
       assert.equal(card.kvn, FACTORY_KVN);
-      // the verify step held SELECT to the tracked version, and the card answers it: 03 01
-      assert.deepEqual([...CARD_VERSION], [0x03, 0x01]);
+      // the verify step held SELECT to the tracked version, and the card answers it: 03 02
+      assert.deepEqual([...CARD_VERSION], [0x03, 0x02]);
       const selected = await card.transceive(selectAid(CARD_AID));
       assert.equal(toHex(selected.slice(-2)), '9000');
-      assert.equal(toHex(selected.slice(0, -2)), '0301');
+      assert.equal(toHex(selected.slice(0, -2)), '0302');
 
       // the tap's second half: the manager keys rotate in place at version 01, with no first contact
       const rotated = await rotateKeys(

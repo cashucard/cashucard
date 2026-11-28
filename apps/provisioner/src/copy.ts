@@ -79,7 +79,7 @@ export function describeResult(
       return 'Smoke test passed: the hello applet loaded, answered HELLO and was removed.';
     }
     if (action === 'cashu') {
-      return 'Installed: the card applet answers 03 01, and the tag answers.';
+      return 'Installed: the card applet answers 03 02, and the tag answers.';
     }
     return 'Keys rotated to the spike set and back to the factory set.';
   }

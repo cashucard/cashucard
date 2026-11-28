@@ -572,7 +572,7 @@ class OutboxTest {
     }
 
     @Test
-    @DisplayName("a torn write never mixes two records: status 0 is no record (6A88); in the source the status goes to 0 before the body is written and to 1 after it, with the length; a descriptor not marked signed is signed again at the next read")
+    @DisplayName("a torn write never mixes two records: status 0 is no record (6A88); in the source the status goes to 0 in SIGN's commit before the body is written (D224), the descriptor's mark to 0 before the body, the body a buffer's worth at a time outside any transaction (D244), and the status to 1 after it, with the length; a descriptor not marked signed is signed again at the next read")
     void tornWriteNeverMixes() throws Exception {
         Payment p = twoByTwo();
         byte[] body = expectedBody(p, MINT, 1, 1);
@@ -592,21 +592,25 @@ class OutboxTest {
         String code = new String(java.nio.file.Files.readAllBytes(SchnorrHWMathTest.mainSourceDir().resolve("CashuApplet.java")), StandardCharsets.UTF_8);
         int from = code.indexOf("private void writeOutbox(");
         String w = code.substring(from, code.indexOf("private static boolean isAllOnes(", from));
-        int clearBegin = w.indexOf("JCSystem.beginTransaction();");
-        int cleared = w.indexOf("outbox[0] = (byte) 0;");
-        int clearCommit = w.indexOf("JCSystem.commitTransaction();");
+        // D244: the status byte went to 0 in SIGN's commit (D224); here only the descriptor's mark, one byte, before the body
+        int marked = w.indexOf("outbox[1] = (byte) 0;");
         int firstBody = w.indexOf("arrayCopyNonAtomic(OUT_MAGIC");
-        int witness = w.indexOf("arrayCopyNonAtomic(lastSig, (short) 1, outbox, at, (short) 64)");
+        int witness = w.indexOf("arrayCopyNonAtomic(lastSig, (short) 1, buf, p, (short) 64)");
+        int flushed = w.indexOf("Util.arrayCopyNonAtomic(buf, (short) 0, outbox, at, p);", witness);
         int markBegin = w.indexOf("JCSystem.beginTransaction();", witness);
         int length = w.indexOf("Util.setShort(outbox, (short) 2, (short)(at - 4));");
         int whole = w.indexOf("outbox[0] = (byte) 1;");
         int markCommit = w.indexOf("JCSystem.commitTransaction();", whole);
-        assertTrue(clearBegin >= 0 && clearBegin < cleared && cleared < clearCommit && clearCommit < firstBody && firstBody < witness
-                && witness < markBegin && markBegin < length && length < whole && whole < markCommit,
-            "status 0 in a transaction, then the body, then the length and status 1 in a transaction");
+        assertTrue(marked >= 0 && marked < firstBody && firstBody < witness && witness < flushed && flushed < markBegin
+                && markBegin < length && length < whole && whole < markCommit,
+            "the descriptor's mark to 0, then the body, the last of it written, then the length and status 1 in a transaction");
         assertEquals(1, w.split("outbox\\[0\\] = \\(byte\\) 1;", -1).length - 1, "status 1 is written once");
-        assertFalse(w.substring(clearCommit, markBegin).contains("beginTransaction"), "the body is written outside any transaction");
+        assertFalse(w.contains("outbox[0] = (byte) 0;"), "writeOutbox lets nothing go itself: SIGN's commit did (D224)");
+        assertEquals(1, w.split("beginTransaction", -1).length - 1, "one transaction, the one that marks the record whole (D244)");
         String sign = code.substring(code.indexOf("private void processSpendAllSign("), code.indexOf("private boolean finishBurn("));
+        int signCommit = sign.indexOf("JCSystem.commitTransaction();");
+        int letGo = sign.indexOf("if (outbox != null) outbox[0] = (byte) 0;");
+        assertTrue(letGo > 0 && letGo < signCommit, "the record before is let go in SIGN's commit (D224)");
         // the receipt is finishBurn's (D196), which SIGN calls before the record
         int receipt = sign.indexOf("if (!finishBurn()) n = 0;");
         int record = sign.indexOf("writeOutbox(buf, n);");

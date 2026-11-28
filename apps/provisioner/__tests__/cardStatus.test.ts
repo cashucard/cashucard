@@ -87,7 +87,7 @@ test('a blank card needs only identity and applet selection; unknown versions st
     [2, 0, 0x90, 0],
     [2, 3, 0x90, 0],
     [2, 4, 0x90, 0],
-    [3, 2, 0x90, 0],
+    [3, 3, 0x90, 0],
     [4, 0, 0x90, 0],
   ]) {
     const commands: number[][] = [];
@@ -103,7 +103,7 @@ test('a blank card needs only identity and applet selection; unknown versions st
     expect(commands.map(a => a[1])).toEqual([0xa4, 0xca, 0xa4]);
   }
 });
-test('a 2.1 card, a 2.2 card (D175: GET_OUTBOX added), a 3.0 card and a 3.1 card are all read past the version', async () => {
+test('a 2.1 card, a 2.2 card (D175: GET_OUTBOX added), a 3.0 card, a 3.1 card and a 3.2 card are all read past the version', async () => {
   const cplc = fromHex(
     '9f7f2a4790d32147000000000030410933632055470000000000000000048c2337323937360000000000000000',
   );
@@ -112,6 +112,7 @@ test('a 2.1 card, a 2.2 card (D175: GET_OUTBOX added), a 3.0 card and a 3.1 card
     [2, 2],
     [3, 0],
     [3, 1],
+    [3, 2],
   ]) {
     const commands: number[][] = [];
     await readCardStatus(async a => {

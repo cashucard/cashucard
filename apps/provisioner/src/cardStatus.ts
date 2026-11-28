@@ -31,7 +31,7 @@ export async function readCardStatus(tx: Transceiver): Promise<CardReadout> {
   if (reply.sw !== 0x9000) {
     throw new CardError(reply.sw, 0xa4);
   }
-  // 2.1, 2.2 (D175), which only adds a public read, 3.0 or 3.1: the cardkit's CARD_VERSIONS
+  // 2.1, 2.2 (D175), which only adds a public read, 3.0, 3.1 or 3.2: the cardkit's CARD_VERSIONS
   if (!supportedCardVersion(reply.data)) {
     return {
       state: 'unsupported',

@@ -99,7 +99,8 @@ final class TearLoader extends ClassLoader {
                             return;
                         }
                         if (op == Opcodes.INVOKESTATIC && owner.equals("javacard/framework/JCSystem")
-                            && (mname.equals("beginTransaction") || mname.equals("commitTransaction") || mname.equals("abortTransaction"))) {
+                            && (mname.equals("beginTransaction") || mname.equals("commitTransaction") || mname.equals("abortTransaction")
+                                || mname.equals("makeTransientByteArray"))) {
                             super.visitMethodInsn(Opcodes.INVOKESTATIC, HOOK, mname, mdesc, false);
                             return;
                         }

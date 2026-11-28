@@ -69,7 +69,7 @@ test("select uses the applet's 11-byte AID, F0 CASHUCARD 01, with the 10-byte pa
   assert.deepEqual(constants.APPLET_AID, Buffer.concat([constants.PACKAGE_AID, Buffer.from([0x01])]))
   assert.deepEqual(constants.OLD_AIDS.upstream0x, hex("D2760000850102"))
   assert.deepEqual(constants.OLD_AIDS.foxy1x, hex("F0464F585943415244"))
-  assert.deepEqual(constants.VERSION, { major: 3, minor: 1 }, "SELECT answers 03 01")
+  assert.deepEqual(constants.VERSION, { major: 3, minor: 2 }, "SELECT answers 03 02")
 })
 
 test("the INS of 3.0 (spec/APDU.md, Commands, by INS)", () => {
@@ -677,7 +677,7 @@ test("allowLoad takes 6200 as the grant, refuses 9000 (a card whose grant opens 
   await assert.rejects(new CardSim("http://127.0.0.1:9", { fetch: answer("6A91") }).allowLoad(), e => e instanceof CardError && e.sw === 0x6a91)
 })
 
-test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (four askings), bounded; VERIFY_PIN holds the same way", async () => {
+test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (five askings on 3.2), bounded; VERIFY_PIN holds the same way", async () => {
   const claim = encode.setOwner(ownerPublicKey()).toString("hex")
   const seen = []
   const sim = new CardSim("http://127.0.0.1:9", { fetch: scripted([...Array(3).fill([claim, "6A98"]), [claim, "9000"]], seen) })
@@ -694,6 +694,20 @@ test("an owner's claim is the same SET_OWNER sent while the card answers 6A98 (f
   await new CardSim("http://127.0.0.1:9", { fetch: scripted([...Array(40).fill([pin, "6A98"]), [pin, "9000"]], waited) }).verifyPin("1234")
   assert.equal(waited.length, 41)
   await assert.rejects(new CardSim("http://127.0.0.1:9", { fetch: scripted([[pin, "6A98"], [pin, "63C1"]]) }).verifyPin("1234"), e => e.sw === 0x63c1)
+})
+
+test("the held askings' bounds cover the applet's counts: the claim's and the longest PIN wait, read from CashuApplet.java (D258)", () => {
+  const src = fs.readFileSync(path.join(__dirname, "../../applet/src/main/java/me/flashapp/cashu/CashuApplet.java"), "utf8")
+  const count = name => {
+    const m = [...src.matchAll(new RegExp("static final short\\s+" + name + "\\s*=\\s*\\(short\\)\\s*(\\d+)\\s*;", "g"))]
+    assert.equal(m.length, 1, name)
+    return Number(m[0][1])
+  }
+  const most = count("PIN_OWED_MOST"), stretch = count("PIN_STRETCH")
+  assert.deepEqual([constants.PIN_OWED_MOST, constants.PIN_STRETCH], [most, stretch], "the client's mirror is the applet's")
+  // the askings answered 6A98 for the longest wait: each asking owed, and one more after every stretch but the last; then the try
+  assert.ok(constants.PIN_WAIT_MOST >= most + Math.ceil(most / stretch), `${constants.PIN_WAIT_MOST} askings cover a wait of ${most} in stretches of ${stretch}`)
+  assert.ok(constants.CLAIM_MOST >= count("CLAIM_ASKINGS"), "a claim is asked no fewer times than the card holds it")
 })
 
 test("groupKeys, certRead and getChange pages on the wire", async () => {
@@ -910,7 +924,7 @@ async function setUp(sim, extra = {}) {
   return { P: fresh.pubkey, ...keys }
 }
 
-test("the bridge answers both SELECTs as the chip does: the whole AID 03 01, the package AID the opener's bare 9000", integration, async () => {
+test("the bridge answers both SELECTs as the chip does: the whole AID 03 02, the package AID the opener's bare 9000", integration, async () => {
   const sim = new CardSim(URL)
   await sim.waitReady()
   await sim.reset()
@@ -920,13 +934,13 @@ test("the bridge answers both SELECTs as the chip does: the whole AID 03 01, the
   assert.equal((await sim.apdu(encode.getInfo())).sw, constants.SW.INS_NOT_SUPPORTED, "and refuses the next command")
   const whole = await sim.apdu(encode.select(constants.APPLET_AID))
   assert.equal(whole.sw, constants.SW.OK)
-  assert.deepEqual(whole.data, Buffer.from([3, 1]))
+  assert.deepEqual(whole.data, Buffer.from([3, 2]))
   const info = await sim.getInfo()
-  assert.equal(info.version, "3.1")
+  assert.equal(info.version, "3.2")
   assert.equal(info.keysPerLoad, true, "GET_INFO P1 4 byte 56 bit 1")
-  assert.equal(info.profilesRaw, 0xf703, "every profile but the wait on every payment (D228)")
+  assert.equal(info.profilesRaw, 0xf703, "every profile but the wait on every payment (D228); byte 56 bit 2, the field over p, waits for the first SET_CARD (D244)")
   await sim.apdu(encode.select(constants.PACKAGE_AID))
-  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
+  assert.deepEqual(await sim.select(), { major: 3, minor: 2 })
 })
 
 test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the owner's changePin → verifyPin; a card with no PIN takes nothing (6A97)", integration, async () => {
@@ -935,8 +949,8 @@ test("reset → fixture {pin, mint, owner, blockedPin} → pinState 2 → the ow
   const fresh = await sim.reset()
   assert.equal(fresh.pubkey.length, 66)
   assert.equal(fresh.slots.length, 128)
-  assert.equal(fresh.version, "3.1")
-  assert.deepEqual(await sim.select(), { major: 3, minor: 1 })
+  assert.equal(fresh.version, "3.2")
+  assert.deepEqual(await sim.select(), { major: 3, minor: 2 })
   await assert.rejects(sim.loadProof("0059534ce0bfa19a", 8, "11".repeat(32), pointHex(5)), e => e instanceof CardError && e.sw === constants.SW.NO_PIN)
   await assert.rejects(sim.spendAllBegin([0]), e => e.sw === constants.SW.NO_PIN)
   const state = await sim.fixture({ pin: "1234", mint: "http://m", owner: true, blockedPin: true })

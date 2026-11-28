@@ -169,8 +169,8 @@ const REVIEW = [
 // cardkit 0.3 adds these to the review; a reset saved by an earlier build has neither
 const REVIEW_03 = ['changeOwed', 'version'];
 // the 3.x versions this app knows, as cardkit's CARD_VERSIONS lists them: a later minor is not taken on trust
-const THREE_LINE = ['3.0', '3.1'];
-/** A card of the 3.x line this app knows (3.0 or 3.1, exactly): its holder wallet frees its spent entries, and this app's settlement cleanup is not its. */
+const THREE_LINE = ['3.0', '3.1', '3.2'];
+/** A card of the 3.x line this app knows (3.0, 3.1 or 3.2, exactly): its holder wallet frees its spent entries, and this app's settlement cleanup is not its. */
 export function threeLine(version: string): boolean {
   return THREE_LINE.includes(version);
 }

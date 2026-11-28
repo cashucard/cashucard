@@ -100,7 +100,8 @@ class TearSweepMoreTest {
             c -> {
                 int[] m = marks(c);
                 if (c.f("pinMarks")[3] != 0) c.wrong("the first set-up mark is " + c.f("pinMarks")[3] + " after a power cut");
-                if (!(m[0] == 3 && m[1] == 4) && !(m[0] == 0 && m[1] == 0)) c.wrong("marks " + m[0] + "/" + m[1]);
+                // six askings owed after three wrong in a row (D258; four before)
+                if (!(m[0] == 3 && m[1] == 6) && !(m[0] == 0 && m[1] == 0)) c.wrong("marks " + m[0] + "/" + m[1]);
                 if (m[0] == 3) {
                     int s = c.sw(new CommandAPDU(CLA, INS_SET_PIN, 0, 0, NEW_PIN));
                     if (s != SW_OK) c.wrong(String.format("the old PIN's marks left; SET_PIN again answers %04X", s));
@@ -161,7 +162,7 @@ class TearSweepMoreTest {
 
     @Test
     void verifyAtTheCap() throws Exception {
-        sweep("VERIFY_PIN wrong, the fifteenth in a row (owed 16,384 after)", c -> {
+        sweep("VERIFY_PIN wrong, the fifteenth in a row (owed 22,527 after, D258; 16,384 before)", c -> {
                 readyNoOwner(c);
                 byte[] m = c.f("pinMarks");
                 m[0] = 14; m[1] = 0; m[2] = 0;
@@ -169,7 +170,7 @@ class TearSweepMoreTest {
             c -> assertEquals(0x63CF, c.raw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, WRONG_PIN)).getSW()),
             c -> {
                 int[] m = marks(c);
-                if (!(m[0] == 14 && m[1] == 0) && !(m[0] == 15 && m[1] == 16384)) c.wrong("marks " + m[0] + "/" + m[1]);
+                if (!(m[0] == 14 && m[1] == 0) && !(m[0] == 15 && m[1] == CashuApplet.PIN_OWED_MOST)) c.wrong("marks " + m[0] + "/" + m[1]);
                 if (c.f("pinState")[0] != 1) c.wrong("pinState " + c.f("pinState")[0]);
                 // the wait served by hand, then the right PIN
                 byte[] mk = c.f("pinMarks"); mk[1] = 0; mk[2] = 0;
@@ -196,7 +197,7 @@ class TearSweepMoreTest {
                     byte[] env = envelopeFor(c, WRONG_PIN, spoil);
                     assertEquals(0x63C1, c.raw(new CommandAPDU(CLA, INS_VERIFY_PIN, 1, 0, env)).getSW());
                 },
-                c -> pinWaitHolds(c, new int[][] { { 0, 0 }, { 1, 1 } }));
+                c -> pinWaitHolds(c, new int[][] { { 0, 0 }, { 1, 2 } }));   // two askings owed after one wrong try (D258; one before)
         }
     }
 

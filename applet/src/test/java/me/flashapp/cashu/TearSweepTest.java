@@ -728,10 +728,10 @@ class TearSweepTest {
         sweep("VERIFY_PIN wrong on a card with no owner, after the wait of its first wrong try", c -> {
                 readyNoOwner(c);
                 assertEquals(0x63C1, c.raw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, WRONG_PIN)).getSW());
-                assertArrayEquals(new int[] { 1, 1 }, marks(c));
+                assertArrayEquals(new int[] { 1, 2 }, marks(c));   // two askings owed since D258 (one before)
             },
             c -> assertEquals(0x63C2, throughTheWait(c, WRONG_PIN).getSW()),
-            c -> pinWaitHolds(c, new int[][] { { 1, 1 }, { 1, 0 }, { 2, 2 } }));
+            c -> pinWaitHolds(c, new int[][] { { 1, 2 }, { 1, 0 }, { 2, 3 } }));
     }
 
     @Test
@@ -741,7 +741,7 @@ class TearSweepTest {
                 assertEquals(0x63C1, c.raw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, WRONG_PIN)).getSW());
             },
             c -> assertEquals(SW_OK, throughTheWait(c, TEST_PIN).getSW()),
-            c -> pinWaitHolds(c, new int[][] { { 1, 1 }, { 1, 0 }, { 2, 2 }, { 0, 0 } }));
+            c -> pinWaitHolds(c, new int[][] { { 1, 2 }, { 1, 0 }, { 2, 3 }, { 0, 0 } }));
     }
 
     @Test
@@ -749,10 +749,10 @@ class TearSweepTest {
         sweep("VERIFY_PIN wrong on a card with no owner owing two stretches (pulled mid-wait)", c -> {
                 readyNoOwner(c);
                 byte[] m = c.f("pinMarks");
-                m[0] = 6; m[1] = 0; m[2] = 32;   // the sixth wrong try in a row: 32 askings owed, two stretches of 16
+                m[0] = 6; m[1] = 0; m[2] = 44;   // the sixth wrong try in a row: 44 askings owed, two stretches of 22 (D258)
             },
             c -> assertEquals(0x63C7, throughTheWait(c, WRONG_PIN).getSW()),
-            c -> pinWaitHolds(c, new int[][] { { 6, 32 }, { 6, 16 }, { 6, 0 }, { 7, 64 } }));
+            c -> pinWaitHolds(c, new int[][] { { 6, 44 }, { 6, 22 }, { 6, 0 }, { 7, 88 } }));
     }
 
     @Test

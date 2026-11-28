@@ -353,7 +353,7 @@ class SchnorrHWMathTest {
         { "CashuApplet.java", "private void processSetCard(",
           "if (outbox == null) { try { outbox = new byte[OUTBOX_LEN]; } catch (SystemException e) { outbox = null; } }" },
         { "CashuApplet.java", "private void processSetCard(",
-          "if (outbox != null && outStage == null) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e) { outStage = null; } }" },
+          "if (outbox != null && outStage == null) { try { outStage = JCSystem.makeTransientByteArray(OUT_STAGE_LEN, JCSystem.CLEAR_ON_DESELECT); } catch (SystemException e) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e2) { outStage = null; } } }" },
         // 3.0's openings' B_ and K (D183) with their shown mark (D190), 536 bytes, for the same reason
         { "CashuApplet.java", "private void processSetCard(",
           "if (openKeys == null) { try { openKeys = new byte[(short)(CHANGE_MOST * OPEN_KEYS_ROW)]; } catch (SystemException e) { openKeys = null; } }" },
@@ -577,7 +577,7 @@ class SchnorrHWMathTest {
         int guard = body.indexOf("if (outbox == null)");
         int allocation = body.indexOf("outbox = new byte[OUTBOX_LEN]");
         int stageGuard = body.indexOf("if (outbox != null && outStage == null)");
-        int stage = body.indexOf("outStage = new byte[OUT_STAGE_LEN]");
+        int stage = body.indexOf("outStage = JCSystem.makeTransientByteArray(OUT_STAGE_LEN, JCSystem.CLEAR_ON_DESELECT)");
         int begin = body.indexOf("JCSystem.beginTransaction()");
         org.junit.jupiter.api.Assertions.assertTrue(store > 0 && store < guard && guard < allocation && allocation < stageGuard && stageGuard < stage && stage < begin,
             "after the store, each behind its guard, the staging after the record, before the transaction that writes the record");
@@ -590,7 +590,8 @@ class SchnorrHWMathTest {
                 org.junit.jupiter.api.Assertions.assertTrue(assigned.start() > setCard[0] && assigned.start() < setCard[1],
                     name + " is assigned only in SET_CARD, near: ..." + src.substring(Math.max(0, assigned.start() - 60), Math.min(src.length(), assigned.start() + 40)).replaceAll("\\s+", " "));
             }
-            org.junit.jupiter.api.Assertions.assertEquals(2, assignments, name + ": the allocation, and the null the catch leaves it as");
+            // outStage (D244): RAM, and where the chip gives none persistent, and the null the second catch leaves
+            org.junit.jupiter.api.Assertions.assertEquals(name.equals("outStage") ? 3 : 2, assignments, name + ": the allocation, and the null the catch leaves it as");
         }
     }
 
@@ -607,10 +608,11 @@ class SchnorrHWMathTest {
      * and D196's 37: what left the card and the message's hash kept beside the last signature (36), and the openings whose change
      * the running day counted (1): 29,889; and D197's 162: the card's secret c and the refund key's y (64), and the keys of the
      * payment in hand (98): 30,051; and the mark of a forgotten PIN's history owed (D196, 1): 30,052; and D202's count of the owners' c
-     * the card has taken (4, after c and the refund key's y): 30,056, within the +300 measured to install.
+     * the card has taken (4, after c and the refund key's y): 30,056; and D257's count of the signer's signings (4, the install's last
+     * array): 30,060, within the +300 measured to install.
      */
     @Test
-    @DisplayName("the constructors make 30,056 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36), less 3.0's one byte of no change grant (D185) and with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195), and D196's 37, and D197's 162 (c, the refund key's y, the payment's keys), and the PIN's mark of a forgotten history (D196, 1), and D202's 4 (the count of the owners' c): neither the 12,288 of the mint's proofs nor the record's 4,293 are among them, for the chip refuses a constructor that asks for that much more")
+    @DisplayName("the constructors make 30,060 bytes of persistent arrays, 1.19's 29,806 and 2.2's installation and generation (36), less 3.0's one byte of no change grant (D185) and with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195), and D196's 37, and D197's 162 (c, the refund key's y, the payment's keys), and the PIN's mark of a forgotten history (D196, 1), and D202's 4 (the count of the owners' c), and D257's 4 (the signer's count): neither the 12,288 of the mint's proofs nor the record's 4,293 are among them, for the chip refuses a constructor that asks for that much more")
     void theConstructorsAskForNoMorePersistentMemoryThanTheBuildThatInstalls() throws Exception {
         String applet = stripCommentsAndCharLiterals(new String(
             java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
@@ -628,10 +630,10 @@ class SchnorrHWMathTest {
                 arrays++;
             }
         }
-        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36 - 1 + 1 + 10 + 37 + 64 + 98 + 1 + 4, total,
+        org.junit.jupiter.api.Assertions.assertEquals(29_806 + 36 - 1 + 1 + 10 + 37 + 64 + 98 + 1 + 4 + 4, total,
             "the persistent arrays the constructors make are the 29,806 bytes of the build that installs (1.19's, and 1.20's: the store of the mint's proofs is made after install) "
-            + "and 2.2's installation and generation, 36 (the record's 4,293 are made at SET_CARD, D176), less 3.0's one byte of no change grant (D185), with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195) and D196's 37 (the receipt's figures kept with the last signature, the counted openings) and D197's 162 (c and the refund key's y, the payment's keys), and one byte more of the PIN's marks: a forgotten PIN's history owed (D196), and D202's count of the owners' c the card has taken (4). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
-        org.junit.jupiter.api.Assertions.assertEquals(25, arrays, "the parse found the 22 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
+            + "and 2.2's installation and generation, 36 (the record's 4,293 are made at SET_CARD, D176), less 3.0's one byte of no change grant (D185), with its one byte of the mark that the card has had a PIN (D192) and its ten of the PIN's marks and the day's loads (D195) and D196's 37 (the receipt's figures kept with the last signature, the counted openings) and D197's 162 (c and the refund key's y, the payment's keys), and one byte more of the PIN's marks: a forgotten PIN's history owed (D196), and D202's count of the owners' c the card has taken (4), and D257's count of the signer's signings (4). A larger figure has to be measured on a card first: +300 bytes installed, +4,321 and +12,288 did not.");
+        org.junit.jupiter.api.Assertions.assertEquals(26, arrays, "the parse found the 23 arrays of CashuApplet's constructor and the 3 of SchnorrHW's");
         org.junit.jupiter.api.Assertions.assertTrue(total + 12_288 > 29_806 + 300, "and the store is the kind of figure the chip refuses there");
     }
 
@@ -985,9 +987,15 @@ class SchnorrHWMathTest {
         return evaluated(k.get(token), k);
     }
 
-    /** { bytes CLEAR_ON_DESELECT, bytes CLEAR_ON_RESET, arrays } asked for by every JCSystem.makeTransientByteArray in the two sources. */
+    /**
+     * { bytes CLEAR_ON_DESELECT, bytes CLEAR_ON_RESET, arrays } asked for by every JCSystem.makeTransientByteArray in the two sources
+     * at install: SET_CARD's one reservation (3.2, D244: the staged outputs, asked for at the first SET_CARD, persistent where
+     * the chip gives no room) is not the install's, and is counted by `transientMemoryAtSetCard`.
+     */
     static int[] transientMemoryAskedFor() throws Exception {
-        String applet = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        String whole = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        int[] setCard = bodyRange(whole, "private void processSetCard(");
+        String applet = whole.substring(0, setCard[0]) + whole.substring(setCard[1]);
         String signer = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8));
         java.util.Map<String, String> constants = constantExpressions(applet, signer);
         int onDeselect = 0, onReset = 0, arrays = 0;
@@ -1020,9 +1028,41 @@ class SchnorrHWMathTest {
         org.junit.jupiter.api.Assertions.assertTrue(asked[1] <= RAM_ON_RESET_MOST, "CLEAR_ON_RESET is " + asked[1] + " bytes, over " + RAM_ON_RESET_MOST + "." + why);
         org.junit.jupiter.api.Assertions.assertTrue(asked[2] <= RAM_ARRAYS_MOST, "transient arrays are " + asked[2] + ", over " + RAM_ARRAYS_MOST + "." + why);
         // a parse that found nothing would prove nothing
-        org.junit.jupiter.api.Assertions.assertEquals(15, asked[2], "the parse found the 13 of CashuApplet and the 2 of SchnorrHW (3.0 has no change grant, D185)");
+        org.junit.jupiter.api.Assertions.assertEquals(16, asked[2], "the parse found the 14 of CashuApplet and the 2 of SchnorrHW (3.0 has no change grant, D185; 3.2 adds the signer's count of a time in the field, D257)");
         org.junit.jupiter.api.Assertions.assertEquals(941, asked[0], "and they add up: CashuApplet 397 (3.0: a held tap's count, one byte, D187, D189) and SchnorrHW 544");
-        org.junit.jupiter.api.Assertions.assertEquals(7, asked[1], "the time the terminal told (4) and the tap's three flags (3: 3.0 adds a byte of marks, TAP_PAID, TAP_CLAIMED and TAP_READ, D187, D189); 1.14 kept six bytes for a clock told twice, and eight with the flags");
+        org.junit.jupiter.api.Assertions.assertEquals(8, asked[1], "the time the terminal told (4), the tap's three flags (3: 3.0 adds a byte of marks, TAP_PAID, TAP_CLAIMED and TAP_READ, D187, D189) and the signer's count of this time in the field (1, D257); 1.14 kept six bytes for a clock told twice, and eight with the flags");
+    }
+
+    /** { bytes CLEAR_ON_DESELECT, arrays } SET_CARD asks for (3.2, D244), with the statement that asks. */
+    static int[] transientMemoryAtSetCard() throws Exception {
+        String whole = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        String signer = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("SchnorrHW.java")), java.nio.charset.StandardCharsets.UTF_8));
+        int[] setCard = bodyRange(whole, "private void processSetCard(");
+        String body = whole.substring(setCard[0], setCard[1]);
+        java.util.Map<String, String> constants = constantExpressions(whole, signer);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("JCSystem\\.makeTransientByteArray\\(\\s*([^,]+?)\\s*,\\s*JCSystem\\.(CLEAR_ON_DESELECT|CLEAR_ON_RESET)\\s*\\)").matcher(body);
+        int bytes = 0, arrays = 0;
+        while (m.find()) {
+            org.junit.jupiter.api.Assertions.assertEquals("CLEAR_ON_DESELECT", m.group(2), "SET_CARD's RAM is one payment's, cleared at a selection");
+            bytes += evaluated(m.group(1), constants);
+            arrays++;
+        }
+        return new int[] { bytes, arrays };
+    }
+
+    @Test
+    @DisplayName("3.2 (D244): SET_CARD asks for the staged outputs (601 bytes, CLEAR_ON_DESELECT), once, and where the chip gives no room it is persistent as before; and (D247) the engines' flags, 5 bytes; the constructors' figures are as they were")
+    void setCardAsksForTheStagedOutputsInRam() throws Exception {
+        int[] asked = transientMemoryAtSetCard();
+        // D247: and the engines' flags (5: the field's four engines and the signature's squaring), at the first SET_CARD and not at
+        // install; the 3.2 chip run had 1,596 bytes of this memory free after the first SET_CARD
+        // D249: and the kept y of the payment's date key, 32
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] { 601 + 6 + 32, 3 }, asked, "one array of OUT_STAGE_LEN: 1 + 16 outputs of 37 and the keyset, 8; the engines' flags (six, D251: agrees()'s too); the kept y");
+        org.junit.jupiter.api.Assertions.assertEquals(941, transientMemoryAskedFor()[0], "and the install's CLEAR_ON_DESELECT is the 941 of the build that installs");
+        String src = stripCommentsAndCharLiterals(new String(java.nio.file.Files.readAllBytes(mainSourceDir().resolve("CashuApplet.java")), java.nio.charset.StandardCharsets.UTF_8));
+        org.junit.jupiter.api.Assertions.assertNotNull(findIgnoringSpace(src,
+            "try { outStage = JCSystem.makeTransientByteArray(OUT_STAGE_LEN, JCSystem.CLEAR_ON_DESELECT); } catch (SystemException e) { try { outStage = new byte[OUT_STAGE_LEN]; } catch (SystemException e2) { outStage = null; } }",
+            0, src.length()), "the RAM asked for, and persistent memory where the chip refuses it, and nothing where it refuses that too");
     }
 
     @Test
@@ -1051,10 +1091,13 @@ class SchnorrHWMathTest {
         String[] kinds = { "new\\s+OwnerPIN\\(", "Signature\\.getInstance\\(", "MessageDigest\\.getInstance\\(", "RandomData\\.getInstance\\(", "new\\s+KeyPair\\(",
             "KeyBuilder\\.buildKey\\(", "KeyAgreement\\.getInstance\\(", "Cipher\\.getInstance\\(", "Checksum\\.getInstance\\(", "KeyAgreement\\b" };
         // 1.12: the RSA keys of the change (one buildKey site, run three times) and their Cipher; SchnorrHW's second KeyAgreement is the chip's point addition
-        int[] inApplet = { 1, 1, 2, 1, 2, 2, 0, 1, 0, 0 };
+        // D247: and the field's four engines of their own, one Cipher site (`rsaEngine`) run four times at the first SET_CARD where the
+        // padded keys held, not at install: memory the chip run must show it gives
+        int[] inApplet = { 1, 1, 2, 1, 2, 2, 0, 2, 0, 0 };
         // SchnorrHW names KeyAgreement in its fields' types and in the getInstance calls, and in its agree-less comments only
         // D216: the signature's squaring on the chip's RSA: one buildKey site and one Cipher, made at the first SET_CARD (`chipMulInit`), not in the constructor
-        int[] inSigner = { 0, 0, 1, 1, 0, 2, 2, 1, 0, -1 };
+        // D251: and agrees()'s own key and key agreement, made at the first SET_CARD (`curveEngine`), not in the constructor
+        int[] inSigner = { 0, 0, 1, 1, 0, 3, 3, 1, 0, -1 };
         for (int i = 0; i < kinds.length; i++) {
             long a = java.util.regex.Pattern.compile(kinds[i]).matcher(applet).results().count();
             org.junit.jupiter.api.Assertions.assertEquals(inApplet[i], a, "CashuApplet.java: " + kinds[i] + " is called " + a + " times where the build that installs called it " + inApplet[i] + ". A chip counts these; measure a larger figure on a card first.");

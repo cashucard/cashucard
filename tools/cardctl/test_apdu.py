@@ -1055,10 +1055,24 @@ def test_selftest_fails_a_blocked_pin_and_names_the_owners_change_pin():
 
 
 def test_selftest_fails_a_card_of_a_version_it_does_not_know():
-    for version in ((1, 20), (0, 6), (2, 0), (2, 3), (3, 2), (4, 0)):
+    for version in ((1, 20), (0, 6), (2, 0), (2, 3), (3, 3), (4, 0)):
         rc, out = run_selftest(FakeApplet(version=version, pin_state=0))
         assert rc == 1, (version, out)
         assert "FAIL  SELECT applet" in out, out
+
+
+def test_selftest_passes_a_3_2_card_whose_byte_56_says_the_field_over_p():
+    """3.2 (D244): SELECT and GET_INFO answer 03 02, and GET_INFO P1 = 4's byte 56 is 07 once the first SET_CARD has found
+    the field over p (bit 2), 03 before: selftest passes both, and names the bit."""
+    for byte56 in (0x03, 0x07):
+        applet = FakeApplet(version=(3, 2), pin_state=0)
+        info = bytearray(applet.info_59)
+        info[56] = byte56
+        applet.info_59 = bytes(info)
+        rc, out = run_selftest(applet)
+        assert rc == 0, (byte56, out)
+        assert "PASS  SELECT applet  — version 3.2" in out and "PASS  keys per load (GET_INFO byte 56 bit 1)" in out, out
+    assert cardctl.decode_info(applet.info_59)["profiles"][-1] == "the field over p"
 
 
 def test_selftest_fails_a_card_whose_signatures_repeat_their_nonce():
@@ -1067,19 +1081,20 @@ def test_selftest_fails_a_card_whose_signatures_repeat_their_nonce():
     assert "FAIL  fresh nonce across identical requests" in out, out
 
 
-def test_select_verdict_passes_only_2_1_2_2_3_0_and_3_1():
+def test_select_verdict_passes_only_2_1_2_2_3_0_3_1_and_3_2():
     assert cardctl._select_verdict(bytes([2, 1])) == (True, "version 2.1")
     assert cardctl._select_verdict(bytes([2, 2]))[0] is True
     assert cardctl._select_verdict(bytes([3, 0])) == (True, "version 3.0")
     assert cardctl._select_verdict(bytes([3, 1])) == (True, "version 3.1")
+    assert cardctl._select_verdict(bytes([3, 2])) == (True, "version 3.2")
     # 2.0 is the v2.0.0 release, whose day a payment of nothing rolled (D26): swept and reinstalled
     for version in (bytes([2, 0]), bytes([1, 20]), bytes([0, 6])):
         ok, detail = cardctl._select_verdict(version)
-        assert ok is False and "not protocol 2.1, 2.2, 3.0 or 3.1:" in detail and "reinstall the tracked CAP" in detail, detail
+        assert ok is False and "not protocol 2.1, 2.2, 3.0, 3.1 or 3.2:" in detail and "reinstall the tracked CAP" in detail, detail
     # a later minor of a major this tool knows, or a later major, is a version it does not know: refused, not passed
-    for version in (bytes([3, 2]), bytes([4, 0])):
+    for version in (bytes([3, 3]), bytes([4, 0])):
         ok, detail = cardctl._select_verdict(version)
-        assert ok is False and "a version this cardctl does not know (it knows 2.1, 2.2, 3.0 and 3.1)" in detail, detail
+        assert ok is False and "a version this cardctl does not know (it knows 2.1, 2.2, 3.0, 3.1 and 3.2)" in detail, detail
     # a 2.x above 2.2 is no release: 02 03 is 3.0's wire before its renumbering (D205), said as such
     for version in (bytes([2, 3]), bytes([2, 4]), bytes([2, 0xFF])):
         ok, detail = cardctl._select_verdict(version)
@@ -1513,8 +1528,9 @@ class FirstSetUpCard(Card23):
     RESET_CARD are held for as many askings as the applet holds them (test_the_mocks_held_askings_are_the_applets).
     """
 
-    HISTORY_ASKINGS = 3   # CashuApplet.HISTORY_ASKINGS (D232; 7 in 3.0, D211): GET_LOG answers at the third asking in a row
-    RESET_ASKINGS = 4     # CashuApplet.RESET_ASKINGS (D232; 17 in 3.0, D211): RESET_CARD resets at the fourth
+    CLAIM_ASKINGS = 5     # CashuApplet.CLAIM_ASKINGS (D258; 4 in 3.1 and 3.0, D211): SET_OWNER claims at the fifth asking in a row
+    HISTORY_ASKINGS = 4   # CashuApplet.HISTORY_ASKINGS (D258; 3 in 3.1, D232; 7 in 3.0, D211): GET_LOG answers at the fourth asking in a row
+    RESET_ASKINGS = 6     # CashuApplet.RESET_ASKINGS (D258; 4 in 3.1, D232; 17 in 3.0, D211): RESET_CARD resets at the sixth
 
     def __init__(self, factory=None, refuse=None, lift_at=None):
         super().__init__(has_owner=False, refund=False, pin_state=0)
@@ -1572,7 +1588,7 @@ class FirstSetUpCard(Card23):
             if not (self.verified and self.first and self.record):
                 return b"", 0x6A91 if not self.first else 0x6982
             self.askings += 1
-            if self.askings < 4:
+            if self.askings < self.CLAIM_ASKINGS:
                 return b"", 0x6A98
             sw = self.take_c(data)
             if sw not in (None, 0x9000):
@@ -1642,7 +1658,7 @@ def test_setup_is_one_selection_and_the_separate_commands_are_not():
                                "0", "--allowance", "0", "--budget", "7"])
     assert code == 0, out
     assert conn.record and conn.record[-17:] == b"https://mint.test", conn.record
-    assert conn.has_owner and conn.askings == 4
+    assert conn.has_owner and conn.askings == FirstSetUpCard.CLAIM_ASKINGS
     assert conn.limits and conn.limits.endswith((50000).to_bytes(4, "big") + bytes(8) + b"\x07"), conn.limits.hex()
     selects = [a for a in conn.sent if a[:2] == b"\x00\xA4"]
     assert len(selects) == 1, "one selection, the one the command began with"
@@ -2131,6 +2147,19 @@ def test_the_mocks_held_askings_are_the_applets():
             break
         assert (sw1, sw2) == (0x6A, 0x98), hex(sw1 << 8 | sw2)
     assert n == reset, f"the mock resets at asking {n}, the applet at {reset}"
+    assert FirstSetUpCard.CLAIM_ASKINGS == _applet_asking("CLAIM_ASKINGS"), "and claims at the applet's asking (D258)"
+
+
+def test_the_pin_wait_bound_covers_the_applets_longest_wait():
+    """VERIFY_PIN is sent again while the card answers 6A98 for at most PIN_WAIT_MOST askings: no fewer than the longest wait
+    the applet can owe (PIN_OWED_MOST askings of work, one asking more after each stretch of PIN_STRETCH but the last, then
+    the try), read from CashuApplet.java, so that a reader never gives up on a card still serving its wait (D258: 22,527 in
+    stretches of 22 on 3.2, where 3.1's bound of 16,384 + 1,024 + 2 was 6,141 askings short)."""
+    import math
+    most, stretch = _applet_asking("PIN_OWED_MOST"), _applet_asking("PIN_STRETCH")
+    assert (cardctl.PIN_OWED_MOST, cardctl.PIN_STRETCH) == (most, stretch), "cardctl's mirror is the applet's"
+    longest = most + math.ceil(most / stretch) - 1 + 1
+    assert cardctl.PIN_WAIT_MOST >= longest, (cardctl.PIN_WAIT_MOST, longest)
 
 
 def test_reset_by_the_pin_holds_the_history_then_seventeen_askings_and_frees_the_card_for_setup():
@@ -3720,7 +3749,7 @@ def test_connect_takes_every_minor_of_3_as_3_0_and_the_known_versions_as_before(
             assert err == "", err
             assert got.at_least(3, 0) == (answer[0] == 3)
     assert cardctl.driven_as(b"\x03\x01") == (3, 1) and cardctl.driven_as(b"\x02\x03") is None
-    assert cardctl._select_verdict(b"\x03\x01")[0] is True and cardctl._select_verdict(b"\x03\x02")[0] is False
+    assert cardctl._select_verdict(b"\x03\x02")[0] is True and cardctl._select_verdict(b"\x03\x03")[0] is False
     for answer in (b"\x04\x00", b"\x01\x14"):
         for command in ("load", "info"):
             got, _, _ = _connect_with(answer, command)

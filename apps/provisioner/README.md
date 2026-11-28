@@ -39,11 +39,11 @@ workflow. The decision behind the GlobalPlatform implementation is
   it, hears `HELLO` to INS 01, and deletes it again. Proves the transport: the
   secure channel, a LOAD of more than one block, an INSTALL, a DELETE.
 - **Install Cashu card.** The three-step install of
-  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 42,741-byte
-  load file in 174 blocks, the opener, the card's applet, then the tag under
+  [`HARDWARE_DEPLOYMENT.md`](../../docs/HARDWARE_DEPLOYMENT.md): the 44,881-byte
+  load file in 182 blocks, the opener, the card's applet, then the tag under
   `D2760000850101` with the card maker's address (the card maker setting, which
   must have passed the installation gate, [D239](../../docs/DECISIONS.md#d239)).
-  Then it checks the card's applet answers `03 01`, `GET_INFO` (30 bytes),
+  Then it checks the card's applet answers `03 02`, `GET_INFO` (30 bytes),
   `GET_PUBKEY` (33 bytes), the tag's SELECT, and that the tag's NDEF file is the
   maker's address with `#new`. With no card maker set, the bench installs no card
   (`cashuPlanFor` in `src/cardkit.ts` takes only a maker that passed `installGate`).
@@ -52,8 +52,8 @@ workflow. The decision behind the GlobalPlatform implementation is
   `3F`) and back, each proved by a fresh login.
 - **Replace existing install (spare card only).** Off by default. With it on, an
   installed card applet is removed first, and only if it is a version the app
-  knows (2.1, 2.2, 3.0 or 3.1), its `GET_INFO` is empty and it is owed no change
-  (`GET_INFO` byte 29 on 3.0 and 3.1, `GET_CHANGE` on 2.1 and 2.2).
+  knows (2.1, 2.2, 3.0, 3.1 or 3.2), its `GET_INFO` is empty and it is owed no change
+  (`GET_INFO` byte 29 on 3.0, 3.1 and 3.2, `GET_CHANGE` on 2.1 and 2.2).
 
 Every run starts from the card as it is: it checks for an installed applet, logs
 in, removes whatever a torn run left (newest instance first, then the package) and
@@ -192,7 +192,7 @@ cancellation during key prefetch prevents NFC from opening later.
 `src/releaseGates.ts` enables installation for internal testing only when the
 build's card load file (`CASHU_LOAD_FILE.sha256`) is on its list of load files a
 chip has installed and the operator approved (`LOAD_FILE_VALIDATED`, fixed when the app is
-built), and only when a card maker's own name and tag address are set (below). The tracked 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
+built), and only when a card maker's own name and tag address are set (below). The tracked 3.2 load file (44,881 bytes, sha256 `c525db93…`, D244 to D259) is not on it: it passed the chip run on three cards on 2026-11-26, but a build from this tree installs no card until the owner's approval adds it. The 3.1 load file (42,741 bytes, sha256 `b2afa9a8…`, D236), released
 as `firmware-v3.1.0`, is on it since the owner's approval of 2026-11-24 for Setup build 16
 (ENG-870). The evidence is the desktop tools' runs of 2026-11-23: that exact file (by sha256)
 was installed and paid from at a test mint on card 58206920, with GlobalPlatformPro,
@@ -273,7 +273,7 @@ perform mint/owner/PIN personalization or report holder readiness.
 The read-only cardkit inspector returns the full installation key, empty-state
 and tag evidence. A card owed change from a payment is never empty: the status
 and reset screens send the operator to the holder wallet to bring the change home,
-and the reset stops before anything is saved or deleted. A 3.0 or 3.1 card's spent entries
+and the reset stops before anything is saved or deleted. A 3.0, 3.1 or 3.2 card's spent entries
 are freed by its holder wallet; this app's settlement check is a 2.1 and 2.2 card's. An interrupted complete new installation can be adopted;
 absent, partial or untouched old states quarantine without a recovery sweep.
 The saved intent names the verified pre-install inspection state separately

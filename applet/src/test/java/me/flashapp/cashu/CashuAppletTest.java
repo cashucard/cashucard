@@ -129,9 +129,12 @@ class CashuAppletTest {
     /** 3.0 (D187, D189): keep holding, a held count not yet through (an owner's claim, a history of a card with no owner): ask again. */
     static final int SW_KEEP_HOLDING        = 0x6A98;
     /** The askings of a claim (D187), of a history of a card with no owner (D189) and of the reset by the PIN of a card with no owner (D196), as D211 sets them (the project owner, 2026-11-14): the last goes through. About 0.75 s an asking on the J3R180: 3, 4 and 11 seconds (15 with the history's). */
-    static final int CLAIM_ASKINGS = 4, HISTORY_ASKINGS = 3, RESET_ASKINGS = 4;
+    /** 3.2 (D258, the project lead's rule that each wait keeps its seconds): 5, 4 and 6, the least whose seconds on the 3.2 file (414.2,
+     *  360.0 and 361.4 ms an asking) are no fewer than 3.1's 4, 3 and 4 took on the base file (538.4, 476.1 and 491.3 ms). */
+    static final int CLAIM_ASKINGS = 5, HISTORY_ASKINGS = 4, RESET_ASKINGS = 6;
     /** The wait (6a) in answers of SPEND_ALL_SIGN (3.1, D231): the least a second payment in the time in the field waits, and what every
      *  limit's worth past the first costs, with no larger first step. */
+    /** 3.2 keeps them (D258, the project lead's decision of 2026-11-26): the payment's wait keeps its count, not its seconds. */
     static final int WAIT_SECOND_SIGNS = 2, WAIT_MORE_SIGNS = 2;
     /* No WAIT_FLOOR_SIGNS: D211 takes D188's floor away. [M1 closed by D228: D211 stands.] */
     /** The most limits' worth a payment is counted for: the applet's WAIT_UNITS_MOST. */
@@ -375,7 +378,7 @@ class CashuAppletTest {
         ResponseAPDU r = send.apply(c);
         for (int asked = 1; r.getSW() == SW_KEEP_HOLDING; asked++) {
             assertEquals(0, r.getData().length, "keep holding, and nothing else");
-            assertTrue(asked < Math.max(Math.max(HISTORY_ASKINGS, CLAIM_ASKINGS), RESET_ASKINGS), "no more askings than the longest held count's (D232: a claim's 4 is longer than a history's 3)");
+            assertTrue(asked < Math.max(Math.max(HISTORY_ASKINGS, CLAIM_ASKINGS), RESET_ASKINGS), "no more askings than the longest held count's (D258: a reset's 6 is longer than a claim's 5 and a history's 4)");
             r = send.apply(c);
         }
         return r;
@@ -996,7 +999,7 @@ class CashuAppletTest {
         // too (today its 1.x card's ten bytes, F0 FOXYCARD 01); on 2.0 the whole AID is these eleven
         ResponseAPDU whole = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_HEX), 256));
         assertEquals(SW_OK, whole.getSW());
-        assertArrayEquals(new byte[] { 0x03, 0x01 }, whole.getData(), "the same answer either way: version 3.1");
+        assertArrayEquals(new byte[] { 0x03, 0x02 }, whole.getData(), "the same answer either way: version 3.2");
         assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_GET_INFO, 0, 0, 256)), "and its instructions follow");
     }
 
@@ -1005,7 +1008,7 @@ class CashuAppletTest {
     void testSelect() {
         ResponseAPDU resp = transmit(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR)));
         assertEquals(SW_OK, resp.getSW());
-        assertArrayEquals(new byte[] { 0x03, 0x01 }, resp.getData(), "version 3.1: the wait a limit's worth past the first two askings with no larger first step and the held taps shorter (D231, D232), on 3.0: the card finishes its own change, two units, keyset keys, the paid list and the certificate (D183 to D193), on 2.2: the assisted-settlement record and GET_OUTBOX (D175), on 2.1: the shared protocol (D18), Foxy's 1.20 under the neutral AID with the fixes of D19 to D24, and D26's rollover rules (1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
+        assertArrayEquals(new byte[] { 0x03, 0x02 }, resp.getData(), "version 3.2: 3.1's wire with the review's fixes and quicker writes (D244); 3.1: the wait a limit's worth past the first two askings with no larger first step and the held taps shorter (D231, D232), on 3.0: the card finishes its own change, two units, keyset keys, the paid list and the certificate (D183 to D193), on 2.2: the assisted-settlement record and GET_OUTBOX (D175), on 2.1: the shared protocol (D18), Foxy's 1.20 under the neutral AID with the fixes of D19 to D24, and D26's rollover rules (1.20: the card keeps the mint's proof with each piece, which it does not check and a phone reads back (1.19: the card answers as an NFC tag, which its owner switches off and on; 1.18: four waits for each limit's worth over the limit past the first; 1.17: a card can be reset; 1.16: the PIN is optional, and a card with one has a no-PIN allowance; 1.15 was the clock: the time written in the newest Bitcoin block header the card has taken)");
         assertNotEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(UPSTREAM_AID))),
             "an upstream reader must not find this applet under upstream's AID: the wire is not the same");
     }
@@ -1015,7 +1018,7 @@ class CashuAppletTest {
     void testInfoFresh() {
         byte[] d = info();
         assertEquals(30, d.length);
-        assertEquals(3, d[0]); assertEquals(1, d[1]);
+        assertEquals(3, d[0]); assertEquals(2, d[1]);
         assertEquals(MAX_PROOFS, d[2] & 0xFF);
         assertEquals(0, d[3]); assertEquals(0, d[4]);
         assertEquals(MAX_PROOFS, d[5] & 0xFF);
@@ -2711,6 +2714,10 @@ class CashuAppletTest {
         int[] all = new int[128];
         for (int i = 0; i < 128; i++) all[i] = i;
         byte[] storage = field("proofStorage").clone(), receipts = field("cardReceipts").clone(), cardLog = field("cardLog").clone(), lastSig = field("lastSig").clone();
+        /* the signer's count (D257) stepped by this time in the field's first signature, an AUTH before the payment, outside any
+         * transaction, as on a card: a card never has a transaction open between commands, and a signing asked inside one is
+         * refused 6F00 */
+        assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_AUTH, 0, 0, new byte[16], 256)));
         assertEquals(SW_OK, sw(beginCommand(all)));
         runtime.leaveATransactionOpen();        // the applet's own beginTransaction at the burn now throws TransactionException
         ResponseAPDU r = signAll();
@@ -3044,7 +3051,7 @@ class CashuAppletTest {
                 // and the answer says what the marked places make it say
                 byte[] d = torn.getData();
                 if (name.equals("SELECT")) {
-                    assertArrayEquals(new byte[] { 0x03, 0x01 }, d, what);
+                    assertArrayEquals(new byte[] { 0x03, 0x02 }, d, what);
                 } else if (name.equals("GET_INFO")) {
                     assertEquals(others, d[3] & 0xFF, what + ": unspent");
                     assertEquals(n + others, d[4] & 0xFF, what + ": spent");
@@ -3179,6 +3186,8 @@ class CashuAppletTest {
             ready();
             loadMany(128, i -> buildProof(KEYSET, 1 + i, i + 1));
             int[] places = scrambled(n);
+            // the signer's count (D257) stepped first, outside any transaction, as on a card (see testAFailedBurnIs6A96AndBurnsNothing)
+            assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_AUTH, 0, 0, new byte[16], 256)), what);
             assertEquals(SW_OK, sw(beginCommand(places)), what);
             java.util.Map<String, byte[]> before = persistent();
             runtime.leaveATransactionOpen();
@@ -3660,7 +3669,7 @@ class CashuAppletTest {
         String loadOne = body(code, "private short loadOne(", "private void processClearSpent(");
         int hexFirst = loadOne.indexOf("slotHex");
         int hexLast = loadOne.lastIndexOf("slotHex");
-        int data = loadOne.indexOf("Util.arrayCopy(buf, in, proofStorage");
+        int data = loadOne.indexOf("Util.arrayCopyNonAtomic(buf, in, proofStorage");
         int status = loadOne.indexOf("STATUS_UNSPENT", data);
         assertTrue(hexFirst > 0 && hexFirst < hexLast && hexLast < data && data < status,
             "both halves of the text are written before the piece's data, and the status byte is last");
@@ -4100,7 +4109,7 @@ class CashuAppletTest {
         assertEquals(CashuApplet.CARD_BITS_OFFSET + 4 + 32 + 29, CashuApplet.CARD_NOW_OFFSET, "bits, hash and 29 zeros take the 65 bytes the time key had, and the clock is where it was");
         assertEquals(185, CashuApplet.CARD_NOW_OFFSET);
         assertEquals(0x03, CashuApplet.VERSION_MAJOR);
-        assertEquals(0x01, CashuApplet.VERSION_MINOR);
+        assertEquals(0x02, CashuApplet.VERSION_MINOR);
         assertEquals(212, CashuApplet.CARD_RECORD_LEN, "and the record is the length it was");
         assertEquals(212, field("cardRecord").length);
     }
@@ -5642,7 +5651,8 @@ class CashuAppletTest {
         assertTrue(load.contains("if (slot < 0 || paid == null) return SW_NO_SPACE;"));
         int places = load.indexOf("if (slotWithNonce(buf, nonce) >= 0) return SW_PIECE_ON_CARD;");
         int rows = load.indexOf("short rows = paid[PAID_ROUND] != (byte) 0 ? PAID_NEXT : (short)(Util.getShort(paid, PAID_NEXT) * PAID_ROW);");
-        int refuse = load.indexOf("if (Util.arrayCompare(paid, r, buf, nonce, PAID_ROW) == 0) return SW_PIECE_ON_CARD;");
+        // D253: each row's first byte first, then the whole row
+        int refuse = load.indexOf("if (paid[r] == first && Util.arrayCompare(paid, r, buf, nonce, PAID_ROW) == 0) return SW_PIECE_ON_CARD;");
         int entered = load.indexOf("if (entry >= 0) enter(entry, buf, in, state);");
         assertTrue(places > 0 && places < rows && rows < refuse && refuse < entered, "after the places, before anything is written");
         String sign = body(code, "private void processSpendAllSign(", "\n    private ");
@@ -5658,13 +5668,16 @@ class CashuAppletTest {
         int note = finish.indexOf("burnPending[0] = (byte) 0;");
         assertTrue(row > 0 && row < copy && copy < mark && mark < note, "the row, then the status byte, then the note");
         String reset = body(code, "private void processResetCard(", "\n    private ");
-        int key = reset.indexOf("if (!certified) cardKeyPair.genKeyPair();");
+        // 3.2 (D244): the new keys owed in the last transaction (ROTATE_KEYS) and drawn after its commit (finishResetKeys)
         int last = reset.lastIndexOf("JCSystem.beginTransaction();");
+        int keysOwed = reset.indexOf("= ROTATE_KEYS;");
         int keeps = reset.indexOf("if (!certified && paid != null) {");
         int empty = reset.indexOf("Util.setShort(paid, PAID_NEXT, (short) 0);");
         int unround = reset.indexOf("paid[PAID_ROUND] = (byte) 0;");
         int done = reset.indexOf("JCSystem.commitTransaction();", last);
-        assertTrue(key > 0 && key < last && last < keeps && keeps < empty && empty < unround && unround < done, "after the new key, in the last transaction, and only where there is a new key: a certified card keeps its key and its list (D192)");
+        int key = reset.indexOf("finishResetKeys();", done);
+        assertTrue(keysOwed > 0 && keysOwed < last && last < keeps && keeps < empty && empty < unround && unround < done && done < key,
+            "in the last transaction with the new keys owed, the keys drawn after it, and only where there is a new key: a certified card keeps its key and its list (D192)");
         // nothing else writes the list
         // but the signatures kept beside the receipts, after the list (SPEND_ALL_AGAIN P1 = 1 reads them)
         String again = body(code, "private void processSpendAllAgain(", "\n    private ");
@@ -6282,7 +6295,8 @@ class CashuAppletTest {
         assertEquals(7, count(code, "checkHeader("), "its declaration and five callers, RESET_CARD's twice (D200), and firstAnchor (D204)");
         for (String[] caller : new String[][] { { "private void processRefresh(", "private void processSetHeader(" }, { "private void processSetOwner(", "private void processGetNonce(" } }) {
             String b = body(code, caller[0], caller[1]);
-            int ch = b.indexOf("checkHeader("), bg = b.indexOf("JCSystem.beginTransaction()"), wr = b.indexOf("writeHeader("), cm = b.indexOf("JCSystem.commitTransaction()");
+            // the transaction the header is written in (3.2, D244: a hand-over commits what it forgets in a transaction before it)
+            int ch = b.indexOf("checkHeader("), wr = b.indexOf("writeHeader("), bg = b.lastIndexOf("JCSystem.beginTransaction()", wr), cm = b.indexOf("JCSystem.commitTransaction()", wr);
             assertTrue(ch > 0 && ch < bg && bg < wr && wr < cm, caller[0] + ": the checks, then the header written inside one transaction");
             assertTrue(b.indexOf("cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;") > wr && b.indexOf("cardRecord[CARD_ROLLS_OFFSET] = (byte) 0;") < cm, caller[0] + ": and the rollover budget full again, in the same transaction");
         }
@@ -8500,7 +8514,7 @@ class CashuAppletTest {
         readyWithLimit(0);
         byte[] more = infoTap();
         assertEquals(3, more[0]);
-        assertEquals(1, more[1], "version 3.1");
+        assertEquals(2, more[1], "version 3.2");
         assertEquals((byte) 0xFF, more[6], "capabilities FF: the limit on one payment is waited for, not refused, the 1.6 forms are there, so are 128 places with the short listing, a payment burned outside its transaction, and the PIN taken sealed");
         assertEquals(SW_OK, setLimits(1000, 100));
         assertEquals(100, paymentLimit());
@@ -9377,8 +9391,8 @@ class CashuAppletTest {
         assertTrue(body.indexOf("Util.arrayCopyNonAtomic(allNet, (short) 0, lastSig, LAST_NET, (short) 4);") < begin && body.indexOf("Util.arrayCopyNonAtomic(scratch, X_MSG, lastSig, (short)(LAST_NET + 4), (short) 32);") < begin
             && body.contains("Util.arrayCopyNonAtomic(scratch, X_MSG, lastSig, (short)(LAST_NET + 4), (short) 32);")
             && tx.contains("Util.arrayCopy(buf, (short) 0, lastSig, (short) 0, SIG_KEPT);"), "what left the card and the hash signed beside the signature before the commit, and the signature with its mark kept in it");
-        assertTrue(body.contains("shaAll.doFinal(buf, (short) 0, (short) 0, scratch, X_MSG)") && body.contains("schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, scratch, X_MSG, buf, (short) 1)"),
-            "the hash that is signed is the hash that is kept (signed under the card's key for the payment's date, D197)");
+        assertTrue(body.contains("shaAll.doFinal(buf, (short) 0, (short) 0, scratch, X_MSG)") && body.contains("schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, groupY, (short) 0, scratch, X_MSG, buf, (short) 1)"),
+            "the hash that is signed is the hash that is kept (signed under the card's key for the payment's date, D197; its check takes BEGIN's y of that key, D249)");
         assertEquals(1, count(body.substring(0, commit), "Util.arrayCopy(cardRecord"), "a spend begins the day's window by copying the clock, in the payment's transaction, and writes no other part of the record");
         assertEquals(1, count(tx, "beginAtNow(CARD_NOPIN_START_OFFSET)"), "and the no-PIN window at the clock, or with none at a weak clock (D201), in the same transaction");
         String fin = body(code, "private boolean finishBurn(", "private void processSpendAllAgain(");
@@ -9492,8 +9506,10 @@ class CashuAppletTest {
         // 3.0 (D184): the putting on of pieces is one helper, logLoaded, which LOAD_PROOF and LOAD_CHANGE call; every entry says its unit
         assertEquals(1, count(code, "private short logEntry("));
         assertEquals(5, count(code, "logEntry("), "its declaration, and the four that ask for it: the spend, the refusal, the putting on of pieces and the let-go, and nowhere else");
-        assertEquals(3, count(code, "logLoaded("), "its declaration, LOAD_PROOF and LOAD_CHANGE");
-        assertTrue(body(code, "private void processLoadChange(", "private boolean unblind(").contains("logLoaded("));
+        // 3.2 (D244): LOAD_CHANGE logs in its own transaction, by logLoadedIn, which logLoaded wraps in one of its own for LOAD_PROOF
+        assertEquals(2, count(code, "logLoaded("), "its declaration and LOAD_PROOF");
+        assertEquals(3, count(code, "logLoadedIn("), "its declaration, logLoaded's and LOAD_CHANGE's");
+        assertTrue(body(code, "private void processLoadChange(", "private boolean unblind(").contains("logLoadedIn("));
         assertTrue(body(code, "private void processLetGo(", "private void processSetTag(").contains("logEntry(LOG_ANY)"), "the let-go, which has no amount, takes the tap's entry whatever its unit");
         assertTrue(body(code, "private void processSpendAllSign(", "private void processSpendAllAgain(").contains("logEntry(unit)"));
         assertTrue(body(code, "private void refuseOverLimit(", "private void processGetLog(").contains("logEntry(unit)"));
@@ -9505,7 +9521,7 @@ class CashuAppletTest {
         // and, since 2.2 (D175), read by the assisted-settlement record for its payment id, which writes none of them
         String outboxWrite = body(code, "private void writeOutbox(", "private static boolean isAllOnes(");
         assertEquals(2, count(outboxWrite, "cardReceipts"), "the record reads the count twice: to stop at FFFFFFFF, and to copy it");
-        assertTrue(outboxWrite.contains("isAllOnes(cardReceipts, (short) 0)") && outboxWrite.contains("arrayCopyNonAtomic(cardReceipts, (short) 0, outbox, at, (short) 4)"),
+        assertTrue(outboxWrite.contains("isAllOnes(cardReceipts, (short) 0)") && outboxWrite.contains("arrayCopyNonAtomic(cardReceipts, (short) 0, buf, p, (short) 4)"),
             "and writes none of it");
         // and SPEND_ALL_AGAIN P1 = 1 reads each receipt's hash, to find the signature kept beside it, and writes none
         String again = body(code, "private void processSpendAllAgain(", "private void requireUnderLimits(");
@@ -9535,7 +9551,8 @@ class CashuAppletTest {
             "and by SET_PIN, for a blocked PIN alone, or one with three wrong tries in a row (D195): owed in the PIN's transaction, taken down after its commit (D196)");
         String owed = body(code, "private void forgetOwed(", "private void processChangePin(").replaceAll("\\s+", " ");
         assertTrue(owed.contains("byte owed = pinMarks[PM_FORGET]; if ((owed & (FORGET_HISTORY | FORGET_PLACES)) == 0) return;")
-            && owed.indexOf("forget();") < owed.indexOf("pinMarks[PM_FORGET] = (byte)(owed & PIN_OWED);"), "forget, then the mark (the new PIN owed after a hand-over kept, D197)");
+            && owed.indexOf("forget();") < owed.indexOf("pinMarks[PM_FORGET] = (byte)(owed & (PIN_OWED | ROTATE_KEYS));"),
+            "forget, then the mark (the new PIN owed after a hand-over kept, D197, and a reset's keys owed, D244)");
         assertTrue(body(code, "public void process(", "private void processGetInfo(").contains("forgetOwed();"), "and at every command, after a tear");
         assertTrue(setPin.contains("boolean spent = pinState[0] == (byte) 2 || pinMarks[PM_WRONG] >= (byte) 3;"));
         assertFalse(code.contains("cardLog = new byte[LOG_LEN];\n        cardLog"), "nor is it made again");
@@ -11251,7 +11268,8 @@ class CashuAppletTest {
         assertTrue(agree > 0 && hwCode.startsWith("short agree(ECPrivateKey priv, byte[] pub, short pubOff, short pubLen, byte[] out, short outOff) { if (pubLen != (short)65) ISOException.throwIt(ISO7816.SW_WRONG_DATA); try { ecdh.init(priv); framed(ecdh.generateSecret(pub, pubOff, pubLen, out, outOff), out, outOff); } finally { rest(); } return (short)65; }", agree),
             "SchnorrHW.agree: 65 bytes (its callers hold the point to the curve), sets the given key, agrees, holds the answer to its framing, and gives the agreement G's x again on every way out");
         assertEquals(5, count(hwCode, "ecdh.init("), "the signer's agreement is initialised in sign (its own key, every time), in agree, in mul (LOAD_CHANGE, D183, and the framing check), in rest (G's x, after each secret use) and in agrees (D212: G's x, the public scalar, and nothing else)");
-        assertTrue(hwCode.contains("boolean agrees(byte[] p, short off) { ready(); tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32); ecdh.init(tmpPriv);"), "agrees gives the agreement G's x, a public number, and no key of the card's");
+        assertTrue(hwCode.contains("boolean agrees(byte[] p, short off) { if (curveKA == null || curveKey == null || ready == null) { ready(); tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32); ecdh.init(tmpPriv);"), "agrees gives the agreement G's x, a public number, and no key of the card's (where it has no key and agreement of its own, D251)");
+        assertTrue(hwCode.contains("k.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32); curveKey = k;"), "and its own key holds G's x too (D251)");
         assertTrue(hwCode.contains("private void rest() { ready(); tmpPriv.setS(CashuApplet.SECP256K1_G, (short) 1, (short) 32); ecdh.init(tmpPriv); gm.init(tmpPriv); if (keyInRam) tmpPriv.clearKey(); }"), "rest puts a public scalar back in the key and in both agreements, and clears a key in RAM");
         assertTrue(hwCode.indexOf("tmpPriv.setS(k, kOff, (short) 32); ecdh.init(tmpPriv);") > 0, "mul sets its own scalar in the signer's key before it initialises the agreement with it");
         assertTrue(hwCode.indexOf("tmpPriv.setS(sc, SC_K, (short)32); ecdh.init(tmpPriv);") > 0, "sign sets its own key and initialises the agreement with it before every use, so that agree leaves nothing behind");
@@ -11519,9 +11537,9 @@ class CashuAppletTest {
         sk = sayPinKey(out, "a nonce for a wrong PIN");
         saySealed(out, "VERIFY_PIN sealed, a wrong PIN on a card with no owner: one wrong try in a row (D195)", INS_VERIFY_PIN, 0x63C1, sk, 1, pinBlock(WRONG_PIN), "", -1);
         sk = sayPinKey(out, "a nonce for an envelope with its tag spoiled");
-        saySealed(out, "VERIFY_PIN sealed, the last byte of the tag changed: a wrong PIN as far as the card can tell, after the wait of one asking", INS_VERIFY_PIN, 0x63C2, sk, 1, pinBlock(NEW_PIN), "tag", -1);
+        saySealed(out, "VERIFY_PIN sealed, the last byte of the tag changed: a wrong PIN as far as the card can tell, after the wait of two askings", INS_VERIFY_PIN, 0x63C2, sk, 1, pinBlock(NEW_PIN), "tag", -1);
         sk = sayPinKey(out, "a nonce for the right PIN");
-        saySealed(out, "VERIFY_PIN sealed, the right PIN after the wait of two askings: no wrong try in a row", INS_VERIFY_PIN, SW_OK, sk, 1, pinBlock(NEW_PIN), "", -1);
+        saySealed(out, "VERIFY_PIN sealed, the right PIN after the wait of three askings: no wrong try in a row", INS_VERIFY_PIN, SW_OK, sk, 1, pinBlock(NEW_PIN), "", -1);
         sk = sayPinKey(out, "a nonce for an envelope with its body spoiled");
         saySealed(out, "VERIFY_PIN sealed, the first byte of the ciphertext changed", INS_VERIFY_PIN, 0x63C1, sk, 1, pinBlock(NEW_PIN), "body", -1);
         sk = sayPinKey(out, "a nonce for an envelope sealed for another instruction");
@@ -11553,7 +11571,7 @@ class CashuAppletTest {
         say(out, "VERIFY_PIN with nothing wrong", "exact", SW_OK, verifyOk);
         say(out, "a wrong PIN", "exact", 0x63C1, new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, WRONG_PIN));
         say(out, "the info after a wrong PIN", "exact", SW_OK, info);
-        say(out, "the right PIN, after the wait of one asking", "exact", SW_OK, verifyOk);
+        say(out, "the right PIN, after the wait of two askings", "exact", SW_OK, verifyOk);
         say(out, "a record whose refund key is not a point", "exact", SW_WRONG_DATA, setCardOpenCommand(record(MINT, badRefund)));
         say(out, "a record with anything where the time key was is taken: the card does not read those 65 bytes", "exact", SW_OK, setCardOpenCommand(recordWithKeyBytes(MINT, REFUND, formerKey)));
         say(out, "a record whose length is not its mint's", "exact", SW_WRONG_LENGTH, setCardOpenCommand(lyingRecord));
@@ -13365,7 +13383,7 @@ class CashuAppletTest {
         byte[] d = info();
         assertEquals(30, d.length);
         byte[] fresh = new byte[30];
-        fresh[0] = 3; fresh[1] = 1; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
+        fresh[0] = 3; fresh[1] = 2; fresh[2] = (byte) 128; fresh[5] = (byte) 128; fresh[6] = (byte) 0xFF; fresh[8] = 4; fresh[9] = 3;
         System.arraycopy(u32(nowBefore), 0, fresh, 17, 4);
         assertArrayEquals(fresh, d, "GET_INFO: a new card, with the clock it had");
         assertEquals(nowBefore, now());
@@ -13637,9 +13655,15 @@ class CashuAppletTest {
         int[] order = { r.indexOf("OFFSET_P2] != RESET_CONFIRM_BYTE"), r.indexOf("ownerSet[0] == (byte) 1"), r.indexOf("requireOwnerProof(LABEL_RESET"),
             r.indexOf("requireLoadAuthority()"), r.indexOf("requireHeld()"),
             r.indexOf("cardLocked[0] == (byte) 1 && pinVerifiedFlag[0] != (byte) 1"), r.indexOf("requireNothingOwed()"), r.indexOf("holdOn(buf"), r.indexOf("freeSpent()"),
-            r.indexOf("pinKeySig[0] = (byte) 0"), r.indexOf("cardKeyPair.genKeyPair()"), r.indexOf("pinKeyPair.genKeyPair()"), r.lastIndexOf("beginTransaction"),
+            r.lastIndexOf("beginTransaction"),
             r.indexOf("cardLocked[0] = (byte) 0"), r.indexOf("pinState[0] = (byte) 0"), r.indexOf("ownerSet[0] = (byte) 0"), r.lastIndexOf("commitTransaction"),
-            r.indexOf("pin.update(") };
+            r.indexOf("finishResetKeys();"), r.indexOf("pin.update(") };
+        /* 3.2 (D244): the keys after the commit, in finishResetKeys (which follows processResetCard in the source): the
+         * signature over the PIN key let go first, then the card key, then the PIN key, then the mark */
+        String keys = body(code, "private void finishResetKeys(", "\n    private ");
+        int sigGone = keys.indexOf("pinKeySig[0] = (byte) 0"), card = keys.indexOf("cardKeyPair.genKeyPair()"), pinKey = keys.indexOf("pinKeyPair.genKeyPair()"),
+            markDown = keys.indexOf("~ROTATE_KEYS");
+        assertTrue(sigGone > 0 && sigGone < card && card < pinKey && pinKey < markDown, "the signature let go, the card key, the PIN key, the mark down");
         for (int i = 0; i < order.length; i++) {
             assertTrue(order[i] > 0, "step " + i + " is there");
             if (i > 0) assertTrue(order[i - 1] < order[i], "step " + i + " follows step " + (i - 1));

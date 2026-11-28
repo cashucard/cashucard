@@ -9637,3 +9637,814 @@ mints, the holder checks each entry with its issuing mint. The operator sees
 the current and proposed mint, including a test or real funds label where
 known. A new mint cannot confirm settlement of another mint's payments.
 [Holder handoff](PROVISIONER-HOLDER-HANDOFF.md#changing-the-mint-on-an-existing-card)
+## <a id="d244"></a>D244: 3.2: the 3.1 review's applet fixes, four quicker writes, and a profile bit for the field over p
+
+**Proposed (protocol 3.2, 2026-11-25; not released; the final 3.2 file passed the chip run on three cards on 2026-11-26,
+[D258](#d258)).** An outside review of 3.1 (APP-H1, APP-M1 to
+APP-M6) and a speed review of the card's writes. No command, answer or count a 3.1 reader meets changes, but one more
+profile bit and one refusal of data no mint sends; the version moves to 3.2 (`03 02`) so that a reader can tell the
+fixed cards apart.
+
+1. **A reset draws its keys after the commit that makes the card new (APP-H1).** `RESET_CARD` drew a new card key (where
+   no certificate keeps it) and PIN key before its last transaction. A card torn between the two kept its owner under a
+   card key that was not the one its owner's key was worked out from: every owner command then answered `6A91`, and an
+   owned card has no reset by the PIN. Now that transaction also writes `ROTATE_KEYS` in `PM_FORGET`, and
+   `finishResetKeys` draws the keys right after it and at the top of every command while the mark is set, before any
+   command (`SELECT` and `GET_PUBKEY` among them) can read a key. Torn before the commit, the card is the old card, its
+   key with it; torn after, a new card whose keys are drawn at its next command. D236 (1) said a card torn before that
+   commit "is still the old card, verdicts and all"; for an uncertified card's key and its PIN key that was not so until
+   this change. jCardSim draws the same key pair every time, so the tear harness now draws a pair of its own at each draw
+   (`TearHook.freshKeys`); with it, the sweep fails on 3.1's order (`the owner kept under a new card key`, torn after
+   `genKeyPair`) and passes on 3.2's. jCardSim: `ReviewFixes32Test.aResetTornAnywhereIsTheOldCardOrANewOne`,
+   `aResetTornAfterItsCommitDrawsItsKeysAtTheNextCommand`.
+2. **A reset clears the self-tests' verdicts (APP-M2).** `curveByAgreement`, `fieldP`, the square's verdict (5) and
+   `SchnorrHW.chipMul` are cleared with `selfTested` in the reset's last transaction: until the next `SET_CARD` works
+   them out again every path is the slow, checked one. jCardSim: `aResetClearsTheVerdicts`.
+3. **A forgotten PIN's replacement frees the spent places (APP-M1, part 1, in part).** D195 and D196 let anyone with an
+   empty card replace a forgotten PIN; the spent places said which pieces the last holder paid with. Now `forgetOwed`
+   frees the spent places and their kept proofs after a forgotten PIN too, as after an owner was replaced. c and the paid
+   list stay. Rejected for 3.2: a new c at that `SET_PIN`, as the review proposed. On a card with no owner and no refund
+   key, c is given only in the first set-up (D196), so the holder who replaced their own forgotten PIN could never read
+   the new c, and a phone that went on locking loads to the old c's keys would load pieces the card never signs for.
+   With c kept, the paid list must stay: it keeps a piece under that c from being loaded twice. What is left of APP-M1 is
+   c linking the holder's earlier payments to a reader that replaces the PIN; closing it needs the phone side (re-reading
+   c) decided first. Part 2 of APP-M1 (`OwnerPIN.update` outside a transaction) is wrong on a conforming chip and is not
+   changed. jCardSim: `aForgottenPinsReplacementFreesTheSpentPlaces`.
+4. **A hand-over commits what it forgets before the new owner's key (APP-M5).** `SET_OWNER` that replaces an owner now
+   commits the new c, the record let go and the forget mark first, then the flag, the clock and the key in a second
+   transaction. On a chip whose key writes take no part in a transaction (the harness's `keysOutsideTx`), a tear in the
+   second leaves the next owner's key with the first commit's c, never the last owner's. A claim is one transaction as
+   before. jCardSim: `aHandOverNeverGivesTheNextOwnerTheLastOwnersC`.
+5. **Four quicker writes and a quicker curve check (the speed review's PERF-CARD-04 to 07).** (a) The staged outputs
+   (601 bytes) are RAM cleared at a selection, asked for at the first `SET_CARD`, persistent where the chip gives no
+   room; the settlement record's body is made in the APDU buffer and written a buffer's worth at a time, and its own
+   transaction before the body is gone (SIGN's commit already lets the last record go, D224). (b) `SPEND_ALL_CHANGE`
+   keeps B_'s y beside B_ (`OPEN_KEYS_ROW` 99, 256 bytes more of persistent memory); `LOAD_CHANGE` takes B_ whole from
+   there where it worked y out again by the root, and logs the piece in its own transaction. `GET_CHANGE` answers as
+   before. (c) `loadOne` writes a piece's data with `arrayCopyNonAtomic`: the status byte after it is still the place's
+   commit (D14). (d) A square over p (`rsaSquare`), held to known answers at the set-up life's first `SET_CARD`, checks
+   y² = x³ + 7 in `requireFullPoint`, where Euler's test and the root took two powers; where its answers do not hold,
+   the old path. Never the chip's key agreement in its place (the review's R1). `blindChange` keeps Euler's test (see
+   the chip run below).
+6. **`LOAD_CHANGE` refuses an s at or over n (`6A80`)**, before any arithmetic: one proof has one s, and the kept one is
+   the one a holder checks. No mint sends one.
+7. **GET_INFO P1 = 4, byte 56, bit 2 (`INFO_FLAG_FIELD_P`)**: set where `fieldP` holds at this set-up life, so a loader
+   may send C compressed (D212) with no loss of speed. A 3.1 reader does not read it.
+8. **APP-M4 is a spec sentence, not code, in 3.2.** An owned card with no refund key answers `GET_CARD` P1 = 3 sealed to
+   the reader's E, so a relay inside the owner's tap after the grant can read c. Refusing it would change what a reader
+   meets after a hand-over; `spec/APDU.md` now says so plainly. APP-M3 (accepted by D233, D234) and APP-M6 (a doc gap)
+   are not changed. The review's rejected speedups R1 to R7 are not taken.
+
+**Built (applet 3.2, not released).** Load file 43,765 bytes, 245 past a multiple of 256 (`sizeTheFile` at seventy-seven
+writes; 43,547 with the forty writes of 3.1), 1,024 bytes over 3.1's 42,741: when this was written no chip had been given a file of this size (jCardSim only). The chip
+run below followed, and the final 3.2 file (44,881 bytes) passed the chip run on three cards ([D258](#d258)).
+The tracked CAP is `cashu-javacard-3.2.0.cap` (load file `ecb9a837…`), and the tools take a 3.2 card: cardctl's selftest
+(`SELFTEST_VERSIONS`, byte 56 bit 2 named), cardkit (`CARD_VERSIONS`, `CARD_VERSION`, the pins), the set-up app (its 3.x
+line), the simulator bridge. The set-up app's approved list ([D74](#d74)) does not take the 3.2 load file: a build from
+this tree installs no card until the owner's approval adds it, in a change of its own.
+
+**The chip run (2026-11-26, J3R180 57723320, against 3.1 on the J3R180 58206920 with the same harness and reader).**
+Two of the four speedups were smaller than the speed review said, for one reason each.
+- The square (5d): a sealed `VERIFY_PIN` took 111.5 ms against 3.1's 132.7 (the first load's, same script). The square
+  is used (with its answers failed it would be 3.1's path and time). The review priced Euler's test and the root at
+  45 to 55 ms each, which was their cost before D214; over p padded every power is about 13 ms whatever its exponent,
+  so `requireFullPoint` went from three powers (about 40 ms) to two (about 27), not to "about 25 from 115". What is left
+  of the 112 ms is the PIN key's agreement, the seal's sums, the PIN's try and the 90-byte command itself.
+  In `blindChange` the square's way was one power more for every x with no root (the root and its square for every x,
+  where Euler's test alone turns such an x away): `SPEND_ALL_CHANGE` steps of about 43 ms a further x against 3.1's 30.
+  `blindChange` is back on Euler's test, whatever the square's verdict.
+- The data copy without its own transaction (5c): 35 `LOAD_PROOF`s in 4,029 ms against 4,033. The change is on the
+  path the harness took (the 04 form goes through `loadOne` like the other forms), but a J3R180 makes an 81-byte
+  `Util.arrayCopy` outside a transaction as fast as `arrayCopyNonAtomic`: the 15 ms the review counted is not there.
+  The code stays (it writes in the same order, with the status byte as the commit), and no speed is claimed for it.
+
+A hand-over torn between its two transactions leaves the last owner's card with a c its phone did not draw (the next
+owner's, where it gave its own). The last owner asks the hand-over again, and its phone reads c again before it locks a
+load to the card's keys; a phone checks `GROUP_KEYS` against its own keys before the mint swap, not only before the
+write (SECURITY-MODEL #20). `spec/APDU.md`'s SET_OWNER and its `6A96` row say so.
+
+## <a id="d245"></a>D245: The key wiped once where every scalar is public
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Item A1 of the 3.2 speed review,
+which found, by JCAlgTest's figures for the J3R180 (`setS` 3.45 ms, a key agreement's `init` 7.9 ms), that a wipe
+(`SchnorrHW.rest()`: G's x into the temporary key, both key agreements given it) is about 19 ms and that most of a
+signature's wipes follow a public scalar. No command, answer or stored byte changes.
+
+**The rule.** `mulPublic` and `addToPublic` are `mul` and `addTo` with no wipe after them, for a scalar that is public; `mul`
+and `addTo` are those two followed by the wipe, as before, and every secret scalar still goes through them (the sealing
+scalar, a change output's blinding factor, the unblinding's n - r, a date's t at SPEND_ALL_BEGIN). The public runs:
+- **A signature's check (step 8, D207, D218).** It no longer begins with a wipe, and its three calls (`[t]G + W` for a
+  date's key, `[e]Q`, `[s]G - T`) leave their scalars in the key. sign()'s `finally`, which runs on every way out, wipes
+  once. A signature wiped four times (five under a date's key); it wipes once.
+- **LOAD_CHANGE's check of the mint's proof** (`-e` twice, `s` twice): four wipes of five go. The unblinding (`addTo` with
+  n - r) keeps its own, at once after it.
+- **SET_CARD's seventeen framing asks** (`checkFraming`): one wipe after the last, in its `finally`, for seventeen.
+
+**Why it is safe.** No blinding factor, unblinding factor or sealing scalar stays in a key object longer than in 3.2, and
+the nonce longer only into the check, as the red team's A1-1 below says. The scalars left in the key are e, s, t and the
+proof's -e and s: each is public once its command answers (e and s are in the signature, the proof's in GET_DLEQ). A
+signature that fails its check never leaves the card, and its s is wiped by the same `finally` as before. The one secret
+the check's first wipe removed was the nonce k, in the key and the key agreement since step 4: the check's first call
+(`addToPublic` with t, or `mulPublic` with e) puts its public scalar in the key in k's place and gives the agreement that
+key, which is what the wipe did with G's x; between step 4 and that call nothing reads either object, and every way out
+passes through sign()'s `finally`. On the chip's path a refused signature is wiped as before (`sign()`, before the
+bytecode's try). No branch or loop count depends on a secret.
+
+**Counts (jCardSim, `WipesTest`; the times are JCAlgTest's, not measured).** One signature: 4 wipes to 1 (5 to 1 under a
+date's key), the key agreement given a key 6 times to 3, the point addition 5 to 2 (7 to 3 dated): about 58 ms (77)
+less. LOAD_CHANGE: 5 wipes to 1, about 77 ms less. SET_CARD's framing: 17 wipes to 1, about 300 ms less once a set-up life.
+The four tests fail on 3b9b5a4. A wait is a signature's work (D218), so every wait is shorter with this; the wait counts
+stay as they are until the chip has been measured.
+
+**Measured** on card 57723320 (2026-11-26, play money; 52be734's file padded by D256, as 01c, against 3b9b5a4's): a wait's
+signature 424.8 ms (463.3), a payment's last SIGN 593.5 (646.2), LOAD_CHANGE 458.4 (508.9), the set-up's commands in all
+4,058 ms (4,358): about 38 ms a signature, 50 a LOAD_CHANGE and 300 a set-up. Both sessions had a card key with an even y
+(prefix 02): an odd key (03) makes a signature about 11.5 ms longer on this chip ([D258](#d258), the card key's parity).
+
+**The red team's first pass (2026-11-26) found the change safe, with three conditions, which
+hold.**
+- **What is given up (its A1-1, LOW).** The nonce k now outlasts part of the check: from step 4 it stays in the temporary
+  key and in the key agreement through `getW`, through the 33-byte path's `agree(cardPrivKey)` (which does not touch the
+  temporary key), and through the date's compare, until the check's first public call puts t or e in its place; in the key
+  agreement until `[e]Q`'s init, on the date path too (`[t]G + W` gives the point addition its key, not the agreement). That
+  is a few milliseconds to about 30 ms, where it was none. On a chip that gives only a persistent temporary key (`keyInRam`
+  false), a tear in that window leaves k in persistent memory. No harm follows on its own: s never left the card, the next
+  signature draws fresh aux randomness, and no command reads a key's S. SECURITY-MODEL #10 says so.
+- **A1-a.** `mulPublic` and `addToPublic` are called only from `verify`, from `unblind`'s four proof steps and from
+  `checkFraming` (and from `mul` and `addTo`, which wipe after them): `WipesTest.thePublicCallsHaveTheseCallersOnly` fails on
+  any other caller, so no later edit can send a secret scalar through them unseen.
+- **A1-b.** In `unblind` the unblinding's `addTo` (n - r, wiped at once) comes before the four public steps, and `sign()`
+  keeps its wipe between the chip's try and the bytecode's: the same test reads both.
+- **A1-c.** After an AUTH, a payment's SIGN, a LOAD_CHANGE refused 6A80 and one taken, and a signature the chip's path got
+  wrong, neither agreement holds a nonce or an opening's r (`WipesTest.theAgreementsKeepNoNonceAndNoR`, jCardSim's copy).
+
+## <a id="d246"></a>D246: The signature's product on the chip, its bytecode trimmed
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Item A2 of the 3.2 speed review.
+No command, answer or stored byte changes.
+
+**The rule.** `splitProduct` (D217) makes e·d = e·d1 + e·d2 by a private `chipProduct` in place of `mulModNChip`, which
+stays as it was for SET_CARD's known answers (D219):
+- q = e/4 mod n is worked out once, by two halvings, and each product is (q + d_i)^2 - (q - d_i)^2 = 4·q·d_i = e·d_i: no
+  halving of either product (8 loops become 4).
+- q - d_i is taken mod n (a subtraction and a masked add of n), which squares to what |e - d_i| did: 3 loops become 2.
+- e, d1 and d2 are under n already (step 6, the reduction of d1, and d2 = d - d1 mod n of a key's scalar) and are not
+  reduced again (4 loops go). Were one not, the engine answers garbage at or over its modulus and the check of step 8
+  refuses the signature, which is then made again by the bytecode (D218).
+
+**Why it is safe.** The engine is shown only what D217 shows it: two masked shares of d, each operand q ± d_i uniform and
+independent of d taken alone, d1 fresh at every signature. q is e's quarter, and e is public. Every step is a fixed loop or
+a mask (the borrow of q - d_i chooses an add of n by a mask, as `mulModNChip`'s choice did): no branch or loop count depends
+on d, d1, d2 or e·d. The check of every signature (D207, D218) is unchanged and still catches a wrong product.
+
+**Counts.** The product's 32-byte bytecode loops: 36 to 22 a signature (each product 15 to 6, the quarter 4 once). About
+14 loops, by the review's estimate of 4 µs a bytecode about 55 ms a signature; not measured. `ChipProductTest` reads the
+engine's inputs: u_i + v_i = e/2 for both products and (u1 - v1 + u2 - v2)/2 = d; its first test fails on 3b9b5a4.
+
+**The red team's first pass (2026-11-26): safe as designed.** It ran the steps through the class's own `halve`, `addIf`,
+`addModN` and `sub32` for every edge pair (0 to 4, n - 1, n - 2, the halves of n, 2^255, 2^128, b = q, b = n - q, a borrow) and
+20,000 random ones: the product is e·b mod n and the engine is never given a number at or over n. Each operand alone is
+uniform (|e - d_i| was biased toward small values: this is an improvement), and the halvings now run on the public e alone.
+Its three conditions:
+- **A2-a.** q stays out of `sc[SC_E]` (it is at `work[256, 288)`): quartered in place, e would be wrong in the check, every
+  chip-path signature would fail it and go to the bytecode with no error.
+- **A2-b.** The chip's product itself is right, not rescued by the fallback: `ChipProductTest.theChipsProductIsRightAndNotRescued`
+  counts two key agreements a signature (R and [e]Q), where a product the check refused would send the signature to the
+  bytecode, which asks for both again. A wrong last subtraction in `chipProduct` fails it (tried: u^2 and v^2 swapped).
+- **A2-c (what this gives up).** SET_CARD's known answers (D219) run through `mulModNChip`, which signing no longer uses. The
+  engine is the same, so D219's cover of the engine stands; `chipProduct`'s own bytecode is covered only by each signature's
+  check, which refuses a wrong product and has the signature made again by the bytecode.
+
+**Measured** on card 57723320 (2026-11-26, play money; 7b87367's file, with D245, against D245's alone): a wait's signature
+367.2 ms (424.8), a payment's last SIGN 524.6 (593.5), LOAD_CHANGE 458.5 (458.4), SPEND_ALL_CHANGE 223.9 (241.2 on
+3b9b5a4): about 58 ms a signature on top of D245's 38, and nothing on LOAD_CHANGE, whose products are not the signature's.
+D245's session had a card key with an even y (02) and this one an odd y (03), which costs about 11.5 ms a signature
+([D258](#d258)): at the same parity the saving is about 69 ms.
+
+## <a id="d247"></a>D247: The chip's RSA engines given their keys once a command
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it with a condition, met in 696d4ba).** Item A3 of the 3.2 speed review,
+in the red team's first, safe form (its "A3a"). `Cipher.init` is about 6 ms on a J3R180 (JCAlgTest); until 3.2 every power
+gave its engine its key first. No command, answer or stored byte changes.
+
+**The rule.**
+- **The signature's squaring** (`SchnorrHW.square`, D216): its engine is given `sqKey` at its first squaring in a command,
+  not at each: a signature's four squarings, one init. `chipMulInit` puts its flag down before it writes the key.
+- **The field's powers over p padded** (D214, D244): the cube, the root, Euler's test and the square each have an engine
+  of their own (`rsaCubeE` … `rsaSquareE`, made at the set-up life's first SET_CARD where the padded keys held), each given
+  its one key object at its first power in a command. Each is held to a known answer through itself at that SET_CARD
+  (`fieldEngines`: 2^3 = 8, the root of 4 is 2, Euler's test of 4 is 1; the square's through `squareInit`'s own answers);
+  `fieldOwn` says they held, is read only with `fieldP` (which a reset clears, so the reset's transaction writes nothing
+  more), and where one fails every power is on `rsa`, as before.
+- **Everything else stays on `rsa`, given its key before every power,** as before: the p*p keys (the simulator's, and the
+  owner point's check mod N, `requireOwnerPoint`).
+- The flags (`engineReady`, five bytes of RAM a selection clears, made at the first SET_CARD and handed to the signer) are
+  put down at the start of every command (`process`), by every write of a key (`fieldKey`, used for every key the field
+  powers take, and `chipMulInit` for the squaring's), and while an engine works (up again only after it answers, so one
+  that throws is given its key again at its next use).
+
+**Why it is safe (the red team's conditions).**
+- **A3-a: one engine per key object, never per exponent.** The p*p key and the padded key of one exponent never share a
+  cached engine: a cached engine is chosen in `powRaw` for its one padded key alone, and `rsa`, which serves every other key,
+  is given its key before every power. An engine given one key and used with the other would answer mod the wrong modulus
+  with no error (the red team's A3-2: off-curve owner keys taken about half the time, good sealed points refused).
+  `EnginesOnceTest.eachEngineServesOneKeyObject` reads the source.
+- **A3-c: a key written puts its engine's flag down.** Every `fieldKey` puts all four field flags down; `chipMulInit`
+  puts the squaring's down before `setModulus` and `setExponent` (`anEngineIsGivenItsKeyAgainAfterItsKeyIsWritten`).
+- **Nothing is assumed of what the chip keeps between commands.** Within one command no key is written but through those
+  calls, no selection or power loss can come between two powers, and the engine is the one the known answers ran through.
+  The red team's A3-1 (an engine exception inside a sealed PIN command costs a PIN try) is not made more likely by this form:
+  an engine is never used across a command boundary without being given its key.
+- A3-b, A3-d and A3-e (flags kept for the selection, a retry on an engine exception, a harness that loses an engine's init
+  at a power cut or a selection) belong to D248, which builds on this and can be left out alone.
+
+**Counts (jCardSim with ChipEnginesTest's engines; the times are JCAlgTest's).** A signature: four inits to one, about
+18 ms (a wait, AUTH, the payment's SIGN: each its own command). A LOAD_PROOF of three pieces in the 33-byte form: six inits
+to two (the cube's and Euler's engines, once each), about 24 ms. A change output (`SPEND_ALL_CHANGE`: K's check and the hash
+to the curve, about five to seven powers): one init a power to one an engine, about 20 to 25 ms. A sealed VERIFY_PIN (the
+cube and the square): no change, each engine's first use in its command. The persistent memory of four Cipher objects and
+five bytes of RAM at the first SET_CARD are what the chip run must show the room for (the 3.2 run had 71,372 bytes persistent
+and 1,596 of RAM free after the first SET_CARD); the load file grows by the code (see the build's size).
+`EnginesOnceTest` fails on d287eda (no such engines; four inits a signature).
+
+**The red team's code pass (2026-11-26): cleared with one condition, met in a follow-up (its C-A3a-1, MEDIUM).** The
+engines of the field's own were held at SET_CARD to the three small answers alone: `fieldPInit`'s full-width answers (G's
+x, p - 1, p - 2) ran on `rsa`, `fieldP` being false while it runs, so an engine right on small values and wrong at full
+width was leaned on, and a root's engine wrong there loses every change output (nothing checks y^2 = x^3 + 7 after the root
+in `blindChange`). Now `fieldEngines` asks `fieldPInit`'s eleven known answers again through the engines (`fieldAnswers`,
+each power on its key's engine), where it asked three: eight powers more, once a set-up life, about 62 ms at JCAlgTest's
+7.8 ms a power (counted, not measured; each engine is still given its key once). The square's engine was already held to
+full-width answers by `squareInit`. `EnginesOnceTest.anEngineWrongAtFullWidthIsFoundAtSetUp` gives a card a cube's, a
+root's or an Euler's engine right below 2^128 and wrong above it, sets it up, and pays with four change outputs: `fieldOwn`
+is false, that engine is asked nothing after the set-up, and the change is right; on 1d9ac2a the three small answers pass
+the engine and the change output is refused (`6A80`).
+
+**What the set-up pays (card 57723320, a J3R180, 2026-11-26; the chip run's figures).** Two SET_CARDs that are not alike:
+- **The first SET_CARD after an install** makes what a reset keeps: the 12,288-byte proof store, the record's arrays, the
+  padded RSA keys and, since this entry and D251, the four engines and the curve check's own key and agreement. 2,007.5 ms
+  on 1d9ac2a (the paid-list run, which installs its file). Over every command of the set-up (the play-money harness's
+  `cardctl setup`, a fresh install each, the process's start included): 4,358 ms on 3b9b5a4, 4,193 ms on 1d9ac2a; by
+  commit, D245 and D246 -341 ms (D245's one wipe for SET_CARD's seventeen framing asks), this entry +141 ms (the four
+  engines made, three powers), D248 -117, D249 +14, D250 +31, D251 +105 (its key and agreement made), the rest within
+  20 ms, the harness's spread being about 100 ms either way. On 52be734 alone (01c): 4,058 ms.
+- **A SET_CARD after a reset by the owner** makes nothing: 1,602.7 ms on c816133 and 1,406.8 ms on 1d9ac2a. The owner's
+  claim after it (four askings, a card that has had a PIN, D236): 3 x 527 + 826 ms on c816133, 409.6 + 412.7 + 412.6 +
+  823.2 ms on 1d9ac2a.
+So no commit made the set-up slower: the 400 ms between the paid-list runs' two SET_CARDs is an install's first set-up
+against a reset's. The follow-up above adds about 62 ms to each set-up life's first SET_CARD. The project lead decided
+(2026-11-26) that a set-up this much longer is acceptable.
+
+## <a id="d248"></a>D248: The chip's RSA engines given their keys once a selection
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it with conditions (a test, met in 1e2b2d3; chip checks 1, 2 and 6, owed)).** The red team's second form of A3
+("A3b"), on D247, and to be left out alone: it goes on a card only where the chip checks below hold. No command, answer or
+stored byte changes.
+
+**The rule.** D247's flags are no longer put down at the start of every command: an engine given its key keeps it for the
+rest of the selection. They are put down at every selection (their RAM is cleared at a deselection, and `select()` clears
+them too, for a chip that keeps a same-package applet's RAM across a SELECT of the tag and back, as D236 does for
+`allState`), at every write of a key (D247), and while an engine works. And an engine that throws `CryptoException` at its
+power (`powRaw`, the signature's squaring) is given its key again and asked once more before the exception is let out.
+
+**Why it is safe (the red team's conditions A3-b to A3-e).**
+- **A3-b.** The flags live in RAM a deselection clears and are cleared in `select()`; never in RAM cleared only at a reset.
+- **A3-c.** Every key written puts its engine's flag down (D247).
+- **A3-d.** A lost init is an init and a retry, never a refusal: an engine exception inside a sealed PIN command (the
+  reader's point held to the curve by the cube and the square) would otherwise be taken as an envelope that does not open
+  and cost a PIN try (the red team's A3-1, proved on 3.2). `EnginesOnceTest.aSealedPinWithLostEnginesCostsNoTry`.
+- **A3-e.** The tests' engines behave as a chip's may: an init copies the key's modulus and exponent, a power cut and a
+  selection lose what the engine was given (it then throws INVALID_INIT), and every Cipher the applet makes is one of them.
+  On that card SET_CARD's known answers hold through every fast path (fieldP, fieldOwn, fieldSquare, chipMul), and no power
+  is ever asked of an engine that holds nothing.
+- **What is still assumed, and only a chip can show:** within one selection an engine keeps what it was given across
+  commands, or loses it so that its next power throws. An engine that lost its key and answered garbage with no error would
+  give wrong powers: refused good points (PIN tries), and a change point off the curve (change lost). The red team's chip
+  check 1 asks exactly this of an RSA Cipher and a key agreement after a deselect and select, the tag selected and back, a
+  power cycle, a key written again with the same values, a key pair drawn again, and an exception on the previous use.
+
+**Counts (jCardSim, the tests' engines; times JCAlgTest's).** On D247: a selection's waits, AUTHs and SIGN give the squaring
+its key once in all (each wait about 6 ms less); a first load of 36 pieces in the 33-byte form, 2 inits in all where D247
+gives 2 a command (about 400 ms less over 35 LOAD_PROOFs); the change outputs of one payment, one init an engine for the
+whole payment; a sealed VERIFY_PIN, 2 inits less where the cube's and the square's engines were used earlier in the
+selection. `EnginesOnceTest` holds the once-a-selection counts, the retry and the sealed PIN.
+
+**The red team's code pass (2026-11-26): cleared with conditions; its C-A3b-1 (LOW) met in a follow-up.** The flags'
+clear in `select()` was reached by no test (its M12: taken out, all 431 tests passed), because jCardSim clears
+CLEAR_ON_DESELECT memory at every selection itself; the clear is there for a chip that keeps a same-package applet's RAM
+across a SELECT of the tag and back. `EnginesOnceTest.selectItselfPutsTheFlagsDown` sets every flag up, makes every engine
+lose what it was given, calls the applet's `select()` alone, and asks a sealed VERIFY_PIN: every flag down, each engine
+given its key, none asked a power while it held nothing. With the clear taken out it fails. On a chip a flag left up would
+cost one exception and a retry an engine, never a wrong answer. Chip checks 1 (a), (b), (c) and (f), room (check 2) and
+ten sealed VERIFY_PINs across a reselect and a tag (check 6) stay owed before this goes on a card.
+
+## <a id="d249"></a>D249: The y of the payment's date key kept from SPEND_ALL_BEGIN
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Item A4 of the 3.2 speed review.
+No command, answer or stored byte changes.
+
+**The rule.** SPEND_ALL_BEGIN works out P + t·G by the chip's point addition (`groupKeys`, D197) and keeps its x and parity
+in `group`, as before; it now keeps its y too, 32 bytes of RAM a selection clears (`groupY`, made at the first SET_CARD,
+cleared with the payment in hand in `select()`). SIGN's check of its signature (step 8, D207) takes Q whole from the point
+named in `group` and that y, where it worked W + t·G out again by the point addition. Where there is no kept y (the chip
+refused the room, a signature under no date: AUTH, the waits, PIN key's signature; the settlement record's, whose key is
+worked out again from c), the check is as before.
+
+**Why it is safe (the red team's first pass: the claim holds, by algebra).** s = k + e·(d + t) is made from the card's own d
+and the t in `group`; the check passes exactly when s·G − e·Q' = R, that is e·((d + t)·G − Q') = 0, so only Q' = (d + t)·G
+passes (or e = 0, a chance of 2^-256). Whatever the kept y gives (a fault in BEGIN's addition, a stale y, p − y, a faulted t
+in `group`), a correct Q' passes and any other fails; a fault in s passes only where δ·G = e·(Q' − Q), which no physical
+fault picks. What is given up is the second, independent working-out of P + t·G at SIGN; the check's algebra already binds
+the point to d + t, so nothing that check stops gets out. Its conditions:
+- **A4-a.** The y is copied straight after the first point addition in `groupKeys`, before the refund step writes R + u·G
+  over the same bytes, and only by SPEND_ALL_BEGIN (GROUP_KEYS passes none). Taken after the refund step, every dated
+  payment on a card with a refund key would be checked against a point off the curve and refused (its A4-1).
+- **A4-b.** It is used only where `g` is given (the payment's SIGN) and is cleared with `allState` in `select()`; SIGN needs
+  the payment in hand, which every other command gives up (A4-2).
+- **A4-c.** The check still holds Q's x to the x in e, still compares Q's parity with the one named (now of the kept y), and
+  still lifts Q to an even Y before [e]Q.
+- **A4-d.** `KeptYTest`: a kept y changed by one bit, or to p − y, between BEGIN and SIGN makes the SIGN 6F00 on the
+  bytecode's path and on the chip's, with nothing burned, the piece unspent and SPEND_ALL_AGAIN answering as if the SIGN was
+  never asked; dated and undated payments sign on cards with and without a refund key (a dated piece is refused on a card
+  with none), each with one point addition in its check.
+
+**Counts.** One point addition less a payment's SIGN (`PerPaymentKeyTest.whatItCosts`: waits + 1, where it was waits + 2):
+about 35 ms by JCAlgTest's figures. 32 bytes of RAM at the first SET_CARD. `KeptYTest` fails on f621b23. **Measured** on
+card 57723320 (2026-11-26, the files of f621b23 and of this commit): a payment's last SIGN 506.9 to 461.0 ms, about 46 ms.
+A wait's signature went from 344.1 to 332.5 ms as well, which this entry does not explain: a wait signs under the card key
+with no date (`work()`, `g` null), and on that path the check works W out as before, with no point addition before or
+after this change. The 12 ms is the card key's parity, not this change: the session of f621b23's file had a key with an
+odd y (prefix 03) and this commit's an even one (02), and an odd key costs about 11.5 ms a signature ([D258](#d258)). The
+files of 7fe7ec6 and eedd741, with no change to signing between them, differ by 11.4 ms the same way (03, then 02).
+
+**The red team's code pass (2026-11-26): cleared.** Its M20 (the kept y's clear in `select()` taken out) passed every test,
+as M12 did for D248, jCardSim clearing that RAM at every selection itself; `KeptYTest.selectItselfClearsTheKeptY` calls
+`select()` alone with a payment in hand and fails with the clear taken out. Harmless on its own (SIGN needs `allState[0]`,
+which the same `select()` clears), it is pinned all the same.
+
+## <a id="d250"></a>D250: The check of every signature hashes e again
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it with a condition, met in f7bdac4; the project lead decides with the measured
+figure).** The red team's A4-3, its own commit after D249, to be taken or left alone. No command, answer or stored byte
+changes.
+
+**The rule.** The check of step 8 (D207, D218) works e out again from what the signature names, the tagged hash of
+Rx ‖ Px ‖ msg, mod n, where it took the e that step 6 left in the scratch.
+
+**What it closes.** D228 accepted the check reading the stored e as "no key given away, the nonce being fresh". That holds
+only while the random generator works. With a stuck generator, AUTH with the same reader nonce gives the same message (the
+card's 16 bytes are stuck too) and the same k; one fault on e after step 6's hash then passes the check, because the check
+reads the same faulted e: s' = k + e'·d, and with the good s = k + e·d, d = (s − s') / (e − e'), e' found by trying the
+fault's few values against P. Two faults, one in the generator (D217 already trusts it) and one in e. With e hashed again,
+a faulted e makes s'·G − e·Q = R + (e' − e)·d·G, which is not R: the chip's signature is refused and the bytecode signs again
+with a fresh nonce (D218), or 6F00 on the bytecode's path. `CheckHashesETest` flips a bit of e as the chip's product begins:
+the signature that leaves verifies, where on f394b29 the faulted one left.
+
+**What it costs.** One tagged hash of 96 bytes (three blocks of SHA-256 with the tag's prefix) a signature: on every AUTH,
+every wait's signature (D218: a wait is a checked signature), the payment's SIGN and the PIN key's signature. Estimated at
+8 ms by JCAlgTest's figures; **measured** on card 57723320 (2026-11-26, the files of f394b29 and of this commit, medians of
+57 waits and 14 last SIGNs): a wait's signature 332.5 to 349.2 ms, **about 17 ms**, and a payment's last SIGN 461.0 to
+489.4 ms, **about 28 ms** (both sessions had a card key with an even y, 02, so the wait's 17 ms is like for like; a payment's
+SIGN signs under a date's key, whose parity the sessions did not record). That takes back about 28 of D249's 46 ms on a payment's SIGN, and adds about 17 ms to every wait. The project lead decides
+on these.
+
+**The red team's code pass (2026-11-26): cleared with a condition, met in a follow-up (its C-A4-3-1, MEDIUM, proved).**
+The check hashed e again from the caller's message buffer, and so did step 6: with a stuck generator, one fault in that
+buffer between step 3 (the nonce's hash) and step 6 (the challenge's) gave a signature of the same R with another e,
+which the check passed, reading the same faulted buffer; with the good signature of the same message, d fell out (the red
+team's test recovered it on 4f610e6). Now step 6 hashes the message as step 3 read it: its last 31 bytes stay in the
+scratch where step 3 put them (nothing writes there before step 6), and its first, which R's last byte takes at step 4, is
+kept in a local of `signOnce`. The nonce and the challenge are then of one message whatever the buffer does, and the check
+hashes e from the buffer as it is then: a message that changed after step 3 fails the check (6F00 on the bytecode's path;
+on the chip's, the bytecode signs again from the message as it now is, with another nonce). The red team proposed a
+32-byte copy of the message kept in RAM and compared with the buffer in the check: no 32 bytes of the signer's RAM are
+free from step 3 to the check (`sc` and `work` are both in use through step 7, on either path), and a new array would be
+RAM made at the first SET_CARD, leaving the signatures before it (AUTH) without the check, under the card key the card
+keeps for life; the hash binds the same three messages to one. It costs nothing measurable (one byte kept, one 32-byte
+copy less). `CheckHashesETest`: the message flipped at step 4 with a stuck generator gives no second signature of one R on
+either path (on 1e2b2d3 the faulted signature leaves the bytecode's path); and, on the bytecode's path, a fault in e as its
+hash answers is refused 6F00 with nothing written out (on f394b29 the faulted signature left).
+
+## <a id="d251"></a>D251: The curve test by agreement on a key and an agreement of its own
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** The `agrees()` half of item A5 of
+the 3.2 speed review (the PIN key's half is not built: the red team's A5-1 and A5-2, a stale key after a reset and PIN tries
+lost after a lost init, against 27 ms a sealed PIN; `agree()` stays as it is for the PIN key). No command, answer or stored
+byte changes.
+
+**The rule.** `agrees()` (D212's curve test of a piece in the 04 form, D215's of LOAD_CHANGE's points) asks a key agreement
+of its own (`curveKA`) with a persistent key of its own (`curveKey`), made at the first SET_CARD (`curveEngine`, before
+`checksCurve`), whose curve and scalar, G's x, are set once and never again. The agreement is given that key at its first ask
+of a selection (`engineReady[5]`: down at every selection, while it works, and at SET_CARD); where it throws
+`CryptoException` it is given the key again and asked once more before the answer is "refused", in `agrees()` and so in
+`checksCurve`. Where the chip refuses the key, the agreement or the flags' room, agrees() uses the temporary key at G's x
+and `ecdh`, as before, and `checksCurve` tests whichever one agrees() then uses.
+
+**Why it is safe (the red team's A5-c, A5-d).**
+- **A5-c.** The key is never the temporary key, which since D245 holds e, s or t between calls: an agreement that kept a
+  reference to it would multiply by them. Any scalar does for a curve test; a public one keeps the answer, [G.x]p, telling
+  nothing.
+- **A5-d.** A lost init is asked once more, so one stale state at SET_CARD does not turn D212 off for the set-up life, and a
+  good piece is not refused at a load; a point off the curve is refused after its one more ask (both fail closed).
+- The agreement that does the card's arithmetic (`ecdh`) is no longer given a loaded point at all: a point off the curve
+  reaches only the curve test's agreement (`KeysetKeysTest.loadChangeGivesTheChipNoPointOffTheCurve`).
+
+**Counts (jCardSim; times JCAlgTest's).** A piece in the 04 form: `setS` and the agreement's init (about 11 ms of the curve
+test's 31) at its first ask of a selection only, so about 11 ms a piece after the first in a selection; LOAD_CHANGE's three
+asks, about 33 ms. One persistent EC key and one key agreement more at the first SET_CARD, and one byte of RAM.
+`CurveAgreementTest` fails on 4f610e6.
+
+## <a id="d252"></a>D252: A load's places looked for once a piece, and a proof of zeros by the chip's compare
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** The two small items of A6 of the 3.2
+speed review. No command, answer or stored byte changes.
+
+**The rule.**
+- **Places.** `loadOne` no longer walks the 128 places for an empty one: its caller gives it the place. LOAD_PROOF's walk for
+  its "a full card says so" check gives the first piece's place, and after each piece stored the next is looked for again,
+  from the place after it (every place before it was taken when the first was looked for, and nothing frees a place during
+  the command). LOAD_CHANGE's one piece takes the place its own check found (nothing writes a place in between).
+- **Zeros.** A piece's mint's proof of 96 zeros (refused, 6A80) and a place's kept proof that is zeros already are found by
+  the chip's own compare (`zeros`): the first byte zero and each byte equal to the next.
+
+**Why it is safe (the red team's A6-5, A6-6).**
+- **A6-5.** A place is looked for once a piece, never kept from one piece to the next: a place kept across a batch would
+  write the second piece over the first's, and the first would be lost. `LoadWalkTest`: three pieces in one LOAD_PROOF take
+  three distinct places, on an empty card, on one with freed places between used ones, and on one with two places left
+  (two go on, the third is refused with nothing written over).
+- **A6-6.** No array of zeros is read: the 96 bytes are compared with themselves one place on, so no write anywhere can make
+  a proof of zeros pass as a proof. The compare answers at the first byte that differs: the bytes are public (GET_DLEQ gives
+  them to anyone), and `isZero`, which reads every byte whatever they are, stays everywhere else.
+
+**Counts.** A LOAD_PROOF of one piece: two walks of the places to one (about 9 ms of bytecode by the review's estimate on a
+card with few places used, more on a fuller one). A proof's zero check: a 96-turn loop to one native compare (about 4 ms).
+Not measured.
+
+## <a id="d253"></a>D253: The paid list and the filled places held to a nonce by its first byte first
+
+**Proposed (applet 3.2, 2026-11-26; not released; its file run on test card 57723320 with play money; the red team's code pass cleared it).** Measured on the test card (J3R180
+57723320, 3.2 at c816133, 266 made-up pieces loaded and paid): a LOAD_PROOF's median grows from 100.3 ms with no row of the
+paid list in use to 132.5 ms with 224, 141 µs a row in a straight line (r² 0.992): 144 ms more on every loaded piece and every
+change piece written back at 1,024 rows. Most of it is the native `Util.arrayCompare` called once a row from a bytecode loop.
+A second, smaller slope, about 0.37 ms for each place already filled, is `slotWithNonce`'s compare of the nonce with every
+filled place. No command, answer or stored byte changes.
+
+**The rule.** In `loadOne`'s search of the paid list (D191) each row in use has its first byte read in bytecode and is
+compared whole by the chip only where that byte is the nonce's; `slotWithNonce` does the same for the filled places' nonces.
+
+**Why it is safe.** Every row in use is still held to the nonce: a row whose first byte is not the nonce's is not the nonce,
+and one whose first byte is is compared whole, as before. No row is passed over, the bounds are the same (the rows in use,
+all 1,024 once the ring has gone round), and nothing is kept between loads: there is no index that could go stale (a torn
+or stale index that hid a row would let a paid piece be loaded again, the red team's A6 HIGH). What a row holds, when rows
+are written and the ring are unchanged. The red team's model (`thePaidListSearches`: lists wrapped and not, stale rows past
+the next one, first bytes 00 and FF, a row's first byte off a row's start) gives today's answer for every nonce. The
+native `ArrayLogic.arrayFindGeneric` search is not built: jCardSim cannot run it, an import cannot fall back at run time on
+a chip without `javacardx.framework.util`, and its easy form misses paid rows. The worst case is today's cost and a byte read
+a row: rows that all begin with the nonce's first byte (a loader can choose its nonces) cost what they cost before.
+
+**Tests (`PaidListSearchTest`).** A nonce on the list at the first row, the last row in use, a row of a list gone round (the
+last of all, and one past the next), refused 6A94; one differing in a row's last byte or its first only, and one at the next
+row of a list not gone round, taken; a filled place's nonce among places whose nonces share their first 31 bytes, refused,
+and one differing in its last byte, taken: each as on 3b9b5a4. jCardSim cannot count the chip's compares; the time is the
+chip run's to show (the same script).
+
+**Measured after it** (card 57723320, 2026-11-26, the same script on 1d9ac2a's file, which has this): 62.8 µs a row in use
+(r² 0.999), where c816133 had 141.0; at 1,024 rows a load is 129 ms, where it was 245.
+
+## <a id="d254"></a>D254: An engine's fault in a sealed command: considered, built, not taken
+
+**Not taken (2026-11-26, on the red team's code pass; built in eedd741, reverted before the 3.2 file; the default
+the project lead was told).** The red team's A5-e: in `unseal` and `stageOwnerC`, any exception other than the card's own curve
+check refusing the reader's point (6A80) or a tag that does not match, in the curve check's RSA powers or after it (the PIN
+key's agreement, the seal's sums), would have been the card's own fault: 6F00, no try counted, the sixteen bytes used up.
+3.2 answers as 3.1 does: every exception there is an envelope that does not open, and costs what a wrong PIN costs.
+
+**What it would have closed.** The red team proved on 3.2's first form (`anEngineExceptionInASealedPinCostsATry`) that an
+engine that throws inside a sealed VERIFY_PIN cost the holder a try with the right PIN; three such, and a card with an owner
+is blocked (its owner can unblock it), while a card with no owner only waits longer.
+
+**Why it is not taken.**
+- **What it gives away.** An engine exception is what a chip's fault detector raises. With D254 it would cost nothing, so a
+  fault attacker probing the PIN key's multiplication would learn "fault detected" for free, as often as they like, at about
+  0.3 s a probe: a safe-error channel, limited but real. Without D254, each such probe costs a try on an owned card (three
+  block it) or a growing wait on one with no owner. The code was right (no free PIN tries: the try is counted before the PIN
+  is compared, and D254's exits are all before that; no oracle without fault equipment: the card holds the point to the curve
+  first, and no point it takes makes the powers or the agreement throw); what it gives is the probe.
+- **What the card keeps without it.** D248's retry (an RSA engine that throws is given its key again and asked once more) and
+  D251's (the curve check's agreement the same) already keep a lost init from costing a try. A try is now lost only where an
+  engine throws twice in a row inside a sealed command: a failing chip, not a normal event.
+
+**To be looked at again** only if the chip run's checks 1 and 6 (an engine after a deselect, a tag's selection, a power cycle
+or an exception; ten sealed VERIFY_PINs across a reselect and a tag) show an exception in a sealed command that survives the
+retry. The reverted commits keep the code and its tests (`SealedFaultTest`) for that day.
+
+## <a id="d255"></a>D255: A piece loaded in the 33-byte form is held to its form alone
+
+**Decided (the project lead, 2026-11-26, after both red teams: the curve check dropped on the 33-byte form only, kept on the
+65-byte form, with the conditions below); not released; gated by the red team's code pass, the review and the chip run.**
+This supersedes, on this one point, D196's "`LOAD_PROOF` checks that C is a point of the curve itself (`6A80`)" and D212's
+33-byte test (Euler's criterion on x³ + 7, which D214 made the chip's RSA over p); those entries are left as they were
+written. The answer on the wire changes for one input only: a `LOAD_PROOF` piece in the 33-byte form whose x has no root,
+`6A80` until now, is stored (`9000`).
+
+**The rule.** In `loadOne`, a piece that comes by `LOAD_PROOF` in the 33-byte form has its C held to its form alone: `02`
+or `03`, and an x under p; it is stored as it came. Everything else stays:
+- the 65-byte form (P2 bit 3) is held to the curve by the chip's key agreement exactly as before (D212, D251), and stored
+  as the 33-byte form by y's low bit, so that a C is always one canonical encoding;
+- every other refusal of `loadOne`: an amount of nothing, a proof of zeros, a nonce already on the card or on the paid
+  list, the unit, the day's count, the limit;
+- `LOAD_CHANGE` is not touched: the card computes with K and C_ there (the unblinding and the mint's proof), and holds them
+  and the unblinded C to the curve as before.
+
+**Why it is safe.** The card never computes with a loaded piece's C: its bytes are copied out (GET_PROOF, GET_PIECES, the
+settlement record) and its hex is hashed into a payment's message; no point arithmetic takes `proofStorage` or `slotHex`
+(the red team's applet pass read every reader of a stored C, planted pieces and ran every read and payment command: all
+answered, nothing parsed C). A loader that wants to harm a card can load a point of the curve that no mint signed just as
+well, so the check never told a real piece from a false one; the mint's proof kept beside the piece does (its DLEQ proof, which GET_DLEQ gives).
+A piece's identity is its nonce: a no-root C cannot shadow or replace another piece (`FormOnlyTest`: the same nonce with a
+good C is refused 6A94).
+
+**What is given up, plainly.** A piece with a mangled point is now stored and fails at the mint when it is spent, where 3.1
+refused it at the load; about half of all corruptions of a 33-byte C were refused, none is now. A loader that drops its own
+copy of a piece on `9000` and sent a corrupted C has lost that piece. The 65-byte form keeps its check because without it a
+y that is not the point's would be stored, silently, as the other point (the red team's F1).
+
+**The conditions (the red team's), and where each is met.**
+- **F1:** the 65-byte form keeps the chip's key agreement (above).
+- **F2:** `cardctl dump` writes the rest of the card where a slot's one fault is a C that is no point: it skips that slot,
+  spent or not, with a true message, and says so in the file's note; a spent slot so made is no longer blamed on a torn
+  CLEAR_SPENT (`tools/cardctl/test_card_file.py`, three tests). An unspent slot with any other fault still refuses the dump.
+- **F3, F4 and the reader requirements:** `spec/APDU.md` (the byte 56 bit 2 text, P2 bit 3, `LOAD_PROOF`'s refusals and the
+  `6A80` row) says the rule, and states what a loader must do: never pay a piece whose proof has not held (to another or
+  with other pieces; its standing is learnt alone, as the reader requirements' item 6 says); give up its own copy of a
+  piece only after its own check of it; send the 65-byte form for the card's own curve check. A loader may time both forms
+  on a card and use the quicker. The first two rules are also item 10 of the spec's reader requirements, the list
+  SECURITY-MODEL #30 and NUT-CCP send a library author to; NUT-CCP's own list takes them when it is next updated.
+  cardctl's `placeholder_c` says why its placeholder is still a point (its own card file refuses one that is not).
+- **Tests:** `ReaderChecksTest.aCThatIsNoPointIsRefused` and `FullPointLoadTest.badPointsAreRefused` hold the new rule (a
+  33-byte C with no root is stored, an x at or over p refused, the 65-byte form's bad points refused); `FormOnlyTest` adds
+  the stored no-root piece paying, the form checks (prefixes other than 02 and 03, x of p, p + 1, 2^256 − 1), the 65-byte
+  form with a wrong y (6A80), and LOAD_CHANGE refusing a C_ off the curve by the agreement and by the card's own test.
+  `EnginesOnceTest`, which drove the field's engines by 33-byte loads, drives them by sealed VERIFY_PINs.
+- **The recording** (`spec/vectors/transcript.json`, which `testWriteTranscript` writes and holds to): unchanged, byte for
+  byte. Its "not a point" exchanges are a 33-byte C of prefix `04`, a form the card still refuses (6A80). The tests here
+  that read it (`tools/cardkit/gp/test/settled-cleanup.test.ts`) need no new recording.
+
+**What each form's check costs (counted, `FormOnlyTest`; times JCAlgTest's and the chip run's).** The 33-byte form: two
+powers of the chip's RSA (the cube and Euler's test, about 2 × 7.8 ms with D247/D248's engines, more where an engine is
+given its key) before D255, none after. The 65-byte form: one key agreement (about 20 ms of curve work; its init once a
+selection with D251) and 32 more bytes a piece on the wire; measured on the test card, `LOAD_PROOF` in the 04 form 115.6 ms
+at 3.2 and 107.0 ms with D251. **Measured** (card 57723320, 2026-11-26): a piece in the 33-byte form loaded in 91.6 ms on
+eedd741's file and in 75.9 ms on this commit's, so the check cost 15.7 ms a piece with the engines given their keys once a
+selection (D248); a first load of 36 pieces went from 4,134 to 3,560 ms in contact.
+
+## <a id="d256"></a>D256: Where the package ends as the chip keeps it decides whether the card's applet is created
+
+**Adopted (2026-11-26, from the chip run of that day on card 57723320, a J3R180 keyed for SCP03 from CardLogix): an
+inference from one chip and one card, which the chip run of each release file confirms.** It replaces, as the place a file
+is aimed at, the load file's own place in its 256-byte page (245 past for every 3.x file until now, CASHU-CARD-HARDWARE.md).
+
+**What was seen.** The per-commit files of the 3.2 speed work were each deleted and loaded again on that card in the same
+way (the opener first, then the card's applet, then the tag). By the load file, the card did not tell them apart: every file
+but two of the test ones was 245 past, and at 245 past it created some and refused others, at the very same sizes. By the
+package without its RefLocation component it did:
+
+| File | Commit | Load file, bytes (past) | Kept by the chip, bytes (past) | The card applet's create |
+|---|---|---|---|---|
+| the tracked 3.2 file | c816133 | 43,765 (245) | 39,637 (213) | created (the morning's run) |
+| 00 | 3b9b5a4 | 43,765 (245) | 39,647 (223) | refused once, created at the second try |
+| 01 | 52be734 | 43,509 (245) | 39,386 (218) | refused, 7 tries of 7 |
+| 01b | 52be734 | 44,021 (245) | 39,898 (218) | refused, 5 tries of 5 |
+| 01c | 52be734 | 43,487 (223) | 39,364 (196) | created at the first try |
+| 01d | 52be734 | 43,601 (81) | 39,478 (54) | created at the first try |
+| 02 | 7b87367 | 43,509 (245) | 39,368 (200) | created at the first try |
+| 03 | 756a459 | 44,021 (245) | 39,815 (135) | created at the first try |
+| 04 | f621b23 | 44,021 (245) | 39,806 (126) | created at the first try |
+| 05 | f394b29 | 44,277 (245) | 40,044 (108) | created at the first try |
+| 06 | 4f610e6 | 44,277 (245) | 40,031 (95) | created at the first try |
+| 07 | 2c38493 | 44,533 (245) | 40,253 (61) | created at the first try |
+| 08 | 4b09cc0 | 44,789 (245) | 40,508 (60) | created at the first try |
+| 09 | 7fe7ec6 | 44,789 (245) | 40,506 (58) | created at the first try |
+| 10 | eedd741 | 44,789 (245) | 40,499 (51) | created at the first try |
+| 11 | 1d9ac2a | 44,789 (245) | 40,496 (48) | created at the first try |
+
+01 and 02 are the same 43,509 bytes, and 01b, 03 and 04 the same 44,021: the outcomes split within each. The code that runs
+at the create is the same in 52be734 and 7b87367 (CashuApplet.java byte for byte; SchnorrHW's constructor and `init()`
+untouched; A2's change runs only inside a signature on the chip's path, which needs `chipMul`, first set by SET_CARD's
+`chipMulInit`), so 52be734's refusal is no use before an init. What A2 changed of the file is its layout: 22 bytes less of
+the Method component, 18 more of RefLocation and 4 more of the constant pool. Where the kept package ends separates every
+file the card has had: 48 to 213 past created, 218 past refused at every try, 223 past refused once in two. The Method
+component's own place fits worse (52be734's refused files at 87 past and 3b9b5a4's at 104 sit between places that created,
+65, 94, 95, 98 and 113). Two files of 52be734 were then padded to the kept places 196 and 54 to test it, and both were
+created at the first try: two foretold of two. A1 alone ran the whole play-money session from 01c (D245).
+
+**Why this measure.** RefLocation lists where the Method component's references to the constant pool are, so that the
+loader can link them; a chip that has linked the package has no use for it. What the install makes (the applets' objects)
+starts after what the chip keeps, and CASHU-CARD-HARDWARE.md already read the old windows as something the install makes
+that must not fall across an edge, where the image ends. The load file's size only approximates where that image ends, off
+by the RefLocation component's length, which differs from build to build by as much as A2's 18 bytes; so a window by the
+load file moved from one version to the next. How the chip lays the package out is not published: the measure is chosen
+because it separates the files, and the reason is an inference.
+
+**The rule.** A file is padded (`CashuApplet.sizeTheFile`) so that its kept package ends 60 to 180 past a multiple of 256,
+aimed at 120, the middle of the places that created, clear of both ends. `tools/refcheck.py` says, after every build, how
+many bytes the kept package is and where it ends, and warns of a file outside 60 to 180 past with the bytes that would move
+it to 120 (`kept_warning`, `KEPT_SEEN` with the table above; `tools/ci/refcheck.test.cjs`). SIZES, AVOID and the warnings by
+the load file's place stay as the record of what was measured that way; for a file with a RefLocation component, which every
+CAP the build makes has, the kept place is the one warned of.
+
+**What it does not know.**
+- One chip and one card. The card had held other packages, and today's deletes and loads put the package where it put it
+  each time (every file was created or refused the same way at every try, 3b9b5a4's alone once each way); a card fresh from
+  its maker may start the package elsewhere, and the places that create then sit elsewhere by the same offset.
+- The edges: 213 past created and 218 refused, so the refused places begin somewhere in between; where they end above 223
+  is not known, nor whether there are others below 48.
+- The earlier windows (1.x, 2.3, 3.0 on card 58206920) were measured by the load file alone and are not read again here.
+
+**What a maker does when the card applet's create answers 6F00** (and what the release run must show):
+- Check that no card applet was made (`gp --list`), then send the same create once more, in a fresh session. A create taken
+  at the second try was seen twice (3b9b5a4's file here; the 3.0 file at 175 past on card 58206920). SECURITY-MODEL open
+  item 10 has the provisioner's form of this: once, only after GET STATUS, logged.
+- Refused again, stop: the file's layout is one this chip refuses, and asking again does not change it (52be734's file was
+  refused twelve times on two sizes). The file is padded again by refcheck's measure and tried on a chip; it is not shipped.
+- The release run's create cycles delete and create the instances with the package loaded, so the package stays where it was
+  loaded: five of them say the file creates there, not on a card where the package lands elsewhere. The release file is
+  loaded and created on a card fresh from the batch it ships on, and once on a card that has held another package.
+
+**The 3.2 file** is padded by this rule. At 9d14bde: unpadded, its kept package ended 86 past; with five writes it ended
+120 past (40,312 bytes), its load file 44,592 bytes (48 past). With D254 left out and D257 in, unpadded it ends 229 past
+(40,421 bytes, outside the aim); with twenty-four writes it ends 120 past (40,568 bytes), its load file 44,869 bytes
+(69 past). That was not the final file: with D258's counts the kept package ends 132 past (40,580 bytes) and the load
+file is 44,881 bytes (81 past), inside the aim, and that file was created at the first try four times of four on each of
+three cards ([D258](#d258)).
+
+## <a id="d257"></a>D257: A count that never comes again mixed into every signature's aux
+
+**Proposed (applet 3.2, 2026-11-26; not released; in the final file, which passed the chip run on three cards on 2026-11-26,
+[D258](#d258); the red team's recommended fix for its C-f7bdac4-1).**
+No command, answer or stored format of the protocol changes; the card keeps four bytes more.
+
+**The rule.** BIP-340's aux, the 32 bytes the signer draws for each signing (step 2), is the generator's 32 bytes with a
+count XORed into its last five: `signCount`, four bytes kept, stepped before the first signing of each time in the field
+and before the first after every 255 more, then `signCountHere`, one byte of RAM cleared at power loss
+(`CLEAR_ON_RESET`), the signings since that step. The pair is never the same twice, so the aux of two signings is never
+the same whatever the generator answers, and neither is the nonce, k = H(t ‖ P ‖ m) with t = d XOR H_aux(aux). Every
+signing counts: AUTH, a wait's, the PIN key's (GET_NONCE P1 = 1), a payment's SIGN, the record's descriptor, and the
+bytecode's signing again after the chip's path was refused.
+
+**What it closes.** The red team's C-f7bdac4-1 (MEDIUM, older than 3.2, proved on both paths): with a stuck generator two
+signatures of one message have one nonce, and one bit of k flipped between its hash and R = kG gives a signature that
+verifies for its own nonce, which no check can refuse; with the good one of the same message, d. Every other way to the
+key by a stuck generator rests on the same thing, one nonce twice: D250's fault in e and the message fault of its
+follow-up among them. `CountedAuxTest`: with the generator stuck, 600 signings of one message across two power cuts and two
+wraps of the RAM count have 600 R on each path; the red team's nonce fault and message fault give no key (the same search
+finds it on a signer with no count); on a card, two AUTHs of one reader nonce with both of the card's generators stuck give
+two R, and the count steps once a time in the field.
+
+**A tear.** The step is written (an atomic `Util.arrayCopy`) before the aux is drawn. Torn before it commits, the count is
+as it was, which was used only with RAM counts of an earlier time in the field, and the next time in the field steps it;
+torn after, it is stepped. A signing is never asked to step it inside a transaction (6F00 there), where an abort would take
+the step back while the RAM count went on. No code path signs inside one.
+
+**BIP-340 and its vectors.** BIP-340's aux is any 32 bytes of auxiliary data; how the card chooses it changes no signature's
+validity. A signer with no count (a test's signer of its own, `counted` not called) draws the generator's aux alone, so the
+tests that pin signatures to a given aux are as they were; with the count, a vector's aux is had again by giving the
+generator that aux XOR the count, and `CountedAuxTest.theCountIsXoredIntoTheAux` pins the card's signature to BIP-340's own
+signing of the aux that comes out, byte for byte.
+
+**The vectors.** `spec/vectors/secret.json`'s signatures and the transcript's 64 signed answers are made again: each is a
+fresh jCardSim card's, whose count is 0 at the install and is stepped by the first signature of each time in the field. A
+model held to the transcript byte for byte mixes the count the same way. The tests that read them (cardsim's
+`cashu-crypto.test.cjs`, cardctl's `test_apdu.py` and `test_spec_consistency.py`, cardkit's `settled-cleanup.test.ts`) pass
+on them. Two of CashuAppletTest's tests made the burn's transaction fail by leaving one open between commands, which
+jCardSim allows and a card does not; they now sign once (an AUTH) before the payment, outside it, as any card's tap would.
+
+**What it costs.** Each signing: five XORs and one byte of RAM, nothing measurable. Each time in the field: one atomic write
+of four persistent bytes at its first signing (one page write with the transaction's log on the chip, a few milliseconds;
+not measured), and one more each 255 signings in one time in the field. Wear: one write a tap; a payment writes far more (the
+paid list, the burn, the day's count). AUTH, which any reader may ask, now causes that one write a tap (SECURITY-MODEL open
+item 7). Memory: four persistent bytes and one of `CLEAR_ON_RESET` at install, made last in the constructor so that nothing
+made before them moves; the install's RAM is then 941 bytes cleared on deselect and 8 on reset in 16 arrays, the budget of
+the build known to install (8 and 16 at their limits).
+
+**What it does not close.** A generator whose output an attacker chooses (not stuck, but steered) can cancel a count it knows:
+the count is no secret. A fault that skips the count's step, or its RAM step, makes two signings share a count: with a stuck
+generator that is the old case again, at the price of one more fault.
+
+**And D250, with this in.** The cheapest way left to the key is a stuck generator, one fault to make two signings share a
+count, and one fault in k before R = kG, which no check after R can see; the re-hash of e stops the variant with the second
+fault in e instead of k, at the same price, and so no longer raises the price of the key. What it still does is hold the
+card's check to BIP-340's own challenge: a fault in e between its hash and the product makes a signature the card refuses
+and makes again (or 6F00), where without it the card would release a signature that verifies under the faulted e alone,
+which no mint takes; on a payment's SIGN that is pieces burned for a signature that is no good. That is the money's safety
+against a fault, not the key's. The project lead decides (D250: about 17 ms a signature, 28 a payment's SIGN); the final file is
+built both ways.
+
+## <a id="d258"></a>D258: The holds and the PIN's wait keep their seconds; a payment's wait keeps its count
+
+**Proposed (applet 3.2, 2026-11-26; not released; the final file passed the chip run on three cards on 2026-11-26, below):
+the project lead's rule that each wait keeps its seconds, for
+the PIN's wait and the owner's holds; and the project lead's decision of 2026-11-26 that a payment's wait over its limit keeps its
+count.** No command, answer or stored format changes; the counts do, and a reader that asks again while the card answers
+`6A98` meets more askings of the same seconds.
+
+**Why.** Every wait on the card is counted in its own work: a payment's wait in signatures (`SPEND_ALL_SIGN` answered
+`00 01`), a held tap's and the PIN's wait in askings, each but the last a signature's work answered `6A98` (`work`, D218). The
+3.2 speed work (D245 to D253, D255, D257) made that signature about 22% quicker, so with 3.1's counts every wait was about a
+fifth shorter than the project lead agreed.
+
+**Which waits keep their seconds:** the PIN's wait after wrong tries, the owner's claim, the history of a card with no owner,
+and its reset by the PIN. These are what slow a reader that is guessing a PIN or taking a card over; their counts are raised.
+
+**Which wait keeps its count:** a payment's wait over its limit on one payment (`WAIT_MORE_SIGNS`) and a second payment's least
+in one time in the field (`WAIT_SECOND_SIGNS`), 2 and 2 as in 3.1, and so `WAIT_SIGNS_MOST` 508. Raised to 3 they kept their
+seconds on the reader (1.08 s a limit's worth on the 3.2 file against 0.93 s for 2 on the base file), but by an estimate of a
+client's pacing in a phone's field (not measured: each signature taken as about a third longer there), 3 would make a
+payment over the limit slower on 3.2 than on 3.1, about 1.45 s a limit's worth against 1.25 s, and 2 about 1.0 s. The project lead chose 2 (2026-11-26) and accepts that a desk reader with the PIN then paces at 2 x 361.4 ms = 0.72 s a
+limit's worth on the test card, against 0.93 s (2 x 463.3 ms) on the base file: faster than L a second there.
+
+**What was measured** (the reader, medians, milliseconds; the base file 00-base-3b9b5a4.cap, the 3.2 file 17-final-a43.cap
+at 0249e32, the chip run of 2026-11-26 on card 57723320, a J3R180):
+
+| What | Base | 3.2 file |
+|---|---|---|
+| A wait's signature (`SPEND_ALL_SIGN` answered "not yet") | 463.3 | 361.4 |
+| The owner's proof (`AUTH`) | 478.9 | 387.1 |
+| A held claim's asking (`SET_OWNER` answered `6A98`) | 538.4 | 414.2 to 425.4 (two runs) |
+| A held PIN's asking (`VERIFY_PIN` answered `6A98`) | 484.8 | 352.6 |
+| A held history's asking (`GET_LOG` answered `6A98`) | 476.1 | 360.0 |
+| A held reset's asking (`RESET_CARD` answered `6A98`) | 491.3 | 361.4 |
+
+**The card key's parity.** On the J3R180 a wait's signature takes about 350 ms when the card's public key has an even y
+(prefix 02) and about 361.5 ms when it is odd (prefix 03), because the odd case runs two more 32-byte subtractions (about
+5.7 ms each, measured); on the J3R452 the final file's figures are 457.3 and 469.7 ms. Each install draws a new card key, so
+two sessions are compared at the same parity, and a difference of about 11.5 ms between sessions of different parity is the
+key, not the code. In the table above the base file's session had an even key and the 3.2 file's two sessions an odd one. The
+hardware report lists the parity of every measuring session of 2026-11-26.
+
+**The rule, for the holds and the PIN.** Never shorter than before: the new count is the least whole count whose time on the
+3.2 file is no less than the old count's time on the base file, with the smaller figure where the 3.2 file has two. A hold of
+N askings is N - 1 askings' work (D236), so its seconds are (N - 1) times an asking's.
+
+| Constant | Old | Base, s | 3.2 file, old count, s | New | 3.2 file, new count, s |
+|---|---|---|---|---|---|
+| `CLAIM_ASKINGS` (3 askings' work, then 4) | 4 | 1.615 | 1.243 | 5 | 1.657 |
+| `HISTORY_ASKINGS` (2, then 3) | 3 | 0.952 | 0.720 | 4 | 1.080 |
+| `RESET_ASKINGS` (3, then 5) | 4 | 1.474 | 1.084 | 6 | 1.807 |
+| `PIN_STRETCH` | 16 | 7.757 | 5.642 | 22 | 7.757 |
+| `PIN_OWED_MOST` | 16,384 | 7,943 (2 h 12 min) | 5,777 (1 h 36 min) | 22,527 | 7,943 |
+| the PIN's wait after the w-th wrong try, 2^(w-1) | 1, 2, 4 ... 8,192 | | | 2, 3, 6, 11, 22 ... 11,264 | no less |
+| `WAIT_MORE_SIGNS` (kept by the project lead's decision) | 2 | 0.927 | 0.723 | 2 | 0.723 |
+| `WAIT_SECOND_SIGNS` (kept) | 2 | 0.927 | 0.723 | 2 | 0.723 |
+| `WAIT_SIGNS_MOST` (2 x 254, kept) | 508 | 235.4 | 183.6 | 508 | 183.6 |
+
+- The PIN's wait owed after a wrong try is a count too, 2^w askings for w wrong tries before it: it is now 11/8 of that, rounded
+  up (`countTry`: x + (3x + 7) / 8 with x = 2^w, w under 14), which is the least by the rule at every w (484.8 / 352.6 is
+  1.37493, just under 11/8), and `PIN_OWED_MOST` from the fifteenth wrong try on. A wrong try still makes the next wait about
+  twice as long (exactly twice from the fourth on).
+- `WAIT_SIGNS_MOST` is a ceiling, not a wait of its own: what 255 limits' worth waits, and the wait of a sum that wrapped. It
+  stays `WAIT_MORE_SIGNS` x (`WAIT_UNITS_MOST` - 1). `WAIT_UNITS_MOST` (255) counts limits' worth, not seconds.
+- The change outputs' credit (one wait off for every two outputs, D231) is not a wait and is not changed.
+
+**Widths.** Every count stays in the type it had. The held counts are in `nonceLive[1]`'s low six bits (the PIN and the
+reset, with their marks) or seven (the claim, the history): the most counted is the PIN's stretch, 22 + 1, under 63. The
+askings owed are a short in `pinMarks` (`PM_OWED`): 22,527 fits (under 32,767), and `countTry`'s 3x + 7 is at most 24,583.
+No count is sent in `GET_INFO` or kept elsewhere on the card.
+
+**What follows it.** spec/APDU.md says the new counts; cardctl and the cardsim client bound a PIN wait by `PIN_OWED_MOST` +
+its stretches (3.1's bound, 17,410 askings, was short of the longest 3.2 wait, 23,551 askings), and their tests read the bound
+against the applet's constants; cardctl's mock card claims, reads and resets at the applet's counts. The claim's, history's
+and reset's bounds of 10, 7 and 17 (3.0's) are more than 3.2's counts and are not changed. spec/vectors/transcript.json and
+secret.json are made again: the PIN's longer waits are more askings in the transcript, and more work before the vectors' own
+signatures moves D257's count and the generator's draws, so their signatures and the card's nonce differ; nothing in their
+form changes. WaitSecondsTest works each hold's count out from the measured figures above and fails on 3.1's, and pins the
+payment's 2 and 2 on purpose, noting that the rule alone would say 3.
+
+**The file.** With `sizeTheFile`'s writes as D256 left them the kept package is 40,580 bytes, 132 past a multiple of 256
+(inside 60 to 180; 120 before), and the load file 44,881 bytes (81 past). The writes are not changed.
+
+**On the chips (2026-11-26).** That file (19-final-waits2.cap, load file sha256 `c525db93…`) passed the whole chip run on
+three cards: 57723320 (a J3R180 keyed for SCP03), 09344120 (a fresh J3R180 from another seller, SCP02) and 36813121 (a
+J3R452, JCOP 4.5, P71D600). The card applet was created at the first try four times of four on each; `GET_INFO` byte 56 was
+07 on all three. The same test payments waited 57 times, as on 3.1. The file from before the speed work (00-base-3b9b5a4,
+245 past) could not be created on the J3R452 (`INSTALL` 6F00): D256's rule seen on a second chip.
+[The report](reports/HARDWARE_TEST_REPORT_2026-11-26_3.2-final.md) has the figures.
+
+## <a id="d259"></a>D259: A known low left in 3.2: agrees()'s first init is outside its try
+
+**Recorded (applet 3.2, 2026-11-26), not fixed: the fix changes the applet's bytes, and the file of 70bff21 has passed its
+chip runs.** The ordinary review of the 3.2 speed code (its L1) found that in `SchnorrHW.agrees` the line
+`if (ready[R_CURVE] != (byte) 1) curveKA.init(curveKey);` sits outside the `try` that turns a refusal into `false`. On a chip
+that refused that `init`, agrees() would throw instead of answering: `checksCurve` at `SET_CARD` would end the command after
+the record's transaction, `selfTested` would stay false, and every later `SET_CARD` would fail the same way, where D251 means
+the card to fall back to the temporary key; in `loadOne` and `unblind` the callers would answer 6A80 to a good point.
+`curveEngine` checks only that the key and the agreement can be made, not that the agreement takes the key.
+
+A second small one, also left: `curveEngine` makes its key with `buildKey` and then sets its curve and scalar
+(`CashuApplet.curve(k)`, `setS`); if either of those threw, the new key would be dropped and made again at the next set-up
+life, so at most one key is lost a reset. SchnorrHW's rule on `new` (outside the constructor, `init()` and the first
+SET_CARD's engine set-up, `chipMulInit` and `curveEngine`, each made once behind a null check) points here.
+
+The J3R180 and the J3R452 (JCOP 4.5, P71D600) both take the `init`: in the chip runs of 2026-11-26 `SET_CARD` passed and
+`GET_INFO` byte 56 was 07 on all three cards (D258). So it matters only on a chip not yet tried. **To fix in the next version
+that changes the applet's bytes:** move the conditional `init` inside the outer `try`, or have `curveEngine` try one
+`curveKA.init(curveKey)` in its own `try` and leave `curveKA` null where it fails; then pad again by D256 and run the chips.

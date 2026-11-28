@@ -65,8 +65,12 @@ class AnchorTearTest {
                     if (rec[CashuApplet.CARD_CLOCK_WEAK_OFFSET] != 0) c.wrong("the anchor's clock weak");
                     if (bits != le(WeakClockTest.NET_BITS)) c.wrong("the anchor, harder, not the hardest: " + Long.toHexString(bits));
                 } else {
-                    if (now != F || readUint32(rec, CashuApplet.CARD_WINDOW_OFFSET) != F + 100 || bits != le(0x20300000L))
-                        c.wrong("the old owner's card changed: now=" + now + " bits=" + Long.toHexString(bits));
+                    /* 3.2 (D244): a hand-over commits what the last owner leaves before the next owner's key; torn between the two
+                     * commits, the card is the last owner's, empty, with its days forgotten (`forgetOwed`, window 0) and its clock
+                     * as it was; torn before the first, as it was in every part */
+                    long window = readUint32(rec, CashuApplet.CARD_WINDOW_OFFSET);
+                    if (now != F || (window != F + 100 && window != 0) || bits != le(0x20300000L))
+                        c.wrong("the old owner's card changed: now=" + now + " window=" + window + " bits=" + Long.toHexString(bits));
                 }
             });
     }

@@ -146,7 +146,7 @@ test('a 2.2 card (D175) and a 3.0 card are reviewed as a 2.1 card is, and a vers
     [2, 0],
     [2, 3],
     [2, 4],
-    [3, 2],
+    [3, 3],
     [4, 0],
   ] as const) {
     await assert.rejects(() => readResetReview(card(1, version).tx));

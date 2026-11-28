@@ -330,7 +330,7 @@ class SignatureCheckTest {
         assertFalse(code.contains("signatureWork"), "no unchecked signature in the applet");
         for (String site : new String[] {
                 "schnorrHW.sign(cardPrivKey, cardPubKey, scratch, X_MSG, buf, AUTH_NONCE_LEN);",
-                "schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, scratch, X_MSG, buf, (short) 1);",
+                "schnorrHW.sign(cardPrivKey, cardPubKey, group, (short) 0, groupY, (short) 0, scratch, X_MSG, buf, (short) 1);",
                 "schnorrHW.sign(cardPrivKey, cardPubKey, buf, (short) 68, scratch, X_MSG, buf, (short) 0);",
                 "schnorrHW.sign(cardPrivKey, cardPubKey, scratch, X_MSG, buf, sigAt);",
                 "schnorrHW.sign(cardPrivKey, cardPubKey, scratch, X_MSG, buf, (short) 0);" }) {

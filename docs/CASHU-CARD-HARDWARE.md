@@ -146,14 +146,32 @@ card 36813121, a J3R452, and on card 09334220, a J3R180 keyed for SCP02, runs th
 ([D238](DECISIONS.md#d238), [the logs](reports/HARDWARE_TEST_LOGS_2026-11-23_3.1-review/)). So 42,741 bytes is a size known to install on a J3R180 keyed for
 SCP03 (58206920), on one keyed for SCP02 (09334220) and on a J3R452 (36813121), as refcheck's general line for it says.
 
+**3.2: the package as the chip keeps it ([D256](DECISIONS.md#d256)).** On card
+57723320 (a J3R180 keyed for SCP03, 2026-11-26) the 3.2 speed work's files, each
+loaded and created the same way, were all 245 past by the load file, and the card
+created some and refused others at the very same sizes: 52be734's file of 43,509
+bytes was refused at every try (7 of 7) where 7b87367's of the same 43,509 bytes
+was created at the first. The code run at the create was the same in both. What
+told them apart, for every file that card had that day, is where the package
+ends without its RefLocation component, which the chip needs only to link: 48
+to 213 past a multiple of 256 created, 218 past was refused at every try, and
+223 past once in two. Two files of 52be734 padded to 196 and 54 past by that
+measure were then created at the first try, as it foretold. So the place aimed
+at is now that one, 60 to 180 past (aimed at 120); it fits what the 1.x reading
+above guessed (what the install makes starts where the package image ends),
+with the image shorter than the load file by RefLocation, whose length differs
+from build to build. It rests on one card of one chip; a card fresh from its
+maker may start the package elsewhere.
+
 What the software does: `CashuApplet.sizeTheFile` is never called and is in
 the package for its length alone, about six bytes a line, so that a build
-can be moved to a size that is known to install; `tools/refcheck.py`, after
-every `ant cap`, keeps every size the chip has answered (`SIZES`) and says
-whether this build's size is one that installed, one that failed, or one not
-tried yet. A size not tried yet is tried on the chip (the deployment guide's
-install, on a spare card), and the answer is added to the table. A
-version is shipped at a size that installed.
+can be moved; `tools/refcheck.py`, after every `ant cap`, says where the
+build's kept package ends and warns of one outside 60 to 180 past with the
+bytes that would move it to 120 past (D256), and keeps every load-file size
+the chip has answered before (`SIZES`), saying whether this build's size is
+one that installed, one that failed, or one not tried yet. A file not tried
+yet is tried on the chip (the deployment guide's install, on a spare card). A
+version is shipped as a file that the chip run has created.
 
 <a id="a-constructor-may-ask-for-little-more-the-rest-is-asked-for-after-the-install"></a>
 

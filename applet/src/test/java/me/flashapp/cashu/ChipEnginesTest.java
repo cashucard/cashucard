@@ -85,17 +85,29 @@ class ChipEnginesTest {
      * The chip's RSA for a FakeKey: x^e mod m for the 64 bytes in, 64 bytes out; for x at or over m, garbage (what the chip
      * answers: no error). `lie` makes it wrong (the last byte of every answer changed), `refuse` makes every use throw. A key
      * that is not a FakeKey goes to the real engine (the simulator's), if there is one.
+     *
+     * As a chip's engine (D248, the red team's A3-e): init copies the key's modulus and exponent, so a key written after it is
+     * not seen until the next init; and what it was given is lost at `forget` (a power cut or a selection: the card's
+     * `onSelect`), after which a power throws INVALID_INIT, as a chip's may, until it is given a key again.
      */
     static class Engine extends Cipher {
         final Cipher real;
         FakeKey key;
+        BigInteger mod, exp;
+        boolean held;
         int powers, oldPowers, garbage;
+        /** Every init, of a FakeKey (D247: an engine is given its key once a command; D248, once a selection). */
+        int inits;
+        /** Every power asked of it while it held nothing (D248): each one answered INVALID_INIT. */
+        int stale;
         boolean lie, refuse;
         /** Every power's key modulus, in order. */
         final List<BigInteger> moduli = new ArrayList<>();
         Engine(Cipher real) { this.real = real; }
+        void forget() { held = false; }
         @Override public void init(Key k, byte m) throws CryptoException {
-            if (k instanceof FakeKey) { key = (FakeKey) k; return; }
+            held = true;
+            if (k instanceof FakeKey) { key = (FakeKey) k; mod = key.mod; exp = key.exp; inits++; return; }
             key = null;
             real.init(k, m);
         }
@@ -105,17 +117,18 @@ class ChipEnginesTest {
         @Override public byte getCipherAlgorithm() { return Cipher.ALG_RSA_NOPAD; }
         @Override public short update(byte[] a, short o, short l, byte[] out, short oo) throws CryptoException { throw new UnsupportedOperationException(); }
         @Override public short doFinal(byte[] a, short o, short l, byte[] out, short oo) throws CryptoException {
+            if (!held) { stale++; CryptoException.throwIt(CryptoException.INVALID_INIT); }
             if (key == null) { oldPowers++; return real.doFinal(a, o, l, out, oo); }
             if (refuse) CryptoException.throwIt(CryptoException.ILLEGAL_VALUE);
             powers++;
-            moduli.add(key.mod);
+            moduli.add(mod);
             assertEquals(64, l, "the chip's RSA takes the modulus' length");
             BigInteger x = new BigInteger(1, Arrays.copyOfRange(a, o, o + l)), r;
-            if (x.compareTo(key.mod) >= 0) {
+            if (x.compareTo(mod) >= 0) {
                 garbage++;
                 r = new BigInteger(1, sha256(a, o, l)).shiftLeft(256).xor(BigInteger.valueOf(0x5A5A5A5AL));
             } else {
-                r = x.modPow(key.exp, key.mod);
+                r = x.modPow(exp, mod);
             }
             if (lie) r = r.xor(BigInteger.ONE);
             byte[] b = r.toByteArray(), res = new byte[64];
@@ -139,12 +152,27 @@ class ChipEnginesTest {
     static boolean flag(Object owner, Class<?> cls, String name) throws Exception { return (Boolean) get(owner, cls, name); }
     static SchnorrHW signerOf(UnitsTest.Card c) throws Exception { return (SchnorrHW) get(c.applet(), CashuApplet.class, "schnorrHW"); }
 
-    /** The two engines a card is given in place of the chip's: `field` for the p keys, `sign` for the signature's squaring. */
+    /**
+     * The engines a card is given in place of the chip's: `field` for the p*p keys and the padded keys' known answers (`rsa`),
+     * `own` the four padded keys' engines of their own (D247: the cube's, the root's, Euler's, the square's), `sign` for the
+     * signature's squaring. Every Cipher the applet makes is one of these (the red team's A3-e).
+     */
     static final class Engines {
         Engine field, sign;
+        final Engine[] own = new Engine[4];
+        Engine[] all() { return new Engine[] { field, own[0], own[1], own[2], own[3], sign }; }
+        /** A power cut or a selection: every engine loses what it was given. */
+        void forget() { for (Engine x : all()) x.forget(); }
+        /** The field's padded powers, on `rsa` and the engines of their own. */
+        int fieldPowers() { int n = field.powers; for (Engine x : own) n += x.powers; return n; }
+        int fieldGarbage() { int n = field.garbage; for (Engine x : own) n += x.garbage; return n; }
+        List<BigInteger> fieldModuli() { List<BigInteger> m = new ArrayList<>(field.moduli); for (Engine x : own) m.addAll(x.moduli); return m; }
+        int stale() { int n = 0; for (Engine x : all()) n += x.stale; return n; }
+        void zero() { for (Engine x : all()) { x.powers = 0; x.oldPowers = 0; x.garbage = 0; } }
     }
+    static final String[] OWN = { "rsaCubeE", "rsaRootE", "rsaEulerE", "rsaSquareE" };
 
-    /** A card (not yet set up) whose chip is `Engine`s: the card's own RSA wrapped with fake padded keys, and the signer's squaring engine. */
+    /** A card (not yet set up) whose chip is `Engine`s: the card's own RSA wrapped with fake padded keys (the square's too), the padded keys' own engines, and the signer's squaring engine; each forgets what it was given at every selection, as a chip's may. */
     static UnitsTest.Card unsetCard(Engines e) throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         Object applet = c.applet();
@@ -153,10 +181,16 @@ class ChipEnginesTest {
         set(applet, CashuApplet.class, "rsaCubeP", new FakeKey());
         set(applet, CashuApplet.class, "rsaRootP", new FakeKey());
         set(applet, CashuApplet.class, "rsaEulerP", new FakeKey());
+        set(applet, CashuApplet.class, "rsaSquareP", new FakeKey());
+        for (int i = 0; i < 4; i++) {
+            e.own[i] = new Engine(null);
+            set(applet, CashuApplet.class, OWN[i], e.own[i]);
+        }
         e.sign = new Engine(null);
         SchnorrHW s = signerOf(c);
         set(s, SchnorrHW.class, "rsaC", e.sign);
         set(s, SchnorrHW.class, "sqKey", new FakeKey());
+        c.onSelect.add(e::forget);
         return c;
     }
     /** A card set up on those engines, with the owner's grant in the tap (as KeysetKeysTest.card). */
@@ -225,7 +259,7 @@ class ChipEnginesTest {
         c.ready(UnitsTest.SAT, true);
         c.grant();
         assertTrue(flag(c.applet(), CashuApplet.class, "fieldP"), "the self-test held");
-        for (BigInteger m : e.field.moduli) assertEquals(P, m, "every power so far is mod p");
+        for (BigInteger m : e.fieldModuli()) assertEquals(P, m, "every power so far is mod p");
         Object applet = c.applet();
         for (String n : new String[] { "rsaCubeP", "rsaRootP", "rsaEulerP" }) {
             FakeKey k = (FakeKey) get(applet, CashuApplet.class, n);
@@ -235,13 +269,11 @@ class ChipEnginesTest {
         assertEquals(BigInteger.valueOf(3), ((FakeKey) get(applet, CashuApplet.class, "rsaCubeP")).exp);
         assertEquals(P.subtract(BigInteger.ONE).shiftRight(1), ((FakeKey) get(applet, CashuApplet.class, "rsaEulerP")).exp);
         assertEquals(ROOT_EXP, ((FakeKey) get(applet, CashuApplet.class, "rsaRootP")).exp, "the root's exponent is the p*p key's: (p+1)/4 + (p-1)/2, odd as an RSA exponent is, and the same root of a square");
-        e.field.powers = 0;
-        e.field.oldPowers = 0;
-        e.field.garbage = 0;
+        e.zero();
         changeIsRight(c, 8);
-        assertTrue(e.field.powers > 8 * 3, "the padded keys did the cube, Euler's test and the root of every change point and of every piece written back");
+        assertTrue(e.fieldPowers() > 8 * 3, "the padded keys did the cube, Euler's test and the root of every change point and of every piece written back");
         assertEquals(0, e.field.oldPowers, "no power of the p*p keys");
-        assertEquals(0, e.field.garbage, "and not one input at or over the modulus (p): the chip answers garbage there");
+        assertEquals(0, e.fieldGarbage(), "and not one input at or over the modulus (p): the chip answers garbage there");
     }
 
     @Test
@@ -282,11 +314,11 @@ class ChipEnginesTest {
         for (BigInteger x : new BigInteger[] { P, P.add(BigInteger.ONE), BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE) }) {
             byte[] a = new byte[128];
             System.arraycopy(unsigned32(x), 0, a, 32, 32);
-            int before = e.field.powers;
+            int before = e.fieldPowers();
             java.lang.reflect.InvocationTargetException t = assertThrows(java.lang.reflect.InvocationTargetException.class, () -> m.invoke(c.applet(), cube, a, (short) 0));
             assertTrue(t.getCause() instanceof ISOException, "refused: " + t.getCause());
             assertEquals(CashuApplet.SW_CRYPTO_ERROR, ((ISOException) t.getCause()).getReason());
-            assertEquals(before, e.field.powers, "no power was asked of the engine");
+            assertEquals(before, e.fieldPowers(), "no power was asked of the engine");
         }
         // and the values under p are the engine's: p - 1 cubed is p - 1
         byte[] a = new byte[128];
@@ -346,6 +378,8 @@ class ChipEnginesTest {
         Object applet = c.applet();
         PerPaymentKeyTest.CountingCipher rsa = (PerPaymentKeyTest.CountingCipher) PerPaymentKeyTest.wrap(applet, CashuApplet.class, "rsa", o -> new PerPaymentKeyTest.CountingCipher((Cipher) o));
         PerPaymentKeyTest.CountingAgreement ecdh = (PerPaymentKeyTest.CountingAgreement) PerPaymentKeyTest.wrap(signerOf(c), SchnorrHW.class, "ecdh", o -> new PerPaymentKeyTest.CountingAgreement((javacard.security.KeyAgreement) o));
+        // D251: and agrees()'s own, which the curve tests by agreement ask
+        PerPaymentKeyTest.CountingAgreement curve = (PerPaymentKeyTest.CountingAgreement) PerPaymentKeyTest.wrap(signerOf(c), SchnorrHW.class, "curveKA", o -> new PerPaymentKeyTest.CountingAgreement((javacard.security.KeyAgreement) o));
         java.lang.reflect.Field f = CashuApplet.class.getDeclaredField("curveByAgreement");
         f.setAccessible(true);
         f.setBoolean(applet, byAgreement);
@@ -354,17 +388,18 @@ class ChipEnginesTest {
         byte[] row = payWithChange(c, place, 8, A.keyFor(8), null);
         c.power();
         assertEquals(SW_OK, show(c, row[0], A, 8));
-        int p0 = rsa.powers, a0 = ecdh.made;
+        int p0 = rsa.powers, a0 = ecdh.made + curve.made;
         assertEquals(SW_OK, KeysetKeysTest.loadChange(c, row, A.privFor(8)).getSW());
-        return new int[] { rsa.powers - p0, ecdh.made - a0 };
+        return new int[] { rsa.powers - p0, ecdh.made + curve.made - a0 };
     }
 
     @Test
-    @DisplayName("D215: LOAD_CHANGE's K, C_ and the unblinded C are held to the curve by the chip's key agreement (three agreements, and no Euler test of theirs: the RSA does only the opening's own B_, a cube and a root); where the set-up's agreement test did not hold, the old tests run (ten powers, no extra agreement)")
+    @DisplayName("D215: LOAD_CHANGE's K, C_ and the unblinded C are held to the curve by the chip's key agreement (three agreements, and no Euler test of theirs: the RSA does nothing, 3.2 keeping the opening's B_ whole); where the set-up's agreement test did not hold, the old tests run (six powers with the square, no extra agreement)")
     void loadChangeChecksByAgreement() throws Exception {
         int[] by = loadChangeCounts(KeysetKeysTest.card(), true), old = loadChangeCounts(KeysetKeysTest.card(), false);
-        assertEquals(2, by[0], "by the agreement: the RSA powers are B_'s cube and root alone");
-        assertEquals(10, old[0], "by Euler's test: K's three and C_'s three, B_'s two, and the unblinded C's cube and Euler");
+        // 3.2 (D244): B_ is kept whole (its y beside it), so its cube and root are gone from both paths
+        assertEquals(0, by[0], "by the agreement: no RSA power at all, B_ kept whole");
+        assertEquals(6, old[0], "by Euler's test: K's two and C_'s two (by the square, D244: a cube and a square where a cube, Euler and a root were three), and the unblinded C's cube and Euler");
         assertEquals(3, by[1] - old[1], "and three key agreements more");
     }
 
@@ -400,8 +435,8 @@ class ChipEnginesTest {
     void aLyingAgreementIsNotLeanedOn() throws Exception {
         UnitsTest.Card c = new UnitsTest.Card();
         SchnorrHW s = signerOf(c);
-        javacard.security.KeyAgreement real = (javacard.security.KeyAgreement) FullPointLoadTest.ecdhField().get(s);
-        FullPointLoadTest.ecdhField().set(s, new FullPointLoadTest.Agreement(real, true));
+        // D251: the agreement agrees() asks is its own, kept at the first SET_CARD where it is given beforehand
+        FullPointLoadTest.agreesThrough(s, new FullPointLoadTest.Agreement(javacard.security.KeyAgreement.getInstance(javacard.security.KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false), true));
         c.ready(UnitsTest.SAT, true);
         c.grant();
         assertFalse(FullPointLoadTest.curveByAgreement(c), "the test failed");

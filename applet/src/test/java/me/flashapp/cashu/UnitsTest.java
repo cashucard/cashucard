@@ -126,7 +126,12 @@ class UnitsTest {
 
         ResponseAPDU send(CommandAPDU c) { return CashuAppletTest.held(sim::transmitCommand, c); }
         int sw(CommandAPDU c) { return send(c).getSW(); }
-        void select() { assertEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR)))); }
+        /** Run before every SELECT: a chip's engines may lose what they were given at a selection or a power cut (D248), and a test's engines are made to. */
+        final java.util.List<Runnable> onSelect = new java.util.ArrayList<>();
+        void select() {
+            for (Runnable r : onSelect) r.run();
+            assertEquals(SW_OK, sw(new CommandAPDU(0x00, 0xA4, 0x04, 0x00, hexToBytes(AID_STR))));
+        }
         /** Taken out of the field and put back: a new tap, nothing given in it. */
         void power() { sim.reset(); select(); }
         void pin() { assertEquals(SW_OK, sw(new CommandAPDU(CLA, INS_VERIFY_PIN, 0, 0, TEST_PIN))); }
