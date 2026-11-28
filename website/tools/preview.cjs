@@ -10,7 +10,7 @@ const port = Number(process.argv[2] || process.env.PORT || 9117);
 const types = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml", ".ttf": "font/ttf",
-  ".mp4": "video/mp4", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml", ".md": "text/markdown; charset=utf-8",
+  ".vtt": "text/vtt; charset=utf-8", ".mp4": "video/mp4", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml", ".md": "text/markdown; charset=utf-8",
 };
 
 // _headers: a line without indentation is a path pattern (one * splat), indented lines are headers for it
@@ -32,18 +32,18 @@ http.createServer((req, res) => {
   let rel = decodeURIComponent(url.pathname);
   if (rel.endsWith("/")) rel += "index.html";
   else if (/^\/[a-z][a-z0-9-]*$/.test(rel)) rel += ".html";
-  const file = path.join(root, rel);
+  let file = path.join(root, rel);
+  let status = 200;
   if (!file.startsWith(root + path.sep) || path.basename(file) === "_headers" || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("Not found");
-    return;
+    file = path.join(root, "404.html");
+    status = 404;
   }
   for (const rule of readRules()) if (matches(rule.pattern, url.pathname)) for (const [k, v] of rule.headers) res.setHeader(k, v);
   const size = fs.statSync(file).size;
   res.setHeader("Content-Type", types[path.extname(file)] || "application/octet-stream");
   res.setHeader("Accept-Ranges", "bytes");
   const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
-  if (range && (range[1] || range[2])) {
+  if (status === 200 && range && (range[1] || range[2])) {
     let start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
     let end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
     if (start >= size || start > end) {
@@ -56,7 +56,7 @@ http.createServer((req, res) => {
     fs.createReadStream(file, { start, end }).pipe(res);
     return;
   }
-  res.writeHead(200, { "Content-Length": size });
+  res.writeHead(status, { "Content-Length": size });
   if (req.method === "HEAD") return res.end();
   fs.createReadStream(file).pipe(res);
-}).listen(port, "127.0.0.1", () => console.log("Preview at http://127.0.0.1:" + port));
+}).listen(port, "127.0.0.1", function () { console.log("Preview at http://127.0.0.1:" + this.address().port); });

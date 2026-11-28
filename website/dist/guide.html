@@ -23,29 +23,38 @@
     <link rel="stylesheet" href="/guide.css" />
     <script src="/guide.js" defer></script>
     <title>Install guide | Cashu Card</title>
+    <link rel="stylesheet" href="/learn.css">
+    <link rel="stylesheet" href="/navigation.css">
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-    <header class="header">
-      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
-    </header>
-    <main id="main" class="guide">
+    <!-- site header -->
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <div class="mast-bar">
+    <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34"></a>
+    <nav class="mast-wide" aria-label="Main navigation"><a href="/downloads">Downloads</a> <a href="/#buy">Get cards</a> <a href="/guide" aria-current="page">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+    <a class="mast-download" href="/downloads">Downloads</a>
+    <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+  <details class="mast-menu">
+    <summary>Menu<span aria-hidden="true"></span></summary>
+    <nav aria-label="Main navigation"><a href="/#buy">Get cards</a> <a href="/guide" aria-current="page">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+  </details>
+</header>
+<!-- end site header -->
+    <main id="main" class="guide install-guide" tabindex="-1">
       <section class="guide-hero" aria-labelledby="guide-title">
         <div class="guide-hero-inner">
           <div class="guide-hero-top">
           <div class="guide-hero-copy">
           <div class="eyebrow"><span class="status-dot"></span> INSTALL GUIDE <span class="eyebrow-divider">/</span> APPLET 3.1</div>
           <h1 id="guide-title">Install the <em>Cashu Card applet</em></h1>
-          <p class="guide-lead">This guide puts the Cashu Card applet on a blank NXP J3R180 card from a computer with a card reader, then checks that the card answers. The first card takes about 20 minutes, most of it spent installing tools, and each card after that takes a few minutes. Cashu Card is experimental: read the <a href="/#risks">risks</a> before a card holds value.</p>
-          <ul class="guide-facts" aria-label="At a glance">
-            <li>Experimental</li>
-            <li>Applet 3.1</li>
-            <li>NXP J3R180 cards</li>
-            <li>GlobalPlatformPro</li>
-            <li>About 20 minutes</li>
-          </ul>
+          <p class="guide-lead">Use a computer and reader to install applet 3.1 on a blank NXP J3R180. Allow 20 minutes for your first card. Once the tools are installed, each card takes a few minutes.</p>
+          <div class="install-actions">
+            <a class="button button-bright" href="#need">Check what you need</a>
+            <a class="button button-outline" href="/downloads#setup">Install with a phone</a>
+          </div>
+          <p class="install-caution">Cashu Card is experimental. <a href="/#risks">Read the risks</a> before you load a card.</p>
           </div>
           <figure class="hero-term" aria-hidden="true">
             <div class="hero-term-bar"><i></i><i></i><i></i><span>After the install</span></div>
@@ -57,28 +66,19 @@
 <span class="out">0301 9000</span></code></pre>
           </figure>
           </div>
-          <ol class="guide-steps" aria-label="The six steps">
-            <li><a href="#tools"><b>01</b><strong>Install the tools</strong><span>Set up Java, PC/SC and GlobalPlatformPro.</span></a></li>
-            <li><a href="#applet"><b>02</b><strong>Get the applet</strong><span>Download one CAP file and check its hash.</span></a></li>
-            <li><a href="#check"><b>03</b><strong>Check the card</strong><span>Read it, then log in once.</span></a></li>
-            <li><a href="#install"><b>04</b><strong>Install</strong><span>Install three applets in order.</span></a></li>
-            <li><a href="#verify"><b>05</b><strong>Check the install</strong><span>The card answers 03 01.</span></a></li>
-            <li><a href="#setup"><b>06</b><strong>Set the card up</strong><span>Set it up before you hand it over.</span></a></li>
-          </ol>
         </div>
       </section>
 
-      <aside class="agent" aria-labelledby="agent-title">
-        <div class="agent-head">
-          <span class="agent-kicker">FOR AI AGENTS</span>
-          <h2 id="agent-title">Hand the install to an AI agent</h2>
-          <p>An AI agent that can run commands on the computer with the reader can follow this guide for you. Give it this prompt. It reads <a href="/guide.md">guide.md</a>, the same steps in plain Markdown with the stops written as rules, and it checks with you before anything outside the guide.</p>
-        </div>
-        <figure class="cmd agent-cmd">
+      <details class="agent">
+        <summary>Use this guide with an AI agent</summary>
+        <div class="agent-content">
+          <p>Give this prompt to an agent on the computer with your card reader. The <a href="/guide.md">Markdown guide</a> includes the same steps and tells the agent when to stop and ask you.</p>
+          <figure class="cmd agent-cmd">
           <figcaption class="cmd-head">Prompt for your agent</figcaption>
           <pre><code>Install the Cashu Card applet on the blank card in my card reader. Follow https://cashucard.org/guide.md step by step, check every output against it, and stop and ask me if a login is refused or anything differs.</code></pre>
         </figure>
-      </aside>
+        </div>
+      </details>
 
       <div class="guide-layout">
         <nav class="guide-rail" aria-label="Guide contents">
@@ -98,9 +98,8 @@
         </nav>
 
         <article class="guide-doc">
-          <p class="note"><b>Choosing an installation path</b>This guide installs the applet directly from a computer and reader. For phone-based issuance with operator accounts and saved recovery records, use <a href="/downloads#setup">Cashu Card Setup</a> with an <a href="/ops-service">ops-service</a>. The <a href="/developers#overview">component overview</a> explains the card, wallet, till and mint.</p>
           <details class="guide-toc">
-            <summary>Contents</summary>
+            <summary>All installation steps</summary>
             <ol>
               <li><a href="#need">What you need</a></li>
               <li><a href="#tools"><b>01</b> Install the tools</a></li>
@@ -122,7 +121,7 @@
               <li><b>A card reader</b> Any PC/SC reader for ISO 7816-4 cards works, contact or contactless. The project tests with the ACS ACR122U, a USB reader for about $40 to $50, sold on <a href="https://www.amazon.com/dp/B07KRKPWYC">Amazon</a> and by <a href="https://store.gototags.com/acs-acr122u-nfc-usb-reader/">GoToTags</a>.</li>
               <li><b>A computer</b> You need a terminal, Git, Java 11 or later and GlobalPlatformPro 20.01.23 or later. Step 1 installs Java and GlobalPlatformPro.</li>
             </ul>
-            <p>Card issuers can install from a phone instead, with the <a href="/downloads#setup">Cashu Card Setup</a> app, which installs the applet over the phone's NFC.</p>
+            <p>For phone-based issuance, <a href="/downloads#setup">Cashu Card Setup</a> uses an <a href="/ops-service">Ops service</a> for operator accounts and recovery records. The <a href="/developers#overview">component overview</a> explains where the wallet, till and mint fit.</p>
           </section>
 
           <section id="tools" aria-labelledby="tools-title">
@@ -273,7 +272,7 @@ SW: 9000</code></pre><p>Read in order: version 3.1, 128 slots, 0 unspent, 0 spen
           <section id="setup" aria-labelledby="setup-title">
             <h2 id="setup-title"><span class="step-no" aria-hidden="true">06</span>Set the card up</h2>
             <p>A card fresh from the install is empty and unowned, and any reader in range can give it a PIN, a record and an owner. Set it up before it leaves your hands.</p>
-            <p>When you give a card to someone, they set it up from their own phone, in a wallet that supports Cashu Card, with <b>Set up this card</b>. The wallets are listed under Apps at the foot of this page.</p>
+            <p>When you give a card to someone, they set it up from their own phone, in a wallet that supports Cashu Card, with <b>Set up this card</b>. Check <a href="https://getflash.io/">Flash</a> or <a href="https://getfoxy.io/">Foxy</a> for wallet support before you issue a batch.</p>
             <details class="more">
               <summary>Set up a bench card with cardctl</summary>
               <div class="more-body">
@@ -334,8 +333,8 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
 
           <section id="reference" aria-labelledby="reference-title">
             <h2 id="reference-title">Reference</h2>
-            <h3>Applet IDs</h3>
-            <div class="table-wrap">
+            <h3 id="applet-ids">Applet IDs</h3>
+            <div class="table-wrap" role="region" aria-labelledby="applet-ids" tabindex="0">
               <table class="ref">
                 <thead><tr><th scope="col">Element</th><th scope="col">AID (hex)</th></tr></thead>
                 <tbody>
@@ -349,8 +348,8 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
                 </tbody>
               </table>
             </div>
-            <h3>Supported cards</h3>
-            <div class="table-wrap">
+            <h3 id="supported-cards">Supported cards</h3>
+            <div class="table-wrap" role="region" aria-labelledby="supported-cards" tabindex="0">
               <table class="ref">
                 <thead><tr><th scope="col">Card</th><th scope="col">Java Card</th><th scope="col">Status</th></tr></thead>
                 <tbody>
@@ -372,14 +371,30 @@ gp --create D2760000850101 --package F0434153485543415244 --applet F043415348554
         </article>
       </div>
     </main>
-    <footer id="source" class="site-footer" aria-label="Protocol and code">
-      <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="https://getflash.io/">Flash <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="https://getfoxy.io/">Foxy <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
-      </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-    </footer>
+    <!-- site footer -->
+<footer id="source" class="site-footer" aria-label="Protocol and code">
+  <div class="footer-groups">
+    <div class="footer-group"><span class="footer-label">PROTOCOL</span>
+      <a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/developers">Developers</a><a href="/guide" aria-current="page">Install guide</a><a href="/ops-service">Host an Ops service</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">HELP</span>
+      <a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a>
+      <a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">PROJECT</span>
+      <a href="https://github.com/cashucard/cashucard">Source code <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/fund">Fund the work</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">APPS</span>
+      <a href="https://getflash.io/">Flash <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="https://getfoxy.io/">Foxy <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span>
+    <a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+</footer>
+<!-- end site footer -->
   </body>
 </html>

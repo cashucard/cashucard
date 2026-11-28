@@ -21,30 +21,39 @@
     <link rel="preload" href="/assets/Figtree-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/guide.css" />
+    <link rel="stylesheet" href="/install-guides.css" />
     <script src="/guide.js" defer></script>
     <title>Developers | Cashu Card</title>
+    <link rel="stylesheet" href="/navigation.css">
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-    <header class="header">
-      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers" aria-current="page">Developers</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
-    </header>
-    <main id="main" class="guide developer-guide">
+    <!-- site header -->
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <div class="mast-bar">
+    <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34"></a>
+    <nav class="mast-wide" aria-label="Main navigation"><a href="/downloads">Downloads</a> <a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers" aria-current="page">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+    <a class="mast-download" href="/downloads">Downloads</a>
+    <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+  <details class="mast-menu">
+    <summary>Menu<span aria-hidden="true"></span></summary>
+    <nav aria-label="Main navigation"><a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers" aria-current="page">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+  </details>
+</header>
+<!-- end site header -->
+    <main id="main" class="guide developer-guide" tabindex="-1">
       <section class="guide-hero" aria-labelledby="dev-title">
         <div class="guide-hero-inner">
           <div class="guide-hero-top">
             <div class="guide-hero-copy">
-              <div class="eyebrow"><span class="status-dot"></span> DEVELOPERS <span class="eyebrow-divider">/</span> NUT-CCP DRAFT</div>
+              <p class="install-edition">Applet 3.1 · Developer guide</p>
               <h1 id="dev-title">Build on <em>Cashu Card</em></h1>
-              <p class="guide-lead">Build a wallet or till with the <a href="#sdks">Cashu Card SDKs</a>, or follow the <a href="#issuers">issuer guide</a> to prepare cards for use.</p>
-              <ul class="guide-facts" aria-label="At a glance">
-                <li>Experimental</li>
-                <li>Applet 3.1</li>
-                <li>Java Card 3.0.5</li>
-                <li>MIT license</li>
-              </ul>
+              <p class="guide-lead">Connect a wallet or till to a card over NFC, or prepare cards for an issuer.</p>
+              <div class="install-actions">
+                <a class="guide-primary" href="#sdks">Choose an SDK</a>
+                <a class="guide-secondary" href="#issuers">Issue cards</a>
+              </div>
             </div>
             <figure class="hero-term" aria-hidden="true">
               <div class="hero-term-bar"><i></i><i></i><i></i><span>Select the card</span></div>
@@ -93,43 +102,63 @@
 
           <section id="sdks" aria-labelledby="sdks-title">
             <h2 id="sdks-title">Card reader SDKs</h2>
-            <p>Choose a library for your app. All four work with Cashu Card 3.0 and 3.1.</p>
+            <p>All four libraries work with Cashu Card 3.0 and 3.1. Choose your platform to get the install command and source.</p>
+            <nav class="sdk-jumps" aria-label="Choose an SDK">
+              <a href="#sdk-typescript">TypeScript</a><a href="#sdk-react-native">React Native</a>
+              <a href="#sdk-rust">Rust</a><a href="#sdk-flutter">Dart / Flutter</a>
+            </nav>
             <ul class="dev-cards sdk-cards">
-              <li>
-                <h3>TypeScript</h3>
-                <p>Read balances, load eCash and accept payments using your own card transport.</p>
-                <figure class="cmd">
-                  <figcaption class="cmd-head">Install with npm</figcaption>
-                  <pre><code>npm install --save-exact cashucard@0.4.0</code></pre>
-                </figure>
-                <div class="sdk-links"><a href="https://www.npmjs.com/package/cashucard/v/0.4.0" aria-label="TypeScript package on npm">Package on npm</a><a href="https://github.com/cashucard/cashu-card-typescript" aria-label="TypeScript source on GitHub">Source on GitHub</a></div>
+              <li id="sdk-typescript">
+                <div class="sdk-description">
+                  <h3>TypeScript</h3>
+                  <p>Read balances, load eCash and accept payments using your own card transport.</p>
+                </div>
+                <div class="sdk-install">
+                  <figure class="cmd">
+                    <figcaption class="cmd-head">Install with npm</figcaption>
+                    <pre><code>npm install --save-exact cashucard@0.4.0</code></pre>
+                  </figure>
+                  <div class="sdk-links"><a href="https://www.npmjs.com/package/cashucard/v/0.4.0" aria-label="TypeScript package on npm">Package on npm</a><a href="https://github.com/cashucard/cashu-card-typescript" aria-label="TypeScript source on GitHub">Source on GitHub</a></div>
+                </div>
               </li>
-              <li>
-                <h3>React Native NFC</h3>
-                <p>Connect the TypeScript reader to NFC on iOS and Android. The source includes the required phone permissions.</p>
-                <figure class="cmd">
-                  <figcaption class="cmd-head">Install with npm</figcaption>
-                  <pre><code>npm install --save-exact cashucard@0.4.0 cashucard-react-native@0.4.0 react-native-nfc-manager@3.17.5</code></pre>
-                </figure>
-                <div class="sdk-links"><a href="https://www.npmjs.com/package/cashucard-react-native/v/0.4.0" aria-label="React Native NFC package on npm">Package on npm</a><a href="https://github.com/cashucard/cashu-card-typescript/tree/main/react-native" aria-label="React Native NFC source on GitHub">Source on GitHub</a></div>
+              <li id="sdk-react-native">
+                <div class="sdk-description">
+                  <h3>React Native NFC</h3>
+                  <p>Connect the TypeScript reader to NFC on iOS and Android. The source includes the required phone permissions.</p>
+                </div>
+                <div class="sdk-install">
+                  <figure class="cmd">
+                    <figcaption class="cmd-head">Install with npm</figcaption>
+                    <pre><code>npm install --save-exact cashucard@0.4.0 cashucard-react-native@0.4.0 react-native-nfc-manager@3.17.5</code></pre>
+                  </figure>
+                  <div class="sdk-links"><a href="https://www.npmjs.com/package/cashucard-react-native/v/0.4.0" aria-label="React Native NFC package on npm">Package on npm</a><a href="https://github.com/cashucard/cashu-card-typescript/tree/main/react-native" aria-label="React Native NFC source on GitHub">Source on GitHub</a></div>
+                </div>
               </li>
-              <li>
-                <h3>Rust</h3>
-                <p>Accept card payments and settle them with the mint. Your app supplies the NFC transport and stores the payment journal.</p>
-                <figure class="cmd">
-                  <figcaption class="cmd-head">Install with Cargo</figcaption>
-                  <pre><code>cargo add cashucard@0.6.0</code></pre>
-                </figure>
-                <div class="sdk-links"><a href="https://crates.io/crates/cashucard/0.6.0" aria-label="Rust package on crates.io">Package on crates.io</a><a href="https://github.com/cashucard/rust-sdk" aria-label="Rust source on GitHub">Source on GitHub</a></div>
+              <li id="sdk-rust">
+                <div class="sdk-description">
+                  <h3>Rust</h3>
+                  <p>Accept card payments and settle them with the mint. Your app supplies the NFC transport and stores the payment journal.</p>
+                </div>
+                <div class="sdk-install">
+                  <figure class="cmd">
+                    <figcaption class="cmd-head">Install with Cargo</figcaption>
+                    <pre><code>cargo add cashucard@0.6.0</code></pre>
+                  </figure>
+                  <div class="sdk-links"><a href="https://crates.io/crates/cashucard/0.6.0" aria-label="Rust package on crates.io">Package on crates.io</a><a href="https://github.com/cashucard/rust-sdk" aria-label="Rust source on GitHub">Source on GitHub</a></div>
+                </div>
               </li>
-              <li>
-                <h3>Dart and Flutter</h3>
-                <p>Use the Rust reader in a Flutter app on iOS or Android. Supply the NFC transport. Native builds need Rust and a Flutter SDK with Dart 3.13.7 or newer in the 3.x series.</p>
-                <figure class="cmd">
-                  <figcaption class="cmd-head">Install with Flutter</figcaption>
-                  <pre><code>flutter pub add cashucard:0.4.0</code></pre>
-                </figure>
-                <div class="sdk-links"><a href="https://pub.dev/packages/cashucard/versions/0.4.0" aria-label="Dart and Flutter package on pub.dev">Package on pub.dev</a><a href="https://github.com/cashucard/dart-sdk" aria-label="Dart and Flutter source on GitHub">Source on GitHub</a></div>
+              <li id="sdk-flutter">
+                <div class="sdk-description">
+                  <h3>Dart and Flutter</h3>
+                  <p>Use the Rust reader in a Flutter app on iOS or Android. Supply the NFC transport. Native builds need Rust and a Flutter SDK with Dart 3.13.7 or newer in the 3.x series.</p>
+                </div>
+                <div class="sdk-install">
+                  <figure class="cmd">
+                    <figcaption class="cmd-head">Install with Flutter</figcaption>
+                    <pre><code>flutter pub add cashucard:0.4.0</code></pre>
+                  </figure>
+                  <div class="sdk-links"><a href="https://pub.dev/packages/cashucard/versions/0.4.0" aria-label="Dart and Flutter package on pub.dev">Package on pub.dev</a><a href="https://github.com/cashucard/dart-sdk" aria-label="Dart and Flutter source on GitHub">Source on GitHub</a></div>
+                </div>
               </li>
             </ul>
             <p>See how <a href="https://github.com/cashucard/cashu-card-pos/blob/main/docs/developer-guide.md">Cashu Card POS handles a sale</a>, from the first tap to settlement and change.</p>
@@ -181,7 +210,7 @@
 
           <section id="status" aria-labelledby="status-title">
             <h2 id="status-title">Status</h2>
-            <p>Cashu Card is an experimental open source project. NUT-CCP is a draft written by this project for proposal to <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>, where it is still to be proposed, numbered or merged, and it has had little testing or review outside the project. The applet's current release is <a href="https://github.com/cashucard/cashucard/releases/tag/firmware-v3.1.0">3.1.0</a>. It was installed on an NXP J3R180 and paid from at a test mint, and a contributor's logs show the same on a J3R452. An independent security review is still to come. Two review rounds were done on the card applet, and their fixes are in firmware 3.1.</p>
+            <p>Cashu Card is an experimental open source project. NUT-CCP is a draft written by this project for proposal to <a href="https://github.com/cashubtc/nuts">cashubtc/nuts</a>, where it is still to be proposed, numbered or merged, and it has had little testing or review outside the project. The Java Card 3.0.5 applet is MIT licensed. Its current release is <a href="https://github.com/cashucard/cashucard/releases/tag/firmware-v3.1.0">3.1.0</a>. It was installed on an NXP J3R180 and paid from at a test mint, and a contributor's logs show the same on a J3R452. An independent security review is still to come. Two review rounds were done on the card applet, and their fixes are in firmware 3.1.</p>
             <p>Build against it to learn, test and give feedback. Read the <a href="/#risks">risks</a> before your users hold real value on a card.</p>
           </section>
 
@@ -241,14 +270,30 @@
         </article>
       </div>
     </main>
-    <footer id="source" class="site-footer" aria-label="Protocol and code">
-      <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an ops-service</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
-      </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-    </footer>
+    <!-- site footer -->
+<footer id="source" class="site-footer" aria-label="Protocol and code">
+  <div class="footer-groups">
+    <div class="footer-group"><span class="footer-label">PROTOCOL</span>
+      <a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/developers" aria-current="page">Developers</a><a href="/guide">Install guide</a><a href="/ops-service">Host an Ops service</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">HELP</span>
+      <a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a>
+      <a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">PROJECT</span>
+      <a href="https://github.com/cashucard/cashucard">Source code <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/fund">Fund the work</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">APPS</span>
+      <a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span>
+    <a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+</footer>
+<!-- end site footer -->
   </body>
 </html>

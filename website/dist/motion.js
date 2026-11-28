@@ -8,7 +8,21 @@
   const toggle = byId("film-toggle"), sound = byId("film-sound");
   const tc = byId("film-tc"), scrub = byId("film-scrub"), fill = byId("film-fill"), list = byId("film-chapters");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-  const FPS = 30;
+  const captions = byId("film-captions");
+  const track = reel.textTracks[0];
+  function syncCaptions() {
+    captions.setAttribute("aria-pressed", String(track.mode === "showing"));
+  }
+  if (track) {
+    syncCaptions();
+    reel.textTracks.addEventListener("change", syncCaptions);
+    captions.addEventListener("click", () => {
+      track.mode = track.mode === "showing" ? "disabled" : "showing";
+      syncCaptions();
+    });
+  } else {
+    captions.hidden = true;
+  }
   const CHAPTERS = [[2, "Card"], [6, "Key"], [12, "Load"], [20, "Tap"], [26, "Sign"], [34, "Settle"], [42, "End"]];
   const ICON = {
     play: '<path d="M2 1 L11 6 L2 11 Z"/>',
@@ -22,10 +36,9 @@
   reel.controls = false;
   ui.hidden = false;
 
-  // chapter marks on the scrub bar
+  // Chapters are separate buttons so they can also be used by touch and keyboard.
   CHAPTERS.forEach(([t, name]) => {
     const li = document.createElement("li");
-    li.style.left = (t / duration) * 100 + "%";
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = name;
@@ -37,13 +50,22 @@
   const marks = [...list.children];
 
   const chapterAt = (t) => { let name = "Opening"; for (const [s, n] of CHAPTERS) if (t >= s) name = n; return name; };
+  function clock(seconds) {
+    return Math.floor(seconds / 60) + ":" + String(Math.floor(seconds) % 60).padStart(2, "0");
+  }
+  let activeChapter = -1;
   function render() {
-    const t = reel.currentTime || 0, d = dur(), f = Math.floor(t * FPS);
-    tc.textContent = "00:00:" + String(Math.floor(f / FPS)).padStart(2, "0") + ":" + String(f % FPS).padStart(2, "0");
+    const t = reel.currentTime || 0, d = dur();
+    tc.textContent = clock(t) + " / " + clock(d);
     fill.style.width = clamp((t / d) * 100, 0, 100) + "%";
     scrub.setAttribute("aria-valuenow", t.toFixed(1));
     scrub.setAttribute("aria-valuetext", Math.round(t) + " seconds, " + chapterAt(t));
-    marks.forEach((li, i) => li.classList.toggle("on", t >= CHAPTERS[i][0] && t < (CHAPTERS[i + 1] ? CHAPTERS[i + 1][0] : d + 1)));
+    const chapter = CHAPTERS.findIndex(([start], i) => t >= start && (!CHAPTERS[i + 1] || t < CHAPTERS[i + 1][0]));
+    if (chapter !== activeChapter) {
+      if (activeChapter >= 0) marks[activeChapter].firstChild.removeAttribute("aria-current");
+      if (chapter >= 0) marks[chapter].firstChild.setAttribute("aria-current", "step");
+      activeChapter = chapter;
+    }
   }
   // the progress loop runs only while the film plays
   function loop() { render(); raf = reel.paused ? 0 : requestAnimationFrame(loop); }
@@ -81,7 +103,7 @@
   const scrubTo = (e) => { const r = scrub.getBoundingClientRect(); seek(clamp((e.clientX - r.left) / r.width, 0, 1) * dur()); };
   scrub.addEventListener("pointerdown", (e) => { dragging = true; scrub.setPointerCapture(e.pointerId); scrubTo(e); });
   scrub.addEventListener("pointermove", (e) => { if (dragging) scrubTo(e); });
-  scrub.addEventListener("pointerup", () => { dragging = false; });
+  scrub.addEventListener("lostpointercapture", () => { dragging = false; });
   scrub.addEventListener("keydown", (e) => {
     const k = e.key;
     if (k === "ArrowRight" || k === "ArrowUp") seek(reel.currentTime + 1);
@@ -98,24 +120,38 @@
     new IntersectionObserver((entries) => entries.forEach((e) => {
       if (e.isIntersecting) reel.preload = "auto";
       if (e.intersectionRatio >= 0.6) {
-        if (!autoplayed && !reduce.matches) { autoplayed = true; play(); }
-        else if (pausedByScroll && !userPaused) { pausedByScroll = false; play(); }
+        if (!autoplayed && !userPaused && !reduce.matches) { autoplayed = true; play(); }
+        else if (pausedByScroll && !userPaused && !reduce.matches) { pausedByScroll = false; play(); }
       } else if (e.intersectionRatio < 0.25 && !reel.paused) { pausedByScroll = true; reel.pause(); }
     }), { threshold: [0, 0.25, 0.6] }).observe(screen);
   }
 
-  // the screen settles to full size as it scrolls up into place
-  if (!reduce.matches) {
-    let ticking = false;
-    const settle = () => {
-      ticking = false;
-      const r = screen.getBoundingClientRect();
-      const k = clamp((innerHeight - r.top) / (innerHeight * 0.9), 0, 1);
-      screen.style.transform = "scale(" + (0.94 + 0.06 * k).toFixed(4) + ")";
-    };
-    addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(settle); } }, { passive: true });
-    settle();
+  // Follow live changes to motion preferences, including when the film has scrolled away.
+  let ticking = false;
+  function settle() {
+    ticking = false;
+    if (reduce.matches) return;
+    const r = screen.getBoundingClientRect();
+    const k = clamp((innerHeight - r.top) / (innerHeight * 0.9), 0, 1);
+    screen.style.transform = "scale(" + (0.94 + 0.06 * k).toFixed(4) + ")";
   }
+  function queueSettle() {
+    if (!ticking) { ticking = true; requestAnimationFrame(settle); }
+  }
+  function syncMotion() {
+    if (reduce.matches) {
+      pausedByScroll = false;
+      reel.pause();
+      bigPlay.hidden = false;
+      screen.style.removeProperty("transform");
+      removeEventListener("scroll", queueSettle);
+    } else {
+      addEventListener("scroll", queueSettle, { passive: true });
+      settle();
+    }
+  }
+  reduce.addEventListener("change", syncMotion);
+  syncMotion();
   setIcon();
   render();
 })();
@@ -196,6 +232,8 @@
       li.querySelector("i").style.width = (live ? clamp((P - a) / (b - a), 0, 1) * 100 : n <= on ? 100 : 0) + "%";
     });
     if (on !== current) {
+      if (current >= 0) steps[current].querySelector("button").removeAttribute("aria-current");
+      steps[on].querySelector("button").setAttribute("aria-current", "step");
       current = on;
       caption.replaceChildren(Object.assign(document.createElement("b"), { textContent: words[on][0] + "." }), document.createTextNode(" " + words[on][1]));
       count.textContent = on + 1 + " of " + steps.length;
@@ -261,6 +299,7 @@
     nav.hidden = live;
     if (!live) { chosen = Math.max(current, 0); P = SHOW[chosen]; }
     drawn = "";
+    if (current >= 0) steps[current].querySelector("button").removeAttribute("aria-current");
     current = -1;
     frame();
   }

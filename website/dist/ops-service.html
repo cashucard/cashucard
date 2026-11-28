@@ -17,24 +17,48 @@
     <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/guide.css" />
+    <link rel="stylesheet" href="/install-guides.css" />
     <script src="/guide.js" defer></script>
     <title>Host an ops-service | Cashu Card</title>
+    <link rel="stylesheet" href="/navigation.css">
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
-    <header class="header">
-      <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34" /></a>
-      <nav aria-label="Main navigation"><a href="/downloads">Downloads</a><a href="/#buy">Get cards</a><a href="/developers">Developers</a></nav>
-      <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
-    </header>
-    <main id="main" class="guide">
+    <!-- site header -->
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <div class="mast-bar">
+    <a class="wordmark" href="/" aria-label="Cashu Card home"><img src="/assets/cashu-card-lockup.svg" alt="" width="156" height="34"></a>
+    <nav class="mast-wide" aria-label="Main navigation"><a href="/downloads">Downloads</a> <a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+    <a class="mast-download" href="/downloads">Downloads</a>
+    <a class="header-link" href="https://github.com/cashucard/cashucard">GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+  <details class="mast-menu">
+    <summary>Menu<span aria-hidden="true"></span></summary>
+    <nav aria-label="Main navigation"><a href="/#buy">Get cards</a> <a href="/guide">Guide</a> <a href="/developers">Developers</a> <a href="/fund">Fund</a> <a href="/support">Support</a></nav>
+  </details>
+</header>
+<!-- end site header -->
+    <main id="main" class="guide ops-guide" tabindex="-1">
       <section class="guide-hero" aria-labelledby="ops-title">
         <div class="guide-hero-inner">
-          <div class="eyebrow"><span class="status-dot"></span> SELF-HOSTING <span class="eyebrow-divider">/</span> OPS-SERVICE 0.1.0</div>
-          <h1 id="ops-title">Host an <em>ops-service</em></h1>
-          <p class="guide-lead">Run the operator console and provisioning API for your own cards. One Docker image provides the service and its SQLite storage tools. Your domain connects it to Cashu Card Setup.</p>
-          <ul class="guide-facts" aria-label="At a glance"><li>Experimental</li><li>Linux AMD64 + ARM64</li><li>Docker Compose</li><li>Your HTTPS domain</li></ul>
-          <p class="guide-back"><a href="/developers#overview">See how all the parts fit together <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></p>
+          <div class="ops-cover">
+            <div>
+              <p class="install-edition">Self-hosting · Ops-service 0.2.1</p>
+              <h1 id="ops-title">Host an <em>ops-service</em></h1>
+              <p class="guide-lead">Run the operator console that connects your issuer’s cards to Cashu Card Setup. One Docker image includes the service and its SQLite tools.</p>
+              <div class="install-actions">
+                <a class="guide-primary" href="#need">Read the setup steps</a>
+                <a class="guide-secondary" href="#backups">Backups and recovery</a>
+              </div>
+            </div>
+            <aside class="compose-card" aria-labelledby="compose-title">
+              <p class="compose-format">Docker Compose</p>
+              <h2 id="compose-title">Issuer service</h2>
+              <p>For a Linux server on AMD64 or ARM64. You’ll need a domain with HTTPS and persistent storage.</p>
+              <a class="compose-download" href="/ops-compose.yaml" download="compose.yaml">Download Compose file<svg class="ui-icon" width="18" height="18" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#down"/></svg></a>
+              <a class="compose-release" href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.2.1">Release 0.2.1 on GitHub</a>
+            </aside>
+          </div>
         </div>
       </section>
       <div class="guide-layout">
@@ -66,14 +90,14 @@
               <li><b>Continuity:</b> saved installation and reset records help distinguish completed work from an unresolved attempt.</li>
               <li><b>Reuse:</b> a reset can use the recorded manager keys after checking the card's identity, owner authorization and empty state.</li>
             </ul>
-            <p>The Cashu Card Setup app needs an ops-service for this issuance workflow. Wallets and tills use the card and mint for payments; an installed card can keep operating while its ops-service is down. You can use an issuer's existing service or host your own.</p>
+            <p>The Cashu Card Setup app needs an ops-service for this issuance workflow. Wallets and tills use the card and mint for payments; an installed card can keep operating while its ops-service is down. You can use an issuer's existing service or host your own. <a href="/developers#overview">See how the service, card and mint fit together.</a></p>
             <details class="more"><summary>The three kinds of card keys</summary><div class="more-body">
               <dl class="faults">
                 <div><dt>Manager keys: the ops-service</dt><dd>Authorize installing and removing the applet. The issuer keeps them in its operational database and encrypted backups.</dd></div>
                 <div><dt>Owner key: the holder wallet</dt><dd>Controls ownership, PIN changes and card settings. The holder wallet establishes this authority after installation.</dd></div>
                 <div><dt>Spending key: the card chip</dt><dd>Generated on the card at installation. Cashu proofs are locked to it; the applet signs payments with it.</dd></div>
               </dl>
-              <p>A reset deletes the applet and its spending key. Empty and reconcile the card first; the service's manager-key backup cannot restore deleted card value. See the <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/docs/OPS-THREAT-MODEL.md">service threat model</a>.</p>
+              <p>A reset deletes the applet and its spending key. Empty and reconcile the card first; the service's manager-key backup cannot restore deleted card value. See the <a href="https://github.com/cashucard/cashucard/blob/ops-v0.2.1/docs/OPS-THREAT-MODEL.md">service threat model</a>.</p>
             </div></details>
           </section>
 
@@ -84,7 +108,7 @@
               <li><b>A hostname and HTTPS reverse proxy</b>For example, <code>ops.example.com</code>. This guide uses Caddy on the same host; an existing trusted proxy also works.</li>
               <li><b>Protected credentials and an independent backup destination</b>Keep a password manager, a separate recovery-key copy and storage outside the service host available.</li>
             </ul>
-            <p>The downloadable Compose file pins <a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">release 0.1.0</a> by its immutable image digest. SQLite is included. Nextcloud and a notification server are optional choices for your backup and alert tooling.</p>
+            <p>The downloadable Compose file pins <a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.2.1">release 0.2.1</a> by its immutable image digest. SQLite is included. Nextcloud and a notification server are optional choices for your backup and alert tooling.</p>
           </section>
 
           <section id="install" aria-labelledby="install-title">
@@ -124,7 +148,7 @@ chmod 600 private/operator-setup.json private/master-key</code></pre></figure>
               <p>After saving the credentials and confirming sign-in, remove the <code>OPS_OPERATOR_SETUP_FILE</code> line from <code>compose.yaml</code>, then run:</p>
               <figure class="cmd" data-command="cleanup"><figcaption class="cmd-head">Server terminal, same directory</figcaption><pre><code>docker compose up -d ops
 docker compose run --rm --entrypoint node setup -e 'require("node:fs").unlinkSync("/secrets/operator-setup.json")'</code></pre></figure>
-              <p>Keep the master and its protected recovery copy. Future password recovery uses an explicit new setup command through a private file; see <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/README.md#recover-operator-access">operator access recovery</a>.</p>
+              <p>Keep the master and its protected recovery copy. Future password recovery uses an explicit new setup command through a private file; see <a href="https://github.com/cashucard/cashucard/blob/ops-v0.2.1/ops/README.md#recover-operator-access">operator access recovery</a>.</p>
             </div></details>
           </section>
 
@@ -155,13 +179,13 @@ docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-e
               <p>Nextcloud can hold encrypted copies on a separate server. ntfy can deliver alerts from your scheduler or monitoring system. Keep the private age identity separate from both the service and backup storage.</p>
               <p><a href="https://github.com/islandbitcoin/atoll-recovery-startos">Atoll Recovery</a> is an optional StartOS companion that copies encrypted Workers exports, reports freshness and can send alerts through ntfy. The Docker service provides filesystem exports; its R2 scheduler, pairing and independent-copy receipt HTTP adapters remain separate work. For this container, arrange your own scheduled copy and alert jobs.</p>
             </div></details>
-            <p>Restore an encrypted export into a fresh database on a recovery host with the private age identity. Restoration disables operator passwords and pauses issuance behind a recovery fence. Recover operator access and reconcile outstanding card work before resuming. Follow the <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/docker/README.md#backups-and-restoration">versioned restore procedure</a>.</p>
+            <p>Restore an encrypted export into a fresh database on a recovery host with the private age identity. Restoration disables operator passwords and pauses issuance behind a recovery fence. Recover operator access and reconcile outstanding card work before resuming. Follow the <a href="https://github.com/cashucard/cashucard/blob/ops-v0.2.1/ops/docker/README.md#backups-and-restoration">versioned restore procedure</a>.</p>
           </section>
 
           <section id="maintain" aria-labelledby="maintain-title">
             <h2 id="maintain-title">Updates and configuration</h2>
             <p>Keep the Compose file, issuer master and persistent volumes together. Before an update, verify a recent independent backup, read the new release notes, and change both services' image pin to that release's digest. Pull and recreate the service, then check readiness and sign-in. Starting with new empty volumes creates a different issuer.</p>
-            <p>The <a href="https://github.com/cashucard/cashucard/blob/ops-v0.1.0/ops/docker/README.md#configuration">configuration reference</a> covers administrator names, mint references, mounted secrets, ports and storage. Offering a mint URL in Cashu Card Setup is installation metadata; the holder wallet later configures the card and funds it.</p>
+            <p>The <a href="https://github.com/cashucard/cashucard/blob/ops-v0.2.1/ops/docker/README.md#configuration">configuration reference</a> covers administrator names, mint references, mounted secrets, ports and storage. Offering a mint URL in Cashu Card Setup is installation metadata; the holder wallet later configures the card and funds it.</p>
           </section>
 
           <section id="help" aria-labelledby="help-title">
@@ -176,14 +200,30 @@ docker compose cp ops:/backups ./encrypted-backups</code></pre><div class="cmd-e
         </article>
       </div>
     </main>
-    <footer id="source" class="site-footer" aria-label="Protocol and code">
-      <div class="footer-groups">
-        <div class="footer-group"><span class="footer-label">PROTOCOL</span><a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/developers">Developers</a><a href="/guide">Install guide</a></div>
-        <div class="footer-group"><span class="footer-label">HELP</span><a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a><a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">SOURCE</span><a href="https://github.com/cashucard/cashucard">Cashu Card <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.1.0">Ops-service release <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-        <div class="footer-group"><span class="footer-label">APPS</span><a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a></div>
-      </div>
-      <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span><a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a></div>
-    </footer>
+    <!-- site footer -->
+<footer id="source" class="site-footer" aria-label="Protocol and code">
+  <div class="footer-groups">
+    <div class="footer-group"><span class="footer-label">PROTOCOL</span>
+      <a href="https://github.com/cashucard/nut/blob/main/CCP.md">Draft specification <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/developers">Developers</a><a href="/guide">Install guide</a><a href="/ops-service" aria-current="page">Host an Ops service</a>
+    </div>
+    <div class="footer-group"><span class="footer-label">HELP</span>
+      <a href="/faq">Questions and answers</a><a href="/#risks">Risks</a><a href="/support">Support</a>
+      <a href="https://github.com/cashucard/cashucard/discussions">Ask on GitHub <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">PROJECT</span>
+      <a href="https://github.com/cashucard/cashucard">Source code <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+      <a href="/fund">Fund the work</a><a href="https://github.com/cashucard/cashucard/releases/tag/ops-v0.2.1">Ops release <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    </div>
+    <div class="footer-group"><span class="footer-label">APPS</span>
+      <a href="/downloads#setup">Cashu Card Setup</a><a href="/downloads#pos">Cashu Card POS</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© CASHU CARD · EXPERIMENTAL OPEN PROTOCOL</span>
+    <a href="https://github.com/cashucard/cashucard/blob/main/LICENSE">MIT license <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+    <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://ops.cashucard.org">Operator console <svg class="ui-icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="/assets/ui-icons.svg#up-right"/></svg></a>
+  </div>
+</footer>
+<!-- end site footer -->
   </body>
 </html>

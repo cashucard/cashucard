@@ -1,0 +1,63 @@
+/* Reader and issuer entry points use the same palette as the install guide. */
+.developer-guide .guide-hero, .ops-guide .guide-hero {
+  padding-block: clamp(32px,5vw,76px);
+}
+.install-edition, .compose-format {
+  margin: 0;
+  color: #d3f39a;
+  font: 700 .76rem/1.45 Figtree, sans-serif;
+  letter-spacing: .095em;
+  text-transform: uppercase;
+}
+.install-edition::before {
+  content: "";
+  width: 26px;
+  height: 2px;
+  margin-inline-end: 10px;
+  display: inline-block;
+  vertical-align: middle;
+  background: currentColor;
+}
+:is(.developer-guide, .ops-guide) .guide-hero h1 { margin: 16px 0; }
+.install-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin-top: 22px; }
+.install-actions a, .compose-download, .compose-release, .sdk-jumps a, .sdk-links a {
+  display: inline-flex; min-height: 44px; align-items: center; width: fit-content;
+}
+.guide-primary, .compose-download {
+  gap: 12px; justify-content: center; padding: 9px 17px; border-radius: 6px;
+  background: #d3f39a; color: #10271e; font-weight: 750; line-height: 1.25;
+}
+.guide-primary:hover, .compose-download:hover { background: #e7ffb7; }
+.guide-secondary, .compose-release { font-weight: 650; text-decoration: underline; text-underline-offset: 4px; }
+.ops-cover { display: grid; gap: clamp(24px,7vw,110px); grid-template-columns: 1.15fr .85fr; align-items: center; }
+.compose-card {
+  justify-self: end; width: min(100%, 376px); padding: clamp(22px,3vw,38px);
+  border: 1px solid #b8d1b35e; border-radius: 14px;
+  background: linear-gradient(135deg,#19412e,#102c20 75%);
+}
+.compose-card h2 { margin: 12px 0; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.045em; line-height: 1.04; }
+.compose-card p:not(.compose-format) { margin: 0 0 16px; font-size: 1rem; line-height: 1.5; color: #c7d9c8; }
+.compose-release { display: flex; color: #d3f39a; font-size: .9rem; }
+.developer-guide #sdks { max-width: 960px; }
+.sdk-jumps { display: flex; flex-wrap: wrap; column-gap: 15px; }
+.sdk-jumps a { font-size: .9rem; font-weight: 650; }
+.sdk-cards { grid-template-columns: 1fr; gap: 0; border: 1px solid #b8d1b338; border-radius: 12px; overflow: clip; }
+.sdk-cards li {
+  display: grid; align-items: start; grid-template-columns: minmax(0,.82fr) minmax(0,1.18fr);
+  gap: 14px clamp(24px,3vw,46px); padding: clamp(16px,2vw,24px); border: 0; border-radius: 0;
+  scroll-margin-block: 16px;
+}
+.sdk-cards li + li { border-top: 1px solid #b8d1b338; }
+.sdk-cards .sdk-description h3 { margin: 0 0 6px; font-size: 21px; }
+.sdk-cards .sdk-description p { margin: 0; }
+.sdk-install { min-width: 0; }
+.sdk-install .sdk-links { gap: 0 14px; margin: 0; }
+:is(.developer-guide,.ops-guide) .copy { min-height: 44px; padding-inline: 14px; font-size: .78rem; }
+:is(.developer-guide,.ops-guide) .cmd-head { min-height: 48px; padding-block: 2px; }
+:is(.developer-guide,.ops-guide) .cmd pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 740px) {
+  .ops-cover { grid-template-columns: 1fr; gap: 22px; }
+  .compose-card { justify-self: start; width: 100%; }
+  .compose-card h2 { margin-block: 6px; }
+  .sdk-cards li { grid-template-columns: minmax(0,1fr); gap: 12px; }
+}

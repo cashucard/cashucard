@@ -194,3 +194,9 @@
 .sdk-cards .cmd { margin: auto 0 0; }
 .sdk-cards .cmd pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .sdk-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 14px; }
+
+/* Copy results are announced beside the guide's first example. */
+.guide-copy-feedback {
+  position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}

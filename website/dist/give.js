@@ -57,10 +57,15 @@
     });
     root.setAttribute("data-current", step);
     var panel = $('[data-step="' + step + '"]');
-    if (step !== "amount" && panel) setTimeout(function () { panel.focus({ preventScroll: true }); }, 60);
+    if (step === "amount") {
+      var activeRail = $('[data-rail][aria-selected="true"]');
+      if (activeRail) activeRail.focus({ preventScroll: true });
+    } else if (panel) {
+      setTimeout(function () { if (state.step === step) panel.focus({ preventScroll: true }); }, 60);
+    }
     if (step !== "amount" && window.matchMedia("(max-width: 900px)").matches) {
       var top = root.getBoundingClientRect().top + window.scrollY - 16;
-      if (Math.abs(window.scrollY - top) > 80) window.scrollTo({ top: top, behavior: "smooth" });
+      if (Math.abs(window.scrollY - top) > 80) window.scrollTo({ top: top, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     }
   }
   function stopWatching() {
@@ -71,12 +76,16 @@
   function setSats(n, fromChip) {
     state.sats = n;
     $all("[data-sats]").forEach(function (b) {
-      b.setAttribute("aria-checked", String(fromChip && +b.getAttribute("data-sats") === n));
+      var selected = fromChip && +b.getAttribute("data-sats") === n;
+      b.setAttribute("aria-checked", String(selected));
+      b.tabIndex = selected ? 0 : -1;
     });
     var label = $("[data-continue-label]");
     var valid = n >= MIN && n <= MAX;
     $("[data-continue]").disabled = !valid;
-    label.textContent = valid ? "Continue with " + fmt(n) + " sats" : "Enter at least " + fmt(MIN) + " sats";
+    if (valid) label.textContent = "Continue with " + fmt(n) + " sats";
+    else if (n > MAX) label.textContent = "Enter at most " + fmt(MAX) + " sats";
+    else label.textContent = "Enter at least " + fmt(MIN) + " sats";
     $("[data-continue-usd]").textContent = valid ? usd(n) : "";
     var hint = $("[data-onchain-hint]");
     if (hint) hint.hidden = !(state.rail === "onchain" && valid && n < ONCHAIN_HINT);
@@ -85,7 +94,11 @@
   }
   function setKind(kind) {
     state.kind = kind;
-    $all("[data-kind]").forEach(function (b) { b.setAttribute("aria-checked", String(b.getAttribute("data-kind") === kind)); });
+    $all("[data-ecash-kinds] [data-kind]").forEach(function (b) {
+      var selected = b.getAttribute("data-kind") === kind;
+      b.setAttribute("aria-checked", String(selected));
+      b.tabIndex = selected ? 0 : -1;
+    });
     var ecash = state.rail === "ecash", fm = ecash && kind === "fedimint";
     $("[data-ecash-kinds]").hidden = !ecash;
     $("[data-fm]").hidden = !fm;
@@ -100,6 +113,8 @@
       t.tabIndex = on ? 0 : -1;
     });
     root.setAttribute("data-rail-current", rail);
+    var options = $("#give-options");
+    if (options) options.setAttribute("aria-labelledby", "give-rail-" + rail);
     setSats(state.sats, !!$('[data-sats][aria-checked="true"]'));
     setKind(state.kind);
   }
@@ -383,20 +398,30 @@
   var SITE_NAMES = { cashucard: "Cashu Card", fedimintcard: "Fedimint Card" };
   function loadPublic() {
     getJSON("/api/public").then(function (p) {
+      if (!Number.isFinite(p.total_sat) || !Number.isFinite(p.count) || !Array.isArray(p.donations)) return;
       if (p.price_usd) state.price = state.price || p.price_usd;
-      document.querySelectorAll("[data-raised]").forEach(function (el) { el.textContent = fmt(p.total_sat || 0); });
-      document.querySelectorAll("[data-raised-usd]").forEach(function (el) { el.textContent = p.price_usd && p.total_sat ? usd(p.total_sat) : ""; });
-      document.querySelectorAll("[data-gifts]").forEach(function (el) { el.textContent = fmt(p.count || 0); });
+      var total = document.querySelector("[data-raised]");
+      var count = document.querySelector("[data-gifts]");
+      total.textContent = fmt(p.total_sat) + " sats";
+      count.textContent = fmt(p.count);
+      document.querySelector("[data-raised-usd]").textContent = p.total_sat ? usd(p.total_sat) : "";
       var body = document.querySelector("[data-ledger]");
-      if (!body) return;
-      if (!p.donations || !p.donations.length) return;
+      if (!p.donations.length) {
+        var message = p.count ? "No recent entries to display." : "No gifts yet.";
+        body.innerHTML = '<tr><td class="empty" colspan="3">' + message + "</td></tr>";
+        return;
+      }
       body.innerHTML = p.donations.slice(0, 50).map(function (d) {
         var date = d.date ? new Date(d.date * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Pending";
-        var rail = { onchain: "On-chain", cashu: "Cashu", fedimint: "Fedimint" }[d.rail] || "Lightning";
-        return "<tr><td>" + date + "</td><td class=\"num\">" + fmt(d.amount_sat) + " sats</td><td>" + rail +
+        var project = Object.hasOwn(SITE_NAMES, d.site) ? SITE_NAMES[d.site] : "Unspecified project";
+        var rail = { onchain: "On-chain", cashu: "Cashu", fedimint: "Fedimint", lightning: "Lightning" };
+        var method = Object.hasOwn(rail, d.rail) ? rail[d.rail] : "Other";
+        return "<tr><td>" + project + "<small>" + date + "</small></td><td class=\"num\">" + fmt(d.amount_sat) + " sats</td><td>" + method +
           (d.confirmed ? "" : ", unconfirmed") + "</td></tr>";
       }).join("");
-    }).catch(function () {});
+    }).catch(function () {
+      /* Keep the initial unavailable message or the last successfully loaded ledger. */
+    });
   }
 
   /* ---------- wire up ---------- */
@@ -414,6 +439,7 @@
     b.addEventListener("click", function () {
       $("[data-custom]").hidden = true;
       $("[data-other]").setAttribute("aria-checked", "false");
+      $("[data-other]").tabIndex = -1;
       setSats(+b.getAttribute("data-sats"), true);
     });
   });
@@ -421,6 +447,7 @@
   other.addEventListener("click", function () {
     $all("[data-sats]").forEach(function (b) { b.setAttribute("aria-checked", "false"); });
     other.setAttribute("aria-checked", "true");
+    other.tabIndex = 0;
     customBox.hidden = false;
     input.focus();
     setSats(parseInt(input.value, 10) || 0, false);
@@ -432,12 +459,34 @@
   });
   input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); $("[data-continue]").click(); } });
 
+  // Arrow keys select a single option in each group, including custom amounts.
+  $all('[role="radiogroup"]').forEach(function (group) {
+    var choices = $all('[role="radio"]', group);
+    group.addEventListener("keydown", function (e) {
+      var index = choices.indexOf(e.target);
+      if (index < 0) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") index++;
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") index--;
+      else if (e.key === "Home") index = 0;
+      else if (e.key === "End") index = choices.length - 1;
+      else return;
+      e.preventDefault();
+      var choice = choices[(index + choices.length) % choices.length];
+      choice.focus();
+      choice.click();
+    });
+  });
+
   var tabs = $all("[data-rail]");
   tabs.forEach(function (t, i) {
     t.addEventListener("click", function () { setRail(t.getAttribute("data-rail")); });
     t.addEventListener("keydown", function (e) {
-      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-      var next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+      var next;
+      if (e.key === "Home") next = tabs[0];
+      else if (e.key === "End") next = tabs[tabs.length - 1];
+      else if (e.key === "ArrowRight" || e.key === "ArrowLeft") next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+      else return;
+      e.preventDefault();
       next.focus(); next.click();
     });
   });
@@ -487,7 +536,7 @@
     b.addEventListener("click", function () { openScan(b.getAttribute("data-scan-open")); });
   });
   $("[data-scan-cancel]").addEventListener("click", function () { closeScan(true); });
-  $all("[data-kind]").forEach(function (b) {
+  $all("[data-ecash-kinds] [data-kind]").forEach(function (b) {
     b.addEventListener("click", function () { setKind(b.getAttribute("data-kind")); });
   });
   $("[data-cu-token]").addEventListener("keydown", function (e) {

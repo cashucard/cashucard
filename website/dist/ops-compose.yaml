@@ -1,6 +1,6 @@
-# Cashu Card ops-service 0.1.0: the public multi-platform release, pinned by digest.
+# Cashu Card ops-service 0.2.1: the public multi-platform release, pinned by digest.
 # Run each issuer in its own directory and keep its Compose project name stable.
-x-ops-image: &ops-image ghcr.io/cashucard/ops-service:0.1.0@sha256:84b90af1120785af721630882a97aa9fe488bd24e386fc5a1272bea7235dc3fa
+x-ops-image: &ops-image ghcr.io/cashucard/ops-service:0.2.1@sha256:06a0398176f089f29f14d84f8221cece6f421dd935f1b041a5663cee9246676c
 services:
   ops:
     image: *ops-image

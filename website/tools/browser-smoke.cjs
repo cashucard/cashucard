@@ -173,7 +173,7 @@ async function main() {
     assert.equal(await evaluate("document.querySelectorAll('#install .buy-option').length"), 2, "Two ways to install the applet");
     assert.ok(await evaluate(`!!document.querySelector('#install a[href="/downloads#setup"]')`), "The install section opens the Setup downloads");
     assert.ok(await evaluate("!!document.querySelector('#install a[href=\"/guide\"]')"), "The install section opens the install guide");
-    assert.equal(await evaluate("[...document.querySelectorAll('.header nav a')].map(a=>a.textContent).join('|')"), "Downloads|Get cards|Developers|Fund", "Main navigation offers downloads first");
+    assert.equal(await evaluate("[...document.querySelectorAll('.header .mast-wide a')].map(a=>a.textContent).join('|')"), "Downloads|Get cards|Guide|Developers|Fund|Support", "Main navigation offers downloads first");
     // the till in the steps is a phone, with the card held to its back
     assert.ok(await evaluate("document.querySelector('#steps li p').textContent.includes(\"to the back of the merchant's phone\")"), "The steps show a phone as the till");
     // the film: custom controls over the native video; with reduced motion it waits for a press
@@ -183,7 +183,11 @@ async function main() {
     assert.ok(await evaluate("document.querySelector('#reel').getAttribute('poster').startsWith('/film/')"), "Film has a local poster");
     assert.equal(await evaluate("document.querySelector('#reel').controls"), false, "Custom controls replace the native ones");
     assert.equal(await evaluate("document.querySelector('#film-ui').hidden"), false, "Film controls show");
-    assert.equal(await evaluate("document.querySelectorAll('#film-chapters button').length"), 7, "Seven chapters on the scrub bar");
+    assert.equal(await evaluate("document.querySelectorAll('#film-chapters button').length"), 7, "Seven chapter controls");
+    assert.equal(await evaluate("document.querySelectorAll('#film-scrub button').length"), 0, "Film chapters are outside the seek slider");
+    await evaluate("document.querySelector('#film-captions').click()");
+    await until("document.querySelector('#reel').textTracks[0].mode==='showing'&&document.querySelector('#reel').textTracks[0].cues?.length>0", "English captions are available");
+    await evaluate("document.querySelector('#film-captions').click()");
     await screenshot("01-home-desktop");
     await evaluate("document.querySelector('#film').scrollIntoView()");
     await new Promise((r) => setTimeout(r, 1500));
@@ -264,20 +268,23 @@ async function main() {
       await viewport(width, height);
       await evaluate("scrollTo(0,0)");
       assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth"), true, "No overflow at " + width);
-      // The menu may sit next to the wordmark or on its own row on a narrow phone.
+      // On phones the main destinations are split between a direct Downloads link and the open menu.
+      if (width <= 820) {
+        assert.ok(await evaluate("document.querySelector('.mast-download').getBoundingClientRect().height >= 44"), "Downloads is reachable before opening Menu");
+        await evaluate("document.querySelector('.mast-menu summary').click()");
+      }
       const nav = await evaluate(`(() => {
-        const links = [...document.querySelectorAll('.header nav a')].map(a => a.getBoundingClientRect());
+        const links = [...document.querySelectorAll('.header nav a, .mast-download')].filter(a => a.getBoundingClientRect().width);
         const mark = document.querySelector('.wordmark').getBoundingClientRect();
         return {
-          n: links.length,
-          shown: links.every(r => r.width > 0 && r.height > 0),
-          inside: links.every(r => r.left >= 12 && r.right <= innerWidth - 12),
-          clear: links.every(r => r.top >= mark.bottom || r.left >= mark.right + 12),
+          targets: links.map(a => a.pathname + a.hash).sort(),
+          inside: links.every(a => { const r = a.getBoundingClientRect(); return r.left >= 12 && r.right <= innerWidth - 12 && r.height >= 44; }),
+          clear: links.every(a => { const r = a.getBoundingClientRect(); return r.top >= mark.bottom || r.left >= mark.right + 6; }),
         };
       })()`);
-      console.log("menu at " + width + ": " + JSON.stringify(nav));
-      assert.ok(nav.n === 4 && nav.shown, "The menu shows at " + width);
-      assert.ok(nav.inside && nav.clear, "The menu fits the header at " + width);
+      assert.deepEqual(nav.targets, ["/downloads", "/#buy", "/guide", "/developers", "/fund", "/support"].sort());
+      assert.ok(nav.inside && nav.clear, "The menu fits at " + width);
+      if (width <= 820) await evaluate("document.querySelector('.mast-menu summary').click()");
       const ratio = await evaluate("document.documentElement.scrollHeight/innerHeight");
       console.log("screens at " + width + "x" + height + " " + ratio.toFixed(2));
       assert.ok(ratio <= maxScreens, "Page within its budget at " + width);
@@ -305,7 +312,7 @@ async function main() {
     assert.ok(storeButtons.every(button => button.imageLoaded && button.touchHeight >= 44), "Store buttons show their artwork with a full touch target");
     assert.equal(storeButtons[0].href, "https://testflight.apple.com/join/M3JucFNy");
     assert.equal(storeButtons[2].href, "https://testflight.apple.com/join/8whkd38v");
-    assert.equal(storeButtons[3].availability, "Public beta pending");
+    assert.equal(storeButtons[3].availability, "Invite required");
 
     // the install guide: its own page, linked from where to get cards, publishing the tracked CAP's hash
     await viewport(1440, 900);
@@ -343,8 +350,22 @@ async function main() {
     for (const [page, sections, minItems] of [["/faq.html", 5, 21], ["/developers.html", 10, 0], ["/ops-service.html", 9, 0], ["/support.html", 4, 0], ["/privacy.html", 9, 0], ["/terms.html", 8, 0]]) {
       // the host serves /faq for /faq.html, as it does /guide; the local preview serves the file name
       await send("Page.navigate", { url: origin + page });
-      await until("location.pathname.replace(/\\.html$/,'')===" + JSON.stringify(page.replace(".html", "")) + "&&document.readyState==='complete'&&!!document.querySelector('.guide-doc')", page + " loads");
-      assert.equal(await evaluate("document.querySelectorAll('.guide-doc > section').length"), sections, page + " has its sections");
+      const isSupport = page === "/support.html";
+      const content = isSupport ? "#answers" : ".guide-doc";
+      const expectedPath = page.replace(".html", "");
+      await until("location.pathname.replace(/\\.html$/,'')===" + JSON.stringify(expectedPath) + "&&document.readyState==='complete'&&!!document.querySelector(" + JSON.stringify(content) + ")", page + " loads");
+      const sectionSelector = isSupport ? "#answers, #email, #community, #other" : ".guide-doc > section";
+      assert.equal(await evaluate("document.querySelectorAll(" + JSON.stringify(sectionSelector) + ").length"), sections, page + " has its sections");
+      if (page === "/ops-service.html") {
+        const composePath = await evaluate("document.querySelector('main a[download]').getAttribute('href')");
+        const release = await evaluate("document.querySelector('.compose-release').href");
+        const compose = await fetch(new URL(composePath, origin));
+        assert.equal(compose.status, 200, "Operators can download the Compose file");
+        const image = (await compose.text()).match(/ghcr\.io\/cashucard\/ops-service:([\d.]+)@sha256:[0-9a-f]{64}/);
+        assert.ok(image, "The downloadable manifest pins an immutable Ops image");
+        assert.equal(release, "https://github.com/cashucard/cashucard/releases/tag/ops-v" + image[1],
+          "The guide links the release in the Compose download");
+      }
       if (page === "/developers.html") {
         const installs = await evaluate(`[...document.querySelectorAll('#sdks li')].map(item => ({
           command: item.querySelector('pre code').textContent,
