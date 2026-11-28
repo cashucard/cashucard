@@ -295,14 +295,17 @@ async function main() {
         label: (link.innerText.trim() || image?.alt || "").replace(/\\s+/g, " "),
         imageLoaded: Boolean(image?.complete && image.naturalWidth),
         touchHeight: link.getBoundingClientRect().height,
-        availability: note?.textContent
+        availability: note?.textContent,
+        href: link.href
       };
     })`);
     assert.deepEqual(storeButtons.map(button => button.label), [
-      "Join the beta on TestFlight", "Get it on Google Play", "Check status on TestFlight", "Invited testers Google Play"
+      "Join the beta on TestFlight", "Get it on Google Play", "Join the beta on TestFlight", "Invited testers Google Play"
     ]);
     assert.ok(storeButtons.every(button => button.imageLoaded && button.touchHeight >= 44), "Store buttons show their artwork with a full touch target");
-    assert.deepEqual(storeButtons.slice(2).map(button => button.availability), ["Public beta in review", "Public beta pending"]);
+    assert.equal(storeButtons[0].href, "https://testflight.apple.com/join/M3JucFNy");
+    assert.equal(storeButtons[2].href, "https://testflight.apple.com/join/8whkd38v");
+    assert.equal(storeButtons[3].availability, "Public beta pending");
 
     // the install guide: its own page, linked from where to get cards, publishing the tracked CAP's hash
     await viewport(1440, 900);
